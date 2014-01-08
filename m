@@ -1,61 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jan 2014 21:32:58 +0000
-Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
-In-Reply-To: <20140107085930.GD12346@S2101-09.ap.freescale.net>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
- <20140107085930.GD12346@S2101-09.ap.freescale.net>
-Message-ID: <20140108213258.GS27432@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 8 Jan 2014 13:33:35 -0800
+Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
+In-Reply-To: <20140108210228.GO27432@n2100.arm.linux.org.uk>
+References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
+ <20140108143529.GB14122@mudshark.cambridge.arm.com>
+ <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
+ <20140108192028.GM27432@n2100.arm.linux.org.uk>
+ <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+ <20140108210228.GO27432@n2100.arm.linux.org.uk>
+Message-ID: <CAD=FV=WV+1S65zwKRAuOfSnWzWxT_NNpYHUcj6bVyyRNXUfcGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 04:59:35PM +0800, Shawn Guo wrote:
-> On Thu, Jan 02, 2014 at 09:28:03PM +0000, Russell King wrote:
-> > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > index e75e11b36dff..0e005f21d241 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > @@ -62,6 +62,12 @@
-> >  		};
-> >  	};
-> >  
-> > +	imx-drm {
-> > +		compatible = "fsl,imx-drm";
-> > +		crtcs = <&ipu1 0>, <&ipu1 1>;
-> > +		connectors = <&ldb>;
-> > +	};
-> > +
-> 
-> While the change works fine on imx6dl, it breaks LVDS support on imx6q
-> right away.
-> 
-> imx-ipuv3 2400000.ipu: IPUv3H probed
-> imx-ipuv3 2800000.ipu: IPUv3H probed
-> [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [drm] No driver support for vblank timestamp query.
-> imx-drm imx-drm.16: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
-> imx-drm imx-drm.16: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
-> imx-drm imx-drm.16: failed to bind ldb.10 (ops imx_ldb_ops): -517
-> 
-> Because we have 4 crtcs for lvds-channel on imx6q while imx-drm master
-> defines only 2 in there, the imx_drm_encoder_parse_of() call from
-> imx_ldb_register() will always return -EPROBE_DEFER.
-> 
->         lvds-channel at 0 {
->                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
->         };
-> 
->         lvds-channel at 1 {
->                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
->         };
+Russell,
 
-This is why some help would be useful here - I think I got these right
-but I've no way to check them.
+On Wed, Jan 8, 2014 at 1:02 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 08, 2014 at 11:43:29AM -0800, Doug Anderson wrote:
+>> Olof came up with the idea that you could update the RW firmware
+>> (affects initial boot) and then cache away the value and restore it in
+>> the kernel after resume.  That would still require a kernel patch but
+>> perhaps a less objectionable one.  ...of course if writing this
+>> register is a problem in secure mode then maybe that patch would be
+>> NAKed anyway.
+>
+> It's not a problem in secure mode, since secure mode will have access
+> to the register.  It's the non-secure mode where various registers
+> either ignore writes, or they trigger an exception that are the problem.
+>
+> Consider what would happen if an exception were to be triggered when no
+> exception handlers were installed (eg, because the MMU is not enabled.)
 
-Can you confirm that adding all four is the right thing not only for
-the imx6q but also the imx6dl sabresd please?
+OK, good to know.  ...so if someone wanted to code up this patch and
+send upstream they would be able to.  :)
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+-Doug
