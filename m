@@ -1,36 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 13:55:37 +0100
-Subject: [PATCH v4 1/3] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
- <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201401081355.38293.arnd@arndb.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 8 Jan 2014 13:58:22 +0100
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <52CD434E.6030906@codethink.co.uk>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <52CD434E.6030906@codethink.co.uk>
+Message-ID: <CAMuHMdV+UAwYoFp=Ex=9jkL4D+mVZYfDGnJdRUsYZfOEm+RGCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Gregory CLEMENT wrote:
-> diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
-> new file mode 100644
-> index 000000000000..31654252fe35
-> --- /dev/null
-> +++ b/include/linux/mvebu-soc-id.h
-> +#ifdef CONFIG_ARCH_MVEBU
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
-> +#else
-> +static inline int mvebu_get_soc_id(u32 *dev, u32 *rev)
-> +{
-> +	return -1;
-> +}
-> +#endif
-> +
-> +#endif /* __LINUX_MVEBU_SOC_ID_H */
+On Wed, Jan 8, 2014 at 1:23 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+>> @@ -378,23 +380,38 @@ static int rcar_thermal_probe(struct platform_device
+>> *pdev)
+>>         spin_lock_init(&common->lock);
+>>         common->dev = dev;
+>>
+>> +       common->clk = devm_clk_get(&pdev->dev, NULL);
+>> +       if (IS_ERR(common->clk)) {
+>> +               dev_err(&pdev->dev, "cannot get clock\n");
+>> +               return PTR_ERR(common->clk);
+>> +       }
+>> +
+>> +       ret = clk_prepare(common->clk);
+>> +       if (ret < 0) {
+>> +               dev_err(&pdev->dev, "unable to prepare clock\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       clk_enable(common->clk);
+>> +
+>>         pm_runtime_enable(dev);
+>>         pm_runtime_get_sync(dev);
+>>
+>>         irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>>         if (irq) {
+>> -               int ret;
+>> +               int ret2;
+>>
+>>                 /*
+>>                  * platform has IRQ support.
+>>                  * Then, drier use common register
+>>                  */
+>>
+>> -               ret = devm_request_irq(dev, irq->start, rcar_thermal_irq,
+>> 0,
+>> -                                      dev_name(dev), common);
+>> -               if (ret) {
+>> +               ret2 = devm_request_irq(dev, irq->start, rcar_thermal_irq,
+>> 0,
+>> +                                       dev_name(dev), common);
+>> +               if (ret2) {
+>>                         dev_err(dev, "irq request failed\n ");
+>> -                       return ret;
+>> +                       ret = ret2;
+>> +                       goto error_unpm;
+>>                 }
+>
+> I'd suggest not renaming ret2 and just use the original ret.
 
-With the quirk handling in patch 3, I think we should remove the public interface
-and EXPORT_SYMBOL(), as well as move this header file into mach-mvebu.
+I did that because the for loop after that block depends on ret still being
+-ENODEV. Upon closer look, I did break that myself by assigning it
+the return value of clk_prepare().
+So I'll use the original ret, and reset it to -ENODEV before the for loop
+(unless we manage to fix it in pm_runtime_*()).
 
-That said, we may want to add support for the soc_bus later on (not as part of the
-stable bug fix) to make it possible to query the soc version from user space through
-the standard sysfs files.
+Gr{oetje,eeting}s,
 
-	Arnd
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
