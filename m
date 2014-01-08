@@ -1,66 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 16:59:02 +0100
-Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <201401081243.04326.arnd@arndb.de>
-References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbdDHyg4uz0tAMccB8yGxsoF4JaHocAxbV_bTJ832kbQw@mail.gmail.com>
- <201401081243.04326.arnd@arndb.de>
-Message-ID: <201401081659.03357.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 8 Jan 2014 16:59:25 +0100
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <1389174517.12612.87.camel@kazak.uk.xensource.com>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <1389174517.12612.87.camel@kazak.uk.xensource.com>
+Message-ID: <20140108155925.GA32641@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014, Linus Walleij wrote:
-> > On Tue, Jan 7, 2014 at 8:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-b> > 
-> > I was wrong about this, too much in my head. As Tomasz says,
-> > pinctrl-samsung can be used, but mandates that everything is
-> > moved over to device tree.
+On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
+> On Mon, 2014-01-06 at 23:49 +0100, Andrew Lunn wrote:
+> > Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
 > > 
-> > Probably the best thing now that I have one problem less is to
-> > leave it to the S3C maintainers to complete their DT migration?
+> > As with the QNAP 119, there are two variants, depending on which SoC
+> > has been used. They differ on Ethernet PHY addresses and number of
+> > PCIe busses.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Let me have another look first, maybe I can find an intermediate
-> step that helps you on your conquest to kill mach/gpio.h.
+> On the assumption that this is basically the same as the think you asked
+> me to test last week:
+> Tested-by: Ian Campbell <ijc@hellion.org.uk> (specifically kirkwood-ts419-6281.dtb)
+ 
+It is the same. Thanks for testing.
 
-I've asked the mighty grep and it said that these are the files
-using the contents you moved around:
+> What is the plan for the board files for the ts* platforms? Are they
+> going to go away? This seems to have happened for the Sheevaplug case,
+> which is causing some transition pain for distros (e.g.
+> http://bugs.debian.org/731345).
 
-drivers/gpio/gpio-samsung.c
-drivers/leds/leds-s3c24xx.c
-drivers/mmc/host/s3cmci.c
-sound/soc/samsung/h1940_uda1380.c
-sound/soc/samsung/neo1973_wm8753.c
-sound/soc/samsung/rx1950_uda1380.c
-sound/soc/samsung/s3c2412-i2s.c
-sound/soc/samsung/s3c24xx-i2s.c
-sound/soc/samsung/smartq_wm8987.c
+We plan to make them go away. We are not quite there yet, there are
+still a couple of boards which don't have DT files. But we are working
+on those.
+ 
+> The big issue for the ts devices is that each board file seems to be
+> splitting into two DTB files so in order to handle upgrades we need to
+> be able to detect which of the two variants we need, both when running
+> the previous board-file kernel and when running the DT version. Any
+> advice? You previously pointed me to a string in the dmesg but this
+> might not be reliable if the early boot messages have gone from the
+> circular buffer and in any case I'm not sure how wise it is to rely on
+> parsing those.
+> 
+> It looks like the board files determine things based on
+> kirkwood_pcie_id() -- is the result of that available in userspace
+> anywhere? I suppose counting the number of PCI buses would work, not a
+> brilliant solution but given the need to work with board file kernels
+> too maybe that's the best option.
 
-The symbols used in these drivers are:
+This is an issue, which has been discussed a bit recently while fixing
+an i2c issues on Marvell XP SoCs. As far as i know, there is no
+reliable export of the version field. It might be available from
+lspci, but so far i've not seen it. I will look into this in the next
+few days.
 
-S3C....GP.()
-S3C_GPIO_END
-S3C_GPIO_PULL_.*
-S3C_GPIO_SFN()
-s3c_gpio_cfgall_range()
-s3c_gpio_setpull()
+> The other issue I spotted is
+> that /dev/input/by-path/platform-gpio-keys-event has
+> become /dev/input/by-path/platform-gpio_keys.3-event. Is it considered
+> valid for a by-path name to change? In particular the 3 here is
+> apparently the node depth in the DTB, which doesn't make much logical
+> sense as a "path" in this context I don't think (I expect it to be some
+> sort of path through the hardware buses, perhaps my expectation is
+> wrong?).
 
-which is basically all of the mach/gpio.h file, plus a few small parts of
-the plat/gpio-cfg.h file. The rest of plat/gpio-cfg.h however is used in
-board files to call into the gpio-samsung.c driver, so we still need 
-the header file for those, until the board files get replaced with DT
-descriptions using the pinctrl interface.
+To be honest, i've no idea about this. I hope somebody else will
+answer. If not, we might need to ask on the input mailing list.
 
-I think it would be worthwhile to go ahead and make all inclusions of
-the plat/gpio-cfg.h file explicit, and remove it from mach/gpio.h, that
-part should be simple enough and helpful at the same time. Besides the
-leds-s3c24xx.c and gpio-samsung.c files we already talked about, I think
-it's only s3cmci.c, s3c2412-i2s.c and s3c24xx-i2s.c that still need this
-outside of mach-s3c*.
-
-The correct way to get rid of S3C...._GP. and S3C_GPIO_END would be to
-pass the GPIO numbers from platform code in platform_data pointers.
-It's not hard to do, but tedious to get right for the seven drivers
-that need them.
-
-	Arnd
+	Andrew
