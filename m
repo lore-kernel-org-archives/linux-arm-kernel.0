@@ -1,52 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 8 Jan 2014 16:13:39 +0200
-Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
-In-Reply-To: <20140107235951.GH5074@atomide.com>
-References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
- <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
- <20140107235951.GH5074@atomide.com>
-Message-ID: <52CD5D13.9090806@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Jan 2014 15:16:37 +0100
+Subject: [PATCH v4 1/3] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <201401081355.38293.arnd@arndb.de>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
+ <201401081355.38293.arnd@arndb.de>
+Message-ID: <52CD5DC5.2030305@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-01-08 01:59, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [131230 05:21]:
->> The omapfb driver uses dma_alloc to reserve memory for the framebuffers.
->> However, on some use cases, even when CMA is in use, it's quite probable
->> that omapfb fails to allocate the fb, either due to not enough free dma
->> memory, fragmented dma memory, or CMA failing to make enough contiguous
->> space.
->>
->> This patch adds a kernel cmdline parameter 'omapfb_vram' which can be
->> used to give the size of a memory area reserved exclusively for omapfb,
->> and optionally a physical address where the memory area is reserved.
->>
->> The memory area is reserved with memblock, and assigned to omapfb with
->> dma_declare_coherent_memory. The dma_alloc function will first try to
->> allocate the fb from the coherent memory area, and if that fails, it'll
->> use the normal method of allocation.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Cc: Ivaylo Dimitrov <freemangordon@abv.bg>
+On 08/01/2014 13:55, Arnd Bergmann wrote:
+> On Tuesday 07 January 2014, Gregory CLEMENT wrote:
+>> diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
+>> new file mode 100644
+>> index 000000000000..31654252fe35
+>> --- /dev/null
+>> +++ b/include/linux/mvebu-soc-id.h
+>> +#ifdef CONFIG_ARCH_MVEBU
+>> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
+>> +#else
+>> +static inline int mvebu_get_soc_id(u32 *dev, u32 *rev)
+>> +{
+>> +	return -1;
+>> +}
+>> +#endif
+>> +
+>> +#endif /* __LINUX_MVEBU_SOC_ID_H */
 > 
-> Feel free to queue this along with the DSS patches:
+> With the quirk handling in patch 3, I think we should remove the public interface
+> and EXPORT_SYMBOL(), as well as move this header file into mach-mvebu.
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> That said, we may want to add support for the soc_bus later on (not as part of the
+> stable bug fix) to make it possible to query the soc version from user space through
+> the standard sysfs files.
 
-Thanks.
-
-This introduces new kernel boot parameter, and I haven't really had time
-to test and think about this. If Ivaylo doesn't insist on this to be
-merged for 3.14, I'd rather leave this for 3.15 as adding new parameter
-that we need to support "forever" should be thought a bit more.
-
- Tomi
+We could do it later indeed. For having a more acceptable patch for stable I will move
+this header file into mach-mvebu.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/5a22d129/attachment.sig>
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
