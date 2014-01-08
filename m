@@ -1,70 +1,47 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 08 Jan 2014 08:56:34 -0800
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-In-Reply-To: <52CA7AFB.9010208@atmel.com>
-References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
- <52AECF56.8020508@atmel.com>
- <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
- <52CA7AFB.9010208@atmel.com>
-Message-ID: <20140108165634.27803.31368@quantum>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 8 Jan 2014 11:59:14 -0500 (EST)
+Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52CC7117.3010704@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1401081151300.1659-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nicolas Ferre (2014-01-06 01:44:27)
-> On 04/01/2014 06:11, Olof Johansson :
-> > On Mon, Dec 16, 2013 at 2:00 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> >> On 16/12/2013 00:47, Stephen Rothwell :
-> >>> Hi Simon,
+On Tue, 7 Jan 2014, Hans de Goede wrote:
+
+> Hi,
+> 
+> On 01/07/2014 10:16 PM, Arnd Bergmann wrote:
+> > On Tuesday 07 January 2014 22:03:11 Hans de Goede wrote:
+> >>>> +
+> >>>> +Optional properties:
+> >>>> + - clocks: array of clocks
+> >>>> + - clock-names: clock names "ahb" and/or "ohci"
 > >>>
-> >>> Today's linux-next merge of the renesas tree got a conflict in
-> >>> drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
-> >>> base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
-> >>> shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
-> >>>
-> >>> I fixed it up (see below) and can carry the fix as necessary (no action
-> >>> is required).
+> >>> Where does "ahb" come from, what does it mean, and how is it relevant
+> >>> to generic platforms?
 > >>
-> >> Fine for me.
-> > 
-> > Simon, Nicolas,
-> > 
-> > <mini-rant>
-> > 
-> > While a very minor issue, this should have been altogether avoided
-> > with a little more attention when applying patches. The Makefile is
-> > sorted, and you've appended new lines to the end instead of in the
-> > place they're supposed to go. Sure, others have done the same mistake
-> > in a few places but that doesn't mean we shouldn't try to keep it
-> > sorted.
-> > 
-> > The very reason _to_ sort a Makefile is to avoid these needless
-> > add-add conflicts when two people append to the same unsorted list.
-> > 
-> > Now I can't resolve it properly and move the entries when I do the
-> > same merge (and get the same conflict), because that will cause a
-> > third conflict for Stephen, and he's about to return from vacation and
-> > is going to cuss at us if we cause too many new conflicts in one day.
-> > :)
-> > 
-> > </mini-rant>
-> > 
-> > So, best choice is to keep the unsortedness now, and have Mike resort
-> > his Makefile for us at the end of the merge window. And keep a little
-> > closer eye on Makefile and Kconfig additions in the future. :)
+> >> ahb is an ARM specific thing, so your right it does not belong in a
+> >> generic driver. I'll use clk1 and clk2 as names in my next version.
+> >
+> > While AHB is a bus created by ARM Ltd, it's not actually specific
+> > to the ARM architecture. My guess is that it is in fact used on 95%
+> > of all SoCs, so I would leave it at that. For the other clock, I
+> > think that's actually the bus clock for the USB interface, so I would
+> > not call it "ohci" but rather just "usb" or "phy".
+> >
+> > I think it's important to distinguish the names and not just use
+> > "clk1" and "clk2", because the driver may actually want to access
+> > a particular clock in some scenario.
 > 
-> Totally agree in keeping a Makefile sorted, when it is already sorted.
-> What I recall having thought when I had seen this Makefile is: well this
-> one must be of the "append your changes to the end" type...
-> 
-> Anyway be sure that I will pay attention to this.
+> The idea here is to have a generic driver, if a driver needs to know
+> about a specific clock, it will likely be another device specific
+> driver and it can use its own dt-bindings and clock names. I believe
+> that for a generic driver meant to cover common hardware configs,
+> simply having X clks and then on power_on enabling clk1, then clk2,
+> then clk3, etc. and on power off do the same in reverse other is
+> a good approach.
 
-The file used to be sorted. I've cleaned it up locally and will apply
-the patch after I take in a few more pull requests.
+I agree.
 
-Regards,
-Mike
-
-> 
-> Bye,
-> -- 
-> Nicolas Ferre
+Alan Stern
