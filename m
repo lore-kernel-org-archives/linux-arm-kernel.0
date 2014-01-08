@@ -1,57 +1,38 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 8 Jan 2014 15:42:58 +0530
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Jan 2014 11:19:28 +0100
 Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
  information
-In-Reply-To: <20140108095652.GD6701@e106331-lin.cambridge.arm.com>
+In-Reply-To: <52CD23E0.8030400@ti.com>
 References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <1389161742-10533-2-git-send-email-rogerq@ti.com>
- <20140108095652.GD6701@e106331-lin.cambridge.arm.com>
-Message-ID: <52CD24AA.8080605@ti.com>
+ <20140108090808.GB16313@earth.universe> <52CD23E0.8030400@ti.com>
+Message-ID: <4812867.NuB3hNkV9d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wednesday 08 January 2014 15:39:36 Roger Quadros wrote:
+> > What about the other clocks acquired in drivers/mfd/omap-usb-host.c? Shouldn't
+> > all of those be provided by via the DT phandle?
+> > 
+> 
+> All those clocks are identically named across the OMAP SoCs and are unique for each
+> SoC, so providing DT phandle for all of them is not required.
+> 
+> The init_60m_fclk was renamed to l3init_60m_fclk in OMAP5, and hence the need for
+> this binding.
 
-On 01/08/2014 03:26 PM, Mark Rutland wrote:
-> On Wed, Jan 08, 2014 at 06:15:38AM +0000, Roger Quadros wrote:
->> The omap-usb-host driver expects the 60MHz functional clock
->> of the USB host module to be named as "init_60m_fclk".
->> Add this information in the DT binding document.
->>
->> CC: Lee Jones <lee.jones@linaro.org>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  Documentation/devicetree/bindings/mfd/omap-usb-host.txt | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->> index b381fa6..5635202 100644
->> --- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->> +++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
->> @@ -32,6 +32,10 @@ Optional properties:
->>  - single-ulpi-bypass: Must be present if the controller contains a single
->>    ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
->>  
->> +- clocks: phandle to 60MHz functional clock to the USB Host module.
->> +
->> +- clock-names: must be "init_60m_fclk"
->> +
-> 
-> Nit: clocks aren't just phandles, there's a clock-specifier too.
-> 
-> Also, it would be nicer if clocks was defined in terms of clock-names,
-> as it makes the relationship between clocks and clock-names clear, and
-> makes it easier to extend the list in future. Something like:
-> 
-> - clocks: a list of phandles + clock-specifiers, one for each entry in
->   clock-names
-> 
-> - clock-names: should include:
->   * "init_60m_fclk" - the 60MHz functional clock to the USB host module.
-> 
+What do you mean it was renamed? Is it a different version of the omap-usb-host
+device then?
 
-OK, I'll update it as per your suggestion.
+> > Should the clk_get be changed to of_clk_get()/of_clk_get_by_name() in the
+> > driver? This would potentially remove the need of the init_60m_fclk name.
+> > 
+> 
+> If we use of_clk_xxx() then we'll need to update DT nodes for OMAP4 and OMAP3 as
+> well to explicitly provide the clock phandle. For now we make use of the fact that
+> SoC clock data names the clock rightly i.e. "init_60m_fclk".
 
-cheers,
--roger
+I'm getting the feeling that init_60m_fclk is not the name of the clock input
+of the omap-usb-host device at all, but rather the name of a signal on the
+omap soc, which would not be an appropriate identifier for the binding.
+
+	Arnd
