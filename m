@@ -1,40 +1,30 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 8 Jan 2014 15:32:17 +0200
-Subject: [PATCH] video: imxfb: Use regulator API with LCD class for
- powering
-In-Reply-To: <20131223082842.GI26070@S2101-09.ap.freescale.net>
-References: <1387624080-15312-1-git-send-email-shc_work@mail.ru>
- <20131223082107.GF26070@S2101-09.ap.freescale.net>
- <1387787053.605757144@f413.i.mail.ru>
- <20131223082842.GI26070@S2101-09.ap.freescale.net>
-Message-ID: <52CD5361.50205@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 8 Jan 2014 14:35:02 +0100
+Subject: [PATCH] ARM: tegra: document which Dalmore revisions are supported
+In-Reply-To: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
+References: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140108133501.GC1592@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-12-23 10:28, Shawn Guo wrote:
-> On Mon, Dec 23, 2013 at 12:24:13PM +0400, Alexander Shiyan wrote:
->>> On Sat, Dec 21, 2013 at 03:08:00PM +0400, Alexander Shiyan wrote:
->>>> This patch replaces custom lcd_power() callback with
->>>> regulator API over LCD class.
->>>
->>> FYI.  Denis' effort on this already goes to v13.
->>>
->>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/285326
->>
->> Hmm, OK, but having LCD class could resolve our problems with contrast control.
->> https://www.mail-archive.com/devicetree at vger.kernel.org/msg07660.html
+On Mon, Jan 06, 2014 at 12:15:49PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> I just want to make sure you two are aware of each other's work.
+> There are a number of revisions of the Dalmore board, each with a variety
+> of incompatible SW-visible HW changes. The Dalmore DT file in the kernel
+> only supports HW revision A04. Document this in the DT file.
+> 
+> Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra114-dalmore.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-So, should I ignore this patch, or...?
-
- Tomi
-
-
+Reviewed-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/3c6e0b7e/attachment.sig>
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/dfae440f/attachment-0001.sig>
