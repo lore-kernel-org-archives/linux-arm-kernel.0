@@ -1,53 +1,75 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Jan 2014 16:21:39 +0100
-Subject: [PATCH v5 3/4] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <1389193589-18485-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140108152139.GB15182@katana>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Jan 2014 15:21:54 +0000
+Subject: [PATCH v2 3/9] devicetree: bindings: Document qcom,saw2 node
+In-Reply-To: <20140108143626.GB11753@e106331-lin.cambridge.arm.com>
+References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+ <1387845593-10050-4-git-send-email-sboyd@codeaurora.org>
+ <20140108143626.GB11753@e106331-lin.cambridge.arm.com>
+Message-ID: <20140108152154.GE11753@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 04:06:28PM +0100, Gregory CLEMENT wrote:
-> The first variants of Armada XP SoCs (A0 stepping) have issues related
-> to the i2c controller which prevent to use the offload mechanism and
-> lead to a kernel hang during boot.
+On Wed, Jan 08, 2014 at 02:36:26PM +0000, Mark Rutland wrote:
+> On Tue, Dec 24, 2013 at 12:39:47AM +0000, Stephen Boyd wrote:
+> > The saw2 binding describes the SPM/AVS wrapper hardware used to
+> > control the regulator supplying voltage to the Krait CPUs.
+> > 
+> > Cc: <devicetree@vger.kernel.org>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  .../devicetree/bindings/arm/msm/qcom,saw2.txt      | 35 ++++++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> > new file mode 100644
+> > index 0000000..1505fb8
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> > @@ -0,0 +1,35 @@
+> > +SPM AVS Wrapper 2 (SAW2)
+> > +
+> > +The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
+> > +Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
+> > +micro-controller that transitions a piece of hardware (like a processor or
+> > +subsystem) into and out of low power modes via a direct connection to
+> > +the PMIC. It can also be wired up to interact with other processors in the
+> > +system, notifying them when a low power state is entered or exited.
+> > +
+> > +PROPERTIES
+> > +
+> > +- compatible:
+> > +	Usage: required
+> > +	Value type: <string>
+> > +	Definition: shall contain "qcom,saw2". A more specific value should be
+> > +		    one of:
+> > +			 "qcom,saw2-v1"
+> > +			 "qcom,saw2-v1.1"
+> > +			 "qcom,saw2-v2"
+> > +			 "qcom,saw2-v2.1"
+> > +
+> > +- reg:
+> > +	Usage: required
+> > +	Value type: <prop-encoded-array>
+> > +	Definition: the first element specifies the base address and size of
+> > +		    the register region. An optional second element specifies
+> > +		    the base address and size of the alias register region.
+> > +
+> > +
+> > +Example:
+> > +
+> > +	regulator at 2099000 {
+> > +		compatible = "qcom,saw2";
+> > +		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+> > +	};
 > 
-> The commit introduces a new the compatible string
-> marvell,mv78230-a0-i2c for the i2c controller. When this compatible
-> string is used the driver disables the offload mechanism and the
-> kernel no more hangs on these SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: stable at vger.kernel.org
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 8be7e42aa4de..f424c0f89946 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -692,6 +692,10 @@ static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
->  	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
->  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
->  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
-> +	{
-> +		.compatible = "marvell,mv78230-a0-i2c",
-> +		.data = &mv64xxx_i2c_regs_mv64xxx
-> +	},
+> I have the same general worry as with the ACC regarding the implicit
+> relationship between CPUs and the registers controlling them, but I
+> assume that's fine for current implementations, and the binding's so
+> simple there's nothing preventing future extension.
 
-I think a oneliner entry like the entries above is easier to read, but
-that is very minor...
+Having looked at the dts files I see each CPU has its own SAW phandle,
+so the above comments are irrelevant.
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/5d478cfa/attachment.sig>
+Thanks,
+Mark.
