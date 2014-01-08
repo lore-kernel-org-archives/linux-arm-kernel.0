@@ -1,65 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Jan 2014 09:53:15 -0800
-Subject: [PATCH 4/5] arm: omap3: twl: use the new lookup method with usb
- phy
-In-Reply-To: <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <20140108175314.GC31686@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 08 Jan 2014 21:56:44 +0300
+Subject: [PATCH v4 net-next 2/4] sh_eth: Add support for r7s72100
+In-Reply-To: <1389168152-9434-3-git-send-email-horms+renesas@verge.net.au>
+References: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
+ <1389168152-9434-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <52CD9F6C.1090500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Heikki Krogerus <heikki.krogerus@linux.intel.com> [131209 07:10]:
-> Provide a complete association for the phy and it's user
-> (musb) with the new phy_lookup_table.
+Hello.
 
-This seems safe to queue via the USB list:
+On 01/08/2014 11:02 AM, Simon Horman wrote:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> This is a fast ethernet controller.
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 > ---
->  arch/arm/mach-omap2/twl-common.c | 15 ++++++---------
->  1 file changed, 6 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index b0d54da..972430b 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -91,18 +91,13 @@ void __init omap_pmic_late_init(void)
->  }
->  
->  #if defined(CONFIG_ARCH_OMAP3)
-> -struct phy_consumer consumers[] = {
-> -	PHY_CONSUMER("musb-hdrc.0", "usb"),
-> -};
-> -
-> -struct phy_init_data init_data = {
-> -	.consumers = consumers,
-> -	.num_consumers = ARRAY_SIZE(consumers),
-> +static struct phy_lookup_table twl4030_usb_lookup = {
-> +	.dev_id = "musb-hdrc.0",
-> +	.table = PHY_LOOKUP("phy-twl4030_usb.0", NULL),
->  };
->  
->  static struct twl4030_usb_data omap3_usb_pdata = {
->  	.usb_mode	= T2_USB_MODE_ULPI,
-> -	.init_data	= &init_data,
->  };
->  
->  static int omap3_batt_table[] = {
-> @@ -225,8 +220,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
->  	}
->  
->  	/* Common platform data configurations */
-> -	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
-> +	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb) {
-> +		phy_add_lookup_table(&twl4030_usb_lookup);
->  		pmic_data->usb = &omap3_usb_pdata;
-> +	}
->  
->  	if (pdata_flags & TWL_COMMON_PDATA_BCI && !pmic_data->bci)
->  		pmic_data->bci = &omap3_bci_pdata;
-> -- 
-> 1.8.5.1
-> 
+
+> Dave,
+
+> please consider this for net-next.
+
+    Dave, I'm currently reviewing this patch and there are errors still, so 
+please don't apply it yet.
+
+WBR, Sergei
