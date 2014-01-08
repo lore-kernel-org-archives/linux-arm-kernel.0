@@ -1,45 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 20:07:41 +0100
-Subject: [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <20140108185837.GI2941@lukather>
-References: <20140107220310.GD3103@lukather>
- <201401081402.22036.arnd@arndb.de> <20140108185837.GI2941@lukather>
-Message-ID: <11502088.u8KH7XkjeY@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed,  8 Jan 2014 19:12:10 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+Message-ID: <1389208330-12495-4-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 19:58:37 Maxime Ripard wrote:
-> > I think it's a pretty cool idea. Have you considered integrating this with
-> > the impedence-matcher project at
-> > 
-> > https://github.com/zonque/pxa-impedance-matcher ?
-> > 
-> > That one basically does the same thing for atags-based boot loaders and I
-> > would guess that parts of the implementation can be shared as well, plus
-> > the combination could support a wider range of devices.
-> 
-> Yep, I've considered it at first. Actually, I even took some bits out
-> of it to use them.
-> 
-> But I thought this would be too far off the pxa-impedance-matcher to
-> bother trying to fit it in. IIRC, pxa-impedance-matcher is taking the
-> mach-id (mostly) to take an already existing DT and give it to the
-> kernel, while we have pretty much the opposite where we have a generic
-> mach-id, and build up the DTB from another source of information.
+From: Mark Brown <broonie@linaro.org>
 
-Yes, I understand the difference.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads.
 
-> I also integrated some fexc bits to be able to parse the script.bin
-> file, which is highly sunxi specific.
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-I believe that the pxa-impedance-matcher now also contains some other
-parts that go beyond just picking the right dtb file and interpreting
-the atags, but I don't think any of them is as complex as the fex
-parsing.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> But if Daniel's interested in merging all of this, I can totally
-> consider it more seriously.
-
-Let's see what he thinks then.
-
-	Arnd
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index e1751e0e6142..ba1e7187f19b 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -183,6 +183,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.2
