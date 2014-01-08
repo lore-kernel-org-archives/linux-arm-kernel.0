@@ -1,38 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jan 2014 09:12:28 +0900
-Subject: [PATCH -trivial 4/4] thermal: rcar: Spelling s/delaye/delay/g
-In-Reply-To: <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
- <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140108001228.GD5136@verge.net.au>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 7 Jan 2014 18:15:47 -0600
+Subject: [RESEND PATCHv8 3/4] mmc: dw_mmc-socfpga: Remove the SOCFPGA
+ specific platform for dw_mmc
+In-Reply-To: <20140107201721.GK20094@book.gsilab.sittig.org>
+References: <1389036754-7249-1-git-send-email-dinguyen@altera.com>
+ <1389036754-7249-4-git-send-email-dinguyen@altera.com>
+ <20140107201721.GK20094@book.gsilab.sittig.org>
+Message-ID: <1389140147.26863.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 07:57:16PM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> Cc: Jiri Kosina <trivial@kernel.org>
+Hi Gerhard,
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, 2014-01-07 at 21:17 +0100, Gerhard Sittig wrote:
+> On Mon, Jan 06, 2014 at 13:32 -0600, dinguyen at altera.com wrote:
+> > 
+> > ---
+> >  drivers/mmc/host/Kconfig          |    8 ---
+> >  drivers/mmc/host/dw_mmc-socfpga.c |  138 -------------------------------------
+> >  2 files changed, 146 deletions(-)
+> >  delete mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+> 
+> Isn't a Makefile affected when you remove a config option and the
+> whole source file which depends on the option?  Running
+> 
+>   git grep MMC_DW_SOCFPGA
+> 
+> on v3.13-rc7-55-gef350bb7c5e0 suggests that
+> drivers/mmc/host/Makefile needs an update as well.
 
-> ---
->  drivers/thermal/rcar_thermal.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, thanks for catching that. Will fix in v9.
+
+Dinh
 > 
-> diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
-> index a5629500723a..32d591087307 100644
-> --- a/drivers/thermal/rcar_thermal.c
-> +++ b/drivers/thermal/rcar_thermal.c
-> @@ -427,7 +427,7 @@ static int rcar_thermal_probe(struct platform_device *pdev)
->  		/* enable temperature comparation */
->  		rcar_thermal_common_write(common, ENR, 0x00030303);
->  
-> -		idle = 0; /* polling delaye is not needed */
-> +		idle = 0; /* polling delay is not needed */
->  	}
->  
->  	for (i = 0;; i++) {
-> -- 
-> 1.7.9.5
 > 
+> virtually yours
+> Gerhard Sittig
