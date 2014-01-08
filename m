@@ -1,87 +1,104 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  8 Jan 2014 16:06:27 +0100
-Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4
- board
-In-Reply-To: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed,  8 Jan 2014 16:06:25 +0100
+Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP SoCs
+Message-ID: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first variants of Armada XP SoCs (A0 stepping) have issues related
-to the i2c controller which prevent to use the offload mechanism and
-lead to a kernel hang during boot.
+Hi,
 
-This commit add quirk in the mvebu platform code to check the SoC
-version and then update the compatible string for the i2c controller
-according to the revision of the SoC. Currently only some OpenBlocks
-AX3-4 boards are known to use an A0 revision so the check is done only
-for these boards.
+Here come the 5th version of the series fixing the i2c bus hang on A0
+version of the Armada XP SoCs. It occurred on the early release of the
+OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
+(A0 stepping) have issues related to the i2c controller which prevent
+to use the offload mechanism and lead to a kernel hang during boot.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-mvebu/armada-370-xp.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+The main change are the use of marvell,mv78230-a0-i2c and that the
+function mvebu_get_soc_id() is now local to mach-mvebu.
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index e2acff98e750..0f61a4f22fb5 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -21,6 +21,7 @@
- #include <linux/clocksource.h>
- #include <linux/dma-mapping.h>
- #include <linux/mbus.h>
-+#include <linux/slab.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -28,6 +29,7 @@
- #include "armada-370-xp.h"
- #include "common.h"
- #include "coherency.h"
-+#include "mvebu-soc-id.h"
- 
- static void __init armada_370_xp_map_io(void)
- {
-@@ -45,8 +47,38 @@ static void __init armada_370_xp_timer_and_clk_init(void)
- #endif
- }
- 
-+static void __init i2c_quirk(void)
-+{
-+	struct device_node *np;
-+	u32 dev, rev;
-+
-+	/*
-+	 * Only revisons more recent than A0 support the offload
-+	 * mechanism. We can exit only if we are sure that we can
-+	 * get the SoC revision and it is more recent than A0.
-+	 */
-+	if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
-+		return;
-+
-+	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c") {
-+		struct property *new_compat;
-+
-+		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
-+
-+		new_compat->name =  kstrdup("compatible", GFP_KERNEL);
-+		new_compat->length =  sizeof("marvell,mv78230-a0-i2c");
-+		new_compat->value =  kstrdup("marvell,mv78230-a0-i2c",
-+						GFP_KERNEL);
-+
-+		of_update_property(np, new_compat);
-+	}
-+	return;
-+}
-+
- static void __init armada_370_xp_dt_init(void)
- {
-+	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
-+		i2c_quirk();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
+The first patch add a mean to detect the SoCs version at run-time and
+the second one use this feature in the driver.
+
+The 3 first patches should be applied on 3.13-rc and on stable kernel
+3.12 as it fixes a regression introduce by the commit 930ab3d403ae
+"i2c: mv64xxx: Add I2C Transaction Generator support".
+
+The first patch could be latter be extend to also be used with dove,
+kirkwood, orion5x and mv78x00 when there will be merged in mvebu and
+even expose the SoC ID and revision to userspace.
+
+Jason, do you still agree to take the series once Wolfram have given
+his acked-by?
+
+Thanks,
+
+Gregory
+
+Changelog:
+v4 -> v5:
+
+- use the marvell,mv78230-a0-i2c compatible string instead of the
+  offload-broken property.
+
+- move the mvebu-soc-id.h file into mach-mvebu
+
+- no more export the mvebu_get_soc_id() function
+
+- enable the quirk only on machines that we know may be affected, i.e.
+OpenBlocks AX3-4.
+
+v3 -> v4:
+
+- checked the offload-broken property instead of calling the
+  mvebu_get_soc_id() function in the mv64xxx_of_config() function.
+
+- added the second patch to manage the quirk and update the device
+  node with the offload-broken if needed.
+
+- removed the acked-by from Wolfram as the code have change in the 3rd
+  patch
+
+In mvebu-soc-id.c:
+ - used EXPORT_SYMBOL_GPL instead of EXPORT_SYMBOL
+
+ - used core_initcall instead of arch_initcall to be called earlier
+   enough.
+
+v2 -> v3:
+
+- fixed typo in the comments added in i2c-mv64xxx.c
+
+- used pr_fmt instead of %s __func__ in all the pr_* functions
+
+- added a check on the pointer returned by of_get_next_child()
+
+- added a return immediately after the 1st check to be able to get rid
+  of indenting the entire function code inside the if { ... } block.
+
+v1 -> v2:
+
+- Changed the way to test the return of the function mvebu_get_soc_id
+  in order to make it clearer.
+
+- Removed the superfluous parentheses
+
+- Added Wolfram's acked-by on the 2nd patch
+
+Gregory CLEMENT (4):
+  ARM: mvebu: Add support to get the ID and the revision of a SoC
+  ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
+  i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
+  i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
+
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   2 +-
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |  32 ++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.c                 | 119 +++++++++++++++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h                 |  32 ++++++
+ drivers/i2c/busses/i2c-mv64xxx.c                   |   8 ++
+ 6 files changed, 193 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
+
 -- 
 1.8.1.2
