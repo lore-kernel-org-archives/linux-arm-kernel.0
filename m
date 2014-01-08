@@ -1,40 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 22:01:46 +0100
-Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
- late
-In-Reply-To: <20140108202407.GA28442@ulmo.nvidia.com>
-References: <20140108011957.GK5074@atomide.com> <14122609.M29raBct1E@wuerfel>
- <20140108202407.GA28442@ulmo.nvidia.com>
-Message-ID: <5253830.a53UI1vY1X@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jan 2014 21:02:28 +0000
+Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
+In-Reply-To: <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
+ <20140108143529.GB14122@mudshark.cambridge.arm.com>
+ <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
+ <20140108192028.GM27432@n2100.arm.linux.org.uk>
+ <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+Message-ID: <20140108210228.GO27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 21:24:08 Thierry Reding wrote:
-> 
-> The problem with devres, or any other solution for that matter, is that
-> for the cases where we'd need something like this (that is, statically
-> allocated devices in board setup code) we don't have a fully initialized
-> struct device. We need at least device_initialize() to have been called
-> before devres can be used. Therefore we still need some sort of lookup
-> table that can be used to seed devres objects. Also devres will go away
-> completely when a driver is unloaded, so it'll have to be repopulated
-> everytime.
-> 
-> I don't think that would buy us much over a simple table lookup.
+On Wed, Jan 08, 2014 at 11:43:29AM -0800, Doug Anderson wrote:
+> Olof came up with the idea that you could update the RW firmware
+> (affects initial boot) and then cache away the value and restore it in
+> the kernel after resume.  That would still require a kernel patch but
+> perhaps a less objectionable one.  ...of course if writing this
+> register is a problem in secure mode then maybe that patch would be
+> NAKed anyway.
 
-I would think we can come up with a way to add data to a device that
-ends up in devres by the time the device gets registered. The question
-is more whether you want a global table (or a set of global tables
-for that matter) or rather have all the data local to the devices
-you register. I generally prefer the latter.
+It's not a problem in secure mode, since secure mode will have access
+to the register.  It's the non-secure mode where various registers
+either ignore writes, or they trigger an exception that are the problem.
 
-There is an interesting question about what subsystems you'd want to
-include in this mechanism. We have a growing number of subsystems
-that want data represented in DT (clock, regulator, dmaengine, reset,
-led, pwm, irq, iommu, ...), most of which don't have a 'struct resource'
-equivalent. We could either try to create something generic enough
-to easily cover all of them, or we declare that if you actually want
-to use all of them you should really use DT, and we make it hard to
-add another subsystem specific lookup mechanism.
+Consider what would happen if an exception were to be triggered when no
+exception handlers were installed (eg, because the MMU is not enabled.)
 
-	Arnd
+> That's one I didn't think about, you're right.  ...but we're really
+> getting into hypothetical situations here.  Are there any r2p0
+> products that have such a fix (and thus require a latency of >= 4)?
+
+Really, we can't know, because this kind of information is dependent on
+the SoC, and probably such customisations are only knowable via NDAs.
+
+However, I do know of some A9 CPUs where exactly this kind of thing has
+happened - where various selected silicon bugs have been fixed but the
+revision still reports the same as one with all those bugs.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
