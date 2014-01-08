@@ -1,25 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jan 2014 09:25:40 +0900
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
-Message-ID: <20140108002540.GE5136@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Jan 2014 16:39:28 -0800
+Subject: [PATCH 0/4] ARM: OMAP: raw read and write endian fix
+In-Reply-To: <CAArO44vC4WKGHSqHX3+Mo5+jcNuyJLkh94+SPd4H+aZYAroYzw@mail.gmail.com>
+References: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAArO44vC4WKGHSqHX3+Mo5+jcNuyJLkh94+SPd4H+aZYAroYzw@mail.gmail.com>
+Message-ID: <20140108003927.GJ5074@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 05:59:01PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com> wrote:
-> > Geert, could you please verify that the series fixes your QSPI clock issues
-> > with the Koelsch board ?
-> >
-> > Laurent Pinchart (2):
-> >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
-> >   clk: shmobile: rcar-gen2: Fix qspi divisor
-> 
-> Thanks, both:
-> 
-> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+* Taras Kondratiuk <taras.kondratiuk@linaro.org> [131223 10:20]:
+> On 23 December 2013 20:10, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
+> > This series does trivial replacement of __raw_xxx functions with xxx_relaxed
+> > endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
+> > Some code here most probably won't be used in BE mode (like debug-leds for
+> > OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
+> > completely and simplify future grep'ing for new __raw_xxx() entries.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Sorry for the delay on these, applying into omap-for-v3.14/be.
+These are trivial, and it's actually nice that you left out the
+assembly related changes as those should be acked by the PM
+people in case there are some issues dealing with the ROM code
+etc.
+
+Regards,
+
+Tony
