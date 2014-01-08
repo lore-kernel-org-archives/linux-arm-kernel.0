@@ -1,33 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 22:37:36 +0100
-Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM
- conversion
-In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201401082237.36626.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Jan 2014 21:38:13 +0000
+Subject: [PATCH v3 7/7] devicetree: bindings: Document PM8921/8058 PMICs
+In-Reply-To: <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
+References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
+ <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140108213813.GC18611@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 December 2013, Stephen Boyd wrote:
-> This is a rework of patches sent a months back by Rohit[1].
-> The goal of these patches is to add support for SMP and (basic)
-> hotplug on MSM based SoCs. To get there, we add support for a
-> generic way to hook in SMP/hotplug support code based on DT. To
-> show how it's used, we convert the MSM8660 SMP support code over
-> to the new method. After that we add support for the rest of the
-> upstream MSM SoCs (note these patches are piled high on top of
-> Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
-> but this should only matter to the MSM maintainers).
+> PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
+> devices respectively. They contain subdevices such as keypads,
+> RTCs, regulators, clocks, etc.
 > 
-> This is one of the last items of code that still requires us to have
-> a mach directory and a machine descriptor. We should be able to move
-> the hotplug/smp code out of mach directories if this approach is
-> accepted.
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
 
-The implementation looks ok to me, but I wonder whether on a global
-scale we want to tie it more closely to the cpuidle implementations.
-We already have a drivers/cpuidle framework, and while I admit
-that I'm not familiar with the code in there, I would assume that
-the smp operations and the cpuidle code usually go hand in hand.
+Just waiting on the Ack for this one now.
 
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
