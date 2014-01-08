@@ -1,92 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  8 Jan 2014 10:37:50 -0800
-Subject: [PATCH v3 7/7] devicetree: bindings: Document PM8921/8058 PMICs
-In-Reply-To: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
-References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 8 Jan 2014 10:38:36 -0800
+Subject: [PATCH v2] ARM: imx: select ARCH_HAS_CPUFREQ for iMX6SL
+In-Reply-To: <20140108144056.GD10725@S2101-09.ap.freescale.net>
+References: <1389148163-5243-1-git-send-email-john.tobias.ph@gmail.com>
+ <20140108144056.GD10725@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYMU2K2q5nU-PyoVMNk0ivQdsLrsKg=uKQcu5aPfcnp6GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
-devices respectively. They contain subdevices such as keypads,
-RTCs, regulators, clocks, etc.
+That's fine with me. We can save two lines in the file.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
-new file mode 100644
-index 000000000000..e3fe625ffd58
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
-@@ -0,0 +1,63 @@
-+Qualcomm PM8xxx PMIC multi-function devices
-+
-+PROPERTIES
-+
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be one of:
-+		    "qcom,pm8058"
-+		    "qcom,pm8921"
-+
-+- #address-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 1
-+
-+- #size-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 0
-+
-+- interrupts:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: specifies the interrupt that indicates a subdevice
-+		    has generated an interrupt (summary interrupt). The
-+		    format of the specifier is defined by the binding document
-+		    describing the node's interrupt parent.
-+
-+- #interrupt-cells:
-+	Usage: required
-+	Value type : <u32>
-+	Definition: must be 2. Specifies the number of cells needed to encode
-+		    an interrupt source. The 1st cell contains the interrupt
-+		    number. The 2nd cell is the trigger type and level flags
-+		    encoded as follows:
-+
-+			1 = low-to-high edge triggered
-+			2 = high-to-low edge triggered
-+			4 = active high level-sensitive
-+			8 = active low level-sensitive
-+
-+- interrupt-controller:
-+	Usage: required
-+	Value type: <empty>
-+	Definition: identifies this node as an interrupt controller
-+
-+EXAMPLE
-+
-+	pmicintc: pmic at 0 {
-+		compatible = "qcom,pm8921";
-+		interrupts = <104 8>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pwrkey {
-+			compatible = "qcom,pm8921-pwrkey";
-+			interrupt-parent = <&pmicintc>;
-+			interrupts = <50 1>, <51 1>;
-+		};
-+	};
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> On Jan 8, 2014, at 6:40 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> On Tue, Jan 07, 2014 at 06:29:23PM -0800, John Tobias wrote:
+>> iMX6SL now supports the cpufreq scaling by re-using the imx6q-cpufreq driver.
+>> By adding it, the user has the capability to select the said driver without
+>> depending it to SOC_IMX6Q.
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>> Changes since v1:
+>> - Fix typo in commit log
+>> - Added Shawn Guo on Cc
+>>
+>> arch/arm/mach-imx/Kconfig | 1 +
+>> 1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index 7a6e6f7..704e5ae 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -808,6 +808,7 @@ config SOC_IMX6Q
+>>
+>> config SOC_IMX6SL
+>>    bool "i.MX6 SoloLite support"
+>> +    select ARCH_HAS_CPUFREQ
+>
+> Since we will eventually enable CPUFREQ and OPP for most of the
+> platforms, maybe we should just move selection of ARCH_HAS_CPUFREQ,
+> ARCH_HAS_OPP and PM_OPP into 'config ARCH_MXC'?
+>
+> Shawn
+>
+>>    select ARM_ERRATA_754322
+>>    select ARM_ERRATA_775420
+>>    select ARM_GIC
+>> --
+>> 1.8.3.2
+>
