@@ -1,56 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Jan 2014 19:29:06 +0100
-Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <1389200137.27473.6.camel@kazak.uk.xensource.com>
-References: <20140107220310.GD3103@lukather>
- <1389200137.27473.6.camel@kazak.uk.xensource.com>
-Message-ID: <20140108182906.GH2941@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Jan 2014 18:30:06 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+References: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140108183006.GC9724@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
-> On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
-> > Another nice thing about it is that a FEX-to-DT compiler comes at no
-> > cost afterwards. Since dtc is able to generate a DTS from
-> > /proc/device-tree, you can easily generate a DTS for your previously
-> > non-supported board using
-> > 
-> >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
-> 
-> I wonder if it might also be useful to compile this as a normal user
-> space application which takes the fex and produces the dtb (or dts)?
+On Wed, Jan 08, 2014 at 05:10:10PM +0000, Mark Brown wrote:
 
-At the moment, no, libfdt only operates on DTB, so we would have to
-chain this somehow with dtc to at least do the DTB to DTS conversion I
-guess.
+[...]
 
-It's not something that I'm pretty fond of either. Or, I don't really
-see the benefit of it.
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> new file mode 100644
+> index 000000000000..853544f30a8b
+> --- /dev/null
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -0,0 +1,92 @@
+> +/*
+> + * arch/arm64/kernel/topology.c
+> + *
+> + * Copyright (C) 2011,2013 Linaro Limited.
+> + *
+> + * Based on the arm32 version written by Vincent Guittot in turn based on
+> + * arch/sh/kernel/topology.c
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/init.h>
+> +#include <linux/percpu.h>
+> +#include <linux/node.h>
+> +#include <linux/nodemask.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
 
-Let's say that you have such tool, I'm guessing one would want it to
-mass-convert fex files to DT. But then, you'd still have to boot that
-DT to be sure that everything is working, so you're pretty much losing
-the mass-convertion thing, since you would have boot this with a
-baremetal babelfish anyway.
+Nitpick, <linux/slab.h> does not belong in this patch. There are other
+includes that should be moved to the respective patch (percpu.h ?) where
+they are actually used.
 
-> I suppose producing something upstreamable would be different/harder
-> though, since it would need to not inline/merge the dtsi file but just
-> leave the include stmt. That's probably a different tool.
-
-Yeah, dtc outputs a "flat" DTS, without any include, so you still need
-to edit it by hand to remove the common part, remove the duplicated
-pinctrl nodes, fix the phandle, etc.
-
-But most of that can be scripted I guess.
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/9d418e5e/attachment.sig>
+Lorenzo
