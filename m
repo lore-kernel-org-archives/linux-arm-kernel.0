@@ -1,31 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jan 2014 09:41:57 +0900
-Subject: [PATCH 04/04 v2] ARM: shmobile: Genmai I2C-over-GPIO support
-In-Reply-To: <20131217163435.GC7071@katana>
-References: <20131217050232.727.9552.sendpatchset@w520>
- <20131217050324.727.61701.sendpatchset@w520>
- <20131217163435.GC7071@katana>
-Message-ID: <20140108004157.GH5136@verge.net.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 08 Jan 2014 01:37:27 +0100
+Subject: [PATCH 6/7] clk/samsung: add support for pll2650xx
+In-Reply-To: <CAPdUM4P9tE5ohtAb5heMRj3GGjdYrNYp5iX7u-uZySiaCikA7Q@mail.gmail.com>
+References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
+ <1419145.DZQg0ZkHVU@amdc1227>
+ <CAPdUM4P9tE5ohtAb5heMRj3GGjdYrNYp5iX7u-uZySiaCikA7Q@mail.gmail.com>
+Message-ID: <3338407.XGYaxCsdnx@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 05:34:36PM +0100, Wolfram Sang wrote:
-> On Tue, Dec 17, 2013 at 02:03:24PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Add support for the Genmai I2C bus hooked up to P1_5 and P1_4 using
-> > the i2c-gpio driver. On the bus sits a 24c128 EEPRROM.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
+On Monday 06 of January 2014 17:14:48 Rahul Sharma wrote:
+> Hi Tomasz,
 > 
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> On 19 December 2013 17:15, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Rahul,
+> >
+> > On Friday 06 of December 2013 21:26:30 Rahul Sharma wrote:
+> >> Add support for pll2650xx in samsung pll file. This pll variant
+> >> is close to pll36xx but uses CON2 registers instead of CON1.
+> >
+> > If the ops are otherwise idential, why not reuse the ops for pll36xx
+> > and use CON1 or CON2 register conditionally based on pll->type field?
+> > (Just as it is already done for pll4600, 4650 and 4650c.)
+> >
+> 
+> I verified the difference and found that  pll2650xx is fairly
+> different in terms of
+> Bit Fields, Con2 register, and additional PLL config bits than pll36xx. Due to
+> this, I have to add lot of if-else code based on pll type which
+> doesn't looks clean.
 
-Hi Magnus, Hi Wolfram,
+Fair enough.
 
-could you clarify the status of this patch for me?
-
-I believe it is reverted by "[PATCH V2 4/5] arm: shmobile: genmai: adapt
-dts to use native i2c driver".
-
-I'm fine with applying both patches at some point. But perhaps
-we can skip some dependencies by just applying a squashed version?
+Best regards,
+Tomasz
