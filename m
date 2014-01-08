@@ -1,27 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jan 2014 10:50:44 +0100
-Subject: [PATCH 3/5] pinctrl: sirf: fix the pins of sdmmc5 connected with
- TriG
-In-Reply-To: <1388717966-11703-4-git-send-email-21cnbao@gmail.com>
+Date: Wed, 8 Jan 2014 10:51:32 +0100
+Subject: [PATCH 4/5] pinctrl: sirf: add pin group for USP0 with only RX or
+ TX frame sync
+In-Reply-To: <1388717966-11703-5-git-send-email-21cnbao@gmail.com>
 References: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
- <1388717966-11703-4-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdaviWDmrpv2VrZLT7CqfzMPQXzx_s+5q-8ihPUe66Q2Rw@mail.gmail.com>
+ <1388717966-11703-5-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdYsmhguywKqZmthOTEpKzOZ3RhXg8yMSEKpNxZ-VQNehw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jan 3, 2014 at 3:59 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-> From: Bin Shi <Bin.Shi@csr.com>
+> From: Rongjun Ying <Rongjun.Ying@csr.com>
 >
-> sdmmc5 has only 3 pins CMD, CLK, DATA which are connected with CSR
-> TriG RF multi-GNSS. The hardware connection is like:
-> DATA -- GPS_SGN
-> CLK  -- GPS_RF_CLK
-> CMD  -- GPS_MAG
-> here we drop redundant pins in sdmmc5 group.
+> USP0 has multiple functions, and has RX and TX frame sync signals,
+> for some scenarios like audio PCM, we don't need both of them.
+> so here we add two possibilities for USP0 only holding one of TX
+> and RX frame sync.
 >
-> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+> Signed-off-by: Barry Song <Barry.Song@csr.com>
 
 Patch applied.
 
