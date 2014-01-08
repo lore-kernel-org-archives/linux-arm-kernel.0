@@ -1,72 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jan 2014 14:36:26 +0000
-Subject: [PATCH v2 3/9] devicetree: bindings: Document qcom,saw2 node
-In-Reply-To: <1387845593-10050-4-git-send-email-sboyd@codeaurora.org>
-References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
- <1387845593-10050-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140108143626.GB11753@e106331-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 8 Jan 2014 22:40:57 +0800
+Subject: [PATCH v2] ARM: imx: select ARCH_HAS_CPUFREQ for iMX6SL
+In-Reply-To: <1389148163-5243-1-git-send-email-john.tobias.ph@gmail.com>
+References: <1389148163-5243-1-git-send-email-john.tobias.ph@gmail.com>
+Message-ID: <20140108144056.GD10725@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 24, 2013 at 12:39:47AM +0000, Stephen Boyd wrote:
-> The saw2 binding describes the SPM/AVS wrapper hardware used to
-> control the regulator supplying voltage to the Krait CPUs.
+On Tue, Jan 07, 2014 at 06:29:23PM -0800, John Tobias wrote:
+> iMX6SL now supports the cpufreq scaling by re-using the imx6q-cpufreq driver.
+> By adding it, the user has the capability to select the said driver without
+> depending it to SOC_IMX6Q.
 > 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
 > ---
->  .../devicetree/bindings/arm/msm/qcom,saw2.txt      | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> Changes since v1:
+> - Fix typo in commit log
+> - Added Shawn Guo on Cc
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-> new file mode 100644
-> index 0000000..1505fb8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
-> @@ -0,0 +1,35 @@
-> +SPM AVS Wrapper 2 (SAW2)
-> +
-> +The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
-> +Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
-> +micro-controller that transitions a piece of hardware (like a processor or
-> +subsystem) into and out of low power modes via a direct connection to
-> +the PMIC. It can also be wired up to interact with other processors in the
-> +system, notifying them when a low power state is entered or exited.
-> +
-> +PROPERTIES
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: shall contain "qcom,saw2". A more specific value should be
-> +		    one of:
-> +			 "qcom,saw2-v1"
-> +			 "qcom,saw2-v1.1"
-> +			 "qcom,saw2-v2"
-> +			 "qcom,saw2-v2.1"
-> +
-> +- reg:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: the first element specifies the base address and size of
-> +		    the register region. An optional second element specifies
-> +		    the base address and size of the alias register region.
-> +
-> +
-> +Example:
-> +
-> +	regulator at 2099000 {
-> +		compatible = "qcom,saw2";
-> +		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
-> +	};
+>  arch/arm/mach-imx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 7a6e6f7..704e5ae 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -808,6 +808,7 @@ config SOC_IMX6Q
+>  
+>  config SOC_IMX6SL
+>  	bool "i.MX6 SoloLite support"
+> +	select ARCH_HAS_CPUFREQ
 
-I have the same general worry as with the ACC regarding the implicit
-relationship between CPUs and the registers controlling them, but I
-assume that's fine for current implementations, and the binding's so
-simple there's nothing preventing future extension.
+Since we will eventually enable CPUFREQ and OPP for most of the
+platforms, maybe we should just move selection of ARCH_HAS_CPUFREQ,
+ARCH_HAS_OPP and PM_OPP into 'config ARCH_MXC'?
 
-Acked-By: Mark Rutland <mark.rutland@arm.com>
+Shawn
 
-Thanks,
-Mark.
+>  	select ARM_ERRATA_754322
+>  	select ARM_ERRATA_775420
+>  	select ARM_GIC
+> -- 
+> 1.8.3.2
+> 
