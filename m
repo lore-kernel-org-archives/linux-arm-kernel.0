@@ -1,30 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 08 Jan 2014 09:59:39 -0800
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <20140108171544.GC14575@lee--X1>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
- <2890647.PEOApIOYyP@amdc1227> <20140108163138.27803.58310@quantum>
- <3008563.6S2kFjQKp9@amdc1227> <20140108171544.GC14575@lee--X1>
-Message-ID: <20140108175939.27803.30462@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Jan 2014 18:00:30 +0000
+Subject: [RFC 07/18] regmap: debugfs: Always create "registers" &
+ "access" files
+In-Reply-To: <1389202297.23721.33.camel@hornet>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-8-git-send-email-pawel.moll@arm.com>
+ <20131224121912.GX30815@sirena.org.uk>
+ <1389202297.23721.33.camel@hornet>
+Message-ID: <20140108180030.GR31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2014-01-08 09:15:44)
-> > I believe Lee has already applied this one, but in future, to avoid such
-> > confusion, if it's more convenient for you, I can send you any clock
-> > series as pull requests.
-> 
-> Me? I haven't applied any clk patches.
+On Wed, Jan 08, 2014 at 05:31:37PM +0000, Pawel Moll wrote:
+> On Tue, 2013-12-24 at 12:19 +0000, Mark Brown wrote:
 
-I have taken patches 1-7 into clk-next just now. I can take patch #8 as
-well but it would probably be better to send it through arm-soc?
+> > No, we need to find a better way of doing this such as checking to see
+> > if register zero is accessible in some way.  We want to avoid having
+> > those files if there's no way of populating them since this is useful
+> > information for tooling.
 
-Regards,
-Mike
+> Something like this then?
 
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+> index c5471cd..45d812c 100644
+> --- a/drivers/base/regmap/regmap-debugfs.c
+> +++ b/drivers/base/regmap/regmap-debugfs.c
+> @@ -511,7 +511,7 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+>  	debugfs_create_file("range", 0400, map->debugfs,
+>  			    map, &regmap_reg_ranges_fops);
+>  
+> -	if (map->max_register) {
+> +	if (map->max_register || regmap_readable(map, 0)) {
+
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/92af00ff/attachment.sig>
