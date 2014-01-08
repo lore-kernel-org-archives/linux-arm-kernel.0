@@ -1,37 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jan 2014 13:42:09 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
+From: pmeerw@pmeerw.net (Peter Meerwald)
+Date: Wed, 8 Jan 2014 13:50:02 +0100 (CET)
+Subject: Information about Atmel MXT224
+In-Reply-To: <52CD4376.50305@gmail.com>
+References: <52CD04F1.8090100@gmail.com>
+ <alpine.DEB.2.01.1401081228580.1454@pmeerw.net> <52CD4376.50305@gmail.com>
+Message-ID: <alpine.DEB.2.01.1401081344451.1454@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+Hello,
 
-> This passes the errata fix using a GPIO to control the RTS pin
-> on one of the AT91 chips to use gpiolib instead of the
-> AT91-specific interfaces. Also remove the reliance on
-> compile-time #defines and the cpu_* check and rely on the
-> platform passing down the proper GPIO pin through platform
-> data.
->
-> This is a prerequisite for getting rid of the local GPIO
-> implementation in the AT91 platform and move toward
-> multiplatform.
->
-> The patch also adds device tree support for getting the
-> RTS GPIO pin from the device tree on DT boot paths.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v3->v4:
+> I am in Belgium and we deal with Gleichmann & Co. Electronics in Germany to
+> have their devkit (SMT-C-T10). I have signed a NDA with them to have MXT224
+> protocol guide but they never send me Protocol Guide.
+> I will try another distributor.
 
-Hi Nicolas, I don't see this patch in linux-next, where did it
-get stuck? Something I can help with? Greg has ACKed it
-and all I think ...
+just ask harder; I got it from them
+ 
+> > something goes wrong in the initialization; the object table of the
+> > chip doesn't match the register data fed in -- the mxt224 can be a bitch
+> > and play dead
+ 
+> So what can I do ? Maybe a problem with the embedded firmware that need an
+> update (atmel_mxt_ts 0-004b: Family ID: 129 Variant ID: 1 Major.Minor.Build:
+> 2.0.AB)
 
-Yours,
-Linus Walleij
+you need to understand the object table and see what object leads to the 
+invalid object message; there is some mismatch between the driver and the 
+chip
+
+> When I do cat /proc/interrupts and I short-circuit /CHG to ground, number
+> increases so low-level handling of interrupt is working.
+
+if I remember correctly, the mxt224 does periodic interrupts (200ms?) 
+when something is wrong with the config
+
+regards, p.
+
+-- 
+
+Peter Meerwald
++43-664-2444418 (mobile)
