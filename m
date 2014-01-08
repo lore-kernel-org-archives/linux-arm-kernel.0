@@ -1,50 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Jan 2014 11:18:37 -0800
-Subject: [PATCH 0/3] omap2: Assorted GPMC cleanups
-In-Reply-To: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140108191836.GD31323@atomide.com>
+Date: Wed, 8 Jan 2014 11:18:47 -0800
+Subject: [PATCH V2 0/2] ARM: OMAP2+/dts: standardize SoC naming
+In-Reply-To: <CAGo_u6o+Lcf0wzmsSir1APd4T3A4D+GPtdRmkBM79mjW2aEGHA@mail.gmail.com>
+References: <1386204578-6018-1-git-send-email-nm@ti.com>
+ <CAGo_u6o+Lcf0wzmsSir1APd4T3A4D+GPtdRmkBM79mjW2aEGHA@mail.gmail.com>
+Message-ID: <20140108191846.GE31323@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [131027 17:52]:
-> (I'm CCing the MTD list, because GPMC is the memory controller
-> used for NOR, NAND and OneNAND devices).
+* Nishanth Menon <nm@ti.com> [140106 16:49]:
+> Hi Benoit, Tony,
 > 
-> Hi all,
+> On Wed, Dec 4, 2013 at 6:49 PM, Nishanth Menon <nm@ti.com> wrote:
+> > Originally attempted partially in [1], the missing binding were
+> > reported as part of Rob's report in [2].
 > 
-> Just a small patchset containing two small cleanups and a minor fix
-> for the GPMC memory controller. The first two are cleanups and can
-> be considered as preparation work for the fix.
-> 
-> The fix is patch 3/3: "Move legacy GPMC width setting". It makes
-> explicit use of the DT property "gpmc,device-width" and removes the
-> subsequent (and redundant) setting of the GPMC width, based in the
-> NAND bus widht.
+> Would you like me to send this series again since I do not see this in:
+> https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.14/dts
 
-Thanks and sorry for the delay. Applying these all into branch
-omap-for-v3.14/fixes-not-urgent.
+No need to and sorry for the delays. I'm applying these into
+omap-for-v3.14/fixes-not-urgent as they should not conflict with
+other DT related patches.
 
 Regards,
 
 Tony
  
-> Tested in AM335x (using DT) so I'd appreciate if someone can test using
-> a board-file, on a device with NAND flash.
+> patchwork links:
+> https://patchwork.kernel.org/patch/3286051/
+> https://patchwork.kernel.org/patch/3286061/
 > 
-> Jon: If you happen to read this, I'd like if you could take a look at
-> patch 1/3, since you were the last to touch that part of the code.
-> 
-> Thanks!
-> 
-> Ezequiel Garcia (3):
->   omap2: gpmc: Move initialization outside the gpmc_t condition
->   omap2: gpmc: Introduce gpmc_set_legacy()
->   omap2: gpmc: Move legacy GPMC width setting
-> 
->  arch/arm/mach-omap2/gpmc-nand.c | 50 +++++++++++++++++++++++------------------
->  1 file changed, 28 insertions(+), 22 deletions(-)
-> 
-> -- 
-> 1.8.1.5
-> 
+> >
+> > So, here is take two of the series, lacking an standard causes issues
+> > that was fixed such as [3]. Ideally, we should never again introduce a
+> > board file without a exact compatible SoC match.
+> >
+> > I have stayed a bit away from updating board and SoC dts files yet
+> > to look at the direction we'd like to go here. If we feel things are
+> > good, I would gladly try to clean our mess up.
+> >
+> > Nishanth Menon (2):
+> >   Documentation: dt: OMAP: explicitly state SoC compatible strings
+> >   ARM: OMAP2+: board-generic: update SoC compatibility strings
+> >
+> >  .../devicetree/bindings/arm/omap/omap.txt          |   53 ++++++++++++++++++++
+> >  arch/arm/mach-omap2/board-generic.c                |    7 +++
+> >  2 files changed, 60 insertions(+)
+> >
+> > [1] https://patchwork.kernel.org/patch/2998201/
+> > [2] http://marc.info/?l=linux-arm-kernel&m=138378029113665&w=2
+> > [3] https://patchwork.kernel.org/patch/3279281/
+> >
+> > --
+> > 1.7.9.5
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
