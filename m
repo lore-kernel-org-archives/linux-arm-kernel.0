@@ -1,87 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:47:02 +0000
-Subject: [PATCH v4 19/37] mtd: st_spi_fsm: Add a check to if the chip can
- handle an SoC reset
+Date: Wed,  8 Jan 2014 13:47:03 +0000
+Subject: [PATCH v4 20/37] mtd: st_spi_fsm: Provide a method to put the chip
+ into 32bit addressing mode
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on information we can obtain though platform specific data and/or
-chip capabilities we are able to determine whether or not we can handle
-a SoC reset or not. To find out why this is important please read the
-comment provided in the patch.
+Most Serial Flash chips support 24bit addressing as a default but more
+recent incarnations can support 32bit. Based on information provided
+though platform specific data and capabilities we can determine whether
+or not our current chip can. This patch provides a means to setup the
+FSM message sequence to put the chip into 32bit mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index fc23354..b21929b 100644
+index b21929b..e74513d 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -246,6 +246,8 @@ struct stfsm {
- 
- 	uint32_t                fifo_dir_delay;
- 	bool                    booted_from_spi;
-+	bool                    reset_signal;
-+	bool                    reset_por;
+@@ -411,6 +411,8 @@ static struct flash_info flash_types[] = {
+ 	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
  };
  
- struct stfsm_seq {
-@@ -552,6 +554,40 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
++static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
++
+ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	.data_size = TRANSFER_SIZE(8),
+ 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
+@@ -554,6 +556,23 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
  	}
  }
  
-+/*
-+ * SoC reset on 'boot-from-spi' systems
-+ *
-+ * Certain modes of operation cause the Flash device to enter a particular state
-+ * for a period of time (e.g. 'Erase Sector', 'Quad Enable', and 'Enter 32-bit
-+ * Addr' commands).  On boot-from-spi systems, it is important to consider what
-+ * happens if a warm reset occurs during this period.  The SPIBoot controller
-+ * assumes that Flash device is in its default reset state, 24-bit address mode,
-+ * and ready to accept commands.  This can be achieved using some form of
-+ * on-board logic/controller to force a device POR in response to a SoC-level
-+ * reset or by making use of the device reset signal if available (limited
-+ * number of devices only).
-+ *
-+ * Failure to take such precautions can cause problems following a warm reset.
-+ * For some operations (e.g. ERASE), there is little that can be done.  For
-+ * other modes of operation (e.g. 32-bit addressing), options are often
-+ * available that can help minimise the window in which a reset could cause a
-+ * problem.
-+ *
-+ */
-+static bool stfsm_can_handle_soc_reset(struct stfsm *fsm)
++static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
 +{
-+	/* Reset signal is available on the board and supported by the device */
-+	if (fsm->reset_signal && fsm->info->flags & FLASH_FLAG_RESET)
-+		return true;
++	struct stfsm_seq *seq = &stfsm_seq_en_32bit_addr;
++	uint32_t cmd = enter ? FLASH_CMD_EN4B_ADDR : FLASH_CMD_EX4B_ADDR;
 +
-+	/* Board-level logic forces a power-on-reset */
-+	if (fsm->reset_por)
-+		return true;
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(cmd) |
++			   SEQ_OPC_CSDEASSERT);
 +
-+	/* Reset is not properly handled and may result in failure to reboot */
-+	return false;
++	stfsm_load_seq(fsm, seq);
++
++	stfsm_wait_seq(fsm);
++
++	return 0;
 +}
 +
- /* Configure 'addr_cfg' according to addressing mode */
- static void stfsm_prepare_erasesec_seq(struct stfsm *fsm,
- 				       struct stfsm_seq *seq)
-@@ -824,6 +860,10 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
- 		goto boot_device_fail;
- 	}
- 
-+	fsm->reset_signal = of_property_read_bool(np, "st,reset-signal");
-+
-+	fsm->reset_por = of_property_read_bool(np, "st,reset-por");
-+
- 	/* Where in the syscon the boot device information lives */
- 	ret = of_property_read_u32(np, "st,boot-device-reg", &boot_device_reg);
- 	if (ret)
+ /*
+  * SoC reset on 'boot-from-spi' systems
+  *
 -- 
 1.8.3.2
