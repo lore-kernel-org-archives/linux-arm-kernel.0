@@ -1,44 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Jan 2014 11:18:03 -0800
-Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <52CD5010.6030309@ti.com>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com>
- <52BC6B16.80507@ti.com> <52BD856E.7010609@ti.com>
- <52C11284.2030500@ti.com> <20140107230733.GD5074@atomide.com>
- <20140107235514.GG5074@atomide.com> <52CD5010.6030309@ti.com>
-Message-ID: <20140108191802.GA31323@atomide.com>
+Date: Wed, 8 Jan 2014 11:18:37 -0800
+Subject: [PATCH 0/3] omap2: Assorted GPMC cleanups
+In-Reply-To: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140108191836.GD31323@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [140108 05:20]:
-> On Wednesday 08 January 2014 05:25 AM, Tony Lindgren wrote:
-> > 
-> > Oops, I noticed some errors on these:
-> > 
-> > WARNING: drivers/built-in.o(.text+0xcd0): Section mismatch in reference from the function irqcrossbar_init() to the function .init.text:crossbar_of_init()
-> > The function irqcrossbar_init() references
-> > the function __init crossbar_of_init().
-> > This is often because irqcrossbar_init lacks a __init 
-> > annotation or the annotation of crossbar_of_init is wrong.
-> > 
-> > WARNING: drivers/built-in.o(.text+0xcdc): Section mismatch in reference from the function irqcrossbar_init() to the (unknown reference) .init.rodata:(unknown)
-> > The function irqcrossbar_init() references
-> > the (unknown reference) __initconst (unknown).
-> > This is often because irqcrossbar_init lacks a __initconst 
-> > annotation or the annotation of (unknown) is wrong.
-> > 
-> > So I've dropped them for now. Care to fix up those errors and
-> > base your patches against let's say v3.13-rc5?
-> > 
->    Very Sorry for the section mismatch warning.
->    I have fixed it and pushed a new branch below based on v3.13-rc5
+* Ezequiel Garcia <ezequiel.garcia@free-electrons.com> [131027 17:52]:
+> (I'm CCing the MTD list, because GPMC is the memory controller
+> used for NOR, NAND and OneNAND devices).
 > 
->    git://github.com/Sricharanti/sricharan.git
->    branch: crossbar_3.13_rc5
+> Hi all,
+> 
+> Just a small patchset containing two small cleanups and a minor fix
+> for the GPMC memory controller. The first two are cleanups and can
+> be considered as preparation work for the fix.
+> 
+> The fix is patch 3/3: "Move legacy GPMC width setting". It makes
+> explicit use of the DT property "gpmc,device-width" and removes the
+> subsequent (and redundant) setting of the GPMC width, based in the
+> NAND bus widht.
 
-Thanks, applying again.
+Thanks and sorry for the delay. Applying these all into branch
+omap-for-v3.14/fixes-not-urgent.
 
 Regards,
 
 Tony
+ 
+> Tested in AM335x (using DT) so I'd appreciate if someone can test using
+> a board-file, on a device with NAND flash.
+> 
+> Jon: If you happen to read this, I'd like if you could take a look at
+> patch 1/3, since you were the last to touch that part of the code.
+> 
+> Thanks!
+> 
+> Ezequiel Garcia (3):
+>   omap2: gpmc: Move initialization outside the gpmc_t condition
+>   omap2: gpmc: Introduce gpmc_set_legacy()
+>   omap2: gpmc: Move legacy GPMC width setting
+> 
+>  arch/arm/mach-omap2/gpmc-nand.c | 50 +++++++++++++++++++++++------------------
+>  1 file changed, 28 insertions(+), 22 deletions(-)
+> 
+> -- 
+> 1.8.1.5
+> 
