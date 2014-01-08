@@ -1,38 +1,70 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed, 08 Jan 2014 16:55:37 +0000
-Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <20140107220310.GD3103@lukather>
-References: <20140107220310.GD3103@lukather>
-Message-ID: <1389200137.27473.6.camel@kazak.uk.xensource.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 08 Jan 2014 08:56:34 -0800
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <52CA7AFB.9010208@atmel.com>
+References: <20131216104738.6f845aabd0e3b609ed9ca170@canb.auug.org.au>
+ <52AECF56.8020508@atmel.com>
+ <CAOesGMgi3COtsr+-9B3Tt350gwBs0Qm0AjatjLWCWTeUkAP5og@mail.gmail.com>
+ <52CA7AFB.9010208@atmel.com>
+Message-ID: <20140108165634.27803.31368@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
-
-> Hence why I started to work on sunxi-babelfish. It aims at being a
-> very thin wrapper around the kernel image, that would generate an
-> uImage, with the babelfish code itself, plus the compiled DTSI we have
-> for the targetted SoCs, and finally the kernel image. During bootup,
-> babelfish will take one of these DTBs, and complete it using the
-> informations fetched from the compiled FEX file the board is feeding
-> it, before finally passing the DTB to Linux that will continue its
-> usual boot.
-
-Very cool!
-
-> [...]
-> Another nice thing about it is that a FEX-to-DT compiler comes at no
-> cost afterwards. Since dtc is able to generate a DTS from
-> /proc/device-tree, you can easily generate a DTS for your previously
-> non-supported board using
+Quoting Nicolas Ferre (2014-01-06 01:44:27)
+> On 04/01/2014 06:11, Olof Johansson :
+> > On Mon, Dec 16, 2013 at 2:00 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> >> On 16/12/2013 00:47, Stephen Rothwell :
+> >>> Hi Simon,
+> >>>
+> >>> Today's linux-next merge of the renesas tree got a conflict in
+> >>> drivers/clk/Makefile between commit 0ad6125b1579 ("clk: at91: add PMC
+> >>> base support") from the arm-soc tree and commit 10cdfe9f327a ("clk:
+> >>> shmobile: Add R-Car Gen2 clocks support") from the renesas tree.
+> >>>
+> >>> I fixed it up (see below) and can carry the fix as necessary (no action
+> >>> is required).
+> >>
+> >> Fine for me.
+> > 
+> > Simon, Nicolas,
+> > 
+> > <mini-rant>
+> > 
+> > While a very minor issue, this should have been altogether avoided
+> > with a little more attention when applying patches. The Makefile is
+> > sorted, and you've appended new lines to the end instead of in the
+> > place they're supposed to go. Sure, others have done the same mistake
+> > in a few places but that doesn't mean we shouldn't try to keep it
+> > sorted.
+> > 
+> > The very reason _to_ sort a Makefile is to avoid these needless
+> > add-add conflicts when two people append to the same unsorted list.
+> > 
+> > Now I can't resolve it properly and move the entries when I do the
+> > same merge (and get the same conflict), because that will cause a
+> > third conflict for Stephen, and he's about to return from vacation and
+> > is going to cuss at us if we cause too many new conflicts in one day.
+> > :)
+> > 
+> > </mini-rant>
+> > 
+> > So, best choice is to keep the unsortedness now, and have Mike resort
+> > his Makefile for us at the end of the merge window. And keep a little
+> > closer eye on Makefile and Kconfig additions in the future. :)
 > 
->   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
+> Totally agree in keeping a Makefile sorted, when it is already sorted.
+> What I recall having thought when I had seen this Makefile is: well this
+> one must be of the "append your changes to the end" type...
+> 
+> Anyway be sure that I will pay attention to this.
 
-I wonder if it might also be useful to compile this as a normal user
-space application which takes the fex and produces the dtb (or dts)?
+The file used to be sorted. I've cleaned it up locally and will apply
+the patch after I take in a few more pull requests.
 
-I suppose producing something upstreamable would be different/harder
-though, since it would need to not inline/merge the dtsi file but just
-leave the include stmt. That's probably a different tool.
+Regards,
+Mike
 
-Ian.
+> 
+> Bye,
+> -- 
+> Nicolas Ferre
