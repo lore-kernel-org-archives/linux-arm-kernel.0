@@ -1,53 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Jan 2014 19:58:37 +0100
-Subject: [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <201401081402.22036.arnd@arndb.de>
-References: <20140107220310.GD3103@lukather> <201401081402.22036.arnd@arndb.de>
-Message-ID: <20140108185837.GI2941@lukather>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 08 Jan 2014 20:00:02 +0100
+Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
+In-Reply-To: <20140108183418.GA12358@obsidianresearch.com>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+ <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
+ <20140108183418.GA12358@obsidianresearch.com>
+Message-ID: <52CDA032.3010804@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Jason,
 
-On Wed, Jan 08, 2014 at 02:02:21PM +0100, Arnd Bergmann wrote:
-> On Tuesday 07 January 2014, Maxime Ripard wrote:
-> 
-> > Anyway, enough talking. Any feedback is, as usual, appreciated.
-> 
-> I think it's a pretty cool idea. Have you considered integrating this with
-> the impedence-matcher project at
-> 
-> https://github.com/zonque/pxa-impedance-matcher ?
-> 
-> That one basically does the same thing for atags-based boot loaders and I
-> would guess that parts of the implementation can be shared as well, plus
-> the combination could support a wider range of devices.
+Le 08/01/2014 19:34, Jason Gunthorpe a ?crit :
+> On Wed, Jan 08, 2014 at 03:21:58PM +0100, Boris BREZILLON wrote:
+>
+>> +int of_get_nand_timings(struct device_node *np, struct nand_timings *timings)
+>> +{
+>> +	memset(timings, 0, sizeof(*timings));
+>> +	of_property_read_u32(np, "tCLS-min", &timings->tCLS_min);
+>> +	of_property_read_u32(np, "tCLH-min", &timings->tCLH_min);
+>> +	of_property_read_u32(np, "tCS-min", &timings->tCS_min);
+> [..]
+>
+> A while ago when discussing another controller it was pointed out
+> these values are all auto-probable directly from the NAND via a ONFI
+> defined GET FEATURE @0x01 query, and adding these timings to the DT
+> was NAK'd..
+>
+> Basically you set the interface to the slowest ONFI timing mode, do
+> the GET FEATURE to the NAND chip and then increase the interface speed
+> to the highest mutually supported ONFI mode.
 
-Yep, I've considered it at first. Actually, I even took some bits out
-of it to use them.
+> Is there some reason you need to encode this in the DT?
 
-But I thought this would be too far off the pxa-impedance-matcher to
-bother trying to fit it in. IIRC, pxa-impedance-matcher is taking the
-mach-id (mostly) to take an already existing DT and give it to the
-kernel, while we have pretty much the opposite where we have a generic
-mach-id, and build up the DTB from another source of information.
+What if the NAND does not support the ONFI interface (and this is
+exactly the case for the NAND available on the cubietruck board:
+H27UCG8T2ATR).
 
-I also integrated some fexc bits to be able to parse the script.bin
-file, which is highly sunxi specific.
+But I'm glag to hear about this ONFI feature :).
+I'll add a function to retrieve these timings if the NAND support
+the ONFI interface.
 
-But if Daniel's interested in merging all of this, I can totally
-consider it more seriously.
+Best Regards,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/bd63bdf9/attachment.sig>
+Boris
+>
+> Jason
