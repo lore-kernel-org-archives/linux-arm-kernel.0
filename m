@@ -1,36 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Jan 2014 16:24:30 +0100
-Subject: [PATCH 1/2] drm/panel: Add support for Samsung LTN101NT05 panel
-In-Reply-To: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
-Message-ID: <20140108152429.GG21974@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 16:28:20 +0100
+Subject: [PATCH v5 3/4] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <52CD6E1E.5040409@free-electrons.com>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140108152139.GB15182@katana> <52CD6E1E.5040409@free-electrons.com>
+Message-ID: <201401081628.21299.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 21, 2013 at 09:38:12PM +0100, Marc Dietrich wrote:
-> The Samsung LNT101NT05 10.1" WXVGA panel can be supported by the simple panel
-> driver.
+On Wednesday 08 January 2014, Gregory CLEMENT wrote:
+> On 08/01/2014 16:21, Wolfram Sang wrote:
+
+> >> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> >> index 8be7e42aa4de..f424c0f89946 100644
+> >> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> >> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> >> @@ -692,6 +692,10 @@ static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> >>      { .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+> >>      { .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> >>      { .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> >> +    {
+> >> +            .compatible = "marvell,mv78230-a0-i2c",
+> >> +            .data = &mv64xxx_i2c_regs_mv64xxx
+> >> +    },
+> > 
+> > I think a oneliner entry like the entries above is easier to read, but
+> > that is very minor...
 > 
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: David Airlie <airlied@linux.ie>
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> ---
-> This isn't strickly required to get the panel up, but Thierry suggested on IRC to
-> include it anyway, in case someone else has some use for it.
+> By using one line we would break the 80 character rule,
+> hat why I did in this way.
+> 
 
-For the record: the reason this isn't strictly needed is because there's
-an EDID that can be probed to get the video timings. But the panel still
-can be supported using the timings from the datasheet. One example where
-this would be useful is when the EDID isn't connected or simply broken.
+It's more a guideline than a strict rule. I agree that one line would
+be better here, but it's not important.
 
-That said: applied, thanks!
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/20c2e49f/attachment-0001.sig>
+	Arnd
