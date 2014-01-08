@@ -1,25 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 13:52:56 +0100
-Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
-In-Reply-To: <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
- <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201401081352.57361.arnd@arndb.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  8 Jan 2014 13:51:17 +0100
+Subject: [PATCH] driver-core: platform: Resolve DT interrupt references late
+In-Reply-To: <20140108011957.GK5074@atomide.com>
+References: <20140108011957.GK5074@atomide.com>
+Message-ID: <1389185477-507-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Gregory CLEMENT wrote:
+When devices are probed from the device tree, any interrupts that they
+reference are resolved at device creation time. This causes problems if
+the interrupt provider hasn't been registered yet at that time, which
+results in the interrupt being set to 0.
 
->  static void __init armada_370_xp_dt_init(void)
->  {
-> +       i2c_quirk();
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
+This is especially bad for platform devices because they are created at
+a very early stage during boot when the majority of interrupt providers
+haven't had a chance to be probed yet. One of the platform where this
+causes major issues is OMAP.
 
-I'd prefer to enable the quirk only on machines that we know may be affected, i.e.
-OpenBlocks AX3-4. That would make it easier in the future for everyone to figure
-out whether they need to include the quirk in their kernels or not, depending
-on whether they want to support these machines. Just a precaution in case we
-end up having lots of quirks in the long run.
+Note that this patch is the easy way out to fix a large part of the
+problems for now. A more proper solution for the long term would be to
+transition drivers to an API that always resolves resources of any kind
+(not only interrupts) at probe time.
 
-	Arnd
+For some background and discussion on possible solutions, see:
+
+	https://lkml.org/lkml/2013/11/22/520
+
+Acked-by: Rob Herring <robherring2@gmail.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Note that this is somewhat urgent and should if at all possible go into
+v3.13 before the release.
+
+ drivers/base/platform.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 3a94b799f166..c894d1af3a5e 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -13,6 +13,7 @@
+ #include <linux/string.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_device.h>
++#include <linux/of_irq.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/dma-mapping.h>
+@@ -87,7 +88,12 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+ 		return -ENXIO;
+ 	return dev->archdata.irqs[num];
+ #else
+-	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
++	struct resource *r;
++
++	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node)
++		return irq_of_parse_and_map(dev->dev.of_node, num);
++
++	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+ 
+ 	return r ? r->start : -ENXIO;
+ #endif
+-- 
+1.8.4.2
