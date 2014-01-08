@@ -1,33 +1,117 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Jan 2014 12:23:59 +0100
-Subject: [PATCH 04/04 v2] ARM: shmobile: Genmai I2C-over-GPIO support
-In-Reply-To: <20140108004157.GH5136@verge.net.au>
-References: <20131217050232.727.9552.sendpatchset@w520>
- <20131217050324.727.61701.sendpatchset@w520>
- <20131217163435.GC7071@katana> <20140108004157.GH5136@verge.net.au>
-Message-ID: <20140108112359.GA2669@katana>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Wed, 08 Jan 2014 12:24:59 +0100
+Subject: Information about Atmel MXT224
+In-Reply-To: <1389171897.588258801@f329.i.mail.ru>
+References: <52CD04F1.8090100@gmail.com> <1389171897.588258801@f329.i.mail.ru>
+Message-ID: <52CD358B.50704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> could you clarify the status of this patch for me?
-> 
-> I believe it is reverted by "[PATCH V2 4/5] arm: shmobile: genmai: adapt
-> dts to use native i2c driver".
-> 
-> I'm fine with applying both patches at some point. But perhaps
-> we can skip some dependencies by just applying a squashed version?
+On 01/08/2014 10:04 AM, Alexander Shiyan wrote:
+ > Do not forget about setup IOMUX for IRQ pin?
 
-If we keep this patch and my one on top of it, we need the PFC series.
-If we skip this patch and use my native I2C right from the beginning, we
-can skip the PFC series and have i2c support right away. I'd prefer the
-latter. I am about to push a branch to my tree that does the latter
-these minutes.
+I don't think so. I follow the same canvas than PMIC_INT. I send my 
+email too fast. The init function was incomplete. Below all I do with 
+MXT_KEY (PB16) connected to /CHG pin of MXT224.
+(Of course, PB16 (CSI_PIXCLK) is not used by another driver)
+The problem is not interrupt in Kernel. It is MXT224 that does not send 
+it. /CHG pin stay High.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/b64c65e6/attachment.sig>
+I can send you all source code of board declaration if you want.
+
+Thanks a lot.
+Ga?tan Carlier.
+
+8---------------------------------------------------------
+#define MXT_KEY                 IMX_GPIO_NR(2, 16)
+static const int imx27gc_pins[] __initconst = {
+	/* UART1 */
+	PE12_PF_UART1_TXD,
+	PE13_PF_UART1_RXD,
+	PE14_PF_UART1_CTS,
+	PE15_PF_UART1_RTS,
+	/* UART3 */
+	PE8_PF_UART3_TXD,
+	PE9_PF_UART3_RXD,
+	PE10_PF_UART3_CTS,
+	PE11_PF_UART3_RTS,
+	/* FEC */
+	PD0_AIN_FEC_TXD0,
+	PD1_AIN_FEC_TXD1,
+	PD2_AIN_FEC_TXD2,
+	PD3_AIN_FEC_TXD3,
+	PD4_AOUT_FEC_RX_ER,
+	PD5_AOUT_FEC_RXD1,
+	PD6_AOUT_FEC_RXD2,
+	PD7_AOUT_FEC_RXD3,
+	PD8_AF_FEC_MDIO,
+	PD9_AIN_FEC_MDC,
+	PD10_AOUT_FEC_CRS,
+	PD11_AOUT_FEC_TX_CLK,
+	PD12_AOUT_FEC_RXD0,
+	PD13_AOUT_FEC_RX_DV,
+	PD14_AOUT_FEC_RX_CLK,
+	PD15_AOUT_FEC_COL,
+	PD16_AIN_FEC_TX_ER,
+	PF23_AIN_FEC_TX_EN,
+	/* CSPI2 */
+	PD22_PF_CSPI2_SCLK,
+	PD23_PF_CSPI2_MISO,
+	PD24_PF_CSPI2_MOSI,
+	SPI2_SS0 | GPIO_GPIO | GPIO_OUT,
+	/* I2C1 */
+	PD17_PF_I2C_DATA,
+	PD18_PF_I2C_CLK,
+	/* I2C2 */
+	PC5_PF_I2C2_SDA,
+	PC6_PF_I2C2_SCL,
+	/* PMIC INT */
+	PMIC_INT | GPIO_GPIO | GPIO_IN,
+	/* SLCD */
+	PA6_AIN_SLCDC_DAT0,
+	PA7_AIN_SLCDC_DAT1,
+	PA8_AIN_SLCDC_DAT2,
+	PA9_AIN_SLCDC_DAT3,
+	PA10_AIN_SLCDC_DAT4,
+	PA11_AIN_SLCDC_DAT5,
+	PA12_AIN_SLCDC_DAT6,
+	PA13_AIN_SLCDC_DAT7,
+	PA25_AIN_SLCDC_CLS, /* D/C */
+	PA26_AIN_SLCDC_CS,
+	PA27_AIN_SLCDC_CLK, /* E/RD */
+	SLCDC_RESET | GPIO_GPIO | GPIO_OUT,
+	SLCDC_BL_POWER | GPIO_GPIO | GPIO_OUT,
+	SLCDC_RW | GPIO_GPIO | GPIO_OUT, /* only for manual reading operation */
+	/* MXT */
+	MXT_KEY | GPIO_GPIO | GPIO_IN, /* Key */
+	/* SSI4 */
+	PC16_PF_SSI4_FS,
+	PC17_PF_SSI4_RXD,
+	PC18_PF_SSI4_TXD,
+	PC19_PF_SSI4_CLK,
+	/* Flash Led */
+	FLASH_ENABLE | GPIO_GPIO | GPIO_OUT,
+	THT_ENABLE | GPIO_GPIO | GPIO_OUT,
+	HP_ENABLE | GPIO_GPIO | GPIO_OUT,
+	HEATING_ENABLE | GPIO_GPIO | GPIO_OUT,
+	BTNLIGHT_ENABLE | GPIO_GPIO | GPIO_OUT,
+	/* GPIO KEY */
+	GPIO_KEY1 | GPIO_GPIO | GPIO_IN,
+	GPIO_KEY2 | GPIO_GPIO | GPIO_IN,
+	GPIO_KEY3 | GPIO_GPIO | GPIO_IN,
+};
+
+static void __init imx27gc_init(void)
+{
+     mxc_gpio_setup_multiple_pins(imx27gc_pins, ARRAY_SIZE(imx27gc_pins),
+		"imx27gc");
+     ...
+     imx27gc_i2c0_devices[0].irq = gpio_to_irq(MXT_KEY);
+     i2c_register_board_info(0, imx27gc_i2c0_devices,
+         ARRAY_SIZE(imx27gc_i2c0_devices));
+         imx27_add_imx_i2c(0, &imx27gc_i2c0_data);
+     ....
+}
+8---------------------------------------------------------
