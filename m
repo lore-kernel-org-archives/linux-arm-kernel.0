@@ -1,40 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 8 Jan 2014 11:28:01 -0600
-Subject: [RFC 04/18] driver core & of: Mark of_nodes of added device as
- populated
-In-Reply-To: <1387815830-8794-5-git-send-email-pawel.moll@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 08 Jan 2014 17:31:37 +0000
+Subject: [RFC 07/18] regmap: debugfs: Always create "registers" &
+ "access" files
+In-Reply-To: <20131224121912.GX30815@sirena.org.uk>
 References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-5-git-send-email-pawel.moll@arm.com>
-Message-ID: <CAL_JsqJGQFstgFu=tpho91C0iv4eH9XSCAVKfXXQO4Z+yD-0tw@mail.gmail.com>
+ <1387815830-8794-8-git-send-email-pawel.moll@arm.com>
+ <20131224121912.GX30815@sirena.org.uk>
+Message-ID: <1389202297.23721.33.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 23, 2013 at 10:23 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> In "Device Tree powered" systems, platform devices are usually
-> massively populated with of_platform_populate() call, executed
-> at some level of initcalls, either by generic architecture
-> or by platform-specific code.
->
-> There are situations though where certain devices must be
-> created (and bound with drivers) before all the others.
-> This presents small challenge in DT-driven systems, as
-> devices explicitly created in early code would be created
-> again by of_platform_populate().
+On Tue, 2013-12-24 at 12:19 +0000, Mark Brown wrote:
+> On Mon, Dec 23, 2013 at 04:23:39PM +0000, Pawel Moll wrote:
+> > When a map covers a single register, max_register is equal
+> > to 0, so the "registers" & "access" files were not created.
+> > 
+> > This patch is removing this restriction. It should be save,
+> > as the maps not without register 0 should return false
+> > for regmap_readable(map, 0).
+> 
+> No, we need to find a better way of doing this such as checking to see
+> if register zero is accessible in some way.  We want to avoid having
+> those files if there's no way of populating them since this is useful
+> information for tooling.
 
-Isn't this already at least partially solved with the aux data
-support? I'm guessing the difference here is how the early device is
-created.
+Something like this then?
 
-> This patch tries to solve that issue in a generic way,
-> adding a "populated" flag which is set in the device_node
-> structure when a device is being created in the core.
-> Later, of_platform_populate() skips such nodes (and
-> its children) in a similar way to the non-available ones.
+diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+index c5471cd..45d812c 100644
+--- a/drivers/base/regmap/regmap-debugfs.c
++++ b/drivers/base/regmap/regmap-debugfs.c
+@@ -511,7 +511,7 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+ 	debugfs_create_file("range", 0400, map->debugfs,
+ 			    map, &regmap_reg_ranges_fops);
+ 
+-	if (map->max_register) {
++	if (map->max_register || regmap_readable(map, 0)) {
+ 		debugfs_create_file("registers", 0400, map->debugfs,
+ 				    map, &regmap_map_fops);
+ 		debugfs_create_file("access", 0400, map->debugfs,
 
-Couldn't you store a struct device ptr in struct device_node instead?
+Other possibility would be replacing max_register with registers_num,
+but it looks a massive job...
 
-In any case I'd like to see this contained within the DT code. I don't
-see why the driver core needs to be modified for a DT specific
-problem.
-
-Rob
+Pawe?
