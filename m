@@ -1,47 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Jan 2014 13:54:50 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
-Message-ID: <52CD4A9A.4010205@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 13:55:37 +0100
+Subject: [PATCH v4 1/3] ARM: mvebu: Add support to get the ID and the
+ revision of a SoC
+In-Reply-To: <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201401081355.38293.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 13:42, Linus Walleij :
-> On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 
->> This passes the errata fix using a GPIO to control the RTS pin
->> on one of the AT91 chips to use gpiolib instead of the
->> AT91-specific interfaces. Also remove the reliance on
->> compile-time #defines and the cpu_* check and rely on the
->> platform passing down the proper GPIO pin through platform
->> data.
->>
->> This is a prerequisite for getting rid of the local GPIO
->> implementation in the AT91 platform and move toward
->> multiplatform.
->>
->> The patch also adds device tree support for getting the
->> RTS GPIO pin from the device tree on DT boot paths.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v3->v4:
-> 
-> Hi Nicolas, I don't see this patch in linux-next, where did it
-> get stuck? Something I can help with? Greg has ACKed it
-> and all I think ...
+On Tuesday 07 January 2014, Gregory CLEMENT wrote:
+> diff --git a/include/linux/mvebu-soc-id.h b/include/linux/mvebu-soc-id.h
+> new file mode 100644
+> index 000000000000..31654252fe35
+> --- /dev/null
+> +++ b/include/linux/mvebu-soc-id.h
+> +#ifdef CONFIG_ARCH_MVEBU
+> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
+> +#else
+> +static inline int mvebu_get_soc_id(u32 *dev, u32 *rev)
+> +{
+> +	return -1;
+> +}
+> +#endif
+> +
+> +#endif /* __LINUX_MVEBU_SOC_ID_H */
 
-Yes, everything seemed ready. It is actually stuck in Uwe's pull-request
-which I asked for an update yesterday...
-(Re: [GIT PULL] get rid of <mach/timex.h>). Maybe we should synchronize
-each other on IRC?
+With the quirk handling in patch 3, I think we should remove the public interface
+and EXPORT_SYMBOL(), as well as move this header file into mach-mvebu.
 
-I would have liked to see it merged in linux-next soon.
+That said, we may want to add support for the soc_bus later on (not as part of the
+stable bug fix) to make it possible to query the soc version from user space through
+the standard sysfs files.
 
-Bye,
--- 
-Nicolas Ferre
+	Arnd
