@@ -1,30 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jan 2014 09:07:09 +0900
-Subject: [PATCH v3 3/3] ARM: shmobile: genmai: Enable r7s72100-ether
-In-Reply-To: <52CC7C1B.20807@cogentembedded.com>
-References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
- <1389061635-4083-4-git-send-email-horms+renesas@verge.net.au>
- <52CC7C1B.20807@cogentembedded.com>
-Message-ID: <20140108000709.GC5136@verge.net.au>
+Date: Wed, 8 Jan 2014 09:12:28 +0900
+Subject: [PATCH -trivial 4/4] thermal: rcar: Spelling s/delaye/delay/g
+In-Reply-To: <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140108001228.GD5136@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 02:13:47AM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Tue, Jan 07, 2014 at 07:57:16PM +0100, Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 > 
-> On 07-01-2014 6:27, Simon Horman wrote:
-> 
->    You've removed RFC but still haven't signed off. :-)
-> 
-> >---
-> >v2
-> >* As suggested by Magnus Damm and Sergei Shtylyov
-> >   - r7s72100 ethernet is not gigabit so do not refer to it as such
-> 
-> >* As suggested by Sergei Shtylyov
-> >   - set no_ether_link as there is no LINK signal documented
-> >     in the manual
-> 
->    I'm OK with the patch, you can add my Acked-by.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> Cc: Jiri Kosina <trivial@kernel.org>
 
-Thanks, will do.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+> ---
+>  drivers/thermal/rcar_thermal.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
+> index a5629500723a..32d591087307 100644
+> --- a/drivers/thermal/rcar_thermal.c
+> +++ b/drivers/thermal/rcar_thermal.c
+> @@ -427,7 +427,7 @@ static int rcar_thermal_probe(struct platform_device *pdev)
+>  		/* enable temperature comparation */
+>  		rcar_thermal_common_write(common, ENR, 0x00030303);
+>  
+> -		idle = 0; /* polling delaye is not needed */
+> +		idle = 0; /* polling delay is not needed */
+>  	}
+>  
+>  	for (i = 0;; i++) {
+> -- 
+> 1.7.9.5
+> 
