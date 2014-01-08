@@ -1,112 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Jan 2014 11:28:36 +0100
-Subject: [RFC PATCH] tty/serial: at91: disable uart timer at start of shutdown
-In-Reply-To: <CAJjB1qLBoXA_XeEV+qU6pi0JVS+==kVA7mEDuAufrYup3htU2g@mail.gmail.com>
-References: <CAJjB1qLBoXA_XeEV+qU6pi0JVS+==kVA7mEDuAufrYup3htU2g@mail.gmail.com>
-Message-ID: <1389176916-6114-1-git-send-email-nicolas.ferre@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Jan 2014 11:38:43 +0100
+Subject: [PATCH 1/3] reset: Add of_reset_control_get
+In-Reply-To: <1389030171.5590.31.camel@pizza.hi.pengutronix.de>
+References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20131221094213.03658852@skate>
+ <1389030171.5590.31.camel@pizza.hi.pengutronix.de>
+Message-ID: <20140108103843.GA2941@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Roszko <mark.roszko@gmail.com>
+Hi Philipp,
 
-The uart timer will schedule a tasklet when it fires. It is possible that it
-can fire inside _shutdown before it is killed in the dma and pdc cleanup
-routines. This causes a tasklet that exists after the port is shutdown, so when
-the kernel finally executes it, it panics as the tty port is NULL.
+On Mon, Jan 06, 2014 at 06:42:51PM +0100, Philipp Zabel wrote:
+> Am Samstag, den 21.12.2013, 09:42 +0100 schrieb Thomas Petazzoni:
+> > Maxime, Philipp,
+> > 
+> > On Fri, 20 Dec 2013 22:41:07 +0100, Maxime Ripard wrote:
+> > > In some cases, you might need to deassert from reset an hardware block that
+> > > doesn't associated to a struct device (CPUs, timers, etc.).
+> > > 
+> > > Add a small helper to retrieve the reset controller from the device tree
+> > > without the need to pass a struct device.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
+> > >  include/linux/reset.h |  4 ++++
+> > >  2 files changed, 34 insertions(+), 9 deletions(-)
+> > 
+> > I'd like to add that I have the exact same need as Maxime. Maxime needs
+> > of_reset_control_get() for timers, and in my case, I need it for CPUs,
+> > since I associated a reset controller to CPU nodes in my DT.
+> > 
+> > Funnily, even though Maxime and I work like 3 meters away from each
+> > other, both of us came up independently with almost exactly the same
+> > implementation to solve the exact same problem, without talking to each
+> > other about this need. It's only yesterday that we discovered we've had
+> > to solve the same problem.
+> > 
+> > So, definitely looking forward to seeing the feedback about this.
+> > 
+> > Thanks!
+> 
+> This looks like a useful addition. I'll reorder the GPIO reset patch for
+> this.
 
-This is a somewhat rare condition but its possible if a program keeps on
-opening/closing the port. It has been observed in particular with systemd
-boot messages that were causing a kernel panic because of this behavior.
+How do you want to get this merged? You'll probably want to take this
+patch, and patches 2/3 and 3/3 depend on some patches merged by Daniel
+Lezcano (that I forgot to CC on this, I'll resend).
 
-Moving the timer deletion to the beginning of the function stops a tasklet from
-being scheduled unexpectedly.
+Maybe the best way would be simply to merge this one for 3.14 through
+your branch, and merge the two other patches in 3.15.
 
-Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
-Cc: stable <stable@vger.kernel.org> # v3.12
-[nicolas.ferre at atmel.com: modify commit message, call setup_timer() in any case]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi Marek,
+Maxime
 
-This is my modified version of your patch.
-* I adapted it to the mainline kernel
-* I rewrote the commit message
-* I used setup_timer() / del_timer_sync() in any case, even the
-  !DMA/!PDC case. Otherwise, the time would have been deleted in
-  an uninitialized state which may lead to errors (I didn't checked
-  though).
-
-Can you please tell me how do you feel with this patch (and the commit message)
-and if it solves the issue that you encounter on your side.
-
-Best regards,
-
- drivers/tty/serial/atmel_serial.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 2b6ac1be00d3..a49f10d269b2 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -825,9 +825,6 @@ static void atmel_release_rx_dma(struct uart_port *port)
- 	atmel_port->desc_rx = NULL;
- 	atmel_port->chan_rx = NULL;
- 	atmel_port->cookie_rx = -EINVAL;
--
--	if (!atmel_port->is_usart)
--		del_timer_sync(&atmel_port->uart_timer);
- }
- 
- static void atmel_rx_from_dma(struct uart_port *port)
-@@ -1229,9 +1226,6 @@ static void atmel_release_rx_pdc(struct uart_port *port)
- 				 DMA_FROM_DEVICE);
- 		kfree(pdc->buf);
- 	}
--
--	if (!atmel_port->is_usart)
--		del_timer_sync(&atmel_port->uart_timer);
- }
- 
- static void atmel_rx_from_pdc(struct uart_port *port)
-@@ -1604,12 +1598,13 @@ static int atmel_startup(struct uart_port *port)
- 	/* enable xmit & rcvr */
- 	UART_PUT_CR(port, ATMEL_US_TXEN | ATMEL_US_RXEN);
- 
-+	setup_timer(&atmel_port->uart_timer,
-+			atmel_uart_timer_callback,
-+			(unsigned long)port);
-+
- 	if (atmel_use_pdc_rx(port)) {
- 		/* set UART timeout */
- 		if (!atmel_port->is_usart) {
--			setup_timer(&atmel_port->uart_timer,
--					atmel_uart_timer_callback,
--					(unsigned long)port);
- 			mod_timer(&atmel_port->uart_timer,
- 					jiffies + uart_poll_timeout(port));
- 		/* set USART timeout */
-@@ -1624,9 +1619,6 @@ static int atmel_startup(struct uart_port *port)
- 	} else if (atmel_use_dma_rx(port)) {
- 		/* set UART timeout */
- 		if (!atmel_port->is_usart) {
--			setup_timer(&atmel_port->uart_timer,
--					atmel_uart_timer_callback,
--					(unsigned long)port);
- 			mod_timer(&atmel_port->uart_timer,
- 					jiffies + uart_poll_timeout(port));
- 		/* set USART timeout */
-@@ -1652,6 +1644,12 @@ static void atmel_shutdown(struct uart_port *port)
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
- 	/*
-+	 * Prevent any tasklets being scheduled during
-+	 * cleanup
-+	 */
-+	del_timer_sync(&atmel_port->uart_timer);
-+
-+	/*
- 	 * Clear out any scheduled tasklets before
- 	 * we destroy the buffers
- 	 */
 -- 
-1.8.2.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/376b280d/attachment.sig>
