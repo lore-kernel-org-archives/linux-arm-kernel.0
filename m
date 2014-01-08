@@ -1,33 +1,71 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 08 Jan 2014 11:09:48 -0500
-Subject: [PATCH v2 1/5] mm: create generic early_ioremap() support
-In-Reply-To: <52CC89B4.4060300@zytor.com>
-References: <1389062120-31896-1-git-send-email-msalter@redhat.com>
- <1389062120-31896-2-git-send-email-msalter@redhat.com>
- <52CC89B4.4060300@zytor.com>
-Message-ID: <1389197388.29144.37.camel@deneb.redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 08 Jan 2014 16:17:19 +0000
+Subject: [RFC 18/18] mfd: vexpress: Split sysreg functions into MFD cells
+In-Reply-To: <20140106104030.GI23772@lee--X1>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-19-git-send-email-pawel.moll@arm.com>
+ <20140106104030.GI23772@lee--X1>
+Message-ID: <1389197839.23721.31.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-01-07 at 15:11 -0800, H. Peter Anvin wrote:
-> On 01/06/2014 06:35 PM, Mark Salter wrote:
-> > 
-> > There is one difference from the existing x86 implementation which
-> > should be noted. The generic early_memremap() function does not return
-> > an __iomem pointer and a new early_memunmap() function has been added
-> > to act as a wrapper for early_iounmap() but with a non __iomem pointer
-> > passed in. This is in line with the first patch of this series:
-> > 
+On Mon, 2014-01-06 at 10:40 +0000, Lee Jones wrote:
+> > +static struct mfd_cell vexpress_sysreg_cells[] = {
+> > +	{
+> > +		.name = "syscon",
+> > +		.of_compatible = "arm,vexpress-sysreg,sys_id",
+> > +		.num_resources = 1,
+> > +		.resources = (struct resource []) {
+> > +			DEFINE_RES_MEM(SYS_ID, 0x4),
+> > +		},
+> > +		.platform_data = &vexpress_sysreg_sys_id_pdata,
+> > +		.pdata_size = sizeof(vexpress_sysreg_sys_id_pdata),
 > 
-> This makes a lot of sense.  However, I would suggest that we preface the
-> patch series with a single patch changing the signature for the existing
-> x86 function, that way this change becomes bisectable.
+> Not sure how comfortable I am with using Device Tree and populating
+> platform_data with information which by the looks of it you're
+> planning to make persistent. What's stopping you from using a DT
+> property to name the block, or better yet, just use the compatible
+> string? Also, won't naming these blocks in DT also aid other OSes?
 
-Ok, that sounds like a good idea. I'm uncertain how best to coordinate
-with Dave Young's patch series to avoid conflicts. His first patch does
-the signature change (and adds the early_memunmap function but that
-isn't used anywhere):
+Right. This particular of_compatible string in the *_cells is a leftover
+from previous versions of the patch. Only the gpio-related ones, as
+mentioned in the example:
 
- https://lkml.org/lkml/2013/12/20/143
+>  Example:
+>         v2m_sysreg: sysreg at 10000000 {
+>                 compatible = "arm,vexpress-sysreg";
+>                 reg = <0x10000000 0x1000>;
+> -               gpio-controller;
+> -               #gpio-cells = <2>;
+> +
+> +               v2m_led_gpios: sys_led at 08 {
+> +                       compatible = "arm,vexpress-sysreg,sys_led";
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +               };
+> +
+> +               v2m_mmc_gpios: sys_mci at 48 {
+> +                       compatible = "arm,vexpress-sysreg,sys_mci";
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +               };
+> +
+> +               v2m_flash_gpios: sys_flash at 4c {
+> +                       compatible = "arm,vexpress-sysreg,sys_flash";
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +               };
+>         };
 
-Any thoughts on how best to avoid potential merge conflicts here?
+are supposed for the sake the gpio users (and some of them don't exist
+in some version of the sysregs).
+
+> > +	return mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO,
+> > +			vexpress_sysreg_cells,
+> > +			ARRAY_SIZE(vexpress_sysreg_cells), mem, 0, 0);
+> 
+> Don't use 0 as NULL, you will cause a sparse error.
+
+... and rightly so! ;-) Well spotted, thanks!
+
+Pawe?
