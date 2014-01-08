@@ -1,14 +1,45 @@
-From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
-Date: Wed, 8 Jan 2014 20:21:24 +0000
-Subject: [PATCH v3 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <52ACAE54.2060007@ti.com>
-References: <1386759570-29671-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1386759570-29671-3-git-send-email-ivan.khoronzhuk@ti.com>,
- <52ACAE54.2060007@ti.com>
-Message-ID: <4F5844B3A985794BA902E12C070812370BBD90C2@DNCE04.ent.ti.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 8 Jan 2014 12:24:34 -0800
+Subject: [PATCH v3] ARM: imx: add select on ARCH_MXC for cpufreq support
+In-Reply-To: <1389211403.678513817@f123.i.mail.ru>
+References: <1389210991-23688-1-git-send-email-john.tobias.ph@gmail.com>
+ <1389211403.678513817@f123.i.mail.ru>
+Message-ID: <CACUGKYNnbQQAkw2=NxBhyrgvrwsOoTCqS4qzP1SYev+tXaMGDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+thanks for the info. Will fix it.
 
-Do you have any comments on this patch?
+On Wed, Jan 8, 2014 at 12:03 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Hello.
+>
+> ?????,  8 ?????? 2014, 11:56 -08:00 ?? John Tobias <john.tobias.ph@gmail.com>:
+>> Moved ARCH_HAS_CPUFREQ, HAVE_IMX_ANATOP and PM_OPP on ARCH_MXC so that
+>> the user can enable the cpufreq support for iMX6Q and/or iMX6SL.
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>>  arch/arm/mach-imx/Kconfig | 13 ++++++-------
+>>  1 file changed, 6 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index 7a6e6f7..3c326be 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -1,5 +1,6 @@
+>>  config ARCH_MXC
+>>       bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+>> +     select ARCH_HAS_CPUFREQ
+>>       select ARCH_REQUIRE_GPIOLIB
+>>       select ARM_CPU_SUSPEND if PM
+>>       select ARM_PATCH_PHYS_VIRT
+>> @@ -9,8 +10,10 @@ config ARCH_MXC
+>>       select GENERIC_ALLOCATOR
+>>       select GENERIC_CLOCKEVENTS
+>>       select GENERIC_IRQ_CHIP
+>> +     select HAVE_IMX_ANATOP
+>
+> Maybe better:
+> select HAVE_IMX_ANATOP if ARCH_MULTI_V6_V7
+>
+> ---
