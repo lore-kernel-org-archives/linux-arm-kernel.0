@@ -1,20 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 12:35:40 +0100
-Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <52CD324D.3020701@ti.com>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <3761842.HRY1CDBF4z@wuerfel> <52CD324D.3020701@ti.com>
-Message-ID: <201401081235.40927.arnd@arndb.de>
+From: pmeerw@pmeerw.net (Peter Meerwald)
+Date: Wed, 8 Jan 2014 12:42:47 +0100 (CET)
+Subject: Information about Atmel MXT224
+In-Reply-To: <52CD04F1.8090100@gmail.com>
+References: <52CD04F1.8090100@gmail.com>
+Message-ID: <alpine.DEB.2.01.1401081228580.1454@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014, Roger Quadros wrote:
-> OK. I'll update the binding information to reflect all the clocks.
-> 
-> But what about clk_get() vs of_clk_get_by_name() ?
 
-I think the convention these days is to just use clk_get(), which calls
-of_clk_get_by_name() internally. Not sure if that's what you are asking.
+> I have tried atmel_mxt_ts driver (original driver from kernel 3.6.0 and 
+> driver from linux-next/master branch copied to kernel 3.6.0) on i.MX27 
+> board. The capacitive glass used is a "GE Touch" 
+> SMT-F-057G007-B011-4:3-NP. It has 16 pads in X and 14 pads in Y. It is 
+> correctly detected (with one warning/error).
 
-	Arnd
+> Does someone has some informations or the protocol guide, please ?
+
+you need to request them from the distributor I guess, they docs are 
+pretty good
+
+> /* TSP */
+> static struct mxt_platform_data mxt_platform_data = {
+> 	.x_line			= 18,
+> 	.y_line			= 11,
+> 	.x_size			= 480,
+
+shouldn't this be 16/14?
+
+> 	.y_size			= 640,
+> 	.blen			= 0x1,
+> 	.threshold		= 0x28,
+> 	.voltage		= 2800000,		/* 2.8V */
+> 	.orient			= MXT_DIAGONAL_COUNTER,
+> 	.irqflags		= IRQF_TRIGGER_FALLING,
+> };
+
+> atmel_mxt_ts 0-004b: No cfg data defined, skipping reg init
+> atmel_mxt_ts 0-004b: Invalid object type
+
+something goes wrong in the initialization; the object table of the 
+chip doesn't match the register data fed in -- the mxt224 can be a bitch 
+and play dead
+
+regards, p.
+
+-- 
+
+Peter Meerwald
++43-664-2444418 (mobile)
