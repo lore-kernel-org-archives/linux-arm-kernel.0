@@ -1,48 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Jan 2014 17:19:58 -0800
-Subject: [PATCH] of/platform: Fix no irq domain found errors when
- populating interrupts
-In-Reply-To: <alpine.DEB.2.02.1401062340240.31394@utopia.booyaka.com>
-References: <20131123004334.GJ10023@atomide.com>
- <20131123010850.GN10023@atomide.com>
- <20131123015034.GP10023@atomide.com>
- <20131124212757.7D224C402A3@trevor.secretlab.ca>
- <alpine.DEB.2.02.1312100331460.32309@utopia.booyaka.com>
- <alpine.DEB.2.02.1312302209200.8869@utopia.booyaka.com>
- <CAL_Jsq+X5G94DUn-zFKQkhEy91cdjCyeciny+kDjr=V6EiBHfQ@mail.gmail.com>
- <alpine.DEB.2.02.1401062340240.31394@utopia.booyaka.com>
-Message-ID: <20140108011957.GK5074@atomide.com>
+Date: Tue, 7 Jan 2014 17:21:11 -0800
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+In-Reply-To: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+Message-ID: <20140108012110.GL5074@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140106 15:43]:
-> On Tue, 31 Dec 2013, Rob Herring wrote:
-> > On Mon, Dec 30, 2013 at 4:10 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > > On Tue, 10 Dec 2013, Paul Walmsley wrote:
-> > >> Is it possible to get this patch, or something similar, merged for
-> > >> v3.13-rc?
-> > >>
-> > >> Once something like PM is broken, it's pretty easy for other broken
-> > >> patches to make it into the tree, since it becomes very difficult to test
-> > >> without turning into a maintainer denial-of-service attack.
-> > >
-> > > Ping.  Could you please provide some guidance here about what you'd need
-> > > to get this solved for v3.13-rc?
-> > 
-> > I agree with doing the platform_get_irq modification and feel free to
-> > add my ack. I'm going to be offline for the next week.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140102 07:11]:
+> The following patch series moves code to setup the DMA hardware and
+> service interrupts from the hardware to the DMA engine driver.  This
+> reduces the dependency on the legacy DMA implementation.
 > 
-> Thanks Rob!
+> This series does not remove the channel allocation/freeing hooks which
+> are used to manage the allocation of physical channels - this is the
+> next step in the evolution.
 > 
-> Tony, would you consider sending this patch upstream for v3.13-rc along 
-> with your 37xxevm fix patches?
+> The patches which move the interrupt handling are currently less than
+> perfect since they're writing to ENABLE_L0 under a different spinlock,
+> and hence RFC only at the moment.
 
-Hmm I'd like to see a proper patch posted for platform_get_irq() by
-Thierry as that one is really his patch. And it also had a comment from
-Grant.
+Nice to see this happening. These seem to work for me based on a quick
+try on omap2+, but on omap1 the build fails:
 
-After that I can queue it if nobody else is picking it as I have a
-dependency to it.
+arch/arm/mach-omap1/dma.c: In function ?dma_write?:
+arch/arm/mach-omap1/dma.c:186: error: ?const struct omap_dma_reg? has no member named ?size?
 
 Regards,
 
