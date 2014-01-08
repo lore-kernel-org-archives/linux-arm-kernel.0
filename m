@@ -1,30 +1,24 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 8 Jan 2014 10:14:47 +0530
-Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
-In-Reply-To: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
-References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAK9yfHx+=X+DiLe_WsiDkYonKCssPTOGqR76=+7N6eyAHXyQGQ@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Wed, 8 Jan 2014 05:03:26 +0000
+Subject: [PATCHv9 2/4] ARM: dts: Add Freescale FTM PWM node for VF610.
+In-Reply-To: <20140107130557.GI12346@S2101-09.ap.freescale.net>
+References: <1389082438-2199-1-git-send-email-Li.Xiubo@freescale.com>
+ <20140107130557.GI12346@S2101-09.ap.freescale.net>
+Message-ID: <d7b0a9b5bd134ba0a56b6d737bee4c42@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
 
-On 7 January 2014 17:33, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> Ensure clk->kref is dereferenced only when clk is not NULL.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Hi Sachin,
->
-> please try if this patch fixes the exyno5420 boot crash.
+> Has the FTM PWM device tree bindings been accepted/merged?  Please only
+> send me DTS changes after that.  Also when you send me the DTS changes,
+> please base on imx/dt or for-next branch of my git tree below.
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git
+> 
 
-Confirmed that this patch works fine on 5420 as well as already
-working 4210 and 5250 boards.
-Thanks for the quick fix.
+Yes, I will resend these dt patches after the FTM driver has been merged
+bases on this tree.
 
-Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+Thanks,
 
-
--- 
-With warm regards,
-Sachin
+Xiubo
