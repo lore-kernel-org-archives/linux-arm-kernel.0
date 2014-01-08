@@ -1,28 +1,66 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 08 Jan 2014 11:25:31 +0100
-Subject: [PATCH] spi: atmel: Refactor spi-atmel to use SPI framework queue
-In-Reply-To: <1389160188-4030-1-git-send-email-wenyou.yang@atmel.com>
-References: <1389160188-4030-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <52CD279B.6020203@gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 8 Jan 2014 15:57:19 +0530
+Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
+ information
+In-Reply-To: <4812867.NuB3hNkV9d@wuerfel>
+References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+ <20140108090808.GB16313@earth.universe> <52CD23E0.8030400@ti.com>
+ <4812867.NuB3hNkV9d@wuerfel>
+Message-ID: <52CD2807.9000200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 06:49, Wenyou Yang wrote:
-> Replace the deprecated master->transfer with transfer_one_message()
-> and allow the SPI subsystem handle all the queuing of messages.
+On 01/08/2014 03:49 PM, Arnd Bergmann wrote:
+> On Wednesday 08 January 2014 15:39:36 Roger Quadros wrote:
+>>> What about the other clocks acquired in drivers/mfd/omap-usb-host.c? Shouldn't
+>>> all of those be provided by via the DT phandle?
+>>>
+>>
+>> All those clocks are identically named across the OMAP SoCs and are unique for each
+>> SoC, so providing DT phandle for all of them is not required.
+>>
+>> The init_60m_fclk was renamed to l3init_60m_fclk in OMAP5, and hence the need for
+>> this binding.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> Hi Mark,
+> What do you mean it was renamed? Is it a different version of the omap-usb-host
+> device then?
+
+I meant the clock gates name on the SoC was renamed. The omap-usb-host device version
+is revised as well.
+
+>>> Should the clk_get be changed to of_clk_get()/of_clk_get_by_name() in the
+>>> driver? This would potentially remove the need of the init_60m_fclk name.
+>>>
+>>
+>> If we use of_clk_xxx() then we'll need to update DT nodes for OMAP4 and OMAP3 as
+>> well to explicitly provide the clock phandle. For now we make use of the fact that
+>> SoC clock data names the clock rightly i.e. "init_60m_fclk".
 > 
-> The patch is based on for-next branch of
-> 	git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
-> 
-> It is tested on sama5d3xek and at91sam9m10g45ek board.
+> I'm getting the feeling that init_60m_fclk is not the name of the clock input
+> of the omap-usb-host device at all, but rather the name of a signal on the
+> omap soc, which would not be an appropriate identifier for the binding.
 
-And the bug I was seeing with SPI_IOC_MESSAGE (cf https://lkml.org/lkml/2013/10/8/269 )
-is now gone !
+It is a clock gate defined like so in the DT clock data
 
-Tested on at91sam9g35-ek
+on OMAP4
+        init_60m_fclk: init_60m_fclk {
+                #clock-cells = <0>;
+                compatible = "ti,divider-clock";
+                clocks = <&dpll_usb_m2_ck>;
+                reg = <0x0104>;
+                ti,dividers = <1>, <8>;
+        };
 
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+on OMAP5
+        l3init_60m_fclk: l3init_60m_fclk {
+                #clock-cells = <0>;
+                compatible = "ti,divider-clock";
+                clocks = <&dpll_usb_m2_ck>;
+                reg = <0x0104>;
+                ti,dividers = <1>, <8>;
+        };
+
+So you can see that it is the same thing with a different name.
+
+cheers,
+-roger
