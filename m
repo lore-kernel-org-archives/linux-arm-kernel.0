@@ -1,33 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Jan 2014 14:39:52 +0100
-Subject: [PATCH v2 3/6] ARM: tegra: Add efuse bindings
-In-Reply-To: <52CB14D3.2060904@wwwdotorg.org>
-References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
- <1387891931-9854-4-git-send-email-pdeschrijver@nvidia.com>
- <52CB14D3.2060904@wwwdotorg.org>
-Message-ID: <20140108133951.GD1592@ulmo.nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Jan 2014 14:42:45 +0100
+Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
+In-Reply-To: <201401081352.57361.arnd@arndb.de>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
+ <201401081352.57361.arnd@arndb.de>
+Message-ID: <52CD55D5.6020703@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 01:40:51PM -0700, Stephen Warren wrote:
-> On 12/24/2013 06:32 AM, Peter De Schrijver wrote:
-[...]
-> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+On 08/01/2014 13:52, Arnd Bergmann wrote:
+> On Tuesday 07 January 2014, Gregory CLEMENT wrote:
 > 
-> > +	efuse at 7000F800 {
+>>  static void __init armada_370_xp_dt_init(void)
+>>  {
+>> +       i2c_quirk();
+>>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>>  }
 > 
-> "fuse" might be a better node name; "efuse" is presumably the name of
-> the instance, not the type of object.
+> I'd prefer to enable the quirk only on machines that we know may be affected, i.e.
+> OpenBlocks AX3-4. That would make it easier in the future for everyone to figure
+> out whether they need to include the quirk in their kernels or not, depending
+> on whether they want to support these machines. Just a precaution in case we
+> end up having lots of quirks in the long run.
 
-There's another occurrence I noticed recently where we haven't followed
-that rule. The PMIC node on Venice2 for instance is called as3722.
-Perhaps that should also be renamed.
+You means something like the following code ?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/22986e05/attachment.sig>
+static void __init armada_370_xp_dt_init(void)
+ {
++       if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
++               i2c_quirk();
+        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+
+
+
+
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
