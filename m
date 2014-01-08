@@ -1,46 +1,65 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 08 Jan 2014 17:31:37 +0000
-Subject: [RFC 07/18] regmap: debugfs: Always create "registers" &
- "access" files
-In-Reply-To: <20131224121912.GX30815@sirena.org.uk>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-8-git-send-email-pawel.moll@arm.com>
- <20131224121912.GX30815@sirena.org.uk>
-Message-ID: <1389202297.23721.33.camel@hornet>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jan 2014 09:53:15 -0800
+Subject: [PATCH 4/5] arm: omap3: twl: use the new lookup method with usb
+ phy
+In-Reply-To: <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
+References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
+Message-ID: <20140108175314.GC31686@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-24 at 12:19 +0000, Mark Brown wrote:
-> On Mon, Dec 23, 2013 at 04:23:39PM +0000, Pawel Moll wrote:
-> > When a map covers a single register, max_register is equal
-> > to 0, so the "registers" & "access" files were not created.
-> > 
-> > This patch is removing this restriction. It should be save,
-> > as the maps not without register 0 should return false
-> > for regmap_readable(map, 0).
-> 
-> No, we need to find a better way of doing this such as checking to see
-> if register zero is accessible in some way.  We want to avoid having
-> those files if there's no way of populating them since this is useful
-> information for tooling.
+* Heikki Krogerus <heikki.krogerus@linux.intel.com> [131209 07:10]:
+> Provide a complete association for the phy and it's user
+> (musb) with the new phy_lookup_table.
 
-Something like this then?
+This seems safe to queue via the USB list:
 
-diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-index c5471cd..45d812c 100644
---- a/drivers/base/regmap/regmap-debugfs.c
-+++ b/drivers/base/regmap/regmap-debugfs.c
-@@ -511,7 +511,7 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
- 	debugfs_create_file("range", 0400, map->debugfs,
- 			    map, &regmap_reg_ranges_fops);
+Acked-by: Tony Lindgren <tony@atomide.com>
  
--	if (map->max_register) {
-+	if (map->max_register || regmap_readable(map, 0)) {
- 		debugfs_create_file("registers", 0400, map->debugfs,
- 				    map, &regmap_map_fops);
- 		debugfs_create_file("access", 0400, map->debugfs,
-
-Other possibility would be replacing max_register with registers_num,
-but it looks a massive job...
-
-Pawe?
+> Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> ---
+>  arch/arm/mach-omap2/twl-common.c | 15 ++++++---------
+>  1 file changed, 6 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> index b0d54da..972430b 100644
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -91,18 +91,13 @@ void __init omap_pmic_late_init(void)
+>  }
+>  
+>  #if defined(CONFIG_ARCH_OMAP3)
+> -struct phy_consumer consumers[] = {
+> -	PHY_CONSUMER("musb-hdrc.0", "usb"),
+> -};
+> -
+> -struct phy_init_data init_data = {
+> -	.consumers = consumers,
+> -	.num_consumers = ARRAY_SIZE(consumers),
+> +static struct phy_lookup_table twl4030_usb_lookup = {
+> +	.dev_id = "musb-hdrc.0",
+> +	.table = PHY_LOOKUP("phy-twl4030_usb.0", NULL),
+>  };
+>  
+>  static struct twl4030_usb_data omap3_usb_pdata = {
+>  	.usb_mode	= T2_USB_MODE_ULPI,
+> -	.init_data	= &init_data,
+>  };
+>  
+>  static int omap3_batt_table[] = {
+> @@ -225,8 +220,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+>  	}
+>  
+>  	/* Common platform data configurations */
+> -	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+> +	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb) {
+> +		phy_add_lookup_table(&twl4030_usb_lookup);
+>  		pmic_data->usb = &omap3_usb_pdata;
+> +	}
+>  
+>  	if (pdata_flags & TWL_COMMON_PDATA_BCI && !pmic_data->bci)
+>  		pmic_data->bci = &omap3_bci_pdata;
+> -- 
+> 1.8.5.1
+> 
