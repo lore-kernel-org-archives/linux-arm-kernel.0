@@ -1,29 +1,26 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Jan 2014 16:19:56 +0100
-Subject: [PATCH 2/2] ARM: tegra: enable LCD panel on Ventana
-In-Reply-To: <1389138437-4686-2-git-send-email-swarren@wwwdotorg.org>
-References: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
- <1389138437-4686-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140108151953.GF21974@ulmo.nvidia.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 8 Jan 2014 16:22:24 +0100
+Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
+ AX3-4 board
+In-Reply-To: <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140108152224.GC15182@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 04:47:17PM -0700, Stephen Warren wrote:
-[...]
-> @@ -581,6 +604,16 @@
->  		};
->  	};
->  
-> +	panel: panel {
-> +		compatible = "chungwa,claa101wa01a", "simple-panel";
+> +		new_compat->name =  kstrdup("compatible", GFP_KERNEL);
+> +		new_compat->length =  sizeof("marvell,mv78230-a0-i2c");
+> +		new_compat->value =  kstrdup("marvell,mv78230-a0-i2c",
+> +						GFP_KERNEL);
+> +
 
-This also needs "chunghwa" rather than "chungwa". With that fixed:
+Very minor again: Strange whitespacing after "="
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/606b9cf6/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/e4f01007/attachment.sig>
