@@ -1,43 +1,23 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 8 Jan 2014 14:28:37 -0800
-Subject: [PATCH 0/7] misc Tegra clock fixes
-In-Reply-To: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
-References: <1388105067-24438-1-git-send-email-abrestic@chromium.org>
-Message-ID: <CAL1qeaG0Y4__viWsZeoFdf8XFN3Wk7CO2abeEjzRZg+wNRV56w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 8 Jan 2014 20:32:07 -0200
+Subject: *** DEADLOCK ***
+In-Reply-To: <CACUGKYP1gcmYbOX8S9PaQV0jePeryiU-e5QwyS72FkDb7m-V3w@mail.gmail.com>
+References: <CACUGKYP1gcmYbOX8S9PaQV0jePeryiU-e5QwyS72FkDb7m-V3w@mail.gmail.com>
+Message-ID: <CAOMZO5DOpfRu6UhZhBcJJ0T7KquLNZbSC0O+qY3pZUA2SuEdhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen, Peter,
+On Wed, Jan 8, 2014 at 8:19 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
+> Hi Dong,
+>
+> I used your patches to fix hardirq-unsafe and didn't see the said
+> messages anymore when I repeatedly booting my board.
+>
+> But, I saw another DEADLOCK  (see below) if I enable my wifi.
 
-> Fixes for various clock-related issues found during bringup of
-> Tegra124-based Venice2 and Norrin boards.
->
-> Andrew Bresticker (3):
->   clk: tegra: fix sdmmc clks on Tegra1x4
->   clk: tegra: cclk_lp has a pllx/2 divider
->   clk: tegra: use max divider if divider overflows
->
-> David Ung (1):
->   clk: tegra: PLLD2 fixes for hdmi
->
-> Gabe Black (1):
->   clk: tegra: Fix PLLP rate table
->
-> Mark Zhang (1):
->   clk: tegra: fix host1x clock on Tegra124
->
-> Rhyland Klein (1):
->   clk: tegra: Fix PLLD mnp table
->
->  drivers/clk/tegra/clk-divider.c          |  2 +-
->  drivers/clk/tegra/clk-id.h               |  4 +++
->  drivers/clk/tegra/clk-tegra-periph.c     |  4 +++
->  drivers/clk/tegra/clk-tegra-super-gen4.c |  2 +-
->  drivers/clk/tegra/clk-tegra114.c         |  8 +++---
->  drivers/clk/tegra/clk-tegra124.c         | 46 +++++++++++++++++++-------------
->  6 files changed, 41 insertions(+), 25 deletions(-)
+Does it work with this patch?
+http://marc.info/?l=linux-mmc&m=138559966709424&w=2
 
-Any comments on this series?
+Regards,
 
-Thanks!
-Andrew
+Fabio Estevam
