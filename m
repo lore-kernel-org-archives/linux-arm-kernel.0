@@ -1,55 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:47:00 +0000
-Subject: [PATCH v4 17/37] mtd: st_spi_fsm: Provide the sequence for enabling
- 32bit addressing mode
+Date: Wed,  8 Jan 2014 13:47:01 +0000
+Subject: [PATCH v4 18/37] mtd: st_spi_fsm: Prepare read/write sequences
+ according to configuration
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for setting 32bit addressing
-mode on the Flash chip.
+Firstly we search for our preference read/write configuration based on a
+given chip's capabilities. Then we actually set up the message sequence
+accordingly.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 5ee6d08..02718ae 100644
+index 02718ae..fc23354 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -447,6 +447,28 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
- 		    SEQ_CFG_STARTSEQ),
- };
+@@ -649,6 +649,23 @@ static void stfsm_prepare_rw_seq(struct stfsm *fsm,
+ 	seq->seq[i++] = STFSM_INST_STOP;
+ }
  
-+static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
++static int stfsm_search_prepare_rw_seq(struct stfsm *fsm,
++				       struct stfsm_seq *seq,
++				       struct seq_rw_config *cfgs)
 +{
-+	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_EN4B_ADDR));
-+	seq->seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_WREN) |
-+			   SEQ_OPC_CSDEASSERT);
++	struct seq_rw_config *config;
 +
-+	seq->seq[0] = STFSM_INST_CMD2;
-+	seq->seq[1] = STFSM_INST_CMD1;
-+	seq->seq[2] = STFSM_INST_WAIT;
-+	seq->seq[3] = STFSM_INST_STOP;
++	config = stfsm_search_seq_rw_configs(fsm, cfgs);
++	if (!config) {
++		dev_err(fsm->dev, "failed to find suitable config\n");
++		return -EINVAL;
++	}
 +
-+	seq->seq_cfg = (SEQ_CFG_PADS_1 |
-+			SEQ_CFG_ERASE |
-+			SEQ_CFG_READNOTWRITE |
-+			SEQ_CFG_CSDEASSERT |
-+			SEQ_CFG_STARTSEQ);
++	stfsm_prepare_rw_seq(fsm, seq, config);
 +
 +	return 0;
 +}
 +
- static inline int stfsm_is_idle(struct stfsm *fsm)
+ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
  {
- 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+ 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
 -- 
 1.8.3.2
