@@ -1,32 +1,67 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jan 2014 13:32:35 +0530
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  8 Jan 2014 17:02:31 +0900
+Subject: [PATCH v4 3/4] ARM: shmobile: r7s72100: Add clock for r7s72100-ether
+In-Reply-To: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1389168152-9434-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 2, 2014 at 9:53 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
->  SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
->  has unmet direct dependencies (!ZBOOT_ROM)
->
-> This is because it's possible to have ZBOOT_ROM enabled, but at the
-> same time have another option enabled which selects AUTO_ZRELADDR
-> overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
-> dependencies between ZBOOT_ROM and the options which depend on
-> !ZBOOT_ROM.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-After this patch I see these warnings with exynos_defconfig
+---
 
-arch/arm/Kconfig:1963:error: recursive dependency detected!
-arch/arm/Kconfig:1963: symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-arch/arm/Kconfig:2151: symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
+Dave,
 
-I am not really sure why this happened as I don't see AUTO_ZRELADDR
-selected by ZBOOT_ROM in Kconfig :)
+I plan to take this change through my tree.
+
+v3 - v4
+* No change
+
+v2
+* As suggested by Sergei Shtylyov
+  - Add MSTP74 to beginning of enum on a line by itself
+* As suggested by Magnus Damm
+  - r7s72100 ethernet is not gigabit so do not refer to it as such
+---
+ arch/arm/mach-shmobile/clock-r7s72100.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+index e6ab0cd..c4ba651 100644
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
++++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+@@ -27,6 +27,7 @@
+ #define FRQCR2		0xfcfe0014
+ #define STBCR3		0xfcfe0420
+ #define STBCR4		0xfcfe0424
++#define STBCR7		0xfcfe0430
+ #define STBCR9		0xfcfe0438
+ 
+ #define PLL_RATE 30
+@@ -146,6 +147,7 @@ struct clk div4_clks[DIV4_NR] = {
+ };
+ 
+ enum {	MSTP97, MSTP96, MSTP95, MSTP94,
++	MSTP74,
+ 	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+ 	MSTP33,	MSTP_NR };
+ 
+@@ -154,6 +156,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
+ 	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
+ 	[MSTP94] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 4, 0), /* RIIC3 */
++	[MSTP74] = SH_CLK_MSTP8(&peripheral1_clk, STBCR7, 4, 0), /* Ether */
+ 	[MSTP47] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 7, 0), /* SCIF0 */
+ 	[MSTP46] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 6, 0), /* SCIF1 */
+ 	[MSTP45] = SH_CLK_MSTP8(&peripheral1_clk, STBCR4, 5, 0), /* SCIF2 */
+@@ -176,6 +179,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
+ 
+ 	/* MSTP clocks */
++	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+ 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+ 
+ 	/* ICK */
+-- 
+1.8.4
