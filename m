@@ -1,129 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Jan 2014 17:46:17 +0100
-Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
- SoCs
-In-Reply-To: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52CD80D9.8000301@free-electrons.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 08 Jan 2014 16:55:37 +0000
+Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
+In-Reply-To: <20140107220310.GD3103@lukather>
+References: <20140107220310.GD3103@lukather>
+Message-ID: <1389200137.27473.6.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 16:06, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here come the 5th version of the series fixing the i2c bus hang on A0
-> version of the Armada XP SoCs. It occurred on the early release of the
-> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
-> (A0 stepping) have issues related to the i2c controller which prevent
-> to use the offload mechanism and lead to a kernel hang during boot.
-> 
-> The main change are the use of marvell,mv78230-a0-i2c and that the
-> function mvebu_get_soc_id() is now local to mach-mvebu.
-> 
-> The first patch add a mean to detect the SoCs version at run-time and
-> the second one use this feature in the driver.
-> 
-> The 3 first patches should be applied on 3.13-rc and on stable kernel
-> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
-> "i2c: mv64xxx: Add I2C Transaction Generator support".
-> 
-> The first patch could be latter be extend to also be used with dove,
-> kirkwood, orion5x and mv78x00 when there will be merged in mvebu and
-> even expose the SoC ID and revision to userspace.
-> 
-> Jason, do you still agree to take the series once Wolfram have given
-> his acked-by?
+On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
 
-Jason,
+> Hence why I started to work on sunxi-babelfish. It aims at being a
+> very thin wrapper around the kernel image, that would generate an
+> uImage, with the babelfish code itself, plus the compiled DTSI we have
+> for the targetted SoCs, and finally the kernel image. During bootup,
+> babelfish will take one of these DTBs, and complete it using the
+> informations fetched from the compiled FEX file the board is feeding
+> it, before finally passing the DTB to Linux that will continue its
+> usual boot.
 
-if it can help you I have just pull my branch at:
-https://github.com/MISL-EBU-System-SW/mainline-public/tree/i2c-mv64xxx-3.13-rc6-fixes-v6
+Very cool!
 
-git at github.com:MISL-EBU-System-SW/mainline-public.git
+> [...]
+> Another nice thing about it is that a FEX-to-DT compiler comes at no
+> cost afterwards. Since dtc is able to generate a DTS from
+> /proc/device-tree, you can easily generate a DTS for your previously
+> non-supported board using
+> 
+>   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
 
-I also taken into account the two comments and added the acked-by from Wolfram and
-Arnd on the appropriate commit.
+I wonder if it might also be useful to compile this as a normal user
+space application which takes the fex and produces the dtb (or dts)?
 
+I suppose producing something upstreamable would be different/harder
+though, since it would need to not inline/merge the dtsi file but just
+leave the include stmt. That's probably a different tool.
 
-Thanks,
-
-Gregory
-
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> Changelog:
-> v4 -> v5:
-> 
-> - use the marvell,mv78230-a0-i2c compatible string instead of the
->   offload-broken property.
-> 
-> - move the mvebu-soc-id.h file into mach-mvebu
-> 
-> - no more export the mvebu_get_soc_id() function
-> 
-> - enable the quirk only on machines that we know may be affected, i.e.
-> OpenBlocks AX3-4.
-> 
-> v3 -> v4:
-> 
-> - checked the offload-broken property instead of calling the
->   mvebu_get_soc_id() function in the mv64xxx_of_config() function.
-> 
-> - added the second patch to manage the quirk and update the device
->   node with the offload-broken if needed.
-> 
-> - removed the acked-by from Wolfram as the code have change in the 3rd
->   patch
-> 
-> In mvebu-soc-id.c:
->  - used EXPORT_SYMBOL_GPL instead of EXPORT_SYMBOL
-> 
->  - used core_initcall instead of arch_initcall to be called earlier
->    enough.
-> 
-> v2 -> v3:
-> 
-> - fixed typo in the comments added in i2c-mv64xxx.c
-> 
-> - used pr_fmt instead of %s __func__ in all the pr_* functions
-> 
-> - added a check on the pointer returned by of_get_next_child()
-> 
-> - added a return immediately after the 1st check to be able to get rid
->   of indenting the entire function code inside the if { ... } block.
-> 
-> v1 -> v2:
-> 
-> - Changed the way to test the return of the function mvebu_get_soc_id
->   in order to make it clearer.
-> 
-> - Removed the superfluous parentheses
-> 
-> - Added Wolfram's acked-by on the 2nd patch
-> 
-> Gregory CLEMENT (4):
->   ARM: mvebu: Add support to get the ID and the revision of a SoC
->   ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
->   i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
->   i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
-> 
->  .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   2 +-
->  arch/arm/mach-mvebu/Makefile                       |   2 +-
->  arch/arm/mach-mvebu/armada-370-xp.c                |  32 ++++++
->  arch/arm/mach-mvebu/mvebu-soc-id.c                 | 119 +++++++++++++++++++++
->  arch/arm/mach-mvebu/mvebu-soc-id.h                 |  32 ++++++
->  drivers/i2c/busses/i2c-mv64xxx.c                   |   8 ++
->  6 files changed, 193 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
->  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ian.
