@@ -1,57 +1,26 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 08 Jan 2014 09:01:55 -0800
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <3008563.6S2kFjQKp9@amdc1227>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
- <2890647.PEOApIOYyP@amdc1227> <20140108163138.27803.58310@quantum>
- <3008563.6S2kFjQKp9@amdc1227>
-Message-ID: <20140108170155.27803.27478@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Jan 2014 17:08:08 +0000
+Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
+References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
+ <201401071215.06064.arnd@arndb.de>
+ <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
+Message-ID: <20140108170808.GH31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-01-08 08:44:29)
-> On Wednesday 08 of January 2014 08:31:38 Mike Turquette wrote:
-> > Quoting Tomasz Figa (2014-01-02 07:22:12)
-> > > On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
-> > > > Quoting Tomasz Figa (2013-12-12 08:07:13)
-> > > > > This series intends to improve clock provider impementation of max77686
-> > > > > PMIC driver. First two patches are simple fixes of current implementation
-> > > > > to allow correct control of provided clocks. Further patches refactor
-> > > > > the driver to make the code cleaner and prepare for further patches. Then
-> > > > > last two patches add registration of OF clock provider and adjust device
-> > > > > tree nodes of boards containing max77686 chip to contain properties
-> > > > > required by clock provider.
-> > > > 
-> > > > Acked-by: Mike Turquette <mturquette@linaro.org>
-> > > 
-> > > Hmm... Shouldn't this series go through the clk tree directly? If not, who
-> > > should be taking it?
-> > 
-> > Yes it should, but I guessed it would come in a pull request. Maybe Ack
-> > is the wrong thing? I can just say "looks good to me me" or something
-> > else.
-> 
-> Nah, I think Ack is completely right, but still this series is quite
-> standalone, e.g. it does not really belong to samsung-clk nor any other
-> clock subtree, so I thought you would be applying them directly.
+On Tue, Jan 07, 2014 at 07:27:49PM +0100, Linus Walleij wrote:
 
-True, this isn't really a samsung clock pull request. We can just
-attribute this one to ironing out a few bugs in our workflow ;-)
+> I think the S3C driver is a different piece of hardware unfortunately.
 
-> 
-> I believe Lee has already applied this one, but in future, to avoid such
-> confusion, if it's more convenient for you, I can send you any clock
-> series as pull requests.
-
-That is fine, and it would also be fine to state in the coverletter that
-you do NOT plan to send a pull request. That removes all ambiguity from
-my side and lets me know to pick the patches manually. Verbosity is
-always good with these sorts of things.
-
-Regards,
-Mike
-
-> 
-> Best regards,
-> Tomasz
-> 
+It's not, the IP is basically the same - the difference between s3c, s5p
+and Exynos is a marketing one, Samsung have generally just reused IP
+where that is reasonable.  There's a great deal of continuity in the
+platforms.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/4a8abf37/attachment.sig>
