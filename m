@@ -1,34 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  8 Jan 2014 14:59:38 -0800
-Subject: [PATCH 1/7] ARM: perf_event: Silence sparse warning
-In-Reply-To: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
-References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1389221984-10973-2-git-send-email-sboyd@codeaurora.org>
+Date: Wed,  8 Jan 2014 14:59:37 -0800
+Subject: [PATCH 0/7] Support Krait CPU PMUs
+Message-ID: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/kernel/perf_event_cpu.c:274:25: warning: incorrect type in assignment (different modifiers)
-arch/arm/kernel/perf_event_cpu.c:274:25: expected int ( *init_fn )( ... )
-arch/arm/kernel/perf_event_cpu.c:274:25: got void const *const data
+This patchset adds support for the Krait CPU PMUs. I split the main patch
+up into two parts: first the basic support that gets us just the architected
+events and second the full support patch that tackles the PMRESR interface.
+I'm willing to squash things together if desired.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/perf_event_cpu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please note, this patchset relies on the per-cpu irq patch from Vinayak Kale,
+7f4a8e7b1943 (genirq: Add an accessor for IRQ_PER_CPU flag, 2013-12-04),
+that's sitting in linux-next. Patches are based on commit 21dea6695134 
+(ARM: msm_defconfig: Enable restart driver, 2013-12-20) in linux-next.
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index d85055cd24ba..20d553c9f5e2 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -254,7 +254,7 @@ static int probe_current_pmu(struct arm_pmu *pmu)
- static int cpu_pmu_device_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *of_id;
--	int (*init_fn)(struct arm_pmu *);
-+	const int (*init_fn)(struct arm_pmu *);
- 	struct device_node *node = pdev->dev.of_node;
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
+Stephen Boyd (7):
+  ARM: perf_event: Silence sparse warning
+  ARM: perf_event: Support percpu irqs for the CPU PMU
+  ARM: perf_event: Add basic support for Krait CPU PMUs
+  ARM: perf_event: Add hook for event index clearing
+  ARM: perf_event: Fully support Krait CPU PMU events
+  devicetree: bindings: Document Krait performance monitor units (PMU)
+  ARM: dts: msm: Add krait-pmu to platforms with Krait CPUs
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   1 +
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts        |   5 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi           |   5 +
+ arch/arm/include/asm/pmu.h                    |   1 +
+ arch/arm/kernel/perf_event.c                  |   2 +
+ arch/arm/kernel/perf_event_cpu.c              | 110 ++++--
+ arch/arm/kernel/perf_event_v7.c               | 545 ++++++++++++++++++++++++++
+ 7 files changed, 640 insertions(+), 29 deletions(-)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
