@@ -1,49 +1,56 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jan 2014 14:42:47 +0530
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <5463332.bvmmoGYyKm@wuerfel>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
- <3792319.Wf518ByjFs@wuerfel>
- <CAKohpo=2qKoffu7TuLHTLtX4vxX3Vs_oPV9DUHOkXiwN_fWCPg@mail.gmail.com>
- <5463332.bvmmoGYyKm@wuerfel>
-Message-ID: <CAKohponfH6KdEu6KGO-kLnp1+zDt3b28ugMVWxGoVECn8LAnkw@mail.gmail.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 08 Jan 2014 10:30:48 +0100
+Subject: [PATCH v3 01/13] clk: sunxi: register factors clocks behind
+ composite
+In-Reply-To: <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
+References: <1387769564-12894-1-git-send-email-emilio@elopez.com.ar>	<1387769564-12894-2-git-send-email-emilio@elopez.com.ar>	<52CC31CD.2060005@overkiz.com>
+ <CAAoKrfo+xOoc=S2wJF9XWz3OJoCOG3jD_m5N3XTSWOY6c1LR7w@mail.gmail.com>
+Message-ID: <52CD1AC8.9060801@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 January 2014 14:37, Arnd Bergmann <arnd@arndb.de> wrote:
->> > --- a/arch/arm/mach-imx/Kconfig
->> > +++ b/arch/arm/mach-imx/Kconfig
->> > @@ -3,7 +3,7 @@ config ARCH_MXC
->> >         select ARCH_REQUIRE_GPIOLIB
->> >         select ARM_CPU_SUSPEND if PM
->> >         select ARM_PATCH_PHYS_VIRT
->> > -       select AUTO_ZRELADDR if !ZBOOT_ROM
->> > +       select AUTO_ZRELADDR
->> >         select CLKSRC_MMIO
->> >         select COMMON_CLK
->> >         select GENERIC_ALLOCATOR
->>
->> Exynos already has this:
->>
->> arch/arm/mach-exynos/Kconfig
->> config SOC_EXYNOS5440
->>     ...
->>     select AUTO_ZRELADDR
+On 07/01/2014 18:47, Emilio L?pez wrote:
+> Hi Boris,
 >
-> Yes, that is ok. The problem with the imx dependency is that the kconfig
-> parser needs to know the state of the ZBOOT_ROM symbol in order to decide
-> whether to select AUTO_ZRELADDR or not, but ZBOOT_ROM in turn depends on
-> AUTO_ZRELADDR.
+> [ Apologies if the email looks weird and for using a link; I'm not
+> using my typical email client ]
 >
-> On second thought, we should just remove the 'select AUTO_ZRELADDR' from
-> ARCH_MXC and everything that is multiplatform enabled, since it's already
-> selected by ARCH_MULTIPLATFORM. An interesting question is what to do
-> about the case where you actually want ZBOOT_ROM with a multiplatform
-> enabled machine. We should probably allow that, but it's not possible
-> to express that in Kconfig as long as ZBOOT_ROM depends on !AUTO_ZRELADDR.
-> Obviously such a kernel won't be true multiplatform (it will only
-> work on systems with the right rom address), but I think that's ok as
-> long as it's documented well and not enabled by default. This is similar
-> to what we need to allow non-MMU builds for multiplatform machines.
+>> I'm currently working on the sunxi NFC (Nand Flash Controller) driver
+>> and I need to set the NAND clk (which is a mod0 clk type) rate.
+>>
+>> It seems that the composite clk fallbacks to the mux_hw's determine_rate
+>> instead of calling the rate_hw's (or factors hw) round_rate, if rate_hw
+>> does not implement determine_rate.
+> That is to be expected; if you have a composite clock that has all
+> fixed parents you'd not implement the determine_rate on the rate
+> component but on the mux one.
+>
+> (...)
+>
+>> But anyway, I think there is a drawback in the way composite clk
+>> implement the determine_rate handler.
+>> Mike, shouldn't we choose the best parent (using mux) fullfilling the
+>> rate_hw needs ?
+> Someone using the composite clock may not want their clocks to start
+> changing parents though. I believe it's easier and better to just
+> implement determine_rate as on this patch on my tree (which I haven't
+> sent yet, but it's literally the next in queue.)
+>
+> http://git.elopez.com.ar/linux/commits/5b4eb3ac406b9c98965714d40e8dd6da943d1ab0
+>
+> Let me know if that resolves your issue.
 
-I see.. So, I confirm that above diff fixes my issue.
+Yes, it works.
+Thanks.
+
+Can you submit it on LAKML so that I can state the dependency in my
+NFC driver series ?
+
+Best Regards,
+
+Boris
+
+>
+> Cheers,
+>
+> Emilio
