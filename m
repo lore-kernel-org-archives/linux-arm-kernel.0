@@ -1,30 +1,37 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Tue,  7 Jan 2014 17:44:04 -0800
-Subject: [PATCH] ARM: imx: select ARCH_HAS_CPUFREQ for iMX6SL
-Message-ID: <1389145444-61816-1-git-send-email-john.tobias.ph@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 8 Jan 2014 09:44:21 +0800
+Subject: [linux-sunxi] Re: [PATCH v2 1/8] clk: sunxi: add
+ clock-output-names dt property support
+In-Reply-To: <20140107221430.GE3103@lukather>
+References: <1388987892-23733-1-git-send-email-wens@csie.org>
+ <1388987892-23733-2-git-send-email-wens@csie.org>
+ <20140107221430.GE3103@lukather>
+Message-ID: <CAGb2v64ZE1an+dGNZey=nER_ZUEK4Og6FYXKUtowtiRQ_q=azA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX6SL now supported the cpufreq scaling by re-using the imx6q-cpufreq driver.
-By adding it, the user has the capability to select the said driver without
-depending it to SOC_IMX6Q.
+Hi,
 
-Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
----
- arch/arm/mach-imx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Wed, Jan 8, 2014 at 6:14 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Mon, Jan 06, 2014 at 01:58:05PM +0800, Chen-Yu Tsai wrote:
+>> sunxi clock drivers use dt node name as clock name, but clock
+>> nodes should be named clk at X, so the names would be the same.
+>> Let the drivers read clock names from dt clock-output-names
+>> property.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Please document this in Documentation/devicetree/bindings.
+>
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 7a6e6f7..704e5ae 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -808,6 +808,7 @@ config SOC_IMX6Q
- 
- config SOC_IMX6SL
- 	bool "i.MX6 SoloLite support"
-+	select ARCH_HAS_CPUFREQ
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_775420
- 	select ARM_GIC
--- 
-1.8.3.2
+Do you want them in the same patch, or separate?
+
+I think someone asked about this yesterday, but don't remember
+the conclusion.
+
+
+Thanks
+ChenYu
