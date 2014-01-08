@@ -1,48 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 09:20:10 +0100
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
- <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
-Message-ID: <3792319.Wf518ByjFs@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Jan 2014 08:14:52 +0000
+Subject: [PATCH v2 3/7] mfd: pm8921: Migrate to irqdomains
+In-Reply-To: <20140107195412.GC14405@codeaurora.org>
+References: <1387831563-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1387831563-13535-4-git-send-email-sboyd@codeaurora.org>
+ <20140106155350.GI30156@lee--X1> <52CB1323.6080200@codeaurora.org>
+ <20140107082233.GB3182@lee--X1>
+ <20140107195412.GC14405@codeaurora.org>
+Message-ID: <20140108081452.GC19974@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 13:32:35 Viresh Kumar wrote:
-> On Thu, Jan 2, 2014 at 9:53 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
-> >  SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
-> >  has unmet direct dependencies (!ZBOOT_ROM)
-> >
-> > This is because it's possible to have ZBOOT_ROM enabled, but at the
-> > same time have another option enabled which selects AUTO_ZRELADDR
-> > overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
-> > dependencies between ZBOOT_ROM and the options which depend on
-> > !ZBOOT_ROM.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> 
-> After this patch I see these warnings with exynos_defconfig
-> 
-> arch/arm/Kconfig:1963:error: recursive dependency detected!
-> arch/arm/Kconfig:1963: symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-> arch/arm/Kconfig:2151: symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
-> 
-> I am not really sure why this happened as I don't see AUTO_ZRELADDR
-> selected by ZBOOT_ROM in Kconfig :)
+On Tue, 07 Jan 2014, Stephen Boyd wrote:
 
-It's a weird dependency. You need this hunk:
+> On 01/07, Lee Jones wrote:
+> > > >> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> > > >> +}
+> > > > Can't you use the MFD core instead?
+> > > >
+> > > 
+> > > Are you suggesting using mfd_add_devices()? At first glance it looks
+> > > like that would require an array of mfd_cell structures that do nothing
+> > > besides match compatible strings in the DT. Using of_platform_populate()
+> > > achieves the same goal and doesn't require an array of mfd_cell
+> > > structures for each different pm8xxx chip that comes along, meaning
+> > > simpler code.
+> > 
+> > I'm inclined to agree, but playing Devil's advocate here, as a device
+> > using the MFD subsystem it's often clearer to readers and other people
+> > looking for examples if the MFD core functionality is used. For
+> > instance, I now have no idea what devices the PM8xxx encompasses
+> > without looking at the DTS file. A small cell structure is a small
+> > price to pay for code clarity IMHO.
+> > 
+> 
+> Why not just put that information in the binding document? And
+> how is this different from adding a bunch of C files to match a
+> set of compatible strings that a dts file has just so that we can
+> add all the devices on a board (think board files for an SoC).
+> Sure it documents the devices on a board, but we've been moving
+> away from that by using of_platform_populate().
+> 
+> IMHO the code is clear. I want to add all subnodes of this
+> device's node as children struct devices. Using
+> of_platform_populate() says that, whereas mfd_add_devices() says
+> I want to add these specific subnodes of this device's node.
+> 
+> Also, as more drivers are written and more bindings are ratified
+> this platform driver will need to be updated with more cells and
+> more compatible strings, causing more inter-tree dependencies and
+> more patches. Please, let's avoid this if we can.
 
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -3,7 +3,7 @@ config ARCH_MXC
-        select ARCH_REQUIRE_GPIOLIB
-        select ARM_CPU_SUSPEND if PM
-        select ARM_PATCH_PHYS_VIRT
--       select AUTO_ZRELADDR if !ZBOOT_ROM
-+       select AUTO_ZRELADDR
-        select CLKSRC_MMIO
-        select COMMON_CLK
-        select GENERIC_ALLOCATOR
+Okay, that's fine. There are a few discussions floating around about
+this. If I find some time, I'll have to have a think about the pros
+and cons of either approach. This is okay for now.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
