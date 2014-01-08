@@ -1,50 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jan 2014 21:36:47 +0000
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <CAOw6vbJNgdWJvb6t7zJ0Gm6gjXuq8Yd=ySgU+zqg-Kb1j1bBvw@mail.gmail.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <CAOw6vbJNgdWJvb6t7zJ0Gm6gjXuq8Yd=ySgU+zqg-Kb1j1bBvw@mail.gmail.com>
-Message-ID: <20140108213647.GT27432@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 22:37:36 +0100
+Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM
+ conversion
+In-Reply-To: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201401082237.36626.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 03:18:21PM -0500, Sean Paul wrote:
-> On Thu, Jan 2, 2014 at 4:27 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Subsystems such as ALSA, DRM and others require a single card-level
-> > device structure to represent a subsystem.  However, firmware tends to
-> > describe the individual devices and the connections between them.
-> >
-> > Therefore, we need a way to gather up the individual component devices
-> > together, and indicate when we have all the component devices.
-> >
-> > We do this in DT by providing a "superdevice" node which specifies
-> > the components, eg:
-> >
-> >         imx-drm {
-> >                 compatible = "fsl,drm";
-> >                 crtcs = <&ipu1>;
-> >                 connectors = <&hdmi>;
-> >         };
-> >
+On Tuesday 24 December 2013, Stephen Boyd wrote:
+> This is a rework of patches sent a months back by Rohit[1].
+> The goal of these patches is to add support for SMP and (basic)
+> hotplug on MSM based SoCs. To get there, we add support for a
+> generic way to hook in SMP/hotplug support code based on DT. To
+> show how it's used, we convert the MSM8660 SMP support code over
+> to the new method. After that we add support for the rest of the
+> upstream MSM SoCs (note these patches are piled high on top of
+> Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
+> but this should only matter to the MSM maintainers).
 > 
-> Hi Russell,
-> This looks really good. I'd definitely like to use it for the exynos
-> drm driver both to bind the various IP blocks together, and also to
-> pull in any attached bridges that are specified in the device tree.
-> Along those lines, it might be worthwhile to pull some of the master
-> bind functionality in your next patch into drm helpers so other
-> drivers can use them, and so we have concrete bindings across drm.
+> This is one of the last items of code that still requires us to have
+> a mach directory and a machine descriptor. We should be able to move
+> the hotplug/smp code out of mach directories if this approach is
+> accepted.
 
-Which bits do you think would be useful to move into the core?
-imx_drm_add_components() is rather imx-drm specific, especially for
-the CRTCs - it carries the knowledge that the OF device to be matched
-can be found in the _parent_ device, rather than the device registered
-into the component helpers.
+The implementation looks ok to me, but I wonder whether on a global
+scale we want to tie it more closely to the cpuidle implementations.
+We already have a drivers/cpuidle framework, and while I admit
+that I'm not familiar with the code in there, I would assume that
+the smp operations and the cpuidle code usually go hand in hand.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+	Arnd
