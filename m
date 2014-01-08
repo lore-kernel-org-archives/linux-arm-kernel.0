@@ -1,36 +1,30 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 08 Jan 2014 01:37:27 +0100
-Subject: [PATCH 6/7] clk/samsung: add support for pll2650xx
-In-Reply-To: <CAPdUM4P9tE5ohtAb5heMRj3GGjdYrNYp5iX7u-uZySiaCikA7Q@mail.gmail.com>
-References: <1386345391-23482-1-git-send-email-rahul.sharma@samsung.com>
- <1419145.DZQg0ZkHVU@amdc1227>
- <CAPdUM4P9tE5ohtAb5heMRj3GGjdYrNYp5iX7u-uZySiaCikA7Q@mail.gmail.com>
-Message-ID: <3338407.XGYaxCsdnx@flatron>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Jan 2014 09:45:14 +0900
+Subject: [PATCH 00/04 v2] ARM: shmobile: r7s72100 and Genmai GPIO /
+ PINCTRL V2
+In-Reply-To: <20131217050232.727.9552.sendpatchset@w520>
+References: <20131217050232.727.9552.sendpatchset@w520>
+Message-ID: <20140108004511.GI5136@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 of January 2014 17:14:48 Rahul Sharma wrote:
-> Hi Tomasz,
+On Tue, Dec 17, 2013 at 02:02:32PM +0900, Magnus Damm wrote:
+> ARM: shmobile: r7s72100 and Genmai GPIO / PINCTRL V2
 > 
-> On 19 December 2013 17:15, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Hi Rahul,
-> >
-> > On Friday 06 of December 2013 21:26:30 Rahul Sharma wrote:
-> >> Add support for pll2650xx in samsung pll file. This pll variant
-> >> is close to pll36xx but uses CON2 registers instead of CON1.
-> >
-> > If the ops are otherwise idential, why not reuse the ops for pll36xx
-> > and use CON1 or CON2 register conditionally based on pll->type field?
-> > (Just as it is already done for pll4600, 4650 and 4650c.)
-> >
+> [PATCH 01/04] ARM: shmobile: r7s72100 GPIO and PINCTRL device nodes
+> [PATCH 02/04] ARM: shmobile: Genmai SCIF2 PINCTRL configuration
+> [PATCH 03/04] ARM: shmobile: Genmai LED1 and LED2 support
+> [PATCH 04/04 v2] ARM: shmobile: Genmai I2C-over-GPIO support
+>
+> Add various device nodes to the r7s72100 SoC and the Genmai board,
+> nothing special just basic support for LEDs and I2C-over-GPIO.
 > 
-> I verified the difference and found that  pll2650xx is fairly
-> different in terms of
-> Bit Fields, Con2 register, and additional PLL config bits than pll36xx. Due to
-> this, I have to add lot of if-else code based on pll type which
-> doesn't looks clean.
+> Changes since V1:
+>  - 2/4 and 3/4 now includes acks, thanks Laurent!
+>  - 4/4 has been updated, thanks to Sergei and Wolfram!
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Fair enough.
+Hi Magnus,
 
-Best regards,
-Tomasz
+what is the status of this series?
