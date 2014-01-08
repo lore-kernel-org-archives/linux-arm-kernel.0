@@ -1,22 +1,51 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 08 Jan 2014 13:04:57 +0400
-Subject: =?UTF-8?B?UmU6IEluZm9ybWF0aW9uIGFib3V0IEF0bWVsIE1YVDIyNA==?=
-In-Reply-To: <52CD04F1.8090100@gmail.com>
-References: <52CD04F1.8090100@gmail.com>
-Message-ID: <1389171897.588258801@f329.i.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Jan 2014 10:07:48 +0100
+Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
+In-Reply-To: <CAKohpo=2qKoffu7TuLHTLtX4vxX3Vs_oPV9DUHOkXiwN_fWCPg@mail.gmail.com>
+References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
+ <3792319.Wf518ByjFs@wuerfel>
+ <CAKohpo=2qKoffu7TuLHTLtX4vxX3Vs_oPV9DUHOkXiwN_fWCPg@mail.gmail.com>
+Message-ID: <5463332.bvmmoGYyKm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????,  8 ?????? 2014, 8:57 +01:00 ?? Ga?tan Carlier <gcembed@gmail.com>:
-> Hello,
-> I have tried atmel_mxt_ts driver (original driver from kernel 3.6.0 and 
-> driver from linux-next/master branch copied to kernel 3.6.0) on i.MX27 
-> board. The capacitive glass used is a "GE Touch" 
-> SMT-F-057G007-B011-4:3-NP. It has 16 pads in X and 14 pads in Y. It is 
-> correctly detected (with one warning/error).
-> The power supply of VDD and AVDD is 2.8V. AVDD will be raised later to 3.3V.
-> When I push on glass, nothing occurs in evetst nor on /CHG pin of MXT224.
+On Wednesday 08 January 2014 13:56:38 Viresh Kumar wrote:
+> On 8 January 2014 13:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> > It's a weird dependency. You need this hunk:
+> >
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -3,7 +3,7 @@ config ARCH_MXC
+> >         select ARCH_REQUIRE_GPIOLIB
+> >         select ARM_CPU_SUSPEND if PM
+> >         select ARM_PATCH_PHYS_VIRT
+> > -       select AUTO_ZRELADDR if !ZBOOT_ROM
+> > +       select AUTO_ZRELADDR
+> >         select CLKSRC_MMIO
+> >         select COMMON_CLK
+> >         select GENERIC_ALLOCATOR
+> 
+> Exynos already has this:
+> 
+> arch/arm/mach-exynos/Kconfig
+> config SOC_EXYNOS5440
+>     ...
+>     select AUTO_ZRELADDR
 
-Do not forget about setup IOMUX for IRQ pin?
+Yes, that is ok. The problem with the imx dependency is that the kconfig
+parser needs to know the state of the ZBOOT_ROM symbol in order to decide
+whether to select AUTO_ZRELADDR or not, but ZBOOT_ROM in turn depends on
+AUTO_ZRELADDR.
 
----
+On second thought, we should just remove the 'select AUTO_ZRELADDR' from
+ARCH_MXC and everything that is multiplatform enabled, since it's already
+selected by ARCH_MULTIPLATFORM. An interesting question is what to do
+about the case where you actually want ZBOOT_ROM with a multiplatform
+enabled machine. We should probably allow that, but it's not possible
+to express that in Kconfig as long as ZBOOT_ROM depends on !AUTO_ZRELADDR.
+Obviously such a kernel won't be true multiplatform (it will only
+work on systems with the right rom address), but I think that's ok as
+long as it's documented well and not enabled by default. This is similar
+to what we need to allow non-MMU builds for multiplatform machines.
+
+	Arnd
