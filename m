@@ -1,78 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 08 Jan 2014 20:13:38 +0100
-Subject: [GIT PULL] Samsung Clock changes for v3.14
-Message-ID: <3518820.nAXoIq2LQG@amdc1227>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jan 2014 11:18:03 -0800
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <52CD5010.6030309@ti.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com>
+ <52BC6B16.80507@ti.com> <52BD856E.7010609@ti.com>
+ <52C11284.2030500@ti.com> <20140107230733.GD5074@atomide.com>
+ <20140107235514.GG5074@atomide.com> <52CD5010.6030309@ti.com>
+Message-ID: <20140108191802.GA31323@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+* Sricharan R <r.sricharan@ti.com> [140108 05:20]:
+> On Wednesday 08 January 2014 05:25 AM, Tony Lindgren wrote:
+> > 
+> > Oops, I noticed some errors on these:
+> > 
+> > WARNING: drivers/built-in.o(.text+0xcd0): Section mismatch in reference from the function irqcrossbar_init() to the function .init.text:crossbar_of_init()
+> > The function irqcrossbar_init() references
+> > the function __init crossbar_of_init().
+> > This is often because irqcrossbar_init lacks a __init 
+> > annotation or the annotation of crossbar_of_init is wrong.
+> > 
+> > WARNING: drivers/built-in.o(.text+0xcdc): Section mismatch in reference from the function irqcrossbar_init() to the (unknown reference) .init.rodata:(unknown)
+> > The function irqcrossbar_init() references
+> > the (unknown reference) __initconst (unknown).
+> > This is often because irqcrossbar_init lacks a __initconst 
+> > annotation or the annotation of (unknown) is wrong.
+> > 
+> > So I've dropped them for now. Care to fix up those errors and
+> > base your patches against let's say v3.13-rc5?
+> > 
+>    Very Sorry for the section mismatch warning.
+>    I have fixed it and pushed a new branch below based on v3.13-rc5
+> 
+>    git://github.com/Sricharanti/sricharan.git
+>    branch: crossbar_3.13_rc5
 
-Please consider pulling following Samsung Clock changes for v3.14.
+Thanks, applying again.
 
-The following changes since commit 2bb00c68e094271b79deac993893461cc051b721:
+Regards,
 
-  Merge branch 'samsung-fixes' into samsung-next-base (2013-12-30 18:15:23 +0100)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.14/samsung-clk
-
-for you to fetch changes up to 59d711e9ddd2f68822a2a99fc939e11a9288b73e:
-
-  ARM: dts: exynos5420: add input clocks to audss clock controller (2014-01-08 18:02:43 +0100)
-
-----------------------------------------------------------------
-(A bit late) first round of Samsung clock patches for v3.14.
-
-----------------------------------------------------------------
-Andrew Bresticker (7):
-      clk: exynos5250: register APLL rate table
-      clk: exynos-audss: convert to platform device
-      clk: exynos-audss: allow input clocks to be specified in device tree
-      clk: exynos5250: add clock ID for div_pcm0
-      ARM: dts: exynos5250: add input clocks to audss clock controller
-      clk: exynos-audss: add support for Exynos 5420
-      ARM: dts: exynos5420: add input clocks to audss clock controller
-
-Andrzej Hajda (8):
-      ARM: exynos4: create a DT header defining CLK IDs
-      clk: exynos4: replace clock ID private enums with IDs from DT header
-      ARM: exynos5250: create a DT header defining CLK IDs
-      clk: exynos5250: replace clock ID private enums with IDs from DT header
-      ARM: exynos5420: create a DT header defining CLK IDs
-      clk: exynos5420: replace clock ID private enums with IDs from DT header
-      ARM: exynos5440: create a DT header defining CLK IDs
-      clk: exynos5440: replace clock ID private enums with IDs from DT header
-
-Sachin Kamat (1):
-      clk: exynos5250: Add CLK_SET_RATE_PARENT flag to mout_apll
-
-Tomasz Figa (7):
-      clk: samsung: exynos5250: Sort definitions by registers and bitfield
-      clk: samsung: exynos5250: Make names of mux and div clocks consistent
-      clk: samsung: exynos5250: Fix parents of gate clocks from GSCL domain
-      clk: samsung: exynos5250: Fix parent of gate clocks from DISP1 domain
-      clk: samsung: exynos5250: Add missing unpopulated mux parents
-      clk: samsung: exynos5250: Correct parent list of audio muxes
-      clk: samsung: exynos5250: Fix parents of gate clocks from MFC domain
-
- .../devicetree/bindings/clock/clk-exynos-audss.txt |  39 +-
- .../devicetree/bindings/clock/exynos5250-clock.txt |   1 +
- arch/arm/boot/dts/exynos5250.dtsi                  |   2 +
- arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
- drivers/clk/samsung/clk-exynos-audss.c             | 159 +++-
- drivers/clk/samsung/clk-exynos4.c                  | 857 ++++++++++-----------
- drivers/clk/samsung/clk-exynos5250.c               | 699 ++++++++++-------
- drivers/clk/samsung/clk-exynos5420.c               | 648 ++++++++--------
- drivers/clk/samsung/clk-exynos5440.c               |  81 +-
- include/dt-bindings/clk/exynos-audss-clk.h         |   3 +-
- include/dt-bindings/clock/exynos4.h                | 244 ++++++
- include/dt-bindings/clock/exynos5250.h             | 160 ++++
- include/dt-bindings/clock/exynos5420.h             | 188 +++++
- include/dt-bindings/clock/exynos5440.h             |  42 +
- 14 files changed, 1957 insertions(+), 1170 deletions(-)
- create mode 100644 include/dt-bindings/clock/exynos4.h
- create mode 100644 include/dt-bindings/clock/exynos5250.h
- create mode 100644 include/dt-bindings/clock/exynos5420.h
- create mode 100644 include/dt-bindings/clock/exynos5440.h
+Tony
