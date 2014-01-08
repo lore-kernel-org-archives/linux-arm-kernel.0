@@ -1,68 +1,51 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Wed, 08 Jan 2014 10:58:34 +0000
-Subject: [PATCH] ARM: DT/kernel: fix arch_match_cpu_phys_id to avoid
- erroneous match
-In-Reply-To: <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
-References: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
-Message-ID: <52CD2F5A.5000001@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 8 Jan 2014 16:34:18 +0530
+Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
+ information
+In-Reply-To: <4840680.vVGZYBJBID@wuerfel>
+References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+ <4812867.NuB3hNkV9d@wuerfel> <52CD2807.9000200@ti.com>
+ <4840680.vVGZYBJBID@wuerfel>
+Message-ID: <52CD30B2.2080807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 07/01/14 16:58, Mark Rutland wrote:
-> Hi,
+On 01/08/2014 04:10 PM, Arnd Bergmann wrote:
+> On Wednesday 08 January 2014 15:57:19 Roger Quadros wrote:
+>> It is a clock gate defined like so in the DT clock data
+>>
+>> on OMAP4
+>>         init_60m_fclk: init_60m_fclk {
+>>                 #clock-cells = <0>;
+>>                 compatible = "ti,divider-clock";
+>>                 clocks = <&dpll_usb_m2_ck>;
+>>                 reg = <0x0104>;
+>>                 ti,dividers = <1>, <8>;
+>>         };
+>>
+>> on OMAP5
+>>         l3init_60m_fclk: l3init_60m_fclk {
+>>                 #clock-cells = <0>;
+>>                 compatible = "ti,divider-clock";
+>>                 clocks = <&dpll_usb_m2_ck>;
+>>                 reg = <0x0104>;
+>>                 ti,dividers = <1>, <8>;
+>>         };
+>>
+>> So you can see that it is the same thing with a different name.
 > 
-> I was just looking in devtree.c and I noticed this seems to have fallen
-> by the wayside. Given that this fixes a possible bug and there have been
-> no negative comments, I think it's good for mainline.
-> 
-> Could you place this in the patch system, assuming Russell has no
-> comments?
-> 
+> Right, but init_60m_fclk is the name of the clock output of the
+> divider here, which is /not/ what you should put in the "clock-names"
+> property of the consumer. The clock input name should reflect what
+> the clock is used for instead.
 
-Can I put this in patch tracker if you have no objections ?
+Ah, now I get it. :). I agree that the name should reflect the function.
 
-Regards,
-Sudeep
+Looking more closely, the driver doesn't enable/disable the init_60m_fclk but just
+uses it to configure the parent of utmi_p1_gfclk which is a clock input to the
+USB module. 
 
-> Cheers,
-> Mark.
-> 
-> On Mon, Oct 21, 2013 at 01:30:32PM +0100, Sudeep KarkadaNagesha wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> The MPIDR contains specific bitfields(MPIDR.Aff{2..0}) which uniquely
->> identify a CPU, in addition to some non-identifying information and
->> reserved bits. The ARM cpu binding defines the 'reg' property to only
->> contain the affinity bits, and any cpu nodes with other bits set in
->> their 'reg' entry are skipped.
->>
->> As such it is not necessary to mask the phys_id with MPIDR_HWID_BITMASK,
->> and doing so could lead to matching erroneous CPU nodes in the device
->> tree. This patch removes the masking of the physical identifier.
->>
->> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> ---
->>  arch/arm/kernel/devtree.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
->> index f35906b..41960fb 100644
->> --- a/arch/arm/kernel/devtree.c
->> +++ b/arch/arm/kernel/devtree.c
->> @@ -171,7 +171,7 @@ void __init arm_dt_init_cpu_maps(void)
->>  
->>  bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
->>  {
->> -	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
->> +	return phys_id == cpu_logical_map(cpu);
->>  }
->>  
->>  /**
->> -- 
->> 1.8.1.2
->>
+Based on this I would call it "refclk_int" for internal reference clock.
+
+cheers,
+-roger
