@@ -1,26 +1,44 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 8 Jan 2014 17:08:08 +0000
-Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
-In-Reply-To: <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
-References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
- <201401071215.06064.arnd@arndb.de>
- <CACRpkdacaskiv2R5YTB_9jFaOueXGEFxYQUEo4eq7aHkDLhjfw@mail.gmail.com>
-Message-ID: <20140108170808.GH31886@sirena.org.uk>
+Date: Wed,  8 Jan 2014 17:10:13 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+References: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+Message-ID: <1389201013-23794-4-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 07:27:49PM +0100, Linus Walleij wrote:
+From: Mark Brown <broonie@linaro.org>
 
-> I think the S3C driver is a different piece of hardware unfortunately.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads.
 
-It's not, the IP is basically the same - the difference between s3c, s5p
-and Exynos is a marketing one, Samsung have generally just reused IP
-where that is reasonable.  There's a great deal of continuity in the
-platforms.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/4a8abf37/attachment.sig>
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index e5140b03b342..869aeaff02dc 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -183,6 +183,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.2
