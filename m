@@ -1,54 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Jan 2014 15:23:09 +0100
-Subject: [GIT PULL] at91: cleanup for 3.14 #2
-Message-ID: <1389190989-8261-1-git-send-email-nicolas.ferre@atmel.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed,  8 Jan 2014 15:21:56 +0100
+Subject: [RFC PATCH 1/9] mtd: nand: retrieve ECC requirements from Hynix READ
+ ID byte 4
+In-Reply-To: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1389190924-26226-2-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+The Hynix nand flashes store their ECC requirements in byte 4 of its id
+(returned on READ ID command).
 
-A little "cleanup" pull-request for 3.14 that goes on top of the previous
-AT91 cleanup material.
-The thing to note from this pull-request is the beginning of board file removal
-thank to the conversion to DT. We are still waiting for more feedback from
-board maintainer to intensify the effort.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/mtd/nand/nand_base.c |   37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-Thanks, best regards,
-
-The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
-
-  ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-cleanup2
-
-for you to fetch changes up to e91a5555df5883bbc204b0e1f8e0489d3f7f3f2e:
-
-  ARM: at91: switch Calao QIL-A9260 board to DT (2013-12-19 17:27:30 +0100)
-
-----------------------------------------------------------------
-Second cleanup pull-request for 3.14:
-- a tiny fix for the recent AT91 CCF implementation
-- the switch of one platform to DT with board file removal
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      clk: at91: fix pmc_clk_ids data type attriubte
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: switch Calao QIL-A9260 board to DT
-
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/at91-qil_a9260.dts        | 185 +++++++++++++++++++
- arch/arm/configs/at91sam9260_9g20_defconfig |   1 -
- arch/arm/mach-at91/Kconfig.non_dt           |   6 -
- arch/arm/mach-at91/Makefile                 |   1 -
- arch/arm/mach-at91/board-qil-a9260.c        | 266 ----------------------------
- drivers/clk/at91/pmc.c                      |   2 +-
- 7 files changed, 187 insertions(+), 275 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-qil_a9260.dts
- delete mode 100644 arch/arm/mach-at91/board-qil-a9260.c
-
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index bd39f7b..15069ec 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -3202,6 +3202,43 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
+ 		else
+ 			mtd->erasesize = (64 * 1024) << tmp;
+ 		*busw = 0;
++
++		/* Retrieve ECC infos */
++		switch ((id_data[4] >> 4) & 0x7) {
++		case 1:
++			chip->ecc_step_ds = 512;
++			chip->ecc_strength_ds = 1;
++			break;
++		case 2:
++			chip->ecc_step_ds = 512;
++			chip->ecc_strength_ds = 2;
++			break;
++		case 3:
++			chip->ecc_step_ds = 512;
++			chip->ecc_strength_ds = 4;
++			break;
++		case 4:
++			chip->ecc_step_ds = 512;
++			chip->ecc_strength_ds = 8;
++			break;
++		case 5:
++			chip->ecc_step_ds = 1024;
++			chip->ecc_strength_ds = 24;
++			break;
++		case 6:
++			chip->ecc_step_ds = 1024;
++			chip->ecc_strength_ds = 32;
++			break;
++		case 7:
++			chip->ecc_step_ds = 1024;
++			chip->ecc_strength_ds = 40;
++			break;
++		case 0:
++		default:
++			chip->ecc_step_ds = 0;
++			chip->ecc_strength_ds = 0;
++			break;
++		}
+ 	} else {
+ 		/* Calc pagesize */
+ 		mtd->writesize = 1024 << (extid & 0x03);
 -- 
-Nicolas Ferre
+1.7.9.5
