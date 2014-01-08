@@ -1,82 +1,45 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jan 2014 09:00:41 +0900
-Subject: [PATCH v2 0/8] SoC and board integration for RSPI on RZ/A1H
-In-Reply-To: <5395895.snn5ED4YEr@avalon>
-References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
- <20140107012628.GD2196@verge.net.au> <5395895.snn5ED4YEr@avalon>
-Message-ID: <20140108000037.GA5136@verge.net.au>
+Date: Wed, 8 Jan 2014 09:06:39 +0900
+Subject: [PATCH v3 net-next 1/3] sh_eth: Add support for r7s72100
+In-Reply-To: <20140107.140755.1722284527902829385.davem@davemloft.net>
+References: <1389061635-4083-1-git-send-email-horms+renesas@verge.net.au>
+ <1389061635-4083-2-git-send-email-horms+renesas@verge.net.au>
+ <20140107.140755.1722284527902829385.davem@davemloft.net>
+Message-ID: <20140108000638.GB5136@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 04:01:30PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Tue, Jan 07, 2014 at 02:07:55PM -0500, David Miller wrote:
+> From: Simon Horman <horms+renesas@verge.net.au>
+> Date: Tue,  7 Jan 2014 11:27:13 +0900
 > 
-> On Tuesday 07 January 2014 10:26:28 Simon Horman wrote:
-> > On Fri, Dec 27, 2013 at 09:15:54PM +0100, Geert Uytterhoeven wrote:
-> > > This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
-> > > and the Genmai development board.
-> > > 
-> > > The series is based on renesas-devel-v3.13-rc5-20131226, with Magnus'
-> > > pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
-> > > 
-> > > It was tested on the Genmai development board (genmai-reference), using
-> > > an in-kernel version of Documentation/spi/spidev_test.c, exercising
-> > > loopback mode on rspi1, with the same outcome as the SDK reference code.
-> > > 
-> > > Notes:
-> > >   1. The proposed DT bindings also talk about QSPI on the R8A779x, as
-> > >      those SoCs use the same driver.
-> > >   
-> > >   2. As the actual spi-rspi driver doesn't use DT yet, platform devices
-> > >      and spi board info are still used from C to instantiate SPI buses and
-> > >      their children, while pinctrl is performed by DT.
-> > >   
-> > >   3. It will not work with the non-reference version of genmai, due to
-> > >      missing pinmux configuration in setup-r7s72100.c.
-> > >   
-> > >   4. Patches [4/8] and [5/8] are new.
-> > >   
-> > >     [1/8] pinctrl: sh-pfc: r7s72100: Add RSPI support
-> > 
-> > I believe that Laurent should handle this.
+> > @@ -318,6 +371,14 @@ static int sh_eth_is_gether(struct sh_eth_private *mdp)
+> >  		return 0;
+> >  }
+> >  
+> > +static int sh_eth_is_rz_fast_ether(struct sh_eth_private *mdp)
+> > +{
+> > +	if (mdp->reg_offset == sh_eth_offset_fast_rz)
+> > +		return 1;
+> > +	else
+> > +		return 0;
+> > +}
 > 
-> I will, but I'm waiting for Magnus to resubmit the base r7s72100 pinctrl patch 
-> series.
+> Please make this return a boolean and use true/false.
 
-Got it.
+Thanks. I will also refactor the giga_ether version of this
+function accordingly.
 
-> > >     [2/8] ARM: shmobile: r7s72100: Add RSPI clocks
-> > 
-> > This seems fine and independent of the other patches.
-> > But unfortunately it no longer applies.
-> > 
-> > Feel free to rebase it if you would like me to queue it up sooner
-> > than later.
-> > 
-> > >     [3/8] ARM: shmobile: r7s72100: Add RSPI platform devices
-> > 
-> > I assume this depends on 1/3.
-> > 
-> > Please add a patch to update the koelsch defconfig.
-> > 
-> > >     [4/8] ARM: shmobile: genmai: Add RSPI children (NEW)
-> > 
-> > This seems reasonable but I assume it depends on earlier patches.
-> > 
-> > Please add a patch to update the koelsch defconfig or Kconfig.
-> > 
-> > >     [5/8] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux (NEW)
-> > >     [6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI bindings
-> > >     [7/8] [RFC] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-> > >     [8/8] [RFC] ARM: shmobile: genmai reference: Add RSPI nodes
 > 
-> -- 
-> Regards,
+> > @@ -2061,6 +2155,10 @@ static struct net_device_stats *sh_eth_get_stats(struct net_device *ndev)
+> >  {
+> >  	struct sh_eth_private *mdp = netdev_priv(ndev);
+> >  
+> > +	if (sh_eth_is_rz_fast_ether(mdp)) {
+> > +		return &ndev->stats;
+> > +	}
 > 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Single statement basic blocks do not need curly braces, therefore
+> please remove them here.
+
+Will do.
