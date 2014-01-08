@@ -1,46 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Jan 2014 18:30:06 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Jan 2014 18:32:18 +0000
+Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140108182331.GB9724@e102568-lin.cambridge.arm.com>
 References: <1389201013-23794-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140108183006.GC9724@e102568-lin.cambridge.arm.com>
+ <1389201013-23794-2-git-send-email-broonie@kernel.org>
+ <20140108182331.GB9724@e102568-lin.cambridge.arm.com>
+Message-ID: <20140108183218.GV31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 05:10:10PM +0000, Mark Brown wrote:
+On Wed, Jan 08, 2014 at 06:23:31PM +0000, Lorenzo Pieralisi wrote:
 
-[...]
+> > This doesn't actually ignore CPUs in the root cpu-map, merely warns
+> > about them.  After looking at ignoring them it seemed like a more
+> > sensible thing to just shove them in a separate cluster for now -
+> > giving the scheduler information about only some of the cores seemed
+> > like it was asking for trouble and trying to do anything more active
+> > seems like a lot of work to unsupport broken systems (if you see what
+> > I mean).  I would expect that the end result of putting them in a
+> > cluster is going to be about the same as not providing information
+> > anyway.
 
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> new file mode 100644
-> index 000000000000..853544f30a8b
-> --- /dev/null
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -0,0 +1,92 @@
-> +/*
-> + * arch/arm64/kernel/topology.c
-> + *
-> + * Copyright (C) 2011,2013 Linaro Limited.
-> + *
-> + * Based on the arm32 version written by Vincent Guittot in turn based on
-> + * arch/sh/kernel/topology.c
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/init.h>
-> +#include <linux/percpu.h>
-> +#include <linux/node.h>
-> +#include <linux/nodemask.h>
-> +#include <linux/sched.h>
-> +#include <linux/slab.h>
+> > It seems like if this isn't enough then either disabling the affected
+> > CPUs entirely or making the warnings louder is the way forwards.
 
-Nitpick, <linux/slab.h> does not belong in this patch. There are other
-includes that should be moved to the respective patch (percpu.h ?) where
-they are actually used.
+> Well, there are so many corner cases (eg duplicated CPUs might be
+> another one - should we track that ? It is probably something worth
+> warning on, you check before initializing a cpu struct if it has already
+> been initialized) that they are hard to track. What you did makes sense
+> to me at first glance.
 
-Lorenzo
+Yes, there's definitely scope for improving the robustness.  On the
+other hand I'm sure all device tree authors are dilligent and careful so
+there's no need for us to worry! :P
+
+> >  arch/arm64/kernel/topology.c | 149 +++++++++++++++++++++++++++++++++++++++++++
+> > +static void __init parse_cluster(struct device_node *cluster, int depth)
+
+> Is it really worth adding a depth parameter just for cpu-map ? Can't we check
+> the node name ? Either way is fine by me, just flagging this up.
+
+It seemed more idiomatic and I suspect we may want the depth in future
+if we try to tell the scheduler about clusters of clusters.  It's
+certainly easier to leave the code as is now I've written it this way if
+nothing else.
+
+> > +	if (leaf)
+> > +		cluster_id++;
+
+> We increment cluster_id even for leaf clusters with no cores, it is
+> probably safe to do it given that cluster id are completely arbitrary
+> numbers, just wanted to mention that.
+
+Right, my thoughts exactly - this is the simplest thing I thought of.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/4ab73550/attachment.sig>
