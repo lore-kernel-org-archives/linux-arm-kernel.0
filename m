@@ -1,23 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 14:44:24 +0100
+Date: Wed, 08 Jan 2014 14:45:26 +0100
 Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
-In-Reply-To: <52CD55D5.6020703@free-electrons.com>
+In-Reply-To: <20140108133958.GA15182@katana>
 References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
- <201401081352.57361.arnd@arndb.de> <52CD55D5.6020703@free-electrons.com>
-Message-ID: <5524929.csF5lYbH6h@wuerfel>
+ <52CD4CBE.6010902@free-electrons.com> <20140108133958.GA15182@katana>
+Message-ID: <3195222.U7OZJLz9Y4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 14:42:45 Gregory CLEMENT wrote:
-> You means something like the following code ?
+On Wednesday 08 January 2014 14:39:59 Wolfram Sang wrote:
+> > >>>> However, when I first read this I thought it should be a -a0 specific
+> > >>>> compatible string, not a 'offload-broken' property - any idea what the
+> > >>>> DT consensus is here? I've seen both approach in use ..
+> > >>>
+> > >>> I prefer the replacement of the compatible string. If it should really
+> > >>> be a seperate property, then it should be a vendor specific property. It
+> > >>> is not generic, at all.
+> > >>
+> > >> Something like "marvell,offload-broken" would be acceptable?
+> > > 
+> > > A tad more, yes. Still, since this is a feature/quirk of the IP core
+> > > revision, it should be deduced from the compatible property IMO. It
+> > > cannot be configured anywhere, so it doesn't change on board level.
+> > 
+> > So you would prefer using the "marvell,mv78230-a0-i2c" comaptible string and
+> > updating it with the follwing piece of code?
 > 
-> static void __init armada_370_xp_dt_init(void)
->  {
-> +       if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
-> +               i2c_quirk();
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
+> This is the approach I favour, yes. Can't say much about the
+> implementation. Looks OK, but dunno if this is minimal...
+> 
 
-Yes, that looks like a good way to do it.
+I would prefer the separate property in this case, but only because it's
+easier to add in the quirk than to change the compatible string, but it's
+not a strong preference and I don't mind getting overruled if you all
+favor the alternative.
 
 	Arnd
