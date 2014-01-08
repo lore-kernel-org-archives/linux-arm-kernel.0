@@ -1,30 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Jan 2014 14:35:02 +0100
-Subject: [PATCH] ARM: tegra: document which Dalmore revisions are supported
-In-Reply-To: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
-References: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140108133501.GC1592@ulmo.nvidia.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 8 Jan 2014 14:39:59 +0100
+Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
+In-Reply-To: <52CD4CBE.6010902@free-electrons.com>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140107183853.GE4227@obsidianresearch.com>
+ <20140107230610.GB2592@katana>
+ <52CD2529.6090206@free-electrons.com>
+ <20140108112926.GB2669@katana>
+ <52CD4CBE.6010902@free-electrons.com>
+Message-ID: <20140108133958.GA15182@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 12:15:49PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> There are a number of revisions of the Dalmore board, each with a variety
-> of incompatible SW-visible HW changes. The Dalmore DT file in the kernel
-> only supports HW revision A04. Document this in the DT file.
-> 
-> Reported-by: Paul Walmsley <pwalmsley@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra114-dalmore.dts | 5 +++++
->  1 file changed, 5 insertions(+)
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
+> >>>> However, when I first read this I thought it should be a -a0 specific
+> >>>> compatible string, not a 'offload-broken' property - any idea what the
+> >>>> DT consensus is here? I've seen both approach in use ..
+> >>>
+> >>> I prefer the replacement of the compatible string. If it should really
+> >>> be a seperate property, then it should be a vendor specific property. It
+> >>> is not generic, at all.
+> >>
+> >> Something like "marvell,offload-broken" would be acceptable?
+> > 
+> > A tad more, yes. Still, since this is a feature/quirk of the IP core
+> > revision, it should be deduced from the compatible property IMO. It
+> > cannot be configured anywhere, so it doesn't change on board level.
+> 
+> So you would prefer using the "marvell,mv78230-a0-i2c" comaptible string and
+> updating it with the follwing piece of code?
+
+This is the approach I favour, yes. Can't say much about the
+implementation. Looks OK, but dunno if this is minimal...
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/dfae440f/attachment-0001.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/119e6c21/attachment.sig>
