@@ -1,37 +1,69 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 08 Jan 2014 08:31:38 -0800
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <2890647.PEOApIOYyP@amdc1227>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
- <20131231194215.12054.39705@quantum> <2890647.PEOApIOYyP@amdc1227>
-Message-ID: <20140108163138.27803.58310@quantum>
+Date: Wed, 08 Jan 2014 08:33:52 -0800
+Subject: [PATCH] clk: clk-divider: fix divisor > 255 bug
+In-Reply-To: <52CA807E.8020100@imgtec.com>
+References: <1387190498-15392-1-git-send-email-james.hogan@imgtec.com>
+ <20140103041556.12054.53966@quantum> <52CA807E.8020100@imgtec.com>
+Message-ID: <20140108163352.27803.86084@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-01-02 07:22:12)
-> On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
-> > Quoting Tomasz Figa (2013-12-12 08:07:13)
-> > > This series intends to improve clock provider impementation of max77686
-> > > PMIC driver. First two patches are simple fixes of current implementation
-> > > to allow correct control of provided clocks. Further patches refactor
-> > > the driver to make the code cleaner and prepare for further patches. Then
-> > > last two patches add registration of OF clock provider and adjust device
-> > > tree nodes of boards containing max77686 chip to contain properties
-> > > required by clock provider.
+Quoting James Hogan (2014-01-06 02:07:58)
+> On 03/01/14 04:15, Mike Turquette wrote:
+> > Quoting James Hogan (2013-12-16 02:41:38)
+> >> Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
+> >> merged in v3.6 added the _get_val function to convert a divisor value to
+> >> a register field value depending on the flags. However it used the type
+> >> u8 for the div field, causing divisors larger than 255 to be masked
+> >> and the resultant clock rate to be too high.
+> >>
+> >> E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
+> >> to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
+> >> was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
+> >>
+> >> Signed-off-by: James Hogan <james.hogan@imgtec.com>
 > > 
-> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> > Taken into clk-next. Thanks for the fix!
 > 
-> Hmm... Shouldn't this series go through the clk tree directly? If not, who
-> should be taking it?
+> Thanks Mike, is there any chance of getting this into v3.13, or is it
+> too late?
 
-Yes it should, but I guessed it would come in a pull request. Maybe Ack
-is the wrong thing? I can just say "looks good to me me" or something
-else.
+I had applied it to clk-next but I just moved it over to my -fixes
+branch. Will send later today.
 
 Regards,
 Mike
 
 > 
-> Best regards,
-> Tomasz
+> Cheers
+> James
+> 
+> >> Cc: Rajendra Nayak <rnayak@ti.com>
+> >> Cc: Mike Turquette <mturquette@linaro.org>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: stable at vger.kernel.org
+> >> ---
+> >> Since this bug was introduced in 3.6, it probably should by applied to
+> >> stable 3.10 and 3.12.
+> >> ---
+> >>  drivers/clk/clk-divider.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> >> index 8d3009e44fba..5543b7df8e16 100644
+> >> --- a/drivers/clk/clk-divider.c
+> >> +++ b/drivers/clk/clk-divider.c
+> >> @@ -87,7 +87,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
+> >>         return 0;
+> >>  }
+> >>  
+> >> -static unsigned int _get_val(struct clk_divider *divider, u8 div)
+> >> +static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
+> >>  {
+> >>         if (divider->flags & CLK_DIVIDER_ONE_BASED)
+> >>                 return div;
+> >> -- 
+> >> 1.8.1.2
+> >>
+> >>
 > 
