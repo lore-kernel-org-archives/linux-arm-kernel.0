@@ -1,81 +1,103 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue,  7 Jan 2014 17:46:46 -0700
-Subject: [PATCH v5 0/5] Hardware Reduced Mode Cleanup for ACPI
-Message-ID: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
+Date: Tue,  7 Jan 2014 17:46:47 -0700
+Subject: [PATCH v5 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to
+ enforce this ACPI mode
+In-Reply-To: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
+References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1389142011-27356-2-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-This series of patches starts with Hanjun's patch to create a kernel
-config item for CONFIG_ACPI_REDUCED_HARDWARE [0].  Building on that, I
-then reviewed all of the code that touched any of several fields in the
-FADT that the OSPM is supposed to ignore when ACPI is in Hardware Reduced
-mode [1].  Any time there was a use of one of the fields to be ignored,
-I evaluated whether or not the code was implementing Hardware Reduced
-mode correctly.  Similarly, for each the flags in the FADT flags field
-that are to be ignored in Hardware Reduced mode, the kernel code was again
-scanned for proper usage.  The remainder of the patches are to fix all of
-the situations I could find where the kernel would not behave correctly
-in this ACPI mode.
+Hardware reduced mode, despite the name, exists primarily to allow
+newer platforms to use a much simpler form of ACPI that does not
+require supporting the legacy of previous versions of the specification.
+This mode was first introduced in the ACPI 5.0 specification, but because
+it is so much simpler and reduces the size of the object code needed to
+support ACPI, it is likely to be used more often in the near future.
 
-These seem to work just fine on the RTSM model for ARMv7, both with and
-without ACPI enabled, and with and without ACPI_REDUCED_HARDWARE enabled;
-similarly for the FVP model for ARMv8.  The patches for ACPI on ARM
-hardware have been submitted elsewhere but they presume that reduced HW
-mode is functioning correctly.  In the meantime, there's no way I can think
-of to test all possible scenarios so feedback would be greatly appreciated.
+To enable the hardware reduced mode of ACPI on some platforms (such as
+ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
+to TRUE in the ACPICA source.  For ARM/ARM64, hardware reduced ACPI
+should be the only mode used; legacy mode would require modifications
+to SoCs in order to provide several x86-specific hardware features (e.g.,
+an NMI and SMI support).
 
+We set ACPI_REDUCED_HARDWARE to TRUE in the ACPICA source by introducing
+a kernel config item to enable/disable ACPI_REDUCED_HARDWARE.  We can then
+change the kernel config instead of having to modify the kernel source
+directly to enable the reduced hardware mode of ACPI.
 
-[0] List at https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/AcpiReducedHw#Section_5:_ACPI_Software_Programming_Model
-[1] Please see the ACPI Specification v5.0 for details on Hardware Reduced
-    mode (sections 3.11.1, 4.1, 5.2.9, at a minimum).
+Lv Zheng suggested that this configuration item does not belong in ACPICA,
+the upstream source for much of the ACPI internals, but rather to the
+Linux kernel itself.  Hence, we introduce this flag so that we can make
+ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
+please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
 
-Changes for v5:
-   -- Clarify that if the kernel config option to build ACPI hardware reduced
-      mode is used, it builds a hardware reduced *only* kernel (i.e., full
-      legacy ACPI mode will no longer work).
+Even though support for X86 in hardware reduced mode is possible, it
+is NOT enabled.  Extensive effort has gone into the Linux kernel so that
+there is a single kernel image than can run on all x86 hardware; the kernel
+changes run-time behavior to adapt to the hardware being used.  This is not
+currently possible with the existing ACPICA infrastructure but only presents
+a problem on achitectures supporting both hardware-reduced and legacy modes
+of ACPI -- i.e., on x86 only.
 
-Changes for v4:
-   -- Given the current state of ACPICA, disable CONFIG_ACPI_REDUCED_HARDWARE
-      for use on anything other than ARM.
-   -- Replaced #ifdefs with run-time checking for hardware reduced mode,
-      whenever possible
+The problem with the current ACPICA code base is that if one builds legacy
+ACPI (a proper superset of hardware-reduced), the kernel can run in hardware-
+reduced with the proper ACPI tables, but there is still ACPICA code that could
+be executed even though it is not allowed by the specification.  If one builds
+a hardware-reduced only ACPI, the kernel cannot run with ACPI tables that are
+for legacy mode.  To ensure compliance with ACPI, one must therefore build
+two separate kernels.  Once this problem has been properly fixed, we can then
+enable x86 hardware-reduced mode and use a single kernel.
 
-Changes for v3:
-   -- Modified enabling ACPI_REDUCED_HARDWARE in ACPICA when using
-      kernel config item CONFIG_ACPI_REDUCED_HARDWARE; now consistent
-      with ACPICA code base where needed
-   -- Enable X86 for CONFIG_ACPI_REDUCED_HARDWARE
-   -- Minimize bus master reload patching
-   -- Remove unneeded patch for dmi_check_system() (was 4/6)
-   -- Correct the patch for removing unneeded map/unmap of FADT fields
-
-Changes for v2:
-   -- Remove patch that was outside of reduced HW mode changes
-   -- Simplify CONFIG_ACPI_REDUCED_HARDWARE in Kconfig
-   -- Simplify use of CONFIG_ACPI_REDUCED_HARDWARE in #ifdefs
-   -- Ensure changelogs are present
-   -- Combine and simplify previous patches 8 & 10
-
-
-Al Stone (5):
-  ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to enforce this ACPI
-    mode
-  ACPI: bus master reload not supported in reduced HW mode
-  ACPI: HW reduced mode does not allow use of the FADT sci_interrupt
-    field
-  ACPI: in HW reduced mode, using FADT PM information is not allowed.
-  ACPI: do not map/unmap memory regions for FADT entries in reduced HW
-    mode
-
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
+---
  drivers/acpi/Kconfig            | 12 ++++++++++++
- drivers/acpi/bus.c              | 30 ++++++++++++++++--------------
- drivers/acpi/osl.c              | 38 +++++++++++++++++++-------------------
- drivers/acpi/pci_link.c         |  2 ++
- drivers/acpi/processor_idle.c   | 14 ++++++++++++--
  include/acpi/platform/aclinux.h |  6 ++++++
- 6 files changed, 67 insertions(+), 35 deletions(-)
+ 2 files changed, 18 insertions(+)
 
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 4770de5..1199087 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -343,6 +343,18 @@ config ACPI_BGRT
+ 	  data from the firmware boot splash. It will appear under
+ 	  /sys/firmware/acpi/bgrt/ .
+ 
++config ACPI_REDUCED_HARDWARE_ONLY
++	bool "Hardware-reduced ACPI support only"
++	depends on ARM || ARM64
++	help
++	This config item changes the way the ACPI code is built.  When this
++	option is selected, the kernel will use a specialized version of
++	ACPICA that ONLY supports the ACPI "reduced hardware" mode.  The
++	resulting kernel will be smaller but it will also be restricted to
++	running in ACPI reduced hardware mode ONLY.
++
++	If you are unsure what to do, do not enable this option.
++
+ source "drivers/acpi/apei/Kconfig"
+ 
+ config ACPI_EXTLOG
+diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+index 28f4f4d..7d71f08 100644
+--- a/include/acpi/platform/aclinux.h
++++ b/include/acpi/platform/aclinux.h
+@@ -52,6 +52,12 @@
+ 
+ #ifdef __KERNEL__
+ 
++/* Compile for reduced hardware mode only with this kernel config */
++
++#ifdef CONFIG_ACPI_REDUCED_HARDWARE_ONLY
++#define ACPI_REDUCED_HARDWARE 1
++#endif
++
+ #include <linux/string.h>
+ #include <linux/kernel.h>
+ #include <linux/ctype.h>
 -- 
 1.8.4.2
