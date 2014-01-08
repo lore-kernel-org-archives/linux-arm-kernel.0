@@ -1,67 +1,56 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 8 Jan 2014 22:29:47 +0400
-Subject: [PATCH] ARM: i.MX51: Fix IOMUX settings
-In-Reply-To: <20140106061233.GE27227@S2101-09.ap.freescale.net>
-References: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
- <20140106061233.GE27227@S2101-09.ap.freescale.net>
-Message-ID: <20140108222947.65b0759f4efd2c40b7136c31@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Jan 2014 19:29:06 +0100
+Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
+In-Reply-To: <1389200137.27473.6.camel@kazak.uk.xensource.com>
+References: <20140107220310.GD3103@lukather>
+ <1389200137.27473.6.camel@kazak.uk.xensource.com>
+Message-ID: <20140108182906.GH2941@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On Mon, 6 Jan 2014 14:12:37 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Jan 01, 2014 at 08:25:01AM +0400, Alexander Shiyan wrote:
-> > This patch fix daisy channel settings for MX51_PAD_EIM_D26__UART3_TXD and
-> > MX51_PAD_AUD3_BB_FS__UART3_TXD pads. Add missing SION bit for W1 pad.
+On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
+> On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
+> > Another nice thing about it is that a FEX-to-DT compiler comes at no
+> > cost afterwards. Since dtc is able to generate a DTS from
+> > /proc/device-tree, you can easily generate a DTS for your previously
+> > non-supported board using
 > > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
 > 
-> Normally, we do not take non-DT platform code change anymore.  But since
-> it's a simple fix, I applied it.
+> I wonder if it might also be useful to compile this as a normal user
+> space application which takes the fex and produces the dtb (or dts)?
 
-Shawn, please revert this patch completely since it breaks work some current boards.
-Lets keep it as is.
-Thanks.
+At the moment, no, libfdt only operates on DTB, so we would have to
+chain this somehow with dtc to at least do the DTB to DTS conversion I
+guess.
 
-> > ---
-> >  arch/arm/mach-imx/iomux-mx51.h | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
-> > index 75bbcc4..e370c98 100644
-> > --- a/arch/arm/mach-imx/iomux-mx51.h
-> > +++ b/arch/arm/mach-imx/iomux-mx51.h
-> > @@ -111,7 +111,7 @@
-> >  #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
-> > -#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
-> > +#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, 0x9f4, 1, MX51_UART_PAD_CTRL)
-> >  #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
-> > @@ -451,7 +451,7 @@
-> >  #define MX51_PAD_AUD3_BB_CK__GPIO4_20		IOMUX_PAD(0x5f8, 0x208, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> >  #define MX51_PAD_AUD3_BB_FS__AUD3_TXFS		IOMUX_PAD(0x5fc, 0x20c, 0, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_AUD3_BB_FS__GPIO4_21		IOMUX_PAD(0x5fc, 0x20c, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> > -#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, __NA_, 0, MX51_UART_PAD_CTRL)
-> > +#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, 0x9f4, 3, MX51_UART_PAD_CTRL)
-> >  #define MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	IOMUX_PAD(0x600, 0x210, 0, __NA_, 0, MX51_ECSPI_PAD_CTRL)
-> >  #define MX51_PAD_CSPI1_MOSI__GPIO4_22		IOMUX_PAD(0x600, 0x210, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> >  #define MX51_PAD_CSPI1_MOSI__I2C1_SDA		IOMUX_PAD(0x600, 0x210, 0x11, 0x9b4, 1, MX51_I2C_PAD_CTRL)
-> > @@ -494,7 +494,7 @@
-> >  #define MX51_PAD_UART3_TXD__UART1_DSR		IOMUX_PAD(0x634, 0x244, 0, __NA_, 0, MX51_UART_PAD_CTRL)
-> >  #define MX51_PAD_UART3_TXD__UART3_TXD		IOMUX_PAD(0x634, 0x244, 1, __NA_, 0, MX51_UART_PAD_CTRL)
-> >  #define MX51_PAD_OWIRE_LINE__GPIO1_24		IOMUX_PAD(0x638, 0x248, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
-> > -#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0, __NA_, 0, NO_PAD_CTRL)
-> > +#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0x10, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_OWIRE_LINE__SPDIF_OUT		IOMUX_PAD(0x638, 0x248, 6, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_KEY_ROW0__KEY_ROW0		IOMUX_PAD(0x63c, 0x24c, 0, __NA_, 0, NO_PAD_CTRL)
-> >  #define MX51_PAD_KEY_ROW1__KEY_ROW1		IOMUX_PAD(0x640, 0x250, 0, __NA_, 0, NO_PAD_CTRL)
-> > -- 
-> > 1.8.3.2
+It's not something that I'm pretty fond of either. Or, I don't really
+see the benefit of it.
+
+Let's say that you have such tool, I'm guessing one would want it to
+mass-convert fex files to DT. But then, you'd still have to boot that
+DT to be sure that everything is working, so you're pretty much losing
+the mass-convertion thing, since you would have boot this with a
+baremetal babelfish anyway.
+
+> I suppose producing something upstreamable would be different/harder
+> though, since it would need to not inline/merge the dtsi file but just
+> leave the include stmt. That's probably a different tool.
+
+Yeah, dtc outputs a "flat" DTS, without any include, so you still need
+to edit it by hand to remove the common part, remove the duplicated
+pinctrl nodes, fix the phandle, etc.
+
+But most of that can be scripted I guess.
 
 -- 
-Alexander Shiyan <shc_work@mail.ru>
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/9d418e5e/attachment.sig>
