@@ -1,63 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Jan 2014 16:26:22 +0100
-Subject: [PATCH v5 3/4] i2c: mv64xxx: Fix bus hang on A0 version of the
- Armada XP SoCs
-In-Reply-To: <20140108152139.GB15182@katana>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-4-git-send-email-gregory.clement@free-electrons.com>
- <20140108152139.GB15182@katana>
-Message-ID: <52CD6E1E.5040409@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 8 Jan 2014 16:24:30 +0100
+Subject: [PATCH 1/2] drm/panel: Add support for Samsung LTN101NT05 panel
+In-Reply-To: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
+Message-ID: <20140108152429.GG21974@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 16:21, Wolfram Sang wrote:
-> On Wed, Jan 08, 2014 at 04:06:28PM +0100, Gregory CLEMENT wrote:
->> The first variants of Armada XP SoCs (A0 stepping) have issues related
->> to the i2c controller which prevent to use the offload mechanism and
->> lead to a kernel hang during boot.
->>
->> The commit introduces a new the compatible string
->> marvell,mv78230-a0-i2c for the i2c controller. When this compatible
->> string is used the driver disables the offload mechanism and the
->> kernel no more hangs on these SoCs.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Reported-by: Andrew Lunn <andrew@lunn.ch>
->> Cc: stable at vger.kernel.org
->> ---
->>  drivers/i2c/busses/i2c-mv64xxx.c | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
->> index 8be7e42aa4de..f424c0f89946 100644
->> --- a/drivers/i2c/busses/i2c-mv64xxx.c
->> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
->> @@ -692,6 +692,10 @@ static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
->>  	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
->>  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
->>  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
->> +	{
->> +		.compatible = "marvell,mv78230-a0-i2c",
->> +		.data = &mv64xxx_i2c_regs_mv64xxx
->> +	},
+On Sat, Dec 21, 2013 at 09:38:12PM +0100, Marc Dietrich wrote:
+> The Samsung LNT101NT05 10.1" WXVGA panel can be supported by the simple panel
+> driver.
 > 
-> I think a oneliner entry like the entries above is easier to read, but
-> that is very minor...
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: David Airlie <airlied@linux.ie>
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> ---
+> This isn't strickly required to get the panel up, but Thierry suggested on IRC to
+> include it anyway, in case someone else has some use for it.
 
-By using one line we would break the 80 character rule,
-hat why I did in this way.
+For the record: the reason this isn't strictly needed is because there's
+an EDID that can be probed to get the video timings. But the panel still
+can be supported using the timings from the datasheet. One example where
+this would be useful is when the EDID isn't connected or simply broken.
 
-> 
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
-> 
+That said: applied, thanks!
 
-Thanks!
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/20c2e49f/attachment-0001.sig>
