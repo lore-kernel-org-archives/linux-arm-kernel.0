@@ -1,34 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jan 2014 18:02:26 +0000
-Subject: [PATCH] ARM: DT/kernel: fix arch_match_cpu_phys_id to avoid
- erroneous match
-In-Reply-To: <52CD2F5A.5000001@arm.com>
-References: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
- <52CD2F5A.5000001@arm.com>
-Message-ID: <20140108180225.GL27432@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 08 Jan 2014 19:04:57 +0100
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+In-Reply-To: <20140108175939.27803.30462@quantum>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+ <20140108171544.GC14575@lee--X1> <20140108175939.27803.30462@quantum>
+Message-ID: <4160932.uvjJSNcuKL@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 10:58:34AM +0000, Sudeep Holla wrote:
-> Hi Russell,
+On Wednesday 08 of January 2014 09:59:39 Mike Turquette wrote:
+> Quoting Lee Jones (2014-01-08 09:15:44)
+> > > I believe Lee has already applied this one, but in future, to avoid such
+> > > confusion, if it's more convenient for you, I can send you any clock
+> > > series as pull requests.
+> > 
+> > Me? I haven't applied any clk patches.
 > 
-> On 07/01/14 16:58, Mark Rutland wrote:
-> > Hi,
-> > 
-> > I was just looking in devtree.c and I noticed this seems to have fallen
-> > by the wayside. Given that this fixes a possible bug and there have been
-> > no negative comments, I think it's good for mainline.
-> > 
-> > Could you place this in the patch system, assuming Russell has no
-> > comments?
-> > 
-> 
-> Can I put this in patch tracker if you have no objections ?
+> I have taken patches 1-7 into clk-next just now.
 
-Yes please.
+Thanks.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> I can take patch #8 as
+> well but it would probably be better to send it through arm-soc?
+
+Hmm, patch 8 is trivial enough to not cause any merge conflicts, but since
+it's unlikely that any users depending on introduced changes will show up
+for 3.14 it shouldn't really matter which tree it goes through...
+
+Best regards,
+Tomasz
