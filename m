@@ -1,26 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 22:43:01 +0100
-Subject: [PATCH V2 5/6] power: reset: change xgene reboot driver to use
- both acpi and dts resource for reboot.
-In-Reply-To: <1389135041-16062-6-git-send-email-fkan@apm.com>
-References: <1389135041-16062-1-git-send-email-fkan@apm.com>
- <1389135041-16062-6-git-send-email-fkan@apm.com>
-Message-ID: <201401082243.01694.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jan 2014 13:43:54 -0800
+Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
+ late
+In-Reply-To: <20140108192830.GA1298@ulmo.nvidia.com>
+References: <20140108011957.GK5074@atomide.com>
+ <1389185477-507-1-git-send-email-treding@nvidia.com>
+ <20140108164040.GA31686@atomide.com>
+ <20140108192830.GA1298@ulmo.nvidia.com>
+Message-ID: <20140108214354.GG31323@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014, Feng Kan wrote:
-> Enable the X-Gene reboot driver to use either the ACPI or the DTS
-> resource using the platform driver method.
+* Thierry Reding <thierry.reding@gmail.com> [140108 11:32]:
+> On Wed, Jan 08, 2014 at 08:40:41AM -0800, Tony Lindgren wrote:
+> > 
+> > There's nothing wrong with the interrupt related code paths, we're just
+> > trying to call the functions at a wrong time when thing are not yet
+> > initialized.
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  drivers/power/reset/xgene-reboot.c |   33 ++++++++++++++++++++++++++++-----
->  1 files changed, 28 insertions(+), 5 deletions(-)
+> The patch won't get rid of that warning, but it should at least restore
+> things to a working state at runtime. At least for well-behaved drivers
+> that use platform_get_irq() rather than those that try to access the
+> resources directly.
+
+Well the problem I'm seeing is these nasty warnings.
+
+BTW, I think the issue you're talking about regarding platform_get_irq()
+got fixed by 4a43d686fe33 (of/irq: Pass trigger type in IRQ resource flags).
+ 
+> > Below is a repost of what works for me without using notifiers. Anybody
+> > got any better ideas for a minimal fix?
 > 
+> That patch is somewhat big for something that should be a minimal fix.
+> Being the size that it is it might have undesired side-effects that may
+> not get noticed until it's way too late, so I'm hesitant to have
+> something like this merged at this point in the release cycle.
 
-Shouldn't an ACPI based system always be able to reboot through the
-UEFI reset_system call? I really don't think we want to support
-ACPI on non-UEFI systems.
+Yes I agree it's rather invasive, but we also do have things pretty
+badly broken in the kernel for device tree based booting. And it seems
+that nobody has a smaller patch that would fix it.
 
-	Arnd
+Regards,
+
+Tony
