@@ -1,50 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jan 2014 09:56:52 +0000
-Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <1389161742-10533-2-git-send-email-rogerq@ti.com>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <1389161742-10533-2-git-send-email-rogerq@ti.com>
-Message-ID: <20140108095652.GD6701@e106331-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Jan 2014 10:05:38 +0000
+Subject: [PATCH v4 4/6] devicetree: bindings: Document Krait L1/L2 EDAC
+In-Reply-To: <20140107201239.GD14405@codeaurora.org>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-5-git-send-email-sboyd@codeaurora.org>
+ <20140107105439.GC5906@e102568-lin.cambridge.arm.com>
+ <20140107201239.GD14405@codeaurora.org>
+Message-ID: <20140108100538.GA2927@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 06:15:38AM +0000, Roger Quadros wrote:
-> The omap-usb-host driver expects the 60MHz functional clock
-> of the USB host module to be named as "init_60m_fclk".
-> Add this information in the DT binding document.
+On Tue, Jan 07, 2014 at 08:12:39PM +0000, Stephen Boyd wrote:
+> On 01/07, Lorenzo Pieralisi wrote:
+> > 
+> > Not sure this binding (cache node) belongs in cpus.txt
+> > 
+> > I am working on defining cache bindings for ARM within the C-state
+> > standardization effort:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/215543.html
 > 
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  Documentation/devicetree/bindings/mfd/omap-usb-host.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+> Thanks I'll take a look.
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-> index b381fa6..5635202 100644
-> --- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-> +++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-> @@ -32,6 +32,10 @@ Optional properties:
->  - single-ulpi-bypass: Must be present if the controller contains a single
->    ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
->  
-> +- clocks: phandle to 60MHz functional clock to the USB Host module.
-> +
-> +- clock-names: must be "init_60m_fclk"
-> +
+> > 
+> > > +
+> > > +	Description: Describes a cache in an ARM based system
+> > > +
+> > > +	- compatible
+> > > +		Usage: required
+> > > +		Value type: <string>
+> > > +		Definition: shall contain at least "cache"
+> > 
+> > It is a bit vague, can't we just follow the ePAPR compatible definition ?
+> > See posting above.
+> 
+> Hm.. I thought this did follow the ePAPR spec. I see 'compatible,
+> required, string, A standard property. The value shall include
+> the string "cache".' Looks the same?
 
-Nit: clocks aren't just phandles, there's a clock-specifier too.
+Sorry, my bad, you are right.
 
-Also, it would be nicer if clocks was defined in terms of clock-names,
-as it makes the relationship between clocks and clock-names clear, and
-makes it easier to extend the list in future. Something like:
+> And I see 'cache-level, required, u32, Specifies the level in the
+> cache hierarchy. For example, a level 2 cache has a value of
+> <2>.'
 
-- clocks: a list of phandles + clock-specifiers, one for each entry in
-  clock-names
+We need to define it properly for ARM, I am not sure we can use level
+as defined in CLIDR, I need to think more about this.
 
-- clock-names: should include:
-  * "init_60m_fclk" - the 60MHz functional clock to the USB host module.
+> > 
+> > > +
+> > > +	- cache-level
+> > > +		Usage: required
+> > > +		Value type: <u32>
+> > > +		Definition: level in the cache heirachy
+> > 
+> > "hierarchy".
+> 
+> Thanks.
+> 
+> > I have a problem with the cache level definition, and in
+> > particular the numbering, ie what the level number represents. If we
+> > mean the cache level seen through the CLIDR and co., it is hard to use
+> > it for shared caches since the level seen by different CPUs can actually
+> > be different, or put it differently the level number might not be unique for
+> > a shared cache. I need to think about a proper way to sort this out.
+> > 
+> 
+> Ok. I don't even use this property in my driver. All I really
+> need is the phandle from cpus pointing to the L2 and the
+> interrupts property in the L2 node.
+> 
+> How do you want to proceed here? If your cache binding goes
+> through I would just need to add the interrupts part. Or you
+> could even add that part in the same patch, you could have my
+> signed-off-by for that.
 
-Thanks,
-Mark.
+Ok, I will try to update the bindings with the interrupt part and copy
+you in, even though the level definition worries me a bit, it is an
+important property for power management and I need to find a proper
+solution before bindings can get accepted (basically the problem is:
+if different CPUs can see a cache at different levels as defined in the
+CLIDR we cannot describe a cache with a single cache level or put it
+differently, level can not represent the value in the CLIDR hence we
+need to describe it differently).
+
+Lorenzo
