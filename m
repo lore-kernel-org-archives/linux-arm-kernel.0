@@ -1,45 +1,32 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jan 2014 17:02:28 +0900
-Subject: [PATCH v4 0/4] Add ethernet support for r7s72100
-Message-ID: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 8 Jan 2014 13:32:35 +0530
+Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
+In-Reply-To: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
+References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 2, 2014 at 9:53 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
+>  SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
+>  has unmet direct dependencies (!ZBOOT_ROM)
+>
+> This is because it's possible to have ZBOOT_ROM enabled, but at the
+> same time have another option enabled which selects AUTO_ZRELADDR
+> overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
+> dependencies between ZBOOT_ROM and the options which depend on
+> !ZBOOT_ROM.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
 
-this series adds ethernet support to sh-pfc for the r7s72100 SoC.
+After this patch I see these warnings with exynos_defconfig
 
-This series is based on a merge of:
-* The topic/r7s72100-v3.13-rc7-20140107 tag in my renesas tree
-* net-next
-  - Head revision: 80077935cad223b29
-    ("Merge branch 'master' of
-      git://git.kernel.org/pub/scm/linux/kernel/git/jkirsher/net-next")
+arch/arm/Kconfig:1963:error: recursive dependency detected!
+arch/arm/Kconfig:1963: symbol ZBOOT_ROM depends on AUTO_ZRELADDR
+arch/arm/Kconfig:2151: symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
 
-The first two patches, targeted at net-next, also applies cleanly there.
-
-Changes since v3
-* Use bool as return type of sh_eth_is_gether()
-  and sh_eth_is_rz_fast_ether()
-* Correct coding style in sh_eth_get_stats()
-
-Changes since v2
-* Trivial rebase
-* Dropped "RFC" from subject
-
-Changes since v1 are noted in the changelog of each patch.
-
-Simon Horman (4):
-  sh_eth: Use bool as return type of sh_eth_is_gether()
-  sh_eth: Add support for r7s72100
-  ARM: shmobile: r7s72100: Add clock for r7s72100-ether
-  ARM: shmobile: genmai: Enable r7s72100-ether
-
- arch/arm/mach-shmobile/board-genmai.c   |  21 ++++++
- arch/arm/mach-shmobile/clock-r7s72100.c |   4 ++
- drivers/net/ethernet/renesas/sh_eth.c   | 124 +++++++++++++++++++++++++++++---
- drivers/net/ethernet/renesas/sh_eth.h   |   4 +-
- 4 files changed, 143 insertions(+), 10 deletions(-)
-
--- 
-1.8.4
+I am not really sure why this happened as I don't see AUTO_ZRELADDR
+selected by ZBOOT_ROM in Kconfig :)
