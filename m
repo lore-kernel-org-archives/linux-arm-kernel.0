@@ -1,94 +1,37 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 08 Jan 2014 12:23:42 +0000
-Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
-In-Reply-To: <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
- <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
-Message-ID: <52CD434E.6030906@codethink.co.uk>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Wed, 08 Jan 2014 13:24:22 +0100
+Subject: Information about Atmel MXT224
+In-Reply-To: <alpine.DEB.2.01.1401081228580.1454@pmeerw.net>
+References: <52CD04F1.8090100@gmail.com>
+ <alpine.DEB.2.01.1401081228580.1454@pmeerw.net>
+Message-ID: <52CD4376.50305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 18:57, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->
-> When using DT to instantiate the rcar-thermal device, it prints the
-> following error:
->
->      rcar_thermal e61f0000.thermal: thermal sensor was broken
->
-> Explicitly request and enable the thermal clock to fix this.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> ---
->   drivers/thermal/rcar_thermal.c |   40 +++++++++++++++++++++++++++++++++-------
->   1 file changed, 33 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
-> index 88f92e1a9944..a5629500723a 100644
-> --- a/drivers/thermal/rcar_thermal.c
-> +++ b/drivers/thermal/rcar_thermal.c
-> @@ -17,6 +17,7 @@
->    *  with this program; if not, write to the Free Software Foundation, Inc.,
->    *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
->    */
-> +#include <linux/clk.h>
->   #include <linux/delay.h>
->   #include <linux/err.h>
->   #include <linux/irq.h>
-> @@ -53,6 +54,7 @@ struct rcar_thermal_common {
->   	struct device *dev;
->   	struct list_head head;
->   	spinlock_t lock;
-> +	struct clk *clk;
->   };
->
->   struct rcar_thermal_priv {
-> @@ -378,23 +380,38 @@ static int rcar_thermal_probe(struct platform_device *pdev)
->   	spin_lock_init(&common->lock);
->   	common->dev = dev;
->
-> +	common->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(common->clk)) {
-> +		dev_err(&pdev->dev, "cannot get clock\n");
-> +		return PTR_ERR(common->clk);
-> +	}
-> +
-> +	ret = clk_prepare(common->clk);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "unable to prepare clock\n");
-> +		return ret;
-> +	}
-> +
-> +	clk_enable(common->clk);
-> +
->   	pm_runtime_enable(dev);
->   	pm_runtime_get_sync(dev);
->
->   	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->   	if (irq) {
-> -		int ret;
-> +		int ret2;
->
->   		/*
->   		 * platform has IRQ support.
->   		 * Then, drier use common register
->   		 */
->
-> -		ret = devm_request_irq(dev, irq->start, rcar_thermal_irq, 0,
-> -				       dev_name(dev), common);
-> -		if (ret) {
-> +		ret2 = devm_request_irq(dev, irq->start, rcar_thermal_irq, 0,
-> +					dev_name(dev), common);
-> +		if (ret2) {
->   			dev_err(dev, "irq request failed\n ");
-> -			return ret;
-> +			ret = ret2;
-> +			goto error_unpm;
->   		}
+On 01/08/2014 12:42 PM, Peter Meerwald wrote:
 
-I'd suggest not renaming ret2 and just use the original ret.
+> you need to request them from the distributor I guess, they docs are
+> pretty good
 
+I am in Belgium and we deal with Gleichmann & Co. Electronics in Germany 
+to have their devkit (SMT-C-T10). I have signed a NDA with them to have 
+MXT224 protocol guide but they never send me Protocol Guide.
+I will try another distributor.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> shouldn't this be 16/14?
+You are right, I already try this and test it again but this does not 
+change anything.
+
+> something goes wrong in the initialization; the object table of the
+> chip doesn't match the register data fed in -- the mxt224 can be a bitch
+> and play dead
+
+So what can I do ? Maybe a problem with the embedded firmware that need 
+an update (atmel_mxt_ts 0-004b: Family ID: 129 Variant ID: 1 
+Major.Minor.Build: 2.0.AB)
+
+When I do cat /proc/interrupts and I short-circuit /CHG to ground, 
+number increases so low-level handling of interrupt is working.
+
+Thanks,
+Ga?tan Carlier.
