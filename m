@@ -1,52 +1,91 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 08 Jan 2014 08:52:28 +0100
-Subject: [PATCH] ARM: shmobile: r8a7779: Remove unused clock constants
-In-Reply-To: <1389155679-27667-1-git-send-email-horms+renesas@verge.net.au>
-References: <1389155679-27667-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <2593623.Zsmb6Gy4Sn@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Jan 2014 16:55:06 +0900
+Subject: [PATCH v3 0/4] Lager and Koelsch reference serial port support
+In-Reply-To: <2632892.VB8aUk9VoW@avalon>
+References: <1386767664-20113-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3500878.UmMfVoYuQ7@avalon> <20140108044416.GH15891@verge.net.au>
+ <2632892.VB8aUk9VoW@avalon>
+Message-ID: <20140108075505.GE18870@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-Thank you for the patch.
-
-On Wednesday 08 January 2014 13:34:39 Simon Horman wrote:
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> v2
-> * Rebase: MSTPSR1 is now used
-> ---
->  arch/arm/mach-shmobile/clock-r8a7779.c | 7 -------
->  1 file changed, 7 deletions(-)
+On Wed, Jan 08, 2014 at 08:51:25AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c
-> b/arch/arm/mach-shmobile/clock-r8a7779.c index 93a5625..8e403ae 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-> @@ -47,17 +47,10 @@
+> On Wednesday 08 January 2014 13:44:17 Simon Horman wrote:
+> > On Tue, Jan 07, 2014 at 09:03:13AM +0100, Laurent Pinchart wrote:
+> > > On Tuesday 07 January 2014 10:39:36 Simon Horman wrote:
+> > > > On Wed, Dec 11, 2013 at 02:14:20PM +0100, Laurent Pinchart wrote:
+> > > > > Hello,
+> > > > > 
+> > > > > This patch set implements serial port support for the Lager reference
+> > > > > board.
+> > > > > 
+> > > > > The code is available in my git tree at
+> > > > > 
+> > > > >         git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial/boards
+> > > > > 
+> > > > > The patches are based on top of the "[PATCH 00/47] sh-sci updates for
+> > > > > v3.14" and "[PATCH v3 00/15] Lager and Koelsch multiplatform support"
+> > > > > patch series.
+> > > > 
+> > > > Hi Laurent, Hi Magnus,
+> > > > 
+> > > > I have marked this series as deferred, but to be honest
+> > > > I don't quite recall what we decided to do with it.
+> > > 
+> > > If I recall correctly the decision was to apply patches 1/4 and 2/4 for
+> > > v3.13 and delay 3/4 and 4/4.
+> > 
+> > In that case I apologise as I did not queue up 1/4 and 1/4 for v3.13.
+> > Instead I have now queued them up locally for v3.14 and will push them soon.
 > 
->  #define MD(nr)	BIT(nr)
-> 
-> -#define FRQMR		IOMEM(0xffc80014)
->  #define MSTPCR0		IOMEM(0xffc80030)
->  #define MSTPCR1		IOMEM(0xffc80034)
->  #define MSTPCR3		IOMEM(0xffc8003c)
->  #define MSTPSR1		IOMEM(0xffc80044)
-> -#define MSTPSR4		IOMEM(0xffc80048)
-> -#define MSTPSR6		IOMEM(0xffc8004c)
-> -#define MSTPCR4		IOMEM(0xffc80050)
-> -#define MSTPCR5		IOMEM(0xffc80054)
-> -#define MSTPCR6		IOMEM(0xffc80058)
-> -#define MSTPCR7		IOMEM(0xffc80040)
-> 
->  #define MODEMR		0xffcc0020
+> I actually meant v3.14, so all is good :-)
 
--- 
-Regards,
+self.errors--; /* :-) */
 
-Laurent Pinchart
+> 
+> > I will leave 3/4 and 4/4 marked as deferred.
+> 
+> Sure. I'll resubmit them for v3.15.
+
+Great, thanks.
+
+> > > > > Changes compared to v2:
+> > > > > 
+> > > > > - Added Koelsch support
+> > > > > 
+> > > > > Changes compared to v1:
+> > > > > 
+> > > > > - Removed early debugging support as it requires more work before
+> > > > > being
+> > > > > 
+> > > > >   mainlined
+> > > > > 
+> > > > > Laurent Pinchart (4):
+> > > > >   ARM: shmobile: r8a7790: Add serial ports to the device tree
+> > > > >   ARM: shmobile: r8a7791: Add serial ports to the device tree
+> > > > >   ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
+> > > > >   ARM: shmobile: koelsch: Enable SCIF0 and SCIF1 serial ports in DT
+> > > > >  
+> > > > >  arch/arm/boot/dts/r8a7790-lager.dts              |  24 ++-
+> > > > >  arch/arm/boot/dts/r8a7790.dtsi                   | 100 +++++++++++++
+> > > > >  arch/arm/boot/dts/r8a7791-koelsch.dts            |  24 ++-
+> > > > >  arch/arm/boot/dts/r8a7791.dtsi                   | 180 ++++++++++++++
+> > > > >  arch/arm/mach-shmobile/board-koelsch-reference.c |  18 +--
+> > > > >  arch/arm/mach-shmobile/board-lager-reference.c   |  18 +--
+> > > > >  arch/arm/mach-shmobile/clock-r8a7790.c           |  16 +-
+> > > > >  arch/arm/mach-shmobile/clock-r8a7791.c           |  24 +--
+> > > > >  arch/arm/mach-shmobile/setup-r8a7790.c           |  26 ++--
+> > > > >  arch/arm/mach-shmobile/setup-r8a7791.c           |  34 ++---
+> > > > >  10 files changed, 374 insertions(+), 90 deletions(-)
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
