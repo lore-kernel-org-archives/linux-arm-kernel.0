@@ -1,231 +1,418 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  8 Jan 2014 10:37:48 -0800
-Subject: [PATCH v3 5/7] mfd: pm8921: Use ssbi regmap
+Date: Wed,  8 Jan 2014 10:37:46 -0800
+Subject: [PATCH v3 3/7] mfd: pm8921: Migrate to irqdomains
 In-Reply-To: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
 References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1389206270-3728-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389206270-3728-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a regmap so that the pm8xxx read/write APIs can be removed
-once all consumer drivers are converted.
+Convert this driver to use irqdomains so that the PMIC's child
+devices can be converted to devicetree.
 
-Reviewed-by: Mark Brown <broonie@linaro.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mfd/Kconfig       |  1 +
- drivers/mfd/pm8921-core.c | 66 +++++++++++++++++++++++++++--------------------
- 2 files changed, 39 insertions(+), 28 deletions(-)
+ drivers/mfd/pm8921-core.c         | 198 +++++++++++++++-----------------------
+ include/linux/mfd/pm8xxx/irq.h    |  36 -------
+ include/linux/mfd/pm8xxx/pm8921.h |  30 ------
+ 3 files changed, 75 insertions(+), 189 deletions(-)
+ delete mode 100644 include/linux/mfd/pm8xxx/irq.h
+ delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 03bb43bb40b9..d33bc35d13a2 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -467,6 +467,7 @@ config MFD_PM8921_CORE
- 	depends on (ARCH_MSM || HEXAGON)
- 	select MFD_CORE
- 	select MFD_PM8XXX
-+	select REGMAP
- 	help
- 	  If you say yes to this option, support will be included for the
- 	  built-in PM8921 PMIC chip.
 diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
-index c25e7dae150b..e9340bd6d1ab 100644
+index 9ddc31f7a71d..c25e7dae150b 100644
 --- a/drivers/mfd/pm8921-core.c
 +++ b/drivers/mfd/pm8921-core.c
-@@ -23,6 +23,7 @@
+@@ -17,15 +17,15 @@
+ #include <linux/interrupt.h>
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
  #include <linux/slab.h>
  #include <linux/err.h>
  #include <linux/ssbi.h>
-+#include <linux/regmap.h>
- #include <linux/of_platform.h>
++#include <linux/of_platform.h>
  #include <linux/mfd/core.h>
+-#include <linux/mfd/pm8xxx/pm8921.h>
  #include <linux/mfd/pm8xxx/core.h>
-@@ -57,6 +58,7 @@
+-#include <linux/mfd/pm8xxx/irq.h>
  
+ #define	SSBI_REG_ADDR_IRQ_BASE		0x1BB
+ 
+@@ -53,11 +53,12 @@
+ #define REG_HWREV		0x002  /* PMIC4 revision */
+ #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
+ 
++#define PM8921_NR_IRQS		256
++
  struct pm_irq_chip {
  	struct device		*dev;
-+	struct regmap		*regmap;
  	spinlock_t		pm_irq_lock;
- 	struct irq_domain	*irqdomain;
+-	unsigned int		devirq;
+-	unsigned int		irq_base;
++	struct irq_domain	*irqdomain;
  	unsigned int		num_irqs;
-@@ -70,29 +72,19 @@ struct pm8921 {
- 	struct pm_irq_chip		*irq_chip;
- };
- 
--static int pm8xxx_read_root_irq(const struct pm_irq_chip *chip, u8 *rp)
--{
--	return pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_ROOT, rp);
--}
--
--static int pm8xxx_read_master_irq(const struct pm_irq_chip *chip, u8 m, u8 *bp)
--{
--	return pm8xxx_readb(chip->dev,
--			SSBI_REG_ADDR_IRQ_M_STATUS1 + m, bp);
--}
--
--static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, u8 bp, u8 *ip)
-+static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, unsigned int bp,
-+				 unsigned int *ip)
- {
- 	int	rc;
- 
- 	spin_lock(&chip->pm_irq_lock);
--	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
-+	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
- 	if (rc) {
- 		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
- 		goto bail;
+ 	unsigned int		num_blocks;
+ 	unsigned int		num_masters;
+@@ -138,7 +139,7 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
+ 	for (i = 0; i < 8; i++) {
+ 		if (bits & (1 << i)) {
+ 			pmirq = block * 8 + i;
+-			irq = pmirq + chip->irq_base;
++			irq = irq_find_mapping(chip->irqdomain, pmirq);
+ 			generic_handle_irq(irq);
+ 		}
  	}
+@@ -197,12 +198,11 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+ static void pm8xxx_irq_mask_ack(struct irq_data *d)
+ {
+ 	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+-	unsigned int pmirq = d->irq - chip->irq_base;
+-	int	master, irq_bit;
++	unsigned int pmirq = irqd_to_hwirq(d);
++	int	irq_bit;
+ 	u8	block, config;
  
--	rc = pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
-+	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
- 	if (rc)
- 		pr_err("Failed Reading Status rc=%d\n", rc);
- bail:
-@@ -100,19 +92,20 @@ bail:
+ 	block = pmirq / 8;
+-	master = block / 8;
+ 	irq_bit = pmirq % 8;
+ 
+ 	config = chip->config[pmirq] | PM_IRQF_MASK_ALL | PM_IRQF_CLR;
+@@ -212,12 +212,11 @@ static void pm8xxx_irq_mask_ack(struct irq_data *d)
+ static void pm8xxx_irq_unmask(struct irq_data *d)
+ {
+ 	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+-	unsigned int pmirq = d->irq - chip->irq_base;
+-	int	master, irq_bit;
++	unsigned int pmirq = irqd_to_hwirq(d);
++	int	irq_bit;
+ 	u8	block, config;
+ 
+ 	block = pmirq / 8;
+-	master = block / 8;
+ 	irq_bit = pmirq % 8;
+ 
+ 	config = chip->config[pmirq];
+@@ -227,12 +226,11 @@ static void pm8xxx_irq_unmask(struct irq_data *d)
+ static int pm8xxx_irq_set_type(struct irq_data *d, unsigned int flow_type)
+ {
+ 	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+-	unsigned int pmirq = d->irq - chip->irq_base;
+-	int master, irq_bit;
++	unsigned int pmirq = irqd_to_hwirq(d);
++	int irq_bit;
+ 	u8 block, config;
+ 
+ 	block = pmirq / 8;
+-	master = block / 8;
+ 	irq_bit  = pmirq % 8;
+ 
+ 	chip->config[pmirq] = (irq_bit << PM_IRQF_BITS_SHIFT)
+@@ -287,12 +285,9 @@ static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
+ 	int pmirq, rc;
+ 	u8  block, bits, bit;
+ 	unsigned long flags;
++	struct irq_data *irq_data = irq_get_irq_data(irq);
+ 
+-	if (chip == NULL || irq < chip->irq_base ||
+-			irq >= chip->irq_base + chip->num_irqs)
+-		return -EINVAL;
+-
+-	pmirq = irq - chip->irq_base;
++	pmirq = irq_data->hwirq;
+ 
+ 	block = pmirq / 8;
+ 	bit = pmirq % 8;
+@@ -321,67 +316,29 @@ bail_out:
  	return rc;
  }
  
--static int pm8xxx_config_irq(struct pm_irq_chip *chip, u8 bp, u8 cp)
-+static int
-+pm8xxx_config_irq(struct pm_irq_chip *chip, unsigned int bp, unsigned int cp)
+-static struct pm_irq_chip *pm8xxx_irq_init(struct device *dev,
+-				const struct pm8xxx_irq_platform_data *pdata)
+-{
+-	struct pm_irq_chip  *chip;
+-	int devirq, rc;
+-	unsigned int pmirq;
+-
+-	if (!pdata) {
+-		pr_err("No platform data\n");
+-		return ERR_PTR(-EINVAL);
+-	}
++static struct lock_class_key pm8xxx_irq_lock_class;
+ 
+-	devirq = pdata->devirq;
+-	if (devirq < 0) {
+-		pr_err("missing devirq\n");
+-		rc = devirq;
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	chip = kzalloc(sizeof(struct pm_irq_chip)
+-			+ sizeof(u8) * pdata->irq_cdata.nirqs, GFP_KERNEL);
+-	if (!chip) {
+-		pr_err("Cannot alloc pm_irq_chip struct\n");
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	chip->dev = dev;
+-	chip->devirq = devirq;
+-	chip->irq_base = pdata->irq_base;
+-	chip->num_irqs = pdata->irq_cdata.nirqs;
+-	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
+-	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
+-	spin_lock_init(&chip->pm_irq_lock);
++static int pm8xxx_irq_domain_map(struct irq_domain *d, unsigned int irq,
++				   irq_hw_number_t hwirq)
++{
++	struct pm_irq_chip *chip = d->host_data;
+ 
+-	for (pmirq = 0; pmirq < chip->num_irqs; pmirq++) {
+-		irq_set_chip_and_handler(chip->irq_base + pmirq,
+-				&pm8xxx_irq_chip,
+-				handle_level_irq);
+-		irq_set_chip_data(chip->irq_base + pmirq, chip);
++	irq_set_lockdep_class(irq, &pm8xxx_irq_lock_class);
++	irq_set_chip_and_handler(irq, &pm8xxx_irq_chip, handle_level_irq);
++	irq_set_chip_data(irq, chip);
+ #ifdef CONFIG_ARM
+-		set_irq_flags(chip->irq_base + pmirq, IRQF_VALID);
++	set_irq_flags(irq, IRQF_VALID);
+ #else
+-		irq_set_noprobe(chip->irq_base + pmirq);
++	irq_set_noprobe(irq);
+ #endif
+-	}
+-
+-	irq_set_irq_type(devirq, pdata->irq_trigger_flag);
+-	irq_set_handler_data(devirq, chip);
+-	irq_set_chained_handler(devirq, pm8xxx_irq_handler);
+-	irq_set_irq_wake(devirq, 1);
+-
+-	return chip;
+-}
+-
+-static int pm8xxx_irq_exit(struct pm_irq_chip *chip)
+-{
+-	irq_set_chained_handler(chip->devirq, NULL);
+-	kfree(chip);
+ 	return 0;
+ }
+ 
++static const struct irq_domain_ops pm8xxx_irq_domain_ops = {
++	.xlate = irq_domain_xlate_twocell,
++	.map = pm8xxx_irq_domain_map,
++};
++
+ static int pm8921_readb(const struct device *dev, u16 addr, u8 *val)
  {
- 	int	rc;
- 
- 	spin_lock(&chip->pm_irq_lock);
--	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
-+	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
- 	if (rc) {
- 		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
- 		goto bail;
- 	}
- 
- 	cp |= PM_IRQF_WRITE;
--	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_CONFIG, cp);
-+	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_CONFIG, cp);
- 	if (rc)
- 		pr_err("Failed Configuring IRQ rc=%d\n", rc);
- bail:
-@@ -123,7 +116,7 @@ bail:
- static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
- {
- 	int pmirq, irq, i, ret = 0;
--	u8 bits;
-+	unsigned int bits;
- 
- 	ret = pm8xxx_read_block_irq(chip, block, &bits);
- 	if (ret) {
-@@ -148,10 +141,11 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
- 
- static int pm8xxx_irq_master_handler(struct pm_irq_chip *chip, int master)
- {
--	u8 blockbits;
-+	unsigned int blockbits;
- 	int block_number, i, ret = 0;
- 
--	ret = pm8xxx_read_master_irq(chip, master, &blockbits);
-+	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_M_STATUS1 + master,
-+			  &blockbits);
- 	if (ret) {
- 		pr_err("Failed to read master %d ret=%d\n", master, ret);
- 		return ret;
-@@ -173,12 +167,12 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
- 	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
- 	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
--	u8	root;
-+	unsigned int root;
- 	int	i, ret, masters = 0;
- 
- 	chained_irq_enter(irq_chip, desc);
- 
--	ret = pm8xxx_read_root_irq(chip, &root);
-+	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_ROOT, &root);
- 	if (ret) {
- 		pr_err("Can't read root status ret=%d\n", ret);
- 		return;
-@@ -283,7 +277,7 @@ static struct irq_chip pm8xxx_irq_chip = {
- static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
- {
- 	int pmirq, rc;
--	u8  block, bits, bit;
-+	unsigned int  block, bits, bit;
- 	unsigned long flags;
- 	struct irq_data *irq_data = irq_get_irq_data(irq);
- 
-@@ -294,14 +288,14 @@ static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
- 
- 	spin_lock_irqsave(&chip->pm_irq_lock, flags);
- 
--	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
-+	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
- 	if (rc) {
- 		pr_err("Failed Selecting block irq=%d pmirq=%d blk=%d rc=%d\n",
- 			irq, pmirq, block, rc);
- 		goto bail_out;
- 	}
- 
--	rc = pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
-+	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
- 	if (rc) {
- 		pr_err("Failed Configuring irq=%d pmirq=%d blk=%d rc=%d\n",
- 			irq, pmirq, block, rc);
-@@ -389,11 +383,21 @@ static struct pm8xxx_drvdata pm8921_drvdata = {
+ 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
+@@ -432,42 +389,19 @@ static struct pm8xxx_drvdata pm8921_drvdata = {
  	.pmic_read_irq_stat	= pm8921_read_irq_stat,
  };
  
-+static const struct regmap_config ssbi_regmap_config = {
-+	.reg_bits = 16,
-+	.val_bits = 8,
-+	.max_register = 0x3ff,
-+	.fast_io = true,
-+	.reg_read = ssbi_reg_read,
-+	.reg_write = ssbi_reg_write
-+};
-+
+-static int pm8921_add_subdevices(const struct pm8921_platform_data
+-					   *pdata,
+-					   struct pm8921 *pmic,
+-					   u32 rev)
+-{
+-	int ret = 0, irq_base = 0;
+-	struct pm_irq_chip *irq_chip;
+-
+-	if (pdata->irq_pdata) {
+-		pdata->irq_pdata->irq_cdata.nirqs = PM8921_NR_IRQS;
+-		pdata->irq_pdata->irq_cdata.rev = rev;
+-		irq_base = pdata->irq_pdata->irq_base;
+-		irq_chip = pm8xxx_irq_init(pmic->dev, pdata->irq_pdata);
+-
+-		if (IS_ERR(irq_chip)) {
+-			pr_err("Failed to init interrupts ret=%ld\n",
+-					PTR_ERR(irq_chip));
+-			return PTR_ERR(irq_chip);
+-		}
+-		pmic->irq_chip = irq_chip;
+-	}
+-	return ret;
+-}
+-
  static int pm8921_probe(struct platform_device *pdev)
  {
+-	const struct pm8921_platform_data *pdata = dev_get_platdata(&pdev->dev);
  	struct pm8921 *pmic;
-+	struct regmap *regmap;
  	int rc;
--	u8 val;
-+	unsigned int val;
- 	unsigned int irq;
+ 	u8 val;
++	unsigned int irq;
  	u32 rev;
- 	struct pm_irq_chip *chip;
-@@ -409,8 +413,13 @@ static int pm8921_probe(struct platform_device *pdev)
- 		return -ENOMEM;
++	struct pm_irq_chip *chip;
++	unsigned int nirqs = PM8921_NR_IRQS;
+ 
+-	if (!pdata) {
+-		pr_err("missing platform data\n");
+-		return -EINVAL;
+-	}
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
+ 
+ 	pmic = devm_kzalloc(&pdev->dev, sizeof(struct pm8921), GFP_KERNEL);
+ 	if (!pmic) {
+@@ -498,37 +432,55 @@ static int pm8921_probe(struct platform_device *pdev)
+ 	pm8921_drvdata.pm_chip_data = pmic;
+ 	platform_set_drvdata(pdev, &pm8921_drvdata);
+ 
+-	rc = pm8921_add_subdevices(pdata, pmic, rev);
++	chip = devm_kzalloc(&pdev->dev, sizeof(*chip) +
++					sizeof(chip->config[0]) * nirqs,
++					GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	pmic->irq_chip = chip;
++	chip->dev = &pdev->dev;
++	chip->num_irqs = nirqs;
++	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
++	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
++	spin_lock_init(&chip->pm_irq_lock);
++
++	chip->irqdomain = irq_domain_add_linear(pdev->dev.of_node, nirqs,
++						&pm8xxx_irq_domain_ops,
++						chip);
++	if (!chip->irqdomain)
++		return -ENODEV;
++
++	irq_set_handler_data(irq, chip);
++	irq_set_chained_handler(irq, pm8xxx_irq_handler);
++	irq_set_irq_wake(irq, 1);
++
++	rc = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+ 	if (rc) {
+-		pr_err("Cannot add subdevices rc=%d\n", rc);
+-		goto err;
++		irq_set_chained_handler(irq, NULL);
++		irq_set_handler_data(irq, NULL);
++		irq_domain_remove(chip->irqdomain);
  	}
  
-+	regmap = devm_regmap_init(&pdev->dev, NULL, pdev->dev.parent,
-+				  &ssbi_regmap_config);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
+-	/* gpio might not work if no irq device is found */
+-	WARN_ON(pmic->irq_chip == NULL);
++	return rc;
++}
+ 
++static int pm8921_remove_child(struct device *dev, void *unused)
++{
++	platform_device_unregister(to_platform_device(dev));
+ 	return 0;
+-
+-err:
+-	mfd_remove_devices(pmic->dev);
+-	return rc;
+ }
+ 
+ static int pm8921_remove(struct platform_device *pdev)
+ {
+-	struct pm8xxx_drvdata *drvdata;
+-	struct pm8921 *pmic = NULL;
+-
+-	drvdata = platform_get_drvdata(pdev);
+-	if (drvdata)
+-		pmic = drvdata->pm_chip_data;
+-	if (pmic) {
+-		mfd_remove_devices(pmic->dev);
+-		if (pmic->irq_chip) {
+-			pm8xxx_irq_exit(pmic->irq_chip);
+-			pmic->irq_chip = NULL;
+-		}
+-	}
++	int irq = platform_get_irq(pdev, 0);
++	struct pm8921 *pmic = pm8921_drvdata.pm_chip_data;
++	struct pm_irq_chip *chip = pmic->irq_chip;
 +
- 	/* Read PMIC chip revision */
--	rc = ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
-+	rc = regmap_read(regmap, REG_HWREV, &val);
- 	if (rc) {
- 		pr_err("Failed to read hw rev reg %d:rc=%d\n", REG_HWREV, rc);
- 		return rc;
-@@ -419,7 +428,7 @@ static int pm8921_probe(struct platform_device *pdev)
- 	rev = val;
++	device_for_each_child(&pdev->dev, NULL, pm8921_remove_child);
++	irq_set_chained_handler(irq, NULL);
++	irq_set_handler_data(irq, NULL);
++	irq_domain_remove(chip->irqdomain);
  
- 	/* Read PMIC chip revision 2 */
--	rc = ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
-+	rc = regmap_read(regmap, REG_HWREV_2, &val);
- 	if (rc) {
- 		pr_err("Failed to read hw rev 2 reg %d:rc=%d\n",
- 			REG_HWREV_2, rc);
-@@ -440,6 +449,7 @@ static int pm8921_probe(struct platform_device *pdev)
- 
- 	pmic->irq_chip = chip;
- 	chip->dev = &pdev->dev;
-+	chip->regmap = regmap;
- 	chip->num_irqs = nirqs;
- 	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
- 	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
+ 	return 0;
+ }
+diff --git a/include/linux/mfd/pm8xxx/irq.h b/include/linux/mfd/pm8xxx/irq.h
+deleted file mode 100644
+index 1a11b02383f0..000000000000
+--- a/include/linux/mfd/pm8xxx/irq.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-/*
+- * Qualcomm PMIC irq 8xxx driver header file
+- *
+- */
+-
+-#ifndef __MFD_PM8XXX_IRQ_H
+-#define __MFD_PM8XXX_IRQ_H
+-
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-
+-struct pm8xxx_irq_core_data {
+-	u32		rev;
+-	int		nirqs;
+-};
+-
+-struct pm8xxx_irq_platform_data {
+-	int				irq_base;
+-	struct pm8xxx_irq_core_data	irq_cdata;
+-	int				devirq;
+-	int				irq_trigger_flag;
+-};
+-
+-#endif /* __MFD_PM8XXX_IRQ_H */
+diff --git a/include/linux/mfd/pm8xxx/pm8921.h b/include/linux/mfd/pm8xxx/pm8921.h
+deleted file mode 100644
+index 00fa3de7659d..000000000000
+--- a/include/linux/mfd/pm8xxx/pm8921.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-/*
+- * Qualcomm PMIC 8921 driver header file
+- *
+- */
+-
+-#ifndef __MFD_PM8921_H
+-#define __MFD_PM8921_H
+-
+-#include <linux/mfd/pm8xxx/irq.h>
+-
+-#define PM8921_NR_IRQS		256
+-
+-struct pm8921_platform_data {
+-	int					irq_base;
+-	struct pm8xxx_irq_platform_data		*irq_pdata;
+-};
+-
+-#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
