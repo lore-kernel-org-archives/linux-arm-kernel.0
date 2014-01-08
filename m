@@ -1,281 +1,240 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 8 Jan 2014 16:51:06 +0800
-Subject: [PATCH V2 3/3] ARM: imx: add suspend in ocram support on i.mx6sl
-In-Reply-To: <1389171067-32008-1-git-send-email-b20788@freescale.com>
-References: <1389171067-32008-1-git-send-email-b20788@freescale.com>
-Message-ID: <1389171067-32008-3-git-send-email-b20788@freescale.com>
+From: falcon@meizu.com (falcon at meizu.com)
+Date: Wed, 8 Jan 2014 16:56:45 +0800
+Subject: [RFC PATCH V2] ARM: compressed: Move ramdisk forward to reserve more
+ memory for kernel image
+Message-ID: <1389171405-19658-1-git-send-email-falcon@meizu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SL's suspend in ocram function is derived from i.MX6Q,
-the only difference is the offset of DDR IO pins, so we need
-to check cpu type in runtime to set DDR IO to high-Z mode
-correctly. This patch can lower the DDR IO power from
-~10mA at 1.2V to ~1mA at 1.2V, measured on i.MX6SL EVK board, SH5.
+From: Wu Zhangjin <falcon@meizu.com>
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
+During embedded linux system booting, before decompressing the kernel image,
+the bootloader(E.g. Uboot) loads the compressed kernel image and ramdisk into
+two contiguous memory space, these two memory space are fixed after the Uboot
+is released, as a result, the maximum size of the decompressed kernel image is
+limited by the size of the reserved memory space (the difference of the two
+contiguous memory addresses).
+
+If want more functions or some debug options, the decompressed kernel image
+may be bigger and may overwrite the followed ramdisk and result in kernel boot
+failure for missing a valid ramdisk.
+
+To fix up this issue, before decompressing the kernel image, this option moves
+the loaded ramdisk image forward with a specified offset and reserve more
+memory for the decompressed kernel image.
+
+--
+
+v1-->v2:
+
+  o Fix up ATAG_RAMDISK support
+  o Add phys base addr for ORION5X and KIRKWOOD
+  o Add an independent move_ramdisk.h, new board support can be added here.
+
+TODO:
+
+  o Add dtb support
+
+Signed-off-by: Wu Zhangjin <falcon@meizu.com>
 ---
-Changes since V1:
-  Add cpu type check to get correct device node.
+ arch/arm/boot/compressed/Makefile       |    2 +-
+ arch/arm/boot/compressed/misc.c         |    7 +++-
+ arch/arm/boot/compressed/move_ramdisk.c |   61 +++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/move_ramdisk.h |   35 ++++++++++++++++++
+ usr/Kconfig                             |   29 +++++++++++++++
+ 5 files changed, 131 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/move_ramdisk.c
+ create mode 100644 arch/arm/boot/compressed/move_ramdisk.h
 
- arch/arm/mach-imx/pm-imx6q.c     |   12 ++-
- arch/arm/mach-imx/suspend-imx6.S |  168 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 174 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 19c8de3..d3253ff 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -333,7 +333,10 @@ void __init imx6q_pm_init(void)
- 	pm_info->mmdc_addr[0] = (void *)be32_to_cpu(*of_get_address(node, 0, NULL, NULL));
- 	pm_info->mmdc_addr[1] = base;
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..e4ef227 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -23,7 +23,7 @@ endif
  
--	node = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-+	if (cpu_is_imx6q() || cpu_is_imx6dl())
-+		node = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-+	else if (cpu_is_imx6sl())
-+		node = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-src");
- 	if (!node) {
- 		pr_warn("failed to find src node!\n");
- 		goto ocram_out;
-@@ -346,6 +349,8 @@ void __init imx6q_pm_init(void)
- 		node = of_find_compatible_node(NULL, NULL, "fsl,imx6q-iomuxc");
- 	else if (cpu_is_imx6dl())
- 		node = of_find_compatible_node(NULL, NULL, "fsl,imx6dl-iomuxc");
-+	else if (cpu_is_imx6sl())
-+		node = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-iomuxc");
- 	if (!node) {
- 		pr_warn("failed to find iomuxc node!\n");
- 		goto ocram_out;
-@@ -354,7 +359,10 @@ void __init imx6q_pm_init(void)
- 	pm_info->iomuxc_addr[0] = (void *)be32_to_cpu(*of_get_address(node, 0, NULL, NULL));
- 	pm_info->iomuxc_addr[1] = base;
+ AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+ HEAD	= head.o
+-OBJS	+= misc.o decompress.o
++OBJS	+= misc.o decompress.o move_ramdisk.o
+ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
  
--	node = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ccm");
-+	if (cpu_is_imx6q() || cpu_is_imx6dl())
-+		node = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ccm");
-+	else if (cpu_is_imx6sl())
-+		node = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-ccm");
- 	if (!node) {
- 		pr_warn("failed to find ccm node!\n");
- 		goto ocram_out;
-diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
-index 5e358e7f3..3c6a4ef 100644
---- a/arch/arm/mach-imx/suspend-imx6.S
-+++ b/arch/arm/mach-imx/suspend-imx6.S
-@@ -68,6 +68,7 @@
- #define MX6Q_SRC_GPR1	0x20
- #define MX6Q_SRC_GPR2	0x24
- #define MX6Q_MMDC_MAPSR	0x404
-+#define MX6Q_MMDC_MPDGCTRL0	0x83c
- #define MX6Q_GPC_IMR1	0x08
- #define MX6Q_GPC_IMR2	0x0c
- #define MX6Q_GPC_IMR3	0x10
-@@ -390,6 +391,103 @@
+ # string library code (-Os is enforced to keep it much smaller)
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 8e2a8fc..df1df60 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -22,7 +22,8 @@ unsigned int __machine_arch_type;
+ #include <linux/types.h>
+ #include <linux/linkage.h>
  
- 	.endm
+-static void putstr(const char *ptr);
++extern void move_ramdisk(void);
++extern void putstr(const char *ptr);
+ extern void error(char *x);
  
-+	.macro	imx6sl_ddr_io_save
-+
-+	ldr	r6, [r11, #0x30c] /* DRAM_DQM0 */
-+	ldr	r7, [r11, #0x310] /* DRAM_DQM1 */
-+	ldr	r8, [r11, #0x314] /* DRAM_DQM2 */
-+	ldr	r9, [r11, #0x318] /* DRAM_DQM3 */
-+	stmfd	r10!, {r6-r9}
-+
-+	ldr	r6, [r11, #0x5c4] /* GPR_B0DS */
-+	ldr	r7, [r11, #0x5cc] /* GPR_B1DS */
-+	ldr	r8, [r11, #0x5d4] /* GPR_B2DS */
-+	ldr	r9, [r11, #0x5d8] /* GPR_B3DS */
-+	stmfd	r10!, {r6-r9}
-+
-+	ldr	r6, [r11, #0x300] /* DRAM_CAS */
-+	ldr	r7, [r11, #0x31c] /* DRAM_RAS */
-+	ldr	r8, [r11, #0x338] /* DRAM_SDCLK_0 */
-+	ldr	r9, [r11, #0x5ac] /* GPR_ADDS*/
-+	stmfd	r10!, {r6-r9}
-+
-+	ldr	r6, [r11, #0x5b0] /* DDRMODE_CTL */
-+	ldr	r7, [r11, #0x5c0] /* DDRMODE */
-+	ldr	r8, [r11, #0x33c] /* DRAM_SODT0*/
-+	ldr	r9, [r11, #0x340] /* DRAM_SODT1*/
-+	stmfd	r10!, {r6-r9}
-+
-+	ldr	r7, [r11, #0x330] /* DRAM_SDCKE0 */
-+	ldr	r8, [r11, #0x334] /* DRAM_SDCKE1 */
-+	ldr	r9, [r11, #0x320] /* DRAM_RESET */
-+	stmfd	r10!, {r7-r9}
-+
-+	.endm
-+
-+	.macro	imx6sl_ddr_io_restore
-+
-+	ldmea	r10!, {r6-r9}
-+	str	r6, [r11, #0x30c] /* DRAM_DQM0 */
-+	str	r7, [r11, #0x310] /* DRAM_DQM1 */
-+	str	r8, [r11, #0x314] /* DRAM_DQM2 */
-+	str	r9, [r11, #0x318] /* DRAM_DQM3 */
-+
-+	ldmea	r10!, {r6-r9}
-+	str	r6, [r11, #0x5c4] /* GPR_B0DS */
-+	str	r7, [r11, #0x5cc] /* GPR_B1DS */
-+	str	r8, [r11, #0x5d4] /* GPR_B2DS */
-+	str	r9, [r11, #0x5d8] /* GPR_B3DS */
-+
-+	ldmea	r10!, {r6-r9}
-+	str	r6, [r11, #0x300] /* DRAM_CAS */
-+	str	r7, [r11, #0x31c] /* DRAM_RAS */
-+	str	r8, [r11, #0x338] /* DRAM_SDCLK_0 */
-+	str	r9, [r11, #0x5ac] /* GPR_ADDS*/
-+
-+	ldmea	r10!, {r6-r9}
-+	str	r6, [r11, #0x5b0] /* DDRMODE_CTL */
-+	str	r7, [r11, #0x5c0] /* DDRMODE */
-+	str	r8, [r11, #0x33c] /* DRAM_SODT0*/
-+	str	r9, [r11, #0x340] /* DRAM_SODT1*/
-+
-+	ldmea	r10!, {r7-r9}
-+	str	r7, [r11, #0x330] /* DRAM_SDCKE0 */
-+	str	r8, [r11, #0x334] /* DRAM_SDCKE1 */
-+	str	r9, [r11, #0x320] /* DRAM_RESET */
-+
-+	.endm
-+
-+	.macro	imx6sl_ddr_io_set_lpm
-+
-+	mov	r9, #0
-+	str	r9, [r11, #0x30c] /* DRAM_DQM0 */
-+	str	r9, [r11, #0x310] /* DRAM_DQM1 */
-+	str	r9, [r11, #0x314] /* DRAM_DQM2 */
-+	str	r9, [r11, #0x318] /* DRAM_DQM3 */
-+
-+	str	r9, [r11, #0x5c4] /* GPR_B0DS */
-+	str	r9, [r11, #0x5cc] /* GPR_B1DS */
-+	str	r9, [r11, #0x5d4] /* GPR_B2DS */
-+	str	r9, [r11, #0x5d8] /* GPR_B3DS */
-+
-+	str	r9, [r11, #0x300] /* DRAM_CAS */
-+	str	r9, [r11, #0x31c] /* DRAM_RAS */
-+	str	r9, [r11, #0x338] /* DRAM_SDCLK_0 */
-+	str	r9, [r11, #0x5ac] /* GPR_ADDS*/
-+
-+	str	r9, [r11, #0x5b0] /* DDRMODE_CTL */
-+	str	r9, [r11, #0x5c0] /* DDRMODE */
-+	str	r9, [r11, #0x33c] /* DRAM_SODT0*/
-+	str	r9, [r11, #0x340] /* DRAM_SODT1*/
-+
-+	mov	r9, #0x80000
-+	str	r9, [r11, #0x320] /* DRAM_RESET */
-+	mov	r9, #0x1000
-+	str	r9, [r11, #0x330] /* DRAM_SDCKE0 */
-+	str	r9, [r11, #0x334] /* DRAM_SDCKE1 */
-+
-+	.endm
-+
- 	.macro  sync_l2_cache
+ #include <mach/uncompress.h>
+@@ -83,7 +84,7 @@ static void icedcc_putc(int ch)
+ #define putc(ch)	icedcc_putc(ch)
+ #endif
  
- 	/* sync L2 cache to drain L2's buffers to DRAM. */
-@@ -453,8 +551,13 @@ ENTRY(imx6_suspend)
- 	b	ddr_io_save_dsm_done
- dl_io_dsm_save:
- 	cmp     r1, #MXC_CPU_IMX6DL
--	bne	ddr_io_save_dsm_done
-+	bne	sl_io_save
- 	imx6dl_ddr_io_save
-+	b	ddr_io_save_dsm_done
-+sl_io_save:
-+	cmp     r1, #MXC_CPU_IMX6SL
-+	bne	ddr_io_save_dsm_done
-+	imx6sl_ddr_io_save
- ddr_io_save_dsm_done:
+-static void putstr(const char *ptr)
++void putstr(const char *ptr)
+ {
+ 	char c;
  
- 	/* need to sync L2 cache before DSM. */
-@@ -487,8 +590,13 @@ poll_dvfs_set_1:
- 	b	ddr_io_set_lpm_dsm_done
- dl_io_dsm_set_lpm:
- 	cmp     r1, #MXC_CPU_IMX6DL
--	bne	ddr_io_set_lpm_dsm_done
-+	bne	sl_io_dsm_set_lpm
- 	imx6dl_ddr_io_set_lpm
-+	b	ddr_io_set_lpm_dsm_done
-+sl_io_dsm_set_lpm:
-+	cmp     r1, #MXC_CPU_IMX6SL
-+	bne	ddr_io_set_lpm_dsm_done
-+	imx6sl_ddr_io_set_lpm
- ddr_io_set_lpm_dsm_done:
+@@ -144,6 +145,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
  
- 	/*
-@@ -575,8 +683,34 @@ rbc_loop:
- 	b	ddr_io_restore_done
- dl_io_restore:
- 	cmp     r1, #MXC_CPU_IMX6DL
--	bne     ddr_io_restore_done
-+	bne     sl_io_restore
- 	imx6dl_ddr_io_restore
-+	b	ddr_io_restore_done
-+sl_io_restore:
-+	cmp     r1, #MXC_CPU_IMX6SL
-+	bne	ddr_io_restore_done
-+	imx6sl_ddr_io_restore
-+	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
-+	/* reset read FIFO, RST_RD_FIFO */
-+	ldr	r7, =MX6Q_MMDC_MPDGCTRL0
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+fifo_reset1_wait:
-+	ldr	r6, [r11, r7]
-+	and	r6, r6, #(1 << 31)
-+	cmp	r6, #0
-+	bne	fifo_reset1_wait
+ 	arch_decomp_setup();
+ 
++	move_ramdisk();
 +
-+	/* reset FIFO a second time */
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+fifo_reset2_wait:
-+	ldr	r6, [r11, r7]
-+	and	r6, r6, #(1 << 31)
-+	cmp	r6, #0
-+	bne	fifo_reset2_wait
- ddr_io_restore_done:
- 
- 	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
-@@ -628,8 +762,34 @@ resume:
- 	b	ddr_io_restore_dsm_done
- dl_io_dsm_restore:
- 	cmp     r1, #MXC_CPU_IMX6DL
--	bne	ddr_io_restore_dsm_done
-+	bne	sl_io_dsm_restore
- 	imx6dl_ddr_io_restore
-+	b	ddr_io_restore_dsm_done
-+sl_io_dsm_restore:
-+	cmp     r1, #MXC_CPU_IMX6SL
-+	bne	ddr_io_restore_dsm_done
-+	imx6sl_ddr_io_restore
-+	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_P_OFFSET]
-+	/* reset read FIFO, RST_RD_FIFO */
-+	ldr	r7, =MX6Q_MMDC_MPDGCTRL0
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+dsm_fifo_reset1_wait:
-+	ldr	r6, [r11, r7]
-+	and	r6, r6, #(1 << 31)
-+	cmp	r6, #0
-+	bne	dsm_fifo_reset1_wait
+ 	putstr("Uncompressing Linux...");
+ 	ret = do_decompress(input_data, input_data_end - input_data,
+ 			    output_data, error);
+diff --git a/arch/arm/boot/compressed/move_ramdisk.c b/arch/arm/boot/compressed/move_ramdisk.c
+new file mode 100644
+index 0000000..b984433
+--- /dev/null
++++ b/arch/arm/boot/compressed/move_ramdisk.c
+@@ -0,0 +1,61 @@
++/*
++ * move_ramdisk.c
++ *
++ * Author: Wu Zhangjin, wuzhangjin at gmail.com, December 2013
++ * Copyright: (C) 2013 Meizu Telecom Equipment Co., Ltd
++ *
++ * Please get help of MOVE_RAMDISK from usr/Kconfig.
++ */
 +
-+	/* reset FIFO a second time */
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+dsm_fifo_reset2_wait:
-+	ldr	r6, [r11, r7]
-+	and	r6, r6, #(1 << 31)
-+	cmp	r6, #0
-+	bne	dsm_fifo_reset2_wait
- ddr_io_restore_dsm_done:
++
++#include "move_ramdisk.h"
++
++extern void putstr(const char *ptr);
++
++void move_ramdisk(void)
++{
++#if defined(CONFIG_MOVE_RAMDISK) && defined(TAG_BASE_ADDR)
++	struct tag *tags = (struct tag *)(TAG_BASE_ADDR);
++	__u32 start, target, size;
++	int found = 0, type = 0;
++
++	putstr("Searching ramdisk ...\n");
++	if (tags->hdr.tag == ATAG_CORE) {
++		putstr("Found tags ...\n");
++		for (tags = tag_next(tags); tags->hdr.size; tags = tag_next(tags)) {
++			if (tags->hdr.tag == ATAG_INITRD2) {
++				putstr("Found initrd2 tag ...\n");
++				found = 1;
++				break;
++			} else if (tags->hdr.tag == ATAG_INITRD) {
++				putstr("Found initrd tag ...\n");
++				found = 1;
++				break;
++			} else if (tags->hdr.tag == ATAG_RAMDISK) {
++				putstr("Found ramdisk tag ...\n");
++				found = 1;
++				type = 1;
++				break;
++			}
++		}
++		if (found) {
++			if (type == 0) {
++				start = tags->u.initrd.start;
++				size = tags->u.initrd.size;
++				target = start + MOVE_RAMDISK_OFFSET;
++				tags->u.initrd.start = target;
++			} else {
++				start = tags->u.ramdisk.start;
++				size = tags->u.ramdisk.size;
++				target = start + MOVE_RAMDISK_OFFSET;
++				tags->u.ramdisk.start = target;
++			}
++
++			putstr("Moving ramdisk forward ...\n");
++			memcpy((char *)target, (char *)start, size + SIZE_FIXUP_OFFSET);
++		}
++	} else {
++		putstr("No tag found ...\n");
++	}
++#endif
++}
+diff --git a/arch/arm/boot/compressed/move_ramdisk.h b/arch/arm/boot/compressed/move_ramdisk.h
+new file mode 100644
+index 0000000..b824cde
+--- /dev/null
++++ b/arch/arm/boot/compressed/move_ramdisk.h
+@@ -0,0 +1,35 @@
++#ifndef _MOVE_RAMDISK_H
++#define _MOVE_RAMDISK_H
++
++#include <asm/setup.h>
++#include <asm/memory.h>
++#include <asm/string.h>
++
++/* The physical base address of your platform, see PHYS_OFFSET */
++#ifdef PLAT_PHYS_OFFSET
++#define __PLAT_PHYS_OFFSET	(PLAT_PHYS_OFFSET)
++#else
++
++#ifdef defined (CONFIG_ARCH_ORION5X) || defined (CONFIG_ARCH_KIRKWOOD)
++#define __PLAT_PHYS_OFFSET    UL(0x00000000)
++#else
++#error "Please define __PLAT_PHYS_OFFSET, the physical base address of DRAM"
++#endif
++
++#endif /* PLAT_PHYS_OFFSET */
++
++/* Most boards put tag at the offset 0x100 with the base PHYS_OFFSET */
++#define TAG_BASE_OFFSET		(0x100)
++
++/* The tag address */
++#ifdef __PLAT_PHYS_OFFSET
++#define TAG_BASE_ADDR		(__PLAT_PHYS_OFFSET + TAG_BASE_OFFSET)
++#endif
++
++/* Some old Uboot pass the wrong size to kernel, fix up it with an offset. */
++#define SIZE_FIXUP_OFFSET	(1024)
++
++#define MOVE_RAMDISK_OFFSET	(CONFIG_MOVE_RAMDISK_OFFSET_M * 1024 * 1024)
++#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
++
++#endif /* _MOVE_RAMDISK_H */
+diff --git a/usr/Kconfig b/usr/Kconfig
+index 65b845b..ad5ce5b 100644
+--- a/usr/Kconfig
++++ b/usr/Kconfig
+@@ -166,3 +166,32 @@ config INITRAMFS_COMPRESSION_LZO
+ 	  (both compression and decompression) is the fastest.
  
- 	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_P_OFFSET]
+ endchoice
++
++config MOVE_RAMDISK
++	bool "Move ramdisk forward to reserve more memory for kernel image"
++	depends on ARM
++	help
++	  During embedded linux system booting, before decompressing the kernel
++	  image, the bootloader(E.g. Uboot) loads the compressed kernel image
++	  and ramdisk into two contiguous memory space, these two memory space
++	  are fixed after the Uboot is released, as a result, the maximum size
++	  of the decompressed kernel image is limited by the size of the
++	  reserved memory space (the difference of the two contiguous memory
++	  addresses).
++
++	  If want more functions or some debug options, the decompressed kernel
++	  image may be bigger and may override the followed ramdisk and result
++	  in kernel boot failure for missing a valid ramdisk.
++
++	  To fix up this issue, before decompressing the kernel image, this
++	  option moves the loaded ramdisk image forward with a specified offset
++	  and reserve more memory for the decompressed kernel image.
++
++config MOVE_RAMDISK_OFFSET_M
++	int "Set the move offset of ramdisk (in Mbytes)"
++	range 5 100
++	default "20"
++	depends on MOVE_RAMDISK
++	help
++	  Specify the move offset of the ramdisk, if want a bigger kernel, please
++	  Increase this size.
 -- 
-1.7.9.5
+1.7.10.4
