@@ -1,49 +1,57 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Jan 2014 16:08:42 -0500 (EST)
-Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
-In-Reply-To: <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
-References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
- <20140108143529.GB14122@mudshark.cambridge.arm.com>
- <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
- <20140108192028.GM27432@n2100.arm.linux.org.uk>
- <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.10.1401081600370.1851@knanqh.ubzr>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 08 Jan 2014 21:24:16 +0000
+Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
+In-Reply-To: <20140108182906.GH2941@lukather>
+References: <20140107220310.GD3103@lukather>
+ <1389200137.27473.6.camel@kazak.uk.xensource.com>
+ <20140108182906.GH2941@lukather>
+Message-ID: <1389216256.7769.39.camel@hastur.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Jan 2014, Doug Anderson wrote:
-
-> Hi,
+On Wed, 2014-01-08 at 19:29 +0100, Maxime Ripard wrote:
+> On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
+> > On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
+> > > Another nice thing about it is that a FEX-to-DT compiler comes at no
+> > > cost afterwards. Since dtc is able to generate a DTS from
+> > > /proc/device-tree, you can easily generate a DTS for your previously
+> > > non-supported board using
+> > > 
+> > >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
+> > 
+> > I wonder if it might also be useful to compile this as a normal user
+> > space application which takes the fex and produces the dtb (or dts)?
 > 
-> On Wed, Jan 8, 2014 at 11:20 AM, Russell King - ARM Linux
-> > No, we're saying to put the work-around in the boot loader, not the kernel.
+> At the moment, no, libfdt only operates on DTB, so we would have to
+> chain this somehow with dtc to at least do the DTB to DTS conversion I
+> guess.
 > 
-> Unfortunately the resume path of the firmware runs from Read Only 
-> firmware code (yes, it sucks), so it's not totally trivial to fix. It 
-> would be possible for someone to unscrew their write protect switch 
-> and update their RO firmware, but that doesn't help the average user.
-
-[...]
-
-> I'd guess that the way forward is:
+> It's not something that I'm pretty fond of either. Or, I don't really
+> see the benefit of it.
 > 
-> * Land kernel workaround locally in Chromium tree
+> Let's say that you have such tool, I'm guessing one would want it to
+> mass-convert fex files to DT. But then, you'd still have to boot that
+> DT to be sure that everything is working, so you're pretty much losing
+> the mass-convertion thing, since you would have boot this with a
+> baremetal babelfish anyway.
+
+I wasn't really thinking of mass conversion. just an easy way for people
+to produce a starting point for their platform to send upstream.
+
+> > I suppose producing something upstreamable would be different/harder
+> > though, since it would need to not inline/merge the dtsi file but just
+> > leave the include stmt. That's probably a different tool.
 > 
-> * I'll try to land FW change locally in at least one Chromium branch.
-> If we were to get a new RO build ever (seems unlikely at this point)
-> it would be fixed for upstream kernels.  If we were to get a new RW
-> build (seems unlikely, but at least less unlikely) it would be fixed
-> if someone landed a kernel patch to save/restore this register across
-> suspend/resume.
+> Yeah, dtc outputs a "flat" DTS, without any include, so you still need
+> to edit it by hand to remove the common part, remove the duplicated
+> pinctrl nodes, fix the phandle, etc.
 > 
-> * If Joe Upstream wants to run an upstream kernel on some type of
-> exynos5250 product (Samsung ARM Chromebook, HP Chromebook 11, Nexus 10
-> are the ones I know of) then he will deal with the small number of
-> crashes or figure out a solution.
+> But most of that can be scripted I guess.
 
-If Joe Upstream wants to run an upstream kernel, doesn't he have to 
-unscrew his write protect switch first, at which point the RO firmware 
-can be updated as well?
+I think this could be done as a separate tool which read a FEX and
+outputted the dts directly (i.e. with printf). The output would have the
+#include for the right dtsi in place and the appropriate overrides
+derived from the FEX. That's not really anything like your
+sunxi-babelfish though.
 
-
-Nicolas
+Ian.
