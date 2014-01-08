@@ -1,93 +1,55 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:46:58 +0000
-Subject: [PATCH v4 15/37] mtd: st_spi_fsm: Fetch boot-device from mode pins
+Date: Wed,  8 Jan 2014 13:47:00 +0000
+Subject: [PATCH v4 17/37] mtd: st_spi_fsm: Provide the sequence for enabling
+ 32bit addressing mode
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's important for us to determine which device was used to boot from in
-order to make some correct decisions surrounding Power Management. On
-each of the platforms which support the FSM this is communicated via
-a set of mode pins held in the system configuration area. This patch
-determine the boot device and stores the result.
+The FSM Serial Flash Controller is driven by issuing a standard set of
+register writes we call a message sequence. This patch supplies a method
+to prepare the message sequence responsible for setting 32bit addressing
+mode on the Flash chip.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 41 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 961abfd..94840b5 100644
+index 5ee6d08..02718ae 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -14,7 +14,9 @@
-  */
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/regmap.h>
- #include <linux/platform_device.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/mtd/mtd.h>
- #include <linux/sched.h>
- #include <linux/delay.h>
-@@ -243,6 +245,7 @@ struct stfsm {
- 	struct flash_info       *info;
- 
- 	uint32_t                fifo_dir_delay;
-+	bool                    booted_from_spi;
+@@ -447,6 +447,28 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
+ 		    SEQ_CFG_STARTSEQ),
  };
  
- struct stfsm_seq {
-@@ -727,10 +730,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
++static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
++{
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(FLASH_CMD_EN4B_ADDR));
++	seq->seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(FLASH_CMD_WREN) |
++			   SEQ_OPC_CSDEASSERT);
++
++	seq->seq[0] = STFSM_INST_CMD2;
++	seq->seq[1] = STFSM_INST_CMD1;
++	seq->seq[2] = STFSM_INST_WAIT;
++	seq->seq[3] = STFSM_INST_STOP;
++
++	seq->seq_cfg = (SEQ_CFG_PADS_1 |
++			SEQ_CFG_ERASE |
++			SEQ_CFG_READNOTWRITE |
++			SEQ_CFG_CSDEASSERT |
++			SEQ_CFG_STARTSEQ);
++
++	return 0;
++}
++
+ static inline int stfsm_is_idle(struct stfsm *fsm)
  {
- 	struct stfsm *fsm = platform_get_drvdata(pdev);
- 	struct flash_info *info = fsm->info;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct regmap *regmap;
-+	uint32_t boot_device_reg;
-+	uint32_t boot_device_spi;
-+	uint32_t boot_device;     /* Value we read from *boot_device_reg */
-+	int ret;
-+
-+	/* Booting from SPI NOR Flash is the default */
-+	fsm->booted_from_spi = true;
- 
- 	/* Use device size to determine address width */
- 	if (info->sector_size * info->n_sectors > 0xFFFFFF)
- 		info->flags |= FLASH_FLAG_32BIT_ADDR;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (!IS_ERR(regmap)) {
-+		ret = PTR_ERR(regmap);
-+		goto boot_device_fail;
-+	}
-+
-+	/* Where in the syscon the boot device information lives */
-+	ret = of_property_read_u32(np, "st,boot-device-reg", &boot_device_reg);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	/* Boot device value when booted from SPI NOR */
-+	ret = of_property_read_u32(np, "st,boot-device-spi", &boot_device_spi);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	ret = regmap_read(regmap, boot_device_reg, &boot_device);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	if (boot_device != boot_device_spi)
-+		fsm->booted_from_spi = false;
-+
-+	return;
-+
-+boot_device_fail:
-+	dev_warn(&pdev->dev,
-+		 "failed to fetch boot device, assuming boot from SPI\n");
- }
- 
- static int stfsm_probe(struct platform_device *pdev)
+ 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
 -- 
 1.8.3.2
