@@ -1,44 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 14:41:19 +0100
-Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
- late
-In-Reply-To: <1389185477-507-1-git-send-email-treding@nvidia.com>
-References: <20140108011957.GK5074@atomide.com>
- <1389185477-507-1-git-send-email-treding@nvidia.com>
-Message-ID: <4589157.TquA4Q59fC@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 8 Jan 2014 14:39:52 +0100
+Subject: [PATCH v2 3/6] ARM: tegra: Add efuse bindings
+In-Reply-To: <52CB14D3.2060904@wwwdotorg.org>
+References: <1387891931-9854-1-git-send-email-pdeschrijver@nvidia.com>
+ <1387891931-9854-4-git-send-email-pdeschrijver@nvidia.com>
+ <52CB14D3.2060904@wwwdotorg.org>
+Message-ID: <20140108133951.GD1592@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 13:51:17 Thierry Reding wrote:
-> When devices are probed from the device tree, any interrupts that they
-> reference are resolved at device creation time. This causes problems if
-> the interrupt provider hasn't been registered yet at that time, which
-> results in the interrupt being set to 0.
-
-Thanks for looking at this problem, it has bothered a lot of people
-for a long time. I'm sorry I wasn't there for the discussion in November,
-but when it came up before, I suggested a different solution that
-apparently didn't get implemented.
-
-> Note that this patch is the easy way out to fix a large part of the
-> problems for now. A more proper solution for the long term would be to
-> transition drivers to an API that always resolves resources of any kind
-> (not only interrupts) at probe time.
+On Mon, Jan 06, 2014 at 01:40:51PM -0700, Stephen Warren wrote:
+> On 12/24/2013 06:32 AM, Peter De Schrijver wrote:
+[...]
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
 > 
-> For some background and discussion on possible solutions, see:
+> > +	efuse at 7000F800 {
 > 
-> 	https://lkml.org/lkml/2013/11/22/520
+> "fuse" might be a better node name; "efuse" is presumably the name of
+> the instance, not the type of object.
 
-I hope I read this thread correctly, sorry if I missed an important
-part. My idea was to add the code not in platform_get_irq() but add
-the resource in platform_drv_probe(), and just bail out with
--EPROBE_DEFER there if necessary.
+There's another occurrence I noticed recently where we haven't followed
+that rule. The PMIC node on Venice2 for instance is called as3722.
+Perhaps that should also be renamed.
 
-We could then skip adding the resources at device creation time.
-Is this something you already plan to do later, or is there a reason
-it wouldn't work?
-
-In the meantime, I don't see anything with your patch, but it also
-wouldn't hurt to do it now if it solves all the problems.
-
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/22986e05/attachment.sig>
