@@ -1,109 +1,106 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Jan 2014 21:24:08 +0100
-Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
- late
-In-Reply-To: <14122609.M29raBct1E@wuerfel>
-References: <20140108011957.GK5074@atomide.com>
- <201401081725.17876.arnd@arndb.de>
- <20140108195909.GB1298@ulmo.nvidia.com>
- <14122609.M29raBct1E@wuerfel>
-Message-ID: <20140108202407.GA28442@ulmo.nvidia.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 8 Jan 2014 12:27:07 -0800
+Subject: [PATCH RFC 1/3] drivers: base: support cpu cache information
+ interface to userspace via sysfs
+In-Reply-To: <1389209168-17189-2-git-send-email-sudeep.holla@arm.com>
+References: <1389209168-17189-1-git-send-email-sudeep.holla@arm.com>
+ <1389209168-17189-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140108202707.GE8417@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 09:09:17PM +0100, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014 20:59:10 Thierry Reding wrote:
-> > On Wed, Jan 08, 2014 at 05:25:17PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 08 January 2014, Thierry Reding wrote:
-> > > > On Wed, Jan 08, 2014 at 04:11:08PM +0100, Arnd Bergmann wrote:
-> > > The more I think about the iommu case, the more I am convinced that it
-> > > does belong into the core, in whatever form we can find. As far as I
-> > > can tell from the little reliable information I have on the topic, I
-> > > would assume that we can keep it in the DT probing code, as there won't
-> > > be a need for multiple arbitrary IOMMUs with ACPI or with board files.
-> > 
-> > I think part of the problem is that we don't have any DT probing code
-> > yet. of_platform_probe() would have been that code. Perhaps if you weigh
-> > in Grant and Greg will reconsider.
+On Wed, Jan 08, 2014 at 07:26:06PM +0000, Sudeep Holla wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
 > 
-> For all I know, we don't even have a binding proposal, but I may
-> have missed that.
-
-Yeah, last time I checked there was no concensus on that. I'll try to
-dig up the thread and get it going again, adding you on Cc if you don't
-mind (and in case you weren't Cc'ed in the first place anyway).
-
-> > > Good point, I forgot about the special case for i2c_client->irq.
-> > > I looked now and noticed that very few i2c devices actually use this
-> > > field, but larger number uses platform_data, which has a similar
-> > > problem.
-> > 
-> > Yeah. It's kind of messy. The more I think about it, the more I begin to
-> > like the lookup table option. One big advantage of that is that we could
-> > actually unify much of the lookup code, much like we do for other types
-> > of resources. It's a pattern that has worked fairly well in a number of
-> > cases, so it seems natural to use it for interrupts as well.
-> > 
-> > An even more extreme option would be to go all the way and introduce
-> > struct irq, along the same lines of the new struct gpiod. That would
-> > allow nice things such as storing trigger types and such within the IRQ
-> > handle and propagate them automatically.
+> This patch adds initial support for providing processor cache information
+> to userspace through sysfs interface. This is based on x86 implementation
+> and hence the interface is intended to be fully compatible.
 > 
-> We already have struct irq_desc, and I believe everybody who works
-> with interrupts supports migrating from irq number interfaces to
-> irq descriptors as soon as we can find someone willing to do that
-> work.
-
-I didn't know that. I had always assumed irq_desc was only for internal
-use by the IRQ code. Perhaps I'll look into that at some point.
-
-> > > No trivial solution that I can see. I think we can deal with the case
-> > > where platform code uses platform_device->resources, and everything else
-> > > comes down to having multiple code branches in the driver, as we already
-> > > have to deal with platform_data and DT properties describing stuff that
-> > > doesn't fit in the resources.
-> > 
-> > That would be another argument in favour of the lookup table. It would
-> > provide a unified mechanism to define static interrupts if no firmware
-> > interface is available *independent* of the device type. You could have
-> > something like:
-> > 
-> > 	static const struct irq_lookup board_irq_lookup[] = {
-> > 		IRQ_LOOKUP("gpio", 0, "0-0040", NULL), /* I2C client via GPIO expander */
-> > 		IRQ_LOOKUP("intc", 0, "ehci.1", NULL), /* platform device via INTC */
-> > 	};
-> > 
-> > Along with:
-> > 
-> > 	struct irq *irq_get(struct device *dev, const char *con_id);
-> > 
-> > To look it up via DT, ACPI, lookup table. That obviously means a more or
-> > less complete change in how interrupts are handled in the kernel, and it
-> > may not be worth it in the end.
+> A per-cpu array of cache information maintained is used mainly for
+> sysfs-related book keeping.
 > 
-> It would certainly need a long migration period, and a plan for how to
-> get there without breaking things in the meantime. Rather than a lookup
-> table like the kind we have for clocks, I'd prefer a general way to
-> attach named properties to devices. My feeling is that building upon
-> devres would be a good plan, since it already provides a way to attach
-> arbitrary data to a device.
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/base/Makefile     |   2 +-
+>  drivers/base/cacheinfo.c  | 296 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cacheinfo.h |  43 +++++++
+>  3 files changed, 340 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/base/cacheinfo.c
+>  create mode 100644 include/linux/cacheinfo.h
+> 
+> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> index 94e8a80..76f07c8 100644
+> --- a/drivers/base/Makefile
+> +++ b/drivers/base/Makefile
+> @@ -4,7 +4,7 @@ obj-y			:= core.o bus.o dd.o syscore.o \
+>  			   driver.o class.o platform.o \
+>  			   cpu.o firmware.o init.o map.o devres.o \
+>  			   attribute_container.o transport_class.o \
+> -			   topology.o
+> +			   topology.o cacheinfo.o
+>  obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
+>  obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
+>  obj-y			+= power/
+> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+> new file mode 100644
+> index 0000000..f436c31
+> --- /dev/null
+> +++ b/drivers/base/cacheinfo.c
+> @@ -0,0 +1,296 @@
+> +/*
+> + * cacheinfo support - processor cache information via sysfs
+> + *
+> + * Copyright (C) 2013 ARM Ltd.
+> + * All Rights Reserved
+> + *
+> + * Author: Sudeep Holla <sudeep.holla@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/bitops.h>
+> +#include <linux/cacheinfo.h>
+> +#include <linux/compiler.h>
+> +#include <linux/cpu.h>
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/kobject.h>
+> +#include <linux/of.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
+> +#include <linux/smp.h>
+> +#include <linux/sysfs.h>
+> +
+> +struct cache_attr {
+> +	struct attribute attr;
+> +	 ssize_t(*show) (unsigned int, unsigned short, char *);
+> +	 ssize_t(*store) (unsigned int, unsigned short, const char *, size_t);
+> +};
+> +
+> +/* pointer to kobject for cpuX/cache */
+> +static DEFINE_PER_CPU(struct kobject *, ci_cache_kobject);
+> +#define per_cpu_cache_kobject(cpu)     (per_cpu(ci_cache_kobject, cpu))
+> +
+> +struct index_kobject {
+> +	struct kobject kobj;
+> +	unsigned int cpu;
+> +	unsigned short index;
+> +};
+> +
+> +static cpumask_t cache_dev_map;
+> +
+> +/* pointer to array of kobjects for cpuX/cache/indexY */
 
-The problem with devres, or any other solution for that matter, is that
-for the cases where we'd need something like this (that is, statically
-allocated devices in board setup code) we don't have a fully initialized
-struct device. We need at least device_initialize() to have been called
-before devres can be used. Therefore we still need some sort of lookup
-table that can be used to seed devres objects. Also devres will go away
-completely when a driver is unloaded, so it'll have to be repopulated
-everytime.
+Please don't use "raw" kobjects for this, use the device attribute
+groups, that's what they are there for.  Bonus is that your code should
+get a lot simpler when you do that.
 
-I don't think that would buy us much over a simple table lookup.
+thanks,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/e9fef157/attachment.sig>
+greg k-h
