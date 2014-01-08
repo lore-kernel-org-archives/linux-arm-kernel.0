@@ -1,33 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 08 Jan 2014 16:06:15 +0000
-Subject: [RFC 12/18] clk: versatile: Split config options for sp810 and
- vexpress_osc
-In-Reply-To: <20131223200538.25490.67340@quantum>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-13-git-send-email-pawel.moll@arm.com>
- <20131223200538.25490.67340@quantum>
-Message-ID: <1389197175.23721.24.camel@hornet>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 08 Jan 2014 11:09:48 -0500
+Subject: [PATCH v2 1/5] mm: create generic early_ioremap() support
+In-Reply-To: <52CC89B4.4060300@zytor.com>
+References: <1389062120-31896-1-git-send-email-msalter@redhat.com>
+ <1389062120-31896-2-git-send-email-msalter@redhat.com>
+ <52CC89B4.4060300@zytor.com>
+Message-ID: <1389197388.29144.37.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-23 at 20:05 +0000, Mike Turquette wrote:
-> Quoting Pawel Moll (2013-12-23 08:23:44)
-> > Move the Kconfig entry for Versatile (& Express) clock drivers
-> > into a separate file and add individual options for sp810
-> > and vexpress_osc drivers, as they are optional in some
-> > configurations and may have separate dependencies.
+On Tue, 2014-01-07 at 15:11 -0800, H. Peter Anvin wrote:
+> On 01/06/2014 06:35 PM, Mark Salter wrote:
 > > 
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
+> > There is one difference from the existing x86 implementation which
+> > should be noted. The generic early_memremap() function does not return
+> > an __iomem pointer and a new early_memunmap() function has been added
+> > to act as a wrapper for early_iounmap() but with a non __iomem pointer
+> > passed in. This is in line with the first patch of this series:
+> > 
 > 
-> Is there a reason to continue to expose these as user-visible config
-> options? I guess that with Device Tree we can just include clock nodes
-> (or not) for boards that use these clocks (or do not use them).
->
-> And it seems for many configurations COMMON_CLK_VERSATILE is always
-> selected, so what is the point of the other two sub-options?
+> This makes a lot of sense.  However, I would suggest that we preface the
+> patch series with a single patch changing the signature for the existing
+> x86 function, that way this change becomes bisectable.
 
-It's mostly for arm64, where all the bits and pieces are individually
-selected (and SP810 is not present in some vexpress configurations).
+Ok, that sounds like a good idea. I'm uncertain how best to coordinate
+with Dave Young's patch series to avoid conflicts. His first patch does
+the signature change (and adds the early_memunmap function but that
+isn't used anywhere):
 
-Pawe?
+ https://lkml.org/lkml/2013/12/20/143
+
+Any thoughts on how best to avoid potential merge conflicts here?
