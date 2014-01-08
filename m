@@ -1,41 +1,129 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 08 Jan 2014 17:44:29 +0100
-Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
-In-Reply-To: <20140108163138.27803.58310@quantum>
-References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
- <2890647.PEOApIOYyP@amdc1227> <20140108163138.27803.58310@quantum>
-Message-ID: <3008563.6S2kFjQKp9@amdc1227>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Jan 2014 17:46:17 +0100
+Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
+ SoCs
+In-Reply-To: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <52CD80D9.8000301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 of January 2014 08:31:38 Mike Turquette wrote:
-> Quoting Tomasz Figa (2014-01-02 07:22:12)
-> > On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
-> > > Quoting Tomasz Figa (2013-12-12 08:07:13)
-> > > > This series intends to improve clock provider impementation of max77686
-> > > > PMIC driver. First two patches are simple fixes of current implementation
-> > > > to allow correct control of provided clocks. Further patches refactor
-> > > > the driver to make the code cleaner and prepare for further patches. Then
-> > > > last two patches add registration of OF clock provider and adjust device
-> > > > tree nodes of boards containing max77686 chip to contain properties
-> > > > required by clock provider.
-> > > 
-> > > Acked-by: Mike Turquette <mturquette@linaro.org>
-> > 
-> > Hmm... Shouldn't this series go through the clk tree directly? If not, who
-> > should be taking it?
+On 08/01/2014 16:06, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Yes it should, but I guessed it would come in a pull request. Maybe Ack
-> is the wrong thing? I can just say "looks good to me me" or something
-> else.
+> Here come the 5th version of the series fixing the i2c bus hang on A0
+> version of the Armada XP SoCs. It occurred on the early release of the
+> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
+> (A0 stepping) have issues related to the i2c controller which prevent
+> to use the offload mechanism and lead to a kernel hang during boot.
+> 
+> The main change are the use of marvell,mv78230-a0-i2c and that the
+> function mvebu_get_soc_id() is now local to mach-mvebu.
+> 
+> The first patch add a mean to detect the SoCs version at run-time and
+> the second one use this feature in the driver.
+> 
+> The 3 first patches should be applied on 3.13-rc and on stable kernel
+> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
+> "i2c: mv64xxx: Add I2C Transaction Generator support".
+> 
+> The first patch could be latter be extend to also be used with dove,
+> kirkwood, orion5x and mv78x00 when there will be merged in mvebu and
+> even expose the SoC ID and revision to userspace.
+> 
+> Jason, do you still agree to take the series once Wolfram have given
+> his acked-by?
 
-Nah, I think Ack is completely right, but still this series is quite
-standalone, e.g. it does not really belong to samsung-clk nor any other
-clock subtree, so I thought you would be applying them directly.
+Jason,
 
-I believe Lee has already applied this one, but in future, to avoid such
-confusion, if it's more convenient for you, I can send you any clock
-series as pull requests.
+if it can help you I have just pull my branch at:
+https://github.com/MISL-EBU-System-SW/mainline-public/tree/i2c-mv64xxx-3.13-rc6-fixes-v6
 
-Best regards,
-Tomasz
+git at github.com:MISL-EBU-System-SW/mainline-public.git
+
+I also taken into account the two comments and added the acked-by from Wolfram and
+Arnd on the appropriate commit.
+
+
+Thanks,
+
+Gregory
+
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> Changelog:
+> v4 -> v5:
+> 
+> - use the marvell,mv78230-a0-i2c compatible string instead of the
+>   offload-broken property.
+> 
+> - move the mvebu-soc-id.h file into mach-mvebu
+> 
+> - no more export the mvebu_get_soc_id() function
+> 
+> - enable the quirk only on machines that we know may be affected, i.e.
+> OpenBlocks AX3-4.
+> 
+> v3 -> v4:
+> 
+> - checked the offload-broken property instead of calling the
+>   mvebu_get_soc_id() function in the mv64xxx_of_config() function.
+> 
+> - added the second patch to manage the quirk and update the device
+>   node with the offload-broken if needed.
+> 
+> - removed the acked-by from Wolfram as the code have change in the 3rd
+>   patch
+> 
+> In mvebu-soc-id.c:
+>  - used EXPORT_SYMBOL_GPL instead of EXPORT_SYMBOL
+> 
+>  - used core_initcall instead of arch_initcall to be called earlier
+>    enough.
+> 
+> v2 -> v3:
+> 
+> - fixed typo in the comments added in i2c-mv64xxx.c
+> 
+> - used pr_fmt instead of %s __func__ in all the pr_* functions
+> 
+> - added a check on the pointer returned by of_get_next_child()
+> 
+> - added a return immediately after the 1st check to be able to get rid
+>   of indenting the entire function code inside the if { ... } block.
+> 
+> v1 -> v2:
+> 
+> - Changed the way to test the return of the function mvebu_get_soc_id
+>   in order to make it clearer.
+> 
+> - Removed the superfluous parentheses
+> 
+> - Added Wolfram's acked-by on the 2nd patch
+> 
+> Gregory CLEMENT (4):
+>   ARM: mvebu: Add support to get the ID and the revision of a SoC
+>   ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
+>   i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
+>   i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
+> 
+>  .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   2 +-
+>  arch/arm/mach-mvebu/Makefile                       |   2 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c                |  32 ++++++
+>  arch/arm/mach-mvebu/mvebu-soc-id.c                 | 119 +++++++++++++++++++++
+>  arch/arm/mach-mvebu/mvebu-soc-id.h                 |  32 ++++++
+>  drivers/i2c/busses/i2c-mv64xxx.c                   |   8 ++
+>  6 files changed, 193 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
+>  create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
