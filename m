@@ -1,32 +1,51 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 8 Jan 2014 11:34:18 -0700
-Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
-In-Reply-To: <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20140108183418.GA12358@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  8 Jan 2014 10:37:43 -0800
+Subject: [PATCH v3 0/7] Modernize pm8921 with irqdomains, regmap, DT
+Message-ID: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 03:21:58PM +0100, Boris BREZILLON wrote:
+These patches lay the groundwork for converting the pm8921 sub-devices
+to devicetree as well as simplify the API by migrating the core code
+to use the regmap API instead of the custom pm8xxx read/write wrapper.
 
-> +int of_get_nand_timings(struct device_node *np, struct nand_timings *timings)
-> +{
-> +	memset(timings, 0, sizeof(*timings));
-> +	of_property_read_u32(np, "tCLS-min", &timings->tCLS_min);
-> +	of_property_read_u32(np, "tCLH-min", &timings->tCLH_min);
-> +	of_property_read_u32(np, "tCS-min", &timings->tCS_min);
-[..]
+Changes since v2:
+ * Picked up reviewed-by tags
+ * Fixed irqdomain teardown in driver remove
+ * No magical 256 constant
+ * Renamed domain to irqdomain
+ * Clarified kzalloc call
+ * Pushed ssbi regmap helpers into header file
+ * Fixed whitespace noise in patch 6
 
-A while ago when discussing another controller it was pointed out
-these values are all auto-probable directly from the NAND via a ONFI
-defined GET FEATURE @0x01 query, and adding these timings to the DT
-was NAK'd..
+Changes since v1:
+ * First 3 cleanup patches dropped because they're applied upstream
+ * New regmap read/write helpers
+ * New patch for DT match table
+ * New binding document
 
-Basically you set the interface to the slowest ONFI timing mode, do
-the GET FEATURE to the NAND chip and then increase the interface speed
-to the highest mutually supported ONFI mode.
+Stephen Boyd (7):
+  mfd: Move pm8xxx-irq.c contents into only driver that uses it
+  mfd: pm8921: Update for genirq changes
+  mfd: pm8921: Migrate to irqdomains
+  mfd: ssbi: Add regmap read/write helpers
+  mfd: pm8921: Use ssbi regmap
+  mfd: pm8921: Add DT match table
+  devicetree: bindings: Document PM8921/8058 PMICs
 
-Is there some reason you need to encode this in the DT?
+ .../devicetree/bindings/mfd/qcom,pm8xxx.txt        |  63 +++
+ drivers/mfd/Kconfig                                |  12 +-
+ drivers/mfd/pm8921-core.c                          | 427 ++++++++++++++++++---
+ drivers/mfd/pm8xxx-irq.c                           | 371 ------------------
+ include/linux/mfd/pm8xxx/irq.h                     |  59 ---
+ include/linux/mfd/pm8xxx/pm8921.h                  |  30 --
+ include/linux/ssbi.h                               |  13 +
+ 7 files changed, 451 insertions(+), 524 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+ delete mode 100644 drivers/mfd/pm8xxx-irq.c
+ delete mode 100644 include/linux/mfd/pm8xxx/irq.h
+ delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 
-Jason
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
