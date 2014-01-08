@@ -1,50 +1,28 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 8 Jan 2014 10:38:36 -0800
-Subject: [PATCH v2] ARM: imx: select ARCH_HAS_CPUFREQ for iMX6SL
-In-Reply-To: <20140108144056.GD10725@S2101-09.ap.freescale.net>
-References: <1389148163-5243-1-git-send-email-john.tobias.ph@gmail.com>
- <20140108144056.GD10725@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYMU2K2q5nU-PyoVMNk0ivQdsLrsKg=uKQcu5aPfcnp6GA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Jan 2014 18:39:39 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <1389201013-23794-3-git-send-email-broonie@kernel.org>
+References: <1389201013-23794-1-git-send-email-broonie@kernel.org>
+ <1389201013-23794-3-git-send-email-broonie@kernel.org>
+Message-ID: <20140108183939.GD9724@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That's fine with me. We can save two lines in the file.
+On Wed, Jan 08, 2014 at 05:10:12PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 
-> On Jan 8, 2014, at 6:40 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->
->> On Tue, Jan 07, 2014 at 06:29:23PM -0800, John Tobias wrote:
->> iMX6SL now supports the cpufreq scaling by re-using the imx6q-cpufreq driver.
->> By adding it, the user has the capability to select the said driver without
->> depending it to SOC_IMX6Q.
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->> Changes since v1:
->> - Fix typo in commit log
->> - Added Shawn Guo on Cc
->>
->> arch/arm/mach-imx/Kconfig | 1 +
->> 1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index 7a6e6f7..704e5ae 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -808,6 +808,7 @@ config SOC_IMX6Q
->>
->> config SOC_IMX6SL
->>    bool "i.MX6 SoloLite support"
->> +    select ARCH_HAS_CPUFREQ
->
-> Since we will eventually enable CPUFREQ and OPP for most of the
-> platforms, maybe we should just move selection of ARCH_HAS_CPUFREQ,
-> ARCH_HAS_OPP and PM_OPP into 'config ARCH_MXC'?
->
-> Shawn
->
->>    select ARM_ERRATA_754322
->>    select ARM_ERRATA_775420
->>    select ARM_GIC
->> --
->> 1.8.3.2
->
+[...]
+
+> +		/* check if the cpu is marked as "disabled", if so ignore */
+> +		if (!of_device_is_available(cn))
+> +			continue;
+
+This check must go. As I mentioned, either we define what this means properly
+or to me the status property of cpu nodes must not be relied upon on ARM.
+
+I can add a patch on top of your series that defines the behaviour for both
+arm32 and arm64 when we reach agreement and code initializing
+cpu_logical_map should be patched as well, accordingly.
+
+Lorenzo
