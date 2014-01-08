@@ -1,54 +1,78 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 8 Jan 2014 12:13:39 -0700
-Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
-In-Reply-To: <52CDA032.3010804@overkiz.com>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
- <20140108183418.GA12358@obsidianresearch.com>
- <52CDA032.3010804@overkiz.com>
-Message-ID: <20140108191339.GB12358@obsidianresearch.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 08 Jan 2014 20:13:38 +0100
+Subject: [GIT PULL] Samsung Clock changes for v3.14
+Message-ID: <3518820.nAXoIq2LQG@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 08:00:02PM +0100, boris brezillon wrote:
-> Hello Jason,
-> 
-> Le 08/01/2014 19:34, Jason Gunthorpe a ?crit :
-> >On Wed, Jan 08, 2014 at 03:21:58PM +0100, Boris BREZILLON wrote:
-> >
-> >>+int of_get_nand_timings(struct device_node *np, struct nand_timings *timings)
-> >>+{
-> >>+	memset(timings, 0, sizeof(*timings));
-> >>+	of_property_read_u32(np, "tCLS-min", &timings->tCLS_min);
-> >>+	of_property_read_u32(np, "tCLH-min", &timings->tCLH_min);
-> >>+	of_property_read_u32(np, "tCS-min", &timings->tCS_min);
-> >[..]
-> >
-> >A while ago when discussing another controller it was pointed out
-> >these values are all auto-probable directly from the NAND via a ONFI
-> >defined GET FEATURE @0x01 query, and adding these timings to the DT
-> >was NAK'd..
-> >
-> >Basically you set the interface to the slowest ONFI timing mode, do
-> >the GET FEATURE to the NAND chip and then increase the interface speed
-> >to the highest mutually supported ONFI mode.
-> 
-> >Is there some reason you need to encode this in the DT?
-> 
-> What if the NAND does not support the ONFI interface (and this is
-> exactly the case for the NAND available on the cubietruck board:
-> H27UCG8T2ATR).
+Hi Mike,
 
-Sounds like a good reason to me! 
+Please consider pulling following Samsung Clock changes for v3.14.
 
-You might want to check if you can boil down the DT timings from the
-huge list to just an ONFI mode number..
+The following changes since commit 2bb00c68e094271b79deac993893461cc051b721:
 
-I'd echo Rob's comments, the property needs to include the units
-in the name, and I strongly recommend picoseconds for these
-values.
+  Merge branch 'samsung-fixes' into samsung-next-base (2013-12-30 18:15:23 +0100)
 
-Also, you might want to check that the ONFI names for these parameters
-are used, not a vendor specific name to try and avoid confusion.
+are available in the git repository at:
 
-Jason
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.14/samsung-clk
+
+for you to fetch changes up to 59d711e9ddd2f68822a2a99fc939e11a9288b73e:
+
+  ARM: dts: exynos5420: add input clocks to audss clock controller (2014-01-08 18:02:43 +0100)
+
+----------------------------------------------------------------
+(A bit late) first round of Samsung clock patches for v3.14.
+
+----------------------------------------------------------------
+Andrew Bresticker (7):
+      clk: exynos5250: register APLL rate table
+      clk: exynos-audss: convert to platform device
+      clk: exynos-audss: allow input clocks to be specified in device tree
+      clk: exynos5250: add clock ID for div_pcm0
+      ARM: dts: exynos5250: add input clocks to audss clock controller
+      clk: exynos-audss: add support for Exynos 5420
+      ARM: dts: exynos5420: add input clocks to audss clock controller
+
+Andrzej Hajda (8):
+      ARM: exynos4: create a DT header defining CLK IDs
+      clk: exynos4: replace clock ID private enums with IDs from DT header
+      ARM: exynos5250: create a DT header defining CLK IDs
+      clk: exynos5250: replace clock ID private enums with IDs from DT header
+      ARM: exynos5420: create a DT header defining CLK IDs
+      clk: exynos5420: replace clock ID private enums with IDs from DT header
+      ARM: exynos5440: create a DT header defining CLK IDs
+      clk: exynos5440: replace clock ID private enums with IDs from DT header
+
+Sachin Kamat (1):
+      clk: exynos5250: Add CLK_SET_RATE_PARENT flag to mout_apll
+
+Tomasz Figa (7):
+      clk: samsung: exynos5250: Sort definitions by registers and bitfield
+      clk: samsung: exynos5250: Make names of mux and div clocks consistent
+      clk: samsung: exynos5250: Fix parents of gate clocks from GSCL domain
+      clk: samsung: exynos5250: Fix parent of gate clocks from DISP1 domain
+      clk: samsung: exynos5250: Add missing unpopulated mux parents
+      clk: samsung: exynos5250: Correct parent list of audio muxes
+      clk: samsung: exynos5250: Fix parents of gate clocks from MFC domain
+
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |  39 +-
+ .../devicetree/bindings/clock/exynos5250-clock.txt |   1 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   2 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
+ drivers/clk/samsung/clk-exynos-audss.c             | 159 +++-
+ drivers/clk/samsung/clk-exynos4.c                  | 857 ++++++++++-----------
+ drivers/clk/samsung/clk-exynos5250.c               | 699 ++++++++++-------
+ drivers/clk/samsung/clk-exynos5420.c               | 648 ++++++++--------
+ drivers/clk/samsung/clk-exynos5440.c               |  81 +-
+ include/dt-bindings/clk/exynos-audss-clk.h         |   3 +-
+ include/dt-bindings/clock/exynos4.h                | 244 ++++++
+ include/dt-bindings/clock/exynos5250.h             | 160 ++++
+ include/dt-bindings/clock/exynos5420.h             | 188 +++++
+ include/dt-bindings/clock/exynos5440.h             |  42 +
+ 14 files changed, 1957 insertions(+), 1170 deletions(-)
+ create mode 100644 include/dt-bindings/clock/exynos4.h
+ create mode 100644 include/dt-bindings/clock/exynos5250.h
+ create mode 100644 include/dt-bindings/clock/exynos5420.h
+ create mode 100644 include/dt-bindings/clock/exynos5440.h
