@@ -1,32 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Jan 2014 15:59:51 -0800
-Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
-In-Reply-To: <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
- <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20140107235951.GH5074@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Jan 2014 09:00:41 +0900
+Subject: [PATCH v2 0/8] SoC and board integration for RSPI on RZ/A1H
+In-Reply-To: <5395895.snn5ED4YEr@avalon>
+References: <1388175362-17132-1-git-send-email-geert@linux-m68k.org>
+ <20140107012628.GD2196@verge.net.au> <5395895.snn5ED4YEr@avalon>
+Message-ID: <20140108000037.GA5136@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [131230 05:21]:
-> The omapfb driver uses dma_alloc to reserve memory for the framebuffers.
-> However, on some use cases, even when CMA is in use, it's quite probable
-> that omapfb fails to allocate the fb, either due to not enough free dma
-> memory, fragmented dma memory, or CMA failing to make enough contiguous
-> space.
+On Tue, Jan 07, 2014 at 04:01:30PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> This patch adds a kernel cmdline parameter 'omapfb_vram' which can be
-> used to give the size of a memory area reserved exclusively for omapfb,
-> and optionally a physical address where the memory area is reserved.
+> On Tuesday 07 January 2014 10:26:28 Simon Horman wrote:
+> > On Fri, Dec 27, 2013 at 09:15:54PM +0100, Geert Uytterhoeven wrote:
+> > > This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
+> > > and the Genmai development board.
+> > > 
+> > > The series is based on renesas-devel-v3.13-rc5-20131226, with Magnus'
+> > > pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
+> > > 
+> > > It was tested on the Genmai development board (genmai-reference), using
+> > > an in-kernel version of Documentation/spi/spidev_test.c, exercising
+> > > loopback mode on rspi1, with the same outcome as the SDK reference code.
+> > > 
+> > > Notes:
+> > >   1. The proposed DT bindings also talk about QSPI on the R8A779x, as
+> > >      those SoCs use the same driver.
+> > >   
+> > >   2. As the actual spi-rspi driver doesn't use DT yet, platform devices
+> > >      and spi board info are still used from C to instantiate SPI buses and
+> > >      their children, while pinctrl is performed by DT.
+> > >   
+> > >   3. It will not work with the non-reference version of genmai, due to
+> > >      missing pinmux configuration in setup-r7s72100.c.
+> > >   
+> > >   4. Patches [4/8] and [5/8] are new.
+> > >   
+> > >     [1/8] pinctrl: sh-pfc: r7s72100: Add RSPI support
+> > 
+> > I believe that Laurent should handle this.
 > 
-> The memory area is reserved with memblock, and assigned to omapfb with
-> dma_declare_coherent_memory. The dma_alloc function will first try to
-> allocate the fb from the coherent memory area, and if that fails, it'll
-> use the normal method of allocation.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Ivaylo Dimitrov <freemangordon@abv.bg>
+> I will, but I'm waiting for Magnus to resubmit the base r7s72100 pinctrl patch 
+> series.
 
-Feel free to queue this along with the DSS patches:
+Got it.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> > >     [2/8] ARM: shmobile: r7s72100: Add RSPI clocks
+> > 
+> > This seems fine and independent of the other patches.
+> > But unfortunately it no longer applies.
+> > 
+> > Feel free to rebase it if you would like me to queue it up sooner
+> > than later.
+> > 
+> > >     [3/8] ARM: shmobile: r7s72100: Add RSPI platform devices
+> > 
+> > I assume this depends on 1/3.
+> > 
+> > Please add a patch to update the koelsch defconfig.
+> > 
+> > >     [4/8] ARM: shmobile: genmai: Add RSPI children (NEW)
+> > 
+> > This seems reasonable but I assume it depends on earlier patches.
+> > 
+> > Please add a patch to update the koelsch defconfig or Kconfig.
+> > 
+> > >     [5/8] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux (NEW)
+> > >     [6/8] [RFC] Documentation: dt: Add Renesas RSPI/QSPI bindings
+> > >     [7/8] [RFC] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
+> > >     [8/8] [RFC] ARM: shmobile: genmai reference: Add RSPI nodes
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
