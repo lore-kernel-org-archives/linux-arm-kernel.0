@@ -1,38 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 11:19:28 +0100
-Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <52CD23E0.8030400@ti.com>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <20140108090808.GB16313@earth.universe> <52CD23E0.8030400@ti.com>
-Message-ID: <4812867.NuB3hNkV9d@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 8 Jan 2014 11:23:16 +0100
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 15:39:36 Roger Quadros wrote:
-> > What about the other clocks acquired in drivers/mfd/omap-usb-host.c? Shouldn't
-> > all of those be provided by via the DT phandle?
-> > 
-> 
-> All those clocks are identically named across the OMAP SoCs and are unique for each
-> SoC, so providing DT phandle for all of them is not required.
-> 
-> The init_60m_fclk was renamed to l3init_60m_fclk in OMAP5, and hence the need for
-> this binding.
+On Wed, Jan 8, 2014 at 2:08 AM, Kuninori Morimoto
+<kuninori.morimoto.gx@gmail.com> wrote:
+>> +     common->clk = devm_clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(common->clk)) {
+>> +             dev_err(&pdev->dev, "cannot get clock\n");
+>> +             return PTR_ERR(common->clk);
+>> +     }
+>> +
+>> +     ret = clk_prepare(common->clk);
+>> +     if (ret < 0) {
+>> +             dev_err(&pdev->dev, "unable to prepare clock\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     clk_enable(common->clk);
+>> +
+>>       pm_runtime_enable(dev);
+>>       pm_runtime_get_sync(dev);
+>
+> And this patch seems strange for me.
+> pm_runtime_xxx() is doing same things.
+> If it didn't work, wrong place is not driver, clock side ?
 
-What do you mean it was renamed? Is it a different version of the omap-usb-host
-device then?
+That's an interesting observation...
 
-> > Should the clk_get be changed to of_clk_get()/of_clk_get_by_name() in the
-> > driver? This would potentially remove the need of the init_60m_fclk name.
-> > 
-> 
-> If we use of_clk_xxx() then we'll need to update DT nodes for OMAP4 and OMAP3 as
-> well to explicitly provide the clock phandle. For now we make use of the fact that
-> SoC clock data names the clock rightly i.e. "init_60m_fclk".
+Gr{oetje,eeting}s,
 
-I'm getting the feeling that init_60m_fclk is not the name of the clock input
-of the omap-usb-host device at all, but rather the name of a signal on the
-omap soc, which would not be an appropriate identifier for the binding.
+                        Geert
 
-	Arnd
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
