@@ -1,34 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jan 2014 13:46:25 +0100
-Subject: [PATCH v5 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY
- to enforce this ACPI mode
-In-Reply-To: <1389142011-27356-2-git-send-email-al.stone@linaro.org>
-References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
- <1389142011-27356-2-git-send-email-al.stone@linaro.org>
-Message-ID: <201401081346.25767.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Jan 2014 13:42:09 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014, al.stone at linaro.org wrote:
-> Even though support for X86 in hardware reduced mode is possible, it
-> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
-> there is a single kernel image than can run on all x86 hardware; the kernel
-> changes run-time behavior to adapt to the hardware being used.  This is not
-> currently possible with the existing ACPICA infrastructure but only presents
-> a problem on achitectures supporting both hardware-reduced and legacy modes
-> of ACPI -- i.e., on x86 only.
+On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Not sure about the logic here: While it's certainly possible to build a kernel
-that runs on all x86 machines, it's also possible to build one that only
-runs on some of them when some basic options are turned off. I don't see
-any difference between that and what we have on ARM64 or the multiplatform
-subset of ARM32.
+> This passes the errata fix using a GPIO to control the RTS pin
+> on one of the AT91 chips to use gpiolib instead of the
+> AT91-specific interfaces. Also remove the reliance on
+> compile-time #defines and the cpu_* check and rely on the
+> platform passing down the proper GPIO pin through platform
+> data.
+>
+> This is a prerequisite for getting rid of the local GPIO
+> implementation in the AT91 platform and move toward
+> multiplatform.
+>
+> The patch also adds device tree support for getting the
+> RTS GPIO pin from the device tree on DT boot paths.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v3->v4:
 
-I don't think you need any strict architecture dependency here. If you want
-to make it harder for users to accidentally turn it on, I'd suggest using
+Hi Nicolas, I don't see this patch in linux-next, where did it
+get stuck? Something I can help with? Greg has ACKed it
+and all I think ...
 
-config ACPI_REDUCED_HARDWARE_ONLY
-       bool "Hardware-reduced ACPI support only"
-       depends on !X86 || EXPERT
-
-	Arnd
+Yours,
+Linus Walleij
