@@ -1,65 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed,  8 Jan 2014 13:51:17 +0100
-Subject: [PATCH] driver-core: platform: Resolve DT interrupt references late
-In-Reply-To: <20140108011957.GK5074@atomide.com>
-References: <20140108011957.GK5074@atomide.com>
-Message-ID: <1389185477-507-1-git-send-email-treding@nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 8 Jan 2014 13:54:50 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdb2GvHAa9kF5KXWMiTDnyepziGmjqrCcgB1B7e0iHVKXA@mail.gmail.com>
+Message-ID: <52CD4A9A.4010205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When devices are probed from the device tree, any interrupts that they
-reference are resolved at device creation time. This causes problems if
-the interrupt provider hasn't been registered yet at that time, which
-results in the interrupt being set to 0.
+On 08/01/2014 13:42, Linus Walleij :
+> On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+>> This passes the errata fix using a GPIO to control the RTS pin
+>> on one of the AT91 chips to use gpiolib instead of the
+>> AT91-specific interfaces. Also remove the reliance on
+>> compile-time #defines and the cpu_* check and rely on the
+>> platform passing down the proper GPIO pin through platform
+>> data.
+>>
+>> This is a prerequisite for getting rid of the local GPIO
+>> implementation in the AT91 platform and move toward
+>> multiplatform.
+>>
+>> The patch also adds device tree support for getting the
+>> RTS GPIO pin from the device tree on DT boot paths.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ChangeLog v3->v4:
+> 
+> Hi Nicolas, I don't see this patch in linux-next, where did it
+> get stuck? Something I can help with? Greg has ACKed it
+> and all I think ...
 
-This is especially bad for platform devices because they are created at
-a very early stage during boot when the majority of interrupt providers
-haven't had a chance to be probed yet. One of the platform where this
-causes major issues is OMAP.
+Yes, everything seemed ready. It is actually stuck in Uwe's pull-request
+which I asked for an update yesterday...
+(Re: [GIT PULL] get rid of <mach/timex.h>). Maybe we should synchronize
+each other on IRC?
 
-Note that this patch is the easy way out to fix a large part of the
-problems for now. A more proper solution for the long term would be to
-transition drivers to an API that always resolves resources of any kind
-(not only interrupts) at probe time.
+I would have liked to see it merged in linux-next soon.
 
-For some background and discussion on possible solutions, see:
-
-	https://lkml.org/lkml/2013/11/22/520
-
-Acked-by: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Note that this is somewhat urgent and should if at all possible go into
-v3.13 before the release.
-
- drivers/base/platform.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 3a94b799f166..c894d1af3a5e 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -13,6 +13,7 @@
- #include <linux/string.h>
- #include <linux/platform_device.h>
- #include <linux/of_device.h>
-+#include <linux/of_irq.h>
- #include <linux/module.h>
- #include <linux/init.h>
- #include <linux/dma-mapping.h>
-@@ -87,7 +88,12 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
- 		return -ENXIO;
- 	return dev->archdata.irqs[num];
- #else
--	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
-+	struct resource *r;
-+
-+	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node)
-+		return irq_of_parse_and_map(dev->dev.of_node, num);
-+
-+	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
- 
- 	return r ? r->start : -ENXIO;
- #endif
+Bye,
 -- 
-1.8.4.2
+Nicolas Ferre
