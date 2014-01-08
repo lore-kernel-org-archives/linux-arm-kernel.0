@@ -1,76 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 8 Jan 2014 10:30:39 -0600
-Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
-In-Reply-To: <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <CAL_Jsq+PT9MzEpHwuiSU2oeqzzqajGdBKgdxCZ8S+9W2mPN+tA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 08 Jan 2014 08:31:38 -0800
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+In-Reply-To: <2890647.PEOApIOYyP@amdc1227>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+ <20131231194215.12054.39705@quantum> <2890647.PEOApIOYyP@amdc1227>
+Message-ID: <20140108163138.27803.58310@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 8:21 AM, Boris BREZILLON <b.brezillon@overkiz.com> wrote:
-> Add a function to retrieve NAND timings from a given DT node.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->  drivers/of/of_mtd.c    |   47 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_mtd.h |    9 +++++++++
->  2 files changed, 56 insertions(+)
->
-> diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
-> index a27ec94..52e07fd 100644
-> --- a/drivers/of/of_mtd.c
-> +++ b/drivers/of/of_mtd.c
-> @@ -83,3 +83,50 @@ bool of_get_nand_on_flash_bbt(struct device_node *np)
->         return of_property_read_bool(np, "nand-on-flash-bbt");
->  }
->  EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
-> +
-> +/**
-> + * of_get_nand_timings - Get nand timings for the given device_node
-> + * @np:        Pointer to the given device_node
-> + *
-> + * return 0 on success errno other wise
-> + */
-> +int of_get_nand_timings(struct device_node *np, struct nand_timings *timings)
-> +{
-> +       memset(timings, 0, sizeof(*timings));
-> +
-> +       of_property_read_u32(np, "tCLS-min", &timings->tCLS_min);
-> +       of_property_read_u32(np, "tCLH-min", &timings->tCLH_min);
-> +       of_property_read_u32(np, "tCS-min", &timings->tCS_min);
-> +       of_property_read_u32(np, "tCH-min", &timings->tCH_min);
-> +       of_property_read_u32(np, "tWP-min", &timings->tWP_min);
-> +       of_property_read_u32(np, "tALS-min", &timings->tALS_min);
-> +       of_property_read_u32(np, "tALH-min", &timings->tALH_min);
-> +       of_property_read_u32(np, "tDS-min", &timings->tDS_min);
-> +       of_property_read_u32(np, "tDH-min", &timings->tDH_min);
-> +       of_property_read_u32(np, "tWC-min", &timings->tWC_min);
-> +       of_property_read_u32(np, "tWH-min", &timings->tWH_min);
-> +       of_property_read_u32(np, "tR-max", &timings->tR_max);
-> +       of_property_read_u32(np, "tAR-min", &timings->tAR_min);
-> +       of_property_read_u32(np, "tCLR-min", &timings->tCLR_min);
-> +       of_property_read_u32(np, "tRR-min", &timings->tRR_min);
-> +       of_property_read_u32(np, "tRP-min", &timings->tRP_min);
-> +       of_property_read_u32(np, "tWB-max", &timings->tWB_max);
-> +       of_property_read_u32(np, "tRC-min", &timings->tRC_min);
-> +       of_property_read_u32(np, "tREA-max", &timings->tREA_max);
-> +       of_property_read_u32(np, "tRHZ-max", &timings->tRHZ_max);
-> +       of_property_read_u32(np, "tCHZ-max", &timings->tCHZ_max);
-> +       of_property_read_u32(np, "tRHOH-min", &timings->tRHOH_min);
-> +       of_property_read_u32(np, "tRLOH-min", &timings->tRLOH_min);
-> +       of_property_read_u32(np, "tCOH-min", &timings->tCOH_min);
-> +       of_property_read_u32(np, "tREH-min", &timings->tREH_min);
-> +       of_property_read_u32(np, "tWHR-min", &timings->tWHR_min);
-> +       of_property_read_u32(np, "tRHW-min", &timings->tRHW_min);
-> +       of_property_read_u32(np, "tIR-min", &timings->tIR_min);
-> +       of_property_read_u32(np, "tCR-min", &timings->tCR_min);
-> +       of_property_read_u32(np, "tADL-min", &timings->tADL_min);
-> +       of_property_read_u32(np, "tRST-max", &timings->tRST_max);
-> +       of_property_read_u32(np, "tWW-min", &timings->tWW_min);
+Quoting Tomasz Figa (2014-01-02 07:22:12)
+> On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
+> > Quoting Tomasz Figa (2013-12-12 08:07:13)
+> > > This series intends to improve clock provider impementation of max77686
+> > > PMIC driver. First two patches are simple fixes of current implementation
+> > > to allow correct control of provided clocks. Further patches refactor
+> > > the driver to make the code cleaner and prepare for further patches. Then
+> > > last two patches add registration of OF clock provider and adjust device
+> > > tree nodes of boards containing max77686 chip to contain properties
+> > > required by clock provider.
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> 
+> Hmm... Shouldn't this series go through the clk tree directly? If not, who
+> should be taking it?
 
-These all need to be documented. These apply to which compatible
-strings? They should also be suffixed with the unit the property is in
-(i.e. -ms, -us, -ns).
+Yes it should, but I guessed it would come in a pull request. Maybe Ack
+is the wrong thing? I can just say "looks good to me me" or something
+else.
 
-Rob
+Regards,
+Mike
+
+> 
+> Best regards,
+> Tomasz
+> 
