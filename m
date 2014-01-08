@@ -1,39 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jan 2014 20:57:54 +0000
-Subject: [PATCH RFC 2/3] ARM: kernel: add support for cpu cache information
-In-Reply-To: <1389209168-17189-3-git-send-email-sudeep.holla@arm.com>
-References: <1389209168-17189-1-git-send-email-sudeep.holla@arm.com>
- <1389209168-17189-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20140108205754.GN27432@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 08 Jan 2014 15:58:52 -0500 (EST)
+Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
+In-Reply-To: <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
+ <20140108143529.GB14122@mudshark.cambridge.arm.com>
+ <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
+ <20140108192028.GM27432@n2100.arm.linux.org.uk>
+ <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.10.1401081538350.1851@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 07:26:07PM +0000, Sudeep Holla wrote:
-> +#if __LINUX_ARM_ARCH__ < 7 /* pre ARMv7 */
-> +
-> +#define MAX_CACHE_LEVEL		1	/* Only 1 level supported */
-> +#define CTR_CTYPE_SHIFT		24
-> +#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
-> +
-> +static inline unsigned int get_ctr(void)
-> +{
-> +	unsigned int ctr;
-> +	asm volatile ("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-> +	return ctr;
-> +}
-> +
-> +static enum cache_type get_cache_type(int level)
-> +{
-> +	if (level > MAX_CACHE_LEVEL)
-> +		return CACHE_TYPE_NOCACHE;
-> +	return get_ctr() & CTR_CTYPE_MASK ?
-> +		CACHE_TYPE_SEPARATE : CACHE_TYPE_UNIFIED;
+On Wed, 8 Jan 2014, Doug Anderson wrote:
 
-So, what do we do for CPUs that don't implement the CTR?  Just return
-random rubbish based on decoding the CPU Identity register as if it
-were the cache type register?
+> On Wed, Jan 8, 2014 at 11:20 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > We've been through these arguments many times, you're not the first to
+> > raise it, and we've decided upon the policy.  We want as _few_ work-
+> > arounds in the kernel as possible, because applying the work-arounds
+> > is very problematical with the mixture of secure and non-secure booting.
+> 
+> OK, fair enough.  If we want no workaround here then we can drop this patch.
+> 
+> 
+> I'd guess that the way forward is:
+> 
+> * Land kernel workaround locally in Chromium tree
+> 
+> * I'll try to land FW change locally in at least one Chromium branch.
+> If we were to get a new RO build ever (seems unlikely at this point)
+> it would be fixed for upstream kernels.  If we were to get a new RW
+> build (seems unlikely, but at least less unlikely) it would be fixed
+> if someone landed a kernel patch to save/restore this register across
+> suspend/resume.
+> 
+> * If Joe Upstream wants to run an upstream kernel on some type of
+> exynos5250 product (Samsung ARM Chromebook, HP Chromebook 11, Nexus 10
+> are the ones I know of) then he will deal with the small number of
+> crashes or figure out a solution.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+At some point you have to realize that what you're proposing is not 
+viable when taking into account the bigger picture.  And your FW 
+architecture is to blame.  If you were running Windows instead of Linux 
+I bet you'd have found a way to fix things differently than asking 
+Microsoft to add a special quirk in their code.  In the PC world you are 
+required to perform a BIOS update instead.
+
+So you really need to provision the ability to update at least a portion 
+of the firmware that is not read-only.  That may be a third-stage 
+bootloader or the like which purpose is only to install workarounds such 
+as this before executing the kernel and which doesn't need to be updated 
+with the kernel.  And in theory you should be able to do that on top of 
+your current RO firmware.
+
+Errata workarounds are often machine specific and they can be applied 
+only in special conditions the kernel might not safely know about until 
+it is too late.
+
+
+Nicolas
