@@ -1,46 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jan 2014 15:20:49 +0000
-Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM
- conversion
-In-Reply-To: <52CB2BDF.9040208@codeaurora.org>
-References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
- <52CB2BDF.9040208@codeaurora.org>
-Message-ID: <20140108152049.GD11753@e106331-lin.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 8 Jan 2014 16:21:39 +0100
+Subject: [PATCH v5 3/4] i2c: mv64xxx: Fix bus hang on A0 version of the
+ Armada XP SoCs
+In-Reply-To: <1389193589-18485-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140108152139.GB15182@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Mon, Jan 06, 2014 at 10:19:11PM +0000, Stephen Boyd wrote:
-> Ping? Can anyone take a look at the generic ARM and DT binding patches
-> and provide acks/reviews? I'd like to send this through arm-soc via the
-> MSM tree if possible.
-
-Apologies for the delay. It's taking a while to warm up after christmas.
-
+On Wed, Jan 08, 2014 at 04:06:28PM +0100, Gregory CLEMENT wrote:
+> The first variants of Armada XP SoCs (A0 stepping) have issues related
+> to the i2c controller which prevent to use the offload mechanism and
+> lead to a kernel hang during boot.
 > 
-> On 12/23/13 16:39, Stephen Boyd wrote:
-> > This is a rework of patches sent a months back by Rohit[1].
-> > The goal of these patches is to add support for SMP and (basic)
-> > hotplug on MSM based SoCs. To get there, we add support for a
-> > generic way to hook in SMP/hotplug support code based on DT. To
-> > show how it's used, we convert the MSM8660 SMP support code over
-> > to the new method. After that we add support for the rest of the
-> > upstream MSM SoCs (note these patches are piled high on top of
-> > Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
-> > but this should only matter to the MSM maintainers).
-> >
-> > This is one of the last items of code that still requires us to have
-> > a mach directory and a machine descriptor. We should be able to move
-> > the hotplug/smp code out of mach directories if this approach is
-> > accepted.
+> The commit introduces a new the compatible string
+> marvell,mv78230-a0-i2c for the i2c controller. When this compatible
+> string is used the driver disables the offload mechanism and the
+> kernel no more hangs on these SoCs.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: stable at vger.kernel.org
+> ---
+>  drivers/i2c/busses/i2c-mv64xxx.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index 8be7e42aa4de..f424c0f89946 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -692,6 +692,10 @@ static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+>  	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+>  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+>  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> +	{
+> +		.compatible = "marvell,mv78230-a0-i2c",
+> +		.data = &mv64xxx_i2c_regs_mv64xxx
+> +	},
 
-Thanks for doing the rework. This looks really good to me now.
+I think a oneliner entry like the entries above is easier to read, but
+that is very minor...
 
-I'd gotten myself confused while reading the bindings, but having now
-had a look over the dts files my concerns were invalid.
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
 
-Hopefully we can move more platforms to use enable-methods now :)
-
-Cheers,
-Mark.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/5d478cfa/attachment.sig>
