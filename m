@@ -1,29 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 8 Jan 2014 10:03:51 -0200
-Subject: [PATCH 2/2] dma: imx-sdma: Assign a default script number for ROM
- firmware cases
-In-Reply-To: <1389170756-22351-3-git-send-email-Guangyu.Chen@freescale.com>
-References: <1389170756-22351-1-git-send-email-Guangyu.Chen@freescale.com>
- <1389170756-22351-3-git-send-email-Guangyu.Chen@freescale.com>
-Message-ID: <CAOMZO5AY1RaxFUcO0r7=Db8Hp_U6oPHSDke0Y0thhEKi5OGCdQ@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 08 Jan 2014 12:20:00 +0000
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <20140107205719.GL20094@book.gsilab.sittig.org>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <20140107205719.GL20094@book.gsilab.sittig.org>
+Message-ID: <52CD4270.3010907@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 6:45 AM, Nicolin Chen <Guangyu.Chen@freescale.com> wrote:
-> i.MX series have inner firmware in its ROM code: when SDMA isn't provided
-> any firmware from Kernel or rootfs, the default inner ROM firmware will be
-> activated. However the current driver doesn't assign any script number to
-> this situation, and those platform running in this case would be broken.
+On 07/01/14 20:57, Gerhard Sittig wrote:
+> On Tue, Jan 07, 2014 at 19:57 +0100, Geert Uytterhoeven wrote:
+>>
+>> @@ -378,23 +380,38 @@ static int rcar_thermal_probe(struct platform_device *pdev)
+>>   	spin_lock_init(&common->lock);
+>>   	common->dev = dev;
+>>
+>> +	common->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(common->clk)) {
+>> +		dev_err(&pdev->dev, "cannot get clock\n");
+>> +		return PTR_ERR(common->clk);
+>> +	}
+>> +
+>> +	ret = clk_prepare(common->clk);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev, "unable to prepare clock\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	clk_enable(common->clk);
+>> +
+>>   	pm_runtime_enable(dev);
+>>   	pm_runtime_get_sync(dev);
 >
-> Thus this patch adds a default script number when no external firmware being
-> loaded so that people would continue to be able to use basic scripts to run
-> their platform without any firmware.
->
-> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
+> clk_enable() can fail, too, so you should check its return value
 
-Thanks, Nicolin.
+Also, if you enable the pm-runtime then the device clock is actually
+handled by the common pm-clock framework.
 
-This fixes audio playback without additional SDMA firmware:
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
