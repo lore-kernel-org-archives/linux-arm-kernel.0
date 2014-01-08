@@ -1,45 +1,62 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 8 Jan 2014 16:41:09 +0530
-Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <3761842.HRY1CDBF4z@wuerfel>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <52CD23E0.8030400@ti.com> <20140108105244.GA21607@earth.universe>
- <3761842.HRY1CDBF4z@wuerfel>
-Message-ID: <52CD324D.3020701@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 08 Jan 2014 12:11:34 +0100
+Subject: [PATCH 1/3] reset: Add of_reset_control_get
+In-Reply-To: <20140108103843.GA2941@lukather>
+References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20131221094213.03658852@skate>
+ <1389030171.5590.31.camel@pizza.hi.pengutronix.de>
+ <20140108103843.GA2941@lukather>
+Message-ID: <1389179494.4297.9.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2014 04:25 PM, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014 11:52:44 Sebastian Reichel wrote:
->>
->> On Wed, Jan 08, 2014 at 03:39:36PM +0530, Roger Quadros wrote:
->>>> What about the other clocks acquired in drivers/mfd/omap-usb-host.c? Shouldn't
->>>> all of those be provided by via the DT phandle?
->>>
->>> All those clocks are identically named across the OMAP SoCs and are unique for each
->>> SoC, so providing DT phandle for all of them is not required.
->>>
->>> The init_60m_fclk was renamed to l3init_60m_fclk in OMAP5, and hence the need for
->>> this binding.
->>
->> I understand the intention of this patch. I was just wondering if
->> all the clocks should be referenced from DT even if that is not
->> strictly needed at the moment. This would make clocks similar to
->> other resources like regulators, gpios, irqs, ...
->>
->> Having the clocks referenced from DT looks cleaner to me. It means I
->> can check the DT file for any resources used by a driver. It also
->> creates some kind of consistency in the kernel.
+Am Mittwoch, den 08.01.2014, 11:38 +0100 schrieb Maxime Ripard:
+> Hi Philipp,
 > 
-> I think that would be best, yes. AFAIK most other platforms do this
-> already, OMAP is a bit behind because it started using clocks when the
-> infrastructure for doing this right was still incomplete.
+> On Mon, Jan 06, 2014 at 06:42:51PM +0100, Philipp Zabel wrote:
+> > Am Samstag, den 21.12.2013, 09:42 +0100 schrieb Thomas Petazzoni:
+> > > Maxime, Philipp,
+> > > 
+> > > On Fri, 20 Dec 2013 22:41:07 +0100, Maxime Ripard wrote:
+> > > > In some cases, you might need to deassert from reset an hardware block that
+> > > > doesn't associated to a struct device (CPUs, timers, etc.).
+> > > > 
+> > > > Add a small helper to retrieve the reset controller from the device tree
+> > > > without the need to pass a struct device.
+> > > > 
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > ---
+> > > >  drivers/reset/core.c  | 39 ++++++++++++++++++++++++++++++---------
+> > > >  include/linux/reset.h |  4 ++++
+> > > >  2 files changed, 34 insertions(+), 9 deletions(-)
+> > > 
+> > > I'd like to add that I have the exact same need as Maxime. Maxime needs
+> > > of_reset_control_get() for timers, and in my case, I need it for CPUs,
+> > > since I associated a reset controller to CPU nodes in my DT.
+> > > 
+> > > Funnily, even though Maxime and I work like 3 meters away from each
+> > > other, both of us came up independently with almost exactly the same
+> > > implementation to solve the exact same problem, without talking to each
+> > > other about this need. It's only yesterday that we discovered we've had
+> > > to solve the same problem.
+> > > 
+> > > So, definitely looking forward to seeing the feedback about this.
+> > > 
+> > > Thanks!
+> > 
+> > This looks like a useful addition. I'll reorder the GPIO reset patch for
+> > this.
 > 
+> How do you want to get this merged? You'll probably want to take this
+> patch, and patches 2/3 and 3/3 depend on some patches merged by Daniel
+> Lezcano (that I forgot to CC on this, I'll resend).
+> 
+> Maybe the best way would be simply to merge this one for 3.14 through
+> your branch, and merge the two other patches in 3.15.
 
-OK. I'll update the binding information to reflect all the clocks.
+Alright, this is applied to my branch. I'll wait a bit for feedback on
+the GPIO reset patches and then send a pull request.
 
-But what about clk_get() vs of_clk_get_by_name() ?
-
-cheers,
--roger
+regards
+Philipp
