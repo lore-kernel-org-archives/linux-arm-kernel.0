@@ -1,77 +1,41 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Wed, 08 Jan 2014 11:36:44 -0500
-Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
-References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <87lhyqa0rn.fsf@nbsps.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 08 Jan 2014 17:44:29 +0100
+Subject: [PATCH v2 0/8] clk: max77686: Clock provider implementation fixes
+In-Reply-To: <20140108163138.27803.58310@quantum>
+References: <1386864441-19561-1-git-send-email-t.figa@samsung.com>
+ <2890647.PEOApIOYyP@amdc1227> <20140108163138.27803.58310@quantum>
+Message-ID: <3008563.6S2kFjQKp9@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  3 Jan 2014, Li.Xiubo at freescale.com wrote:
+On Wednesday 08 of January 2014 08:31:38 Mike Turquette wrote:
+> Quoting Tomasz Figa (2014-01-02 07:22:12)
+> > On Tuesday 31 of December 2013 11:42:15 Mike Turquette wrote:
+> > > Quoting Tomasz Figa (2013-12-12 08:07:13)
+> > > > This series intends to improve clock provider impementation of max77686
+> > > > PMIC driver. First two patches are simple fixes of current implementation
+> > > > to allow correct control of provided clocks. Further patches refactor
+> > > > the driver to make the code cleaner and prepare for further patches. Then
+> > > > last two patches add registration of OF clock provider and adjust device
+> > > > tree nodes of boards containing max77686 chip to contain properties
+> > > > required by clock provider.
+> > > 
+> > > Acked-by: Mike Turquette <mturquette@linaro.org>
+> > 
+> > Hmm... Shouldn't this series go through the clk tree directly? If not, who
+> > should be taking it?
+> 
+> Yes it should, but I guessed it would come in a pull request. Maybe Ack
+> is the wrong thing? I can just say "looks good to me me" or something
+> else.
 
-> The FTM PWM device can be found on Vybrid VF610 Tower and
-> Layerscape LS-1 SoCs.
->
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> Signed-off-by: Alison Wang <b18965@freescale.com>
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->
-> Hi Thierry, Bill
+Nah, I think Ack is completely right, but still this series is quite
+standalone, e.g. it does not really belong to samsung-clk nor any other
+clock subtree, so I thought you would be applying them directly.
 
-[snip]
+I believe Lee has already applied this one, but in future, to avoid such
+confusion, if it's more convenient for you, I can send you any clock
+series as pull requests.
 
-> +static unsigned long fsl_pwm_calculate_period_cycles(struct fsl_pwm_chip *fpc,
-> +						     unsigned long period_ns,
-> +						     enum fsl_pwm_clk index)
-> +{
-> +	bool bg = fpc->big_endian;
-> +	int ret;
-> +
-> +	fpc->counter_clk_select = FTM_SC_CLK(bg, index);
-
-Yes, this is the spirit of what I was suggesting.  The code is much less
-efficient/bigger on the Vybrid with this run-time detection; but this is
-more efficient/smaller than previous versions.  I think that 'bg' can be
-a compiler '#define' base on the configured SOC-systems.  Ie, if the
-kernel config only has 'Vybrid' or only 'LayerScape', then 'bg' can be a
-hard coded value.  The compiler will produce much better code in these
-cases.
-
-Also, maybe 'distro' people may want to make a 'hand-held' (Debian) or a
-'router' (OpenWRT) distribution and they would only pick either 'Vybrid'
-or 'LayerScape'.  However, if someone wants an 'every ARM under the
-sun', then the code still works.  So, I think that the code is better
-setup for a subsequent patch set like this (or at least just a good).
-
-Especially, the stuff on the I/O swapping in the 'readl()' and
-'writel()' is no longer needed; I think you can use the same function
-for both SOCs.
-
-> +#define __FTM_SWAP32(v) ((u32)(\
-> +	(((u32)(v) & (u32)0x000000ffUL) << 24) |\
-> +	(((u32)(v) & (u32)0x0000ff00UL) <<  8) |\
-> +	(((u32)(v) & (u32)0x00ff0000UL) >>  8) |\
-> +	(((u32)(v) & (u32)0xff000000UL) >> 24)))
-> +#define FTM_SWAP32(b, v)	(b ? __FTM_SWAP32(v) : v)
-
-I think that there are macros that you could use here.  For instance,
-'#include <linux/swab.h>' (powerpc and arm) has some assembler macros
-that are quite fast for swapping.  If the kernel config has ARCH >= 6
-for ARM, then the very fast 'rev' instruction is used.  If not, then a
-generic version is used as you have coded.  The PowerPC (another
-possible future ARCH for QorIQ/Layerscape SOC?) always has inline
-assembler macros.
-
-So,
-
-+ #include <linux/swab.h>
-...
-+ #define FTM_SWAP32(b, v)	(b ? __swab32(v) : v)
-
-might be better.
-
-Suggested-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-
-Thanks,
-Bill Pringlemeir.
+Best regards,
+Tomasz
