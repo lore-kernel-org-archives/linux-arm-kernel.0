@@ -1,99 +1,196 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:47:06 +0000
-Subject: [PATCH v4 23/37] mtd: st_spi_fsm: Supply the N25Qxxx specific read
- configurations
+Date: Wed,  8 Jan 2014 13:47:12 +0000
+Subject: [PATCH v4 29/37] mtd: st_spi_fsm: Add the ability to write to a
+ Serial Flash device
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-30-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The N25Qxxx Serial Flash devices required different sequence
-configurations depending on whether they're running in 24bit (3Byte)
-or 32bit (4Byte) mode. We provide those here.
+When a write is requested by userspace the MFD framework calls back
+into the driver to conduct the actual command issue and data send.
+Here we provide the routines which do exactly that.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 53 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 150 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 150 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 5582df0..3b56b6e 100644
+index c2ee7e3..0b80d74 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -236,6 +236,15 @@
- #define FLASH_CMD_READ4_1_1_4  0x6c
- #define FLASH_CMD_READ4_1_4_4  0xec
+@@ -1078,6 +1078,98 @@ static int stfsm_read(struct stfsm *fsm, uint8_t *buf, uint32_t size,
+ 	return 0;
+ }
+ 
++static int stfsm_write(struct stfsm *fsm, const uint8_t *const buf,
++		       const uint32_t size, const uint32_t offset)
++{
++	struct stfsm_seq *seq = &stfsm_seq_write;
++	uint32_t data_pads;
++	uint32_t write_mask;
++	uint32_t size_ub;
++	uint32_t size_lb;
++	uint32_t size_mop;
++	uint32_t tmp[4];
++	uint32_t page_buf[FLASH_PAGESIZE_32];
++	uint8_t *t = (uint8_t *)&tmp;
++	const uint8_t *p;
++	int ret;
++	int i;
++
++	dev_dbg(fsm->dev, "writing %d bytes to 0x%08x\n", size, offset);
++
++	/* Enter 32-bit address mode, if required */
++	if (fsm->configuration & CFG_WRITE_TOGGLE_32BIT_ADDR)
++		stfsm_enter_32bit_addr(fsm, 1);
++
++	/* Must write in multiples of 32 cycles (or 32*pads/8 bytes) */
++	data_pads = ((seq->seq_cfg >> 16) & 0x3) + 1;
++	write_mask = (data_pads << 2) - 1;
++
++	/* Handle non-aligned buf */
++	if ((uint32_t)buf & 0x3) {
++		memcpy(page_buf, buf, size);
++		p = (uint8_t *)page_buf;
++	} else {
++		p = buf;
++	}
++
++	/* Handle non-aligned size */
++	size_ub = (size + write_mask) & ~write_mask;
++	size_lb = size & ~write_mask;
++	size_mop = size & write_mask;
++
++	seq->data_size = TRANSFER_SIZE(size_ub);
++	seq->addr1 = (offset >> 16) & 0xffff;
++	seq->addr2 = offset & 0xffff;
++
++	/* Need to set FIFO to write mode, before writing data to FIFO (see
++	 * GNBvb79594)
++	 */
++	writel(0x00040000, fsm->base + SPI_FAST_SEQ_CFG);
++
++	/*
++	 * Before writing data to the FIFO, apply a small delay to allow a
++	 * potential change of FIFO direction to complete.
++	 */
++	if (fsm->fifo_dir_delay == 0)
++		readl(fsm->base + SPI_FAST_SEQ_CFG);
++	else
++		udelay(fsm->fifo_dir_delay);
++
++
++	/* Write data to FIFO, before starting sequence (see GNBvd79593) */
++	if (size_lb) {
++		stfsm_write_fifo(fsm, (uint32_t *)p, size_lb);
++		p += size_lb;
++	}
++
++	/* Handle non-aligned size */
++	if (size_mop) {
++		memset(t, 0xff, write_mask + 1);	/* fill with 0xff's */
++		for (i = 0; i < size_mop; i++)
++			t[i] = *p++;
++
++		stfsm_write_fifo(fsm, tmp, write_mask + 1);
++	}
++
++	/* Start sequence */
++	stfsm_load_seq(fsm, seq);
++
++	/* Wait for sequence to finish */
++	stfsm_wait_seq(fsm);
++
++	/* Wait for completion */
++	ret = stfsm_wait_busy(fsm);
++
++	/* Exit 32-bit address mode, if required */
++	if (fsm->configuration & CFG_WRITE_TOGGLE_32BIT_ADDR) {
++		stfsm_enter_32bit_addr(fsm, 0);
++		if (fsm->configuration & CFG_WRITE_EX_32BIT_ADDR_DELAY)
++			udelay(1);
++	}
++
++	return 0;
++}
++
+ /*
+  * Read an address range from the flash chip. The address range
+  * may be any size provided it is within the physical boundaries.
+@@ -1111,6 +1203,63 @@ static int stfsm_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	return 0;
+ }
  
 +/*
-+ * Flags to tweak operation of default read/write/erase routines
++ * Write an address range to the flash chip.  Data must be written in
++ * FLASH_PAGESIZE chunks.  The address range may be any size provided
++ * it is within the physical boundaries.
 + */
-+#define CFG_READ_TOGGLE_32BIT_ADDR     0x00000001
-+#define CFG_WRITE_TOGGLE_32BIT_ADDR    0x00000002
-+#define CFG_WRITE_EX_32BIT_ADDR_DELAY  0x00000004
-+#define CFG_ERASESEC_TOGGLE_32BIT_ADDR 0x00000008
-+#define CFG_S25FL_CHECK_ERROR_FLAGS    0x00000010
++static int stfsm_mtd_write(struct mtd_info *mtd, loff_t to, size_t len,
++			   size_t *retlen, const u_char *buf)
++{
++	struct stfsm *fsm = dev_get_drvdata(mtd->dev.parent);
 +
- struct stfsm {
- 	struct device		*dev;
- 	void __iomem		*base;
-@@ -244,6 +253,7 @@ struct stfsm {
- 	struct mutex		lock;
- 	struct flash_info       *info;
++	u32 page_offs;
++	u32 bytes;
++	uint8_t *b = (uint8_t *)buf;
++	int ret = 0;
++
++	dev_dbg(fsm->dev, "%s to 0x%08x, len %zd\n", __func__, (u32)to, len);
++
++	if (retlen)
++		*retlen = 0;
++
++	if (!len)
++		return 0;
++
++	if (to + len > mtd->size)
++		return -EINVAL;
++
++	/* Offset within page */
++	page_offs = to % FLASH_PAGESIZE;
++
++	mutex_lock(&fsm->lock);
++
++	while (len) {
++		/* Write up to page boundary */
++		bytes = min(FLASH_PAGESIZE - page_offs, len);
++
++		ret = stfsm_write(fsm, b, bytes, to);
++		if (ret)
++			goto out1;
++
++		b += bytes;
++		len -= bytes;
++		to += bytes;
++
++		/* We are now page-aligned */
++		page_offs = 0;
++
++		if (retlen)
++			*retlen += bytes;
++
++	}
++
++out1:
++	mutex_unlock(&fsm->lock);
++
++	return ret;
++}
++
+ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ {
+ 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+@@ -1380,6 +1529,7 @@ static int stfsm_probe(struct platform_device *pdev)
+ 	fsm->mtd.erasesize	= info->sector_size;
  
-+	uint32_t                configuration;
- 	uint32_t                fifo_dir_delay;
- 	bool                    booted_from_spi;
- 	bool                    reset_signal;
-@@ -438,6 +448,49 @@ static struct seq_rw_config default_write_configs[] = {
- 	{0x00,			 0,			0, 0, 0, 0x00, 0, 0},
- };
+ 	fsm->mtd._read  = stfsm_mtd_read;
++	fsm->mtd._write = stfsm_mtd_write;
  
-+/*
-+ * [N25Qxxx] Configuration
-+ */
-+#define N25Q_VCR_DUMMY_CYCLES(x)	(((x) & 0xf) << 4)
-+#define N25Q_VCR_XIP_DISABLED		((uint8_t)0x1 << 3)
-+#define N25Q_VCR_WRAP_CONT		0x3
-+
-+/* N25Q 3-byte Address READ configurations
-+ *	- 'FAST' variants configured for 8 dummy cycles.
-+ *
-+ * Note, the number of dummy cycles used for 'FAST' READ operations is
-+ * configurable and would normally be tuned according to the READ command and
-+ * operating frequency.  However, this applies universally to all 'FAST' READ
-+ * commands, including those used by the SPIBoot controller, and remains in
-+ * force until the device is power-cycled.  Since the SPIBoot controller is
-+ * hard-wired to use 8 dummy cycles, we must configure the device to also use 8
-+ * cycles.
-+ */
-+static struct seq_rw_config n25q_read3_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,	        0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
-+
-+/* N25Q 4-byte Address READ configurations
-+ *	- use special 4-byte address READ commands (reduces overheads, and
-+ *        reduces risk of hitting watchdog reset issues).
-+ *	- 'FAST' variants configured for 8 dummy cycles (see note above.)
-+ */
-+static struct seq_rw_config n25q_read4_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ4_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ4_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ4_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ4_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ4_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ4,	0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
-+
- static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
- 
- static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	dev_err(&pdev->dev,
+ 		"Found serial flash device: %s\n"
 -- 
 1.8.3.2
