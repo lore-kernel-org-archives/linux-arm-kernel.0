@@ -1,294 +1,308 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  8 Jan 2014 17:30:07 +0100
-Subject: [PATCH v2 1/2] ohci-platform: Add support for devicetree instantiation
-In-Reply-To: <1389198608-24339-1-git-send-email-hdegoede@redhat.com>
-References: <1389198608-24339-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1389198608-24339-2-git-send-email-hdegoede@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jan 2014 08:40:41 -0800
+Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
+ late
+In-Reply-To: <1389185477-507-1-git-send-email-treding@nvidia.com>
+References: <20140108011957.GK5074@atomide.com>
+ <1389185477-507-1-git-send-email-treding@nvidia.com>
+Message-ID: <20140108164040.GA31686@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for ohci-platform instantiation from devicetree, including
-optionally getting clks and a phy from devicetree, and enabling / disabling
-those on power_on / off.
+* Thierry Reding <thierry.reding@gmail.com> [140108 04:55]:
+> When devices are probed from the device tree, any interrupts that they
+> reference are resolved at device creation time. This causes problems if
+> the interrupt provider hasn't been registered yet at that time, which
+> results in the interrupt being set to 0.
+> 
+> This is especially bad for platform devices because they are created at
+> a very early stage during boot when the majority of interrupt providers
+> haven't had a chance to be probed yet. One of the platform where this
+> causes major issues is OMAP.
+> 
+> Note that this patch is the easy way out to fix a large part of the
+> problems for now. A more proper solution for the long term would be to
+> transition drivers to an API that always resolves resources of any kind
+> (not only interrupts) at probe time.
+> 
+> For some background and discussion on possible solutions, see:
+> 
+> 	https://lkml.org/lkml/2013/11/22/520
+> 
+> Acked-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Note that this is somewhat urgent and should if at all possible go into
+> v3.13 before the release.
+> 
+>  drivers/base/platform.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 3a94b799f166..c894d1af3a5e 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/string.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/module.h>
+>  #include <linux/init.h>
+>  #include <linux/dma-mapping.h>
+> @@ -87,7 +88,12 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+>  		return -ENXIO;
+>  	return dev->archdata.irqs[num];
+>  #else
+> -	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> +	struct resource *r;
+> +
+> +	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node)
+> +		return irq_of_parse_and_map(dev->dev.of_node, num);
+> +
+> +	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+>  
+>  	return r ? r->start : -ENXIO;
+>  #endif
 
-This should allow using ohci-platform from devicetree in various cases.
-Specifically after this commit it can be used for the ohci controller found
-on Allwinner sunxi SoCs.
+Hmm actually testing this patch, it does not fix fix the $Subject bug :(
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../devicetree/bindings/usb/platform-ohci.txt      |  25 ++++
- drivers/usb/host/ohci-platform.c                   | 148 ++++++++++++++++++---
- 2 files changed, 153 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/platform-ohci.txt
+irq: no irq domain found for /ocp/pinmux at 48002030 !
+[    0.301361] ------------[ cut here ]------------
+[    0.301391] WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
+[    0.301422] Modules linked in:
+[    0.301452] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0-rc7-00002-g4d998a6 #17
+[    0.301513] [<c0015c04>] (unwind_backtrace+0x0/0xf4) from [<c00127b0>] (show_stack+0x14/0x1c)
+[    0.301544] [<c00127b0>] (show_stack+0x14/0x1c) from [<c05685a4>] (dump_stack+0x6c/0xa0)
+[    0.301574] [<c05685a4>] (dump_stack+0x6c/0xa0) from [<c00425b4>] (warn_slowpath_common+0x64/0x84)
+[    0.301605] [<c00425b4>] (warn_slowpath_common+0x64/0x84) from [<c00425f0>] (warn_slowpath_null+0x1c/0x24)
+[    0.301635] [<c00425f0>] (warn_slowpath_null+0x1c/0x24) from [<c0485210>] (of_device_alloc+0x144/0x184)
+[    0.301635] [<c0485210>] (of_device_alloc+0x144/0x184) from [<c0485294>] (of_platform_device_create_pdata+0x44/0x9c)
+[    0.301666] [<c0485294>] (of_platform_device_create_pdata+0x44/0x9c) from [<c04853bc>] (of_platform_bus_create+0xd0/0x170)
+[    0.301696] [<c04853bc>] (of_platform_bus_create+0xd0/0x170) from [<c0485418>] (of_platform_bus_create+0x12c/0x170)
+[    0.301727] [<c0485418>] (of_platform_bus_create+0x12c/0x170) from [<c04854bc>] (of_platform_populate+0x60/0x98)
+[    0.301757] [<c04854bc>] (of_platform_populate+0x60/0x98) from [<c07ca53c>] (pdata_quirks_init+0x28/0x78)
+[    0.301788] [<c07ca53c>] (pdata_quirks_init+0x28/0x78) from [<c07bab20>] (customize_machine+0x20/0x48)
+[    0.301818] [<c07bab20>] (customize_machine+0x20/0x48) from [<c000882c>] (do_one_initcall+0x2c/0x150)
+[    0.301849] [<c000882c>] (do_one_initcall+0x2c/0x150) from [<c07b75d8>] (do_basic_setup+0x94/0xd4)
+[    0.301879] [<c07b75d8>] (do_basic_setup+0x94/0xd4) from [<c07b7694>] (kernel_init_freeable+0x7c/0x120)
+[    0.301910] [<c07b7694>] (kernel_init_freeable+0x7c/0x120) from [<c05667ec>] (kernel_init+0x8/0x120)
+[    0.301940] [<c05667ec>] (kernel_init+0x8/0x120) from [<c000e908>] (ret_from_fork+0x14/0x2c)
+[    0.302124] ---[ end trace 2b87f5de2f86f809 ]---
+...
 
-diff --git a/Documentation/devicetree/bindings/usb/platform-ohci.txt b/Documentation/devicetree/bindings/usb/platform-ohci.txt
-new file mode 100644
-index 0000000..44bfa57
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/platform-ohci.txt
-@@ -0,0 +1,25 @@
-+Generic Platform OHCI controller
-+
-+Required properties:
-+- compatible : "allwinner,sun4i-ohci"
-+- reg : ohci controller register range (address and length)
-+- interrupts : ohci controller interrupt
-+
-+Optional properties:
-+- clocks : a list of phandle + clock specifier pairs, one for each entry
-+   in clock-names.
-+- clock-names : "clk0", "clk1", ...
-+- phys : phy
-+- phy-names : "phy0"
-+
-+Example:
-+
-+	ohci0: ohci at 0x01c14400 {
-+		compatible = "allwinner,sun4i-ohci";
-+		reg = <0x01c14400 0x100>;
-+		interrupts = <64>;
-+		clocks = <&usb_clk 6>, <&ahb_gates 2>;
-+		clock-names = "clk0", "clk1";
-+		phys = <&usbphy 1>;
-+		phy-names = "phy0";
-+	};
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index f351ff5..7cab768 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright 2007 Michael Buesch <m@bues.ch>
-  * Copyright 2011-2012 Hauke Mehrtens <hauke@hauke-m.de>
-+ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
-  *
-  * Derived from the OCHI-SSB driver
-  * Derived from the OHCI-PCI driver
-@@ -14,11 +15,14 @@
-  * Licensed under the GNU/GPL. See COPYING for details.
-  */
+There's nothing wrong with the interrupt related code paths, we're just
+trying to call the functions at a wrong time when thing are not yet
+initialized.
+
+Below is a repost of what works for me without using notifiers. Anybody
+got any better ideas for a minimal fix?
+
+Regards,
+
+Tony
+
+8< -------------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 7 Jan 2014 17:07:18 -0800
+Subject: [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
+
+Currently we get the following kind of errors if we try to use interrupt
+phandles to irqchips that have not yet initialized:
+
+irq: no irq domain found for /ocp/pinmux at 48002030 !
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
+(show_stack+0x14/0x1c)
+(dump_stack+0x6c/0xa0)
+(warn_slowpath_common+0x64/0x84)
+(warn_slowpath_null+0x1c/0x24)
+(of_device_alloc+0x144/0x184)
+(of_platform_device_create_pdata+0x44/0x9c)
+(of_platform_bus_create+0xd0/0x170)
+(of_platform_bus_create+0x12c/0x170)
+(of_platform_populate+0x60/0x98)
+
+This is because we're wrongly trying to populate resources that are not yet
+available. It's perfectly valid to create irqchips dynamically, so let's
+fix up the issue by populating the interrupt resources at the driver probe
+time instead.
+
+Note that at least currently we cannot dynamically allocate the resources as bus
+specific code may add legacy resources with platform_device_add_resources()
+before the driver probe. At least omap_device_alloc() currently relies on
+num_resources to determine if legacy resources should be added. This issue
+will get fixed automatically when mach-omap2 boots with DT only, but there
+are probably other places too where platform_device_add_resources() modifies
+things before driver probe.
+
+The addition of of_platform_probe() is based on patches posted earlier by
+Thierry Reding <thierry.reding@gmail.com>.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -481,6 +481,10 @@ static int platform_drv_probe(struct device *_dev)
+ 	struct platform_device *dev = to_platform_device(_dev);
+ 	int ret;
  
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
- #include <linux/hrtimer.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/err.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/usb.h>
-@@ -28,6 +32,12 @@
- 
- #define DRIVER_DESC "OHCI generic platform driver"
- 
-+#define OHCI_MAX_CLKS 3
-+struct ohci_platform_priv {
-+	struct clk *clks[OHCI_MAX_CLKS];
-+	struct phy *phy;
-+};
++	ret = of_platform_probe(dev);
++	if (ret)
++		return ret;
 +
- static const char hcd_name[] = "ohci-platform";
+ 	if (ACPI_HANDLE(_dev))
+ 		acpi_dev_pm_attach(_dev, true);
  
- static int ohci_platform_reset(struct usb_hcd *hcd)
-@@ -48,11 +58,69 @@ static int ohci_platform_reset(struct usb_hcd *hcd)
- 	return ohci_setup(hcd);
- }
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -141,7 +141,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 				  struct device *parent)
+ {
+ 	struct platform_device *dev;
+-	int rc, i, num_reg = 0, num_irq;
++	int num_reg = 0, num_irq;
+ 	struct resource *res, temp_res;
  
-+static int ohci_platform_power_on(struct platform_device *dev)
+ 	dev = platform_device_alloc("", -1);
+@@ -154,7 +154,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 			num_reg++;
+ 	num_irq = of_irq_count(np);
+ 
+-	/* Populate the resource table */
++	/*
++	 * Only allocate the resources for us to use later on. Note that bus
++	 * specific code may also add in additional legacy resources using
++	 * platform_device_add_resources(), and may even rely on us allocating
++	 * the basic resources here to do so. So we cannot allocate the
++	 * resources lazily until the legacy code has been fixed to not rely
++	 * on allocating resources here.
++	 */
+ 	if (num_irq || num_reg) {
+ 		res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
+ 		if (!res) {
+@@ -164,11 +171,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 
+ 		dev->num_resources = num_reg + num_irq;
+ 		dev->resource = res;
+-		for (i = 0; i < num_reg; i++, res++) {
+-			rc = of_address_to_resource(np, i, res);
+-			WARN_ON(rc);
+-		}
+-		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
++		/* See of_device_resource_populate for populating the data */
+ 	}
+ 
+ 	dev->dev.of_node = of_node_get(np);
+@@ -187,6 +190,50 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ EXPORT_SYMBOL(of_device_alloc);
+ 
+ /**
++ * of_device_resource_populate - Populate device resources from device tree
++ * @dev: pointer to platform device
++ *
++ * The device interrupts are not necessarily available for all
++ * irqdomains initially so we need to populate them lazily at
++ * device probe time from of_platform_populate.
++ */
++static int of_device_resource_populate(struct platform_device *pdev)
 +{
-+	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct ohci_platform_priv *priv =
-+		(struct ohci_platform_priv *)hcd_to_ohci(hcd)->priv;
-+	int clk, ret;
++	struct device_node *np = pdev->dev.of_node;
++	int rc, i, num_reg = 0, num_irq;
++	struct resource *res, temp_res;
 +
-+	for (clk = 0; priv->clks[clk] && clk < OHCI_MAX_CLKS; clk++) {
-+		ret = clk_prepare_enable(priv->clks[clk]);
-+		if (ret)
-+			goto err_disable_clks;
++	res = pdev->resource;
++
++	/*
++	 * Count the io and irq resources again. Currently we cannot rely on
++	 * pdev->num_resources as bus specific code may have changed that
++	 * with platform_device_add_resources(). But the resources we allocated
++	 * earlier are still there and available for us to populate.
++	 */
++	if (of_can_translate_address(np))
++		while (of_address_to_resource(np, num_reg, &temp_res) == 0)
++			num_reg++;
++	num_irq = of_irq_count(np);
++
++	if (pdev->num_resources < num_reg + num_irq) {
++		dev_WARN(&pdev->dev, "not enough resources %i < %i\n",
++			 pdev->num_resources, num_reg + num_irq);
++		return -EINVAL;
 +	}
 +
-+	if (priv->phy) {
-+		ret = phy_init(priv->phy);
-+		if (ret)
-+			goto err_disable_clks;
-+
-+		ret = phy_power_on(priv->phy);
-+		if (ret)
-+			goto err_exit_phy;
++	for (i = 0; i < num_reg; i++, res++) {
++		rc = of_address_to_resource(np, i, res);
++		WARN_ON(rc);
 +	}
++
++	if (num_irq)
++		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
 +
 +	return 0;
-+
-+err_exit_phy:
-+	phy_exit(priv->phy);
-+err_disable_clks:
-+	while (--clk >= 0)
-+		clk_disable_unprepare(priv->clks[clk]);
-+
-+	return ret;
 +}
 +
-+static void ohci_platform_power_off(struct platform_device *dev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct ohci_platform_priv *priv =
-+		(struct ohci_platform_priv *)hcd_to_ohci(hcd)->priv;
-+	int clk;
-+
-+	if (priv->phy) {
-+		phy_power_off(priv->phy);
-+		phy_exit(priv->phy);
-+	}
-+
-+	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
-+		if (priv->clks[clk])
-+			clk_disable_unprepare(priv->clks[clk]);
-+}
-+
- static struct hc_driver __read_mostly ohci_platform_hc_driver;
- 
- static const struct ohci_driver_overrides platform_overrides __initconst = {
--	.product_desc =	"Generic Platform OHCI controller",
--	.reset =	ohci_platform_reset,
-+	.product_desc =		"Generic Platform OHCI controller",
-+	.reset =		ohci_platform_reset,
-+	.extra_priv_size =	sizeof(struct ohci_platform_priv),
-+};
-+
-+static struct usb_ohci_pdata ohci_platform_defaults = {
-+	.power_on =		ohci_platform_power_on,
-+	.power_suspend =	ohci_platform_power_off,
-+	.power_off =		ohci_platform_power_off,
- };
- 
- static int ohci_platform_probe(struct platform_device *dev)
-@@ -60,12 +128,24 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_hcd *hcd;
- 	struct resource *res_mem;
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
--	int irq;
--	int err = -ENOMEM;
-+	int clk, irq, err;
-+	char name[8];
- 
-+	/*
-+	 * Use reasonable defaults so platforms don't have to provide these
-+	 * with DT probing on ARM.
-+	 */
- 	if (!pdata) {
--		WARN_ON(1);
--		return -ENODEV;
-+		pdata = dev->dev.platform_data = &ohci_platform_defaults;
-+		/*
-+		 * Right now device-tree probed devices don't get dma_mask set.
-+		 * Since shared usb code relies on it, set it here for now.
-+		 * Once we have dma capability bindings this can go away.
-+		 */
-+		err = dma_coerce_mask_and_coherent(&dev->dev,
-+						   DMA_BIT_MASK(32));
-+		if (err)
-+			return err;
- 	}
- 
- 	if (usb_disabled())
-@@ -83,17 +163,40 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		return -ENXIO;
- 	}
- 
-+	hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
-+			dev_name(&dev->dev));
-+	if (!hcd)
-+		return -ENOMEM;
-+
-+	if (pdata == &ohci_platform_defaults) {
-+		struct ohci_platform_priv *priv = (struct ohci_platform_priv *)
-+						  hcd_to_ohci(hcd)->priv;
-+
-+		priv->phy = devm_phy_get(&dev->dev, "phy0");
-+		if (IS_ERR(priv->phy)) {
-+			err = PTR_ERR(priv->phy);
-+			if (err == -EPROBE_DEFER)
-+				goto err_put_hcd;
-+			priv->phy = NULL;
-+		}
-+
-+		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
-+			snprintf(name, sizeof(name), "clk%d", clk);
-+			priv->clks[clk] = devm_clk_get(&dev->dev, name);
-+			if (IS_ERR(priv->clks[clk])) {
-+				err = PTR_ERR(priv->clks[clk]);
-+				if (err == -EPROBE_DEFER)
-+					goto err_put_hcd;
-+				priv->clks[clk] = NULL;
-+			}
-+		}
-+	}
-+
-+	platform_set_drvdata(dev, hcd);
- 	if (pdata->power_on) {
- 		err = pdata->power_on(dev);
- 		if (err < 0)
--			return err;
--	}
--
--	hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
--			dev_name(&dev->dev));
--	if (!hcd) {
--		err = -ENOMEM;
--		goto err_power;
-+			goto err_put_hcd;
- 	}
- 
- 	hcd->rsrc_start = res_mem->start;
-@@ -102,21 +205,19 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	hcd->regs = devm_ioremap_resource(&dev->dev, res_mem);
- 	if (IS_ERR(hcd->regs)) {
- 		err = PTR_ERR(hcd->regs);
--		goto err_put_hcd;
-+		goto err_power;
- 	}
- 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (err)
--		goto err_put_hcd;
--
--	platform_set_drvdata(dev, hcd);
-+		goto err_power;
- 
- 	return err;
- 
--err_put_hcd:
--	usb_put_hcd(hcd);
- err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
-+err_put_hcd:
-+	usb_put_hcd(hcd);
- 
- 	return err;
++/**
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+  * @bus_id: name to assign device
+@@ -485,4 +532,35 @@ int of_platform_populate(struct device_node *root,
+ 	return rc;
  }
-@@ -178,6 +279,12 @@ static int ohci_platform_resume(struct device *dev)
- #define ohci_platform_resume	NULL
- #endif /* CONFIG_PM */
- 
-+static const struct of_device_id ohci_platform_ids[] = {
-+	{ .compatible = "allwinner,sun4i-ohci", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, ohci_platform_ids);
+ EXPORT_SYMBOL_GPL(of_platform_populate);
 +
- static const struct platform_device_id ohci_platform_table[] = {
- 	{ "ohci-platform", 0 },
- 	{ }
-@@ -198,6 +305,7 @@ static struct platform_driver ohci_platform_driver = {
- 		.owner	= THIS_MODULE,
- 		.name	= "ohci-platform",
- 		.pm	= &ohci_platform_pm_ops,
-+		.of_match_table = ohci_platform_ids,
- 	}
- };
++/**
++ * of_platform_probe() - OF specific initialization at probe time
++ * @pdev: pointer to a platform device
++ *
++ * This function is called by the driver core to perform devicetree-specific
++ * setup for a given platform device@probe time. If a device's resources
++ * as specified in the device tree are not available yet, this function can
++ * return -EPROBE_DEFER and cause the device to be probed again later, when
++ * other drivers that potentially provide the missing resources have been
++ * probed in turn.
++ *
++ * Note that because of the above, all code executed by this function must
++ * be prepared to be run multiple times on the same device (i.e. it must be
++ * idempotent).
++ *
++ * Returns 0 on success or a negative error code on failure.
++ */
++int of_platform_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	if (!pdev->dev.of_node)
++		return 0;
++
++	ret = of_device_resource_populate(pdev);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
+ #endif /* CONFIG_OF_ADDRESS */
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -72,6 +72,8 @@ extern int of_platform_populate(struct device_node *root,
+ 				const struct of_device_id *matches,
+ 				const struct of_dev_auxdata *lookup,
+ 				struct device *parent);
++
++extern int of_platform_probe(struct platform_device *pdev);
+ #else
+ static inline int of_platform_populate(struct device_node *root,
+ 					const struct of_device_id *matches,
+@@ -80,6 +82,11 @@ static inline int of_platform_populate(struct device_node *root,
+ {
+ 	return -ENODEV;
+ }
++
++static inline int of_platform_probe(struct platform_device *pdev)
++{
++	return 0;
++}
+ #endif
  
--- 
-1.8.4.2
+ #endif	/* _LINUX_OF_PLATFORM_H */
