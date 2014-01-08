@@ -1,69 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 8 Jan 2014 16:59:25 +0100
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <1389174517.12612.87.camel@kazak.uk.xensource.com>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <1389174517.12612.87.camel@kazak.uk.xensource.com>
-Message-ID: <20140108155925.GA32641@lunn.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 08 Jan 2014 17:00:53 +0100
+Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52CA603B.3070203@redhat.com>
+References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
+ <201401060816.02998.arnd@arndb.de> <52CA603B.3070203@redhat.com>
+Message-ID: <52CD7635.8040102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
-> On Mon, 2014-01-06 at 23:49 +0100, Andrew Lunn wrote:
-> > Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
-> > 
-> > As with the QNAP 119, there are two variants, depending on which SoC
-> > has been used. They differ on Ethernet PHY addresses and number of
-> > PCIe busses.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> On the assumption that this is basically the same as the think you asked
-> me to test last week:
-> Tested-by: Ian Campbell <ijc@hellion.org.uk> (specifically kirkwood-ts419-6281.dtb)
- 
-It is the same. Thanks for testing.
+Hi,
 
-> What is the plan for the board files for the ts* platforms? Are they
-> going to go away? This seems to have happened for the Sheevaplug case,
-> which is causing some transition pain for distros (e.g.
-> http://bugs.debian.org/731345).
+On 01/06/2014 08:50 AM, Hans de Goede wrote:
 
-We plan to make them go away. We are not quite there yet, there are
-still a couple of boards which don't have DT files. But we are working
-on those.
- 
-> The big issue for the ts devices is that each board file seems to be
-> splitting into two DTB files so in order to handle upgrades we need to
-> be able to detect which of the two variants we need, both when running
-> the previous board-file kernel and when running the DT version. Any
-> advice? You previously pointed me to a string in the dmesg but this
-> might not be reliable if the early boot messages have gone from the
-> circular buffer and in any case I'm not sure how wise it is to rely on
-> parsing those.
-> 
-> It looks like the board files determine things based on
-> kirkwood_pcie_id() -- is the result of that available in userspace
-> anywhere? I suppose counting the number of PCI buses would work, not a
-> brilliant solution but given the need to work with board file kernels
-> too maybe that's the best option.
+<snip>
 
-This is an issue, which has been discussed a bit recently while fixing
-an i2c issues on Marvell XP SoCs. As far as i know, there is no
-reliable export of the version field. It might be available from
-lspci, but so far i've not seen it. I will look into this in the next
-few days.
+>> Otherwise you don't know the difference between "no clock
+>> provided", "error getting the clock reference" and "clock controller not
+>> initialized yet, try again".
+>
+> I guess of these 3 we really only want to continue on "no clock provided",
+> so I think something like this (for both clks and the phy) would be best:
+>
+>          priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
+>          if (IS_ERR(priv->ahb_clk)) {
+>              err = PTR_ERR(priv->ahb_clk);
+>              if (err != -EINVAL && err != -ENODATA)
+>                  goto err_put_hcd;
+>              priv->ahb_clk = NULL; /* No clock provided */
+>          }
+>
+> To clarify -EINVAL will be returned when there is no clock-names, and
+> -ENODATA when the specified name is not found in clock-names.
 
-> The other issue I spotted is
-> that /dev/input/by-path/platform-gpio-keys-event has
-> become /dev/input/by-path/platform-gpio_keys.3-event. Is it considered
-> valid for a by-path name to change? In particular the 3 here is
-> apparently the node depth in the DTB, which doesn't make much logical
-> sense as a "path" in this context I don't think (I expect it to be some
-> sort of path through the hardware buses, perhaps my expectation is
-> wrong?).
+Ok, so I've got this wrong, if there is no clk by that name specified
+in dt -ENOENT will be returned. Actually -ENOENT is the only
+error clk_get and thus devm_clk_get will ever return.
 
-To be honest, i've no idea about this. I hope somebody else will
-answer. If not, we might need to ask on the input mailing list.
+So it seems that clk_get currently is not properly passing along
+probe-deferral. To make things future proof I will add a probe
+deferral check to the next version of my patch.
 
-	Andrew
+Regards,
+
+Hans
