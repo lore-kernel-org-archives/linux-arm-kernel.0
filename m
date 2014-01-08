@@ -1,44 +1,37 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 8 Jan 2014 11:45:37 +0530
-Subject: [PATCH v4 0/5] USB Host support for OMAP5 uEVM (for 3.14)
-Message-ID: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+Date: Wed, 8 Jan 2014 11:45:38 +0530
+Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding information
+In-Reply-To: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+Message-ID: <1389161742-10533-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit & Tony,
+The omap-usb-host driver expects the 60MHz functional clock
+of the USB host module to be named as "init_60m_fclk".
+Add this information in the DT binding document.
 
-This patchset brings up USB Host ports and Ethernet port on
-the OMAP5 uEVM board.
+CC: Lee Jones <lee.jones@linaro.org>
+CC: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ Documentation/devicetree/bindings/mfd/omap-usb-host.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-It depends on the TI Clock DT conversion patches [1] and is based
-on 3.13-rc7
-
-[1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/289895
-
-Changelog:
-
-v4:
-- Updated DT binding document for clock binding
-
-v3:
-- Rebased on top of 3.13-rc7
-
-cheers,
--roger
-
-Roger Quadros (5):
-  mfd: omap-usb-host: Update DT clock binding information
-  ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
-  ARM: dts: omap4-panda: Provide USB PHY clock
-  ARM: dts: omap5-uevm: Provide USB PHY clock
-  ARM: OMAP2+: Remove legacy_init_ehci_clk()
-
- Documentation/devicetree/bindings/mfd/omap-usb-host.txt |  4 ++++
- arch/arm/boot/dts/omap4-panda-common.dtsi               |  8 ++------
- arch/arm/boot/dts/omap5-uevm.dts                        |  8 ++------
- arch/arm/boot/dts/omap5.dtsi                            |  2 ++
- arch/arm/mach-omap2/pdata-quirks.c                      | 16 ----------------
- 5 files changed, 10 insertions(+), 28 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+index b381fa6..5635202 100644
+--- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
++++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+@@ -32,6 +32,10 @@ Optional properties:
+ - single-ulpi-bypass: Must be present if the controller contains a single
+   ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
+ 
++- clocks: phandle to 60MHz functional clock to the USB Host module.
++
++- clock-names: must be "init_60m_fclk"
++
+ Required properties if child node exists:
+ 
+ - #address-cells: Must be 1
 -- 
 1.8.3.2
