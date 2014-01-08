@@ -1,64 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Jan 2014 12:29:26 +0100
-Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
-In-Reply-To: <52CD2529.6090206@free-electrons.com>
-References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
- <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
- <20140107183853.GE4227@obsidianresearch.com>
- <20140107230610.GB2592@katana>
- <52CD2529.6090206@free-electrons.com>
-Message-ID: <20140108112926.GB2669@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 12:29:44 +0100
+Subject: [PATCH v2 3/3] ARM: sun7i: irqchip: Update the documentation
+In-Reply-To: <1389030097-10822-4-git-send-email-carlo.caione@gmail.com>
+References: <1389030097-10822-1-git-send-email-carlo.caione@gmail.com>
+ <1389030097-10822-4-git-send-email-carlo.caione@gmail.com>
+Message-ID: <201401081229.45029.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 11:15:05AM +0100, Gregory CLEMENT wrote:
-> Hi Wolfram,
-> 
-> On 08/01/2014 00:06, Wolfram Sang wrote:
-> > On Tue, Jan 07, 2014 at 11:38:53AM -0700, Jason Gunthorpe wrote:
-> >> On Tue, Jan 07, 2014 at 05:35:03PM +0100, Gregory CLEMENT wrote:
-> >>> +static struct property i2c_offload_broken = {
-> >>> +	.name = "offload-broken",
-> >>> +};
-> >>> +
-> >>> +static void __init i2c_quirk(void)
-> >>> +{
-> >>> +	struct device_node *np;
-> >>> +	u32 dev, rev;
-> >>> +
-> >>> +	/*
-> >>> +	 * Only revisons more recent than A0 support the offload
-> >>> +	 * mechanism. We can exit only if we are sure that we can
-> >>> +	 * get the SoC revision and it is more recent than A0.
-> >>> +	 */
-> >>> +	if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
-> >>> +		return;
-> >>> +
-> >>> +	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c")
-> >>> +		of_add_property(np, &i2c_offload_broken);
-> >>
-> >> I like this approach.
-> > 
-> > Sorry, but I don't.
-> > 
-> >> However, when I first read this I thought it should be a -a0 specific
-> >> compatible string, not a 'offload-broken' property - any idea what the
-> >> DT consensus is here? I've seen both approach in use ..
-> > 
-> > I prefer the replacement of the compatible string. If it should really
-> > be a seperate property, then it should be a vendor specific property. It
-> > is not generic, at all.
-> 
-> Something like "marvell,offload-broken" would be acceptable?
+On Monday 06 January 2014, Carlo Caione wrote:
+> +Allwinner Sunxi NMI Controller
+> +==============================
+> +
+> +Required properties:
+> +
+> +- compatible : should be "allwinner,sun7i-sc-nmi"
+> +- reg : Specifies base physical address and size of the registers.
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 2.
 
-A tad more, yes. Still, since this is a feature/quirk of the IP core
-revision, it should be deduced from the compatible property IMO. It
-cannot be configured anywhere, so it doesn't change on board level.
+I think you should list what the two cells are so users know what to
+put in the irq specifier.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/aa332e8f/attachment.sig>
+> +sc-nmi-intc at 01c00030 {
+> +       compatible = "allwinner,sun7i-sc-nmi";
+> +       interrupt-controller;
+> +       #interrupt-cells = <2>;
+> +       reg = <0x01c00030 0x0c>;
+> +       interrupt-parent = <&gic>;
+> +       interrupts = <0 0 1>;
+> +};
+
+Is <0 0 1> the correct representation of the NMI? This question has recently
+come up on IRC and I didn't know the answer at the time.
+
+	Arnd
