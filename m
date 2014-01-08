@@ -1,114 +1,47 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Wed, 8 Jan 2014 11:02:04 +0530
-Subject: [PATCH V2 02/10] ARM: EXYNOS: initial board support for
- exynos5260 SoC
-In-Reply-To: <3255549.jEqQKz0UeP@wuerfel>
-References: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
- <1389099548-14649-3-git-send-email-rahul.sharma@samsung.com>
- <3255549.jEqQKz0UeP@wuerfel>
-Message-ID: <CAPdUM4Mi1H4CHeT_wXo8DtuEYMBCANK4ewsYd5GnciRe5fvpfg@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 8 Jan 2014 11:15:01 +0530
+Subject: [PATCH v3 1/4] ARM: dts: OMAP5: Add 60MHz clock reference to
+ USB Host module
+In-Reply-To: <201401071613.39245.arnd@arndb.de>
+References: <1389096889-22179-1-git-send-email-rogerq@ti.com>
+ <1389096889-22179-2-git-send-email-rogerq@ti.com>
+ <201401071613.39245.arnd@arndb.de>
+Message-ID: <52CCE5DD.4040301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd,
-
-On 7 January 2014 18:54, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 07 January 2014 18:29:00 Rahul Sharma wrote:
->> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+On 01/07/2014 08:43 PM, Arnd Bergmann wrote:
+> On Tuesday 07 January 2014, Roger Quadros wrote:
+>> USB Host driver (drivers/mfd/omap-usb-host.c) expects the 60MHz
+>> reference clock to be named "init_60m_fclk". Provide this
+>> information.
 >>
->> This patch add basic arch side support for exynos5260 SoC.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
->> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
 >> ---
->> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
->> index 09e6898..e0c7108 100644
->> --- a/arch/arm/mach-exynos/common.c
->> +++ b/arch/arm/mach-exynos/common.c
->> @@ -52,6 +52,7 @@ static const char name_exynos4210[] = "EXYNOS4210";
->>  static const char name_exynos4212[] = "EXYNOS4212";
->>  static const char name_exynos4412[] = "EXYNOS4412";
->>  static const char name_exynos5250[] = "EXYNOS5250";
->> +static const char name_exynos5260[] = "EXYNOS5260";
->>  static const char name_exynos5410[] = "EXYNOS5410";
->>  static const char name_exynos5420[] = "EXYNOS5420";
->>  static const char name_exynos5440[] = "EXYNOS5440";
->> @@ -92,6 +93,12 @@ static struct cpu_table cpu_ids[] __initdata = {
->>               .init           = exynos_init,
->>               .name           = name_exynos5410,
->>       }, {
->> +             .idcode         = EXYNOS5260_SOC_ID,
->> +             .idmask         = EXYNOS5_SOC_MASK,
->> +             .map_io         = exynos5_map_io,
->> +             .init           = exynos_init,
->> +             .name           = name_exynos5260,
->> +     }, {
->>               .idcode         = EXYNOS5420_SOC_ID,
->>               .idmask         = EXYNOS5_SOC_MASK,
->>               .map_io         = exynos5_map_io,
->
-> I think we've seen enough of these. Please generalize it enough
-> so we won't need to add any more entries whenever a new SoC
-> comes up. It's probably fine for now to have to tell the difference
-> between EXYNOS4 and EXYNOS5, but not new chips within some family.
->
-> According to rumors on the web, EXYNOS6 is going to be released
-> soon with a 64-bit CPU in it, and since we don't allow platform
-> specific code for arm64 like this any more, you should just
-> drop it for arm32 as well.
-
-I agree with you. Let me explore options to optimize this part of the
-code. I prefer
-to add code here (along with legacy ) to accept DT bindings for Exynos5 family
-SoCs and use them for Exynos5260. Next, I will migrate the rest of the existing
-platforms and get rid of existing platform code.
-
->
->> @@ -279,6 +286,15 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->>       },
->>  };
+>>  arch/arm/boot/dts/omap5.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
 >>
->> +static struct map_desc exynos5260_iodesc[] __initdata = {
->> +     {
->> +             .virtual        = (unsigned long)S5P_VA_SYSRAM_NS,
->> +             .pfn            = __phys_to_pfn(EXYNOS5260_PA_SYSRAM_NS),
->> +             .length         = SZ_4K,
->> +             .type           = MT_DEVICE,
->> +     },
->> +};
->> +
->>  void exynos4_restart(enum reboot_mode mode, const char *cmd)
->>  {
->>       __raw_writel(0x1, S5P_SWRESET);
->
-> The only difference you have is the map descriptor, and that should
-> go away if you only add a proper DT binding for SYSRAM. Try to get
-> rid of the remaining map_desc entries while you're at it.
->
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index 2f12a47..e0ab379 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -765,6 +765,8 @@
+>>                         #address-cells = <1>;
+>>                         #size-cells = <1>;
+>>                         ranges;
+>> +                       clocks = <&l3init_60m_fclk>;
+>> +                       clock-names = "init_60m_fclk";
+>>  
+>>                         usbhsohci: ohci at 4a064800 {
+>>                                 compatible = "ti,ohci-omap3", "usb-ohci";
+> 
+> The bindings/mfd/omap-usb-host.txt file doesn't document any clocks.
+> Please create another patch to document the clock names in this binding
+> before you start putting them into the dtsi file. So far the clock
+> names are an implementation detail of Linux as they are not part
+> of the binding, and with your patch it becomes part of the ABI.
+> 
+Right. I'll re-post the series.
 
-Ok. let me check this.
-
->> diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
->> index 31cac97..13c802b 100644
->> --- a/arch/arm/plat-samsung/include/plat/map-s5p.h
->> +++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
->> @@ -23,6 +23,7 @@
->>
->>  #define S5P_VA_SYSRAM                S3C_ADDR(0x02400000)
->>  #define S5P_VA_SYSRAM_NS     S3C_ADDR(0x02410000)
->> +
->>  #define S5P_VA_DMC0          S3C_ADDR(0x02440000)
->>  #define S5P_VA_DMC1          S3C_ADDR(0x02480000)
->>  #define S5P_VA_SROMC         S3C_ADDR(0x024C0000)
->>
->
-> This hunk doesn't really belong in the patch at all.
-
-I will move it to correct patch.
-
-Regards,
-Rahul Sharma
-
->
->         Arnd
+cheers,
+-roger
