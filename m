@@ -1,51 +1,46 @@
-From: b44548@freescale.com (Chao Fu)
-Date: Wed, 8 Jan 2014 14:14:15 +0800
-Subject: [PATCH v2 2/2] spi:dspi:Remove some coding sytle not in standard
-In-Reply-To: <1389161655-21856-1-git-send-email-b44548@freescale.com>
-References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
-Message-ID: <1389161655-21856-2-git-send-email-b44548@freescale.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 8 Jan 2014 16:13:06 +0900
+Subject: [PATCH v3 0/4] Lager and Koelsch reference serial port support
+In-Reply-To: <20140108044416.GH15891@verge.net.au>
+References: <1386767664-20113-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140107013936.GF2196@verge.net.au> <3500878.UmMfVoYuQ7@avalon>
+ <20140108044416.GH15891@verge.net.au>
+Message-ID: <CANqRtoTg6d-bYXavbt=xf-EJEfxZjSMoO+rW9KpsyaXOuhHjYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Fu <B44548@freescale.com>
+On Wed, Jan 8, 2014 at 1:44 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Jan 07, 2014 at 09:03:13AM +0100, Laurent Pinchart wrote:
+>> Hi Simon,
+>>
+>> On Tuesday 07 January 2014 10:39:36 Simon Horman wrote:
+>> > On Wed, Dec 11, 2013 at 02:14:20PM +0100, Laurent Pinchart wrote:
+>> > > Hello,
+>> > >
+>> > > This patch set implements serial port support for the Lager reference
+>> > > board.
+>> > >
+>> > > The code is available in my git tree at
+>> > >
+>> > >         git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial/boards
+>> > >
+>> > > The patches are based on top of the "[PATCH 00/47] sh-sci updates for
+>> > > v3.14" and "[PATCH v3 00/15] Lager and Koelsch multiplatform support"
+>> > > patch series.
+>> >
+>> > Hi Laurent, Hi Magnus,
+>> >
+>> > I have marked this series as deferred, but to be honest
+>> > I don't quite recall what we decided to do with it.
+>>
+>> If I recall correctly the decision was to apply patches 1/4 and 2/4 for v3.13
+>> and delay 3/4 and 4/4.
+>
+> In that case I apologise as I did not queue up 1/4 and 1/4 for v3.13.
+> Instead I have now queued them up locally for v3.14 and will push them soon.
+>
+> I will leave 3/4 and 4/4 marked as deferred.
 
-Remove some coding sytle not in standard in former code.
+Sounds good, I believe this is in line with what we discussed earlier. Thanks!
 
-Signed-off-by: Chao Fu      <b44548@freescale.com>
----
-Change in v2:
-	New.
-
- drivers/spi/spi-fsl-dspi.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 1cd6d79..76cd521 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -113,10 +113,10 @@ struct fsl_dspi {
- 
- 	void __iomem		*base;
- 	int			irq;
--	struct clk 		*clk;
-+	struct clk		*clk;
- 
- 	bool			big_endian;
--	struct spi_transfer 	*cur_transfer;
-+	struct spi_transfer	*cur_transfer;
- 	struct chip_data	*cur_chip;
- 	size_t			len;
- 	void			*tx;
-@@ -127,8 +127,8 @@ struct fsl_dspi {
- 	u8			cs;
- 	u16			void_write_data;
- 
--	wait_queue_head_t 	waitq;
--	u32 			waitflags;
-+	wait_queue_head_t	waitq;
-+	u32			waitflags;
- };
- 
- static inline u8 dspi_readb(void __iomem *addr)
--- 
-1.8.4
+/ magnus
