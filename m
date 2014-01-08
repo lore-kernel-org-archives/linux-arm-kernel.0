@@ -1,113 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:47:11 +0000
-Subject: [PATCH v4 28/37] mtd: st_spi_fsm: Supply a busy wait for post-write
- status
+Date: Wed,  8 Jan 2014 13:47:10 +0000
+Subject: [PATCH v4 27/37] mtd: st_spi_fsm: Write to Flash via the FSM FIFO
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-29-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we write data to the Serial Flash chip we'll wait a predetermined
-period of time before giving up. During that period of time we poll the
-status register until completion.
+When we write data to the FIFO the FSM Controller subsequently writes
+that data out to the Serial Flash chip.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 65 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index c64f741..c2ee7e3 100644
+index b43fed1..c64f741 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -236,8 +236,18 @@
- #define FLASH_CMD_READ4_1_1_4  0x6c
- #define FLASH_CMD_READ4_1_4_4  0xec
- 
-+/* Status register */
-+#define FLASH_STATUS_BUSY      0x01
-+#define FLASH_STATUS_WEL       0x02
-+#define FLASH_STATUS_BP0       0x04
-+#define FLASH_STATUS_BP1       0x08
-+#define FLASH_STATUS_BP2       0x10
-+#define FLASH_STATUS_SRWP0     0x80
-+#define FLASH_STATUS_TIMEOUT   0xff
-+
- #define FLASH_PAGESIZE         256			/* In Bytes    */
- #define FLASH_PAGESIZE_32      (FLASH_PAGESIZE / 4)	/* In uint32_t */
-+#define FLASH_MAX_BUSY_WAIT    (300 * HZ)	/* Maximum 'CHIPERASE' time */
- 
- /*
-  * Flags to tweak operation of default read/write/erase routines
-@@ -517,6 +527,22 @@ static struct stfsm_seq stfsm_seq_read_jedec = {
- 		    SEQ_CFG_STARTSEQ),
- };
- 
-+static struct stfsm_seq stfsm_seq_read_status_fifo = {
-+	.data_size = TRANSFER_SIZE(4),
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 |
-+		       SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_RDSR)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_DATA_READ,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
-+
- static struct stfsm_seq stfsm_seq_erase_sector = {
- 	/* 'addr_cfg' configured during initialisation */
- 	.seq_opc = {
-@@ -692,6 +718,45 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
- 	return 0;
+@@ -661,6 +661,20 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
  }
  
-+static uint8_t stfsm_wait_busy(struct stfsm *fsm)
++static int stfsm_write_fifo(struct stfsm *fsm,
++			    const uint32_t *buf, const uint32_t size)
 +{
-+	struct stfsm_seq *seq = &stfsm_seq_read_status_fifo;
-+	unsigned long deadline;
-+	uint32_t status;
++	uint32_t words = size >> 2;
 +
-+	/* Use RDRS1 */
-+	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
-+			   SEQ_OPC_CYCLES(8) |
-+			   SEQ_OPC_OPCODE(FLASH_CMD_RDSR));
++	dev_dbg(fsm->dev, "writing %d bytes to FIFO\n", size);
 +
-+	/* Load read_status sequence */
-+	stfsm_load_seq(fsm, seq);
++	BUG_ON((((uint32_t)buf) & 0x3) || (size & 0x3));
 +
-+	/* Repeat until busy bit is deasserted, or timeout */
-+	deadline = jiffies + FLASH_MAX_BUSY_WAIT;
-+	do {
-+		cond_resched();
++	writesl(fsm->base + SPI_FAST_SEQ_DATA_REG, buf, words);
 +
-+		stfsm_wait_seq(fsm);
-+
-+		stfsm_read_fifo(fsm, &status, 4);
-+		if ((status & FLASH_STATUS_BUSY) == 0)
-+			return 0;
-+
-+		/* Restart */
-+		writel(seq->seq_cfg, fsm->base + SPI_FAST_SEQ_CFG);
-+
-+	} while (!time_after_eq(jiffies, deadline));
-+
-+	stfsm_read_fifo(fsm, &status, 4);
-+	if ((status & FLASH_STATUS_BUSY) == 0)
-+		return 0;
-+
-+	dev_err(fsm->dev, "timeout on wait_busy\n");
-+
-+	return -EIO;
++	return size;
 +}
 +
- static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
+ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
  {
- 	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
+ 	struct stfsm_seq *seq = &stfsm_seq_en_32bit_addr;
 -- 
 1.8.3.2
