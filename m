@@ -1,61 +1,133 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Jan 2014 15:02:39 -0800
-Subject: [PATCH v2 2/9] devicetree: bindings: Document qcom,kpss-acc
-In-Reply-To: <20140108143235.GA11753@e106331-lin.cambridge.arm.com>
-References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
- <1387845593-10050-3-git-send-email-sboyd@codeaurora.org>
- <20140108142541.GK6701@e106331-lin.cambridge.arm.com>
- <20140108143235.GA11753@e106331-lin.cambridge.arm.com>
-Message-ID: <52CDD90F.4040306@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 08 Jan 2014 14:59:43 -0800
+Subject: [GIT PULL] Samsung Clock changes for v3.14
+In-Reply-To: <2008892.PW38q65uR0@flatron>
+References: <3518820.nAXoIq2LQG@amdc1227> <20140108220749.6098.18052@quantum>
+ <2008892.PW38q65uR0@flatron>
+Message-ID: <20140108225943.6098.47795@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/14 06:32, Mark Rutland wrote:
-> On Wed, Jan 08, 2014 at 02:25:41PM +0000, Mark Rutland wrote:
->> On Tue, Dec 24, 2013 at 12:39:46AM +0000, Stephen Boyd wrote:
->>> The kpss acc binding describes the clock, reset, and power domain
->>> controller for a Krait CPU.
->>>
->>> Cc: <devicetree@vger.kernel.org>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>>  .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  | 30 ++++++++++++++++++++++
->>>  1 file changed, 30 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->>> new file mode 100644
->>> index 0000000..1333db9
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->>> @@ -0,0 +1,30 @@
->>> +Krait Processor Sub-system (KPSS) Application Clock Controller (ACC)
->>> +
->>> +The KPSS ACC provides clock, power domain, and reset control to a Krait CPU.
->>> +There is one ACC register region per CPU within the KPSS remapped region as
->>> +well as an alias register region that remaps accesses to the ACC associated
->>> +with the CPU accessing the region.
->> Is the mapping of ACC register to a specific processor well-defined? I
->> assume it's just in order of MPIDR.Aff0.
->>
->> To maintain our collective sanity in the face of possible future
->> implementations, do you have an idea as to whether this might need to be
->> extended in future for multiple clusters / reordered IDs and so on?
->>
->> I assume we'd just allocate a new compatible string if those get a
->> little crazy.
-> Actually, I'm getting too hung-up on future-proofing. Assuming the
-> mapping is well-defined for current implementations we can always add an
-> additional property later if required.
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
->
+Quoting Tomasz Figa (2014-01-08 14:43:24)
+> On Wednesday 08 of January 2014 14:07:49 Mike Turquette wrote:
+> > Quoting Tomasz Figa (2014-01-08 11:13:38)
+> > > Hi Mike,
+> > > 
+> > > Please consider pulling following Samsung Clock changes for v3.14.
+> > > 
+> > > The following changes since commit 2bb00c68e094271b79deac993893461cc051b721:
+> > 
+> > Hi Tomasz,
+> > 
+> > Commit 2bb00c68 is the tip of the Samsung clk fixes that I'm about to
+> > send out. Can you rebase this request onto the tip of clk-next?
+> 
+> I guess I can do it, but wouldn't this introduce merge conflicts, since
+> some of the fixes are changing the same parts of the code?
 
-Thanks Mark. As far as I know it will always be a one to one
-relationship. I can't predict the future though so you're suggestion
-seems like a good escape plan if needed.
+Yes it will cause conflicts, but that is sometimes OK.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> I based my samsung-next branch on top of your clk-next with my fixes
+> branch merged, since that's what will end up in Linus' tree anyway. Was it
+> not the right thing to do?
+
+Well maybe I am missing something, but I think it is not the best thing.
+The problem is that those patches will sort of be merged twice. Again
+maybe I am missing something. The same commit IDs will be used so
+perhaps it is OK...
+
+Part of this trouble is caused by the simple way that I fork clk-next
+from v3.xx-rc1. Since I never rebase that branch to a more recent -rc
+then there is a delta between the fixes that go in the queue of patches
+for the next merge window.
+
+I guess one way that other subsystems handle this is by having something
+like clk-next-late which is a new branch based on a later -rc.
+
+How awful is the merge conflict resolution?
+
+Regards,
+Mike
+
+> 
+> Best regards,
+> Tomasz
+> 
+> > 
+> > Thanks!
+> > Mike
+> > 
+> > > 
+> > >   Merge branch 'samsung-fixes' into samsung-next-base (2013-12-30 18:15:23 +0100)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.14/samsung-clk
+> > > 
+> > > for you to fetch changes up to 59d711e9ddd2f68822a2a99fc939e11a9288b73e:
+> > > 
+> > >   ARM: dts: exynos5420: add input clocks to audss clock controller (2014-01-08 18:02:43 +0100)
+> > > 
+> > > ----------------------------------------------------------------
+> > > (A bit late) first round of Samsung clock patches for v3.14.
+> > > 
+> > > ----------------------------------------------------------------
+> > > Andrew Bresticker (7):
+> > >       clk: exynos5250: register APLL rate table
+> > >       clk: exynos-audss: convert to platform device
+> > >       clk: exynos-audss: allow input clocks to be specified in device tree
+> > >       clk: exynos5250: add clock ID for div_pcm0
+> > >       ARM: dts: exynos5250: add input clocks to audss clock controller
+> > >       clk: exynos-audss: add support for Exynos 5420
+> > >       ARM: dts: exynos5420: add input clocks to audss clock controller
+> > > 
+> > > Andrzej Hajda (8):
+> > >       ARM: exynos4: create a DT header defining CLK IDs
+> > >       clk: exynos4: replace clock ID private enums with IDs from DT header
+> > >       ARM: exynos5250: create a DT header defining CLK IDs
+> > >       clk: exynos5250: replace clock ID private enums with IDs from DT header
+> > >       ARM: exynos5420: create a DT header defining CLK IDs
+> > >       clk: exynos5420: replace clock ID private enums with IDs from DT header
+> > >       ARM: exynos5440: create a DT header defining CLK IDs
+> > >       clk: exynos5440: replace clock ID private enums with IDs from DT header
+> > > 
+> > > Sachin Kamat (1):
+> > >       clk: exynos5250: Add CLK_SET_RATE_PARENT flag to mout_apll
+> > > 
+> > > Tomasz Figa (7):
+> > >       clk: samsung: exynos5250: Sort definitions by registers and bitfield
+> > >       clk: samsung: exynos5250: Make names of mux and div clocks consistent
+> > >       clk: samsung: exynos5250: Fix parents of gate clocks from GSCL domain
+> > >       clk: samsung: exynos5250: Fix parent of gate clocks from DISP1 domain
+> > >       clk: samsung: exynos5250: Add missing unpopulated mux parents
+> > >       clk: samsung: exynos5250: Correct parent list of audio muxes
+> > >       clk: samsung: exynos5250: Fix parents of gate clocks from MFC domain
+> > > 
+> > >  .../devicetree/bindings/clock/clk-exynos-audss.txt |  39 +-
+> > >  .../devicetree/bindings/clock/exynos5250-clock.txt |   1 +
+> > >  arch/arm/boot/dts/exynos5250.dtsi                  |   2 +
+> > >  arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
+> > >  drivers/clk/samsung/clk-exynos-audss.c             | 159 +++-
+> > >  drivers/clk/samsung/clk-exynos4.c                  | 857 ++++++++++-----------
+> > >  drivers/clk/samsung/clk-exynos5250.c               | 699 ++++++++++-------
+> > >  drivers/clk/samsung/clk-exynos5420.c               | 648 ++++++++--------
+> > >  drivers/clk/samsung/clk-exynos5440.c               |  81 +-
+> > >  include/dt-bindings/clk/exynos-audss-clk.h         |   3 +-
+> > >  include/dt-bindings/clock/exynos4.h                | 244 ++++++
+> > >  include/dt-bindings/clock/exynos5250.h             | 160 ++++
+> > >  include/dt-bindings/clock/exynos5420.h             | 188 +++++
+> > >  include/dt-bindings/clock/exynos5440.h             |  42 +
+> > >  14 files changed, 1957 insertions(+), 1170 deletions(-)
+> > >  create mode 100644 include/dt-bindings/clock/exynos4.h
+> > >  create mode 100644 include/dt-bindings/clock/exynos5250.h
+> > >  create mode 100644 include/dt-bindings/clock/exynos5420.h
+> > >  create mode 100644 include/dt-bindings/clock/exynos5440.h
+> > > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
