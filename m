@@ -1,37 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 11:55:18 +0100
-Subject: [PATCH v4 1/5] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <20140108105244.GA21607@earth.universe>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <52CD23E0.8030400@ti.com> <20140108105244.GA21607@earth.universe>
-Message-ID: <3761842.HRY1CDBF4z@wuerfel>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Wed, 08 Jan 2014 10:58:34 +0000
+Subject: [PATCH] ARM: DT/kernel: fix arch_match_cpu_phys_id to avoid
+ erroneous match
+In-Reply-To: <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
+References: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <20140107165815.GF4180@e106331-lin.cambridge.arm.com>
+Message-ID: <52CD2F5A.5000001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 11:52:44 Sebastian Reichel wrote:
-> 
-> On Wed, Jan 08, 2014 at 03:39:36PM +0530, Roger Quadros wrote:
-> > > What about the other clocks acquired in drivers/mfd/omap-usb-host.c? Shouldn't
-> > > all of those be provided by via the DT phandle?
-> > 
-> > All those clocks are identically named across the OMAP SoCs and are unique for each
-> > SoC, so providing DT phandle for all of them is not required.
-> > 
-> > The init_60m_fclk was renamed to l3init_60m_fclk in OMAP5, and hence the need for
-> > this binding.
-> 
-> I understand the intention of this patch. I was just wondering if
-> all the clocks should be referenced from DT even if that is not
-> strictly needed at the moment. This would make clocks similar to
-> other resources like regulators, gpios, irqs, ...
-> 
-> Having the clocks referenced from DT looks cleaner to me. It means I
-> can check the DT file for any resources used by a driver. It also
-> creates some kind of consistency in the kernel.
+Hi Russell,
 
-I think that would be best, yes. AFAIK most other platforms do this
-already, OMAP is a bit behind because it started using clocks when the
-infrastructure for doing this right was still incomplete.
+On 07/01/14 16:58, Mark Rutland wrote:
+> Hi,
+> 
+> I was just looking in devtree.c and I noticed this seems to have fallen
+> by the wayside. Given that this fixes a possible bug and there have been
+> no negative comments, I think it's good for mainline.
+> 
+> Could you place this in the patch system, assuming Russell has no
+> comments?
+> 
 
-	Arnd
+Can I put this in patch tracker if you have no objections ?
+
+Regards,
+Sudeep
+
+> Cheers,
+> Mark.
+> 
+> On Mon, Oct 21, 2013 at 01:30:32PM +0100, Sudeep KarkadaNagesha wrote:
+>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>>
+>> The MPIDR contains specific bitfields(MPIDR.Aff{2..0}) which uniquely
+>> identify a CPU, in addition to some non-identifying information and
+>> reserved bits. The ARM cpu binding defines the 'reg' property to only
+>> contain the affinity bits, and any cpu nodes with other bits set in
+>> their 'reg' entry are skipped.
+>>
+>> As such it is not necessary to mask the phys_id with MPIDR_HWID_BITMASK,
+>> and doing so could lead to matching erroneous CPU nodes in the device
+>> tree. This patch removes the masking of the physical identifier.
+>>
+>> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> ---
+>>  arch/arm/kernel/devtree.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>> index f35906b..41960fb 100644
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -171,7 +171,7 @@ void __init arm_dt_init_cpu_maps(void)
+>>  
+>>  bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+>>  {
+>> -	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
+>> +	return phys_id == cpu_logical_map(cpu);
+>>  }
+>>  
+>>  /**
+>> -- 
+>> 1.8.1.2
+>>
