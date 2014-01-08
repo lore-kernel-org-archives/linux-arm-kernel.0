@@ -1,71 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:47:04 +0000
-Subject: [PATCH v4 21/37] mtd: st_spi_fsm: Update the flash Volatile
- Configuration Register
+Date: Wed,  8 Jan 2014 13:47:05 +0000
+Subject: [PATCH v4 22/37] mtd: st_spi_fsm: Provide the default read/write
+ configurations
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-23-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for updating a chip's VCR.
+Message sequences can vary depending on how many pads (lines) are
+required to address the chip (mode & dummy), how many data pads (lines)
+are required to write out to the chip which will determine speed
+amongst other things which are detailed by the SFDP specification. We
+are able to use multiple configurations for each chip, but they need
+to me matched to a device's capabilities. These configurations are
+listed in preference order - most preferred first.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index e74513d..d009e1b 100644
+index d009e1b..5582df0 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -451,6 +451,23 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
- 		    SEQ_CFG_STARTSEQ),
+@@ -411,6 +411,33 @@ static struct flash_info flash_types[] = {
+ 	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
  };
  
-+static struct stfsm_seq stfsm_seq_wrvcr = {
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-+	.seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WRVCR)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_CMD2,
-+		STFSM_INST_STA_WR1,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
++/*
++ * FSM message sequence configurations:
++ *
++ * All configs are presented in order of preference
++ */
++
++/* Default READ configurations, in order of preference */
++static struct seq_rw_config default_read_configs[] = {
++	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 2, 4},
++	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 4, 0},
++	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 4, 0},
++	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
++	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,		0, 1, 1, 0x00, 0, 0},
++	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
 +};
 +
- static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
- {
- 	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-@@ -573,6 +590,21 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
- 	return 0;
- }
++/* Default WRITE configurations */
++static struct seq_rw_config default_write_configs[] = {
++	{FLASH_FLAG_WRITE_1_4_4, FLASH_CMD_WRITE_1_4_4, 1, 4, 4, 0x00, 0, 0},
++	{FLASH_FLAG_WRITE_1_1_4, FLASH_CMD_WRITE_1_1_4, 1, 1, 4, 0x00, 0, 0},
++	{FLASH_FLAG_WRITE_1_2_2, FLASH_CMD_WRITE_1_2_2, 1, 2, 2, 0x00, 0, 0},
++	{FLASH_FLAG_WRITE_1_1_2, FLASH_CMD_WRITE_1_1_2, 1, 1, 2, 0x00, 0, 0},
++	{FLASH_FLAG_READ_WRITE,  FLASH_CMD_WRITE,       1, 1, 1, 0x00, 0, 0},
++	{0x00,			 0,			0, 0, 0, 0x00, 0, 0},
++};
++
+ static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
  
-+static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
-+{
-+	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
-+
-+	dev_dbg(fsm->dev, "writing VCR 0x%02x\n", data);
-+
-+	seq->status = (STA_DATA_BYTE1(data) | STA_PADS_1 | STA_CSDEASSERT);
-+
-+	stfsm_load_seq(fsm, seq);
-+
-+	stfsm_wait_seq(fsm);
-+
-+	return 0;
-+}
-+
- /*
-  * SoC reset on 'boot-from-spi' systems
-  *
+ static struct stfsm_seq stfsm_seq_read_jedec = {
 -- 
 1.8.3.2
