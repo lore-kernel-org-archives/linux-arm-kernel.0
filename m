@@ -1,80 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 8 Jan 2014 13:32:15 -0800
-Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
-In-Reply-To: <alpine.LFD.2.10.1401081538350.1851@knanqh.ubzr>
-References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
- <20140108143529.GB14122@mudshark.cambridge.arm.com>
- <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
- <20140108192028.GM27432@n2100.arm.linux.org.uk>
- <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
- <alpine.LFD.2.10.1401081538350.1851@knanqh.ubzr>
-Message-ID: <CAD=FV=W_=NsEXwfnSw_VzwboDZHWU+AX09f0ECNX-XqYDF5Phg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jan 2014 21:32:58 +0000
+Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
+In-Reply-To: <20140107085930.GD12346@S2101-09.ap.freescale.net>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
+ <20140107085930.GD12346@S2101-09.ap.freescale.net>
+Message-ID: <20140108213258.GS27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+On Tue, Jan 07, 2014 at 04:59:35PM +0800, Shawn Guo wrote:
+> On Thu, Jan 02, 2014 at 09:28:03PM +0000, Russell King wrote:
+> > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > index e75e11b36dff..0e005f21d241 100644
+> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > @@ -62,6 +62,12 @@
+> >  		};
+> >  	};
+> >  
+> > +	imx-drm {
+> > +		compatible = "fsl,imx-drm";
+> > +		crtcs = <&ipu1 0>, <&ipu1 1>;
+> > +		connectors = <&ldb>;
+> > +	};
+> > +
+> 
+> While the change works fine on imx6dl, it breaks LVDS support on imx6q
+> right away.
+> 
+> imx-ipuv3 2400000.ipu: IPUv3H probed
+> imx-ipuv3 2800000.ipu: IPUv3H probed
+> [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [drm] No driver support for vblank timestamp query.
+> imx-drm imx-drm.16: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+> imx-drm imx-drm.16: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+> imx-drm imx-drm.16: failed to bind ldb.10 (ops imx_ldb_ops): -517
+> 
+> Because we have 4 crtcs for lvds-channel on imx6q while imx-drm master
+> defines only 2 in there, the imx_drm_encoder_parse_of() call from
+> imx_ldb_register() will always return -EPROBE_DEFER.
+> 
+>         lvds-channel at 0 {
+>                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+>         };
+> 
+>         lvds-channel at 1 {
+>                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+>         };
 
-On Wed, Jan 8, 2014 at 12:58 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 8 Jan 2014, Doug Anderson wrote:
->
->> On Wed, Jan 8, 2014 at 11:20 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > We've been through these arguments many times, you're not the first to
->> > raise it, and we've decided upon the policy.  We want as _few_ work-
->> > arounds in the kernel as possible, because applying the work-arounds
->> > is very problematical with the mixture of secure and non-secure booting.
->>
->> OK, fair enough.  If we want no workaround here then we can drop this patch.
->>
->>
->> I'd guess that the way forward is:
->>
->> * Land kernel workaround locally in Chromium tree
->>
->> * I'll try to land FW change locally in at least one Chromium branch.
->> If we were to get a new RO build ever (seems unlikely at this point)
->> it would be fixed for upstream kernels.  If we were to get a new RW
->> build (seems unlikely, but at least less unlikely) it would be fixed
->> if someone landed a kernel patch to save/restore this register across
->> suspend/resume.
->>
->> * If Joe Upstream wants to run an upstream kernel on some type of
->> exynos5250 product (Samsung ARM Chromebook, HP Chromebook 11, Nexus 10
->> are the ones I know of) then he will deal with the small number of
->> crashes or figure out a solution.
->
-> At some point you have to realize that what you're proposing is not
-> viable when taking into account the bigger picture.  And your FW
-> architecture is to blame.  If you were running Windows instead of Linux
-> I bet you'd have found a way to fix things differently than asking
-> Microsoft to add a special quirk in their code.  In the PC world you are
-> required to perform a BIOS update instead.
+This is why some help would be useful here - I think I got these right
+but I've no way to check them.
 
-Yup, I can believe that.
+Can you confirm that adding all four is the right thing not only for
+the imx6q but also the imx6dl sabresd please?
 
-...I'm merely trying to report reality.  Firmware updates (even RW
-ones) require an extra level of scrutiny / testing and a chunk of
-in-house resources.  Those resources get allocated if there is no
-other choice, but I can't force a lot of people to spend a lot of time
-to approve a RW firmware update (actually approving >= 3 RW firmware
-updates since there are at least three different 5250 variants) when
-there is a simple and low risk kernel fix for it.  I could try, but
-I'll get slapped down / laughed at.
-
-If this were the Windows/x86 world and we had no choice the decision
-would go a different way.  ...but we're not in the Windows/x86 world.
-
-
-> So you really need to provision the ability to update at least a portion
-> of the firmware that is not read-only.  That may be a third-stage
-> bootloader or the like which purpose is only to install workarounds such
-> as this before executing the kernel and which doesn't need to be updated
-> with the kernel.  And in theory you should be able to do that on top of
-> your current RO firmware.
-
-The fact that we have too much code in RO is a known issue and people
-are definitely working on that.  It has already bitten us.  It's
-unlikely that someone will try retrofit something to work on existing
-devices, though.
-
--Doug
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
