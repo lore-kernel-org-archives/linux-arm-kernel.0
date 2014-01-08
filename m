@@ -1,38 +1,39 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 8 Jan 2014 14:51:40 -0600
-Subject: [GIT PULL] SOCFPGA DT updates for 3.14
-Message-ID: <1389214300-5806-1-git-send-email-dinguyen@altera.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Wed, 8 Jan 2014 12:55:33 -0800
+Subject: [PATCH v3] ARM: imx: add select on ARCH_MXC for cpufreq support
+In-Reply-To: <CACUGKYPZefRPr73Wq+700qeFiDYHmLr4kSFCvkYRojHoE4ZxxA@mail.gmail.com>
+References: <1389210991-23688-1-git-send-email-john.tobias.ph@gmail.com>
+ <1389211403.678513817@f123.i.mail.ru>
+ <CAOMZO5DR0YGc=V5PJ6xy5PNwa9LCVfnS9gbRh1yW9wLo_oTEtw@mail.gmail.com>
+ <CACUGKYPZefRPr73Wq+700qeFiDYHmLr4kSFCvkYRojHoE4ZxxA@mail.gmail.com>
+Message-ID: <CACUGKYNLZzy+Pc+LLYmRrdgBUaOJV+wnEtT7qJH6aZyVBXYSJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof,
+I recompiled the kernel using the said config and it works. But, if
+you have any other suggestion it would be great.
 
-Please consider pulling in these 2 SOCFPGA DT patches for v3.14.
+Regards,
 
-Thanks,
-Dinh
+john
 
-The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
-
-  Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-for-3.14
-
-for you to fetch changes up to 672ef909e9b10933dc676c87d1bdeaabfcc11dda:
-
-  ARM: dts: socfpga: add pl330 clock (2014-01-08 12:04:03 -0600)
-
-----------------------------------------------------------------
-SOCFPGA DT updates for v3.14
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      ARM: dts: socfpga: update L2 tag and data latency
-
-Steffen Trumtrar (1):
-      ARM: dts: socfpga: add pl330 clock
-
- arch/arm/boot/dts/socfpga.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+On Wed, Jan 8, 2014 at 12:45 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
+> Hi Fabio,
+>
+> How about select HAVE_IMX_ANATOP if SOC_IMX6Q || SOC_IMX6SL
+>
+> Regards,
+>
+> john
+>
+> On Wed, Jan 8, 2014 at 12:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> On Wed, Jan 8, 2014 at 6:03 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+>>
+>>> Maybe better:
+>>> select HAVE_IMX_ANATOP if ARCH_MULTI_V6_V7
+>>
+>> mx31, mx35, mx51 and mx53 do not have this ANATOP block.
+>>
+>> Regards,
+>>
+>> Fabio Estevam
