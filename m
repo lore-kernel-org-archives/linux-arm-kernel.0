@@ -1,47 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:46:43 +0000
-Subject: [PATCH v4 00/36] mtd: st_spi_fsm: Add new driver
-Message-ID: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 8 Jan 2014 09:06:11 -0500
+Subject: [BUG] More select madness - keystone
+In-Reply-To: <52CCD029.6090404@ti.com>
+References: <20140102172625.GC7383@n2100.arm.linux.org.uk>
+ <52C5BB4A.6010802@ti.com> <52C5BFE3.6050408@ti.com> <52CCD029.6090404@ti.com>
+Message-ID: <52CD5B53.6040704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 4:
-  Tended to Brian's previous review comments
-    - Checkpatch acceptance
-    - MODULE_DEVICE_TABLE() name slip correction
-    - Timeout issue(s) resolved
-    - Potential infinite loop mitigated
-    - Code clarity suggests heeded
-    - Duplication with MTD core code removed
-    - Upgraded to using ROUND_UP() helper
-    - Moved non-shared header code into main driver
-    - Relocated dynamic msg sequence stores into main struct
-    - Averted adaption of static (table) data
-    - Basic whitespace/spelling/data type/dev_err suggestions accepted
+On Tuesday 07 January 2014 11:12 PM, Sekhar Nori wrote:
+> On Friday 03 January 2014 01:07 AM, Santosh Shilimkar wrote:
+>> On Thursday 02 January 2014 02:17 PM, Santosh Shilimkar wrote:
+>>> On Thursday 02 January 2014 12:26 PM, Russell King - ARM Linux wrote:
+>>>> warning: (ARCH_KEYSTONE && SPI_DAVINCI) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
+>>>>
+>>>> This results in the EDMA engine code not being built.  Yet another
+>>>> example of why improper use of the "select" statement is bad news
+>>>> and leads to broken configurations.
+>>>>
+>>> Thanks for reporting Russell. Will have a look.
+>>>
+>> Just to be clear for records, the select was introduced before
+>> KEYSTONE support was enabled. As per git blame, it came via commit
+>> b5f1433059 {spi: davici - make davinci select edma}.
+> 
+> I don't quite recall why this was needed and the commit description does
+> not help. Anyway, this is not needed - at least with current code. I
+> verified that the DaVinci SPI driver builds correctly with TI_EDMA
+> switched off. I can send a revert.
+> 
+Please do...
 
-Version 3:
-  Okay, this thing should be fully functional now. Identify a chip
-  based on it's JEDEC ID, Read, Write, Erase (all or by sector).
-  Support for various chip quirks added too.
- 
-Version 2:
-  The first bunch of these patches have been on the MLs before, but
-  didn't receive a great deal of attention for the most part. We are
-  a little more featureful this time however. We can now successfully
-  setup and configure the N25Q256. We still can't read/write/erase
-  it though. I'll start work on that next week and will provide it in
-  the next instalment.
- 
-Version 1:
-  First stab at getting this thing Mainlined. It doesn't do a great deal
-  yet, but we are able to initialise the device and dynamically set it up
-  correctly based on an extracted JEDEC ID.
+> BTW, it looks like arch/arm/mach-keystone/Kconfig has a select for
+> TI_EDMA as well and that needs to be removed too.
+> 
+I have patch to kill that. Will be posting that.
 
- Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
- arch/arm/boot/dts/stih416-b2105.dts              |   14 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
- drivers/mtd/devices/Kconfig                      |    8 +
- drivers/mtd/devices/Makefile                     |    1 +
- drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
- drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 2266 insertions(+)
+Regards,
+Santosh
