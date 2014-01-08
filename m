@@ -1,240 +1,45 @@
-From: falcon@meizu.com (falcon at meizu.com)
-Date: Wed, 8 Jan 2014 16:56:45 +0800
-Subject: [RFC PATCH V2] ARM: compressed: Move ramdisk forward to reserve more
- memory for kernel image
-Message-ID: <1389171405-19658-1-git-send-email-falcon@meizu.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 8 Jan 2014 11:04:13 +0200
+Subject: [PATCH 0/2] video: mxsfb: fix broken videomode selection
+In-Reply-To: <1389014278-4903-1-git-send-email-LW@KARO-electronics.de>
+References: <1389014278-4903-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <52CD148D.7060107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu Zhangjin <falcon@meizu.com>
+On 2014-01-06 15:17, Lothar Wa?mann wrote:
+> The first patch in this set converts some messages that are printed
+> in case of errors to be error messages rather than debug messages.
+> 
+> The second patch fixes a bug in the video selection code that
+> incorrectly OR's together the 'pixelclk-active' and 'de-active'
+> flags from all possible video modes specified in DT into one flag.
+> 
+> The current code does not allow selecting one specific mode from a
+> list of video modes, but always uses the last one of the video modes
+> listed in the DT.
+> 
+> 
+> Since all current dts files only have one entry in their
+> 'display-timings' node, this bug was not apparent and the fix does not
+> change the driver's behaviour for the current users.
+> 
+>  b/drivers/video/mxsfb.c |    6 +--
+>  drivers/video/mxsfb.c   |  120 +++++++++++++++++++++++++++++-----------------------------------------
+>  2 files changed, 53 insertions(+), 73 deletions(-)
+> 
 
-During embedded linux system booting, before decompressing the kernel image,
-the bootloader(E.g. Uboot) loads the compressed kernel image and ramdisk into
-two contiguous memory space, these two memory space are fixed after the Uboot
-is released, as a result, the maximum size of the decompressed kernel image is
-limited by the size of the reserved memory space (the difference of the two
-contiguous memory addresses).
+Thanks, queued for 3.14.
 
-If want more functions or some debug options, the decompressed kernel image
-may be bigger and may overwrite the followed ramdisk and result in kernel boot
-failure for missing a valid ramdisk.
+Your diffstat above looks a bit funny. Where did that "b/" come from?
 
-To fix up this issue, before decompressing the kernel image, this option moves
-the loaded ramdisk image forward with a specified offset and reserve more
-memory for the decompressed kernel image.
+ Tomi
 
---
 
-v1-->v2:
-
-  o Fix up ATAG_RAMDISK support
-  o Add phys base addr for ORION5X and KIRKWOOD
-  o Add an independent move_ramdisk.h, new board support can be added here.
-
-TODO:
-
-  o Add dtb support
-
-Signed-off-by: Wu Zhangjin <falcon@meizu.com>
----
- arch/arm/boot/compressed/Makefile       |    2 +-
- arch/arm/boot/compressed/misc.c         |    7 +++-
- arch/arm/boot/compressed/move_ramdisk.c |   61 +++++++++++++++++++++++++++++++
- arch/arm/boot/compressed/move_ramdisk.h |   35 ++++++++++++++++++
- usr/Kconfig                             |   29 +++++++++++++++
- 5 files changed, 131 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/compressed/move_ramdisk.c
- create mode 100644 arch/arm/boot/compressed/move_ramdisk.h
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index bb26756..e4ef227 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -23,7 +23,7 @@ endif
- 
- AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
- HEAD	= head.o
--OBJS	+= misc.o decompress.o
-+OBJS	+= misc.o decompress.o move_ramdisk.o
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
- 
- # string library code (-Os is enforced to keep it much smaller)
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 8e2a8fc..df1df60 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -22,7 +22,8 @@ unsigned int __machine_arch_type;
- #include <linux/types.h>
- #include <linux/linkage.h>
- 
--static void putstr(const char *ptr);
-+extern void move_ramdisk(void);
-+extern void putstr(const char *ptr);
- extern void error(char *x);
- 
- #include <mach/uncompress.h>
-@@ -83,7 +84,7 @@ static void icedcc_putc(int ch)
- #define putc(ch)	icedcc_putc(ch)
- #endif
- 
--static void putstr(const char *ptr)
-+void putstr(const char *ptr)
- {
- 	char c;
- 
-@@ -144,6 +145,8 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
- 
- 	arch_decomp_setup();
- 
-+	move_ramdisk();
-+
- 	putstr("Uncompressing Linux...");
- 	ret = do_decompress(input_data, input_data_end - input_data,
- 			    output_data, error);
-diff --git a/arch/arm/boot/compressed/move_ramdisk.c b/arch/arm/boot/compressed/move_ramdisk.c
-new file mode 100644
-index 0000000..b984433
---- /dev/null
-+++ b/arch/arm/boot/compressed/move_ramdisk.c
-@@ -0,0 +1,61 @@
-+/*
-+ * move_ramdisk.c
-+ *
-+ * Author: Wu Zhangjin, wuzhangjin at gmail.com, December 2013
-+ * Copyright: (C) 2013 Meizu Telecom Equipment Co., Ltd
-+ *
-+ * Please get help of MOVE_RAMDISK from usr/Kconfig.
-+ */
-+
-+
-+#include "move_ramdisk.h"
-+
-+extern void putstr(const char *ptr);
-+
-+void move_ramdisk(void)
-+{
-+#if defined(CONFIG_MOVE_RAMDISK) && defined(TAG_BASE_ADDR)
-+	struct tag *tags = (struct tag *)(TAG_BASE_ADDR);
-+	__u32 start, target, size;
-+	int found = 0, type = 0;
-+
-+	putstr("Searching ramdisk ...\n");
-+	if (tags->hdr.tag == ATAG_CORE) {
-+		putstr("Found tags ...\n");
-+		for (tags = tag_next(tags); tags->hdr.size; tags = tag_next(tags)) {
-+			if (tags->hdr.tag == ATAG_INITRD2) {
-+				putstr("Found initrd2 tag ...\n");
-+				found = 1;
-+				break;
-+			} else if (tags->hdr.tag == ATAG_INITRD) {
-+				putstr("Found initrd tag ...\n");
-+				found = 1;
-+				break;
-+			} else if (tags->hdr.tag == ATAG_RAMDISK) {
-+				putstr("Found ramdisk tag ...\n");
-+				found = 1;
-+				type = 1;
-+				break;
-+			}
-+		}
-+		if (found) {
-+			if (type == 0) {
-+				start = tags->u.initrd.start;
-+				size = tags->u.initrd.size;
-+				target = start + MOVE_RAMDISK_OFFSET;
-+				tags->u.initrd.start = target;
-+			} else {
-+				start = tags->u.ramdisk.start;
-+				size = tags->u.ramdisk.size;
-+				target = start + MOVE_RAMDISK_OFFSET;
-+				tags->u.ramdisk.start = target;
-+			}
-+
-+			putstr("Moving ramdisk forward ...\n");
-+			memcpy((char *)target, (char *)start, size + SIZE_FIXUP_OFFSET);
-+		}
-+	} else {
-+		putstr("No tag found ...\n");
-+	}
-+#endif
-+}
-diff --git a/arch/arm/boot/compressed/move_ramdisk.h b/arch/arm/boot/compressed/move_ramdisk.h
-new file mode 100644
-index 0000000..b824cde
---- /dev/null
-+++ b/arch/arm/boot/compressed/move_ramdisk.h
-@@ -0,0 +1,35 @@
-+#ifndef _MOVE_RAMDISK_H
-+#define _MOVE_RAMDISK_H
-+
-+#include <asm/setup.h>
-+#include <asm/memory.h>
-+#include <asm/string.h>
-+
-+/* The physical base address of your platform, see PHYS_OFFSET */
-+#ifdef PLAT_PHYS_OFFSET
-+#define __PLAT_PHYS_OFFSET	(PLAT_PHYS_OFFSET)
-+#else
-+
-+#ifdef defined (CONFIG_ARCH_ORION5X) || defined (CONFIG_ARCH_KIRKWOOD)
-+#define __PLAT_PHYS_OFFSET    UL(0x00000000)
-+#else
-+#error "Please define __PLAT_PHYS_OFFSET, the physical base address of DRAM"
-+#endif
-+
-+#endif /* PLAT_PHYS_OFFSET */
-+
-+/* Most boards put tag at the offset 0x100 with the base PHYS_OFFSET */
-+#define TAG_BASE_OFFSET		(0x100)
-+
-+/* The tag address */
-+#ifdef __PLAT_PHYS_OFFSET
-+#define TAG_BASE_ADDR		(__PLAT_PHYS_OFFSET + TAG_BASE_OFFSET)
-+#endif
-+
-+/* Some old Uboot pass the wrong size to kernel, fix up it with an offset. */
-+#define SIZE_FIXUP_OFFSET	(1024)
-+
-+#define MOVE_RAMDISK_OFFSET	(CONFIG_MOVE_RAMDISK_OFFSET_M * 1024 * 1024)
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+
-+#endif /* _MOVE_RAMDISK_H */
-diff --git a/usr/Kconfig b/usr/Kconfig
-index 65b845b..ad5ce5b 100644
---- a/usr/Kconfig
-+++ b/usr/Kconfig
-@@ -166,3 +166,32 @@ config INITRAMFS_COMPRESSION_LZO
- 	  (both compression and decompression) is the fastest.
- 
- endchoice
-+
-+config MOVE_RAMDISK
-+	bool "Move ramdisk forward to reserve more memory for kernel image"
-+	depends on ARM
-+	help
-+	  During embedded linux system booting, before decompressing the kernel
-+	  image, the bootloader(E.g. Uboot) loads the compressed kernel image
-+	  and ramdisk into two contiguous memory space, these two memory space
-+	  are fixed after the Uboot is released, as a result, the maximum size
-+	  of the decompressed kernel image is limited by the size of the
-+	  reserved memory space (the difference of the two contiguous memory
-+	  addresses).
-+
-+	  If want more functions or some debug options, the decompressed kernel
-+	  image may be bigger and may override the followed ramdisk and result
-+	  in kernel boot failure for missing a valid ramdisk.
-+
-+	  To fix up this issue, before decompressing the kernel image, this
-+	  option moves the loaded ramdisk image forward with a specified offset
-+	  and reserve more memory for the decompressed kernel image.
-+
-+config MOVE_RAMDISK_OFFSET_M
-+	int "Set the move offset of ramdisk (in Mbytes)"
-+	range 5 100
-+	default "20"
-+	depends on MOVE_RAMDISK
-+	help
-+	  Specify the move offset of the ramdisk, if want a bigger kernel, please
-+	  Increase this size.
--- 
-1.7.10.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/44134686/attachment.sig>
