@@ -1,116 +1,66 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 08 Jan 2014 15:57:49 +0000
-Subject: [RFC 08/18] hwmon: vexpress: Use regmap instead of custom
- interface
-In-Reply-To: <20131223173139.GA1678@roeck-us.net>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-9-git-send-email-pawel.moll@arm.com>
- <20131223173139.GA1678@roeck-us.net>
-Message-ID: <1389196669.23721.17.camel@hornet>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 16:59:02 +0100
+Subject: [PATCH 1/2 v3] ARM: s3c24xx: get rid of custom <mach/gpio.h>
+In-Reply-To: <201401081243.04326.arnd@arndb.de>
+References: <1386939220-12776-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbdDHyg4uz0tAMccB8yGxsoF4JaHocAxbV_bTJ832kbQw@mail.gmail.com>
+ <201401081243.04326.arnd@arndb.de>
+Message-ID: <201401081659.03357.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-12-23 at 17:31 +0000, Guenter Roeck wrote:
-> On Mon, Dec 23, 2013 at 04:23:40PM +0000, Pawel Moll wrote:
-> > This patch makes the Versatile Express hwmon driver
-> > use regmap interface, instead of custom vexpress config
-> > one. It will request the regmap resource associated
-> > with the device, which makes it pretty much hardware
-> > agnostic.
+On Wednesday 08 January 2014, Arnd Bergmann wrote:
+> On Wednesday 08 January 2014, Linus Walleij wrote:
+> > On Tue, Jan 7, 2014 at 8:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+b> > 
+> > I was wrong about this, too much in my head. As Tomasz says,
+> > pinctrl-samsung can be used, but mandates that everything is
+> > moved over to device tree.
 > > 
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Jean Delvare <khali@linux-fr.org>
-> > Cc: Guenter Roeck <linux@roeck-us.net>
-> > Cc: lm-sensors at lm-sensors.org
-> > ---
-> >  drivers/hwmon/Kconfig    |  3 ++-
-> >  drivers/hwmon/vexpress.c | 29 +++++++++++------------------
-> >  2 files changed, 13 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> > index 52d548f..7747a47 100644
-> > --- a/drivers/hwmon/Kconfig
-> > +++ b/drivers/hwmon/Kconfig
-> > @@ -1324,7 +1324,8 @@ config SENSORS_TWL4030_MADC
-> >  
-> >  config SENSORS_VEXPRESS
-> >  	tristate "Versatile Express"
-> > -	depends on VEXPRESS_CONFIG
-> > +	depends on ARM || ARM64
-> > +	depends on REGMAP
-> >  	help
-> >  	  This driver provides support for hardware sensors available on
-> >  	  the ARM Ltd's Versatile Express platform. It can provide wide
-> > diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
-> > index d867e6b..b58cf1c 100644
-> > --- a/drivers/hwmon/vexpress.c
-> > +++ b/drivers/hwmon/vexpress.c
-> > @@ -22,11 +22,11 @@
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> >  #include <linux/platform_device.h>
-> > -#include <linux/vexpress.h>
-> > +#include <linux/regmap.h>
-> >  
-> >  struct vexpress_hwmon_data {
-> >  	struct device *hwmon_dev;
-> > -	struct vexpress_config_func *func;
-> > +	struct regmap *reg;
-> >  };
-> >  
-> >  static ssize_t vexpress_hwmon_name_show(struct device *dev,
-> > @@ -56,7 +56,7 @@ static ssize_t vexpress_hwmon_u32_show(struct device *dev,
-> >  	int err;
-> >  	u32 value;
-> >  
-> > -	err = vexpress_config_read(data->func, 0, &value);
-> > +	err = regmap_read(data->reg, 0, &value);
-> >  	if (err)
-> >  		return err;
-> >  
-> > @@ -69,13 +69,13 @@ static ssize_t vexpress_hwmon_u64_show(struct device *dev,
-> >  {
-> >  	struct vexpress_hwmon_data *data = dev_get_drvdata(dev);
-> >  	int err;
-> > -	u32 value_hi, value_lo;
-> > +	unsigned int value_hi, value_lo;
-> >  
-> > -	err = vexpress_config_read(data->func, 0, &value_lo);
-> > +	err = regmap_read(data->reg, 0, &value_lo);
-> >  	if (err)
-> >  		return err;
-> >  
-> > -	err = vexpress_config_read(data->func, 1, &value_hi);
-> > +	err = regmap_read(data->reg, 1, &value_hi);
-> >  	if (err)
-> >  		return err;
-> >  
-> > @@ -175,26 +175,21 @@ static int vexpress_hwmon_probe(struct platform_device *pdev)
-> >  	if (!match)
-> >  		return -ENODEV;
-> >  
-> > -	data->func = vexpress_config_func_get_by_dev(&pdev->dev);
-> > -	if (!data->func)
-> > +	data->reg = dev_get_regmap(&pdev->dev, NULL);
-> > +	if (!data->reg)
-> >  		return -ENODEV;
-> >  
-> >  	err = sysfs_create_group(&pdev->dev.kobj, match->data);
-> >  	if (err)
-> > -		goto error;
-> > +		return err;
-> >  
-> >  	data->hwmon_dev = hwmon_device_register(&pdev->dev);
-> >  	if (IS_ERR(data->hwmon_dev)) {
-> > -		err = PTR_ERR(data->hwmon_dev);
-> > -		goto error;
-> > +		sysfs_remove_group(&pdev->dev.kobj, match->data);
-> > +		return PTR_ERR(data->hwmon_dev);
+> > Probably the best thing now that I have one problem less is to
+> > leave it to the S3C maintainers to complete their DT migration?
 > 
-> This change is unrelated and violates coding style. If the goto disturbs you,
-> I would suggest to convert the driver to use devm_hwmon_device_register_with_groups() 
-> in a separate patch and get rid of the error handling and the entire remove() function.
+> Let me have another look first, maybe I can find an intermediate
+> step that helps you on your conquest to kill mach/gpio.h.
 
-Ok, will do, thanks!
+I've asked the mighty grep and it said that these are the files
+using the contents you moved around:
 
-Pawe?
+drivers/gpio/gpio-samsung.c
+drivers/leds/leds-s3c24xx.c
+drivers/mmc/host/s3cmci.c
+sound/soc/samsung/h1940_uda1380.c
+sound/soc/samsung/neo1973_wm8753.c
+sound/soc/samsung/rx1950_uda1380.c
+sound/soc/samsung/s3c2412-i2s.c
+sound/soc/samsung/s3c24xx-i2s.c
+sound/soc/samsung/smartq_wm8987.c
+
+The symbols used in these drivers are:
+
+S3C....GP.()
+S3C_GPIO_END
+S3C_GPIO_PULL_.*
+S3C_GPIO_SFN()
+s3c_gpio_cfgall_range()
+s3c_gpio_setpull()
+
+which is basically all of the mach/gpio.h file, plus a few small parts of
+the plat/gpio-cfg.h file. The rest of plat/gpio-cfg.h however is used in
+board files to call into the gpio-samsung.c driver, so we still need 
+the header file for those, until the board files get replaced with DT
+descriptions using the pinctrl interface.
+
+I think it would be worthwhile to go ahead and make all inclusions of
+the plat/gpio-cfg.h file explicit, and remove it from mach/gpio.h, that
+part should be simple enough and helpful at the same time. Besides the
+leds-s3c24xx.c and gpio-samsung.c files we already talked about, I think
+it's only s3cmci.c, s3c2412-i2s.c and s3c24xx-i2s.c that still need this
+outside of mach-s3c*.
+
+The correct way to get rid of S3C...._GP. and S3C_GPIO_END would be to
+pass the GPIO numbers from platform code in platform_data pointers.
+It's not hard to do, but tedious to get right for the seven drivers
+that need them.
+
+	Arnd
