@@ -1,39 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jan 2014 16:13:24 +0100
-Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
- SoCs
-In-Reply-To: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <4109972.QJJQdqxEL1@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 8 Jan 2014 16:18:46 +0100
+Subject: [PATCH 1/2] ARM: tegra: enable LCD panel on Seaboard
+In-Reply-To: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
+References: <1389138437-4686-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140108151845.GE21974@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 January 2014 16:06:25 Gregory CLEMENT wrote:
-> Hi,
+On Tue, Jan 07, 2014 at 04:47:16PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Here come the 5th version of the series fixing the i2c bus hang on A0
-> version of the Armada XP SoCs. It occurred on the early release of the
-> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
-> (A0 stepping) have issues related to the i2c controller which prevent
-> to use the offload mechanism and lead to a kernel hang during boot.
+> Seaboard uses a CLAA101WA01A LCD panel. Enable the relevant display
+> controller, backlight, and regulators.
 > 
-> The main change are the use of marvell,mv78230-a0-i2c and that the
-> function mvebu_get_soc_id() is now local to mach-mvebu.
-> 
-> The first patch add a mean to detect the SoCs version at run-time and
-> the second one use this feature in the driver.
-> 
-> The 3 first patches should be applied on 3.13-rc and on stable kernel
-> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
-> "i2c: mv64xxx: Add I2C Transaction Generator support".
-> 
-> The first patch could be latter be extend to also be used with dove,
-> kirkwood, orion5x and mv78x00 when there will be merged in mvebu and
-> even expose the SoC ID and revision to userspace.
-> 
-> Jason, do you still agree to take the series once Wolfram have given
-> his acked-by?
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra20-seaboard.dts | 55 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 54 insertions(+), 1 deletion(-)
 
-Whole series
+I think this patch needs s/chungwa/chunghwa/, but other than that it
+looks good to me:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140108/5822c78c/attachment-0001.sig>
