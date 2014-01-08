@@ -1,42 +1,67 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 08 Jan 2014 18:25:31 +0000
-Subject: [RFC 10/18] regulator: vexpress: Use regmap instead of custom
- interface
-In-Reply-To: <20131224122455.GY30815@sirena.org.uk>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-11-git-send-email-pawel.moll@arm.com>
- <20131224122455.GY30815@sirena.org.uk>
-Message-ID: <1389205531.23721.40.camel@hornet>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 8 Jan 2014 22:29:47 +0400
+Subject: [PATCH] ARM: i.MX51: Fix IOMUX settings
+In-Reply-To: <20140106061233.GE27227@S2101-09.ap.freescale.net>
+References: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
+ <20140106061233.GE27227@S2101-09.ap.freescale.net>
+Message-ID: <20140108222947.65b0759f4efd2c40b7136c31@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-12-24 at 12:24 +0000, Mark Brown wrote:
-> On Mon, Dec 23, 2013 at 04:23:42PM +0000, Pawel Moll wrote:
+Hello.
+
+On Mon, 6 Jan 2014 14:12:37 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Jan 01, 2014 at 08:25:01AM +0400, Alexander Shiyan wrote:
+> > This patch fix daisy channel settings for MX51_PAD_EIM_D26__UART3_TXD and
+> > MX51_PAD_AUD3_BB_FS__UART3_TXD pads. Add missing SION bit for W1 pad.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > 
-> > This patch makes the Versatile Express regulator driver
-> > use regmap interface, instead of custom vexpress config
-> > one. It will request the regmap resource associated
-> > with the device, which makes it pretty much hardware
-> > agnostic.
-> 
-> If this change is making the operations hardware agnostic regmap based
-> ones then they should be being either replaced with standard operations
-> or standard operations being added.  It looks like you should be able to
-> use the existing linear map operations.
+> Normally, we do not take non-DT platform code change anymore.  But since
+> it's a simple fix, I applied it.
 
-Bad wording on my side. What I meant was: it doesn't matter what wacky
-VE-specific interface is hidden behind the regmap, not it's a generic
-regulator driver.
+Shawn, please revert this patch completely since it breaks work some current boards.
+Lets keep it as is.
+Thanks.
 
-Having said that, I could create helpers for continuous (linear won't
-cut - if you remember the continuous_voltage_range was introduced for
-VE's sake) regulator, which would simply read/write value to a specified
-register. Not sure how useful would that be, though. I doubt that such
-"regulator" will appear anywhere outside VE world. And if so, this would
-probably call for a "generic continuous regulator" driver and a relevant
-DT binding, which I don't think anyone really wants. If your opinion
-differs, I'm happy to botch something up.
+> > ---
+> >  arch/arm/mach-imx/iomux-mx51.h | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
+> > index 75bbcc4..e370c98 100644
+> > --- a/arch/arm/mach-imx/iomux-mx51.h
+> > +++ b/arch/arm/mach-imx/iomux-mx51.h
+> > @@ -111,7 +111,7 @@
+> >  #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
+> > -#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
+> > +#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, 0x9f4, 1, MX51_UART_PAD_CTRL)
+> >  #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
+> > @@ -451,7 +451,7 @@
+> >  #define MX51_PAD_AUD3_BB_CK__GPIO4_20		IOMUX_PAD(0x5f8, 0x208, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+> >  #define MX51_PAD_AUD3_BB_FS__AUD3_TXFS		IOMUX_PAD(0x5fc, 0x20c, 0, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_AUD3_BB_FS__GPIO4_21		IOMUX_PAD(0x5fc, 0x20c, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+> > -#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, __NA_, 0, MX51_UART_PAD_CTRL)
+> > +#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, 0x9f4, 3, MX51_UART_PAD_CTRL)
+> >  #define MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	IOMUX_PAD(0x600, 0x210, 0, __NA_, 0, MX51_ECSPI_PAD_CTRL)
+> >  #define MX51_PAD_CSPI1_MOSI__GPIO4_22		IOMUX_PAD(0x600, 0x210, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+> >  #define MX51_PAD_CSPI1_MOSI__I2C1_SDA		IOMUX_PAD(0x600, 0x210, 0x11, 0x9b4, 1, MX51_I2C_PAD_CTRL)
+> > @@ -494,7 +494,7 @@
+> >  #define MX51_PAD_UART3_TXD__UART1_DSR		IOMUX_PAD(0x634, 0x244, 0, __NA_, 0, MX51_UART_PAD_CTRL)
+> >  #define MX51_PAD_UART3_TXD__UART3_TXD		IOMUX_PAD(0x634, 0x244, 1, __NA_, 0, MX51_UART_PAD_CTRL)
+> >  #define MX51_PAD_OWIRE_LINE__GPIO1_24		IOMUX_PAD(0x638, 0x248, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
+> > -#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0, __NA_, 0, NO_PAD_CTRL)
+> > +#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0x10, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_OWIRE_LINE__SPDIF_OUT		IOMUX_PAD(0x638, 0x248, 6, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_KEY_ROW0__KEY_ROW0		IOMUX_PAD(0x63c, 0x24c, 0, __NA_, 0, NO_PAD_CTRL)
+> >  #define MX51_PAD_KEY_ROW1__KEY_ROW1		IOMUX_PAD(0x640, 0x250, 0, __NA_, 0, NO_PAD_CTRL)
+> > -- 
+> > 1.8.3.2
 
-Cheers!
-
-Pawe?
+-- 
+Alexander Shiyan <shc_work@mail.ru>
