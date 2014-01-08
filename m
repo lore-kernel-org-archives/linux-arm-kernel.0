@@ -1,45 +1,34 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 8 Jan 2014 12:24:34 -0800
-Subject: [PATCH v3] ARM: imx: add select on ARCH_MXC for cpufreq support
-In-Reply-To: <1389211403.678513817@f123.i.mail.ru>
-References: <1389210991-23688-1-git-send-email-john.tobias.ph@gmail.com>
- <1389211403.678513817@f123.i.mail.ru>
-Message-ID: <CACUGKYNnbQQAkw2=NxBhyrgvrwsOoTCqS4qzP1SYev+tXaMGDQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 8 Jan 2014 12:26:13 -0800
+Subject: [PATCH RFC 1/3] drivers: base: support cpu cache information
+ interface to userspace via sysfs
+In-Reply-To: <1389209168-17189-2-git-send-email-sudeep.holla@arm.com>
+References: <1389209168-17189-1-git-send-email-sudeep.holla@arm.com>
+ <1389209168-17189-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140108202613.GD8417@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-thanks for the info. Will fix it.
-
-On Wed, Jan 8, 2014 at 12:03 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Hello.
->
-> ?????,  8 ?????? 2014, 11:56 -08:00 ?? John Tobias <john.tobias.ph@gmail.com>:
->> Moved ARCH_HAS_CPUFREQ, HAVE_IMX_ANATOP and PM_OPP on ARCH_MXC so that
->> the user can enable the cpufreq support for iMX6Q and/or iMX6SL.
->>
->> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
->> ---
->>  arch/arm/mach-imx/Kconfig | 13 ++++++-------
->>  1 file changed, 6 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index 7a6e6f7..3c326be 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -1,5 +1,6 @@
->>  config ARCH_MXC
->>       bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
->> +     select ARCH_HAS_CPUFREQ
->>       select ARCH_REQUIRE_GPIOLIB
->>       select ARM_CPU_SUSPEND if PM
->>       select ARM_PATCH_PHYS_VIRT
->> @@ -9,8 +10,10 @@ config ARCH_MXC
->>       select GENERIC_ALLOCATOR
->>       select GENERIC_CLOCKEVENTS
->>       select GENERIC_IRQ_CHIP
->> +     select HAVE_IMX_ANATOP
->
-> Maybe better:
-> select HAVE_IMX_ANATOP if ARCH_MULTI_V6_V7
->
+On Wed, Jan 08, 2014 at 07:26:06PM +0000, Sudeep Holla wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
+> 
+> This patch adds initial support for providing processor cache information
+> to userspace through sysfs interface. This is based on x86 implementation
+> and hence the interface is intended to be fully compatible.
+> 
+> A per-cpu array of cache information maintained is used mainly for
+> sysfs-related book keeping.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
+>  drivers/base/Makefile     |   2 +-
+>  drivers/base/cacheinfo.c  | 296 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cacheinfo.h |  43 +++++++
+>  3 files changed, 340 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/base/cacheinfo.c
+>  create mode 100644 include/linux/cacheinfo.h
+
+You are creating sysfs files, yet you didn't add Documentation/ABI/
+information, which is required.  Please fix that.
+
+greg k-h
