@@ -1,57 +1,39 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed, 08 Jan 2014 21:24:16 +0000
-Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <20140108182906.GH2941@lukather>
-References: <20140107220310.GD3103@lukather>
- <1389200137.27473.6.camel@kazak.uk.xensource.com>
- <20140108182906.GH2941@lukather>
-Message-ID: <1389216256.7769.39.camel@hastur.hellion.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jan 2014 21:25:12 +0000
+Subject: [PATCH RFC 24/46] imx-drm: provide common connector mode
+ validation function
+In-Reply-To: <20140107063803.GB12346@S2101-09.ap.freescale.net>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypnw-0007F7-EB@rmk-PC.arm.linux.org.uk>
+ <20140107063803.GB12346@S2101-09.ap.freescale.net>
+Message-ID: <20140108212512.GQ27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-01-08 at 19:29 +0100, Maxime Ripard wrote:
-> On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
-> > On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
-> > > Another nice thing about it is that a FEX-to-DT compiler comes at no
-> > > cost afterwards. Since dtc is able to generate a DTS from
-> > > /proc/device-tree, you can easily generate a DTS for your previously
-> > > non-supported board using
-> > > 
-> > >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
-> > 
-> > I wonder if it might also be useful to compile this as a normal user
-> > space application which takes the fex and produces the dtb (or dts)?
+On Tue, Jan 07, 2014 at 02:38:05PM +0800, Shawn Guo wrote:
+> On Thu, Jan 02, 2014 at 09:27:48PM +0000, Russell King wrote:
+> > diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+> > index 5649f180dc44..4eb594ce9cff 100644
+> > --- a/drivers/staging/imx-drm/imx-drm.h
+> > +++ b/drivers/staging/imx-drm/imx-drm.h
+> > @@ -68,4 +68,7 @@ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
+> >  int imx_drm_encoder_add_possible_crtcs(struct imx_drm_encoder *imx_drm_encoder,
+> >  		struct device_node *np);
+> >  
+> > +int imx_drm_connector_mode_valid(struct drm_connector *connector,
+> > +	struct drm_display_mode *mode);
+> > +
+> >  #endif /* _IMX_DRM_H_ */
 > 
-> At the moment, no, libfdt only operates on DTB, so we would have to
-> chain this somehow with dtc to at least do the DTB to DTS conversion I
-> guess.
-> 
-> It's not something that I'm pretty fond of either. Or, I don't really
-> see the benefit of it.
-> 
-> Let's say that you have such tool, I'm guessing one would want it to
-> mass-convert fex files to DT. But then, you'd still have to boot that
-> DT to be sure that everything is working, so you're pretty much losing
-> the mass-convertion thing, since you would have boot this with a
-> baremetal babelfish anyway.
+>   CC      drivers/staging/imx-drm/ipu-v3/ipu-dc.o
+>   LD      net/ethernet/built-in.o
+> In file included from drivers/staging/imx-drm/ipu-v3/ipu-dc.c:23:0:
+> drivers/staging/imx-drm/ipu-v3/../imx-drm.h:56:9: warning: ?struct drm_display_mode? declared inside parameter list [enabled by default]
+> drivers/staging/imx-drm/ipu-v3/../imx-drm.h:56:9: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
 
-I wasn't really thinking of mass conversion. just an easy way for people
-to produce a starting point for their platform to send upstream.
+Thanks, fixed.
 
-> > I suppose producing something upstreamable would be different/harder
-> > though, since it would need to not inline/merge the dtsi file but just
-> > leave the include stmt. That's probably a different tool.
-> 
-> Yeah, dtc outputs a "flat" DTS, without any include, so you still need
-> to edit it by hand to remove the common part, remove the duplicated
-> pinctrl nodes, fix the phandle, etc.
-> 
-> But most of that can be scripted I guess.
-
-I think this could be done as a separate tool which read a FEX and
-outputted the dts directly (i.e. with printf). The output would have the
-#include for the right dtsi in place and the appropriate overrides
-derived from the FEX. That's not really anything like your
-sunxi-babelfish though.
-
-Ian.
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
