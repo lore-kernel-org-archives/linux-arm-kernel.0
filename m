@@ -1,116 +1,73 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Wed, 8 Jan 2014 18:39:52 +0530
-Subject: [PATCH V4 1/2] Phy: Exynos: Add Exynos5250 sata phy driver
-In-Reply-To: <2078358.4WniMksEuS@amdc1032>
-References: <1388408823-4963-1-git-send-email-yuvaraj.cd@samsung.com>
- <11600750.UKZ7EpemHS@amdc1032>
- <CAKuRcOJVQ9U_4rpUf-6+=nbO=UoNkkTU5ttmRqfWxi4_nh7fag@mail.gmail.com>
- <2078358.4WniMksEuS@amdc1032>
-Message-ID: <CAKuRcOK73rpH_qJu-tNRjsBNA20B0_w7EiA-Xw6vVTc-arygkA@mail.gmail.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 8 Jan 2014 18:48:08 +0530
+Subject: [PATCH V5 0/4] DRIVERS: IRQCHIP: Add support for crossbar IP
+In-Reply-To: <20140107235514.GG5074@atomide.com>
+References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
+ <52B168A5.4010202@ti.com> <52BBB614.5010707@ti.com> <52BC6B16.80507@ti.com>
+ <52BD856E.7010609@ti.com> <52C11284.2030500@ti.com>
+ <20140107230733.GD5074@atomide.com> <20140107235514.GG5074@atomide.com>
+Message-ID: <52CD5010.6030309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 7:52 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Thursday, January 02, 2014 07:03:23 PM Yuvaraj Kumar wrote:
->> On Tue, Dec 31, 2013 at 9:00 PM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->
->> >> @@ -8,3 +8,4 @@ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)   += phy-exynos-mipi-video.o
->> >>  obj-$(CONFIG_PHY_MVEBU_SATA)         += phy-mvebu-sata.o
->> >>  obj-$(CONFIG_OMAP_USB2)                      += phy-omap-usb2.o
->> >>  obj-$(CONFIG_TWL4030_USB)            += phy-twl4030-usb.o
->> >> +obj-$(CONFIG_EXYNOS5250_SATA_PHY)    += sata_phy_exynos5250.o exynos5250_phy_i2c.o
->> >
->> > Will this compile/work without I2C support?
->> No.I missed this.It will not compile without I2C support.
->> How about  below change in drivers/phy/Kconfig ?
->> config EXYNOS5250_SATA_PHY
->> select I2C
->> select I2C_S3C2410
->
-> Fine with me.
->
->> > CONFIG_EXYNOS5250_SATA_PHY doesn't require it currently.
->> I didnt get this. what it doesn't require?
->
-> It doesn't require I2C.  If you add above I2C selects it will be OK.
->
->> >> +struct i2c_driver sataphy_i2c_driver = {
->> >
->> > Keeping it global together with sataphy_attach_i2c_client() is not very
->> > nice.  I've talked with our local device tree guru (a.k.a. Tomasz Figa)
->> > about this and it may be that this i2c driver is not even necessary.
->> Can you elaborate more on this?
->
-> The usage of the global i2c driver is not a proper solution.
->
-> i2c driver should register itself in the driver init function
-do you mean i2c-s3c2410.c driver?
-> (which is not present currently) instead of being registered by
-> the SATA PHY driver.
->
-> The SATA PHY driver should find i2c client device using DT.
->
-> sataphy_attach_i2c_client() should then be removed.
->
->> > If you manage to extract i2c adapter and address data from the device
->> > tree (using proper of_* methods) they can be used instead of i2c client
->> > data in the SATA PHY driver.
->> I think the above is true, if the complete SATA PHY controller sits on
->> the i2c adapter.
->> But in Exynos5250 case,only the few configurations ( CMU and TRSV
->> blocks ) SATA PHY
->> are done through I2C(channel 9). Correct me if i am wrong.
->
-> Well, it shouldn't matter if all or only some of the configuration of
-> the SATA PHY controller is done through i2c.
->
-> Anyway, how about another idea -> adding a new phandle of i2c client
-> device to SATA PHY DT entry and using DT in the SATA PHY driver to
-> find i2c client device?
->
-> i.e. "samsung,exynos-sataphy-i2c-phandle" property in SATA PHY
-> controller DT entry can point at existing "sata-phy at 38" sataphy i2c
-> client DT entry (by adding new label to it, i.e. "sata_phy_i2c").
->
-> Such new phandle can be used first to find the DT device node of i2c
-> device (by using of_parse_phandle(), if it returns NULL the error
-> should be returned) and then later to find proper i2c client device
-> (by using of_find_i2c_device_by_node(), if it returns NULL deferred
-> probing should be requested by returning -EPROBE_DEFER).
-I can get the i2c_client structure,but how the client driver binding
-happens to registered device?
-Currently with this approach i2c client device is being registered but
-cleint driver could not able to bind with the device.
-[    0.082680] i2c i2c-9: adapter [s3c2410-i2c] registered
-[    0.082691] i2c i2c-9: of_i2c: walking child nodes
-[    0.082696] i2c i2c-9: of_i2c: register /i2c at 121D0000/sata-phy at 38
-[    0.082794] i2c 9-0038: uevent
-[    0.082845] i2c i2c-9: client [exynos-sataphy-i2c] registered with
-bus id 9-0038
-[    0.082851] s3c-i2c 121d0000.i2c: i2c-9: S3C I2C adapter
->
-> i2c at 121D0000 {
->         ...
->         sata_phy_i2c: sata-phy at 38 {
->                 ...
->         };
->         ...
-> };
->
-> sata_phy: sata-phy at 12170000 {
->         ...
->         samsung,exynos-sataphy-i2c-phandle = <&sata_phy_i2c>;
->         ...
-> };
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
+Hi Tony,
+
+On Wednesday 08 January 2014 05:25 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [140107 15:10]:
+>> * Sricharan R <r.sricharan@ti.com> [131229 22:30]:
+>>> On Friday 27 December 2013 07:19 PM, Sricharan R wrote:
+>>>> On Thursday 26 December 2013 11:14 PM, Santosh Shilimkar wrote:
+>>>>> On Wednesday 25 December 2013 11:52 PM, Sricharan R wrote:
+>>>>>> On Wednesday 18 December 2013 02:49 PM, Sricharan R wrote:
+>>>>>>> I have addressed all the comments on this series, can this be merged now ?
+>>>>>>>
+>>>>>>   Ping..
+>>>>>>
+>>>>> Thomas has already given his reviewed-by tag so the patches can be
+>>>>> taken via arm-soc tree considering OMAP and GIC changes. Can you
+>>>>> create a branch with all these patches applied and send it
+>>>>> to Tony ?
+>>>>>
+>>>> Ok, i will send out a branch for this.
+>>>>
+>>>  
+>>>  I have pushed the below branch
+>>>
+>>> git://github.com/Sricharanti/sricharan.git
+>>> branch: crossbar
+>>>
+>>> This is on top of Tony's linux-omap master branch
+>>
+>> The linux-omap master branch cannot be used as a base as it
+>> contains tons of commit history not in mainline. So I'll
+>> manually applied these patches into omap-for-v3.14/crosbar
+>> branch.
+> 
+> Oops, I noticed some errors on these:
+> 
+> WARNING: drivers/built-in.o(.text+0xcd0): Section mismatch in reference from the function irqcrossbar_init() to the function .init.text:crossbar_of_init()
+> The function irqcrossbar_init() references
+> the function __init crossbar_of_init().
+> This is often because irqcrossbar_init lacks a __init 
+> annotation or the annotation of crossbar_of_init is wrong.
+> 
+> WARNING: drivers/built-in.o(.text+0xcdc): Section mismatch in reference from the function irqcrossbar_init() to the (unknown reference) .init.rodata:(unknown)
+> The function irqcrossbar_init() references
+> the (unknown reference) __initconst (unknown).
+> This is often because irqcrossbar_init lacks a __initconst 
+> annotation or the annotation of (unknown) is wrong.
+> 
+> So I've dropped them for now. Care to fix up those errors and
+> base your patches against let's say v3.13-rc5?
+> 
+   Very Sorry for the section mismatch warning.
+   I have fixed it and pushed a new branch below based on v3.13-rc5
+
+   git://github.com/Sricharanti/sricharan.git
+   branch: crossbar_3.13_rc5
+
+Regards,
+ Sricharan
+
+   
+  
