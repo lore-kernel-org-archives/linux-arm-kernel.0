@@ -1,40 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 8 Jan 2014 09:06:11 -0500
-Subject: [BUG] More select madness - keystone
-In-Reply-To: <52CCD029.6090404@ti.com>
-References: <20140102172625.GC7383@n2100.arm.linux.org.uk>
- <52C5BB4A.6010802@ti.com> <52C5BFE3.6050408@ti.com> <52CCD029.6090404@ti.com>
-Message-ID: <52CD5B53.6040704@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Jan 2014 15:07:54 +0100
+Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
+In-Reply-To: <20140108133958.GA15182@katana>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140107183853.GE4227@obsidianresearch.com> <20140107230610.GB2592@katana>
+ <52CD2529.6090206@free-electrons.com> <20140108112926.GB2669@katana>
+ <52CD4CBE.6010902@free-electrons.com> <20140108133958.GA15182@katana>
+Message-ID: <52CD5BBA.4080600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014 11:12 PM, Sekhar Nori wrote:
-> On Friday 03 January 2014 01:07 AM, Santosh Shilimkar wrote:
->> On Thursday 02 January 2014 02:17 PM, Santosh Shilimkar wrote:
->>> On Thursday 02 January 2014 12:26 PM, Russell King - ARM Linux wrote:
->>>> warning: (ARCH_KEYSTONE && SPI_DAVINCI) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
+Hi Wolfram,
+
+On 08/01/2014 14:39, Wolfram Sang wrote:
+> 
+>>>>>> However, when I first read this I thought it should be a -a0 specific
+>>>>>> compatible string, not a 'offload-broken' property - any idea what the
+>>>>>> DT consensus is here? I've seen both approach in use ..
+>>>>>
+>>>>> I prefer the replacement of the compatible string. If it should really
+>>>>> be a seperate property, then it should be a vendor specific property. It
+>>>>> is not generic, at all.
 >>>>
->>>> This results in the EDMA engine code not being built.  Yet another
->>>> example of why improper use of the "select" statement is bad news
->>>> and leads to broken configurations.
->>>>
->>> Thanks for reporting Russell. Will have a look.
+>>>> Something like "marvell,offload-broken" would be acceptable?
 >>>
->> Just to be clear for records, the select was introduced before
->> KEYSTONE support was enabled. As per git blame, it came via commit
->> b5f1433059 {spi: davici - make davinci select edma}.
+>>> A tad more, yes. Still, since this is a feature/quirk of the IP core
+>>> revision, it should be deduced from the compatible property IMO. It
+>>> cannot be configured anywhere, so it doesn't change on board level.
+>>
+>> So you would prefer using the "marvell,mv78230-a0-i2c" comaptible string and
+>> updating it with the follwing piece of code?
 > 
-> I don't quite recall why this was needed and the commit description does
-> not help. Anyway, this is not needed - at least with current code. I
-> verified that the DaVinci SPI driver builds correctly with TI_EDMA
-> switched off. I can send a revert.
-> 
-Please do...
+> This is the approach I favour, yes. Can't say much about the
+> implementation. Looks OK, but dunno if this is minimal...
 
-> BTW, it looks like arch/arm/mach-keystone/Kconfig has a select for
-> TI_EDMA as well and that needs to be removed too.
-> 
-I have patch to kill that. Will be posting that.
+Allocating memory in each loop could seem convoluted. In my first approach
+I just used a static struct but I got warning during boot about duplicated
+node. It seems we can use the same property struct for two different nodes.
 
-Regards,
-Santosh
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
