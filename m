@@ -1,67 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jan 2014 13:46:54 +0000
-Subject: [PATCH v4 11/37] mtd: st_spi_fsm: Search for preferred FSM message
- sequence configurations
+Date: Wed,  8 Jan 2014 13:46:55 +0000
+Subject: [PATCH v4 12/37] mtd: st_spi_fsm: Fetch platform specific
+ configurations
 In-Reply-To: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
 References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1389188840-14306-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1389188840-14306-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we provide a means to traverse though all supplied FSM message
-sequence configurations and pick one based on our chip's capabilities.
-The first one we match will be the preferred one, as they are
-presented in order of preference.
+All supported platforms are able to pass specific configurations via
+the Device Tree on boot. Here we add a function which is to be called
+during the probing process which will extract them, or make other
+assumptions based on capabilities provided.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index a70e916..efd8fdb 100644
+index efd8fdb..1803f94 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -258,6 +258,18 @@ struct stfsm_seq {
- 	uint32_t seq_cfg;
- } __packed __aligned(4);
- 
-+/* Parameters to configure a READ or WRITE FSM sequence */
-+struct seq_rw_config {
-+	uint32_t        flags;          /* flags to support config */
-+	uint8_t         cmd;            /* FLASH command */
-+	int             write;          /* Write Sequence */
-+	uint8_t         addr_pads;      /* No. of addr pads (MODE & DUMMY) */
-+	uint8_t         data_pads;      /* No. of data pads */
-+	uint8_t         mode_data;      /* MODE data */
-+	uint8_t         mode_cycles;    /* No. of MODE cycles */
-+	uint8_t         dummy_cycles;   /* No. of DUMMY cycles */
-+};
-+
- /* SPI Flash Device Table */
- struct flash_info {
- 	char            *name;
-@@ -493,6 +505,21 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
- 	}
+@@ -654,6 +654,16 @@ static int stfsm_init(struct stfsm *fsm)
+ 	return 0;
  }
  
-+/* Search for preferred configuration based on available flags */
-+static struct seq_rw_config *
-+stfsm_search_seq_rw_configs(struct stfsm *fsm,
-+			    struct seq_rw_config cfgs[])
++static void stfsm_fetch_platform_configs(struct platform_device *pdev)
 +{
-+	struct seq_rw_config *config;
-+	int flags = fsm->info->flags;
++	struct stfsm *fsm = platform_get_drvdata(pdev);
++	struct flash_info *info = fsm->info;
 +
-+	for (config = cfgs; config->cmd != 0; config++)
-+		if ((config->flags & flags) == config->flags)
-+			return config;
-+
-+	return NULL;
++	/* Use device size to determine address width */
++	if (info->sector_size * info->n_sectors > 0xFFFFFF)
++		info->flags |= FLASH_FLAG_32BIT_ADDR;
 +}
 +
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ static int stfsm_probe(struct platform_device *pdev)
  {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -712,6 +722,8 @@ static int stfsm_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, fsm);
+ 
++	stfsm_fetch_platform_configs(pdev);
++
+ 	fsm->mtd.dev.parent	= &pdev->dev;
+ 	fsm->mtd.type		= MTD_NORFLASH;
+ 	fsm->mtd.writesize	= 4;
 -- 
 1.8.3.2
