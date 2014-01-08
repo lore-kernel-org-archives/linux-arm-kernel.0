@@ -1,35 +1,50 @@
 From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Wed,  8 Jan 2014 18:07:16 -0500
-Subject: [RFC 0/5] Nand
-In-Reply-To: <87siupheou.fsf@nbsps.com>
+Date: Wed,  8 Jan 2014 18:07:19 -0500
+Subject: [RFC 3/5] mtd:fsl_nfc: Add device tree documentation.
+In-Reply-To: <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
 References: <87siupheou.fsf@nbsps.com>
-Message-ID: <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+ <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+Message-ID: <1389222441-4322-4-git-send-email-bpringlemeir@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an update of a driver originally by Shaohui Xie <b21989@freescale.com>
-and then updated by Jason Jin <Jason.jin@freescale.com>.  It is used and tested
-on the Vybrid Tower system (VF610-TWR).  However, the 'fsl_nfc' is present on
-many Freescale SOC devices.  Such as the MPC5125 (PowerPC), MCF54418 (ColdFire)
-and the Kinetis K70 (ARM Cortex-M).
 
-The code in this patch is about 4x faster than other versions on the Internet,
-at least with the Vybrid SOC and gcc-4.8.  Currently the MTD OOB test fails with
-or without hardware ECC.  All of the other tests print 'success'.
+Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+---
+ Documentation/devicetree/bindings/mtd/fsl-nfc.txt | 25 +++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/fsl-nfc.txt
 
-The current 'device tree' bindings for the 'vf610-twr' will testing of the entire
-flash device.  A command line option such as,
-
- mtdparts=fsl_nfc:256k(loader),8M(boot0),8M(boot1),-(root)
-
-can be used to partion the existing NAND flash or the 'vf610-twr.dts' can be 
-modified to add some similar partitions. 
-
-cumentation/devicetree/bindings/mtd/fsl-nfc.txt |  25 ++++
- arch/arm/boot/dts/vf610-twr.dts                   |  41 +++++++
- arch/arm/boot/dts/vf610.dtsi                      |   9 ++
- arch/arm/mach-imx/Kconfig                         |   1 +
- drivers/mtd/nand/Kconfig                          |  13 +++
- drivers/mtd/nand/Makefile                         |   1 +
- drivers/mtd/nand/fsl_nfc.c                        | 790 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 880 insertions(+)
+diff --git a/Documentation/devicetree/bindings/mtd/fsl-nfc.txt b/Documentation/devicetree/bindings/mtd/fsl-nfc.txt
+new file mode 100644
+index 0000000..1d339b1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/fsl-nfc.txt
+@@ -0,0 +1,25 @@
++* Freescale's NFC (nand flash controller)
++
++Required properties:
++- compatible : "fsl,XXX-nfc"
++- reg : Address range of the mtd chip
++- interrupts: Should contain the STMMAC interrupts
++- nand-bus-width: see nand.txt
++- nand-ecc-mode: see nand.txt
++- nand-on-flash-bbt: see nand.txt
++- clock-frequency : Optional clock rate to NFC in Hz
++- #address-cells, #size-cells : Must be present if the device has sub-nodes
++  representing partitions.
++
++Example:
++
++	nfc: nand at 400e0000 {
++		compatible = "fsl,vf610-nfc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x400e0000 0x4000>;
++		interrupts = <0 83 0x04>;
++		clocks = <&clks VF610_CLK_NFC>;
++		clock-names = "nfc";
++		clock-frequency = <33000000>;
++	};
+-- 
+1.8.0.2
