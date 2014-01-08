@@ -1,46 +1,70 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 08 Jan 2014 17:00:53 +0100
-Subject: [PATCH 1/2] ohci-platform: Add support for devicetree
- instantiation
-In-Reply-To: <52CA603B.3070203@redhat.com>
-References: <1388963080-12544-1-git-send-email-hdegoede@redhat.com>
- <201401060816.02998.arnd@arndb.de> <52CA603B.3070203@redhat.com>
-Message-ID: <52CD7635.8040102@redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 08 Jan 2014 16:01:03 +0000
+Subject: [RFC 02/18] power/reset: vexpress: Use sched_clock as the time
+ source
+In-Reply-To: <CANcMJZALQ0khcqkdQA5Tnr6_9kfWK=UUmrUB4mCv2MEkmLv0sg@mail.gmail.com>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-3-git-send-email-pawel.moll@arm.com>
+ <CANcMJZALQ0khcqkdQA5Tnr6_9kfWK=UUmrUB4mCv2MEkmLv0sg@mail.gmail.com>
+Message-ID: <1389196863.23721.20.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2013-12-23 at 19:28 +0000, John Stultz wrote:
+> On Mon, Dec 23, 2013 at 8:23 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > At this stage of system shutdown procedure the jiffies may
+> > not be updated anymore, so have to base on raw sched_clock
+> > values.
+> >
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Anton Vorontsov <anton@enomsg.org>
+> > Cc: David Woodhouse <dwmw2@infradead.org>
+> > ---
+> >  drivers/power/reset/vexpress-poweroff.c | 7 ++++---
+> >  1 file changed, 4 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
+> > index 476aa49..d752233 100644
+> > --- a/drivers/power/reset/vexpress-poweroff.c
+> > +++ b/drivers/power/reset/vexpress-poweroff.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/sched.h>
+> >  #include <linux/stat.h>
+> >  #include <linux/vexpress.h>
+> >
+> > @@ -27,12 +28,12 @@ static void vexpress_reset_do(struct device *dev, const char *what)
+> >                         vexpress_config_func_get_by_dev(dev);
+> >
+> >         if (func) {
+> > -               unsigned long timeout;
+> > +               unsigned long long timeout_ns;
+> >
+> >                 err = vexpress_config_write(func, 0, 0);
+> >
+> > -               timeout = jiffies + HZ;
+> > -               while (time_before(jiffies, timeout))
+> > +               timeout_ns = sched_clock() + 50000000;
+> > +               while (!err && time_before64(sched_clock(), timeout_ns))
+> >                         cpu_relax();
+> >         }
+> 
+> So this may not be a problem in this particular case, but sched_clock
+> could be backed by jiffies on some hardware, causing the same problem
+> to appear.
 
-On 01/06/2014 08:50 AM, Hans de Goede wrote:
+Uh, right. As you guessed, on vexpress sched_clock, once registered, is
+always available. But of course I shouldn't fully rely on this.
 
-<snip>
+> Might udelay/mdelay be a better fit for this sort of case (since
+> udelay may be counter backed, but may also be loop backed on hardware
+> without continuous counters)?
 
->> Otherwise you don't know the difference between "no clock
->> provided", "error getting the clock reference" and "clock controller not
->> initialized yet, try again".
->
-> I guess of these 3 we really only want to continue on "no clock provided",
-> so I think something like this (for both clks and the phy) would be best:
->
->          priv->ahb_clk = devm_clk_get(&dev->dev, "ahb");
->          if (IS_ERR(priv->ahb_clk)) {
->              err = PTR_ERR(priv->ahb_clk);
->              if (err != -EINVAL && err != -ENODATA)
->                  goto err_put_hcd;
->              priv->ahb_clk = NULL; /* No clock provided */
->          }
->
-> To clarify -EINVAL will be returned when there is no clock-names, and
-> -ENODATA when the specified name is not found in clock-names.
+I'm sure I though about udelay, but for some reason decided against it.
+The reason may be already invalid, so I'll check it again :-)
 
-Ok, so I've got this wrong, if there is no clk by that name specified
-in dt -ENOENT will be returned. Actually -ENOENT is the only
-error clk_get and thus devm_clk_get will ever return.
+Thanks!
 
-So it seems that clk_get currently is not properly passing along
-probe-deferral. To make things future proof I will add a probe
-deferral check to the next version of my patch.
-
-Regards,
-
-Hans
+Pawe?
