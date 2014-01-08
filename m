@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jan 2014 21:02:28 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 08 Jan 2014 16:08:42 -0500 (EST)
 Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
 In-Reply-To: <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
 References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
@@ -7,37 +7,43 @@ References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
  <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
  <20140108192028.GM27432@n2100.arm.linux.org.uk>
  <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
-Message-ID: <20140108210228.GO27432@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.10.1401081600370.1851@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 11:43:29AM -0800, Doug Anderson wrote:
-> Olof came up with the idea that you could update the RW firmware
-> (affects initial boot) and then cache away the value and restore it in
-> the kernel after resume.  That would still require a kernel patch but
-> perhaps a less objectionable one.  ...of course if writing this
-> register is a problem in secure mode then maybe that patch would be
-> NAKed anyway.
+On Wed, 8 Jan 2014, Doug Anderson wrote:
 
-It's not a problem in secure mode, since secure mode will have access
-to the register.  It's the non-secure mode where various registers
-either ignore writes, or they trigger an exception that are the problem.
+> Hi,
+> 
+> On Wed, Jan 8, 2014 at 11:20 AM, Russell King - ARM Linux
+> > No, we're saying to put the work-around in the boot loader, not the kernel.
+> 
+> Unfortunately the resume path of the firmware runs from Read Only 
+> firmware code (yes, it sucks), so it's not totally trivial to fix. It 
+> would be possible for someone to unscrew their write protect switch 
+> and update their RO firmware, but that doesn't help the average user.
 
-Consider what would happen if an exception were to be triggered when no
-exception handlers were installed (eg, because the MMU is not enabled.)
+[...]
 
-> That's one I didn't think about, you're right.  ...but we're really
-> getting into hypothetical situations here.  Are there any r2p0
-> products that have such a fix (and thus require a latency of >= 4)?
+> I'd guess that the way forward is:
+> 
+> * Land kernel workaround locally in Chromium tree
+> 
+> * I'll try to land FW change locally in at least one Chromium branch.
+> If we were to get a new RO build ever (seems unlikely at this point)
+> it would be fixed for upstream kernels.  If we were to get a new RW
+> build (seems unlikely, but at least less unlikely) it would be fixed
+> if someone landed a kernel patch to save/restore this register across
+> suspend/resume.
+> 
+> * If Joe Upstream wants to run an upstream kernel on some type of
+> exynos5250 product (Samsung ARM Chromebook, HP Chromebook 11, Nexus 10
+> are the ones I know of) then he will deal with the small number of
+> crashes or figure out a solution.
 
-Really, we can't know, because this kind of information is dependent on
-the SoC, and probably such customisations are only knowable via NDAs.
+If Joe Upstream wants to run an upstream kernel, doesn't he have to 
+unscrew his write protect switch first, at which point the RO firmware 
+can be updated as well?
 
-However, I do know of some A9 CPUs where exactly this kind of thing has
-happened - where various selected silicon bugs have been fixed but the
-revision still reports the same as one with all those bugs.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Nicolas
