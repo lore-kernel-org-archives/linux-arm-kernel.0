@@ -1,118 +1,89 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 8 Jan 2014 08:21:21 -0800
-Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
-In-Reply-To: <20140108143529.GB14122@mudshark.cambridge.arm.com>
-References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
- <20140108143529.GB14122@mudshark.cambridge.arm.com>
-Message-ID: <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jan 2014 17:25:17 +0100
+Subject: [PATCH] driver-core: platform: Resolve DT interrupt references
+ late
+In-Reply-To: <20140108155855.GA22984@ulmo.nvidia.com>
+References: <20140108011957.GK5074@atomide.com> <6734073.GzLvMSsKrR@wuerfel>
+ <20140108155855.GA22984@ulmo.nvidia.com>
+Message-ID: <201401081725.17876.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WIll,
+On Wednesday 08 January 2014, Thierry Reding wrote:
+> On Wed, Jan 08, 2014 at 04:11:08PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 08 January 2014 15:55:27 Thierry Reding wrote:
+> > > It stands to reason that if they push back on the IOMMU variant of what
+> > > is essentially the same thing, they will push back on the IRQ variant as
+> > > well. One alternative I proposed was to, just as you suggested earlier,
+> > > move the code into platform_drv_probe() or rather a function called from
+> > > it. That proposal never got any replies, though.
+> > > 
+> > > 	https://lkml.org/lkml/2013/12/14/39
+> > 
+> > I guess putting it into the platform_drv_probe function seems reasonable,
+> > I would be more scared of the implications of a notifier based method.
+> 
+> I fully agree. Of course if we decide against moving things into the
+> core and in favour of a more generic API that drivers should use, then
+> this issue goes away silently at least for resources that the driver
+> needs to use explicitly (memory-mapped regions, interrupts, ...).
+> 
+> The issue remains for IOMMU which is meant to be used transparently
+> through the DMA API. Perhaps a good compromise would be to have some
+> sort of generic helper that can be called to initialize IOMMU support
+> for a particular device and support probe deferral on error. Something
+> like this perhaps:
+> 
+> 	int iommu_attach(struct device *dev);
+> 	int iommu_detach(struct device *dev);
+> 
+> I still don't like very much how that needs to be done in each driver
+> explicitly, but if we can't do it in the core, then the only other clean
+> way to handle it would be to treat it like any other sort of resource
+> and handle it explicitly. Perhaps handing out some sort of cookie would
+> be preferable to just an error code?
 
-Thanks for your comments!
+The more I think about the iommu case, the more I am convinced that it
+does belong into the core, in whatever form we can find. As far as I
+can tell from the little reliable information I have on the topic, I
+would assume that we can keep it in the DT probing code, as there won't
+be a need for multiple arbitrary IOMMUs with ACPI or with board files.
 
-On Wed, Jan 8, 2014 at 6:35 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jan 08, 2014 at 01:33:11PM +0000, Vivek Gautam wrote:
->> The erratum-773769 occurs on Arm Coretex-A15 (rev r2p0),
->> when L2 Data Ram latency is set to 4 cycles or more; or
->> when ACP is in use, or with L2 Data RAM slice configured.
->> Therefore, the effective latency as calculated in Table 7-2 of
->> Cotex-A15 (rev r2p0) trm should be 3 cycles or less.
->>
->> On Exynos5250 based systems the effective data ram latency
->> is 4 cycles, since we have DATA_RAM_SETUP bit enabled (L2CTRL[5]=1b'1)
->> and DATA_RAM_LATENCY bits set to 0x2 (L2CTLR[2:0]=3b'010) therefore,
->> the effective L2 data RAM latency becomes 4 cycles.
->> So erratum '773769' occurs causing a corrupted L2 Cache.
->>
->> This patch gives a workaround to the mentioned erratum, using below
->> mentioned algo:
->> ----------------------------------------------------------------
->> if data RAM setup = 1
->>   then check if effective latency i.e (latency + setup + 1) > 3
->>   if 'true'
->>     then clear data RAM setup
->>       goto branch 'a'
->> if data RAM setup = 0
->>   a: then check if data RAM latency > 0x10
->>     if true then force data RAM latency = 0x10
->> ----------------------------------------------------------------
->> so that the effective data RAM latency reduces to 3 cycles or less
->> and hence prevent hitting the erratum.
->>
->> NOTE: The Exynos5250 based products have already been shipped, which
->>       makes it impossible to add the change in bootloader, so we are
->>       adding the required change in kernel.
->
-> NAK. Whilst I appreciate that you may not be able to fix your bootloader,
-> this isn't the right change to make in the kernel. Blindly changing memory
-> latencies is likely to do more harm than good for a multi-platform kernel,
-> even if it works for exynos 5250. The only alternative I can think of (if you
-> have to make a mainline kernel change) is to restrict the clock frequencies at
-> which the CPU is allowed to run, although that obviously requires some
-> investigation in order to determine how viable it is for your SoC.
+> > > One downside of that approach is that, while it maps well to platform
+> > > devices or generic devices that have some sort of firmware interface
+> > > such as OF or ACPI, I don't see how it can be made to work with an I2C
+> > > client that's registered from board setup code for example. Well, I
+> > > suppose that problem could be solved by throwing another lookup table at
+> > > it, just like we do for clocks, regulators, PWMs and GPIOs.
+> > 
+> > Wouldn't you still be able to attach resources in the traditional
+> > way for those, but use the same new interface to get at them?
+> 
+> I wouldn't know how. For instance platform devices store the IRQ number
+> within a struct resource of type IORESOURCE_IRQ, whereas I2C clients
+> store them in the struct i2c_client's .irq field.
 
-OK, so humor me a little here...
+Good point, I forgot about the special case for i2c_client->irq.
+I looked now and noticed that very few i2c devices actually use this
+field, but larger number uses platform_data, which has a similar
+problem.
 
-I'll start off by saying that I'm totally OK if mainline doesn't want
-this fixed.  If mainline is not interested in running reliably on
-exynos5250-based products then there's nothing I can do about it.  It
-seems unfortunate, but I'm not going to get into a shouting match
-about it.
+> So without actually introspecting the struct device (possibly using the
+> .bus field for example) and upcasting you won't know how to get at the
+> resources. One possibility to remedy that would be to try and unify the
+> resources within struct device. But that doesn't feel right.
+> 
+> One other thing I had considered at one point was to extend the bus_type
+> structure and give it a way to obtain resources in a bus-specific way,
+> but that feel even more wrong.
+> 
+> Perhaps I'm missing something obvious, though, and this is actually much
+> more trivial to solve.
 
-You're saying that this patch is blindly changing memory latencies.  I
-don't think it is (please correct me if I'm wrong!).  This patch:
+No trivial solution that I can see. I think we can deal with the case
+where platform code uses platform_device->resources, and everything else
+comes down to having multiple code branches in the driver, as we already
+have to deal with platform_data and DT properties describing stuff that
+doesn't fit in the resources.
 
-* Is guarded by a CONFIG option so the code isn't even compiled in if
-you don't want EXYNOS5250 support.  I know this doesn't help
-multiplatform, but it means that if you really hate the code it's easy
-to disable.
-
-* Is guarded by a runtime check of the revision number so that it
-doesn't run on unaffected A15 revisions.
-
-* Is guarded by a runtime check so it does nothing at all if the total
-latency is <= 3 (AKA if boot code already picked a sane value)
-
-...with the above guards it's pretty safe...
-
-I will agree that there is a _potential_ that this could make things
-work worse on an already broken product our there, but I would say
-there's a reasonable chance that such a product doesn't exist (but
-please correct me if I'm wrong).  Specifically, this patch will cause
-problems in two examples that I can think of:
-
---
-
-Example A: existing A15 <=r2p0 product with 773769-ignorant boot code
-that could be fixed, but that needs "setup = 1"
-
-In this case we've got boot code that's like the exynos5250 boot code
-that accidentally sets the total latency to >= 4 when it would work
-just fine to use a value of 3.  ...except that unlike the exynos5250
-this hypthetical SoC needs to leave setup = 1.
-
-...if such a machine were found in the wild (seems unlikely?) then
-we'll need to figure out what to do.  If its boot code cannot be
-updated and we want to support this product with a similar patch then
-we'll need to be more dynamic.
-
---
-
-Example B: existing A15 <=r2p0 product that just has to live with crashes
-
-In this case we've got a product where we're going to just accept that
-it crashes sometimes (since this is a fairly hard crash to trigger)
-because it crashes even more when the total latency < 4.  In this case
-we don't want to "fix" the errata because that makes things worse.
-
-...if such a machine were find in the wild (it's possible, I guess?)
-then that's a really good reason not to take this patch or to find
-some way to dynamically enable / disable it.
-
---
-
-Let me know what you think of the above, or if I'm misunderstanding something...
-
--Doug
+	Arnd
