@@ -1,58 +1,35 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 8 Jan 2014 09:36:14 +0530
-Subject: [PATCH v3 0/2] gpio: davinci: reuse for keystone arch
-In-Reply-To: <52CC3EDC.7070404@ti.com>
-References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
- <52CC3EDC.7070404@ti.com>
-Message-ID: <52CCCEB6.9050006@ti.com>
+Date: Wed, 8 Jan 2014 09:42:25 +0530
+Subject: [BUG] More select madness - keystone
+In-Reply-To: <52C5BFE3.6050408@ti.com>
+References: <20140102172625.GC7383@n2100.arm.linux.org.uk>
+ <52C5BB4A.6010802@ti.com> <52C5BFE3.6050408@ti.com>
+Message-ID: <52CCD029.6090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 January 2014 11:22 PM, Santosh Shilimkar wrote:
-> Sekhar,
-> 
-> On Tuesday 24 December 2013 06:41 AM, Grygorii Strashko wrote:
->> This series is intended to update Davinci GPIO driver and reuse
->> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
->> Keystone GPIO IP: supports:
->> - up to 32 GPIO lines;
->> - only unbanked irqs;
+On Friday 03 January 2014 01:07 AM, Santosh Shilimkar wrote:
+> On Thursday 02 January 2014 02:17 PM, Santosh Shilimkar wrote:
+>> On Thursday 02 January 2014 12:26 PM, Russell King - ARM Linux wrote:
+>>> warning: (ARCH_KEYSTONE && SPI_DAVINCI) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
+>>>
+>>> This results in the EDMA engine code not being built.  Yet another
+>>> example of why improper use of the "select" statement is bad news
+>>> and leads to broken configurations.
+>>>
+>> Thanks for reporting Russell. Will have a look.
 >>
->> See Documentation:
->> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>
->> This series based on:
->> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/gpio
->>
->> Changes in v3:
->> - fixed code, changed by mistake; fixed sparse warning 
->> Changes in v2:
->> - minor comments applied, no functional changes
->>
->> v2: https://lkml.org/lkml/2013/12/18/135
->> v1: https://lkml.org/lkml/2013/12/12/366
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Alexandre Courbot <gnurou@gmail.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Grygorii Strashko (2):
->>   gpio: davinci: don't create irq_domain in case of unbanked irqs
->>   gpio: davinci: reuse for Keystone SoC
->>
->>  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
->>  drivers/gpio/gpio-davinci.c                        |   82 ++++++++++++++------
->>  2 files changed, 61 insertions(+), 25 deletions(-)
->>
-> Have you picked up the $subject series in your queue ?
+> Just to be clear for records, the select was introduced before
+> KEYSTONE support was enabled. As per git blame, it came via commit
+> b5f1433059 {spi: davici - make davinci select edma}.
 
-Not yet, at least on the new compatible introduction, I need an ack from
-DT folks.
+I don't quite recall why this was needed and the commit description does
+not help. Anyway, this is not needed - at least with current code. I
+verified that the DaVinci SPI driver builds correctly with TI_EDMA
+switched off. I can send a revert.
 
-I am happy with the patches though and have tested them as well, In case
-I do not get an ack from 2/2 in time, I can at least send 1/2 for
-inclusion after my first gpio pull request to ARM-SoC gets pulled.
+BTW, it looks like arch/arm/mach-keystone/Kconfig has a select for
+TI_EDMA as well and that needs to be removed too.
 
 Thanks,
 Sekhar
