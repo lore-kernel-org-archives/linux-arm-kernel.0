@@ -1,76 +1,41 @@
-From: alex.elder@linaro.org (Alex Elder)
-Date: Thu, 09 Jan 2014 07:09:03 -0600
-Subject: [GIT PULL] bcm driver updates for 3.14
-In-Reply-To: <CAEPRUYpZTTX8bB68V5WMzBroj+arADsbbmXVSgBtn0At1SmRmw@mail.gmail.com>
-References: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>	<20140109060432.GC8285@quad.lixom.net>
- <CAEPRUYpZTTX8bB68V5WMzBroj+arADsbbmXVSgBtn0At1SmRmw@mail.gmail.com>
-Message-ID: <52CE9F6F.8000507@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jan 2014 13:17:32 +0000
+Subject: [PATCH RFC 00/46] Preview of imx-drm cleanup series
+In-Reply-To: <20140107063319.GA12346@S2101-09.ap.freescale.net>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <20140107063319.GA12346@S2101-09.ap.freescale.net>
+Message-ID: <20140109131732.GC27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2014 01:52 AM, Christian Daudt wrote:
-> On Wed, Jan 8, 2014 at 10:04 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Sun, Jan 05, 2014 at 10:58:36PM -0800, Christian Daudt wrote:
->>> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
->>>
->>>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-drivers
->>
->> Hi,
->>
->> Is there a reason you're sending this through arm-soc instead of through Mike's
->> clk tree? I don't see any dependencies on SoC code so I think it can go
->> independently through clk?
->>
->>
->> -Olof
-> The reason for the clk patches is that the file
-> include/dt-bindings/clock/bcm281xx.h is  used both by the driver and
-> the by the bcm11351.dtsi file (which has other mods going through
-> arm-soc). But now that you mentioned it, I looked and didn't find the
-> patch that modifies dts to include it. Alex - did I miss it?
+On Tue, Jan 07, 2014 at 02:33:22PM +0800, Shawn Guo wrote:
+> On Thu, Jan 02, 2014 at 09:25:28PM +0000, Russell King - ARM Linux wrote:
+> > Here is my large patch series which cleans up imx-drm, and gets it ready
+> > to move out of drivers/staging.  This is a preview only.
+> 
+> When moving to non-RFC patches, you may want to run checkpatch.pl on the
+> patches.  There are some errors and warnings than just "line over 80
+> characters" one.
 
-Yes you did.  Or I guess I may have, or may not have communicated
-the situation adequately.
+I'm going to fix some of them, but I'm not fixing all of them.  The
+reason is that some of these should have been done to the code already,
+and I'm not going to mess up my patches integrating coding style fixes
+amongst moving code around.
 
-There were four commits:
-    clk: bcm281xx: define kona clock binding
-    clk: bcm281xx: add initial clock framework support
-    clk: bcm281xx: define U32_MAX conditionally for now
-and
-    ARM: dts: bcm281xx: define real clocks
+The warnings about "over 80 characters" are fine for new code but not
+when code is merely being moved - there it's far more important not to
+reformat code.
 
-The first one is in your tagged branch "bcm-for-3.14-dt".
-The second two are in "bcm-for-3.14-drivers".  The last one
-is missing.
+The errors you refer to are:
+(a) in Fabio's patch adding imx-hdmi support, a derivative of which has
+    already been accepted into the staging tree.
+(b) in ipuv3-crtc.c, where checkpatch detects the presence of the FSF
+    address in the context of my patch.
 
-HOWEVER there's more to it than that.  My DT change depended
-on both code and DT changes from Tim Kryger--from another
-series you were trying to coordinate taking through your tree.
-    https://lkml.org/lkml/2013/12/5/508
-And because those seem to be missing from your tree we can't
-just use the DT patch as-is.  As I understand it we have been
-waiting for one unresponsive maintainer on that series (but
-I haven't been following closely).
+So, these are not my problem to fix, and I will *not* fix these "errors"
+in this series.
 
-For what it's worth, the DT patch is available here:
-    git://git.linaro.org/landing-teams/working/broadcom/kernel.git
-as the last commit in branch "pull/csd-kona-clocks".
-
-But to get this resolved we have to either:
-- include Tim's series in the pull request;
-- update my DT file to *not* define clocks affected by
-  Tim's series;
-- or make a trivial update to my code so it does *not*
-  disable unused clocks.
-
-(Or maybe something else.)
-
-I'm here to help and can respond quickly.  Christian and Tim are
-on the US West coast so it'll be a few hours before they're around
-to help out.
-
-					-Alex
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
