@@ -1,203 +1,140 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 9 Jan 2014 16:03:16 +0800
-Subject: [PATCH V3] ARM: imx: add cpuidle support for i.mx6sl
-Message-ID: <1389254596-20173-1-git-send-email-b20788@freescale.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 9 Jan 2014 08:08:43 +0000
+Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+In-Reply-To: <52CE5123.9050702@gmail.com>
+References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
+ <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+ <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
+ <52CE5123.9050702@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EDB141E@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpuidle support for i.MX6SL, currently only support
-two cpuidle levels(ARM wfi and WAIT mode), and add software
-workaround for WAIT mode errata as below:
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Ivaylo Dimitrov
+> Sent: Thursday, January 09, 2014 1:05 PM
+> To: Hiremath, Vaibhav; Valkeinen, Tomi; Tony Lindgren; Ivaylo Dimitrov
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> fbdev at vger.kernel.org
+> Subject: Re: RE: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+> 
+> 
+> On 09.01.2014 07:06, Hiremath, Vaibhav wrote:
+> > Tomi,
+> >
+> > I am seeing underflow issue on AM43x device if I use omapfb_vram argument.
+> > Did you see this on OMAP?
+> >
+> > I am using "omapfb_vram=10M at 0xA0000000", and I believe it is correct way
+> of usage.
+> >
+> > Thanks,
+> > Vaibhav
+> >
+> 
+> AFAIK underflow interrupts could come from badly calculated DSS core clock or
+> bad HW resizer setup and should be unrelated to the memory allocation. It
+> might be something similar to the problem I have on N900
+> - see https://lkml.org/lkml/2014/1/6/173
+> 
 
-ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
-          during WAIT mode entry process could cause cache memory
-          corruption.
+I can see the difference when I really "omapfb_vram" command line argument.
 
-Software workaround:
-    To prevent this issue from occurring, software should ensure that
-the ARM to IPG clock ratio is less than 12:5 (that is < 2.4x), before
-entering WAIT mode.
+Without omapfb_vram in bootargs 
+-------------------------------------------
+bootargs=console=ttyO0,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait mem=128M 
+consoleblank=0 clocksource=gp_timer consoleblank=0 earlyprintk omapfb.debug=y omapdss.debug=y
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
-Changes since V2:
-    Fix conflict when applying patch to shawnguo/for-next, as I
-    generated it from linux-next before.
+I do not get UNDERFLOW during boot.
 
- arch/arm/mach-imx/Makefile         |    1 +
- arch/arm/mach-imx/clk-imx6sl.c     |   26 ++++++++++++++++
- arch/arm/mach-imx/common.h         |    1 +
- arch/arm/mach-imx/cpuidle-imx6sl.c |   57 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h        |    5 ++++
- arch/arm/mach-imx/mach-imx6sl.c    |    3 ++
- 6 files changed, 93 insertions(+)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6sl.c
+With omapfb_vram in the bootargs
+---------------------------------------------
+bootargs=console=ttyO0,115200n8 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait mem=128M 
+consoleblank=0 clocksource=gp_timer consoleblank=0 earlyprintk omapfb_vram=10M at 0xA0000000 
+omapfb.debug=y omapdss.debug=y
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index befcaf5..8589032 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
- obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
-+obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
- endif
- 
- ifdef CONFIG_SND_IMX_SOC
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 5877eea..f6c3b4f 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -66,6 +66,32 @@ static struct clk_div_table video_div_table[] = {
- static struct clk *clks[IMX6SL_CLK_END];
- static struct clk_onecell_data clk_data;
- 
-+/*
-+ * ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
-+ *           during WAIT mode entry process could cause cache memory
-+ *           corruption.
-+ *
-+ * Software workaround:
-+ *     To prevent this issue from occurring, software should ensure that the
-+ * ARM to IPG clock ratio is less than 12:5 (that is < 2.4x), before
-+ * entering WAIT mode.
-+ *
-+ * This function will set the ARM clk to max value within the 12:5 limit.
-+ */
-+void imx6sl_set_wait_clk(bool enter)
-+{
-+	static unsigned long saved_arm_rate;
-+
-+	if (enter) {
-+		unsigned long ipg_rate = clk_get_rate(clks[IMX6SL_CLK_IPG]);
-+		unsigned long max_arm_wait_rate = (12 * ipg_rate) / 5;
-+		saved_arm_rate = clk_get_rate(clks[IMX6SL_CLK_ARM]);
-+		clk_set_rate(clks[IMX6SL_CLK_ARM], max_arm_wait_rate);
-+	} else {
-+		clk_set_rate(clks[IMX6SL_CLK_ARM], saved_arm_rate);
-+	}
-+}
-+
- static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 4f4a95c..1048248 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -140,6 +140,7 @@ void imx_anatop_pre_suspend(void);
- void imx_anatop_post_resume(void);
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- void imx6q_set_int_mem_clk_lpm(void);
-+void imx6sl_set_wait_clk(bool enter);
- 
- void imx_cpu_die(unsigned int cpu);
- int imx_cpu_kill(unsigned int cpu);
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-new file mode 100644
-index 0000000..d4b6b81
---- /dev/null
-+++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (C) 2014 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <asm/cpuidle.h>
-+#include <asm/proc-fns.h>
-+
-+#include "common.h"
-+#include "cpuidle.h"
-+
-+static int imx6sl_enter_wait(struct cpuidle_device *dev,
-+			    struct cpuidle_driver *drv, int index)
-+{
-+	imx6q_set_lpm(WAIT_UNCLOCKED);
-+	/*
-+	 * Software workaround for ERR005311, see function
-+	 * description for details.
-+	 */
-+	imx6sl_set_wait_clk(true);
-+	cpu_do_idle();
-+	imx6sl_set_wait_clk(false);
-+	imx6q_set_lpm(WAIT_CLOCKED);
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver imx6sl_cpuidle_driver = {
-+	.name = "imx6sl_cpuidle",
-+	.owner = THIS_MODULE,
-+	.states = {
-+		/* WFI */
-+		ARM_CPUIDLE_WFI_STATE,
-+		/* WAIT */
-+		{
-+			.exit_latency = 50,
-+			.target_residency = 75,
-+			.flags = CPUIDLE_FLAG_TIME_VALID |
-+				CPUIDLE_FLAG_TIMER_STOP,
-+			.enter = imx6sl_enter_wait,
-+			.name = "WAIT",
-+			.desc = "Clock off",
-+		},
-+	},
-+	.state_count = 2,
-+	.safe_state_index = 0,
-+};
-+
-+int __init imx6sl_cpuidle_init(void)
-+{
-+	return cpuidle_register(&imx6sl_cpuidle_driver, NULL);
-+}
-diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
-index 786f98e..24e3367 100644
---- a/arch/arm/mach-imx/cpuidle.h
-+++ b/arch/arm/mach-imx/cpuidle.h
-@@ -13,6 +13,7 @@
- #ifdef CONFIG_CPU_IDLE
- extern int imx5_cpuidle_init(void);
- extern int imx6q_cpuidle_init(void);
-+extern int imx6sl_cpuidle_init(void);
- #else
- static inline int imx5_cpuidle_init(void)
- {
-@@ -22,4 +23,8 @@ static inline int imx6q_cpuidle_init(void)
- {
- 	return 0;
- }
-+static inline int imx6sl_cpuidle_init(void)
-+{
-+	return 0;
-+}
- #endif
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 0f4fd4c..a26fdb2 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -17,6 +17,7 @@
- #include <asm/mach/map.h>
- 
- #include "common.h"
-+#include "cpuidle.h"
- 
- static void __init imx6sl_fec_init(void)
- {
-@@ -39,6 +40,8 @@ static void __init imx6sl_init_late(void)
- 	/* imx6sl reuses imx6q cpufreq driver */
- 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
- 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
-+
-+	imx6sl_cpuidle_init();
- }
- 
- static void __init imx6sl_init_machine(void)
--- 
-1.7.9.5
+I always get UNDERFLOW during boot itself.
+
+> Is it possible to upload the video you have problems with, so me to test it on
+> N900? So far I didn't see any underflow issues on it (N900 is OMAP3, in case
+> you're not aware), no matter the resolution of the videos I played(up to 720p),
+> however I didn't test the part that allocates the memory on a pre-defined
+> address. Though I don't think that should matter.
+
+No, that's what is causing issue to me. Can you try predefined address flow?
+Just to highlight, I get UNDERFLOW during boot itself, immediately when it gets mapped to userspace.
+
+Boot LOG:
+
+[    1.443021] OMAPFB: omapfb_probe
+[    1.446137] OMAPFB: create 3 framebuffers
+[    1.446178] OMAPFB: fb_infos allocated
+[    1.446198] OMAPFB: allocating 1536000 bytes for fb 0
+[    1.451044] OMAPFB: allocated VRAM paddr a0000000, vaddr ca000000
+[    1.451069] OMAPFB: region0 phys a0000000 virt ca000000 size=1536000
+[    1.451086] OMAPFB: region1 phys 00000000 virt   (null) size=0
+[    1.451100] OMAPFB: region2 phys 00000000 virt   (null) size=0
+[    1.451109] OMAPFB: fbmems allocated
+[    1.451363] OMAPFB: check_fb_var 0
+[    1.451386] OMAPFB: max frame size 1536000, line size 3200
+[    1.451401] OMAPFB: xres = 800, yres = 480, vxres = 800, vyres = 480
+[    1.451414] OMAPFB: set_fb_fix
+[    1.460278] OMAPFB: fb_infos initialized
+[    1.465325] OMAPFB: set_par(0)
+[    1.465384] OMAPFB: set_fb_fix
+[    1.465393] OMAPFB: apply_changes, fb 0, ovl 0
+[    1.465443] OMAPFB: setup_overlay 0, posx 0, posy 0, outw 800, outh 480
+[    1.465450] OMAPFB: paddr a0000000
+[    1.465592] OMAPFB: pan_display(0)
+[    1.465600] OMAPFB: setcmap
+[    1.465607] OMAPFB: setcmap
+[    1.474504] Console: switching to colour frame buffer device 100x30
+[    1.474528] OMAPFB: pan_display(0)
+[    1.474534] OMAPFB: setcmap
+[    1.482185] OMAPFB: setcmap
+[    1.484808] OMAPFB: framebuffers registered
+[    1.484839] OMAPFB: apply_changes, fb 0, ovl 0
+[    1.484857] OMAPFB: setup_overlay 0, posx 0, posy 0, outw 800, outh 480
+[    1.484870] OMAPFB: paddr a0000000
+[    1.484919] OMAPFB: apply_changes, fb 1, ovl 1
+[    1.485010] OMAPFB: apply_changes, fb 2, ovl 2
+[    1.485111] OMAPFB: create_framebuffers done
+[    1.485128] OMAPFB: mgr->apply'ed
+[    1.489793] OMAPFB: create sysfs for fbs
+[    1.489816] OMAPFB: create sysfs for fbs
+
+....
+
+[    4.822549] Freeing unused kernel memory: 440K (c0919000 - c0987000)
+[    5.276615] OMAPFB: pan_display(0)
+[    5.276625] OMAPFB: setcmap
+[    5.276635] OMAPFB: setcmap
+[    5.293518] OMAPFB: user mmap region start a0000000, len 1536000, off 0
+[    5.300171] omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+
+...
+
+[   20.499076] OMAPFB: pan_display(0)
+[   20.499085] OMAPFB: setcmap
+[   20.499093] OMAPFB: setcmap
+[   20.544419] OMAPFB: check_var(0)
+[   20.544631] OMAPFB: check_fb_var 0
+[   20.544644] OMAPFB: max frame size 1536000, line size 3200
+[   20.544651] OMAPFB: xres = 800, yres = 480, vxres = 800, vyres = 480
+[   20.544699] OMAPFB: set_par(0)
+[   20.544706] OMAPFB: set_fb_fix
+[   20.544712] OMAPFB: apply_changes, fb 0, ovl 0
+[   20.544762] OMAPFB: setup_overlay 0, posx 0, posy 0, outw 800, outh 480
+[   20.544767] OMAPFB: paddr a0000000
+[   20.544798] OMAPFB: pan_display(0)
+[   20.544802] OMAPFB: setcmap
+[   20.544859] OMAPFB: pan_display(0)
+[   20.544865] OMAPFB: setcmap
+[   20.544872] OMAPFB: setcmap
+[   20.553841] OMAPFB: setcmap
+[   23.002160] OMAPFB: user mmap region start a0000000, len 1536000, off 0
+
+Thanks,
+Vaibhav
