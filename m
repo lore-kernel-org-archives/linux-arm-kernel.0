@@ -1,80 +1,60 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Thu, 9 Jan 2014 11:15:35 +1100
-Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
-In-Reply-To: <1389216256.7769.39.camel@hastur.hellion.org.uk>
-References: <20140107220310.GD3103@lukather>
- <1389200137.27473.6.camel@kazak.uk.xensource.com>
- <20140108182906.GH2941@lukather>
- <1389216256.7769.39.camel@hastur.hellion.org.uk>
-Message-ID: <CAGRGNgVrK0BAbi+kjSTP7RnE5GsmtqQi7MKM9Y0Oi=4FRD2kgA@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Wed, 8 Jan 2014 16:28:04 -0800
+Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
+In-Reply-To: <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
+References: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
+Message-ID: <CAAYSxhpgJwnq63fUdYBtmneRads_69c2mik8upofvAS1Y25fOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
-
-On Thu, Jan 9, 2014 at 8:24 AM, Ian Campbell <ijc@hellion.org.uk> wrote:
-> On Wed, 2014-01-08 at 19:29 +0100, Maxime Ripard wrote:
->> On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
->> > On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
->> > > Another nice thing about it is that a FEX-to-DT compiler comes at no
->> > > cost afterwards. Since dtc is able to generate a DTS from
->> > > /proc/device-tree, you can easily generate a DTS for your previously
->> > > non-supported board using
->> > >
->> > >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
->> >
->> > I wonder if it might also be useful to compile this as a normal user
->> > space application which takes the fex and produces the dtb (or dts)?
+On Wed, Jan 8, 2014 at 3:38 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+> On Tue, Jan 7, 2014 at 10:53 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+>> The board schematic states that the "SD_CARD_DET_N gets pulled to GND
+>> when card is inserted" so the polarity has been updated to active low.
 >>
->> At the moment, no, libfdt only operates on DTB, so we would have to
->> chain this somehow with dtc to at least do the DTB to DTS conversion I
->> guess.
+>> Polarity is now specified with a GPIO define instead of a magic number.
 >>
->> It's not something that I'm pretty fond of either. Or, I don't really
->> see the benefit of it.
+>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
 >>
->> Let's say that you have such tool, I'm guessing one would want it to
->> mass-convert fex files to DT. But then, you'd still have to boot that
->> DT to be sure that everything is working, so you're pretty much losing
->> the mass-convertion thing, since you would have boot this with a
->> baremetal babelfish anyway.
+>> diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+>> index 08e47c2..27dd110 100644
+>> --- a/arch/arm/boot/dts/bcm28155-ap.dts
+>> +++ b/arch/arm/boot/dts/bcm28155-ap.dts
+>> @@ -13,6 +13,8 @@
+>>
+>>  /dts-v1/;
+>>
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +
+>>  #include "bcm11351.dtsi"
+>>
+>>  / {
+>> @@ -40,7 +42,7 @@
+>>
+>>         sdio4: sdio at 3f1b0000 {
+>>                 max-frequency = <48000000>;
+>> -               cd-gpios = <&gpio 14 0>;
+>> +               cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
+>>                 status = "okay";
+>>         };
+>>  };
+>> --
+>> 1.8.0.1
+>>
+> Tim,
+>  Does bcm11351-brt not also suffer from the same bug? If it does can
+> you pls update the patch to also fix it?
 >
-> I wasn't really thinking of mass conversion. just an easy way for people
-> to produce a starting point for their platform to send upstream.
->
->> > I suppose producing something upstreamable would be different/harder
->> > though, since it would need to not inline/merge the dtsi file but just
->> > leave the include stmt. That's probably a different tool.
->>
->> Yeah, dtc outputs a "flat" DTS, without any include, so you still need
->> to edit it by hand to remove the common part, remove the duplicated
->> pinctrl nodes, fix the phandle, etc.
->>
->> But most of that can be scripted I guess.
->
-> I think this could be done as a separate tool which read a FEX and
-> outputted the dts directly (i.e. with printf). The output would have the
-> #include for the right dtsi in place and the appropriate overrides
-> derived from the FEX. That's not really anything like your
-> sunxi-babelfish though.
+>  Thanks,
+>    csd
 
-I was thinking about exactly this in the context of my (stalled)
-online fex / board submission helper tool.
+The BRT and AP boards are similar so it may have the same problem but
+I don't have a BRT and wouldn't be able to test any changes to its DTS
+file.
 
-I.e. $RANDOM_USER submits their script.bin / script.fex file then it
-produces (amongst other things) a dts based on it's contents using
-sensible conversions based on what other knowledgeable people have
-done in the past.
-
-I was also thinking about adding a mass-converting interface to this
-tool so we could regenerate the u-boot memory info and kernel dts
-files from the contents of sunxi-boards.
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
-.Plan: http://sites.google.com/site/juliancalaby/
+-Tim
