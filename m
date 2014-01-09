@@ -1,37 +1,43 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 09 Jan 2014 09:34:59 +0200
-Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
-References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
- <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
- <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
- <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
-Message-ID: <52CE5123.9050702@gmail.com>
+From: Guangyu.Chen@freescale.com (Nicolin Chen)
+Date: Thu, 9 Jan 2014 15:41:38 +0800
+Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock
+ tree
+In-Reply-To: <20140109065740.GD21717@S2101-09.ap.freescale.net>
+References: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
+ <20140109035810.GB21717@S2101-09.ap.freescale.net>
+ <20140109034940.GA14480@MrMyself>
+ <20140109065740.GD21717@S2101-09.ap.freescale.net>
+Message-ID: <20140109074137.GA14809@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 09, 2014 at 02:57:42PM +0800, Shawn Guo wrote:
+> On Thu, Jan 09, 2014 at 11:49:41AM +0800, Nicolin Chen wrote:
+> > On Thu, Jan 09, 2014 at 11:58:12AM +0800, Shawn Guo wrote:
+> > > >  static struct clk *clk[clk_max];
+> > > > @@ -355,6 +355,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+> > > >  	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+> > > >  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+> > > >  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
+> > > > +	clk[esai_ahb]     = imx_clk_gate2("esai_ahb",      "ahb",               base + 0x6c, 16);
+> > > 
+> > > Hmm, having two clocks operating on the same gate bit will get us
+> > > problem in clock disabling.  Clock enabling is fine, since either
+> > > one who calls clk_enable() first will just set the gate bit.  But in
+> > > case that clk_enable() is called on both clocks, and then when either
+> > > clock calls clk_disable(), the gate bit will be cleared and thus breaks
+> > > the other one that might still be in use.
+> > 
+> > Understood. But how could we handle this situation? The only way I can figure
+> > out is to make sure the driver open/close them at the same time, it's not a
+> > perfect way though.
+> 
+> Hmm, we generally leave the gate bit to the clock used to access
+> register, because usually it's the first one to be on and the last one
+> to be off.
 
-On 09.01.2014 07:06, Hiremath, Vaibhav wrote:
-> Tomi,
->
-> I am seeing underflow issue on AM43x device if I use omapfb_vram argument.
-> Did you see this on OMAP?
->
-> I am using "omapfb_vram=10M at 0xA0000000", and I believe it is correct way of usage.
->
-> Thanks,
-> Vaibhav
->
+Then we should attach CLK_IGNORE_UNUSED to clk[esai] since clk[esai_ahb] is
+the clock used to access memory, shouldn't we?
 
-AFAIK underflow interrupts could come from badly calculated DSS core 
-clock or bad HW resizer setup and should be unrelated to the memory 
-allocation. It might be something similar to the problem I have on N900 
-- see https://lkml.org/lkml/2014/1/6/173
-
-Is it possible to upload the video you have problems with, so me to test 
-it on N900? So far I didn't see any underflow issues on it (N900 is 
-OMAP3, in case you're not aware), no matter the resolution of the videos 
-I played(up to 720p), however I didn't test the part that allocates the 
-memory on a pre-defined address. Though I don't think that should matter.
-
-Ivo
+Thank you.
+Nicolin
