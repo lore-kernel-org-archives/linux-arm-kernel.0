@@ -1,59 +1,55 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 9 Jan 2014 08:31:16 +0000
-Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
-In-Reply-To: <52CE5D6F.3050700@ti.com>
-References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
- <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
- <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
- <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
- <52CE5123.9050702@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EDB141E@DBDE04.ent.ti.com>
- <52CE5D6F.3050700@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EDB1489@DBDE04.ent.ti.com>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Thu,  9 Jan 2014 14:01:14 +0530
+Subject: [PATCH CFT] ARM:SHMOBILE: Enable AUTO_ZRELADDR by default
+Message-ID: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables AUTO_ZRELADDR as default config to Renasas R-Mobile and
+SH-Mobile platforms.
 
-> -----Original Message-----
-> From: Valkeinen, Tomi
-> Sent: Thursday, January 09, 2014 1:57 PM
-> To: Hiremath, Vaibhav; Ivaylo Dimitrov; Ivaylo Dimitrov
-> Cc: Tony Lindgren; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-fbdev at vger.kernel.org
-> Subject: Re: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
-> 
-> On 2014-01-09 10:08, Hiremath, Vaibhav wrote:
-> 
-> > No, that's what is causing issue to me. Can you try predefined address flow?
-> > Just to highlight, I get UNDERFLOW during boot itself, immediately when it
-> gets mapped to userspace.
-> >
-> > Boot LOG:
-> >
-> 
-> > [    4.822549] Freeing unused kernel memory: 440K (c0919000 - c0987000)
-> > [    5.276615] OMAPFB: pan_display(0)
-> > [    5.276625] OMAPFB: setcmap
-> > [    5.276635] OMAPFB: setcmap
-> > [    5.293518] OMAPFB: user mmap region start a0000000, len 1536000, off 0
-> > [    5.300171] omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the
-> overlay
-> 
-> Hmm that's interesting... So you have some tool that's ran early, which draws
-> something on the screen? Or maybe that's X starting?
-> 
+AUTO_ZRELADDR config enables auto calculation of the decompressed kernel image
+address. AUTO_ZRELADDR config is mutually exclusive to ZBOOT_ROM, and also
+assumes zImage to be loaded in the first 128MiB from start of memory.
 
-It's initial demo, not sure whether you heard of MATRIX demo. I am running Matrix demo
-As part of init script.
+CFT::Call For Testing
 
-> Ah... I think I understand now. As I mentioned, AM4x has issues already.
-> I think the CPU/others can block DSS when accessing memory. So, if we have
-> bad caching for the mapped framebuffer, the CPU will use more bandwidth
-> when reading/writing to it, and that will cause DSS to underflow.
-> 
+Requesting maintainers of R-Mobile and SH-Mobile platforms to evaluate the
+changes on the board and comment, as I dont have the board for testing, and
+also requesting an ACK.
 
-Yeah, AM4x already has some issues but I am comparing normal dma_alloc and reserved
-Memory and I see different behavior and it could be due to bad caching for the mapped buffers.
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <damm@opensource.se>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-sh at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
+and ZRELADDR
+---------------------------------------------------
 
-Thanks,
-Vaibhav
+https://lkml.org/lkml/2011/10/14/434
+
+-------------------------------------------------
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8e668e2..077ef9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -674,6 +674,7 @@ config ARCH_MSM
+ config ARCH_SHMOBILE
+ 	bool "Renesas SH-Mobile / R-Mobile"
+ 	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+-- 
+1.7.10.4
