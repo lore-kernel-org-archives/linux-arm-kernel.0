@@ -1,101 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 9 Jan 2014 12:50:52 +0000
-Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <1389208330-12495-2-git-send-email-broonie@kernel.org>
-References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
- <1389208330-12495-2-git-send-email-broonie@kernel.org>
-Message-ID: <20140109125052.GB6089@e102568-lin.cambridge.arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 9 Jan 2014 14:53:54 +0200
+Subject: pull request for some small fixes
+In-Reply-To: <20140108162757.27803.23767@quantum>
+References: <20131223162705.GE3378@tbergstrom-lnx.Nvidia.com>
+ <20140106054322.26907.37296@quantum>
+ <20140107125122.GC26588@tbergstrom-lnx.Nvidia.com>
+ <20140108162757.27803.23767@quantum>
+Message-ID: <20140109125354.GU26588@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 07:12:08PM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 20eef01a4707..e77c6b0844be 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -17,10 +17,157 @@
->  #include <linux/percpu.h>
->  #include <linux/node.h>
->  #include <linux/nodemask.h>
-> +#include <linux/of.h>
->  #include <linux/sched.h>
-> +#include <linux/slab.h>
+On Wed, Jan 08, 2014 at 05:27:57PM +0100, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2014-01-07 04:51:22)
+> > On Mon, Jan 06, 2014 at 06:43:22AM +0100, Mike Turquette wrote:
+> > > Quoting Peter De Schrijver (2013-12-23 08:27:05)
+> > > > The following changes since commit 62ce7cd62f534023224912dc9b909963f26a38da:
+> > > > 
+> > > >   clk: tegra: fix __clk_lookup() return value checks (2013-11-28 15:09:22 +0200)
+> > > > 
+> > > > are available in the git repository at:
+> > > >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-next-1
+> > > 
+> > > Hi Peter,
+> > > 
+> > > Do you intend for this to go as fixes for 3.13-rc8? The fixes are based
+> > 
+> > Yes.
+> > 
+> > > off of a commit from my clk-next branch.
+> > > 
+> > Do you want me to rebase them on 3.13-rc7?
+> 
+> Please do. I hope to send off a pull request today.
+> 
 
-It does not belong here either.
+The fixes are on top of the clk-tegra-for-3.14, so I can't apply them on 3.13-rc7 directly.
 
->  #include <asm/topology.h>
->  
-> +#ifdef CONFIG_OF
-> +static int cluster_id;
+Cheers,
 
-This is __initdata. I think it is better to move it to parse_cluster
-and pass it to parse_core as a parameter instead of using a global.
-
-> +static int __init get_cpu_for_node(struct device_node *node)
-> +{
-> +	struct device_node *cpu_node;
-> +	int cpu;
-> +
-> +	cpu_node = of_parse_phandle(node, "cpu", 0);
-> +	if (!cpu_node) {
-> +		pr_crit("%s: Unable to parse CPU phandle\n", node->full_name);
-
-This messages is spit out anytime you try to grab a cpu phandle and it
-is not there. In particular, in parse_core if core is not a leaf but you
-still try to grab a cpu phandle this message is spit out and that's not
-nice at all. Either we remove the message or we do not check the phandle
-in core nodes that are not leaves.
-
-> +		return -1;
-> +	}
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		if (of_get_cpu_node(cpu, NULL) == cpu_node)
-> +			return cpu;
-> +	}
-> +
-> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
-> +	return -1;
-> +}
-> +
-> +static void __init parse_core(struct device_node *core, int core_id)
-> +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	int i, cpu;
-> +	struct device_node *t;
-> +
-> +	i = 0;
-> +	do {
-> +		snprintf(name, sizeof(name), "thread%d", i);
-> +		t = of_get_child_by_name(core, name);
-> +		if (t) {
-> +			leaf = false;
-> +			cpu = get_cpu_for_node(t);
-> +			if (cpu >= 0) {
-> +				pr_info("CPU%d: socket %d core %d thread %d\n",
-> +					cpu, cluster_id, core_id, i);
-
-Since all these variables are internal values that have no real meaning
-I am not sure it is useful to print them out. Probably better to print
-the resulting cpu masks on every cpu, problem is when to do that.
-
-> +				cpu_topology[cpu].socket_id = cluster_id;
-> +				cpu_topology[cpu].core_id = core_id;
-> +				cpu_topology[cpu].thread_id = i;
-> +			} else {
-> +				pr_err("%s: Can't get CPU for thread\n",
-> +				       t->full_name);
-> +			}
-> +		}
-> +		i++;
-> +	} while (t);
-> +
-> +	cpu = get_cpu_for_node(core);
-
-This is what I am referring too above. For core nodes containing threads a
-message is spit out and that must not be there. Either we avoid parsing
-core nodes that are not leaves or we change get_cpu_core_for_node.
-
-Lorenzo
+Peter.
