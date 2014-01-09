@@ -1,39 +1,39 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:48:11 +0100
-Subject: [PATCH 17/18] ARM: dts: Add support for the Overo Summit
+Date: Thu,  9 Jan 2014 17:48:09 +0100
+Subject: [PATCH 15/18] ARM: dts: Add support for the Overo Alto35
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-18-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-16-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Summit is an expansion board for Gumstix Overo products.
+Alto35 is an expansion board for Gumstix Overo products.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
  arch/arm/boot/dts/Makefile               |  1 +
- arch/arm/boot/dts/omap3-overo-summit.dts | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
+ arch/arm/boot/dts/omap3-overo-alto35.dts | 52 ++++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-alto35.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3f6ef70..d00f023 100644
+index 799b306..29432b0 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -193,6 +193,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-overo-chestnut43.dtb \
+@@ -189,6 +189,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-n900.dtb \
+ 	omap3-n9.dtb \
+ 	omap3-n950.dtb \
++	omap3-overo-alto35.dtb \
  	omap3-overo-gallop43.dtb \
  	omap3-overo-palo43.dtb \
-+	omap3-overo-summit.dtb \
  	omap3-overo-tobi.dtb \
- 	omap3-gta04.dtb \
- 	omap3-igep0020.dtb \
-diff --git a/arch/arm/boot/dts/omap3-overo-summit.dts b/arch/arm/boot/dts/omap3-overo-summit.dts
+diff --git a/arch/arm/boot/dts/omap3-overo-alto35.dts b/arch/arm/boot/dts/omap3-overo-alto35.dts
 new file mode 100644
-index 0000000..fd8b47c
+index 0000000..40c7e6c
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-summit.dts
-@@ -0,0 +1,27 @@
++++ b/arch/arm/boot/dts/omap3-overo-alto35.dts
+@@ -0,0 +1,52 @@
 +/*
 + * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
 + *
@@ -43,21 +43,46 @@ index 0000000..fd8b47c
 + */
 +
 +/*
-+ * Summit expansion board is manufactured by Gumstix Inc.
++ * Alto35 expansion board is manufactured by Gumstix Inc.
 + */
 +
 +#include "omap3-overo-common.dtsi"
 +
++#include <dt-bindings/input/input.h>
++
 +/ {
-+	model = "TI OMAP3 Gumstix Overo on Summit";
-+	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap3";
++	model = "TI OMAP3 Gumstix Overo on Alto35";
++	compatible = "gumstix,omap3-overo-alto35", "gumstix,omap3-overo", "ti,omap3";
 +
 +	leds {
 +		compatible = "gpio-leds";
-+		heartbeat {
-+			label = "overo:red:gpio21";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
++		gpio148 {
++			label = "overo:red:gpio148";
++			gpios = <&gpio5 20 GPIO_ACTIVE_HIGH>;	/* gpio 148 */
++		};
++		gpio150 {
++			label = "overo:yellow:gpio150";
++			gpios = <&gpio5 22 GPIO_ACTIVE_HIGH>;	/* gpio 150 */
++		};
++		gpio151 {
++			label = "overo:blue:gpio151";
++			gpios = <&gpio5 23 GPIO_ACTIVE_HIGH>;	/* gpio 151 */
++		};
++		gpio170 {
++			label = "overo:green:gpio170";
++			gpios = <&gpio6 10 GPIO_ACTIVE_HIGH>;	/* gpio 170 */
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button0 at 10 {
++			label = "button0";
++			linux,code = <BTN_0>;
++			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup;
 +		};
 +	};
 +};
