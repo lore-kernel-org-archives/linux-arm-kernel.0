@@ -1,40 +1,55 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 9 Jan 2014 10:24:22 -0600
-Subject: [PATCH] ARM: socfpga: dts: add pl330 clock
-In-Reply-To: <1387449054-27115-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1387449054-27115-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1389284662.13556.26.camel@linux-builds1>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 9 Jan 2014 08:33:05 -0800
+Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
+ dependency on aemif
+In-Reply-To: <52CE7C44.1000803@ti.com>
+References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com>
+ <52BC1BB8.2070007@ti.com> <52CE7C44.1000803@ti.com>
+Message-ID: <20140109163305.GC28655@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-12-19 at 11:30 +0100, Steffen Trumtrar wrote:
-> The pl330 dmac won't be added to the list of amba devices, as it doesn't have
-> a clock entry.
-> Add the clock.
+On Thu, Jan 09, 2014 at 04:09:00PM +0530, Sekhar Nori wrote:
+> On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
+> > On 12/18/2013 02:13 PM, Sekhar Nori wrote:
+> >> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
+> >>> Hi, Sekhar
+> >>>
+> >>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
+> >>> series.
+> >>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
+> >>> and can be found at http://git.infradead.org/l2-mtd.git
+> >>>
+> >>> This patch can be still applied on top of the series without conflicts.
+> >>>
+> >>> Can you please pick up the $subject patch if you are OK with it?
+> >>
+> >> I have no problems with the patch and can pick it too, but need ack from
+> >> MTD maintainer (David) as it touches drivers/mtd/ too.
+> >>
+> >> David,
+> >>
+> >> If you do not have the patch, we can resend it.
+> >>
+> >> Thanks,
+> >> Sekhar
+> >>
+> > 
+> > Hi Brian,
+> > 
+> > Do you agree if this patch will go through Davinci tree?
+> > 
+> > This is the last one we need to reuse Davinci Nand driver for Keystone.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> Rebased to
-> 	git://git.rocketboards.org/linux-socfpga-next.git next-dt
-> 
->  arch/arm/boot/dts/socfpga.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 634950f..8920371 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -79,6 +79,8 @@
->  				#dma-cells = <1>;
->  				#dma-channels = <8>;
->  				#dma-requests = <32>;
-> +				clocks = <&l4_main_clk>;
-> +				clock-names = "apb_pclk";
->  			};
->  		};
->  
+> Since we never got an ack from MTD folks, I am going and go ahead and
+> try pushing this through ARM-SoC regardless. I will CC the MTD
+> maintainers on the pull request so any objections could even be posted
+> there.
 
-Applied to next-dt.
+Sorry, I've been a little busy / out for vacation. The MTD parts look OK
+to me. Feel free to take it in your tree.
 
-Thanks,
-Dinh
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+
+Brian
