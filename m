@@ -1,51 +1,80 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 08 Jan 2014 16:55:58 -0700
-Subject: [PATCH v5 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY
- to enforce this ACPI mode
-In-Reply-To: <201401081346.25767.arnd@arndb.de>
-References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
- <1389142011-27356-2-git-send-email-al.stone@linaro.org>
- <201401081346.25767.arnd@arndb.de>
-Message-ID: <52CDE58E.5000001@redhat.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 9 Jan 2014 11:15:35 +1100
+Subject: [linux-sunxi] [ANNOUNCE] sunxi-babelfish (FEX-to-DT translator)
+In-Reply-To: <1389216256.7769.39.camel@hastur.hellion.org.uk>
+References: <20140107220310.GD3103@lukather>
+ <1389200137.27473.6.camel@kazak.uk.xensource.com>
+ <20140108182906.GH2941@lukather>
+ <1389216256.7769.39.camel@hastur.hellion.org.uk>
+Message-ID: <CAGRGNgVrK0BAbi+kjSTP7RnE5GsmtqQi7MKM9Y0Oi=4FRD2kgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2014 05:46 AM, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014, al.stone at linaro.org wrote:
->> Even though support for X86 in hardware reduced mode is possible, it
->> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
->> there is a single kernel image than can run on all x86 hardware; the kernel
->> changes run-time behavior to adapt to the hardware being used.  This is not
->> currently possible with the existing ACPICA infrastructure but only presents
->> a problem on achitectures supporting both hardware-reduced and legacy modes
->> of ACPI -- i.e., on x86 only.
->
-> Not sure about the logic here: While it's certainly possible to build a kernel
-> that runs on all x86 machines, it's also possible to build one that only
-> runs on some of them when some basic options are turned off. I don't see
-> any difference between that and what we have on ARM64 or the multiplatform
-> subset of ARM32.
->
-> I don't think you need any strict architecture dependency here. If you want
-> to make it harder for users to accidentally turn it on, I'd suggest using
->
-> config ACPI_REDUCED_HARDWARE_ONLY
->         bool "Hardware-reduced ACPI support only"
->         depends on !X86 || EXPERT
->
-> 	Arnd
+Hi Ian,
 
-Hrm.  Seems a fair point.  I'll respin the patch set to incorporate
-this, though now that I think of it I will add !IA64 since it is
-unlikely they'll do a reduced hardware platform any time soon and
-would have the same problem as x86.
+On Thu, Jan 9, 2014 at 8:24 AM, Ian Campbell <ijc@hellion.org.uk> wrote:
+> On Wed, 2014-01-08 at 19:29 +0100, Maxime Ripard wrote:
+>> On Wed, Jan 08, 2014 at 04:55:37PM +0000, Ian Campbell wrote:
+>> > On Tue, 2014-01-07 at 23:03 +0100, Maxime Ripard wrote:
+>> > > Another nice thing about it is that a FEX-to-DT compiler comes at no
+>> > > cost afterwards. Since dtc is able to generate a DTS from
+>> > > /proc/device-tree, you can easily generate a DTS for your previously
+>> > > non-supported board using
+>> > >
+>> > >   dtc -I fs -O dts -o my-board.dts /proc/device-tree/
+>> >
+>> > I wonder if it might also be useful to compile this as a normal user
+>> > space application which takes the fex and produces the dtb (or dts)?
+>>
+>> At the moment, no, libfdt only operates on DTB, so we would have to
+>> chain this somehow with dtc to at least do the DTB to DTS conversion I
+>> guess.
+>>
+>> It's not something that I'm pretty fond of either. Or, I don't really
+>> see the benefit of it.
+>>
+>> Let's say that you have such tool, I'm guessing one would want it to
+>> mass-convert fex files to DT. But then, you'd still have to boot that
+>> DT to be sure that everything is working, so you're pretty much losing
+>> the mass-convertion thing, since you would have boot this with a
+>> baremetal babelfish anyway.
+>
+> I wasn't really thinking of mass conversion. just an easy way for people
+> to produce a starting point for their platform to send upstream.
+>
+>> > I suppose producing something upstreamable would be different/harder
+>> > though, since it would need to not inline/merge the dtsi file but just
+>> > leave the include stmt. That's probably a different tool.
+>>
+>> Yeah, dtc outputs a "flat" DTS, without any include, so you still need
+>> to edit it by hand to remove the common part, remove the duplicated
+>> pinctrl nodes, fix the phandle, etc.
+>>
+>> But most of that can be scripted I guess.
+>
+> I think this could be done as a separate tool which read a FEX and
+> outputted the dts directly (i.e. with printf). The output would have the
+> #include for the right dtsi in place and the appropriate overrides
+> derived from the FEX. That's not really anything like your
+> sunxi-babelfish though.
+
+I was thinking about exactly this in the context of my (stalled)
+online fex / board submission helper tool.
+
+I.e. $RANDOM_USER submits their script.bin / script.fex file then it
+produces (amongst other things) a dts based on it's contents using
+sensible conversions based on what other knowledgeable people have
+done in the past.
+
+I was also thinking about adding a mass-converting interface to this
+tool so we could regenerate the u-boot memory info and kernel dts
+files from the contents of sunxi-boards.
+
+Thanks,
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
+.Plan: http://sites.google.com/site/juliancalaby/
