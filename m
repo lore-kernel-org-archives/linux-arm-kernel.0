@@ -1,36 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Jan 2014 22:00:08 -0800
-Subject: [GIT PULL] DaVinci GPIO updates for v3.14
-In-Reply-To: <52CA5447.4060703@ti.com>
-References: <52BB2C1E.5010300@ti.com>
- <52CA5447.4060703@ti.com>
-Message-ID: <20140109060008.GA8285@quad.lixom.net>
+Date: Wed, 8 Jan 2014 22:02:34 -0800
+Subject: [PATCH RESEND] irqchip: sirf: set IRQ_LEVEL status_flags
+In-Reply-To: <1388720086-13135-1-git-send-email-21cnbao@gmail.com>
+References: <1388720086-13135-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20140109060234.GB8285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 12:29:19PM +0530, Sekhar Nori wrote:
-> On Thursday 26 December 2013 12:33 AM, Sekhar Nori wrote:
-> > Hi Arnd, Olof, Kevin,
-> > 
-> > Here are some DaVinci GPIO driver updates and the resulting platform 
-> > code changes. All the patches have been acked by Linus. To handle
-> > dependencies easily, we both agreed that it will be better I send the
-> > driver updates via ARM-SoC. There is a new DT-binding which has been
-> > acked by Rob H.
-> > 
-> > I have made the pull request over -rc4 instead of an older -rc because 
-> > of this work depends on some fixes merged in that -rc (even for a 
-> > successful build).
+On Fri, Jan 03, 2014 at 11:34:46AM +0800, Barry Song wrote:
+> SiRF internal interrupts are using level trigger. we need to tell the irq
+> core this information. otherwise, we might get some problems as below
+> 1. disable_irq(n)
+> here irq core will mark the disabled flag but still keep the irq enabled
+> due to involved lazy-disable
+> 2. doing someting after disable_irq(n)
+> in step 2, if one interrupt n comes, irq core will mark it as pending and
+> mask the HW interrupt really. we name the coming interrupt as "X".
+> 3. enable_irq(n)
+> this will unmask the interrupt, so the level-trigger HW interrupt will come
+> again, irq_handler will enter as "E1". after that, irq core will also check
+> whether irq n is pending, if yes, and pending interrupt is not level-trigger,
+> irq core will execute the pending irq_handler.
+> so if we don't set the IRQ_LEVEL flag here, irq core will execute pending
+> X again as "E2", but actually the pending interrupt has been handled by "E1".
+> that makes a level-trigger HW interrupt is executed twice.
 > 
-> Can you please pull this?
+> here we fix the issue to avoid redundant interrupt overload.
+> 
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
 
-Already done, seems that I missed emailing about it.
-
-$ git branch --contains 6075a8b2b6c32ddcb99b85189ae41ab2903e560f
-  davinci/gpio
-  for-next
-  next/drivers
-  to-build
+Applied to fixes-non-critical for 3.14.
 
 
 -Olof
