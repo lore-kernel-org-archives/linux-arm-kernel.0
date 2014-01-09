@@ -1,24 +1,27 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Thu, 9 Jan 2014 19:46:19 +0800
-Subject: [PATCH V3 Resend] cpufreq: create cpufreq_generic_get() routine
-In-Reply-To: <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
-References: <d9239e0a5df99392647ff8343673342f89d09476.1389059568.git.viresh.kumar@linaro.org>
- <CAOesGMgfFVoVJpOMXWtzVWj_F4pD-L9Osyv4u6=c8RUWOoLHFw@mail.gmail.com>
- <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
-Message-ID: <20140109114619.GA20423@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Jan 2014 11:48:00 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140109114759.GG3081@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Wed, Jan 08, 2014 at 07:12:07PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> Add basic CPU topology support to arm64, based on the existing pre-v8
+> code and some work done by Mark Hambleton.  This patch does not
+> implement any topology discovery support since that should be based on
+> information from firmware, it merely implements the scaffolding for
+> integration of topology support in the architecture.
 
-> @Fengguang: Would it make sense to add build tests for all ARM
-> defconfigs in your build system? I thought its already there :)
-> That way I can always be sure that my stuff (would be helpful for
-> others as well though) isn't breaking build (Atleast) for any platform.
+Mark, for future patches, could you please add a cover letter with a
+simple changelog and also add some versioning to the subject ([PATCH v*]).
+It's getting hard to follow which series addresses what comments,
+especially when you post more updates in the same day.
 
-Sure. I just added build test workers for all defconfigs from all
-archs. Note that due to the large number of configs, they'll have
-longer delays, but should still finish in one day.
+Thanks.
 
-Thanks,
-Fengguang
+-- 
+Catalin
