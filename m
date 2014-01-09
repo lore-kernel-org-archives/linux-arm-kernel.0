@@ -1,35 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 9 Jan 2014 17:50:44 +0000
-Subject: [PATCH v8 4/6] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <1389269716.27473.73.camel@kazak.uk.xensource.com>
-References: <alpine.DEB.2.02.1401081845040.21510@kaball.uk.xensource.com>
- <1389206998-27875-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109121308.GH3081@arm.com>
- <1389269716.27473.73.camel@kazak.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1401091750120.21510@kaball.uk.xensource.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Jan 2014 17:52:08 +0000
+Subject: [PATCH v2 1/2] spi:fsl-dspi:add support of DSPI IP in big endian
+In-Reply-To: <1389161655-21856-1-git-send-email-b44548@freescale.com>
+References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
+Message-ID: <20140109175208.GK12858@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jan 2014, Ian Campbell wrote:
-> On Thu, 2014-01-09 at 12:13 +0000, Catalin Marinas wrote:
-> > On Wed, Jan 08, 2014 at 06:49:56PM +0000, Stefano Stabellini wrote:
-> > >  arch/arm64/Kconfig         |   20 ++++++++++++++++++++
-> > >  arch/arm64/kernel/Makefile |    1 +
-> > >  2 files changed, 21 insertions(+)
-> > [...]
-> > > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > > index 5ba2fd4..1dee735 100644
-> > > --- a/arch/arm64/kernel/Makefile
-> > > +++ b/arch/arm64/kernel/Makefile
-> > > @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
-> > >  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
-> > >  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
-> > >  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-> > > +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
-> > 
-> > Did you forget a git add?
-> 
-> I was just about to say the same thing for the previous arm patch too.
+On Wed, Jan 08, 2014 at 02:14:14PM +0800, Chao Fu wrote:
 
-That is what I get for still using patch queues :-/
+This looks a lot nicer - a few things below though.
+
+> +#define DSPI_BITWISE16(d, v)	(d->big_endian ? cpu_to_be16(v) : cpu_to_le16(v))
+> +#define DSPI_BITWISE32(d, v)	(d->big_endian ? cpu_to_be32(v) : cpu_to_le32(v))
+
+These should probably be inline for the same reason as the I/O
+functions, perhaps even being done as part of the I/O functions.
+
+> +static inline u16 dspi_readw(void __iomem *addr)
+> +{
+> +	u16 __v = (__force u16) __raw_readw(addr);
+> +	__iormb();
+> +
+> +	return __v;
+> +}
+
+Why does this need a barrier and why does it not take care of the
+endianness translation?  A quick glance through shows most if not all of
+the callers doing the translation.
+
+> +static inline void dspi_writew(u16 val, void __iomem *addr)
+> +{
+> +	__iowmb();
+> +	__raw_writew((__force u16) val, addr);
+> +}
+
+Again the memory barrier seems odd, especially the barrier *before*
+doing the write.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/4e66f9b4/attachment.sig>
