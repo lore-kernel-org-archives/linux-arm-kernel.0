@@ -1,18 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 9 Jan 2014 14:13:11 +0900
-Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
-In-Reply-To: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
-References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140109051311.GH2132@verge.net.au>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 9 Jan 2014 13:17:34 +0800
+Subject: [PATCH 2/5] ARM: dts: SiRF: add lost usp1_uart_nostreamctrl pin
+ group for atlas6
+In-Reply-To: <CACRpkdbiPzB-MJr7Dm24b3cNd9urcT3SSV9qAz2iRPfCjygAHg@mail.gmail.com>
+References: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
+ <1388717966-11703-3-git-send-email-21cnbao@gmail.com>
+ <CACRpkdbiPzB-MJr7Dm24b3cNd9urcT3SSV9qAz2iRPfCjygAHg@mail.gmail.com>
+Message-ID: <CAGsJ_4zkw+VWewdjneuDK=C91vgJpZ12RbvrnY2Ss3Qj-AGa0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 05:48:00PM +0900, Simon Horman wrote:
-> Select the SMSC_PHY if ethernet is enabled on shmbile boards
-> that have an SMSC phy. This allows the SMSC-specific phy driver
-> to be used rather than relying on generic phy code.
-> 
-> Based on the renesas-devel-v3.13-rc7-20140107 tag
-> of my renesas tree.
+2014/1/8 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Jan 3, 2014 at 3:59 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> From: Qipan Li <Qipan.Li@csr.com>
+>>
+>> this patch adds lost usp1_uart_nostreamctrl pin group for atlas6, which
+>> matches with the change in drivers/pinctrl/sirf/pinctrl-atlas6.c.
+>>
+>> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> Please funnel this patch through ARM SoC or similar sirf tree.
 
-I have queued up these changes.
+ok. i'll send a pull request including these two pinmux dts changes
+and several other dts changes for 3.14.
+
+>
+> Yours,
+> Linus Walleij
+
+-barry
