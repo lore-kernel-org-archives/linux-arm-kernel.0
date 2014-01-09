@@ -1,61 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 09 Jan 2014 20:08:32 +0100
-Subject: [GIT PULL] Samsung Clock changes for v3.14
-In-Reply-To: <20140109004956.7168.34121@quantum>
-References: <3518820.nAXoIq2LQG@amdc1227> <20140108225943.6098.47795@quantum>
- <20140109004956.7168.34121@quantum>
-Message-ID: <5724394.ipj3s2zcuB@flatron>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 09 Jan 2014 23:14:30 +0300
+Subject: [PATCH v3 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
+References: <1389290226-6971-1-git-send-email-hdegoede@redhat.com>
+ <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <52CF0326.1090407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 of January 2014 16:49:56 Mike Turquette wrote:
-> Quoting Mike Turquette (2014-01-08 14:59:43)
-> > Quoting Tomasz Figa (2014-01-08 14:43:24)
-> > > On Wednesday 08 of January 2014 14:07:49 Mike Turquette wrote:
-> > > > Quoting Tomasz Figa (2014-01-08 11:13:38)
-> > > > > Hi Mike,
-> > > > > 
-> > > > > Please consider pulling following Samsung Clock changes for v3.14.
-> > > > > 
-> > > > > The following changes since commit 2bb00c68e094271b79deac993893461cc051b721:
-> > > > 
-> > > > Hi Tomasz,
-> > > > 
-> > > > Commit 2bb00c68 is the tip of the Samsung clk fixes that I'm about to
-> > > > send out. Can you rebase this request onto the tip of clk-next?
-> > > 
-> > > I guess I can do it, but wouldn't this introduce merge conflicts, since
-> > > some of the fixes are changing the same parts of the code?
-> > 
-> > Yes it will cause conflicts, but that is sometimes OK.
-> > 
-> > > 
-> > > I based my samsung-next branch on top of your clk-next with my fixes
-> > > branch merged, since that's what will end up in Linus' tree anyway. Was it
-> > > not the right thing to do?
-> > 
-> > Well maybe I am missing something, but I think it is not the best thing.
-> > The problem is that those patches will sort of be merged twice. Again
-> > maybe I am missing something. The same commit IDs will be used so
-> > perhaps it is OK...
-> > 
-> > Part of this trouble is caused by the simple way that I fork clk-next
-> > from v3.xx-rc1. Since I never rebase that branch to a more recent -rc
-> > then there is a delta between the fixes that go in the queue of patches
-> > for the next merge window.
-> > 
-> > I guess one way that other subsystems handle this is by having something
-> > like clk-next-late which is a new branch based on a later -rc.
-> > 
-> > How awful is the merge conflict resolution?
-> 
-> Thanks for working this out on IRC. I've taken this pull request into
-> clk-next for 3.14.
+Hello.
 
-Great, thanks.
+On 01/09/2014 08:57 PM, Hans de Goede wrote:
 
-One more thing. Could you update your public tree to let patches get some
-wider testing in linux-next before the merge window?
+> Add support for ohci-platform instantiation from devicetree, including
+> optionally getting clks and a phy from devicetree, and enabling / disabling
+> those on power_on / off.
 
-Best regards,
-Tomasz
+> This should allow using ohci-platform from devicetree in various cases.
+> Specifically after this commit it can be used for the ohci controller found
+> on Allwinner sunxi SoCs.
+
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>   .../devicetree/bindings/usb/mmio-ohci.txt          |  22 +++
+>   drivers/usb/host/ohci-platform.c                   | 150 ++++++++++++++++++---
+>   2 files changed, 152 insertions(+), 20 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/usb/mmio-ohci.txt
+
+> diff --git a/Documentation/devicetree/bindings/usb/mmio-ohci.txt b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+> new file mode 100644
+> index 0000000..9c776ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+> @@ -0,0 +1,22 @@
+> +Generic MMIO OHCI controller
+
+    OHCI controller always uses MMIO, and likewise EHCI. You don't need to 
+specifically mention it.
+
+> +
+> +Required properties:
+> +- compatible : "mmio-ohci"
+
+    Likewise, it's not a good name. Why not call it "platform-ohci"?
+
+> +- reg : ohci controller register range (address and length)
+> +- interrupts : ohci controller interrupt
+> +
+> +Optional properties:
+> +- clocks : a list of phandle + clock specifier pairs
+> +- phys : phandle + phy specifier pair
+> +- phy-names : "usb"
+> +
+> +Example:
+> +
+> +	ohci0: ohci at 0x01c14400 {
+> +		compatible = "mmio-ohci";
+> +		reg = <0x01c14400 0x100>;
+> +		interrupts = <64>;
+> +		clocks = <&usb_clk 6>, <&ahb_gates 2>;
+> +		phys = <&usbphy 1>;
+> +		phy-names = "usb";
+> +	};
+
+WBR, Sergei
