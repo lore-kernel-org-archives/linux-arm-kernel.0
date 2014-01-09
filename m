@@ -1,174 +1,89 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 9 Jan 2014 15:31:16 -0600
-Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the "altr,
- socfpga-gate-clk"
-In-Reply-To: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
-References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1389303079-19808-2-git-send-email-dinguyen@altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 14:12:05 -0800
+Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
+In-Reply-To: <52CE055C.5030103@codeaurora.org>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
+ <20140109015158.7168.60274@quantum> <52CE055C.5030103@codeaurora.org>
+Message-ID: <52CF1EB5.9070706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On 01/08/14 18:11, Stephen Boyd wrote:
+> On 01/08/14 17:51, Mike Turquette wrote:
+>> Patch #3 illustrates the sort of struct-member-creep that worries me.
+>> What is to stop someone from putting "unsigned int divider_reg" or
+>> "unsigned int mux_reg", and then the thing just keeps growing.
+>>
+> I see two ways forward if you don't want these members in struct clk_hw.
+>
+> 1) Inheritance: struct clk_regmap wrapper struct and
+> clk_register_regmap() and devm_clk_register_regmap() and then another
+> wrapper struct around that.
+>
+>  example:
+>
+> struct clk_regmap {
+>         struct clk_hw hw;
+>         struct regmap *regmap;
+>         unsigned int enable_reg;
+>         unsigned int enable_mask;
+>         bool enable_is_inverted;
+> };
+>
+> struct clk_branch {
+>         u32     hwcg_reg;
+>         u32     halt_reg;
+>         u8      hwcg_bit;
+>         u8      halt_bit;
+>         u8      halt_check;
+>
+>         struct clk_regmap       clkr;
+> };
+>
+> static struct clk_branch gsbi1_uart_clk = {
+>         .halt_reg = 0x2fcc,
+>         .halt_bit = 10,
+>         .clkr = {
+>                 .enable_reg = 0x29d4,
+>                 .enable_mask = BIT(9),
+>                 .hw.init = &(struct clk_init_data){
+>                         .name = "gsbi1_uart_clk",
+>                         .parent_names = (const char *[]){
+>                                 "gsbi1_uart_src",
+>                         },
+>                         .num_parents = 1,
+>                         .ops = &clk_branch_ops,
+>                         .flags = CLK_SET_RATE_PARENT,
+>                 },
+>         },
+> };
 
-The clk-phase property is used to represent the 2 clock phase values that is
-needed for the SD/MMC driver. Add a prepare function to the clk_ops, that will
-use the syscon driver to set sdmmc_clk's phase shift that is located in the
-system manager.
+The downside to this approach is that we have to have two similar
+structs for struct clk_gate if we want to support regmap in that code
+path. If we put the regmap inside struct clk_hw we don't have two
+different structs, we would just assign different ops.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
-v9: none
-v8: Use degrees in the clk-phase binding property
-v7: Add dts property to represent the clk phase of the sdmmc_clk. Add a
-    prepare function to the gate clk that will toggle clock phase setting.
-    Remove the "altr,socfpga-sdmmc-sdr-clk" clock type.
-v6: Add a new clock type "altr,socfpga-sdmmc-sdr-clk" that will be used to
-    set the phase shift settings.
-v5: Use the "snps,dw-mshc" binding
-v4: Use the sdmmc_clk prepare function to set the phase shift settings
-v3: Not use the syscon driver because as of 3.13-rc1, the syscon driver is
-    loaded after the clock driver.
-v2: Use the syscon driver
----
- .../devicetree/bindings/clock/altr_socfpga.txt     |    5 ++
- arch/arm/boot/dts/socfpga.dtsi                     |    1 +
- drivers/clk/socfpga/clk-gate.c                     |   68 ++++++++++++++++++++
- 3 files changed, 74 insertions(+)
+struct clk_gate {
+        struct clk_hw hw;
+        void __iomem    *reg;
+        u8              bit_idx;
+        u8              flags;
+        spinlock_t      *lock;
+};
 
-diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-index 0045433..5dfd145 100644
---- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-+++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-@@ -23,3 +23,8 @@ Optional properties:
-         and the bit index.
- - div-reg : For "socfpga-gate-clk", div-reg contains the divider register, bit shift,
-         and width.
-+- clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
-+	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
-+	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
-+	hold/delay times that is needed for the SD/MMC CIU clock. The values of both
-+	can be 0-315 degrees, in 45 degree increments.
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index f936476..e776512 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -413,6 +413,7 @@
- 						compatible = "altr,socfpga-gate-clk";
- 						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
- 						clk-gate = <0xa0 8>;
-+						clk-phase = <0 135>;
- 					};
- 
- 					nand_x_clk: nand_x_clk {
-diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-index 4efcf4e..501d513 100644
---- a/drivers/clk/socfpga/clk-gate.c
-+++ b/drivers/clk/socfpga/clk-gate.c
-@@ -19,7 +19,9 @@
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/io.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of.h>
-+#include <linux/regmap.h>
- 
- #include "clk.h"
- 
-@@ -35,6 +37,11 @@
- 
- #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
- 
-+/* SDMMC Group for System Manager defines */
-+#define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
-+#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
-+	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-+
- static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
- {
- 	u32 l4_src;
-@@ -115,7 +122,61 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
- 	return parent_rate / div;
- }
- 
-+static int socfpga_clk_prepare(struct clk_hw *hwclk)
-+{
-+	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
-+	struct regmap *sys_mgr_base_addr;
-+	int i;
-+	u32 hs_timing;
-+	u32 clk_phase[2];
-+
-+	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
-+		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-+		if (IS_ERR(sys_mgr_base_addr)) {
-+			pr_err("%s: failed to find altr,sys-mgr regmap!\n", __func__);
-+			return -EINVAL;
-+		}
-+
-+		for (i = 0; i < 2; i++) {
-+			switch (socfpgaclk->clk_phase[i]) {
-+			case 0:
-+				clk_phase[i] = 0;
-+				break;
-+			case 45:
-+				clk_phase[i] = 1;
-+				break;
-+			case 90:
-+				clk_phase[i] = 2;
-+				break;
-+			case 135:
-+				clk_phase[i] = 3;
-+				break;
-+			case 180:
-+				clk_phase[i] = 4;
-+				break;
-+			case 225:
-+				clk_phase[i] = 5;
-+				break;
-+			case 270:
-+				clk_phase[i] = 6;
-+				break;
-+			case 315:
-+				clk_phase[i] = 7;
-+				break;
-+			default:
-+				clk_phase[i] = 0;
-+				break;
-+			}
-+		}
-+		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
-+		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
-+			hs_timing);
-+	}
-+	return 0;
-+}
-+
- static struct clk_ops gateclk_ops = {
-+	.prepare = socfpga_clk_prepare,
- 	.recalc_rate = socfpga_clk_recalc_rate,
- 	.get_parent = socfpga_clk_get_parent,
- 	.set_parent = socfpga_clk_set_parent,
-@@ -126,6 +187,7 @@ static void __init __socfpga_gate_init(struct device_node *node,
- {
- 	u32 clk_gate[2];
- 	u32 div_reg[3];
-+	u32 clk_phase[2];
- 	u32 fixed_div;
- 	struct clk *clk;
- 	struct socfpga_gate_clk *socfpga_clk;
-@@ -166,6 +228,12 @@ static void __init __socfpga_gate_init(struct device_node *node,
- 		socfpga_clk->div_reg = 0;
- 	}
- 
-+	rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
-+	if (!rc) {
-+		socfpga_clk->clk_phase[0] = clk_phase[0];
-+		socfpga_clk->clk_phase[1] = clk_phase[1];
-+	}
-+
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
- 	init.name = clk_name;
+and
+
+struct clk_gate_regmap {
+        struct clk_regmap hw;
+        u8              flags;
+        spinlock_t      *lock;
+};
+
+Do you have any preference on which way we move forward here? I have the
+wrapper method all finished and ready to send if you agree with that
+approach.
+
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
