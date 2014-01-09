@@ -1,67 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 09 Jan 2014 23:14:30 +0300
-Subject: [PATCH v3 1/2] ohci-platform: Add support for devicetree
- instantiation
-In-Reply-To: <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
-References: <1389290226-6971-1-git-send-email-hdegoede@redhat.com>
- <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <52CF0326.1090407@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 11:17:29 -0800
+Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
+In-Reply-To: <20140109104943.GB17838@mudshark.cambridge.arm.com>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
+ <20140109104943.GB17838@mudshark.cambridge.arm.com>
+Message-ID: <52CEF5C9.1010701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 01/09/14 02:49, Will Deacon wrote:
+>
+>> +static irq_handler_t cpu_handler;
+>> +
+>> +static irqreturn_t cpu_pmu_dispatch_irq(int irq, void *dev)
+>> +{
+>> +	struct arm_pmu *arm_pmu = *(struct arm_pmu **)dev;
+>> +	return cpu_handler(irq, arm_pmu);
+>> +}
+> I don't like this bit -- having a global cpu_handler field is going to
+> interfere with the big.LITTLE work and casting the per-cpu dev token is also
+> pretty hacky.
+>
+> However, you're forced down this route by the need to invoke the armpmu IRQ
+> dispatcher. Now, that only exists as a workaround for the braindead
+> interrupt routing on the u8500 (they OR'd all the PMU SPIs together) -- it's
+> not a problem that will affect a system using PPIs. If you look, there is
+> only one use of the thing in: arch/arm/mach-ux500/cpu-db8500.c.
+>
+> So, we could rename that callback to make it clear that it's not so much an
+> IRQ handler wrapper as a specific hack to deal with broken SPIs. Then the
+> cpu_pmu code can neglect to make the callback if it's using PPI.
+>
+> What do you think?
 
-On 01/09/2014 08:57 PM, Hans de Goede wrote:
+Yeah I hate this bouncing layer too but it was the best I could come up
+with. I'll rename it to 'armpmu_dispatch_spi_irq' (bikeshedding welcome).
 
-> Add support for ohci-platform instantiation from devicetree, including
-> optionally getting clks and a phy from devicetree, and enabling / disabling
-> those on power_on / off.
+We can avoid the hacky cast of the per-cpu dev token by using the
+cpu_pmu pointer directly, but we'll still need to pass something to the
+percpu interrupt handler otherwise the genirq layer doesn't allow us to
+request the PPI. I can pass hw_events I guess. Is that what you're
+thinking? Or were you thinking that we could just use
+cpu_pmu->handle_irq as the handler argument in request_percpu_irq()? I
+can't figure out how that is supposed to work.
 
-> This should allow using ohci-platform from devicetree in various cases.
-> Specifically after this commit it can be used for the ohci controller found
-> on Allwinner sunxi SoCs.
-
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->   .../devicetree/bindings/usb/mmio-ohci.txt          |  22 +++
->   drivers/usb/host/ohci-platform.c                   | 150 ++++++++++++++++++---
->   2 files changed, 152 insertions(+), 20 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/usb/mmio-ohci.txt
-
-> diff --git a/Documentation/devicetree/bindings/usb/mmio-ohci.txt b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
-> new file mode 100644
-> index 0000000..9c776ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
-> @@ -0,0 +1,22 @@
-> +Generic MMIO OHCI controller
-
-    OHCI controller always uses MMIO, and likewise EHCI. You don't need to 
-specifically mention it.
-
-> +
-> +Required properties:
-> +- compatible : "mmio-ohci"
-
-    Likewise, it's not a good name. Why not call it "platform-ohci"?
-
-> +- reg : ohci controller register range (address and length)
-> +- interrupts : ohci controller interrupt
-> +
-> +Optional properties:
-> +- clocks : a list of phandle + clock specifier pairs
-> +- phys : phandle + phy specifier pair
-> +- phy-names : "usb"
-> +
-> +Example:
-> +
-> +	ohci0: ohci at 0x01c14400 {
-> +		compatible = "mmio-ohci";
-> +		reg = <0x01c14400 0x100>;
-> +		interrupts = <64>;
-> +		clocks = <&usb_clk 6>, <&ahb_gates 2>;
-> +		phys = <&usbphy 1>;
-> +		phy-names = "usb";
-> +	};
-
-WBR, Sergei
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
