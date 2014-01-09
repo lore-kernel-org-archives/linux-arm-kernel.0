@@ -1,95 +1,38 @@
-From: m.paolino@virtualopensystems.com (Michele Paolino)
-Date: Thu, 09 Jan 2014 12:22:38 +0100
-Subject: [PATCH v4 0/5] USB Host support for OMAP5 uEVM (for 3.14)
-In-Reply-To: <52CE8314.2000000@ti.com>
-References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
- <52CE824D.2090905@virtualopensystems.com> <52CE8314.2000000@ti.com>
-Message-ID: <52CE867E.1090203@virtualopensystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jan 2014 11:33:00 +0000
+Subject: [PATCH V3 Resend] cpufreq: create cpufreq_generic_get() routine
+In-Reply-To: <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
+References: <d9239e0a5df99392647ff8343673342f89d09476.1389059568.git.viresh.kumar@linaro.org>
+ <CAOesGMgfFVoVJpOMXWtzVWj_F4pD-L9Osyv4u6=c8RUWOoLHFw@mail.gmail.com>
+ <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
+Message-ID: <20140109113300.GA27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 12:08, Roger Quadros wrote:
-> Hi Michele,
->
-> Did you enable CONFIG_USB_EHCI_HCD_OMAP in the kernel config?
-> It is not enabled by default in omap2plus_defconfig.
-Indeed it works.  Thank you!
+On Thu, Jan 09, 2014 at 02:56:28PM +0530, Viresh Kumar wrote:
+> Naah.. After some investigation I found this:
+> 
+> - We already have dummy implementations of clk routines in case
+> CONFIG_HAVE_CLK is not defined (I added them long back).
+> 
+> - There is one thing common among all above defconfigs, all
+> belong to SA1100 family :)
+> 
+> - And the problem is: SA1100 wanted to define its own clk routines
+> and selects CLKDEV_LOOKUP (which enables HAVE_CLK), but it
+> doesn't implement all clk routines. Which is *wrong*.
 
->
-> cheers,
-> -roger
->
-> On 01/09/2014 04:34 PM, Michele Paolino wrote:
->> Hello Roger,
->>
->> I'm testing your patch on an OMAP5430 EVM board. The ethernet is not working in my case. The kernel I'm using is (Tero Kristo's repo - branch 3.13-rc7-dt-clks-v13). Is there something that I'm missing?
->>
->> Here below you can find more info about my configuration:
->>
->> boot error messages:
->> eth0: ERROR while getting interface flags: No such device
->> SIOCSIFADDR: No such device
->> eth0: ERROR while getting interface flags: No such device
->> SIOCADDRT: Network is unreachable
->>
->> root at OMAP5:~# /usr/lib/klibc/bin/ipconfig eth0
->> ipconfig: eth0: SIOCGIFINDEX: No such device
->> /usr/lib/klibc/bin/ipconfig: no devices to configure
->>
->> root at OMAP5:~# uname -a
->> Linux OMAP5 3.13.0-rc7-g2a4526d-dirty #0 SMP Wed Jan 8 10:41:48 CET 2014x
->>
->> root at OMAP5:~# dmesg | grep eth
->> [    1.661434] usbcore: registered new interface driver cdc_ether
->>
->> Regards,
->>
->>
->> On 08/01/2014 07:15, Roger Quadros wrote:
->>> Hi Benoit & Tony,
->>>
->>> This patchset brings up USB Host ports and Ethernet port on
->>> the OMAP5 uEVM board.
->>>
->>> It depends on the TI Clock DT conversion patches [1] and is based
->>> on 3.13-rc7
->>>
->>> [1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/289895
->>>
->>> Changelog:
->>>
->>> v4:
->>> - Updated DT binding document for clock binding
->>>
->>> v3:
->>> - Rebased on top of 3.13-rc7
->>>
->>> cheers,
->>> -roger
->>>
->>> Roger Quadros (5):
->>>    mfd: omap-usb-host: Update DT clock binding information
->>>    ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
->>>    ARM: dts: omap4-panda: Provide USB PHY clock
->>>    ARM: dts: omap5-uevm: Provide USB PHY clock
->>>    ARM: OMAP2+: Remove legacy_init_ehci_clk()
->>>
->>>   Documentation/devicetree/bindings/mfd/omap-usb-host.txt |  4 ++++
->>>   arch/arm/boot/dts/omap4-panda-common.dtsi               |  8 ++------
->>>   arch/arm/boot/dts/omap5-uevm.dts                        |  8 ++------
->>>   arch/arm/boot/dts/omap5.dtsi                            |  2 ++
->>>   arch/arm/mach-omap2/pdata-quirks.c                      | 16 ----------------
->>>   5 files changed, 10 insertions(+), 28 deletions(-)
->>>
->>
->> -- 
->> *Michele Paolino*, Virtualization R&D Engineer
->> Virtual Open Systems
->> /Open Source  KVM  Virtualization  Developments/
->> /Multicore Systems Virtualization Porting Services/
->> Web/:/ www.virtualopensystems. <http://www.virtualopensystems.com/>com <http://www.virtualopensystems.com/>
->>
->>
---
-Michele Paolino, Virtualization R&D Engineer
-Virtual Open Systems
+No, it implements only what it's clk API implementation requires.
+
+> @Russell: If above looks correct then can you please communicate
+> what should we do here? I don't really know what exactly these
+> routines should have, simply a copy of dummy routines from clk.h
+> or some meaningful stuff. So, maybe you can write a patch, otherwise
+> let me know what to write and I will give it a try.
+
+I've no idea at the moment, and I don't have time to look at this.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
