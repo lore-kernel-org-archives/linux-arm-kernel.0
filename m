@@ -1,38 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Jan 2014 10:30:05 +0000
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20140109103004.GB11089@mudshark.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 9 Jan 2014 16:09:00 +0530
+Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
+ dependency on aemif
+In-Reply-To: <52BC1BB8.2070007@ti.com>
+References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com> <52BC1BB8.2070007@ti.com>
+Message-ID: <52CE7C44.1000803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
-> Remove !GENERIC_ATOMIC64 build dependency:
-> - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
->   GENERIC_ATOMIC64;
-> - call armv7_atomic64_xchg directly from xen/events.h.
+On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
+> On 12/18/2013 02:13 PM, Sekhar Nori wrote:
+>> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
+>>> Hi, Sekhar
+>>>
+>>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
+>>> series.
+>>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
+>>> and can be found at http://git.infradead.org/l2-mtd.git
+>>>
+>>> This patch can be still applied on top of the series without conflicts.
+>>>
+>>> Can you please pick up the $subject patch if you are OK with it?
+>>
+>> I have no problems with the patch and can pick it too, but need ack from
+>> MTD maintainer (David) as it touches drivers/mtd/ too.
+>>
+>> David,
+>>
+>> If you do not have the patch, we can resend it.
+>>
+>> Thanks,
+>> Sekhar
+>>
 > 
-> Remove !CPU_V6 build dependency:
-> - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
->   CONFIG_CPU_V6;
-> - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
+> Hi Brian,
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: arnd at arndb.de
-> CC: linux at arm.linux.org.uk
-> CC: will.deacon at arm.com
-> CC: gang.chen at asianux.com
-> CC: catalin.marinas at arm.com
-> CC: jaccon.bastiaansen at gmail.com
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
+> Do you agree if this patch will go through Davinci tree?
 > 
+> This is the last one we need to reuse Davinci Nand driver for Keystone.
 
-I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
-What am I missing?
+Since we never got an ack from MTD folks, I am going and go ahead and
+try pushing this through ARM-SoC regardless. I will CC the MTD
+maintainers on the pull request so any objections could even be posted
+there.
 
-Will
+Thanks,
+Sekhar
