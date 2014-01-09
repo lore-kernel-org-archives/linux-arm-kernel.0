@@ -1,32 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Jan 2014 23:11:03 -0800
-Subject: linux-next: manual merge of the sh tree with the tree
-In-Reply-To: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
-References: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
-Message-ID: <CAOesGMgJe9KR2muA4F9EaXYpDFDLxVZsKOj-8qZFbDZTiRBuww@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 9 Jan 2014 16:16:56 +0900
+Subject: possible regression on 3.13 when calling flush_dcache_page
+In-Reply-To: <20140106093408.GA2816@ldesroches-Latitude-E6320>
+References: <20131212143618.GJ12099@ldesroches-Latitude-E6320>
+ <20131213015909.GA8845@lge.com>
+ <20131216144343.GD9627@ldesroches-Latitude-E6320>
+ <20131218072117.GA2383@lge.com>
+ <20131220080851.GC16592@ldesroches-Latitude-E6320>
+ <20131223224435.GD16592@ldesroches-Latitude-E6320>
+ <20131224063837.GA27156@lge.com>
+ <20140103145404.GC18002@ldesroches-Latitude-E6320>
+ <20140106002648.GC696@lge.com>
+ <20140106093408.GA2816@ldesroches-Latitude-E6320>
+Message-ID: <20140109071656.GA10290@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 5, 2014 at 5:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Paul,
->
-> Today's linux-next merge of the sh tree got conflicts in
-> drivers/tty/serial/sh-sci.c and include/linux/serial_sci.h between
-> commits 8fb9631c517b ("serial: sh-sci: Sort headers alphabetically"),
-> 20bdcab8268c ("serial: sh-sci: Add OF support") and probably others from
-> the arm-soc tree and commits ada80ee7fa60 ("serial: sh-sci: Add OF
-> support") and b19ef75c56e9 ("serial: sh-sci: OF definitions need
-> linux/of.h") from the sh tree.
->
-> The arm-soc tree version is dated much more recently than
-> the sh tree version and conflicts badly, so for today I have just dropped
-> the sh tree (everything in there was committed before April 2013).  Please
-> figure this out.
+On Mon, Jan 06, 2014 at 10:34:09AM +0100, Ludovic Desroches wrote:
+> On Mon, Jan 06, 2014 at 09:26:48AM +0900, Joonsoo Kim wrote:
+> > On Fri, Jan 03, 2014 at 03:54:04PM +0100, Ludovic Desroches wrote:
+> > > Hi,
+> > > 
+> > > On Tue, Dec 24, 2013 at 03:38:37PM +0900, Joonsoo Kim wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > > > > > I think that this commit may not introduce a bug. This patch remove one
+> > > > > > > > > variable on slab management structure and replace variable name. So there
+> > > > > > > > > is no functional change.
+> > > 
+> > > You are right, the commit given by git bisect was not the good one...
+> > > Since I removed other patches done on top of it, I thought it really was
+> > > this one but in fact it is 8456a64.
+> > 
+> > Okay. It seems more reasonable to me.
+> > I guess that this is the same issue with following link.
+> > http://lkml.org/lkml/2014/1/4/81
+> > 
+> > And, perhaps, that patch solves your problem. But I'm not sure that it is the
+> > best solution for this problem. I should discuss with slab maintainers.
+> 
+> Yes this patch solves my problem.
+> 
+> > 
+> > I will think about this problem more deeply and report the solution to you
+> > as soon as possible.
+> 
+> Ok thanks.
+> 
 
-The request to merge the sh code came through Simon with claimed
-agreement from SH maintainers to do so -- I didn't verify this since
-they have in the past been well-coordinated. Simon?
+Hello,
 
+That patch will be merged through Andrew's tree.
+Use it to fix your problem :)
 
-
--Olof
+Thanks.
