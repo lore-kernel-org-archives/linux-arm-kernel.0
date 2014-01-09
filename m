@@ -1,88 +1,155 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Thu,  9 Jan 2014 21:29:19 +0530
-Subject: [PATCH 0/6] cpufreq: use cpufreq-cpu0 driver for exynos4210 based
- platforms
-Message-ID: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+Date: Thu,  9 Jan 2014 21:29:20 +0530
+Subject: [PATCH 1/6] cpufreq: cpufreq-cpu0: allow optional safe voltage during
+ frequency transitions
+In-Reply-To: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series removes the use of Exynos4210 specific cpufreq driver
-and enables to use the cpufreq-cpu0 driver for Exynos4210 based platforms.
-This is being done for few reasons.
+On some platforms such as the Samsung Exynos, changing the frequency
+of the CPU clock requires changing the frequency of the PLL that is
+supplying the CPU clock. To change the frequency of the PLL, the CPU
+clock is temporarily reparented to another parent clock.
 
-(a) The Exynos4210 cpufreq driver reads/writes clock controller registers
-    bypassing the Exynos4 CCF driver which is sort of problematic.
-(b) Removes the need for having clock controller register definitions
-    in the cpufreq driver and also removes the need for statically
-    io-remapping clock controller address space (helps in moving towards
-    multiplatform kernel).
+The clock frequency of this temporary parent clock could be much higher
+than the clock frequency of the PLL at the time of reparenting. Due
+to the temporary increase in the CPU clock speed, the CPU (and any other
+components in the CPU clock domain such as dividers, mux, etc.) have to
+to be operated at a higher voltage level, called the safe voltage level.
+This patch adds optional support to temporarily switch to a safe voltage
+level during CPU frequency transitions.
 
-In order to use cpufreq-cpu0 driver and provide fast cpu clock switching
-during dvfs operations, the following apporach has been used.
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+---
+ .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    5 ++
+ drivers/cpufreq/cpufreq-cpu0.c                     |   49 +++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 2 deletions(-)
 
-(a) A new CPU clock provider type has been introduced in Samsung's CCF
-    support. This clock provider type can be a compostion of multiple
-    clock blocks such as mux, dividers and gates. Typically, in Exynos
-    platforms, there are multiple clock blocks in between the output
-    of the APLL and the CPU clock domain output. Representing these
-    mutiple clock blocks within a opaque CPU clock provider type helps
-    in reducing the time taken to perform a CPU clock frequency change
-    operation, which is generally required during DVFS operations.
-    This approach was suggested by Arnd Bergmann <arnd@arndb.de> during
-    LCE-2013.
-
-(b) A new optional safe operating point property has been introduced
-    in the cpufreq-cpu0 driver binding. On some platforms such as the
-    Samsung Exynos, a change in CPU frequency requires a change in the
-    PLL output that drives the CPU clock. A change in PLL output
-    requires the PLL output be turned off, which implies that the CPU
-    (and other components in the CPU clock domain) be supplied with
-    an alternate clock source during the time the PLL output is changed.
-
-    The clock speed of this alternate clock source could be higher
-    than the clock speed of the PLL at the time of switching over to
-    the alternate clock source. This temporary increase in clock speed
-    of the CPU clock domain implies that the blocks within the CPU
-    clock domain should also be supplied with an appropriate voltage
-    supply level as required to drive the CPU clock domain components
-    at the speed of the alternative clock source. This temporary
-    voltage level required during switching of CPU clock speed is
-    called safe voltage level. And the cpufreq-cpu0 driver has been
-    modified to setup the safe voltage levels during the changes
-    in CPU clock speed.
-
-(c) The CPU clock supply as been restructured as
-    [ Output of APLL -> Opaque CPU clock provider -> CPU clock output ]
-    And with the changes in (a) and (b) above, the cpufreq-cpu0 driver
-    can now be used and can remove the use of Exynos4210 specific
-    cpufreq driver.
-
-This approach is currently tried on Exynos4210 only. The same approach
-can be adopted for other Exynos SoCs as well. This patch series is
-based on linux-next master branch.
-
-Thomas Abraham (6):
-  cpufreq: cpufreq-cpu0: allow optional safe voltage during frequency transitions
-  clk: samsung: add infrastructure to register CPU clocks
-  clk: samsung: register cpu clock provider for exynos4210 SoC
-  cpufreq: exynos: remove Exynos4210 specific cpufreq driver support
-  arm: exynos4-dt: statically add platform device for cpufreq-cpu0 platform driver
-  arm: dts: add cpu nodes for Exynos4210 SoC
-
- .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    5 +
- arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
- arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
- arch/arm/boot/dts/exynos4210.dtsi                  |   22 +++
- arch/arm/mach-exynos/mach-exynos4-dt.c             |    6 +
- drivers/clk/samsung/clk-exynos4.c                  |   96 ++++++++++++-
- drivers/clk/samsung/clk.c                          |   71 +++++++++
- drivers/clk/samsung/clk.h                          |   37 +++++-
- drivers/cpufreq/Kconfig.arm                        |   11 --
- drivers/cpufreq/Makefile                           |    1 -
- drivers/cpufreq/cpufreq-cpu0.c                     |   49 ++++++-
- drivers/cpufreq/exynos-cpufreq.c                   |    4 +-
- drivers/cpufreq/exynos-cpufreq.h                   |    8 -
- drivers/cpufreq/exynos4210-cpufreq.c               |  157 --------------------
- 15 files changed, 301 insertions(+), 184 deletions(-)
- delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+index f055515..020d859 100644
+--- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
++++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+@@ -19,6 +19,10 @@ Optional properties:
+ - cooling-min-level:
+ - cooling-max-level:
+      Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
++- safe-opp-index: Certain platforms require that during a opp transition,
++  a system should not go below a particular opp level. For such systems,
++  this property specifies the minimum opp to be maintained during the
++  opp transitions.
+ 
+ Examples:
+ 
+@@ -36,6 +40,7 @@ cpus {
+ 			396000  950000
+ 			198000  850000
+ 		>;
++		safe-opp-index = <1>;
+ 		clock-latency = <61036>; /* two CLK32 periods */
+ 		#cooling-cells = <2>;
+ 		cooling-min-level = <0>;
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index 0c12ffc..dda4b7b 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -27,6 +27,8 @@
+ 
+ static unsigned int transition_latency;
+ static unsigned int voltage_tolerance; /* in percentage */
++static unsigned long safe_frequency;
++static unsigned long safe_voltage;
+ 
+ static struct device *cpu_dev;
+ static struct clk *cpu_clk;
+@@ -69,12 +71,26 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		 new_freq / 1000, volt ? volt / 1000 : -1);
+ 
+ 	/* scaling up?  scale voltage before frequency */
+-	if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
++	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
++				new_freq >= safe_frequency) {
+ 		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
+ 		if (ret) {
+ 			pr_err("failed to scale voltage up: %d\n", ret);
+ 			return ret;
+ 		}
++	} else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
++		/*
++		 * the scaled up voltage level for the new_freq is lower
++		 * than the safe voltage level. so set safe_voltage
++		 * as the intermediate voltage level and revert it
++		 * back after the frequency has been changed.
++		 */
++		ret = regulator_set_voltage(cpu_reg, safe_voltage,
++						safe_voltage);
++		if (ret) {
++			pr_err("failed to set safe voltage: %d\n", ret);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = clk_set_rate(cpu_clk, freq_exact);
+@@ -94,6 +110,19 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		}
+ 	}
+ 
++	/*
++	 * if safe voltage was applied during voltage scale up, then set
++	 * the correct target voltage now.
++	 */
++	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
++					new_freq < safe_frequency) {
++		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
++		if (ret) {
++			pr_err("failed to scale voltage up: %d\n", ret);
++			return ret;
++		}
++	}
++
+ 	return ret;
+ }
+ 
+@@ -116,7 +145,9 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+ 
+ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+ {
++	struct dev_pm_opp *opp;
+ 	struct device_node *np;
++	unsigned int safe_opp_index;
+ 	int ret;
+ 
+ 	cpu_dev = get_cpu_device(0);
+@@ -165,13 +196,27 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+ 		goto out_put_node;
+ 	}
+ 
++	if (!of_property_read_u32(np, "safe-opp-index", &safe_opp_index)) {
++		rcu_read_lock();
++		opp = dev_pm_opp_find_freq_exact(cpu_dev,
++			freq_table[safe_opp_index].frequency * 1000, true);
++		if (IS_ERR(opp)) {
++			rcu_read_unlock();
++			pr_err("safe opp index %d is invalid\n",
++							safe_opp_index);
++			goto out_free_table;
++		}
++		safe_voltage = dev_pm_opp_get_voltage(opp);
++		safe_frequency = freq_table[safe_opp_index].frequency;
++		rcu_read_unlock();
++	}
++
+ 	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
+ 
+ 	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+ 		transition_latency = CPUFREQ_ETERNAL;
+ 
+ 	if (!IS_ERR(cpu_reg)) {
+-		struct dev_pm_opp *opp;
+ 		unsigned long min_uV, max_uV;
+ 		int i;
+ 
+-- 
+1.6.6.rc2
