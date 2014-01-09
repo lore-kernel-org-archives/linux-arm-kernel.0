@@ -1,37 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 15:37:21 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 3/3] ARM: sun7i: irqchip: Update the
- documentation
-In-Reply-To: <CAOQ7t2YYr_gphkXnp1OVsR_sHoOdEhVzDMETjJ2FsDz=Pvh7xQ@mail.gmail.com>
-References: <1389030097-10822-1-git-send-email-carlo.caione@gmail.com>
- <14122384.i9DNmsOzpC@wuerfel>
- <CAOQ7t2YYr_gphkXnp1OVsR_sHoOdEhVzDMETjJ2FsDz=Pvh7xQ@mail.gmail.com>
-Message-ID: <201401091537.21584.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 9 Jan 2014 09:37:06 -0500
+Subject: [PATCH] ARM: keystone: config: fix build warning when
+ CONFIG_DMADEVICES is not set
+Message-ID: <1389278226-23071-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Carlo Caione wrote:
-> In Allwinner A20/A31 SoCs NMI controller is an independent module
-> external and in cascade with the GIC. It catches the NMI pin's state
-> and generates irq to GIC.
-> (therefore NMI is not really not Non-maskable but it is a normal interrupt).
-> Here is an ascii-plot of the system (thanks to Maxime and the
-> Allwinner engineers for this)
-> 
->            +---------+            +-----------+
->            |         +------------+ FIQ       |
->            |   GIC   |            |           |
->            |         +------------+ INT   CPU |
->            +--+---+--+            |           |
->               |   |               |           |
->               |   +------+        |           |
->               |          |        |           |
->  +-----+   +--+--+   +---+---+    |           |
->  | AXP +-+-+ NMI +   | ALARM |    |           |
->  +-----+ | +-----+   +---+---+    +-----------+
->          |               |
->          +---------------+
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Ah, cool. That certianly makes sense now. Thanks for the explanation.
+Drop automatic selection of TI_EDMA from Keystone Kconfig file,
+as it produces build warning in case if CONFIG_DMADEVICES is not set:
 
-	Arnd
+warning: (ARCH_KEYSTONE) selects TI_EDMA which has unmet direct dependencies (DMADEVICES && (ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE))
+
+Instead enable TI EDMA support from defconfig.
+
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+
+Kevin, Olof, Arnd,
+
+Please let me know if you can pick this patch in 3.14 arm-soc
+queue or you prefer a pull request for the same. It applies against
+'next/soc' cleanly.
+
+Regards,
+Santosh
+
+ arch/arm/configs/keystone_defconfig |    1 +
+ arch/arm/mach-keystone/Kconfig      |    1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index a018244..4582e16 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -142,6 +142,7 @@ CONFIG_USB_DWC3_DEBUG=y
+ CONFIG_USB_DWC3_VERBOSE=y
+ CONFIG_KEYSTONE_USB_PHY=y
+ CONFIG_DMADEVICES=y
++CONFIG_TI_EDMA=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_MEMORY=y
+ CONFIG_EXT4_FS=y
+diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+index dabc5ee..90a708f 100644
+--- a/arch/arm/mach-keystone/Kconfig
++++ b/arch/arm/mach-keystone/Kconfig
+@@ -10,7 +10,6 @@ config ARCH_KEYSTONE
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_ERRATA_798181 if SMP
+ 	select COMMON_CLK_KEYSTONE
+-	select TI_EDMA
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ZONE_DMA if ARM_LPAE
+ 	help
+-- 
+1.7.9.5
