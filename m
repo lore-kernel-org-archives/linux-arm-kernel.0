@@ -1,66 +1,61 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 9 Jan 2014 14:00:58 +0200
-Subject: [PATCH 2/5] ARM: kprobes-test: use <asm/opcodes.h> for
- instruction accesses
-In-Reply-To: <1389265491.4041.6.camel@linaro1.home>
-References: <1387815579-15677-1-git-send-email-taras.kondratiuk@linaro.org>
- <1387815579-15677-3-git-send-email-taras.kondratiuk@linaro.org>
- <1388764386.3430.10.camel@linaro1.home>
- <CAArO44ump6fid28qDGYK3=vMNLpgicMjYNO1hOdyU7D-Lkd3bQ@mail.gmail.com>
- <1389265491.4041.6.camel@linaro1.home>
-Message-ID: <CAArO44vRhQrxD25q=+SsgnRpd3UV0T=KZV_yh=uTEu0-PinMFg@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 9 Jan 2014 17:38:14 +0530
+Subject: [PATCH v5 0/9] USB Host support for OMAP5 uEVM (for 3.14)
+Message-ID: <1389269303-30465-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks.
-I'll prepare a pull request.
+Hi Benoit & Tony,
 
-On 9 January 2014 13:04, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Thu, 2014-01-09 at 12:54 +0200, Taras Kondratiuk wrote:
->> On 3 January 2014 17:53, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> > On Mon, 2013-12-23 at 18:19 +0200, Taras Kondratiuk wrote:
->> >> From: Ben Dooks <ben.dooks@codethink.co.uk>
->> >>
->> >> Ensure we read instructions in the correct endian-ness by using
->> >> the <asm/opcodes.h> helper to transform them as necessary.
->> >>
->> >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> >> [taras.kondratiuk at linaro.org: fix next_instruction() function]
->> >> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->> >> ---
->> >
->> > Apart from the spurious line removal (see below) then:
->> >
->> > Acked-by: Jon Medhurst <tixy@linaro.org>
->> >
->> > and you can include an ACK for the other patches in this series too.
->> >
->> > Thanks.
->>
->> >> @@ -1593,7 +1594,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
->> >>       return 0;
->> >>  }
->> >>
->> >> -
->> >
->> > I know the above blank line isn't needed but I believe the convention is
->> > to avoid doing unrelated white-space clean-ups in patches.
->>
->> Right, I will remove it.
->> Should this series go through Russell's patch tracking system or it
->> can be pulled
->> to some tree?
->
-> I would assume as a pull request sent to Russell using the email alias
-> he uses for these things: linux+pull at arm.linux.org.uk I'm sure he's
-> shout up if I'm wrong...
->
-> --
-> Tixy
->
+This patchset brings up USB Host ports and Ethernet port on
+the OMAP5 uEVM board.
 
+It depends on the TI Clock DT conversion patches [1] and is based
+on 3.13-rc7
 
+[1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/289895
+
+NOTE: I've tested this only on the OMAP5 uEVM board. Since the patchset
+changes could affect OMAP3/4, it must be verified at least on
+a Beagleboard and a Panda board before being pulled in.
+I request someone to verify this on OMAP3/4 since I don't have access
+to those boards at the moment. Thanks.
+
+Changelog:
+
+v5:
+- Expose all clocks in the DT binding document for mfd:omap-usb-host
+and mfd:omap-usb-tll
+
+v4:
+- Updated DT binding document for clock binding
+
+v3:
+- Rebased on top of 3.13-rc7
+
+cheers,
+-roger
+
+Roger Quadros (9):
+  mfd: omap-usb-host: Use resource managed clk_get()
+  mfd: omap-usb-host: Get clocks based on hardware revision
+  mfd: omap-usb-host: Update DT clock binding information
+  mfd: omap-usb-tll: Update DT clock binding information
+  ARM: dts: omap4: Update omap-usb-host node
+  ARM: dts: omap5: Update omap-usb-host node
+  ARM: dts: omap4-panda: Provide USB PHY clock
+  ARM: dts: omap5-uevm: Provide USB PHY clock
+  ARM: OMAP2+: Remove legacy_init_ehci_clk()
+
+ .../devicetree/bindings/mfd/omap-usb-host.txt      |  23 +++
+ .../devicetree/bindings/mfd/omap-usb-tll.txt       |  10 ++
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+ arch/arm/boot/dts/omap4.dtsi                       |   6 +
+ arch/arm/boot/dts/omap5-uevm.dts                   |   8 +-
+ arch/arm/boot/dts/omap5.dtsi                       |   6 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |  16 --
+ drivers/mfd/omap-usb-host.c                        | 172 ++++++++++-----------
+ 8 files changed, 128 insertions(+), 121 deletions(-)
 
 -- 
-Regards,
-Taras Kondratiuk
+1.8.3.2
