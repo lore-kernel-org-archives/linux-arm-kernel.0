@@ -1,58 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Jan 2014 18:42:51 +0000
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109103004.GB11089@mudshark.cambridge.arm.com>
- <201401091204.17932.arnd@arndb.de>
- <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
-Message-ID: <20140109184251.GL17838@mudshark.cambridge.arm.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Thu, 09 Jan 2014 19:07:39 +0000
+Subject: [PATCH RFC 1/3] drivers: base: support cpu cache information
+ interface to userspace via sysfs
+In-Reply-To: <20140108202613.GD8417@kroah.com>
+References: <1389209168-17189-1-git-send-email-sudeep.holla@arm.com>
+ <1389209168-17189-2-git-send-email-sudeep.holla@arm.com>
+ <20140108202613.GD8417@kroah.com>
+Message-ID: <52CEF37B.9010401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 12:47:24PM +0000, Stefano Stabellini wrote:
-> On Thu, 9 Jan 2014, Arnd Bergmann wrote:
-> > On Thursday 09 January 2014, Will Deacon wrote:
-> > > On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
-> > > > Remove !GENERIC_ATOMIC64 build dependency:
-> > > > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
-> > > >   GENERIC_ATOMIC64;
-> > > > - call armv7_atomic64_xchg directly from xen/events.h.
-> > > > 
-> > > > Remove !CPU_V6 build dependency:
-> > > > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-> > > >   CONFIG_CPU_V6;
-> > > > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
-> > > > 
-> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > CC: arnd at arndb.de
-> > > > CC: linux at arm.linux.org.uk
-> > > > CC: will.deacon at arm.com
-> > > > CC: gang.chen at asianux.com
-> > > > CC: catalin.marinas at arm.com
-> > > > CC: jaccon.bastiaansen at gmail.com
-> > > > CC: linux-arm-kernel at lists.infradead.org
-> > > > CC: linux-kernel at vger.kernel.org
-> > > > 
-> > > 
-> > > I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
-> > > What am I missing?
-> > 
-> > This is about being able to build a kernel that runs on ARMv6 and ARMv7
-> > and also includes Xen. Because of obvious hardware limitations, Xen
-> > will only run on v7, but currently you cannot even build it once you
-> > enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
-> > do atomic accesses in a generic way on non-32bit variables.
+On 08/01/14 20:26, Greg Kroah-Hartman wrote:
+> On Wed, Jan 08, 2014 at 07:26:06PM +0000, Sudeep Holla wrote:
+>> From: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>> This patch adds initial support for providing processor cache information
+>> to userspace through sysfs interface. This is based on x86 implementation
+>> and hence the interface is intended to be fully compatible.
+>>
+>> A per-cpu array of cache information maintained is used mainly for
+>> sysfs-related book keeping.
+>>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/base/Makefile     |   2 +-
+>>  drivers/base/cacheinfo.c  | 296 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/cacheinfo.h |  43 +++++++
+>>  3 files changed, 340 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/base/cacheinfo.c
+>>  create mode 100644 include/linux/cacheinfo.h
 > 
-> Yep, that's right.
+> You are creating sysfs files, yet you didn't add Documentation/ABI/
+> information, which is required.  Please fix that.
+> 
+Ah, I overlooked it. But I am not creating any new sysfs files in this series.
+I am just trying to unify duplicated code in various architectures.
 
-Ok, thanks for the explanation. Looking at the patch, I wonder whether it's
-not cleaner just to implement xchg code separately for Xen? The Linux code
-isn't always sufficient (due to the GENERIC_ATOMIC64 stuff) and most of the
-churn coming out of this patch is an attempt to provide some small code
-reuse at the cost of code readability.
+Since these sysfs files are already created in:
+1. arch/ia64/kernel/topology.c
+2. arch/powerpc/kernel/cacheinfo.c
+3. arch/s390/kernel/cache.c
+4. arch/x86/kernel/cpu/intel_cacheinfo.c and
+also already used by user-space tools like `lscpu` I assumed it's already
+documented.
 
-What do others think?
+I will add it in next version.
 
-Will
+Regards,
+Sudeep
