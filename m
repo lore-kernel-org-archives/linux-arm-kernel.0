@@ -1,69 +1,30 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:48:00 +0100
-Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
+Date: Thu,  9 Jan 2014 17:47:55 +0100
+Subject: [PATCH 01/18] of: add vendor prefix for Gumstix
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC2 is used by the on-board WiFi module populated on some boards
-(based on Marvell Libertas 8688 SDIO).
-
-Note: currently WiFi only works on cold boot, as the module is not
-properly reset (missing binding for the GPIO reset).
+Using "gumstix" for Gumstix Inc.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-overo.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index d48f25c..9ce9591 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -32,6 +32,12 @@
- 		ti,mcbsp = <&mcbsp2>;
- 		ti,codec = <&twl_audio>;
- 	};
-+
-+	vlibertas: regulator-vlibertas {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vlibertas";
-+		regulator-always-on;
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -59,6 +65,17 @@
- 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
- 		>;
- 	};
-+
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -102,7 +119,11 @@
- 
- /* optional on board WiFi */
- &mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&vlibertas>;
- 	bus-width = <4>;
-+	non-removable;
- };
- 
- &twl_gpio {
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index edbb8d8..968a955 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -33,6 +33,7 @@ fsl	Freescale Semiconductor
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gmt	Global Mixed-mode Technology, Inc.
++gumstix	Gumstix, Inc.
+ hisilicon	Hisilicon Limited.
+ hp	Hewlett Packard
+ ibm	International Business Machines (IBM)
 -- 
 1.8.1.2
