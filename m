@@ -1,60 +1,30 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Jan 2014 17:38:23 +0530
-Subject: [PATCH v5 9/9] ARM: OMAP2+: Remove legacy_init_ehci_clk()
-In-Reply-To: <1389269303-30465-1-git-send-email-rogerq@ti.com>
-References: <1389269303-30465-1-git-send-email-rogerq@ti.com>
-Message-ID: <1389269303-30465-10-git-send-email-rogerq@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Jan 2014 12:13:08 +0000
+Subject: [PATCH v8 4/6] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <1389206998-27875-4-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1401081845040.21510@kaball.uk.xensource.com>
+ <1389206998-27875-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20140109121308.GH3081@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The necessary clock phandle for the EHCI clock is now provided
-via device tree so we no longer need this legacy method.
+On Wed, Jan 08, 2014 at 06:49:56PM +0000, Stefano Stabellini wrote:
+>  arch/arm64/Kconfig         |   20 ++++++++++++++++++++
+>  arch/arm64/kernel/Makefile |    1 +
+>  2 files changed, 21 insertions(+)
+[...]
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 5ba2fd4..1dee735 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
+>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+>  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+> +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+Did you forget a git add?
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 39f020c..6a4e2d1 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -26,20 +26,6 @@ struct pdata_init {
- 	void (*fn)(void);
- };
- 
--/*
-- * Create alias for USB host PHY clock.
-- * Remove this when clock phandle can be provided via DT
-- */
--static void __init __used legacy_init_ehci_clk(char *clkname)
--{
--	int ret;
--
--	ret = clk_add_alias("main_clk", NULL, clkname, NULL);
--	if (ret)
--		pr_err("%s:Failed to add main_clk alias to %s :%d\n",
--		       __func__, clkname, ret);
--}
--
- #if IS_ENABLED(CONFIG_WL12XX)
- 
- static struct wl12xx_platform_data wl12xx __initdata;
-@@ -105,7 +91,6 @@ static void __init omap4_sdp_legacy_init(void)
- static void __init omap4_panda_legacy_init(void)
- {
- 	omap4_panda_display_init_of();
--	legacy_init_ehci_clk("auxclk3_ck");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
- #endif
-@@ -113,7 +98,6 @@ static void __init omap4_panda_legacy_init(void)
- #ifdef CONFIG_SOC_OMAP5
- static void __init omap5_uevm_legacy_init(void)
- {
--	legacy_init_ehci_clk("auxclk1_ck");
- }
- #endif
- 
 -- 
-1.8.3.2
+Catalin
