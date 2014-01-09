@@ -1,109 +1,133 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Thu, 09 Jan 2014 18:06:52 +0100
-Subject: [PATCH 00/18] ARM: dts: Better support for Gumstix Overo
-In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <52CED72C.5050703@baylibre.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 09 Jan 2014 18:07:23 +0100
+Subject: [PATCH v2 03/12] at91: dt: sam9261: Added support for the lcd
+ display
+In-Reply-To: <1389270709-32662-4-git-send-email-jjhiblot@traphandler.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+ <1389270709-32662-4-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52CED74B.3030806@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On 09/01/2014 13:31, Jean-Jacques Hiblot wrote:
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   arch/arm/boot/dts/at91sam9261.dtsi  | 37 ++++++++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/at91sam9261ek.dts | 31 +++++++++++++++++++++++++++++++
+>   arch/arm/mach-at91/at91sam9261.c    |  1 +
+>   3 files changed, 68 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+> index 773c3d6..cd219b9 100644
+> --- a/arch/arm/boot/dts/at91sam9261.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
+> @@ -290,7 +290,33 @@
+>   						atmel,pins = <AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>   					};
+>   				};
+> -
+> +				fb {
+> +					pinctrl_fb: fb-0 {
+> +						atmel,pins =
+> +							<AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB1 periph A */
+> +							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB2 periph A */
+> +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB3 periph A */
+> +							 AT91_PIOB 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB7 periph A */
+> +							 AT91_PIOB 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB8 periph A */
+> +							 AT91_PIOB 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB9 periph A */
+> +							 AT91_PIOB 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB10 periph A */
+> +							 AT91_PIOB 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB11 periph A */
+> +							 AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A */
+> +							 AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB15 periph A */
+> +							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB16 periph A */
+> +							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB17 periph A */
+> +							 AT91_PIOB 18 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB18 periph A */
+> +							 AT91_PIOB 19 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB19 periph A */
+> +							 AT91_PIOB 20 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB20 periph A */
+> +							 AT91_PIOB 23 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB23 periph B */
+> +							 AT91_PIOB 24 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB24 periph B */
+> +							 AT91_PIOB 25 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB25 periph B */
+> +							 AT91_PIOB 26 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB26 periph B */
+> +							 AT91_PIOB 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB27 periph B */
+> +							 AT91_PIOB 28 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB28 periph B */
+> +							 >;
+> +					};
+> +				};
+>   				pioA: gpio at fffff400 {
+>   					compatible = "atmel,at91rm9200-gpio";
+>   					reg = <0xfffff400 0x200>;
+> @@ -436,6 +462,15 @@
+>   			};
+>   		};
+>   
+> +		fb0: fb at 0x00600000 {
+> +			compatible = "atmel,at91sam9261-lcdc";
+> +			reg = <0x00600000 0x1000>;
+> +			interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_fb>;
+> +			status = "disabled";
+> +		};
+> +
+>   		nand0: nand at 40000000 {
+>   			compatible = "atmel,at91rm9200-nand";
+>   			#address-cells = <1>;
+> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+> index f3d22a9..03c05fc 100644
+> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+> @@ -52,6 +52,37 @@
+>   				reg = <0x0 0x20000>;
+>   			};
+>   		};
 
-On 09/01/2014 17:47, Florian Vaussard wrote:
-> Hello,
->
-> This series adds a number of improvements to Gumstix Overo.
+One more nitpick :
+I think this should be taken out in another patch (first 9261 lcdc support,
+then ek board lcd def) :p.
 
-Thanks for that nice series.
-
-> Patch 1+2: fix an issue with the vendor prefix (reported long ago by Javier Martinez Canillas)
-> Patch 3+4: add some missing pinctrl entries
-> Patch 5: completely turn off the PMIC on power off
-> Patch 6: enable the on-board Wifi
-> Patch 7: add the high-speed USB PHY
-> Patch 8: add specific timings for LAN9221 into a generic file
-> -> This might interest other people using the same chip, result in doubled bandwith
->
-> Patch 9: simplify omap3-tobi by using patch 8
-> Patch 10: add support for AT24C01 EEPROM used on expansion boards
-> Patch 11: factorize parts common to all expansion boards
-> Patch 12: rename omap3-tobi to omap3-overo-tobi
-> -> I do not know to which extent this might qualify as an API breakage,
->     but the new name is far better IMHO
->
-> Patch 13 to 17: add new extension boards (Palo43, Gallop43, Alto35, Chestnut43, Summit)
-> Patch 18: add the HDMI output
-> -> this patch depends on Tomi Valkeinen's DT binding for OMAPDSS, which is
->     not yet merged, so this patch will have to wait
->
->
-> The patches 13 to 17 are based on the hardware schematics and compile-tested, as I
-> do not have the necessary hardware (anyone willing to send me some boards ? :-)
-> We are mainly missing the support for the various LCDs, the accelerometer + probably
-> other small things.
->
-> This series is based on Tony's omap-for-v3.14/dt branch + work from Tomi [1] for the patch 18.
->
-> Benoit: I guess that I am too late for the 3.14... ?
-
-Yeah, I think so, even my 3.14 branch is too late for 3.14 :-)
-
-Thanks,
-Benoit
-
->
-> Regards,
->
-> Florian
->
->
-> Florian Vaussard (18):
->    of: add vendor prefix for Gumstix
->    ARM: dts: omap3-tobi: Use the correct vendor prefix
->    ARM: dts: omap3-tobi: Add missing pinctrl
->    ARM: dts: omap3-overo: Add missing pinctrl
->    ARM: dts: omap3-overo: Use complete poweroff
->    ARM: dts: omap3-overo: Enable MMC2
->    ARM: dts: omap3-overo: Add HSUSB PHY
->    ARM: dts: omap: Add common file for SMSC9221
->    ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
->    ARM: dts: omap3-tobi: Add AT24C01 EEPROM
->    ARM: dts: omap3-tobi: Create a file for common Gumstix peripherals
->    ARM: dts: omap3-tobi: Rename to omap3-overo-tobi
->    ARM: dts: Add support for the Overo Palo43
->    ARM: dts: Add support for the Overo Gallop43
->    ARM: dts: Add support for the Overo Alto35
->    ARM: dts: Add support for the Overo Chestnut43
->    ARM: dts: Add support for the Overo Summit
->    ARM: dts: overo: Add support for DVI output
->
->   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->   arch/arm/boot/dts/Makefile                         |   7 +-
->   arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi          |  58 ++++++++++
->   arch/arm/boot/dts/omap3-overo-alto35.dts           |  52 +++++++++
->   arch/arm/boot/dts/omap3-overo-chestnut43.dts       |  76 +++++++++++++
->   arch/arm/boot/dts/omap3-overo-common-dvi.dtsi      | 108 ++++++++++++++++++
->   arch/arm/boot/dts/omap3-overo-common.dtsi          |  39 +++++++
->   arch/arm/boot/dts/omap3-overo-gallop43.dts         |  51 +++++++++
->   arch/arm/boot/dts/omap3-overo-palo43.dts           |  52 +++++++++
->   arch/arm/boot/dts/omap3-overo-summit.dts           |  30 +++++
->   .../dts/{omap3-tobi.dts => omap3-overo-tobi.dts}   |  41 +------
->   arch/arm/boot/dts/omap3-overo.dtsi                 | 122 +++++++++++++++++++--
->   12 files changed, 594 insertions(+), 43 deletions(-)
->   create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
->   create mode 100644 arch/arm/boot/dts/omap3-overo-alto35.dts
->   create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
->   create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
->   create mode 100644 arch/arm/boot/dts/omap3-overo-common.dtsi
->   create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43.dts
->   create mode 100644 arch/arm/boot/dts/omap3-overo-palo43.dts
->   create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
->   rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} (54%)
->
-
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+> +
+> +		fb0: fb at 0x00600000 {
+> +			display = <&display0>;
+> +			status = "okay";
+> +			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
+> +			display0: display {
+> +				bits-per-pixel = <16>;
+> +				atmel,lcdcon-backlight;
+> +				atmel,dmacon = <0x1>;
+> +				atmel,lcdcon2 = <0x80008002>;
+> +				atmel,guard-time = <1>;
+> +				atmel,lcd-wiring-mode = "BRG";
+> +
+> +				display-timings {
+> +					native-mode = <&timing0>;
+> +					timing0: timing0 {
+> +						clock-frequency = <4965000>;
+> +						hactive = <240>;
+> +						vactive = <320>;
+> +						hback-porch = <1>;
+> +						hfront-porch = <33>;
+> +						vback-porch = <1>;
+> +						vfront-porch = <0>;
+> +						hsync-len = <5>;
+> +						vsync-len = <1>;
+> +						hsync-active = <1>;
+> +						vsync-active = <1>;
+> +					};
+> +				};
+> +			};
+> +		};
+>   	};
+>   
+>   	leds {
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 200d17a..a67bfe6 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -197,6 +197,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>   	/* more tc lookup table for DT entries */
+>   	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+>   	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+> +	CLKDEV_CON_DEV_ID("hclk", "600000.fb", &hck1),
+>   	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+>   	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+>   	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
