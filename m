@@ -1,51 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 9 Jan 2014 17:44:58 +0000
-Subject: [PATCH v10 2/4] arm64: topology: Add support for topology DT
- bindings
-In-Reply-To: <1389287106-29979-3-git-send-email-broonie@kernel.org>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
- <1389287106-29979-3-git-send-email-broonie@kernel.org>
-Message-ID: <20140109174458.GA13541@e102568-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 09 Jan 2014 18:45:32 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 2/2] ehci-platform: Add support for
+ clks and phy passed through devicetree
+In-Reply-To: <Pine.LNX.4.44L0.1401091043380.1493-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1401091043380.1493-100000@iolanthe.rowland.org>
+Message-ID: <52CEE03C.3090804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 05:05:04PM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> +#include <linux/slab.h>
+Hi,
 
-Move it to patch 3 please where kcalloc is actually used.
+On 01/09/2014 04:47 PM, Alan Stern wrote:
+> On Thu, 9 Jan 2014, Hans de Goede wrote:
+>
+>>>> +Optional properties:
+>>>> +- clocks : a list of phandle + clock specifier pairs, one for each entry
+>>>> +   in clock-names.
+>>>> +- clock-names : "clk0", "clk1", ...
+>>>> +- phys : phy
+>>>> +- phy-names : "phy0"
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +	ehci at d8007900 {
+>>>> +		compatible = "via,vt8500-ehci";
+>>>> +		reg = <0xd8007900 0x200>;
+>>>> +		interrupts = <43>;
+>>>> +		clocks = <&usb_clk 6>, <&ahb_gates 2>;
+>>>> +		clock-names = "clk0", "clk1";
+>>>
+>>> I'm really not convinced by this either. It prevents you from doing
+>>> anything useful out of these clocks, and the only thing you can
+>>> actually do with it is calling clk_get, and that's pretty much it.
+>>>
+>>> What if you some platform needs to adjust the rate of one of the two?
+>>
+>> Then it needs its own driver. This is intended as a binding for a
+>> *generic* driver, which is meant to cover simple straight forward
+>> non-pci ohci cases. For more complex cases a separate driver will
+>> need to be written.
+>>
+>> I must say I'm becoming a bit unhappy with how the reviews of devicetree
+>> bindings are being done. In one case it is not generic enough (ahci-sunxi).
+>>
+>> If I then try to make it more generic in a case where that can actually
+>> be done as the hardware is pretty straight forward, it is not specific enough.
+>> You can simply not have both!
+>>
+>>> Or wants to cut one but not the other for any reason?
+>>
+>> This is another example of non generic behavior, requiring a separate
+>> (small using the existing ohci core) platform glue driver, like the *19* we
+>> already have.
+>
+> Would DT allow ehci-platform.c to access the clocks by their index in
+> the array, rather than by name?  After all, you don't really care about
+> the names at all, since the driver knows nothing about the clocks'
+> functions.
 
-[...]
+Yes, actually I've been discussing this with Maxime on irc and I'm
+just done preparing a v3 doing exactly that. I was just checking mail
+for any more review comments before pushing out v3 :)
 
-> +static void __init parse_dt_topology(void)
-> +{
-> +	struct device_node *cn;
-> +	int cluster_id = 0;
-> +
-> +	cn = of_find_node_by_path("/cpus");
-> +	if (!cn) {
-> +		pr_err("No CPU information found in DT\n");
-> +		return;
-> +	}
-> +
-> +	/*
-> +	 * If topology is provided as a cpu-map it is essentially a
-> +	 * root cluster.
-> +	 */
-> +	cn = of_find_node_by_name(cn, "cpu-map");
-> +	if (!cn)
-> +		return;
-> +	parse_cluster(cn, 0, &cluster_id);
+> The same is true of the phy entry.
 
-You do not need to pass a pointer, sorry I wanted to comment but I did
-not manage to do it in time. Define cluster_id it as static __initdata in
-parse_cluster and pass it by value to parse_core, that's it no need for
-a pointer unless I am missing something. This way cluster_id is defined
-where it is used and still does what you expect from it. I just did not
-like the fact that was defined outside function scope to pass state
-across functions, it is just a matter of taste really.
+The phy entry must have a name, this is specified in the phy bindings
+in Documentation/devicetree/bindings/phy/phy-bindings.txt:
 
-Apart from that I will re-review the entire series and add proper tags
-accordingly.
+"""
+PHY user node
+=============
 
-Lorenzo
+Required Properties:
+phys : the phandle for the PHY device (used by the PHY subsystem)
+phy-names : the names of the PHY corresponding to the PHYs present in the
+             *phys* phandle
+"""
+
+Now that I've dropped the clock-names, I've changed the ugly "phy0" name
+to "usb" as the phy pointed to is supposed to be an usb phy.
+
+Regards,
+
+Hans
