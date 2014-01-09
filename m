@@ -1,67 +1,36 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 09 Jan 2014 09:36:18 +0100
-Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
-In-Reply-To: <20140108191339.GB12358@obsidianresearch.com>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
- <20140108183418.GA12358@obsidianresearch.com> <52CDA032.3010804@overkiz.com>
- <20140108191339.GB12358@obsidianresearch.com>
-Message-ID: <52CE5F82.6070802@overkiz.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 9 Jan 2014 17:44:56 +0900
+Subject: [PATCH CFT] ARM:SHMOBILE: Enable AUTO_ZRELADDR by default
+In-Reply-To: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <CANqRtoSko2Ctwkq-Q8TTLmkjNQPFi5CPxyvHt_NSxq4qBAX+BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 20:13, Jason Gunthorpe wrote:
-> On Wed, Jan 08, 2014 at 08:00:02PM +0100, boris brezillon wrote:
->> Hello Jason,
->>
->> Le 08/01/2014 19:34, Jason Gunthorpe a ?crit :
->>> On Wed, Jan 08, 2014 at 03:21:58PM +0100, Boris BREZILLON wrote:
->>>
->>>> +int of_get_nand_timings(struct device_node *np, struct nand_timings *timings)
->>>> +{
->>>> +	memset(timings, 0, sizeof(*timings));
->>>> +	of_property_read_u32(np, "tCLS-min", &timings->tCLS_min);
->>>> +	of_property_read_u32(np, "tCLH-min", &timings->tCLH_min);
->>>> +	of_property_read_u32(np, "tCS-min", &timings->tCS_min);
->>> [..]
->>>
->>> A while ago when discussing another controller it was pointed out
->>> these values are all auto-probable directly from the NAND via a ONFI
->>> defined GET FEATURE @0x01 query, and adding these timings to the DT
->>> was NAK'd..
->>>
->>> Basically you set the interface to the slowest ONFI timing mode, do
->>> the GET FEATURE to the NAND chip and then increase the interface speed
->>> to the highest mutually supported ONFI mode.
->>> Is there some reason you need to encode this in the DT?
->> What if the NAND does not support the ONFI interface (and this is
->> exactly the case for the NAND available on the cubietruck board:
->> H27UCG8T2ATR).
-> Sounds like a good reason to me!
+On Thu, Jan 9, 2014 at 5:31 PM, panchaxari
+<panchaxari.prasannamurthy@linaro.org> wrote:
+> This patch enables AUTO_ZRELADDR as default config to Renasas R-Mobile and
+> SH-Mobile platforms.
 >
-> You might want to check if you can boil down the DT timings from the
-> huge list to just an ONFI mode number..
-
-Sure, but the sunxi driver needs at least 19 of them...
-
+> AUTO_ZRELADDR config enables auto calculation of the decompressed kernel image
+> address. AUTO_ZRELADDR config is mutually exclusive to ZBOOT_ROM, and also
+> assumes zImage to be loaded in the first 128MiB from start of memory.
 >
-> I'd echo Rob's comments, the property needs to include the units
-> in the name, and I strongly recommend picoseconds for these
-> values.
-
-Agreed, picosecond is a more future-proof unit.
-
+> CFT::Call For Testing
 >
-> Also, you might want to check that the ONFI names for these parameters
-> are used, not a vendor specific name to try and avoid confusion.
-
-I'll check it.
-
-Thanks.
-
-Best Regards,
-
-Boris
-
+> Requesting maintainers of R-Mobile and SH-Mobile platforms to evaluate the
+> changes on the board and comment, as I dont have the board for testing, and
+> also requesting an ACK.
 >
-> Jason
+> Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+
+Thanks for the patch. I believe we enable this for the multiplatform
+case already. The legacy case still supports ZBOOT_ROM and boards that
+don't work with AUTO_ZRELADDR, so because of this we intentionally
+don't enable it there.
+
+What is the reason you want to add it here?
+
+Thanks,
+
+/ magnus
