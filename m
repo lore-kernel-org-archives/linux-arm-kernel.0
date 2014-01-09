@@ -1,33 +1,53 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 9 Jan 2014 17:43:17 -0300
-Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
-In-Reply-To: <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
- <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 12:52:21 -0800
+Subject: [PATCH v4 4/6] devicetree: bindings: Document Krait L1/L2 EDAC
+In-Reply-To: <20140108100538.GA2927@e102568-lin.cambridge.arm.com>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-5-git-send-email-sboyd@codeaurora.org>
+ <20140107105439.GC5906@e102568-lin.cambridge.arm.com>
+ <20140107201239.GD14405@codeaurora.org>
+ <20140108100538.GA2927@e102568-lin.cambridge.arm.com>
+Message-ID: <52CF0C05.1080308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Enric Balletbo to cc]
+On 01/08/14 02:05, Lorenzo Pieralisi wrote:
+> On Tue, Jan 07, 2014 at 08:12:39PM +0000, Stephen Boyd wrote:
+>> On 01/07, Lorenzo Pieralisi wrote:
+>>
+>>> I have a problem with the cache level definition, and in
+>>> particular the numbering, ie what the level number represents. If we
+>>> mean the cache level seen through the CLIDR and co., it is hard to use
+>>> it for shared caches since the level seen by different CPUs can actually
+>>> be different, or put it differently the level number might not be unique for
+>>> a shared cache. I need to think about a proper way to sort this out.
+>>>
+>> Ok. I don't even use this property in my driver. All I really
+>> need is the phandle from cpus pointing to the L2 and the
+>> interrupts property in the L2 node.
+>>
+>> How do you want to proceed here? If your cache binding goes
+>> through I would just need to add the interrupts part. Or you
+>> could even add that part in the same patch, you could have my
+>> signed-off-by for that.
+> Ok, I will try to update the bindings with the interrupt part and copy
+> you in, even though the level definition worries me a bit, it is an
+> important property for power management and I need to find a proper
+> solution before bindings can get accepted (basically the problem is:
+> if different CPUs can see a cache at different levels as defined in the
+> CLIDR we cannot describe a cache with a single cache level or put it
+> differently, level can not represent the value in the CLIDR hence we
+> need to describe it differently).
 
-Hello Florian,
+Ok. I've dropped the cache part from this patch. I left the example as
+is minus the cache-level attribute.
 
-On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
-> MMC2 is used by the on-board WiFi module populated on some boards
-> (based on Marvell Libertas 8688 SDIO).
->
-> Note: currently WiFi only works on cold boot, as the module is not
-> properly reset (missing binding for the GPIO reset).
->
+Understanding how the cache-level value would be used might help. I
+wonder if the cache-level can just be a number that describes the
+largest value that the cache could be assigned. Then if you have
+different CPUs seeing different levels of cache they can traverse from
+their CPU node to the cache and count how many phandles they went through.
 
-Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
-for LBEE1USJYC WiFi connected to SDIO") ?
-
-If I remember correctly the LBEE1USJYC Wifi/BT combo module is
-basically a Marvell Libertas 8688 Wlan and Enric got soft reset
-working too by adding a GPIO property to the regulator for the reset
-GPIO.
-
-Hope it helps,
-Javier
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
