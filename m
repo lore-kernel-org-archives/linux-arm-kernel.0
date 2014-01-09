@@ -1,53 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Jan 2014 10:54:59 +0530
-Subject: 3.13-rc2 phy-twl4030-usb.c - Timeout setting T2 HSUSB PHY DPLL
-In-Reply-To: <CAAfyv36sNyEiEHEOKfZWN1xRYLGUt-NW18uhcJbSTWRBA5=2BA@mail.gmail.com>
-References: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>	<529F1E89.6080700@ti.com>
- <CAAfyv36sNyEiEHEOKfZWN1xRYLGUt-NW18uhcJbSTWRBA5=2BA@mail.gmail.com>
-Message-ID: <52CE32AB.1050204@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 Jan 2014 22:00:08 -0800
+Subject: [GIT PULL] DaVinci GPIO updates for v3.14
+In-Reply-To: <52CA5447.4060703@ti.com>
+References: <52BB2C1E.5010300@ti.com>
+ <52CA5447.4060703@ti.com>
+Message-ID: <20140109060008.GA8285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-I have no idea what is happening there. Have you tried using device tree boot?
-Board file boot support would be dropped eventually.
-
-Did you try if I2C read write to the twl4030 device works and all necessary clocks/supplies are
-present?
-
-Kishon, do you know what is causing the USB DPLL failure there?
-
-cheers,
--roger
-
-On 01/09/2014 02:31 AM, Belisko Marek wrote:
-> Any pointers? Still present in 3.13-rc7.
+On Mon, Jan 06, 2014 at 12:29:19PM +0530, Sekhar Nori wrote:
+> On Thursday 26 December 2013 12:33 AM, Sekhar Nori wrote:
+> > Hi Arnd, Olof, Kevin,
+> > 
+> > Here are some DaVinci GPIO driver updates and the resulting platform 
+> > code changes. All the patches have been acked by Linus. To handle
+> > dependencies easily, we both agreed that it will be better I send the
+> > driver updates via ARM-SoC. There is a new DT-binding which has been
+> > acked by Rob H.
+> > 
+> > I have made the pull request over -rc4 instead of an older -rc because 
+> > of this work depends on some fixes merged in that -rc (even for a 
+> > successful build).
 > 
-> On Wed, Dec 4, 2013 at 1:22 PM, Roger Quadros <rogerq@ti.com> wrote:
->> +Kishon
->>
->> On 12/03/2013 11:33 PM, Belisko Marek wrote:
->>> Hi,
->>>
->>> current 3.13-rcX break usb support on gta04 board (similar to
->>> beagleboard) when booting via board file.
->>>
->>> In console we can see messages:
->>>  [ 5227.287841] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>> [ 5232.936096] omap_musb_mailbox: musb core is not yet ready
->>> [ 5233.958160] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>> [ 5235.058227] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>>
->>> Any pointer what could cause that? (in 3.12 usb works fine)
->>>
->>> BR,
->>>
->>> marek
->>>
->>
-> 
-> BR,
-> 
-> marek
-> 
+> Can you please pull this?
+
+Already done, seems that I missed emailing about it.
+
+$ git branch --contains 6075a8b2b6c32ddcb99b85189ae41ab2903e560f
+  davinci/gpio
+  for-next
+  next/drivers
+  to-build
+
+
+-Olof
