@@ -1,36 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Jan 2014 22:02:34 -0800
-Subject: [PATCH RESEND] irqchip: sirf: set IRQ_LEVEL status_flags
-In-Reply-To: <1388720086-13135-1-git-send-email-21cnbao@gmail.com>
-References: <1388720086-13135-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20140109060234.GB8285@quad.lixom.net>
+Date: Wed, 8 Jan 2014 22:04:32 -0800
+Subject: [GIT PULL] bcm driver updates for 3.14
+In-Reply-To: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
+References: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
+Message-ID: <20140109060432.GC8285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 11:34:46AM +0800, Barry Song wrote:
-> SiRF internal interrupts are using level trigger. we need to tell the irq
-> core this information. otherwise, we might get some problems as below
-> 1. disable_irq(n)
-> here irq core will mark the disabled flag but still keep the irq enabled
-> due to involved lazy-disable
-> 2. doing someting after disable_irq(n)
-> in step 2, if one interrupt n comes, irq core will mark it as pending and
-> mask the HW interrupt really. we name the coming interrupt as "X".
-> 3. enable_irq(n)
-> this will unmask the interrupt, so the level-trigger HW interrupt will come
-> again, irq_handler will enter as "E1". after that, irq core will also check
-> whether irq n is pending, if yes, and pending interrupt is not level-trigger,
-> irq core will execute the pending irq_handler.
-> so if we don't set the IRQ_LEVEL flag here, irq core will execute pending
-> X again as "E2", but actually the pending interrupt has been handled by "E1".
-> that makes a level-trigger HW interrupt is executed twice.
+On Sun, Jan 05, 2014 at 10:58:36PM -0800, Christian Daudt wrote:
+> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
 > 
-> here we fix the issue to avoid redundant interrupt overload.
+>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
 > 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
+> are available in the git repository at:
+> 
+>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-drivers
 
-Applied to fixes-non-critical for 3.14.
+Hi,
+
+Is there a reason you're sending this through arm-soc instead of through Mike's
+clk tree? I don't see any dependencies on SoC code so I think it can go
+independently through clk?
 
 
 -Olof
