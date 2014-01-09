@@ -1,41 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jan 2014 13:17:32 +0000
-Subject: [PATCH RFC 00/46] Preview of imx-drm cleanup series
-In-Reply-To: <20140107063319.GA12346@S2101-09.ap.freescale.net>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <20140107063319.GA12346@S2101-09.ap.freescale.net>
-Message-ID: <20140109131732.GC27432@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Jan 2014 13:26:20 +0000
+Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <20140109125052.GB6089@e102568-lin.cambridge.arm.com>
+References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+ <1389208330-12495-2-git-send-email-broonie@kernel.org>
+ <20140109125052.GB6089@e102568-lin.cambridge.arm.com>
+Message-ID: <20140109132620.GL31886@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 02:33:22PM +0800, Shawn Guo wrote:
-> On Thu, Jan 02, 2014 at 09:25:28PM +0000, Russell King - ARM Linux wrote:
-> > Here is my large patch series which cleans up imx-drm, and gets it ready
-> > to move out of drivers/staging.  This is a preview only.
-> 
-> When moving to non-RFC patches, you may want to run checkpatch.pl on the
-> patches.  There are some errors and warnings than just "line over 80
-> characters" one.
+On Thu, Jan 09, 2014 at 12:50:52PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Jan 08, 2014 at 07:12:08PM +0000, Mark Brown wrote:
 
-I'm going to fix some of them, but I'm not fixing all of them.  The
-reason is that some of these should have been done to the code already,
-and I'm not going to mess up my patches integrating coding style fixes
-amongst moving code around.
+> > +#ifdef CONFIG_OF
+> > +static int cluster_id;
 
-The warnings about "over 80 characters" are fine for new code but not
-when code is merely being moved - there it's far more important not to
-reformat code.
+> This is __initdata. I think it is better to move it to parse_cluster
+> and pass it to parse_core as a parameter instead of using a global.
 
-The errors you refer to are:
-(a) in Fabio's patch adding imx-hdmi support, a derivative of which has
-    already been accepted into the staging tree.
-(b) in ipuv3-crtc.c, where checkpatch detects the presence of the FSF
-    address in the context of my patch.
+Should be __initdata, yes.  I actually started using pointers but
+passing the pointer around just seemed more ugly, it made the code in
+the functions look more scary due to the dereferences.
 
-So, these are not my problem to fix, and I will *not* fix these "errors"
-in this series.
+> > +	cpu_node = of_parse_phandle(node, "cpu", 0);
+> > +	if (!cpu_node) {
+> > +		pr_crit("%s: Unable to parse CPU phandle\n", node->full_name);
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> This messages is spit out anytime you try to grab a cpu phandle and it
+> is not there. In particular, in parse_core if core is not a leaf but you
+> still try to grab a cpu phandle this message is spit out and that's not
+> nice at all. Either we remove the message or we do not check the phandle
+> in core nodes that are not leaves.
+
+I'll just drop it.
+
+> > +			cpu = get_cpu_for_node(t);
+> > +			if (cpu >= 0) {
+> > +				pr_info("CPU%d: socket %d core %d thread %d\n",
+> > +					cpu, cluster_id, core_id, i);
+
+> Since all these variables are internal values that have no real meaning
+> I am not sure it is useful to print them out. Probably better to print
+> the resulting cpu masks on every cpu, problem is when to do that.
+
+I found it was useful for getting a quick overview of the topology from
+the logs - the actual numbers don't matter but being able to see which
+cores are grouped together seemed useful.  I'm not sure the masks would
+be an improvement for the human reader, I'd expect that presenting more
+decoded information would be more helpful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/64be5a90/attachment.sig>
