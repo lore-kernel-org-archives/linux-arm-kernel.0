@@ -1,64 +1,74 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 8 Jan 2014 23:56:42 -0800
-Subject: [PATCH v7 2/4] ARM: BCM5301X: add early debugging support
-In-Reply-To: <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
-References: <1389135492-11655-1-git-send-email-hauke@hauke-m.de>
- <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
-Message-ID: <CAEPRUYqf1uR18kSYp73nktzVbC9Qpdpy2-nNr00iY4ZJdrnXCw@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Thu, 9 Jan 2014 07:57:44 +0000
+Subject: [PATCHv8 RFC] pwm: Add Freescale FTM PWM driver support
+In-Reply-To: <87lhyqa0rn.fsf@nbsps.com>
+References: <1388726661-3391-1-git-send-email-Li.Xiubo@freescale.com>
+ <87lhyqa0rn.fsf@nbsps.com>
+Message-ID: <ced2022399cf4ceb9833c269842b04e2@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 2:58 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> This adds support for early debugging of BCM5301X SoC.
->
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Kconfig.debug |    7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index bda94e4..eebd81e 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -102,6 +102,11 @@ choice
->                   Say Y here if you want kernel low-level debugging support
->                   on Marvell Berlin SoC based platforms.
->
-> +       config DEBUG_BCM_5301X
-> +               bool "Kernel low-level debugging on BCM5301X UART1"
-> +               depends on ARCH_BCM_5301X
-> +               select DEBUG_UART_PL01X
-> +
 
-This is probably best to be in alpha order which the other config
-options (mostly) are.
+> > +static unsigned long fsl_pwm_calculate_period_cycles(struct fsl_pwm_chip
+> *fpc,
+> > +						     unsigned long period_ns,
+> > +						     enum fsl_pwm_clk index)
+> > +{
+> > +	bool bg = fpc->big_endian;
+> > +	int ret;
+> > +
+> > +	fpc->counter_clk_select = FTM_SC_CLK(bg, index);
+> 
+> Yes, this is the spirit of what I was suggesting.  The code is much less
+> efficient/bigger on the Vybrid with this run-time detection; but this is
+> more efficient/smaller than previous versions.  I think that 'bg' can be
+> a compiler '#define' base on the configured SOC-systems.  Ie, if the
+> kernel config only has 'Vybrid' or only 'LayerScape', then 'bg' can be a
+> hard coded value.  The compiler will produce much better code in these
+> cases.
+> 
+> Also, maybe 'distro' people may want to make a 'hand-held' (Debian) or a
+> 'router' (OpenWRT) distribution and they would only pick either 'Vybrid'
+> or 'LayerScape'.  However, if someone wants an 'every ARM under the
+> sun', then the code still works.  So, I think that the code is better
+> setup for a subsequent patch set like this (or at least just a good).
+> 
+> Especially, the stuff on the I/O swapping in the 'readl()' and
+> 'writel()' is no longer needed; I think you can use the same function
+> for both SOCs.
+> 
+> > +#define __FTM_SWAP32(v) ((u32)(\
+> > +	(((u32)(v) & (u32)0x000000ffUL) << 24) |\
+> > +	(((u32)(v) & (u32)0x0000ff00UL) <<  8) |\
+> > +	(((u32)(v) & (u32)0x00ff0000UL) >>  8) |\
+> > +	(((u32)(v) & (u32)0xff000000UL) >> 24)))
+> > +#define FTM_SWAP32(b, v)	(b ? __FTM_SWAP32(v) : v)
+> 
+> I think that there are macros that you could use here.  For instance,
+> '#include <linux/swab.h>' (powerpc and arm) has some assembler macros
+> that are quite fast for swapping.  If the kernel config has ARCH >= 6
+> for ARM, then the very fast 'rev' instruction is used.  If not, then a
+> generic version is used as you have coded.  The PowerPC (another
+> possible future ARCH for QorIQ/Layerscape SOC?) always has inline
+> assembler macros.
+> 
+> So,
+> 
+> + #include <linux/swab.h>
+> ...
+> + #define FTM_SWAP32(b, v)	(b ? __swab32(v) : v)
+> 
+> might be better.
+> 
 
->         config DEBUG_CLPS711X_UART1
->                 bool "Kernel low-level debugging messages via UART1"
->                 depends on ARCH_CLPS711X
-> @@ -1005,6 +1010,7 @@ config DEBUG_UART_PHYS
->         default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
->         default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
->         default 0x20201000 if DEBUG_BCM2835
-> +       default 0x18000300 if DEBUG_BCM_5301X
+Yes.
 
-this should be in numeric order so it should be moved a few lines up
+I have removed the big-endian support temporarily, and will send followed
+patches about this.
 
->         default 0x4000e400 if DEBUG_LL_UART_EFM32
->         default 0x40090000 if ARCH_LPC32XX
->         default 0x40100000 if DEBUG_PXA_UART1
-> @@ -1047,6 +1053,7 @@ config DEBUG_UART_VIRT
->         default 0xf0009000 if DEBUG_CNS3XXX
->         default 0xf01fb000 if DEBUG_NOMADIK_UART
->         default 0xf0201000 if DEBUG_BCM2835
-> +       default 0xf1000300 if DEBUG_BCM_5301X
->         default 0xf11f1000 if ARCH_VERSATILE
->         default 0xf1600000 if ARCH_INTEGRATOR
->         default 0xf1c28000 if DEBUG_SUNXI_UART0
+ 
+Thanks,
 
-After those changes:
-Acked-by: Christian Daudt <bcm@fixthebug.org>
-
- thanks,
-   csd
+--
+Best Regards,
+Xiubo
