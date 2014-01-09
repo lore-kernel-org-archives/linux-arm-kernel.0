@@ -1,158 +1,44 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:48:12 +0100
-Subject: [PATCH 18/18] ARM: dts: overo: Add support for DVI output
-In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-19-git-send-email-florian.vaussard@epfl.ch>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 9 Jan 2014 17:55:57 +0100
+Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
+In-Reply-To: <52CE312B.3060108@killerwolves.net>
+References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
+ <52CE312B.3060108@killerwolves.net>
+Message-ID: <20140109165557.GB9681@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Summit and Tobi expansion boards have a HDMI connector with a TFP410
-encoder. Add a common include file for this configuration, and then
-use it for Summit and Tobi.
+On Thu, Jan 09, 2014 at 03:18:35PM +1000, Ben Peddell wrote:
+> On 07/01/14 09:47, Andrew Lunn wrote:
+> > Request for Testing:
+> > 
+> > This patch adds support for around 30 different boards. Most .dts
+> > files support a couple of different models. I don't have any of this
+> > hardware. None of this is tested.
+> 
+> Tested by Ben Peddell <klightspeed@killerwolves.net> (specifically kirkwood-ds210.dts on DS211j)
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap3-overo-common-dvi.dtsi | 108 ++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo-summit.dts      |   3 +
- arch/arm/boot/dts/omap3-overo-tobi.dts        |   2 +
- 3 files changed, 113 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
+Hi Ben
 
-diff --git a/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi b/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
-new file mode 100644
-index 0000000..e4a0fa0
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
-@@ -0,0 +1,108 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * DVI output for some Gumstix Overo boards (Tobi and Summit)
-+ */
-+
-+&omap3_pmx_core {
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl.i2c3_scl */
-+			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda.i2c3_sda */
-+		>;
-+	};
-+
-+	dss_dpi_pins: pinmux_dss_dpi_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
-+			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
-+			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
-+			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
-+			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
-+			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
-+			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
-+			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
-+			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
-+			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
-+			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
-+			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
-+			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
-+			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
-+			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
-+			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
-+			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
-+			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
-+			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
-+			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
-+			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
-+			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
-+			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
-+			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
-+			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
-+			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
-+			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
-+			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
-+		>;
-+	};
-+};
-+
-+&dss {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
-+
-+	vdds_dsi-supply = <&vpll2>;
-+
-+	dpi_out: endpoint {
-+		remote-endpoint = <&tfp410_in>;
-+		data-lines = <24>;
-+	};
-+};
-+
-+/ {
-+	aliases {
-+		display0 = &dvi0;
-+	};
-+
-+	tfp410: encoder at 0 {
-+		compatible = "ti,tfp410";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tfp410_in: endpoint at 0 {
-+					remote-endpoint = <&dpi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tfp410_out: endpoint at 0 {
-+					remote-endpoint = <&dvi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dvi0: connector at 0 {
-+		compatible = "dvi-connector";
-+		label = "dvi";
-+
-+		i2c-bus = <&i2c3>;
-+
-+		dvi_connector_in: endpoint {
-+			remote-endpoint = <&tfp410_out>;
-+		};
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-summit.dts b/arch/arm/boot/dts/omap3-overo-summit.dts
-index fd8b47c..1b8774e 100644
---- a/arch/arm/boot/dts/omap3-overo-summit.dts
-+++ b/arch/arm/boot/dts/omap3-overo-summit.dts
-@@ -25,3 +25,6 @@
- 		};
- 	};
- };
-+
-+#include "omap3-overo-common-dvi.dtsi"
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-index 5072da2..17a85ad 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-@@ -50,3 +50,5 @@
- 	};
- };
+Thanks for testing. I will fix the gpo and send a v2 sometime. I
+should also check if there are any more gpo's i have as gpio's.
  
-+#include "omap3-overo-common-dvi.dtsi"
-+
--- 
-1.8.1.2
+> To get running on the stock bootloader, I needed to extend the 
+> initramfs to fill the entire rd.gz flash partition, configure the 
+> kernel to use the dtb appended to it, configure it to ignore the 
+> information passed to it by the bootloader, and add the following 
+> nodes to the dts:
+> 
+> /chosen {
+> 	linux,initrd-start = <0x800040>;
+> 	linux,initrd-end   = <0x940000>;
+> };
+
+Do you know why these initrd properties are needed?  There is only one
+other board in mainline that requires this. I also wonder what
+implications this has. u-boot has the capability of reading the initrd
+from disc to RAM and passing its location to the kernel. By hard
+coding these values, are we blocking that?
+
+Thanks
+	Andrew
