@@ -1,71 +1,50 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 9 Jan 2014 09:50:07 -0500
-Subject: [GIT PULL] bcm driver updates for 3.14
-In-Reply-To: <52CE9F6F.8000507@linaro.org>
-References: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
- <20140109060432.GC8285@quad.lixom.net>
- <CAEPRUYpZTTX8bB68V5WMzBroj+arADsbbmXVSgBtn0At1SmRmw@mail.gmail.com>
- <52CE9F6F.8000507@linaro.org>
-Message-ID: <20140109145007.GV10935@beef>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Thu, 9 Jan 2014 15:57:53 +0100
+Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock
+ tree
+In-Reply-To: <20140109075525.GO6750@pengutronix.de>
+References: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
+ <20140109075525.GO6750@pengutronix.de>
+Message-ID: <20140109145753.GV20094@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 07:09:03AM -0600, Alex Elder wrote:
-> On 01/09/2014 01:52 AM, Christian Daudt wrote:
-> > On Wed, Jan 8, 2014 at 10:04 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> On Sun, Jan 05, 2014 at 10:58:36PM -0800, Christian Daudt wrote:
-> >>> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
-> >>>
-> >>>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-drivers
-> >>
-> >> Hi,
-> >>
-> >> Is there a reason you're sending this through arm-soc instead of through Mike's
-> >> clk tree? I don't see any dependencies on SoC code so I think it can go
-> >> independently through clk?
-> >>
-> >>
-> >> -Olof
-> > The reason for the clk patches is that the file
-> > include/dt-bindings/clock/bcm281xx.h is  used both by the driver and
-> > the by the bcm11351.dtsi file (which has other mods going through
-> > arm-soc). But now that you mentioned it, I looked and didn't find the
-> > patch that modifies dts to include it. Alex - did I miss it?
+On Thu, Jan 09, 2014 at 08:55 +0100, Sascha Hauer wrote:
 > 
-> Yes you did.  Or I guess I may have, or may not have communicated
-> the situation adequately.
+> [ ... ]
 > 
-> There were four commits:
->     clk: bcm281xx: define kona clock binding
->     clk: bcm281xx: add initial clock framework support
->     clk: bcm281xx: define U32_MAX conditionally for now
-> and
->     ARM: dts: bcm281xx: define real clocks
-> 
-> The first one is in your tagged branch "bcm-for-3.14-dt".
-> The second two are in "bcm-for-3.14-drivers".  The last one
-> is missing.
-> 
-> HOWEVER there's more to it than that.  My DT change depended
-> on both code and DT changes from Tim Kryger--from another
-> series you were trying to coordinate taking through your tree.
->     https://lkml.org/lkml/2013/12/5/508
-> And because those seem to be missing from your tree we can't
-> just use the DT patch as-is.  As I understand it we have been
-> waiting for one unresponsive maintainer on that series (but
-> I haven't been following closely).
+> We have the situation here that a single bit controls two clocks. As
+> Shawn mentioned just using two gates on the same bit doesn't work
+> properly. Do we need a new basic clock type or expand the common gate
+> code somehow?
+> This situation happens from time to time and I haven't seen a solution
+> for this.
 
-To clarify, we've been expecting an ack from Chris Ball on the sdhci
-patch all along. When that didn't come, the
-"ARM: dts: bcm281xx: define real clocks" had to be dropped. The fallout
-is that the original reason for taking the clk driver through arm-soc
-for 3.14 is no longer valid.
+You may want to lookup the following message:
 
-Ideally we'd love an 11th hour ack and be able to use the common clock
-driver in 3.14 but we can carry that to 3.15.
+  Date: Tue, 23 Jul 2013 15:14:06 +0200
+  From: Gerhard Sittig <gsi@denx.de>
+  To: linuxppc-dev at lists.ozlabs.org, Anatolij Gustschin <agust@denx.de>,
+	  Mike Turquette <mturquette@linaro.org>,
+	  linux-arm-kernel at lists.infradead.org, devicetree at vger.kernel.org
+  Cc: [ ... ]
+  Subject: Re: [PATCH v3 17/31] clk: mpc512x: introduce COMMON_CLK for MPC512x
 
--Matt
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185687.html
+
+The specific situation was for MS-CAN on PowerPC, but it inspired
+my outlining an approach to "shared clock gates".  See an example
+implementation towards the end of the message with both the
+clk-gate.c extension, as well as rather generic example use.
+
+My approach turned out to not be needed, but it might serve as a
+starting point for you.  You'd have to add support for static
+declaration though, but this should be straight forward.
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
