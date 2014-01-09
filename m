@@ -1,31 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 9 Jan 2014 09:42:11 +0800
-Subject: [PATCH] ARM: i.MX51: Fix IOMUX settings
-In-Reply-To: <20140108222947.65b0759f4efd2c40b7136c31@mail.ru>
-References: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
- <20140106061233.GE27227@S2101-09.ap.freescale.net>
- <20140108222947.65b0759f4efd2c40b7136c31@mail.ru>
-Message-ID: <20140109014209.GA21717@S2101-09.ap.freescale.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 08 Jan 2014 17:50:18 -0800
+Subject: [PATCH v2 0/9] CPU enable method based SMP/hotplug + MSM
+ conversion
+In-Reply-To: <201401082237.36626.arnd@arndb.de>
+References: <1387845593-10050-1-git-send-email-sboyd@codeaurora.org>
+ <201401082237.36626.arnd@arndb.de>
+Message-ID: <52CE005A.3070802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 10:29:47PM +0400, Alexander Shiyan wrote:
-> Hello.
-> 
-> On Mon, 6 Jan 2014 14:12:37 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Wed, Jan 01, 2014 at 08:25:01AM +0400, Alexander Shiyan wrote:
-> > > This patch fix daisy channel settings for MX51_PAD_EIM_D26__UART3_TXD and
-> > > MX51_PAD_AUD3_BB_FS__UART3_TXD pads. Add missing SION bit for W1 pad.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > 
-> > Normally, we do not take non-DT platform code change anymore.  But since
-> > it's a simple fix, I applied it.
-> 
-> Shawn, please revert this patch completely since it breaks work some current boards.
-> Lets keep it as is.
+On 01/08/14 13:37, Arnd Bergmann wrote:
+> On Tuesday 24 December 2013, Stephen Boyd wrote:
+>> This is a rework of patches sent a months back by Rohit[1].
+>> The goal of these patches is to add support for SMP and (basic)
+>> hotplug on MSM based SoCs. To get there, we add support for a
+>> generic way to hook in SMP/hotplug support code based on DT. To
+>> show how it's used, we convert the MSM8660 SMP support code over
+>> to the new method. After that we add support for the rest of the
+>> upstream MSM SoCs (note these patches are piled high on top of
+>> Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
+>> but this should only matter to the MSM maintainers).
+>>
+>> This is one of the last items of code that still requires us to have
+>> a mach directory and a machine descriptor. We should be able to move
+>> the hotplug/smp code out of mach directories if this approach is
+>> accepted.
+> The implementation looks ok to me, but I wonder whether on a global
+> scale we want to tie it more closely to the cpuidle implementations.
+> We already have a drivers/cpuidle framework, and while I admit
+> that I'm not familiar with the code in there, I would assume that
+> the smp operations and the cpuidle code usually go hand in hand.
 
-Okay, dropped.
+Sure. Right now the smp ops code is fairly well tied into the arch layer
+so it sounds like there is some future work when we move this stuff out
+of the mach directory.
 
-Shawn
+Would arm-soc be able to pick these patches up for 3.14? I think
+everything is in place for these patches now that Mark has reviewed them.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
