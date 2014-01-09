@@ -1,49 +1,37 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 9 Jan 2014 12:54:56 +0200
-Subject: [PATCH 2/5] ARM: kprobes-test: use <asm/opcodes.h> for
- instruction accesses
-In-Reply-To: <1388764386.3430.10.camel@linaro1.home>
-References: <1387815579-15677-1-git-send-email-taras.kondratiuk@linaro.org>
- <1387815579-15677-3-git-send-email-taras.kondratiuk@linaro.org>
- <1388764386.3430.10.camel@linaro1.home>
-Message-ID: <CAArO44ump6fid28qDGYK3=vMNLpgicMjYNO1hOdyU7D-Lkd3bQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 9 Jan 2014 11:58:25 +0100
+Subject: [PATCH 2/2] serial: fsl_lpuart: add eDMA support
+In-Reply-To: <20140109103515.164af26c@ipc1.ka-ro>
+References: <1389236681-30372-1-git-send-email-yao.yuan@freescale.com>
+ <1389236681-30372-3-git-send-email-yao.yuan@freescale.com>
+ <20140109103515.164af26c@ipc1.ka-ro>
+Message-ID: <201401091158.25902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 January 2014 17:53, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Mon, 2013-12-23 at 18:19 +0200, Taras Kondratiuk wrote:
->> From: Ben Dooks <ben.dooks@codethink.co.uk>
->>
->> Ensure we read instructions in the correct endian-ness by using
->> the <asm/opcodes.h> helper to transform them as necessary.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> [taras.kondratiuk at linaro.org: fix next_instruction() function]
->> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->> ---
->
-> Apart from the spurious line removal (see below) then:
->
-> Acked-by: Jon Medhurst <tixy@linaro.org>
->
-> and you can include an ACK for the other patches in this series too.
->
-> Thanks.
+On Thursday 09 January 2014, Lothar Wa?mann wrote:
+> > +static int lpuart_dma_rx(struct lpuart_port *sport)
+> > +{
+> > +     dma_sync_single_for_device(sport->port.dev, sport->dma_rx_buf_bus,
+> > +                     DMA_RX_BUFFER_SIZE, DMA_TO_DEVICE);
+> >
+> dma_alloc_coherent() (which you use to allocate the DMA rx buffer) and
+> dma_symc_*() are orthogonal to each other!
+> You either allocate DMA coherent memory as DMA buffer or use ordinary
+> memory with the DMA streaming API (dma_map_*(), dma_sync_*()).
+> See Documentation/DMA-API-HOWTO.txt
 
->> @@ -1593,7 +1594,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
->>       return 0;
->>  }
->>
->> -
->
-> I know the above blank line isn't needed but I believe the convention is
-> to avoid doing unrelated white-space clean-ups in patches.
+Well spotted, it took me a while to figure out what the driver actually
+does mixing these two. Apparently the tx path is using the streaming
+DMA API, while the rx path uses the consistent API.
 
-Right, I will remove it.
-Should this series go through Russell's patch tracking system or it
-can be pulled
-to some tree?
+I think the driver should really use the same API both ways, and it
+depends on the amount of data transferred with each DMA which API
+fits better. I'd say that if typical transfer is just a few dozen
+bytes at most, it should perform better if you use the consistent API
+with uncacheable memory buffers, because it won't have the overhead
+from the cache flushes. If you often transfer kilobytes at once,
+the streaming API would be faster because it avoids uncached memory
+accesses.
 
--- 
-Regards,
-Taras Kondratiuk
+	Arnd
