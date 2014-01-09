@@ -1,54 +1,44 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 09 Jan 2014 11:04:51 +0000
-Subject: [PATCH 2/5] ARM: kprobes-test: use <asm/opcodes.h> for
- instruction accesses
-In-Reply-To: <CAArO44ump6fid28qDGYK3=vMNLpgicMjYNO1hOdyU7D-Lkd3bQ@mail.gmail.com>
-References: <1387815579-15677-1-git-send-email-taras.kondratiuk@linaro.org>
- <1387815579-15677-3-git-send-email-taras.kondratiuk@linaro.org>
- <1388764386.3430.10.camel@linaro1.home>
- <CAArO44ump6fid28qDGYK3=vMNLpgicMjYNO1hOdyU7D-Lkd3bQ@mail.gmail.com>
-Message-ID: <1389265491.4041.6.camel@linaro1.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 9 Jan 2014 12:04:17 +0100
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <20140109103004.GB11089@mudshark.cambridge.arm.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+Message-ID: <201401091204.17932.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-09 at 12:54 +0200, Taras Kondratiuk wrote:
-> On 3 January 2014 17:53, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> > On Mon, 2013-12-23 at 18:19 +0200, Taras Kondratiuk wrote:
-> >> From: Ben Dooks <ben.dooks@codethink.co.uk>
-> >>
-> >> Ensure we read instructions in the correct endian-ness by using
-> >> the <asm/opcodes.h> helper to transform them as necessary.
-> >>
-> >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> >> [taras.kondratiuk at linaro.org: fix next_instruction() function]
-> >> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> >> ---
-> >
-> > Apart from the spurious line removal (see below) then:
-> >
-> > Acked-by: Jon Medhurst <tixy@linaro.org>
-> >
-> > and you can include an ACK for the other patches in this series too.
-> >
-> > Thanks.
+On Thursday 09 January 2014, Will Deacon wrote:
+> On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
+> > Remove !GENERIC_ATOMIC64 build dependency:
+> > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
+> >   GENERIC_ATOMIC64;
+> > - call armv7_atomic64_xchg directly from xen/events.h.
+> > 
+> > Remove !CPU_V6 build dependency:
+> > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+> >   CONFIG_CPU_V6;
+> > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: arnd at arndb.de
+> > CC: linux at arm.linux.org.uk
+> > CC: will.deacon at arm.com
+> > CC: gang.chen at asianux.com
+> > CC: catalin.marinas at arm.com
+> > CC: jaccon.bastiaansen at gmail.com
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: linux-kernel at vger.kernel.org
+> > 
 > 
-> >> @@ -1593,7 +1594,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
-> >>       return 0;
-> >>  }
-> >>
-> >> -
-> >
-> > I know the above blank line isn't needed but I believe the convention is
-> > to avoid doing unrelated white-space clean-ups in patches.
-> 
-> Right, I will remove it.
-> Should this series go through Russell's patch tracking system or it
-> can be pulled
-> to some tree?
+> I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
+> What am I missing?
 
-I would assume as a pull request sent to Russell using the email alias
-he uses for these things: linux+pull at arm.linux.org.uk I'm sure he's
-shout up if I'm wrong...
+This is about being able to build a kernel that runs on ARMv6 and ARMv7
+and also includes Xen. Because of obvious hardware limitations, Xen
+will only run on v7, but currently you cannot even build it once you
+enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
+do atomic accesses in a generic way on non-32bit variables.
 
--- 
-Tixy
+	Arnd
