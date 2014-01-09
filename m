@@ -1,16 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jan 2014 10:02:59 +0000
-Subject: [PATCH CFT] ARM:VERSATILE: Enable ARM_PATCH_PHYS_VIRT and
- AUTO_ZRELADDR by default
-In-Reply-To: <1389248382-5262-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-References: <1389248382-5262-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-Message-ID: <20140109100259.GX27432@n2100.arm.linux.org.uk>
+Date: Thu, 9 Jan 2014 10:03:08 +0000
+Subject: [PATCH CFT] ARM:SHMOBILE: Enable AUTO_ZRELADDR by default
+In-Reply-To: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+References: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
+Message-ID: <20140109100308.GY27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 11:49:42AM +0530, panchaxari wrote:
-> This patch enables ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR as default configs
-> to versatile platform.
+On Thu, Jan 09, 2014 at 02:01:14PM +0530, panchaxari wrote:
+> This patch enables AUTO_ZRELADDR as default config to Renasas R-Mobile and
+> SH-Mobile platforms.
 
 NAK.
 
