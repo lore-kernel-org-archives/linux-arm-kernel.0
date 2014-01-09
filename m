@@ -1,88 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 09:56:38 +0100
-Subject: [PATCH 2/2] serial: fsl_lpuart: add eDMA support
-In-Reply-To: <1389236681-30372-3-git-send-email-yao.yuan@freescale.com>
-References: <1389236681-30372-1-git-send-email-yao.yuan@freescale.com>
- <1389236681-30372-3-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201401090956.38789.arnd@arndb.de>
+From: panchaxari.prasannamurthy@linaro.org (panchaxari)
+Date: Thu,  9 Jan 2014 14:49:24 +0530
+Subject: [PATCH CFT] ARM:EP93XX: Enable ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
+ by default
+Message-ID: <1389259164-7442-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Yuan Yao wrote:
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> ---
->  .../devicetree/bindings/serial/fsl-lpuart.txt      |  17 +-
->  drivers/tty/serial/fsl_lpuart.c                    | 434 +++++++++++++++++----
->  2 files changed, 365 insertions(+), 86 deletions(-)
+This patch enables ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR as default configs
+to EP93XX platforms from Cirrus.
 
+Introduction of PHYS_VIRT config as default config enables phy-to-virt and
+virt-to-phy translation functions at boot and module loading time, and enforce
+dynamic reallocation of memory. PHYS_VIRT config is mutually exclusive to
+XIP_KERNEL, XIP_KERNEL is used in systems with NOR flash devices.
 
-Both patches are lacking a changeset description. Please describe why
-this patch is needed and what the changes to the interfaces are.
+AUTO_ZRELADDR config enables auto calculation of the decompressed kernel image
+address. AUTO_ZRELADDR config is mutually exclusive to ZBOOT_ROM, and also
+assumes zImage to be loaded in the first 128MiB from start of memory.
 
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> index 6fd1dd1..311598d 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> @@ -4,11 +4,20 @@ Required properties:
->  - compatible : Should be "fsl,<soc>-lpuart"
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain uart interrupt
-> +- clocks : clocks: from common clock binding: handle to uart clock
-> +- clock-names : from common clock binding: Shall be "jpg"
+CFT::Call For Testing
 
-	typo: "ipg", not "jpg"
+Requesting maintainers of EP93XX platform to evaluate the changes on the
+board and comment, as I dont have the board for testing and also requesting
+an ACK.
 
-> +- dma-names: Should contain "lpuart-tx" for transmit and "lpuart-rx" for receive channels
-> +- dmas: Should contain dma specifiers for transmit and receive channels
+Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+Below lkml link is a quoting by Russell which explains more on concept of
+PHYS_VIRT and ZRELADDR
+-------------------------------------------------
 
-I note that this is an incompatible change: Prior to this patch,
-the dma properties were not allowed, now they are listed as
-"required". We try hard to avoid incompatible changes to the binding
-in general. Please make sure that you either
+https://lkml.org/lkml/2011/10/14/434
 
-a) list the dma properties as "optional" and verify that the driver still works
-   fine when they are absent, or
+-------------------------------------------------
+---
+ arch/arm/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-b) document in the changeset text your motivation for doing an incompatible
-   change, why you could not do it in a compatible way, and what the possible
-   impact is for existing users.
-
->  Example:
->  
->  uart0: serial at 40027000 {
-> -	       compatible = "fsl,vf610-lpuart";
-> -	       reg = <0x40027000 0x1000>;
-> -	       interrupts = <0 61 0x00>;
-> -       };
-> +		compatible = "fsl,vf610-lpuart";
-> +		reg = <0x40027000 0x1000>;
-> +		interrupts = <0 61 0x00>;
-> +		clocks = <&clks VF610_CLK_UART0>;
-> +		clock-names = "ipg";
-> +		dma-names = "lpuart-tx","lpuart-rx";
-> +		dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>,
-> +			<&edma0 0 VF610_EDMA_MUXID0_UART0_RX>;
-> +	};
-
-I checked again and found that VF610_EDMA_MUXID0_UART0_TX and RX are not
-defined as macros anywhere, and I think they should not be. The common
-convention is to just ust number literals here. There is no point
-defining the macros in a common header file because they will change
-with every new SoC.
-
-> @@ -131,6 +158,10 @@ static struct of_device_id lpuart_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
->  
-> +static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count);
-> +static int lpuart_dma_rx(struct lpuart_port *sport);
-> +static void lpuart_prepare_tx(struct lpuart_port *sport);
-> +
->  static void lpuart_stop_tx(struct uart_port *port)
->  {
->  	unsigned char temp;
-
-Coding style: Please try to avoid forward declarations for "static" functions.
-Instead, reorder the code in a way that they are not needed.
-
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3501362..077ef9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -420,10 +420,12 @@ config ARCH_EBSA110
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
++	select ARCH_PATCH_PHYS_VIRT
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select ARM_AMBA
+ 	select ARM_VIC
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select CPU_ARM920T
+ 	select NEED_MACH_MEMORY_H
+-- 
+1.7.10.4
