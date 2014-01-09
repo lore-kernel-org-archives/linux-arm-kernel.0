@@ -1,54 +1,43 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 8 Jan 2014 23:54:44 -0800
-Subject: [PATCH v7 2/4] ARM: BCM5301X: add early debugging support
-In-Reply-To: <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
-References: <1389135492-11655-1-git-send-email-hauke@hauke-m.de>
- <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
-Message-ID: <CAEPRUYrWp3wSpOPKEQWTGMLKhrtpdumbvjEnTW_18s4gNx3+Lg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 9 Jan 2014 08:55:26 +0100
+Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock
+ tree
+In-Reply-To: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
+References: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
+Message-ID: <20140109075525.GO6750@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 2:58 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> This adds support for early debugging of BCM5301X SoC.
->
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Kconfig.debug |    7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index bda94e4..eebd81e 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -102,6 +102,11 @@ choice
->                   Say Y here if you want kernel low-level debugging support
->                   on Marvell Berlin SoC based platforms.
->
-> +       config DEBUG_BCM_5301X
-> +               bool "Kernel low-level debugging on BCM5301X UART1"
-> +               depends on ARCH_BCM_5301X
-> +               select DEBUG_UART_PL01X
-> +
->         config DEBUG_CLPS711X_UART1
->                 bool "Kernel low-level debugging messages via UART1"
->                 depends on ARCH_CLPS711X
-> @@ -1005,6 +1010,7 @@ config DEBUG_UART_PHYS
->         default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
->         default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
->         default 0x20201000 if DEBUG_BCM2835
-> +       default 0x18000300 if DEBUG_BCM_5301X
->         default 0x4000e400 if DEBUG_LL_UART_EFM32
->         default 0x40090000 if ARCH_LPC32XX
->         default 0x40100000 if DEBUG_PXA_UART1
-> @@ -1047,6 +1053,7 @@ config DEBUG_UART_VIRT
->         default 0xf0009000 if DEBUG_CNS3XXX
->         default 0xf01fb000 if DEBUG_NOMADIK_UART
->         default 0xf0201000 if DEBUG_BCM2835
-> +       default 0xf1000300 if DEBUG_BCM_5301X
->         default 0xf11f1000 if ARCH_VERSATILE
->         default 0xf1600000 if ARCH_INTEGRATOR
->         default 0xf1c28000 if DEBUG_SUNXI_UART0
-> --
-> 1.7.10.4
->
+[Added Mike Turquette to Cc]
+
+On Thu, Jan 09, 2014 at 11:04:59AM +0800, Nicolin Chen wrote:
+> esai_ahb clock is derived from ahb and used to provide ESAI the capability of
+> register accessing and FSYS clock source for I2S clocks dividing. Although the
+> gate of this esai_ahb is duplicated with esai clock -- the baud clock, yet
+> considering about the differences of their clock rates, it's quite essential
+> to patch this missing clock.
+> 
+
+[...]
+
+>  static struct clk *clk[clk_max];
+> @@ -355,6 +355,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+>  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+>  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
+> +	clk[esai_ahb]     = imx_clk_gate2("esai_ahb",      "ahb",               base + 0x6c, 16);
+
+We have the situation here that a single bit controls two clocks. As
+Shawn mentioned just using two gates on the same bit doesn't work
+properly. Do we need a new basic clock type or expand the common gate
+code somehow?
+This situation happens from time to time and I haven't seen a solution
+for this.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
