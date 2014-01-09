@@ -1,89 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 09 Jan 2014 14:12:05 -0800
-Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
-In-Reply-To: <52CE055C.5030103@codeaurora.org>
-References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
- <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
- <20140109015158.7168.60274@quantum> <52CE055C.5030103@codeaurora.org>
-Message-ID: <52CF1EB5.9070706@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 09 Jan 2014 14:23:22 -0800
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20140109222322.7168.74522@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/14 18:11, Stephen Boyd wrote:
-> On 01/08/14 17:51, Mike Turquette wrote:
->> Patch #3 illustrates the sort of struct-member-creep that worries me.
->> What is to stop someone from putting "unsigned int divider_reg" or
->> "unsigned int mux_reg", and then the thing just keeps growing.
->>
-> I see two ways forward if you don't want these members in struct clk_hw.
->
-> 1) Inheritance: struct clk_regmap wrapper struct and
-> clk_register_regmap() and devm_clk_register_regmap() and then another
-> wrapper struct around that.
->
->  example:
->
-> struct clk_regmap {
->         struct clk_hw hw;
->         struct regmap *regmap;
->         unsigned int enable_reg;
->         unsigned int enable_mask;
->         bool enable_is_inverted;
-> };
->
-> struct clk_branch {
->         u32     hwcg_reg;
->         u32     halt_reg;
->         u8      hwcg_bit;
->         u8      halt_bit;
->         u8      halt_check;
->
->         struct clk_regmap       clkr;
-> };
->
-> static struct clk_branch gsbi1_uart_clk = {
->         .halt_reg = 0x2fcc,
->         .halt_bit = 10,
->         .clkr = {
->                 .enable_reg = 0x29d4,
->                 .enable_mask = BIT(9),
->                 .hw.init = &(struct clk_init_data){
->                         .name = "gsbi1_uart_clk",
->                         .parent_names = (const char *[]){
->                                 "gsbi1_uart_src",
->                         },
->                         .num_parents = 1,
->                         .ops = &clk_branch_ops,
->                         .flags = CLK_SET_RATE_PARENT,
->                 },
->         },
-> };
+Quoting Tero Kristo (2014-01-09 06:00:11)
+> Hi,
+> 
+> So, bad luck number release for this, as v12 wasn't sufficient still.
+> 
+> Changes compared to previous version:
+> - Dropped any changes to generic clock drivers, as it seems impossible
+>   to agree anything in short term, this means the patch set shrank in
+>   size from 49 patches to 40 (first 9 patches were dropped).
+> - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
+>   to drivers/clk/ti, and made the modifications needed to the TI version
+>   of the clock drivers only (based on discussions with Mike, this is fine)
+> - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
+>   with any generic implementation we might have at some point, migrating
+>   this to the generic version should be easy enough also.
+> - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
+>   versions and resulted into an orphan clock node
+> - Fixed compile problem for omap5 only build reported by Felipe
+> - Fixed a couple of sparse warnings
+> - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
+>   instead of __raw_readl / __raw_writel
 
-The downside to this approach is that we have to have two similar
-structs for struct clk_gate if we want to support regmap in that code
-path. If we put the regmap inside struct clk_hw we don't have two
-different structs, we would just assign different ops.
+Hi Tero,
 
-struct clk_gate {
-        struct clk_hw hw;
-        void __iomem    *reg;
-        u8              bit_idx;
-        u8              flags;
-        spinlock_t      *lock;
-};
+This approach takes care of all of my concerns with this series. Thanks
+for your long suffering patience on it.
 
-and
+It seems some build errors are cropping up, so once those are fixed then
+I'll be happy to merge clk-next-dt-clks-v13 into clk-next for 3.14.
 
-struct clk_gate_regmap {
-        struct clk_regmap hw;
-        u8              flags;
-        spinlock_t      *lock;
-};
+Regards,
+Mike
 
-Do you have any preference on which way we move forward here? I have the
-wrapper method all finished and ready to send if you agree with that
-approach.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Testing done:
+> - omap3-beagle: boot / suspend-resume (RET) / suspend-resume (OFF)
+> - omap4-panda-es: boot / suspend-resume (RET)
+> - omap5-uevm: boot
+> - am335x-bone: boot
+> - dra7-evm: boot
+> 
+> Maintainer friendly branches also available:
+> 
+> tree: https://github.com/t-kristo/linux-pm.git
+> 
+> clk driver only (Mike): clk-next-dt-clks-v13
+> DTS data only (Benoit): dts_for_3.14-dt-clks-v13
+> full-branch (Tony/Paul): 3.13-rc7-dt-clks-v13
+> 
+> -Tero
+> 
