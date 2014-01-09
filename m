@@ -1,74 +1,117 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 9 Jan 2014 20:29:05 +0800
-Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
- framework
-In-Reply-To: <201401091221.34496.arnd@arndb.de>
-References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
- <201401071653.49964.arnd@arndb.de>
- <CAGsJ_4x=SdqCjcCwFYFXy88z0xhWaDp2rE_HXOhRxs_7miireQ@mail.gmail.com>
- <201401091221.34496.arnd@arndb.de>
-Message-ID: <CAGsJ_4xfqQ+-gsSd2vrzPkEUVELmHDkQLGSu_2kx7F-JPgQ5vQ@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu,  9 Jan 2014 13:31:39 +0100
+Subject: [PATCH v2 02/12] at91: dt: sam9261: Basic Device Tree support for the
+ at91sam9261ek
+In-Reply-To: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1389270709-32662-3-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/9 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 09 January 2014, Barry Song wrote:
->> 2014/1/7 Arnd Bergmann <arnd@arndb.de>:
->> > On Tuesday 07 January 2014, Barry Song wrote:
->> >> > Can't this be a regular platform device? Drivers that get the reference to
->> >> > the reset controller should respect a -EPROBE_DEFER error message if they
->> >> > get initialized in the wrong order.
->> >>
->> >> Arnd, it is ok if prima2 is not a platform for automotive. here prima2
->> >> actually wants a "right" order for products.
->> >> for example, there are some local hacking to move camera for rearview
->> >> started earlier than other devices as this feature needs to be ready
->> >> as early as possible.
->> >> some earlier boot devices depend on reset module to be ready. so if we
->> >> move to regular platform driver for upstream, it still requires some
->> >> local hacking to move it earlier.
->> >
->> > I don't understand what you mean. It should be a matter of a few miliseconds
->> > at most to retry initialization, more likely in the microseconds. How big
->> > are the delays you are worried about?
->>
->> what i am worrried about is 100ms or more. device drivers need time to
->> initialize and that will take time, if some devices initialization
->> happen before the deferred probing, the deferred probing might be
->> delayed 100ms.
->> for example, we want camera begin to show rear-view in several
->> hundreds of ms, there are some local hacking to move i2c and camera
->> probe earlier than other devices.
->> that means actually there is requirement for right order of probing
->> but not defer probing sometimes.
->
-> I see, this seems like a valid concern. I had not considered that other
-> drivers might need more time for initialization. In general of course
-> they should not, but I understand that hardware is not perfect and
-> some drivers you don't own may have bugs that cause unnecessary delays.
+This patch implements a simple DTS to boot a at91sam9261ek with a dt-enabled
+kernel (at91_dt_defconfig).
+Only dbgu, nand and watchdog are described in the DT.
 
-the functionality of defer probing is really working. but embedded
-systems with all kinds of hardware and various strange requirement
-will want the "right" order.
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ arch/arm/boot/dts/Makefile          |  2 +
+ arch/arm/boot/dts/at91sam9261ek.dts | 75 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
 
->
-> We have discussed probe ordering a lot of times on the mailing lists
-> and also during the last kernel summit, but those discussions are usually
-> focused on trying to correctly boot up a system, which is hard enough
-> even without additional requirements like yours.
->
-> Generally the hack that people use when things fail to work correctly
-> is to hijack an earlier initcall level, e.g. subsys_initcall rather
-> than using module_init. Please first see if that can solve your problem.
-> If it doesn't help, please resubmit your current patch with a detailed
-> description in the code on why you have to do it like this.
-
-that is ok if it moves to subsys_initcall. some people might think
-using subsys_initcall imports redundant function call for non-sirf
-platform in multi-platform and machine-specific hook will not import
-that :-)
-
->
->         Arnd
-
--barry
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 772a30e..ece523d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -11,6 +11,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+ dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
+ dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
++# sam9261
++dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
+ # sam9263
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+new file mode 100644
+index 0000000..f3d22a9
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -0,0 +1,75 @@
++/*
++ * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
++ *
++ *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
++ *
++ * Licensed under GPLv2 only.
++ */
++/dts-v1/;
++#include "at91sam9261.dtsi"
++
++/ {
++	model = "Atmel at91sam9261ek";
++	compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "mem=64M console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <18432000>;
++		};
++	};
++
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			watchdog at fffffd40 {
++				status = "okay";
++			};
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt = <1>;
++			status = "okay";
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x20000>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		ds8 {
++			label = "ds8";
++			gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++		ds7 {
++			label = "ds7";
++			gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "nand-disk";
++		};
++		ds1 {
++			label = "ds1";
++			gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+-- 
+1.8.5.2
