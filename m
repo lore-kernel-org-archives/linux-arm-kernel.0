@@ -1,33 +1,28 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 9 Jan 2014 13:17:34 +0800
-Subject: [PATCH 2/5] ARM: dts: SiRF: add lost usp1_uart_nostreamctrl pin
- group for atlas6
-In-Reply-To: <CACRpkdbiPzB-MJr7Dm24b3cNd9urcT3SSV9qAz2iRPfCjygAHg@mail.gmail.com>
-References: <1388717966-11703-1-git-send-email-21cnbao@gmail.com>
- <1388717966-11703-3-git-send-email-21cnbao@gmail.com>
- <CACRpkdbiPzB-MJr7Dm24b3cNd9urcT3SSV9qAz2iRPfCjygAHg@mail.gmail.com>
-Message-ID: <CAGsJ_4zkw+VWewdjneuDK=C91vgJpZ12RbvrnY2Ss3Qj-AGa0Q@mail.gmail.com>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Thu, 09 Jan 2014 15:18:35 +1000
+Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
+In-Reply-To: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
+References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
+Message-ID: <52CE312B.3060108@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/8 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Jan 3, 2014 at 3:59 AM, Barry Song <21cnbao@gmail.com> wrote:
->
->> From: Qipan Li <Qipan.Li@csr.com>
->>
->> this patch adds lost usp1_uart_nostreamctrl pin group for atlas6, which
->> matches with the change in drivers/pinctrl/sirf/pinctrl-atlas6.c.
->>
->> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->
-> Please funnel this patch through ARM SoC or similar sirf tree.
+On 07/01/14 09:47, Andrew Lunn wrote:
+> Request for Testing:
+> 
+> This patch adds support for around 30 different boards. Most .dts
+> files support a couple of different models. I don't have any of this
+> hardware. None of this is tested.
 
-ok. i'll send a pull request including these two pinmux dts changes
-and several other dts changes for 3.14.
+Tested by Ben Peddell <klightspeed@killerwolves.net> (specifically kirkwood-ds210.dts on DS211j)
 
->
-> Yours,
-> Linus Walleij
+To get running on the stock bootloader, I needed to extend the 
+initramfs to fill the entire rd.gz flash partition, configure the 
+kernel to use the dtb appended to it, configure it to ignore the 
+information passed to it by the bootloader, and add the following 
+nodes to the dts:
 
--barry
+/chosen {
+	linux,initrd-start = <0x800040>;
+	linux,initrd-end   = <0x940000>;
+};
