@@ -1,59 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 12:21:34 +0100
-Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
- framework
-In-Reply-To: <CAGsJ_4x=SdqCjcCwFYFXy88z0xhWaDp2rE_HXOhRxs_7miireQ@mail.gmail.com>
-References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
- <201401071653.49964.arnd@arndb.de>
- <CAGsJ_4x=SdqCjcCwFYFXy88z0xhWaDp2rE_HXOhRxs_7miireQ@mail.gmail.com>
-Message-ID: <201401091221.34496.arnd@arndb.de>
+From: m.paolino@virtualopensystems.com (Michele Paolino)
+Date: Thu, 09 Jan 2014 12:22:38 +0100
+Subject: [PATCH v4 0/5] USB Host support for OMAP5 uEVM (for 3.14)
+In-Reply-To: <52CE8314.2000000@ti.com>
+References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+ <52CE824D.2090905@virtualopensystems.com> <52CE8314.2000000@ti.com>
+Message-ID: <52CE867E.1090203@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Barry Song wrote:
-> 2014/1/7 Arnd Bergmann <arnd@arndb.de>:
-> > On Tuesday 07 January 2014, Barry Song wrote:
-> >> > Can't this be a regular platform device? Drivers that get the reference to
-> >> > the reset controller should respect a -EPROBE_DEFER error message if they
-> >> > get initialized in the wrong order.
-> >>
-> >> Arnd, it is ok if prima2 is not a platform for automotive. here prima2
-> >> actually wants a "right" order for products.
-> >> for example, there are some local hacking to move camera for rearview
-> >> started earlier than other devices as this feature needs to be ready
-> >> as early as possible.
-> >> some earlier boot devices depend on reset module to be ready. so if we
-> >> move to regular platform driver for upstream, it still requires some
-> >> local hacking to move it earlier.
-> >
-> > I don't understand what you mean. It should be a matter of a few miliseconds
-> > at most to retry initialization, more likely in the microseconds. How big
-> > are the delays you are worried about?
-> 
-> what i am worrried about is 100ms or more. device drivers need time to
-> initialize and that will take time, if some devices initialization
-> happen before the deferred probing, the deferred probing might be
-> delayed 100ms.
-> for example, we want camera begin to show rear-view in several
-> hundreds of ms, there are some local hacking to move i2c and camera
-> probe earlier than other devices.
-> that means actually there is requirement for right order of probing
-> but not defer probing sometimes.
+On 09/01/2014 12:08, Roger Quadros wrote:
+> Hi Michele,
+>
+> Did you enable CONFIG_USB_EHCI_HCD_OMAP in the kernel config?
+> It is not enabled by default in omap2plus_defconfig.
+Indeed it works.  Thank you!
 
-I see, this seems like a valid concern. I had not considered that other
-drivers might need more time for initialization. In general of course
-they should not, but I understand that hardware is not perfect and
-some drivers you don't own may have bugs that cause unnecessary delays.
-
-We have discussed probe ordering a lot of times on the mailing lists
-and also during the last kernel summit, but those discussions are usually
-focused on trying to correctly boot up a system, which is hard enough
-even without additional requirements like yours.
-
-Generally the hack that people use when things fail to work correctly
-is to hijack an earlier initcall level, e.g. subsys_initcall rather
-than using module_init. Please first see if that can solve your problem.
-If it doesn't help, please resubmit your current patch with a detailed
-description in the code on why you have to do it like this.
-
-	Arnd
+>
+> cheers,
+> -roger
+>
+> On 01/09/2014 04:34 PM, Michele Paolino wrote:
+>> Hello Roger,
+>>
+>> I'm testing your patch on an OMAP5430 EVM board. The ethernet is not working in my case. The kernel I'm using is (Tero Kristo's repo - branch 3.13-rc7-dt-clks-v13). Is there something that I'm missing?
+>>
+>> Here below you can find more info about my configuration:
+>>
+>> boot error messages:
+>> eth0: ERROR while getting interface flags: No such device
+>> SIOCSIFADDR: No such device
+>> eth0: ERROR while getting interface flags: No such device
+>> SIOCADDRT: Network is unreachable
+>>
+>> root at OMAP5:~# /usr/lib/klibc/bin/ipconfig eth0
+>> ipconfig: eth0: SIOCGIFINDEX: No such device
+>> /usr/lib/klibc/bin/ipconfig: no devices to configure
+>>
+>> root at OMAP5:~# uname -a
+>> Linux OMAP5 3.13.0-rc7-g2a4526d-dirty #0 SMP Wed Jan 8 10:41:48 CET 2014x
+>>
+>> root at OMAP5:~# dmesg | grep eth
+>> [    1.661434] usbcore: registered new interface driver cdc_ether
+>>
+>> Regards,
+>>
+>>
+>> On 08/01/2014 07:15, Roger Quadros wrote:
+>>> Hi Benoit & Tony,
+>>>
+>>> This patchset brings up USB Host ports and Ethernet port on
+>>> the OMAP5 uEVM board.
+>>>
+>>> It depends on the TI Clock DT conversion patches [1] and is based
+>>> on 3.13-rc7
+>>>
+>>> [1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/289895
+>>>
+>>> Changelog:
+>>>
+>>> v4:
+>>> - Updated DT binding document for clock binding
+>>>
+>>> v3:
+>>> - Rebased on top of 3.13-rc7
+>>>
+>>> cheers,
+>>> -roger
+>>>
+>>> Roger Quadros (5):
+>>>    mfd: omap-usb-host: Update DT clock binding information
+>>>    ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
+>>>    ARM: dts: omap4-panda: Provide USB PHY clock
+>>>    ARM: dts: omap5-uevm: Provide USB PHY clock
+>>>    ARM: OMAP2+: Remove legacy_init_ehci_clk()
+>>>
+>>>   Documentation/devicetree/bindings/mfd/omap-usb-host.txt |  4 ++++
+>>>   arch/arm/boot/dts/omap4-panda-common.dtsi               |  8 ++------
+>>>   arch/arm/boot/dts/omap5-uevm.dts                        |  8 ++------
+>>>   arch/arm/boot/dts/omap5.dtsi                            |  2 ++
+>>>   arch/arm/mach-omap2/pdata-quirks.c                      | 16 ----------------
+>>>   5 files changed, 10 insertions(+), 28 deletions(-)
+>>>
+>>
+>> -- 
+>> *Michele Paolino*, Virtualization R&D Engineer
+>> Virtual Open Systems
+>> /Open Source  KVM  Virtualization  Developments/
+>> /Multicore Systems Virtualization Porting Services/
+>> Web/:/ www.virtualopensystems. <http://www.virtualopensystems.com/>com <http://www.virtualopensystems.com/>
+>>
+>>
+--
+Michele Paolino, Virtualization R&D Engineer
+Virtual Open Systems
