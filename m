@@ -1,25 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Jan 2014 13:26:41 +0100
-Subject: [PATCH v2 1/3] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <20140109162035.a23fac6b35297b63d67163e0@mail.ru>
-References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
- <3585542.v49U0LMMmk@wuerfel>
- <20140109162035.a23fac6b35297b63d67163e0@mail.ru>
-Message-ID: <5805022.go1dlAzuQx@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jan 2014 12:27:09 +0000
+Subject: [PATCH v2 24/28] drm/i2c: tda998x: adjust the audio CTS to the
+ mode clock
+In-Reply-To: <20140109120702.492c58d8@armhf>
+References: <20140109120702.492c58d8@armhf>
+Message-ID: <20140109122708.GB27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014 16:20:35 Alexander Shiyan wrote:
-> So, irq_domain_add_simple() do not work for me.
-> Current driver uses 1:1 mapping between hwirq and virq. Since DT is not
-> supported by all CLPS711X drivers, I am initialize some devices in
-> init_machine call, so these devices uses 0-based IRQs (i.e. old scheme).
-> Using irq_domain_add_simple() means all our IRQs will be dynamic and its
-> numbers starts from NR_IRQS, so usage irq_domain_add_simple() at this stage
-> is not possible. Once all boards will be ported to DT, I'll review this
-> code, but cannot do it now.
+On Thu, Jan 09, 2014 at 12:07:02PM +0100, Jean-Francois Moine wrote:
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> index 68630b8..c2163f4 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -723,7 +723,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+>  		struct drm_display_mode *mode)
+>  {
+>  	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
+> -	uint32_t n;
+> +	uint32_t n, cts;
+>  
+>  	/* Enable audio ports */
+>  	reg_write(priv, REG_ENA_AP, priv->audio_port);
+> @@ -777,9 +777,10 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+>  	n = 128 * AUDIO_SAMPLE;		/* acr_n = 128 * sample_rate / 1000 */
+>  
+>  	/* Write the CTS and N values */
+> -	buf[0] = 0x44;
+> -	buf[1] = 0x42;
+> -	buf[2] = 0x01;
+> +	cts = mode->clock;
+> +	buf[0] = cts;
+> +	buf[1] = cts >> 8;
+> +	buf[2] = cts >> 16;
 
-Ok, makes sense. I didn't know you were mixing static devices
-with DT-probed ones. Your driver looks good then.
+NAK.  We use auto-CTS mode, so the actual programmed CTS value is
+entirely irrelevant.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
