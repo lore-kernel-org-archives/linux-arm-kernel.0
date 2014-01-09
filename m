@@ -1,48 +1,74 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 9 Jan 2014 11:58:27 +0100
-Subject: [PATCH v2 4/28] drm/i2c: tda998x: change probe message origin
-Message-ID: <20140109115827.18d0df97@armhf>
+Date: Thu, 9 Jan 2014 11:58:11 +0100
+Subject: [PATCH v2 3/28] drm/i2c: tda998x: code cleanup
+Message-ID: <20140109115811.779554cb@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch gives a more precise information about the device getting the
-TDA chip version.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c    | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c  | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index cd7ac58..63d5be2 100644
+index 603f716..cd7ac58 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1187,12 +1187,21 @@ tda998x_encoder_init(struct i2c_client *client,
- 	priv->rev &= ~0x30; /* not-hdcp and not-scalar bit */
+@@ -335,7 +335,7 @@ cec_write(struct tda998x_priv *priv, uint16_t addr, uint8_t val)
+ 	uint8_t buf[] = {addr, val};
+ 	int ret;
  
- 	switch (priv->rev) {
--	case TDA9989N2:  dev_info(dev->dev, "found TDA9989 n2");  break;
--	case TDA19989:   dev_info(dev->dev, "found TDA19989");    break;
--	case TDA19989N2: dev_info(dev->dev, "found TDA19989 n2"); break;
--	case TDA19988:   dev_info(dev->dev, "found TDA19988");    break;
-+	case TDA9989N2:
-+		dev_info(&client->dev, "found TDA9989 n2");
-+		break;
-+	case TDA19989:
-+		dev_info(&client->dev, "found TDA19989");
-+		break;
-+	case TDA19989N2:
-+		dev_info(&client->dev, "found TDA19989 n2");
-+		break;
-+	case TDA19988:
-+		dev_info(&client->dev, "found TDA19988");
-+		break;
- 	default:
--		DBG("found unsupported device: %04x", priv->rev);
-+		dev_err(&client->dev, "found unsupported device: %04x\n",
-+			priv->rev);
- 		goto fail;
+-	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	ret = i2c_master_send(client, buf, sizeof buf);
+ 	if (ret < 0)
+ 		dev_err(&client->dev, "Error %d writing to cec:0x%x\n", ret, addr);
+ }
+@@ -372,7 +372,8 @@ set_page(struct tda998x_priv *priv, uint16_t reg)
+ 		};
+ 		int ret = i2c_master_send(client, buf, sizeof(buf));
+ 		if (ret < 0) {
+-			dev_err(&client->dev, "Error %d writing to REG_CURPAGE\n", ret);
++			dev_err(&client->dev, "setpage %04x err %d\n",
++					reg, ret);
+ 			return ret;
+ 		}
+ 
+@@ -449,7 +450,7 @@ reg_write(struct tda998x_priv *priv, uint16_t reg, uint8_t val)
+ 	if (ret < 0)
+ 		return;
+ 
+-	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	ret = i2c_master_send(client, buf, sizeof buf);
+ 	if (ret < 0)
+ 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
+ }
+@@ -465,7 +466,7 @@ reg_write16(struct tda998x_priv *priv, uint16_t reg, uint16_t val)
+ 	if (ret < 0)
+ 		return;
+ 
+-	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
++	ret = i2c_master_send(client, buf, sizeof buf);
+ 	if (ret < 0)
+ 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
+ }
+@@ -998,7 +999,7 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
+ 
+ 	ret = reg_read_range(priv, REG_EDID_DATA_0, buf, EDID_LENGTH);
+ 	if (ret != EDID_LENGTH) {
+-		dev_err(encoder->dev->dev, "failed to read edid block %d: %d",
++		dev_err(encoder->dev->dev, "failed to read edid block %d: %d\n",
+ 				blk, ret);
+ 		return ret;
  	}
+@@ -1012,7 +1013,7 @@ static uint8_t *
+ do_get_edid(struct drm_encoder *encoder)
+ {
+ 	struct tda998x_priv *priv = to_tda998x_priv(encoder);
+-	int j = 0, valid_extensions = 0;
++	int j, valid_extensions = 0;
+ 	uint8_t *block, *new;
+ 	bool print_bad_edid = drm_debug & DRM_UT_KMS;
  
 
 -- 
