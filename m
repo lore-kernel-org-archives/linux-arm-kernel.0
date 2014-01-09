@@ -1,53 +1,203 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Thu, 9 Jan 2014 15:51:07 +0800
-Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock
- tree
-In-Reply-To: <20140109075827.GP6750@pengutronix.de>
-References: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
- <20140109035810.GB21717@S2101-09.ap.freescale.net>
- <20140109034940.GA14480@MrMyself>
- <20140109065740.GD21717@S2101-09.ap.freescale.net>
- <20140109074137.GA14809@MrMyself>
- <20140109075827.GP6750@pengutronix.de>
-Message-ID: <20140109075106.GB14809@MrMyself>
+From: b20788@freescale.com (Anson Huang)
+Date: Thu, 9 Jan 2014 16:03:16 +0800
+Subject: [PATCH V3] ARM: imx: add cpuidle support for i.mx6sl
+Message-ID: <1389254596-20173-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 08:58:28AM +0100, Sascha Hauer wrote:
-> On Thu, Jan 09, 2014 at 03:41:38PM +0800, Nicolin Chen wrote:
-> > On Thu, Jan 09, 2014 at 02:57:42PM +0800, Shawn Guo wrote:
-> > > On Thu, Jan 09, 2014 at 11:49:41AM +0800, Nicolin Chen wrote:
-> > > > On Thu, Jan 09, 2014 at 11:58:12AM +0800, Shawn Guo wrote:
-> > > > > >  static struct clk *clk[clk_max];
-> > > > > > @@ -355,6 +355,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> > > > > >  	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
-> > > > > >  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
-> > > > > >  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
-> > > > > > +	clk[esai_ahb]     = imx_clk_gate2("esai_ahb",      "ahb",               base + 0x6c, 16);
-> > > > > 
-> > > > > Hmm, having two clocks operating on the same gate bit will get us
-> > > > > problem in clock disabling.  Clock enabling is fine, since either
-> > > > > one who calls clk_enable() first will just set the gate bit.  But in
-> > > > > case that clk_enable() is called on both clocks, and then when either
-> > > > > clock calls clk_disable(), the gate bit will be cleared and thus breaks
-> > > > > the other one that might still be in use.
-> > > > 
-> > > > Understood. But how could we handle this situation? The only way I can figure
-> > > > out is to make sure the driver open/close them at the same time, it's not a
-> > > > perfect way though.
-> > > 
-> > > Hmm, we generally leave the gate bit to the clock used to access
-> > > register, because usually it's the first one to be on and the last one
-> > > to be off.
-> > 
-> > Then we should attach CLK_IGNORE_UNUSED to clk[esai] since clk[esai_ahb] is
-> > the clock used to access memory, shouldn't we?
-> 
-> Please wait for Mikes input or let's look how a proper solution can look
-> like. I've already seen the case that a single bit controls multiple
-> clocks. Hacking around this issue each time is not a solution.
+Add cpuidle support for i.MX6SL, currently only support
+two cpuidle levels(ARM wfi and WAIT mode), and add software
+workaround for WAIT mode errata as below:
 
-Okay.
+ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
+          during WAIT mode entry process could cause cache memory
+          corruption.
 
-Thank you, Sascha.
+Software workaround:
+    To prevent this issue from occurring, software should ensure that
+the ARM to IPG clock ratio is less than 12:5 (that is < 2.4x), before
+entering WAIT mode.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+Changes since V2:
+    Fix conflict when applying patch to shawnguo/for-next, as I
+    generated it from linux-next before.
+
+ arch/arm/mach-imx/Makefile         |    1 +
+ arch/arm/mach-imx/clk-imx6sl.c     |   26 ++++++++++++++++
+ arch/arm/mach-imx/common.h         |    1 +
+ arch/arm/mach-imx/cpuidle-imx6sl.c |   57 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.h        |    5 ++++
+ arch/arm/mach-imx/mach-imx6sl.c    |    3 ++
+ 6 files changed, 93 insertions(+)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6sl.c
+
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index befcaf5..8589032 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -30,6 +30,7 @@ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ ifeq ($(CONFIG_CPU_IDLE),y)
+ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+ obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
++obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
+ endif
  
+ ifdef CONFIG_SND_IMX_SOC
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 5877eea..f6c3b4f 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -66,6 +66,32 @@ static struct clk_div_table video_div_table[] = {
+ static struct clk *clks[IMX6SL_CLK_END];
+ static struct clk_onecell_data clk_data;
+ 
++/*
++ * ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
++ *           during WAIT mode entry process could cause cache memory
++ *           corruption.
++ *
++ * Software workaround:
++ *     To prevent this issue from occurring, software should ensure that the
++ * ARM to IPG clock ratio is less than 12:5 (that is < 2.4x), before
++ * entering WAIT mode.
++ *
++ * This function will set the ARM clk to max value within the 12:5 limit.
++ */
++void imx6sl_set_wait_clk(bool enter)
++{
++	static unsigned long saved_arm_rate;
++
++	if (enter) {
++		unsigned long ipg_rate = clk_get_rate(clks[IMX6SL_CLK_IPG]);
++		unsigned long max_arm_wait_rate = (12 * ipg_rate) / 5;
++		saved_arm_rate = clk_get_rate(clks[IMX6SL_CLK_ARM]);
++		clk_set_rate(clks[IMX6SL_CLK_ARM], max_arm_wait_rate);
++	} else {
++		clk_set_rate(clks[IMX6SL_CLK_ARM], saved_arm_rate);
++	}
++}
++
+ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ {
+ 	struct device_node *np;
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 4f4a95c..1048248 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -140,6 +140,7 @@ void imx_anatop_pre_suspend(void);
+ void imx_anatop_post_resume(void);
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+ void imx6q_set_int_mem_clk_lpm(void);
++void imx6sl_set_wait_clk(bool enter);
+ 
+ void imx_cpu_die(unsigned int cpu);
+ int imx_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
+new file mode 100644
+index 0000000..d4b6b81
+--- /dev/null
++++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
+@@ -0,0 +1,57 @@
++/*
++ * Copyright (C) 2014 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
++
++#include "common.h"
++#include "cpuidle.h"
++
++static int imx6sl_enter_wait(struct cpuidle_device *dev,
++			    struct cpuidle_driver *drv, int index)
++{
++	imx6q_set_lpm(WAIT_UNCLOCKED);
++	/*
++	 * Software workaround for ERR005311, see function
++	 * description for details.
++	 */
++	imx6sl_set_wait_clk(true);
++	cpu_do_idle();
++	imx6sl_set_wait_clk(false);
++	imx6q_set_lpm(WAIT_CLOCKED);
++
++	return index;
++}
++
++static struct cpuidle_driver imx6sl_cpuidle_driver = {
++	.name = "imx6sl_cpuidle",
++	.owner = THIS_MODULE,
++	.states = {
++		/* WFI */
++		ARM_CPUIDLE_WFI_STATE,
++		/* WAIT */
++		{
++			.exit_latency = 50,
++			.target_residency = 75,
++			.flags = CPUIDLE_FLAG_TIME_VALID |
++				CPUIDLE_FLAG_TIMER_STOP,
++			.enter = imx6sl_enter_wait,
++			.name = "WAIT",
++			.desc = "Clock off",
++		},
++	},
++	.state_count = 2,
++	.safe_state_index = 0,
++};
++
++int __init imx6sl_cpuidle_init(void)
++{
++	return cpuidle_register(&imx6sl_cpuidle_driver, NULL);
++}
+diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
+index 786f98e..24e3367 100644
+--- a/arch/arm/mach-imx/cpuidle.h
++++ b/arch/arm/mach-imx/cpuidle.h
+@@ -13,6 +13,7 @@
+ #ifdef CONFIG_CPU_IDLE
+ extern int imx5_cpuidle_init(void);
+ extern int imx6q_cpuidle_init(void);
++extern int imx6sl_cpuidle_init(void);
+ #else
+ static inline int imx5_cpuidle_init(void)
+ {
+@@ -22,4 +23,8 @@ static inline int imx6q_cpuidle_init(void)
+ {
+ 	return 0;
+ }
++static inline int imx6sl_cpuidle_init(void)
++{
++	return 0;
++}
+ #endif
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 0f4fd4c..a26fdb2 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -17,6 +17,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
++#include "cpuidle.h"
+ 
+ static void __init imx6sl_fec_init(void)
+ {
+@@ -39,6 +40,8 @@ static void __init imx6sl_init_late(void)
+ 	/* imx6sl reuses imx6q cpufreq driver */
+ 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+ 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
++
++	imx6sl_cpuidle_init();
+ }
+ 
+ static void __init imx6sl_init_machine(void)
+-- 
+1.7.9.5
