@@ -1,27 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 9 Jan 2014 11:48:00 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1389208330-12495-1-git-send-email-broonie@kernel.org>
-References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140109114759.GG3081@arm.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu,  9 Jan 2014 12:49:47 +0100
+Subject: [PATCH] at91: smc: bug fix in sam9_smc_cs_read()
+Message-ID: <1389268187-23585-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 07:12:07PM +0000, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Add basic CPU topology support to arm64, based on the existing pre-v8
-> code and some work done by Mark Hambleton.  This patch does not
-> implement any topology discovery support since that should be based on
-> information from firmware, it merely implements the scaffolding for
-> integration of topology support in the architecture.
+There was a copy/paste error when reading the nwe_pulse value.
 
-Mark, for future patches, could you please add a cover letter with a
-simple changelog and also add some versioning to the subject ([PATCH v*]).
-It's getting hard to follow which series addresses what comments,
-especially when you post more updates in the same day.
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ arch/arm/mach-at91/sam9_smc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks.
-
+diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
+index 99a0a1d..b26156b 100644
+--- a/arch/arm/mach-at91/sam9_smc.c
++++ b/arch/arm/mach-at91/sam9_smc.c
+@@ -101,7 +101,7 @@ static void sam9_smc_cs_read(void __iomem *base,
+ 	/* Pulse register */
+ 	val = __raw_readl(base + AT91_SMC_PULSE);
+ 
+-	config->nwe_setup = val & AT91_SMC_NWEPULSE;
++	config->nwe_pulse = val & AT91_SMC_NWEPULSE;
+ 	config->ncs_write_pulse = (val & AT91_SMC_NCS_WRPULSE) >> 8;
+ 	config->nrd_pulse = (val & AT91_SMC_NRDPULSE) >> 16;
+ 	config->ncs_read_pulse = (val & AT91_SMC_NCS_RDPULSE) >> 24;
 -- 
-Catalin
+1.8.5.2
