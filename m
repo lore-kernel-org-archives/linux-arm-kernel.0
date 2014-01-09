@@ -1,60 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jan 2014 15:24:37 +0000
-Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
-In-Reply-To: <20140108012110.GL5074@atomide.com>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <20140108012110.GL5074@atomide.com>
-Message-ID: <20140109152437.GB27282@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 9 Jan 2014 23:25:38 +0800
+Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
+In-Reply-To: <20140108213258.GS27432@n2100.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
+ <20140107085930.GD12346@S2101-09.ap.freescale.net>
+ <20140108213258.GS27432@n2100.arm.linux.org.uk>
+Message-ID: <20140109152536.GG21717@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 05:21:11PM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140102 07:11]:
-> > The following patch series moves code to setup the DMA hardware and
-> > service interrupts from the hardware to the DMA engine driver.  This
-> > reduces the dependency on the legacy DMA implementation.
+On Wed, Jan 08, 2014 at 09:32:58PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 07, 2014 at 04:59:35PM +0800, Shawn Guo wrote:
+> > On Thu, Jan 02, 2014 at 09:28:03PM +0000, Russell King wrote:
+> > > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > > index e75e11b36dff..0e005f21d241 100644
+> > > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > > @@ -62,6 +62,12 @@
+> > >  		};
+> > >  	};
+> > >  
+> > > +	imx-drm {
+> > > +		compatible = "fsl,imx-drm";
+> > > +		crtcs = <&ipu1 0>, <&ipu1 1>;
+> > > +		connectors = <&ldb>;
+> > > +	};
+> > > +
 > > 
-> > This series does not remove the channel allocation/freeing hooks which
-> > are used to manage the allocation of physical channels - this is the
-> > next step in the evolution.
+> > While the change works fine on imx6dl, it breaks LVDS support on imx6q
+> > right away.
 > > 
-> > The patches which move the interrupt handling are currently less than
-> > perfect since they're writing to ENABLE_L0 under a different spinlock,
-> > and hence RFC only at the moment.
+> > imx-ipuv3 2400000.ipu: IPUv3H probed
+> > imx-ipuv3 2800000.ipu: IPUv3H probed
+> > [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> > [drm] No driver support for vblank timestamp query.
+> > imx-drm imx-drm.16: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+> > imx-drm imx-drm.16: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+> > imx-drm imx-drm.16: failed to bind ldb.10 (ops imx_ldb_ops): -517
+> > 
+> > Because we have 4 crtcs for lvds-channel on imx6q while imx-drm master
+> > defines only 2 in there, the imx_drm_encoder_parse_of() call from
+> > imx_ldb_register() will always return -EPROBE_DEFER.
+> > 
+> >         lvds-channel at 0 {
+> >                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+> >         };
+> > 
+> >         lvds-channel at 1 {
+> >                 crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+> >         };
 > 
-> Nice to see this happening. These seem to work for me based on a quick
-> try on omap2+, but on omap1 the build fails:
+> This is why some help would be useful here - I think I got these right
+> but I've no way to check them.
 > 
-> arch/arm/mach-omap1/dma.c: In function ?dma_write?:
-> arch/arm/mach-omap1/dma.c:186: error: ?const struct omap_dma_reg? has no member named ?size?
+> Can you confirm that adding all four is the right thing not only for
+> the imx6q but also the imx6dl sabresd please?
 
-Right, needs this incremental patch:
+Yea, adding all four into imx-drm crtcs works for imx6q, but it doesn't
+for imx6dl, because &ipu2 is unavailable for imx6dl at all.
 
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index 3afde9628839..404f89e3eeb8 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -183,7 +183,7 @@ static inline void dma_write(u32 val, int reg, int lch)
- 	addr += reg_map[reg].stride * lch;
- 
- 	__raw_writew(val, addr);
--	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
-+	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
- 		__raw_writew(val >> 16, addr + 2);
- }
- 
-@@ -196,7 +196,7 @@ static inline u32 dma_read(int reg, int lch)
- 	addr += reg_map[reg].stride * lch;
- 
- 	val = __raw_readw(addr);
--	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
-+	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
- 		val |= __raw_readw(addr + 2) << 16;
- 
- 	return val;
+Here is how I get around it.
 
+---8<-----------
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index 9cbdfe7..66f220a 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -20,6 +20,10 @@
+        compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+ };
+
++&imx_drm {
++       crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
++};
++
+ &sata {
+        status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 0e005f2..dfca3e0 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -62,7 +62,7 @@
+                };
+        };
+
+-       imx-drm {
++       imx_drm: imx-drm {
+                compatible = "fsl,imx-drm";
+                crtcs = <&ipu1 0>, <&ipu1 1>;
+                connectors = <&ldb>;
