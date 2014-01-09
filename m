@@ -1,85 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 9 Jan 2014 17:51:28 +0900
-Subject: [PATCH CFT] ARM:SHMOBILE: Enable AUTO_ZRELADDR by default
-In-Reply-To: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-References: <1389256274-6308-1-git-send-email-panchaxari.prasannamurthy@linaro.org>
-Message-ID: <20140109085128.GI9267@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  9 Jan 2014 16:52:37 +0800
+Subject: [PATCH v3 0/8] ARM: sunxi: rename DT clock node names to clk@N
+Message-ID: <1389257565-19797-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does not enable AUTO_ZRELADDR by default.
-It forces AUTO_ZRELADDR to be enabled to be used unless ZBOOT_ROM is enabled.
+This is v3 of the clock node renaming patch series, which renames
+the clock nodes in sunxi dts to conform to device tree naming
+conventions, i.e. clk at N. Dummy clocks that will be renamed/removed
+later, or clocks sharing registers are not renamed.
 
-I'm not opposed to this approach but I think the changelog is misleading.
+Renamed clock nodes have clock-output-names properties added to
+desginate their names. Support for this is added in the first
+patch.
 
+Changes since v2:
 
-AUTO_ZRELADDR is known to work on the Genmai, Koelsch, KZM9D and Lager
-boards and is enabled in their defconfigs.
+  * Dropped Cubietruck dts i2c controller patch. Maxime has taken it.
+  * Changed ARM in commit messages to uppercase.
+  * Add pll5, pll6 clock names to factors_data tied to compatible strings.
+  * Dropped pll5 output name in dts due to the previous change.
+  * Added dts binding documentation for "clock-output-names", as well as
+    examples.
 
-I will defer to Magnus on weather he is comfortable with being
-enable globally for shmobile but if not perhaps it could be selected
-on a per-board or per-SoC basis.
+Changes since v1:
 
-On Thu, Jan 09, 2014 at 02:01:14PM +0530, panchaxari wrote:
-> This patch enables AUTO_ZRELADDR as default config to Renasas R-Mobile and
-> SH-Mobile platforms.
-> 
-> AUTO_ZRELADDR config enables auto calculation of the decompressed kernel image
-> address. AUTO_ZRELADDR config is mutually exclusive to ZBOOT_ROM, and also
-> assumes zImage to be loaded in the first 128MiB from start of memory.
-> 
-> CFT::Call For Testing
-> 
-> Requesting maintainers of R-Mobile and SH-Mobile platforms to evaluate the
-> changes on the board and comment, as I dont have the board for testing, and
-> also requesting an ACK.
-> 
-> Signed-off-by: panchaxari <panchaxari.prasannamurthy@linaro.org>
+  * Fixed pll5, pll6 divs clock name handling 
 
-Please use your first name and last  name in the From address and
-Signed-off-by line.
+Cheers
+ChenYu
 
-e.g.
+Chen-Yu Tsai (8):
+  clk: sunxi: add clock-output-names dt property support
+  clk: sunxi: update clock-output-names dt binding documentation
+  clk: sunxi: add names for pll5, pll6 parent clocks to factors_data
+  clk: sunxi: get divs parent clock name from parent factor clock
+  ARM: dts: sun4i: rename clock node names to clk at N
+  ARM: dts: sun5i: rename clock node names to clk at N
+  ARM: dts: sun6i: rename clock node names to clk at N
+  ARM: dts: sun7i: rename clock node names to clk at N
 
-Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
+ Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++++++++++++++----
+ arch/arm/boot/dts/sun4i-a10.dtsi                  | 24 ++++++++-------
+ arch/arm/boot/dts/sun5i-a10s.dtsi                 | 24 ++++++++-------
+ arch/arm/boot/dts/sun5i-a13.dtsi                  | 24 ++++++++-------
+ arch/arm/boot/dts/sun6i-a31.dtsi                  | 12 ++++----
+ arch/arm/boot/dts/sun7i-a20.dtsi                  | 19 +++++++-----
+ drivers/clk/sunxi/clk-sunxi.c                     | 36 ++++++++++++++++-------
+ 7 files changed, 117 insertions(+), 58 deletions(-)
 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <damm@opensource.se>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-sh at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
-> Below lkml link is a quoting by Russell which clears the concept of PHYS_VIRT
-> and ZRELADDR
-> ---------------------------------------------------
-> 
-> https://lkml.org/lkml/2011/10/14/434
-> 
-> -------------------------------------------------
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 8e668e2..077ef9d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -674,6 +674,7 @@ config ARCH_MSM
->  config ARCH_SHMOBILE
->  	bool "Renesas SH-Mobile / R-Mobile"
->  	select ARM_PATCH_PHYS_VIRT
-> +	select AUTO_ZRELADDR
->  	select CLKDEV_LOOKUP
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_ARM_SCU if SMP
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+1.8.5.2
