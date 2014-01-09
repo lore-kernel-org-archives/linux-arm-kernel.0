@@ -1,93 +1,187 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 09 Jan 2014 14:26:30 +0100
-Subject: [PATCH v2 2/2] ehci-platform: Add support for clks and phy passed
- through devicetree
-In-Reply-To: <20140108181632.GG2941@lukather>
-References: <1389198608-24339-1-git-send-email-hdegoede@redhat.com>
- <1389198608-24339-3-git-send-email-hdegoede@redhat.com>
- <20140108181632.GG2941@lukather>
-Message-ID: <52CEA386.6060103@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 09 Jan 2014 14:31:22 +0100
+Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <52CEA4AA.8050503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 01/08/2014 07:16 PM, Maxime Ripard wrote:
-> On Wed, Jan 08, 2014 at 05:30:08PM +0100, Hans de Goede wrote:
->> Currently ehci-platform is only used in combination with devicetree when used
->> with some via socs. By extending it to (optionally) get clks and a phy from
->> devicetree, and enabling / disabling those on power_on / off, it can be used
->> more generically. Specifically after this commit it can be used for the
->> ehci controller on Allwinner sunxi SoCs.
->>
->> Somehow we've ended up with 2 device-bindings documents for ehci-platform.c,
->> this patch renames and updates one to platform-ehci.txt to reflect that this
->> is a generic platform driver, and removes the other.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   .../devicetree/bindings/usb/platform-ehci.txt      |  25 ++++
->>   .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
->>   .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
->>   drivers/usb/host/ehci-platform.c                   | 126 +++++++++++++++++----
->>   4 files changed, 131 insertions(+), 47 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/usb/platform-ehci.txt
->>   delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
->>   delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
->>
->> diff --git a/Documentation/devicetree/bindings/usb/platform-ehci.txt b/Documentation/devicetree/bindings/usb/platform-ehci.txt
->> new file mode 100644
->> index 0000000..56c478d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/usb/platform-ehci.txt
->> @@ -0,0 +1,25 @@
->> +Generic Platform EHCI controller
->> +
->> +Required properties:
->> +- compatible : "via,vt8500-ehci" or "wm,prizm-ehci"
->> +- reg : ehci controller register range (address and length)
->> +- interrupts : ehci controller interrupt
->> +
->> +Optional properties:
->> +- clocks : a list of phandle + clock specifier pairs, one for each entry
->> +   in clock-names.
->> +- clock-names : "clk0", "clk1", ...
->> +- phys : phy
->> +- phy-names : "phy0"
->> +
->> +Example:
->> +
->> +	ehci at d8007900 {
->> +		compatible = "via,vt8500-ehci";
->> +		reg = <0xd8007900 0x200>;
->> +		interrupts = <43>;
->> +		clocks = <&usb_clk 6>, <&ahb_gates 2>;
->> +		clock-names = "clk0", "clk1";
->
-> I'm really not convinced by this either. It prevents you from doing
-> anything useful out of these clocks, and the only thing you can
-> actually do with it is calling clk_get, and that's pretty much it.
->
-> What if you some platform needs to adjust the rate of one of the two?
+Sorry to chime in only now but it seems that this series is breaking the
+touchscreen calibration on 3.13 (and -rc7 is out so it might be too
+late).
 
-Then it needs its own driver. This is intended as a binding for a
-*generic* driver, which is meant to cover simple straight forward
-non-pci ohci cases. For more complex cases a separate driver will
-need to be written.
+At first, I though I became a terrible clicker ;) but I found some
+evidences:
 
-I must say I'm becoming a bit unhappy with how the reviews of devicetree
-bindings are being done. In one case it is not generic enough (ahci-sunxi).
+xinput_calibrator is complaining about misclicks, debug output:
+DEBUG: Adding click 0 (X=105, Y=59)
+DEBUG: Not adding click 1 (X=100, Y=59): within 7 pixels of previous click
+DEBUG: Adding click 1 (X=696, Y=58)
+DEBUG: Not adding click 2 (X=700, Y=55): within 7 pixels of previous click
+DEBUG: Adding click 2 (X=103, Y=422)
+DEBUG: Mis-click detected, click 3 (X=438, Y=415) not aligned with click 1 (X=696, Y=58) or click 2 (X=103, Y=422) (threshold=15)
+DEBUG: Adding click 0 (X=424, Y=411)
 
-If I then try to make it more generic in a case where that can actually
-be done as the hardware is pretty straight forward, it is not specific enough.
-You can simply not have both!
+Do you see the confusion ? At some point one of the coordinates is not
+updated. Successful calibration with 3.12.6 gives:
+DEBUG: Adding click 0 (X=126, Y=405)
+DEBUG: Adding click 1 (X=684, Y=399)
+DEBUG: Adding click 2 (X=128, Y=77)
+DEBUG: Adding click 3 (X=683, Y=77)
 
-> Or wants to cut one but not the other for any reason?
 
-This is another example of non generic behavior, requiring a separate
-(small using the existing ohci core) platform glue driver, like the *19* we
-already have.
+With ts_calibrate:
+xres = 800, yres = 480
+Took 1 samples...
+Top left : X =  435 Y = 3572
+Took 2 samples...
+Top right : X = 2094 Y = 3553
+Took 2 samples...
+Bot right : X = 2939 Y = 2077
+Took 2 samples...
+Bot left : X = 2060 Y =  644
+Took 2 samples...
+Center : X = 1279 Y = 1346
 
-Regards,
+We experience the same thing, when changing position on an axis, we get
+an average between the previous and the new position (probably because
+we got 2 samples):
+ - Top Left is ok
+ - Top right is almost ok: X should be around 3500/3700
+ - Bot right is starting to get really wrong: X is getting better (it
+   should still be around 3500/3700) but Y should be quite lower
+ - Bot left: Y is ok but X should be lower
+ - Center is completely wrong, both values should be around 2000
 
-Hans
+Last test with evtest which is always difficult because it outputs a lot
+of debug. Two separate touchs, bottom left and then top right (note that
+this is with fsl,ave-ctrl = <8>;):
+
+Event: time 1389210862.451000, type 3 (Absolute), code 0 (X), value 2183
+Event: time 1389210862.451000, type 3 (Absolute), code 1 (Y), value 720
+Event: time 1389210862.451000, type 3 (Absolute), code 24 (Pressure), value 6
+Event: time 1389210862.451000, type 1 (Key), code 330 (Touch), value 1
+Event: time 1389210862.451000, -------------- Report Sync ------------
+Event: time 1389210862.477721, type 3 (Absolute), code 0 (X), value 448
+Event: time 1389210862.477721, type 3 (Absolute), code 1 (Y), value 667
+Event: time 1389210862.477721, type 3 (Absolute), code 24 (Pressure), value 595
+Event: time 1389210862.477721, -------------- Report Sync ------------
+Event: time 1389210862.504718, type 3 (Absolute), code 0 (X), value 434
+Event: time 1389210862.504718, type 3 (Absolute), code 1 (Y), value 704
+Event: time 1389210862.504718, type 3 (Absolute), code 24 (Pressure), value 580
+Event: time 1389210862.504718, -------------- Report Sync ------------
+Event: time 1389210862.536688, type 1 (Key), code 330 (Touch), value 0
+Event: time 1389210862.536688, -------------- Report Sync ------------
+Event: time 1389210863.359697, type 3 (Absolute), code 0 (X), value 432
+Event: time 1389210863.359697, type 3 (Absolute), code 1 (Y), value 726
+Event: time 1389210863.359697, type 3 (Absolute), code 24 (Pressure), value 210
+Event: time 1389210863.359697, type 1 (Key), code 330 (Touch), value 1
+Event: time 1389210863.359697, -------------- Report Sync ------------
+Event: time 1389210863.391687, type 1 (Key), code 330 (Touch), value 0
+Event: time 1389210863.391687, -------------- Report Sync ------------
+
+We get 3 reports for bottom left, then pen up, then one report for top
+right that is almost exactly the same a bottom left !
+
+Output from 3.12:
+Event: time 1389210022.146809, type 3 (Absolute), code 0 (X), value 286
+Event: time 1389210022.146809, type 3 (Absolute), code 1 (Y), value 504
+Event: time 1389210022.146809, type 3 (Absolute), code 24 (Pressure), value 3045
+Event: time 1389210022.146809, type 1 (Key), code 330 (Touch), value 1
+Event: time 1389210022.146809, -------------- Report Sync ------------
+Event: time 1389210022.166830, type 3 (Absolute), code 0 (X), value 256
+Event: time 1389210022.166830, type 3 (Absolute), code 1 (Y), value 489
+Event: time 1389210022.166830, type 3 (Absolute), code 24 (Pressure), value 3033
+Event: time 1389210022.166830, -------------- Report Sync ------------
+Event: time 1389210022.186812, type 3 (Absolute), code 24 (Pressure), value 0
+Event: time 1389210022.186812, type 1 (Key), code 330 (Touch), value 0
+Event: time 1389210022.186812, -------------- Report Sync ------------
+Event: time 1389210025.196808, type 3 (Absolute), code 0 (X), value 3812
+Event: time 1389210025.196808, type 3 (Absolute), code 1 (Y), value 3637
+Event: time 1389210025.196808, type 3 (Absolute), code 24 (Pressure), value 4032
+Event: time 1389210025.196808, type 1 (Key), code 330 (Touch), value 1
+Event: time 1389210025.196808, -------------- Report Sync ------------
+Event: time 1389210025.216819, type 3 (Absolute), code 24 (Pressure), value 0
+Event: time 1389210025.216819, type 1 (Key), code 330 (Touch), value 0
+Event: time 1389210025.216819, -------------- Report Sync ------------
+
+
+While this is not necessarily an issue with ts_calibrate (it is possible
+to click longer so it collects more samples), I don't see that working
+with xinput_calibrator.
+
+While I don't have much experience with the TS part of the code but I
+can investigate if you don't have any idea.
+
+
+On 23/09/2013 16:36, Juergen Beisert wrote:
+> The following series replaces the current busy loop touchscreen implementation
+> for i.MX28/i.MX23 SoCs by a fully interrupt driven implementation.
+> 
+> Since i.MX23 and i.MX28 silicon differs, the existing implementation can
+> be used for the i.MX28 SoC only.
+> 
+> The first patch adds proper clock handling. Various platforms seems to disable
+> the internal 2 kHz clock which is used by the LRADC delay units.
+> 
+> The next two patches of this series move the i.MX28 specific definitions
+> out of the way. The forth patch simplifies the register access to make it easier
+> to add the i.MX23 support. Then the i.MX23 specific definitions are added, also
+> the code to distinguish both SoCs at run-time.
+> Up to here the existing touchscreen driver will now run on an i.MX23 Soc as well.
+> 
+> When these i.MX SoCs are running from battery it seems not to be a good idea to
+> run a busy loop to detect touches and their location. The 6th patch adds a
+> fully interrupt driven implementation which makes use of the built-in delay
+> and multiple sample features of the touchscreen controller. This will reduce
+> the interrupt load to a minimum.
+> 
+> The remaining patches in this series just removes the existing busy loop
+> implementation, add a proposal for devicetree binding and a reminder what has
+> still to be done with the LRADC driver.
+> 
+> Changes since v5:
+> 
+> - add missing clock handling which prevents the delay units from work (this
+>   should make it work on the MX28EVK and M28EVK as well)
+> 
+> Changes since v4:
+> 
+> - honor Jonathan's comments about function names
+> - honor Dmitry's comments about workqueue canceling and interrupts
+> - adding devicetree bindings proposal
+> 
+> Changes since v3:
+> 
+> - split adding register access functions and i.MX23 support into two patches
+> 
+> Changes since v2:
+> 
+> - useless debug output removed
+> 
+> Changes since v1:
+> 
+> - adding register access functions to make the existing code more readable
+> - adding some functions to distinguish the SoCs at run-time to avoid if-else
+>   contructs whenever differences in the register layout between i.MX23 and
+>   i.MX28 must be handled
+> 
+> Comments are welcome.
+> 
+> Juergen
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
