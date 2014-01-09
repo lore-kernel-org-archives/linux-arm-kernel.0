@@ -1,22 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 9 Jan 2014 14:10:34 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: Remove unused clock constants
-In-Reply-To: <2593623.Zsmb6Gy4Sn@avalon>
-References: <1389155679-27667-1-git-send-email-horms+renesas@verge.net.au>
- <2593623.Zsmb6Gy4Sn@avalon>
-Message-ID: <20140109051033.GG2132@verge.net.au>
+Date: Thu, 9 Jan 2014 14:13:11 +0900
+Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
+In-Reply-To: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140109051311.GH2132@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 08:52:28AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
+On Tue, Jan 07, 2014 at 05:48:00PM +0900, Simon Horman wrote:
+> Select the SMSC_PHY if ethernet is enabled on shmbile boards
+> that have an SMSC phy. This allows the SMSC-specific phy driver
+> to be used rather than relying on generic phy code.
 > 
-> Thank you for the patch.
-> 
-> On Wednesday 08 January 2014 13:34:39 Simon Horman wrote:
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Based on the renesas-devel-v3.13-rc7-20140107 tag
+> of my renesas tree.
 
-Thanks, I will queue this up.
+I have queued up these changes.
