@@ -1,36 +1,69 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:47:59 +0100
-Subject: [PATCH 05/18] ARM: dts: omap3-overo: Use complete poweroff
+Date: Thu,  9 Jan 2014 17:48:00 +0100
+Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-6-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the TWL4030 PMIC does not completely poweroff the processor.
-Commit b0fc1da4d0359d3cce8f12e0f014aed0704ae202 introduced the necessary
-binding to do this, so use it.
+MMC2 is used by the on-board WiFi module populated on some boards
+(based on Marvell Libertas 8688 SDIO).
+
+Note: currently WiFi only works on cold boot, as the module is not
+properly reset (missing binding for the GPIO reset).
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-overo.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/omap3-overo.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index 2d8b80c..d48f25c 100644
+index d48f25c..9ce9591 100644
 --- a/arch/arm/boot/dts/omap3-overo.dtsi
 +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -76,6 +76,11 @@
- 			codec {
- 			};
- 		};
-+
-+		twl_power: power {
-+			compatible = "ti,twl4030-power";
-+			ti,use_poweroff;
-+		};
+@@ -32,6 +32,12 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
  	};
++
++	vlibertas: regulator-vlibertas {
++		compatible = "regulator-fixed";
++		regulator-name = "vlibertas";
++		regulator-always-on;
++	};
  };
  
+ &omap3_pmx_core {
+@@ -59,6 +65,17 @@
+ 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
+ 		>;
+ 	};
++
++	mmc2_pins: pinmux_mmc2_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
++			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
++			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
++			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
++			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
++			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -102,7 +119,11 @@
+ 
+ /* optional on board WiFi */
+ &mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&vlibertas>;
+ 	bus-width = <4>;
++	non-removable;
+ };
+ 
+ &twl_gpio {
 -- 
 1.8.1.2
