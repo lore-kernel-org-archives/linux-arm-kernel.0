@@ -1,17 +1,45 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu,  9 Jan 2014 17:05:02 +0000
-Subject: [PATCH v10 0/4] arm64 topology
-Message-ID: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+Date: Thu,  9 Jan 2014 17:05:06 +0000
+Subject: [PATCH v10 4/4] arm64: topology: Provide relative power numbers for
+ cores
+In-Reply-To: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+Message-ID: <1389287106-29979-5-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another round of minor tweaks
+From: Mark Brown <broonie@linaro.org>
 
- - Remove some problematic and controversial prints
- - Pass cluster_id around as a pointer
- - Move slab.h further back in the series
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads.
 
-   arm64: topology: Implement basic CPU topology support
-   arm64: topology: Add support for topology DT bindings
-   arm64: topology: Tell the scheduler about the relative
-   arm64: topology: Provide relative power numbers for cores
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 1f086fc7665d..022ad0905a2a 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -177,6 +177,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.2
