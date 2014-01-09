@@ -1,44 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 12:04:17 +0100
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <20140109103004.GB11089@mudshark.cambridge.arm.com>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109103004.GB11089@mudshark.cambridge.arm.com>
-Message-ID: <201401091204.17932.arnd@arndb.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 9 Jan 2014 16:38:04 +0530
+Subject: [PATCH v4 0/5] USB Host support for OMAP5 uEVM (for 3.14)
+In-Reply-To: <52CE824D.2090905@virtualopensystems.com>
+References: <1389161742-10533-1-git-send-email-rogerq@ti.com>
+ <52CE824D.2090905@virtualopensystems.com>
+Message-ID: <52CE8314.2000000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Will Deacon wrote:
-> On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
-> > Remove !GENERIC_ATOMIC64 build dependency:
-> > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
-> >   GENERIC_ATOMIC64;
-> > - call armv7_atomic64_xchg directly from xen/events.h.
-> > 
-> > Remove !CPU_V6 build dependency:
-> > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-> >   CONFIG_CPU_V6;
-> > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: arnd at arndb.de
-> > CC: linux at arm.linux.org.uk
-> > CC: will.deacon at arm.com
-> > CC: gang.chen at asianux.com
-> > CC: catalin.marinas at arm.com
-> > CC: jaccon.bastiaansen at gmail.com
-> > CC: linux-arm-kernel at lists.infradead.org
-> > CC: linux-kernel at vger.kernel.org
-> > 
+Hi Michele,
+
+Did you enable CONFIG_USB_EHCI_HCD_OMAP in the kernel config?
+It is not enabled by default in omap2plus_defconfig.
+
+cheers,
+-roger
+
+On 01/09/2014 04:34 PM, Michele Paolino wrote:
+> Hello Roger,
 > 
-> I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
-> What am I missing?
-
-This is about being able to build a kernel that runs on ARMv6 and ARMv7
-and also includes Xen. Because of obvious hardware limitations, Xen
-will only run on v7, but currently you cannot even build it once you
-enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
-do atomic accesses in a generic way on non-32bit variables.
-
-	Arnd
+> I'm testing your patch on an OMAP5430 EVM board. The ethernet is not working in my case. The kernel I'm using is (Tero Kristo's repo - branch 3.13-rc7-dt-clks-v13). Is there something that I'm missing?
+> 
+> Here below you can find more info about my configuration:
+> 
+> boot error messages:
+> eth0: ERROR while getting interface flags: No such device
+> SIOCSIFADDR: No such device
+> eth0: ERROR while getting interface flags: No such device
+> SIOCADDRT: Network is unreachable
+> 
+> root at OMAP5:~# /usr/lib/klibc/bin/ipconfig eth0              
+> ipconfig: eth0: SIOCGIFINDEX: No such device
+> /usr/lib/klibc/bin/ipconfig: no devices to configure
+> 
+> root at OMAP5:~# uname -a
+> Linux OMAP5 3.13.0-rc7-g2a4526d-dirty #0 SMP Wed Jan 8 10:41:48 CET 2014x
+> 
+> root at OMAP5:~# dmesg | grep eth
+> [    1.661434] usbcore: registered new interface driver cdc_ether
+> 
+> Regards,
+> 
+> 
+> On 08/01/2014 07:15, Roger Quadros wrote:
+>> Hi Benoit & Tony,
+>>
+>> This patchset brings up USB Host ports and Ethernet port on
+>> the OMAP5 uEVM board.
+>>
+>> It depends on the TI Clock DT conversion patches [1] and is based
+>> on 3.13-rc7
+>>
+>> [1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/289895
+>>
+>> Changelog:
+>>
+>> v4:
+>> - Updated DT binding document for clock binding
+>>
+>> v3:
+>> - Rebased on top of 3.13-rc7
+>>
+>> cheers,
+>> -roger
+>>
+>> Roger Quadros (5):
+>>   mfd: omap-usb-host: Update DT clock binding information
+>>   ARM: dts: OMAP5: Add 60MHz clock reference to USB Host module
+>>   ARM: dts: omap4-panda: Provide USB PHY clock
+>>   ARM: dts: omap5-uevm: Provide USB PHY clock
+>>   ARM: OMAP2+: Remove legacy_init_ehci_clk()
+>>
+>>  Documentation/devicetree/bindings/mfd/omap-usb-host.txt |  4 ++++
+>>  arch/arm/boot/dts/omap4-panda-common.dtsi               |  8 ++------
+>>  arch/arm/boot/dts/omap5-uevm.dts                        |  8 ++------
+>>  arch/arm/boot/dts/omap5.dtsi                            |  2 ++
+>>  arch/arm/mach-omap2/pdata-quirks.c                      | 16 ----------------
+>>  5 files changed, 10 insertions(+), 28 deletions(-)
+>>
+> 
+> 
+> -- 
+> *Michele Paolino*, Virtualization R&D Engineer
+> Virtual Open Systems
+> /Open Source  KVM  Virtualization  Developments/
+> /Multicore Systems Virtualization Porting Services/
+> Web/:/ www.virtualopensystems. <http://www.virtualopensystems.com/>com <http://www.virtualopensystems.com/>
+> 
+> 
