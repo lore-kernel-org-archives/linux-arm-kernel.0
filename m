@@ -1,41 +1,32 @@
-From: mark.roszko@gmail.com (Mark Roszko)
-Date: Thu, 9 Jan 2014 02:08:14 -0500
-Subject: [RFC PATCH] tty/serial: at91: disable uart timer at start of
- shutdown
-In-Reply-To: <CAJjB1q+0cMqGRX8e5ssvvvo1pSw4KY7n38vWOh-PnE8GRC2Pug@mail.gmail.com>
-References: <CAJjB1qLBoXA_XeEV+qU6pi0JVS+==kVA7mEDuAufrYup3htU2g@mail.gmail.com>
- <1389176916-6114-1-git-send-email-nicolas.ferre@atmel.com>
- <CAJjB1q+0cMqGRX8e5ssvvvo1pSw4KY7n38vWOh-PnE8GRC2Pug@mail.gmail.com>
-Message-ID: <CAJjB1qJez363RAaNg1bzE3QTsaGDFfAqOJux=VttNXCyaQTy3A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 Jan 2014 23:11:03 -0800
+Subject: linux-next: manual merge of the sh tree with the tree
+In-Reply-To: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
+References: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
+Message-ID: <CAOesGMgJe9KR2muA4F9EaXYpDFDLxVZsKOj-8qZFbDZTiRBuww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just to sumarize the bug after poking before the patch:
-   systemd calls open/close on /dev/ttyS0 per line
-   atmel_shutdown executes on close
-   uart_timer_callback may fire during shutdown before timer is killed
-   tasklet gets scheduled after tasklet_kill
-   atmel_shutdown returns back to uart_close
-dice roll:
-   if the tasklet executes before uart_close kills the tty references,
-the kernel is fine           <--- I saw this happening more often than
-panics, around once every 3 resets
-   if the tasklet executes after uart_close kills the tty references, it panics
+On Sun, Jan 5, 2014 at 5:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Paul,
+>
+> Today's linux-next merge of the sh tree got conflicts in
+> drivers/tty/serial/sh-sci.c and include/linux/serial_sci.h between
+> commits 8fb9631c517b ("serial: sh-sci: Sort headers alphabetically"),
+> 20bdcab8268c ("serial: sh-sci: Add OF support") and probably others from
+> the arm-soc tree and commits ada80ee7fa60 ("serial: sh-sci: Add OF
+> support") and b19ef75c56e9 ("serial: sh-sci: OF definitions need
+> linux/of.h") from the sh tree.
+>
+> The arm-soc tree version is dated much more recently than
+> the sh tree version and conflicts badly, so for today I have just dropped
+> the sh tree (everything in there was committed before April 2013).  Please
+> figure this out.
 
-I tested the patch by old fashion way of manual board resets with a
-total of 70 resets each on two individual SAMA5D34-EK boards I have in
-my possession programmed with the same patched kernel image and
-rootfs. They did not panic once with the patch applied. Typically
-before the patch the panic would occur around once every 10 resets if
-not more often to the point it occured for 4 resets straight.
+The request to merge the sh code came through Simon with claimed
+agreement from SH maintainers to do so -- I didn't verify this since
+they have in the past been well-coordinated. Simon?
 
-I have been trying to automate the testing, even If I make sure
-nothing is using ttyS0 and then run a program that spams open()
-writev() and close() (systemd uses the syscalls) to print messages, it
-will never panic so I'm possibly misunderstanding how the driver
-startup/shutdown ops get triggered(which should just be open/close
-respectively) or variable length of messages from systemd and timing
-between messages contributes to being unlucky and having the timer
-fire@the wrong time.
 
-But from manual testing I'm pretty confident the bug is fixed.
+
+-Olof
