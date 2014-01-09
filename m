@@ -1,55 +1,54 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 9 Jan 2014 08:33:05 -0800
-Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-In-Reply-To: <52CE7C44.1000803@ti.com>
-References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com>
- <52BC1BB8.2070007@ti.com> <52CE7C44.1000803@ti.com>
-Message-ID: <20140109163305.GC28655@norris-Latitude-E6410>
+From: giometti@enneenne.com (Rodolfo Giometti)
+Date: Thu, 9 Jan 2014 17:33:26 +0100
+Subject: NAND support for Armada 370
+In-Reply-To: <20140108233603.GB2595@localhost>
+References: <20140102124407.GF10251@enneenne.com>
+ <20140102144236.270c4a6a@skate>
+ <20140103112926.GP10251@enneenne.com>
+ <20140103145336.GA9618@localhost>
+ <20140106153438.GX10251@enneenne.com>
+ <20140108233603.GB2595@localhost>
+Message-ID: <20140109163326.GD17831@enneenne.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 04:09:00PM +0530, Sekhar Nori wrote:
-> On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
-> > On 12/18/2013 02:13 PM, Sekhar Nori wrote:
-> >> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
-> >>> Hi, Sekhar
-> >>>
-> >>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
-> >>> series.
-> >>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
-> >>> and can be found at http://git.infradead.org/l2-mtd.git
-> >>>
-> >>> This patch can be still applied on top of the series without conflicts.
-> >>>
-> >>> Can you please pick up the $subject patch if you are OK with it?
-> >>
-> >> I have no problems with the patch and can pick it too, but need ack from
-> >> MTD maintainer (David) as it touches drivers/mtd/ too.
-> >>
-> >> David,
-> >>
-> >> If you do not have the patch, we can resend it.
-> >>
-> >> Thanks,
-> >> Sekhar
-> >>
-> > 
-> > Hi Brian,
-> > 
-> > Do you agree if this patch will go through Davinci tree?
-> > 
-> > This is the last one we need to reuse Davinci Nand driver for Keystone.
+On Wed, Jan 08, 2014 at 08:36:03PM -0300, Ezequiel Garcia wrote:
+> Hi Rodolfo,
 > 
-> Since we never got an ack from MTD folks, I am going and go ahead and
-> try pushing this through ARM-SoC regardless. I will CC the MTD
-> maintainers on the pull request so any objections could even be posted
-> there.
+> Sorry for being so unresponsive these days, I've been on vacation.
+> I'll review your patch on Monday.
 
-Sorry, I've been a little busy / out for vacation. The MTD parts look OK
-to me. Feel free to take it in your tree.
+Ok.
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+> In fact, already took a quick look and it looks good. I have a few
+> doubts:
+> 
+> 1. Do we need the ECC layout? (MTD already provides defaults)
 
-Brian
+Ok, I did some testes and we can safely remove it! :)
+
+> 2. Is this compatible with Marvell's U-Boot? (can you write from U-Boot,
+> and read from Linux, and viceversa?)
+
+Till now all our tests are ok! :)
+
+Attached is the new patch release.
+
+Ciao,
+
+Rodolfo
+
+-- 
+
+GNU/Linux Solutions                  e-mail: giometti at enneenne.com
+Linux Device Driver                          giometti at linux.it
+Embedded Systems                     phone:  +39 349 2432127
+UNIX programming                     skype:  rodolfo.giometti
+Freelance ICT Italia - Consulente ICT Italia - www.consulenti-ict.it
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mtd-pxa3xx_nand.c-add-support-for-2048-bytes-page-si.patch
+Type: text/x-diff
+Size: 1192 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/2c993927/attachment.bin>
