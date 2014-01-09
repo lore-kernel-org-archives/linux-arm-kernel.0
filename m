@@ -1,22 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 15:38:47 +0100
-Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
-In-Reply-To: <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <201401091538.48127.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 09 Jan 2014 15:39:59 +0100
+Subject: [PATCH v4 2/3] ARM: mvebu: Add quirk for i2c
+In-Reply-To: <52CD5BBA.4080600@free-electrons.com>
+References: <1389112504-9931-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389112504-9931-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140107183853.GE4227@obsidianresearch.com> <20140107230610.GB2592@katana>
+ <52CD2529.6090206@free-electrons.com> <20140108112926.GB2669@katana>
+ <52CD4CBE.6010902@free-electrons.com> <20140108133958.GA15182@katana>
+ <52CD5BBA.4080600@free-electrons.com>
+Message-ID: <52CEB4BF.4040108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Zhangfei Gao wrote:
-> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
-> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
-> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
+On 08/01/2014 15:07, Gregory CLEMENT wrote:
+> Hi Wolfram,
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c |   48 +++++++++++++++++++++++++++++++++------------
->  1 file changed, 35 insertions(+), 13 deletions(-)
+> On 08/01/2014 14:39, Wolfram Sang wrote:
+>>
+>>>>>>> However, when I first read this I thought it should be a -a0 specific
+>>>>>>> compatible string, not a 'offload-broken' property - any idea what the
+>>>>>>> DT consensus is here? I've seen both approach in use ..
+>>>>>>
+>>>>>> I prefer the replacement of the compatible string. If it should really
+>>>>>> be a seperate property, then it should be a vendor specific property. It
+>>>>>> is not generic, at all.
+>>>>>
+>>>>> Something like "marvell,offload-broken" would be acceptable?
+>>>>
+>>>> A tad more, yes. Still, since this is a feature/quirk of the IP core
+>>>> revision, it should be deduced from the compatible property IMO. It
+>>>> cannot be configured anywhere, so it doesn't change on board level.
+>>>
+>>> So you would prefer using the "marvell,mv78230-a0-i2c" comaptible string and
+>>> updating it with the follwing piece of code?
+>>
+>> This is the approach I favour, yes. Can't say much about the
+>> implementation. Looks OK, but dunno if this is minimal...
+> 
+> Allocating memory in each loop could seem convoluted. In my first approach
+> I just used a static struct but I got warning during boot about duplicated
+> node. It seems we can use the same property struct for two different nodes.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Oh! I just meant the opposite: " It seems  we can NOT use the same property
+struct for two different nodes."
+
+
+> 
+>>
+> 
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
