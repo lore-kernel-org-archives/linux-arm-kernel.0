@@ -1,25 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jan 2014 15:33:28 +0000
-Subject: [PATCH RFC 27/46] imx-drm: convert to componentised device support
-In-Reply-To: <20140109152536.GG21717@S2101-09.ap.freescale.net>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1VypoB-0007FJ-PA@rmk-PC.arm.linux.org.uk>
- <20140107085930.GD12346@S2101-09.ap.freescale.net>
- <20140108213258.GS27432@n2100.arm.linux.org.uk>
- <20140109152536.GG21717@S2101-09.ap.freescale.net>
-Message-ID: <20140109153327.GE27432@n2100.arm.linux.org.uk>
+From: arete74@gmail.com (Gerardo Di Iorio)
+Date: Thu, 9 Jan 2014 16:34:04 +0100
+Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
+Message-ID: <20140109153404.GA21055@kvmhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 11:25:38PM +0800, Shawn Guo wrote:
-> Yea, adding all four into imx-drm crtcs works for imx6q, but it doesn't
-> for imx6dl, because &ipu2 is unavailable for imx6dl at all.
-> 
-> Here is how I get around it.
+Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
 
-Thanks, I've rolled your change into this commit now.
+Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
+---
+ arch/arm/mach-sunxi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 547004c..adb2574 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_SUNXI
+-       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
++       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
+        select ARCH_HAS_RESET_CONTROLLER
+        select ARCH_REQUIRE_GPIOLIB
+        select ARM_GIC
+--
+1.8.4.2
