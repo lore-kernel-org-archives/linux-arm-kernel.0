@@ -1,69 +1,49 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Jan 2014 09:31:25 +0100
-Subject: [PATCH v5 3/4] [media] exynos-scaler: Add m2m functionality for
- the SCALER driver
-In-Reply-To: <1389238094-19386-4-git-send-email-shaik.ameer@samsung.com>
-References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
- <1389238094-19386-4-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <2693737.HeuDsQMSy5@amdc1032>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Thu, 09 Jan 2014 09:31:22 +0100
+Subject: [RFC PATCH 6/9] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <201401082228.55807.arnd@arndb.de>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+ <1389190924-26226-7-git-send-email-b.brezillon@overkiz.com>
+ <201401082228.55807.arnd@arndb.de>
+Message-ID: <52CE5E5A.6050209@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/01/2014 22:28, Arnd Bergmann wrote:
+> On Wednesday 08 January 2014, Boris BREZILLON wrote:
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+>> @@ -0,0 +1,71 @@
+>> +Allwinner NAND Flash Controller (NFC)
+>> +
+>> +Required properties:
+>> +- compatible : "allwinner,sun4i-nfc".
+>> +- reg : shall contain registers location and length for data and reg.
+>> +- interrupts : shall define the NFC interrupt.
+>> +- #address-cells: shall be set to 1. Encode the nand CS.
+>> +- #size-cells : shall be set to 0.
+>> +- clocks : shall reference NFC clocks.
+>> +- clock-names : NFC internal clock names. Shall contain :
+>> +    * "ahb_clk" : AHB gating clock
+>> +    * "sclk" : NFC clock
+>> +
+> One small request: Can we try to avoid the "NFC" name here? I think it's
+> too overloaded and people may confuse it with near-field communication,
+> which I'm sure will be supported in sunxi based devices at some point.
+>
+> It doesn't hurt to also mention that the function block is called
+> nfc, but I think references to it are better named "nand", which is
+> less confusing.
 
-Hi,
+Sure, I'll remove references to the NFC acronym:
+  - change compatible string to "allwinner,sun4i-nand"
+  - avoid NFC references in the doc
+  - rename the driver into sunxi-nand.c (formerly sunxi_nfc.c)
 
-On Thursday, January 09, 2014 08:58:13 AM Shaik Ameer Basha wrote:
-> This patch adds the Makefile and memory to memory (m2m) interface
-> functionality for the SCALER driver.
-> 
-> [arun.kk at samsung.com: fix compilation issues]
-> 
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  drivers/media/platform/Kconfig                    |    8 +
->  drivers/media/platform/Makefile                   |    1 +
->  drivers/media/platform/exynos-scaler/Makefile     |    3 +
->  drivers/media/platform/exynos-scaler/scaler-m2m.c |  788 +++++++++++++++++++++
+Do you see any other references to this acronym ?
 
-It would be cleaner to add Kconfig + Makefiles in the same patch
-that adds core functionality (patch #2) and then switch the order of
-patch #2 and patch #3.
 
->  4 files changed, 800 insertions(+)
->  create mode 100644 drivers/media/platform/exynos-scaler/Makefile
->  create mode 100644 drivers/media/platform/exynos-scaler/scaler-m2m.c
-> 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index b2a4403..aec5b80 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -196,6 +196,14 @@ config VIDEO_SAMSUNG_EXYNOS_GSC
->  	help
->  	  This is a v4l2 driver for Samsung EXYNOS5 SoC G-Scaler.
->  
-> +config VIDEO_SAMSUNG_EXYNOS_SCALER
-> +	tristate "Samsung Exynos SCALER driver"
-> +	depends on OF && VIDEO_DEV && VIDEO_V4L2 && ARCH_EXYNOS5
+Best Regards,
 
-Please check for EXYNOS5410 and EXYNOS5420 explicitly instead
-of checking just for ARCH_EXYNOS5.
-
-Also this config option doesn't need to depend on OF since
-the whole EXYNOS support is OF only now.
-
-> +	select VIDEOBUF2_DMA_CONTIG
-> +	select V4L2_MEM2MEM_DEV
-> +	help
-> +	  This is a v4l2 driver for Samsung EXYNOS5410/5420 SoC SCALER.
-> +
->  config VIDEO_SH_VEU
->  	tristate "SuperH VEU mem2mem video processing driver"
->  	depends on VIDEO_DEV && VIDEO_V4L2 && HAS_DMA
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Boris
+> 	Arnd
