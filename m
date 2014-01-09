@@ -1,44 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Jan 2014 11:04:40 +0000
-Subject: [PATCH 3/7] ARM: perf_event: Add basic support for Krait CPU PMUs
-In-Reply-To: <1389221984-10973-4-git-send-email-sboyd@codeaurora.org>
-References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
- <1389221984-10973-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140109110440.GC17838@mudshark.cambridge.arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 9 Jan 2014 16:33:59 +0530
+Subject: [PATCH] ARM: config: enable ams AS3722 power reset driver
+In-Reply-To: <52CDA181.4030005@wwwdotorg.org>
+References: <1389084000-17033-1-git-send-email-ldewangan@nvidia.com>
+ <52CDA181.4030005@wwwdotorg.org>
+Message-ID: <52CE821F.6030908@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 10:59:40PM +0000, Stephen Boyd wrote:
-> Add basic support for the Krait CPU PMU. This allows us to use
-> the architected functionality of the PMU.
-> 
-> This is based on code originally written by Ashwin Chaugule and
-> Neil Leeder [1].
-> 
-> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/tree/arch/arm/kernel/perf_event_msm_krait.c?h=msm-3.4
-> 
-> Cc: Neil Leeder <nleeder@codeaurora.org>
-> Cc: Ashwin Chaugule <ashwinc@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/perf_event_cpu.c |   1 +
->  arch/arm/kernel/perf_event_v7.c  | 165 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 166 insertions(+)
-
-[...]
-
-> +static int krait_pmu_init(struct arm_pmu *cpu_pmu)
-> +{
-> +	u32 id = read_cpuid_id() & 0xffffff00;
-> +
-> +	armv7pmu_init(cpu_pmu);
-> +	cpu_pmu->name		= "ARMv7 Krait";
-> +	/* Some early versions of Krait don't support PC write events */
-> +	if (id == 0x511f0400 || id == 0x510f0600)
-> +		cpu_pmu->map_event	= krait_map_event_no_branch;
-
-Hmm, I'd really rather this information came via the DT. In fact, you could
-just drop the branch event from your main map_event_function and keep things
-simple. It depends how badly you want to advertise it in perf list :)
-
-Will
+On Thursday 09 January 2014 12:35 AM, Stephen Warren wrote:
+> On 01/07/2014 01:39 AM, Laxman Dewangan wrote:
+>> ams AS3722 is used as system PMIC for Tegra124 based Venice2.
+>> Enable ams AS3722 power reset driver for enabling power off
+>> system using PMIC.
+> I assume you'll also send a patch to add the following to DT:
+>
+> 			ams,system-power-controller;
+>
+Oops, I missed it.
+Sent it.
