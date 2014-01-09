@@ -1,156 +1,54 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 8 Jan 2014 18:38:24 -0800
-Subject: *** DEADLOCK ***
-In-Reply-To: <CAA+hA=QubicjmANRnQgNK4pEe6fLi_17-+jfo9z2HrRZjK=aOQ@mail.gmail.com>
-References: <CACUGKYP1gcmYbOX8S9PaQV0jePeryiU-e5QwyS72FkDb7m-V3w@mail.gmail.com>
- <CAA+hA=QubicjmANRnQgNK4pEe6fLi_17-+jfo9z2HrRZjK=aOQ@mail.gmail.com>
-Message-ID: <CACUGKYM60Sx-E2QnR7et0mc8XcCsSKgo6ynGkmSJKxedhGbWqw@mail.gmail.com>
+From: Guangyu.Chen@freescale.com (Nicolin Chen)
+Date: Thu, 9 Jan 2014 11:04:59 +0800
+Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock tree
+Message-ID: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
+esai_ahb clock is derived from ahb and used to provide ESAI the capability of
+register accessing and FSYS clock source for I2S clocks dividing. Although the
+gate of this esai_ahb is duplicated with esai clock -- the baud clock, yet
+considering about the differences of their clock rates, it's quite essential
+to patch this missing clock.
 
-It works.
+Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
+---
+ Documentation/devicetree/bindings/clock/imx6q-clock.txt | 1 +
+ arch/arm/mach-imx/clk-imx6q.c                           | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Regards,
-
-john
-
-On Wed, Jan 8, 2014 at 6:14 PM, Dong Aisheng <dongas86@gmail.com> wrote:
-> Hi John,
->
-> On Thu, Jan 9, 2014 at 6:19 AM, John Tobias <john.tobias.ph@gmail.com> wrote:
->> Hi Dong,
->>
->> I used your patches to fix hardirq-unsafe and didn't see the said
->> messages anymore when I repeatedly booting my board.
->>
->> But, I saw another DEADLOCK  (see below) if I enable my wifi.
->>
->
-> I guess you may miss this one.
-> http://www.spinics.net/lists/arm-kernel/msg296596.html
-> Can you apply it and try again?
->
-> Regards
-> Dong Aisheng
->
->> Regards,
->>
->> john
->>
->>
->> [   24.554647] =================================
->> [   24.559021] [ INFO: inconsistent lock state ]
->> [   24.563401] 3.13.0-rc1 #47 Tainted: G           O
->> [   24.568122] ---------------------------------
->> [   24.572497] inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
->> [   24.578528] kworker/u2:1/13 [HC0[0]:SC0[0]:HE1:SE1] takes:
->> [   24.584029]  (&(&host->lock)->rlock){?.-...}, at: [<8032d8d4>]
->> sdhci_execute_tuning+0x48/0x70c
->> [   24.592776] {IN-HARDIRQ-W} state was registered at:
->> [   24.597669]   [<8004d940>] mark_lock+0x1b0/0x784
->> [   24.602339]   [<8004f080>] __lock_acquire+0xb74/0x1cd0
->> [   24.607518]   [<800509ac>] lock_acquire+0x70/0x84
->> [   24.612262]   [<8050d928>] _raw_spin_lock+0x38/0x48
->> [   24.617188]   [<8032e754>] sdhci_irq+0x20/0xbe0
->> [   24.621761]   [<8005963c>] handle_irq_event_percpu+0x3c/0x1a0
->> [   24.627549]   [<800597e4>] handle_irq_event+0x44/0x64
->> [   24.632638]   [<8005c214>] handle_fasteoi_irq+0x84/0x14c
->> [   24.637993]   [<80058e24>] generic_handle_irq+0x34/0x44
->> [   24.643258]   [<8000f8a8>] handle_IRQ+0x40/0x8c
->> [   24.647835]   [<80008578>] gic_handle_irq+0x34/0x5c
->> [   24.652752]   [<80013204>] __irq_svc+0x44/0x58
->> [   24.657242]   [<80251534>] pin_get_from_name+0x58/0x80
->> [   24.662429]   [<802536e0>] pinconf_map_to_setting+0x70/0xb0
->> [   24.668050]   [<80250cb8>] pinctrl_get+0x238/0x46c
->> [   24.672880]   [<80250f20>] devm_pinctrl_get+0x34/0x70
->> [   24.677972]   [<802a6610>] pinctrl_bind_pins+0x34/0x200
->> [   24.683245]   [<802913d8>] driver_probe_device+0x88/0x390
->> [   24.688691]   [<802917c8>] __driver_attach+0x9c/0xa0
->> [   24.693695]   [<8028f604>] bus_for_each_dev+0x68/0x9c
->> [   24.698789]   [<80290e58>] driver_attach+0x24/0x28
->> [   24.703621]   [<80290a58>] bus_add_driver+0x164/0x220
->> [   24.708712]   [<80291e54>] driver_register+0x80/0x100
->> [   24.713802]   [<802930dc>] __platform_driver_register+0x5c/0x64
->> [   24.719767]   [<806bba98>] sdhci_esdhc_imx_driver_init+0x18/0x20
->> [   24.725817]   [<80008818>] do_one_initcall+0xe4/0x190
->> [   24.730907]   [<806a1c38>] kernel_init_freeable+0x12c/0x1cc
->> [   24.736530]   [<80502dc0>] kernel_init+0x10/0x128
->> [   24.741283]   [<8000f068>] ret_from_fork+0x14/0x2c
->> [   24.746122] irq event stamp: 45121
->> [   24.749539] hardirqs last  enabled at (45121): [<8050dbb8>]
->> _raw_spin_unlock_irqrestore+0x38/0x4c
->> [   24.758457] hardirqs last disabled at (45120): [<8050da34>]
->> _raw_spin_lock_irqsave+0x24/0x5c
->> [   24.766939] softirqs last  enabled at (45112): [<80025264>]
->> __do_softirq+0x1c8/0x278
->> [   24.774723] softirqs last disabled at (45101): [<80025700>]
->> irq_exit+0xc0/0x108
->> [   24.782072]
->> [   24.782072] other info that might help us debug this:
->> [   24.788620]  Possible unsafe locking scenario:
->> [   24.788620]
->> [   24.794556]        CPU0
->> [   24.797016]        ----
->> [   24.799474]   lock(&(&host->lock)->rlock);
->> [   24.803624]   <Interrupt>
->> [   24.806255]     lock(&(&host->lock)->rlock);
->> [   24.810576]
->> [   24.810576]  *** DEADLOCK ***
->> [   24.810576]
->> [   24.816521] 2 locks held by kworker/u2:1/13:
->> [   24.820803]  #0:  (kmmcd){.+.+.+}, at: [<80036adc>]
->> process_one_work+0x124/0x44c
->> [   24.828333]  #1:  ((&(&host->detect)->work)){+.+.+.}, at:
->> [<80036adc>] process_one_work+0x124/0x44c
->> [   24.837503]
->> [   24.837503] stack backtrace:
->> [   24.841889] CPU: 0 PID: 13 Comm: kworker/u2:1 Tainted: G
->> O 3.13.0-rc1 #47
->> [   24.849578] Workqueue: kmmcd mmc_rescan
->> [   24.853448] Backtrace:
->> [   24.855958] [<80012444>] (dump_backtrace+0x0/0x110) from
->> [<80012714>] (show_stack+0x18/0x1c)
->> [   24.864412]  r6:00000000 r5:807c4b24 r4:bf867200 r3:bf867200
->> [   24.870192] [<800126fc>] (show_stack+0x0/0x1c) from [<80507598>]
->> (dump_stack+0x24/0x28)
->> [   24.878235] [<80507574>] (dump_stack+0x0/0x28) from [<80505744>]
->> (print_usage_bug.part.34+0x2b0/0x2bc)
->> [   24.887578] [<80505494>] (print_usage_bug.part.34+0x0/0x2bc) from
->> [<8004d9d4>] (mark_lock+0x244/0x784)
->> [   24.896900]  r8:807c4b24 r7:806e1908 r6:bf867200 r5:bf867670 r4:00000002
->> [   24.903739] [<8004d790>] (mark_lock+0x0/0x784) from [<8004eb0c>]
->> (__lock_acquire+0x600/0x1cd0)
->> [   24.912383] [<8004e50c>] (__lock_acquire+0x0/0x1cd0) from
->> [<800509ac>] (lock_acquire+0x70/0x84)
->> [   24.921113] [<8005093c>] (lock_acquire+0x0/0x84) from [<8050d928>]
->> (_raw_spin_lock+0x38/0x48)
->> [   24.929652]  r7:00000004 r6:00000005 r5:bfbec000 r4:bf9e6c70
->> [   24.935439] [<8050d8f0>] (_raw_spin_lock+0x0/0x48) from
->> [<8032d8d4>] (sdhci_execute_tuning+0x48/0x70c)
->> [   24.944761]  r4:bf9e6800
->> [   24.947349] [<8032d88c>] (sdhci_execute_tuning+0x0/0x70c) from
->> [<80322f50>] (mmc_sdio_init_card+0xa3c/0xadc)
->> [   24.957207] [<80322514>] (mmc_sdio_init_card+0x0/0xadc) from
->> [<80323310>] (mmc_attach_sdio+0x80/0x368)
->> [   24.966549] [<80323290>] (mmc_attach_sdio+0x0/0x368) from
->> [<8031b968>] (mmc_rescan+0x26c/0x2f0)
->> [   24.975283] [<8031b6fc>] (mmc_rescan+0x0/0x2f0) from [<80036b58>]
->> (process_one_work+0x1a0/0x44c)
->> [   24.984082]  r8:00000000 r7:bf94fea8 r6:bf84e800 r5:bf9e6af8 r4:bf914d80
->> r3:8031b6fc
->> [   24.992078] [<800369b8>] (process_one_work+0x0/0x44c) from
->> [<80037a9c>] (worker_thread+0x124/0x3f8)
->> [   25.001161] [<80037978>] (worker_thread+0x0/0x3f8) from
->> [<8003d6cc>] (kthread+0xdc/0xf0)
->> [   25.009284] [<8003d5f0>] (kthread+0x0/0xf0) from [<8000f068>]
->> (ret_from_fork+0x14/0x2c)
->> [   25.017302]  r7:00000000 r6:00000000 r5:8003d5f0 r4:bf92dd00
->> [   25.065548] mmc1: new ultra high speed SDR50 SDIO card at address 0001
->> [   25.085698] vendor=0x02DF device=0x9129 class=0 function=1
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index 6aab72b..90ec91f 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -220,6 +220,7 @@ clocks and IDs.
+ 	lvds2_sel		205
+ 	lvds1_gate		206
+ 	lvds2_gate		207
++	esai_ahb		208
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index af2e582..20215b9 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -107,7 +107,7 @@ enum mx6q_clks {
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+ 	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div,
+-	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
++	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, esai_ahb, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -355,6 +355,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+ 	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+ 	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
++	clk[esai_ahb]     = imx_clk_gate2("esai_ahb",      "ahb",               base + 0x6c, 16);
+ 	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
+ 	clk[gpt_ipg_per]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
+ 	if (cpu_is_imx6dl())
+-- 
+1.8.4
