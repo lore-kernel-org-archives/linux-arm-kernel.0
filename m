@@ -1,49 +1,124 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Thu, 09 Jan 2014 09:31:22 +0100
-Subject: [RFC PATCH 6/9] mtd: nand: add sunxi NFC dt bindings doc
-In-Reply-To: <201401082228.55807.arnd@arndb.de>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-7-git-send-email-b.brezillon@overkiz.com>
- <201401082228.55807.arnd@arndb.de>
-Message-ID: <52CE5E5A.6050209@overkiz.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 09 Jan 2014 09:35:56 +0100
+Subject: [PATCH v5 2/4] [media] exynos-scaler: Add core functionality for
+ the SCALER driver
+In-Reply-To: <1389238094-19386-3-git-send-email-shaik.ameer@samsung.com>
+References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
+ <1389238094-19386-3-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <6360580.TZncfE63yq@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2014 22:28, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014, Boris BREZILLON wrote:
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
->> @@ -0,0 +1,71 @@
->> +Allwinner NAND Flash Controller (NFC)
->> +
->> +Required properties:
->> +- compatible : "allwinner,sun4i-nfc".
->> +- reg : shall contain registers location and length for data and reg.
->> +- interrupts : shall define the NFC interrupt.
->> +- #address-cells: shall be set to 1. Encode the nand CS.
->> +- #size-cells : shall be set to 0.
->> +- clocks : shall reference NFC clocks.
->> +- clock-names : NFC internal clock names. Shall contain :
->> +    * "ahb_clk" : AHB gating clock
->> +    * "sclk" : NFC clock
->> +
-> One small request: Can we try to avoid the "NFC" name here? I think it's
-> too overloaded and people may confuse it with near-field communication,
-> which I'm sure will be supported in sunxi based devices at some point.
->
-> It doesn't hurt to also mention that the function block is called
-> nfc, but I think references to it are better named "nand", which is
-> less confusing.
 
-Sure, I'll remove references to the NFC acronym:
-  - change compatible string to "allwinner,sun4i-nand"
-  - avoid NFC references in the doc
-  - rename the driver into sunxi-nand.c (formerly sunxi_nfc.c)
+Hi,
 
-Do you see any other references to this acronym ?
+On Thursday, January 09, 2014 08:58:12 AM Shaik Ameer Basha wrote:
+> This patch adds the core functionality for the SCALER driver.
+> 
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  drivers/media/platform/exynos-scaler/scaler.c | 1231 +++++++++++++++++++++++++
+>  drivers/media/platform/exynos-scaler/scaler.h |  376 ++++++++
+>  2 files changed, 1607 insertions(+)
+>  create mode 100644 drivers/media/platform/exynos-scaler/scaler.c
+>  create mode 100644 drivers/media/platform/exynos-scaler/scaler.h
 
+[...]
 
-Best Regards,
+> +static int scaler_probe(struct platform_device *pdev)
+> +{
+> +	struct scaler_dev *scaler;
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	if (!dev->of_node)
+> +		return -ENODEV;
+> +
+> +	scaler = devm_kzalloc(dev, sizeof(*scaler), GFP_KERNEL);
+> +	if (!scaler)
+> +		return -ENOMEM;
+> +
+> +	scaler->pdev = pdev;
+> +	scaler->variant = scaler_get_variant_data(pdev);
+> +
+> +	init_waitqueue_head(&scaler->irq_queue);
+> +	spin_lock_init(&scaler->slock);
+> +	mutex_init(&scaler->lock);
+> +	scaler->clock = ERR_PTR(-EINVAL);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	scaler->regs = devm_request_and_ioremap(dev, res);
+> +	if (!scaler->regs)
+> +		return -ENODEV;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (!res) {
+> +		dev_err(dev, "failed to get IRQ resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	ret = scaler_clk_get(scaler);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = devm_request_irq(dev, res->start, scaler_irq_handler,
+> +				0, pdev->name, scaler);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to install irq (%d)\n", ret);
+> +		goto err_clk;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, scaler);
+> +	pm_runtime_enable(dev);
+> +
+> +	/* Initialize the continious memory allocator */
+> +	scaler->alloc_ctx = vb2_dma_contig_init_ctx(dev);
+> +	if (IS_ERR(scaler->alloc_ctx)) {
+> +		ret = PTR_ERR(scaler->alloc_ctx);
+> +		goto err_clk;
+> +	}
+> +
+> +	ret = v4l2_device_register(dev, &scaler->v4l2_dev);
+> +	if (ret < 0)
+> +		goto err_clk;
+> +
+> +	ret = scaler_register_m2m_device(scaler);
+> +	if (ret < 0)
+> +		goto err_v4l2;
+> +
+> +	dev_info(dev, "registered successfully\n");
+> +	return 0;
+> +
+> +err_v4l2:
+> +	v4l2_device_unregister(&scaler->v4l2_dev);
+> +err_clk:
+> +	scaler_clk_put(scaler);
 
-Boris
-> 	Arnd
+vb2_dma_contig_cleanup_ctx() and pm_runtime_disable() calls on
+failure are missing
+
+> +	return ret;
+> +}
+> +
+> +static int scaler_remove(struct platform_device *pdev)
+> +{
+> +	struct scaler_dev *scaler = platform_get_drvdata(pdev);
+> +
+> +	scaler_unregister_m2m_device(scaler);
+> +	v4l2_device_unregister(&scaler->v4l2_dev);
+> +
+> +	vb2_dma_contig_cleanup_ctx(scaler->alloc_ctx);
+> +	pm_runtime_disable(&pdev->dev);
+> +	scaler_clk_put(scaler);
+> +
+> +	scaler_dbg(scaler, "%s driver unloaded\n", pdev->name);
+> +	return 0;
+> +}
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
