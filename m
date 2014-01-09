@@ -1,606 +1,402 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Thu, 9 Jan 2014 16:56:02 -0600
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAHrpEqS-_EBa2z+StMjk9upeyLWLff_p=bS+14TVMDQjoEHv+g@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Fri, 10 Jan 2014 03:07:32 +0400
+Subject: [PATCH v3.1 11/21] ARM: pxa: support ICP DAS LP-8x4x FPGA irq
+In-Reply-To: <1387309071-22382-12-git-send-email-ynvich@gmail.com>
+References: <1387309071-22382-12-git-send-email-ynvich@gmail.com>
+Message-ID: <1389308855-32588-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 3, 2014 at 4:53 PM, Frank Li <Frank.Li@freescale.com> wrote:
-> After enable DMA
->
-> spi-nor read speed is
-> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
-> 1+0 records in
-> 1+0 records out
-> 1048576 bytes (1.0 MB) copied, 0.720402 s, 1.5 MB/s
->
-> spi-nor write speed is
-> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
-> 1+0 records in
-> 1+0 records out
-> 1048576 bytes (1.0 MB) copied, 3.56044 s, 295 kB/s
->
-> Before enable DMA
->
-> spi-nor read speed is
-> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
-> 1+0 records in
-> 1+0 records out
-> 1048576 bytes (1.0 MB) copied, 2.37717 s, 441 kB/s
->
-> spi-nor write speed is
->
-> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
-> 1+0 records in
-> 1+0 records out
-> 1048576 bytes (1.0 MB) copied, 4.83181 s, 217 kB/s
->
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+ICP DAS LP-8x4x contains FPGA chip. The chip functions as an interrupt
+source providing 16 additional interrupts among other things. The
+interrupt lines are muxed to a GPIO pin of a 2nd level PXA-GPIO
+interrupt controller. GPIO pins of the 2nd level controller are in turn
+muxed to a CPU interrupt line.
 
-ping!
+Until pxa is completely converted to device tree, it is impossible
+to use IRQCHIP_DECLARE() and the irqdomain needs to added manually.
+Drivers for the on-CPU IRQs and GPIO-IRQs are loaded using
+postcore_initcall(). We need to have all irq domain drivers loaded prior
+to DT parsing in order to allow normal initialization of IRQ resources
+with DT.
 
-> ---
->  drivers/spi/spi-imx.c |  447 ++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 441 insertions(+), 6 deletions(-)
->
-> Change from v1.
->         1. check if res is null at res = platform_get_resource(pdev, IORESOURCE_MEM, 0)
->         2. fix failure transfer when len is not multiple watermark
->
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index b80f2f7..1a9099a 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -39,6 +39,10 @@
->  #include <linux/of_gpio.h>
->
->  #include <linux/platform_data/spi-imx.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/platform_data/dma-imx.h>
-> +#include <linux/dmaengine.h>
-> +
->
->  #define DRIVER_NAME "spi_imx"
->
-> @@ -52,6 +56,9 @@
->  #define MXC_INT_RR     (1 << 0) /* Receive data ready interrupt */
->  #define MXC_INT_TE     (1 << 1) /* Transmit FIFO empty interrupt */
->
-> +/* The maximum  bytes that a sdma BD can transfer.*/
-> +#define MAX_SDMA_BD_BYTES  (1 << 15)
-> +
->  struct spi_imx_config {
->         unsigned int speed_hz;
->         unsigned int bpw;
-> @@ -84,6 +91,7 @@ struct spi_imx_data {
->
->         struct completion xfer_done;
->         void __iomem *base;
-> +       resource_size_t mapbase;
->         int irq;
->         struct clk *clk_per;
->         struct clk *clk_ipg;
-> @@ -92,6 +100,29 @@ struct spi_imx_data {
->         unsigned int count;
->         void (*tx)(struct spi_imx_data *);
->         void (*rx)(struct spi_imx_data *);
-> +       int (*txrx_bufs)(struct spi_device *spi, struct spi_transfer *t);
-> +       struct dma_chan         *dma_chan_rx, *dma_chan_tx;
-> +       unsigned int            dma_is_inited;
-> +       struct device *dev;
-> +
-> +       struct completion dma_rx_completion;
-> +       struct completion dma_tx_completion;
-> +
-> +       u8 *dma_rx_tmpbuf;
-> +       unsigned int dma_rx_tmpbuf_size;
-> +       unsigned int dma_rx_tmpbuf_phy_addr;
-> +
-> +       u8 *dma_tx_tmpbuf;
-> +       unsigned int dma_tx_tmpbuf_size;
-> +       unsigned int dma_tx_tmpbuf_phy_addr;
-> +
-> +       unsigned int usedma;
-> +       unsigned int dma_finished;
-> +       /* SDMA wartermark */
-> +       u32 rx_wml;
-> +       u32 tx_wml;
-> +       u32 rxt_wml;
-> +
->         void *rx_buf;
->         const void *tx_buf;
->         unsigned int txfifo; /* number of words pushed in tx FIFO */
-> @@ -185,6 +216,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->  #define MX51_ECSPI_CTRL                0x08
->  #define MX51_ECSPI_CTRL_ENABLE         (1 <<  0)
->  #define MX51_ECSPI_CTRL_XCH            (1 <<  2)
-> +#define MX51_ECSPI_CTRL_SMC            (1 <<  3)
->  #define MX51_ECSPI_CTRL_MODE_MASK      (0xf << 4)
->  #define MX51_ECSPI_CTRL_POSTDIV_OFFSET 8
->  #define MX51_ECSPI_CTRL_PREDIV_OFFSET  12
-> @@ -202,9 +234,22 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->  #define MX51_ECSPI_INT_TEEN            (1 <<  0)
->  #define MX51_ECSPI_INT_RREN            (1 <<  3)
->
-> +#define MX51_ECSPI_DMA      0x14
-> +#define MX51_ECSPI_DMA_TX_WML_OFFSET 0
-> +#define MX51_ECSPI_DMA_TX_WML_MASK 0x3F
-> +#define MX51_ECSPI_DMA_RX_WML_OFFSET 16
-> +#define MX51_ECSPI_DMA_RX_WML_MASK (0x3F << 16)
-> +#define MX51_ECSPI_DMA_RXT_WML_OFFSET 24
-> +#define MX51_ECSPI_DMA_RXT_WML_MASK (0x3F << 16)
-> +
-> +#define MX51_ECSPI_DMA_TEDEN_OFFSET 7
-> +#define MX51_ECSPI_DMA_RXDEN_OFFSET 23
-> +#define MX51_ECSPI_DMA_RXTDEN_OFFSET 31
-> +
->  #define MX51_ECSPI_STAT                0x18
->  #define MX51_ECSPI_STAT_RR             (1 <<  3)
->
-> +#define MX51_ECSPI_TESTREG     0x20
->  /* MX51 eCSPI */
->  static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi)
->  {
-> @@ -255,16 +300,28 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
->  {
->         u32 reg;
->
-> -       reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-> -       reg |= MX51_ECSPI_CTRL_XCH;
-> -       writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
-> +       if (!spi_imx->usedma) {
-> +               reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-> +               reg |= MX51_ECSPI_CTRL_XCH;
-> +               writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
-> +       } else {
-> +               if (!spi_imx->dma_finished) {
-> +                       reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-> +                       reg |= MX51_ECSPI_CTRL_SMC;
-> +                       writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
-> +               } else {
-> +                       reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-> +                       reg &= (~MX51_ECSPI_CTRL_SMC);
-> +                       writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
-> +               }
-> +       }
->  }
->
->  static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->                 struct spi_imx_config *config)
->  {
-> -       u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
-> -
-> +       u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
-> +       u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
->         /*
->          * The hardware seems to have a race condition when changing modes. The
->          * current assumption is that the selection of the channel arrives
-> @@ -297,6 +354,30 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->         writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
->         writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
->
-> +       /*
-> +        * Configure the DMA register: setup the watermark
-> +        * and enable DMA request.
-> +        */
-> +       if (spi_imx->dma_is_inited) {
-> +               dma = readl(spi_imx->base + MX51_ECSPI_DMA);
-> +
-> +               spi_imx->tx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> +               spi_imx->rx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> +               spi_imx->rxt_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> +               rx_wml_cfg = spi_imx->rx_wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
-> +               tx_wml_cfg = spi_imx->tx_wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
-> +               rxt_wml_cfg = spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
-> +               dma = (dma & (~MX51_ECSPI_DMA_TX_WML_MASK)
-> +                                  & (~MX51_ECSPI_DMA_RX_WML_MASK)
-> +                                  & (~MX51_ECSPI_DMA_RXT_WML_MASK))
-> +                                  | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
-> +                                  | (1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
-> +                                  | (1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
-> +                                  | (1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
-> +
-> +               writel(dma, spi_imx->base + MX51_ECSPI_DMA);
-> +       }
-> +
->         return 0;
->  }
->
-> @@ -708,7 +789,285 @@ static int spi_imx_setupxfer(struct spi_device *spi,
->         return 0;
->  }
->
-> -static int spi_imx_transfer(struct spi_device *spi,
-> +static void spi_imx_sdma_exit(struct spi_imx_data *spi_imx)
-> +{
-> +       if (spi_imx->dma_chan_rx) {
-> +               dma_release_channel(spi_imx->dma_chan_rx);
-> +               spi_imx->dma_chan_rx = NULL;
-> +       }
-> +
-> +       if (spi_imx->dma_chan_tx) {
-> +               dma_release_channel(spi_imx->dma_chan_tx);
-> +               spi_imx->dma_chan_tx = NULL;
-> +       }
-> +
-> +       spi_imx->dma_is_inited = 0;
-> +}
-> +
-> +static void spi_imx_dma_rx_callback(void *cookie)
-> +{
-> +       struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
-> +
-> +       complete(&spi_imx->dma_rx_completion);
-> +
-> +}
-> +
-> +static void spi_imx_dma_tx_callback(void *cookie)
-> +{
-> +       struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
-> +
-> +       complete(&spi_imx->dma_tx_completion);
-> +}
-> +
-> +static int spi_imx_sdma_transfer(struct spi_device *spi,
-> +                               struct spi_transfer *transfer)
-> +{
-> +       struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> +       int ret = 0;
-> +       int sg_num;
-> +       int loop;
-> +       int left;
-> +       u32 dma;
-> +
-> +       struct scatterlist *sg_rx, *sg_tx;
-> +       struct dma_async_tx_descriptor *txdesc;
-> +       struct dma_async_tx_descriptor *rxdesc;
-> +
-> +       init_completion(&spi_imx->dma_rx_completion);
-> +       init_completion(&spi_imx->dma_tx_completion);
-> +
-> +       /*
-> +        * Get the valid physical address for the tx buf, if the rx buf address
-> +        * is null or it cannot be mapped, we should allocate memory for it.
-> +        */
-> +       if (virt_addr_valid(transfer->tx_buf)) {
-> +               transfer->tx_dma = dma_map_single(spi_imx->dev,
-> +                                (void *)transfer->tx_buf, transfer->len,
-> +                                DMA_TO_DEVICE);
-> +               if (dma_mapping_error(spi_imx->dev, transfer->tx_dma)) {
-> +                       dev_err(spi_imx->dev,
-> +                       "Memory dma map fail, line = %d\n", __LINE__);
-> +                       ret = -EFAULT;
-> +                       goto err_tx;
-> +               }
-> +       } else {
-> +               if (transfer->len > spi_imx->dma_tx_tmpbuf_size) {
-> +                       if (!spi_imx->dma_tx_tmpbuf_size) {
-> +                               kfree(spi_imx->dma_tx_tmpbuf);
-> +                               spi_imx->dma_tx_tmpbuf_size = 0;
-> +                       }
-> +
-> +                       spi_imx->dma_tx_tmpbuf =
-> +                                       kzalloc(transfer->len, GFP_KERNEL);
-> +                       if (NULL == spi_imx->dma_tx_tmpbuf) {
-> +                               dev_err(spi_imx->dev, "Alloc memory fail.\n");
-> +                               ret = -EFAULT;
-> +                               goto err_tx;
-> +                       }
-> +                       spi_imx->dma_tx_tmpbuf_size = transfer->len;
-> +               }
-> +
-> +               /*
-> +                * Move the transfered data to new buffer from the old one
-> +                * that cannot be mapped.
-> +                */
-> +               if (transfer->tx_buf)
-> +                       memcpy(spi_imx->dma_tx_tmpbuf,
-> +                                       transfer->tx_buf,
-> +                                       transfer->len);
-> +
-> +               spi_imx->dma_tx_tmpbuf_phy_addr = dma_map_single(spi_imx->dev,
-> +                       spi_imx->dma_tx_tmpbuf, transfer->len,
-> +                       DMA_TO_DEVICE);
-> +
-> +               if (dma_mapping_error(spi_imx->dev,
-> +                       spi_imx->dma_tx_tmpbuf_phy_addr)) {
-> +                       dev_err(spi_imx->dev,
-> +                               "Memory dma map fail, line = %d\n",
-> +                               __LINE__);
-> +                       ret = -EFAULT;
-> +                       goto err_tx;
-> +               }
-> +
-> +               transfer->tx_dma = spi_imx->dma_tx_tmpbuf_phy_addr;
-> +       }
-> +
-> +       /* Prepare sg for tx sdma. */
-> +       sg_num = ((transfer->len - 1) / MAX_SDMA_BD_BYTES) + 1;
-> +       sg_tx = kzalloc(sg_num * sizeof(struct scatterlist), GFP_KERNEL);
-> +       if (NULL == sg_tx) {
-> +               dev_err(spi_imx->dev,
-> +                       "Memory allocate fail, line = %d\n",
-> +                       __LINE__);
-> +               goto err_tx_sg;
-> +       }
-> +       sg_init_table(sg_tx, sg_num);
-> +       for (loop = 0; loop < (sg_num - 1); loop++) {
-> +               sg_dma_address(&sg_tx[loop]) =
-> +                       transfer->tx_dma + loop * MAX_SDMA_BD_BYTES;
-> +               sg_dma_len(&sg_tx[loop]) = MAX_SDMA_BD_BYTES;
-> +       }
-> +
-> +       sg_dma_address(&sg_tx[loop]) =
-> +               transfer->tx_dma + loop * MAX_SDMA_BD_BYTES;
-> +       sg_dma_len(&sg_tx[loop]) = transfer->len - loop * MAX_SDMA_BD_BYTES;
-> +
-> +       txdesc = dmaengine_prep_slave_sg(spi_imx->dma_chan_tx,
-> +                       sg_tx, sg_num , DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
-> +       if (!txdesc) {
-> +               ret = -EFAULT;
-> +               goto err_rx;
-> +       }
-> +
-> +       txdesc->callback = spi_imx_dma_tx_callback;
-> +       txdesc->callback_param = (void *)spi_imx;
-> +
-> +       /*
-> +        * Get the valid physical address for the rx buf, if the rx buf address
-> +        * is null or it cannot be mapped, we should allocate memory for it.
-> +        */
-> +       if (virt_addr_valid(transfer->rx_buf)) {
-> +               transfer->rx_dma = dma_map_single(spi_imx->dev,
-> +                               transfer->rx_buf, transfer->len,
-> +                               DMA_FROM_DEVICE);
-> +
-> +               if (dma_mapping_error(spi_imx->dev, transfer->rx_dma)) {
-> +                       dev_err(spi_imx->dev,
-> +                               "Memory allocate fail, line = %d\n",
-> +                               __LINE__);
-> +                       ret = -EFAULT;
-> +                       goto err_rx;
-> +               }
-> +       } else {
-> +               if (transfer->len > spi_imx->dma_rx_tmpbuf_size) {
-> +                       if (!spi_imx->dma_rx_tmpbuf_size) {
-> +                               kfree(spi_imx->dma_rx_tmpbuf);
-> +                               spi_imx->dma_rx_tmpbuf_size = 0;
-> +                       }
-> +
-> +                       spi_imx->dma_rx_tmpbuf =
-> +                                       kzalloc(transfer->len, GFP_KERNEL);
-> +                       if (NULL == spi_imx->dma_rx_tmpbuf) {
-> +                               dev_err(spi_imx->dev, "Alloc memory fail.\n");
-> +                               ret = -EFAULT;
-> +                               goto err_rx;
-> +                       }
-> +                       spi_imx->dma_rx_tmpbuf_size = transfer->len;
-> +               }
-> +
-> +               spi_imx->dma_rx_tmpbuf_phy_addr = dma_map_single(spi_imx->dev,
-> +                               spi_imx->dma_rx_tmpbuf, transfer->len,
-> +                               DMA_FROM_DEVICE);
-> +
-> +               if (dma_mapping_error(spi_imx->dev,
-> +                               spi_imx->dma_rx_tmpbuf_phy_addr)) {
-> +                       dev_err(spi_imx->dev,
-> +                               "Memory dma map fail, line = %d\n",
-> +                               __LINE__);
-> +                       ret = -EFAULT;
-> +                       goto err_rx;
-> +               }
-> +
-> +               transfer->rx_dma = spi_imx->dma_rx_tmpbuf_phy_addr;
-> +       }
-> +
-> +       /* Prepare sg for rx sdma. */
-> +       sg_num = ((transfer->len - 1) / MAX_SDMA_BD_BYTES) + 1;
-> +       sg_rx = kzalloc(sg_num * sizeof(struct scatterlist), GFP_KERNEL);
-> +       if (NULL == sg_rx) {
-> +               dev_err(spi_imx->dev,
-> +                       "Memory dma map fail, line = %d\n", __LINE__);
-> +               goto err_rx_sg;
-> +       }
-> +       sg_init_table(sg_rx, sg_num);
-> +       for (loop = 0; loop < (sg_num - 1); loop++) {
-> +               sg_dma_address(&sg_rx[loop]) =
-> +                       transfer->rx_dma + loop * MAX_SDMA_BD_BYTES;
-> +               sg_dma_len(&sg_rx[loop]) = MAX_SDMA_BD_BYTES;
-> +       }
-> +
-> +       sg_dma_address(&sg_rx[loop]) =
-> +                       transfer->rx_dma + loop * MAX_SDMA_BD_BYTES;
-> +       sg_dma_len(&sg_rx[loop]) = transfer->len - loop * MAX_SDMA_BD_BYTES;
-> +       rxdesc = dmaengine_prep_slave_sg(spi_imx->dma_chan_rx,
-> +                       sg_rx, sg_num , DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
-> +       if (!rxdesc) {
-> +               ret = -EFAULT;
-> +               goto err_desc;
-> +       }
-> +
-> +       rxdesc->callback = spi_imx_dma_rx_callback;
-> +       rxdesc->callback_param = (void *)spi_imx;
-> +
-> +       /* Trigger the cspi module. */
-> +       spi_imx->dma_finished = 0;
-> +
-> +       spi_imx->devtype_data->trigger(spi_imx);
-> +
-> +       dmaengine_submit(txdesc);
-> +       dmaengine_submit(rxdesc);
-> +
-> +       dma_async_issue_pending(spi_imx->dma_chan_tx);
-> +       dma_async_issue_pending(spi_imx->dma_chan_rx);
-> +
-> +       /* Wait SDMA to finish the data transfer.*/
-> +       ret = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
-> +                                               msecs_to_jiffies(3000));
-> +       if (!ret) {
-> +               dev_err(spi_imx->dev,
-> +                       "I/O Error in DMA TX, line = %d ####\n", __LINE__);
-> +               dmaengine_terminate_all(spi_imx->dma_chan_tx);
-> +               goto err_desc;
-> +       } else {
-> +               dma = readl(spi_imx->base + MX51_ECSPI_DMA);
-> +               dma = dma & (~MX51_ECSPI_DMA_RXT_WML_MASK);
-> +               /* Change RX_DMA_LENGTH trigger dma fetch tail data */
-> +               left = transfer->len & (~spi_imx->rxt_wml);
-> +               if (left)
-> +                       writel(dma | (left << MX51_ECSPI_DMA_RXT_WML_OFFSET),
-> +                                       spi_imx->base + MX51_ECSPI_DMA);
-> +
-> +               ret = wait_for_completion_timeout(&spi_imx->dma_rx_completion,
-> +                               msecs_to_jiffies(3000));
-> +
-> +               writel(dma | (spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET),
-> +                               spi_imx->base + MX51_ECSPI_DMA);
-> +               if (!ret) {
-> +                       dev_err(spi_imx->dev,
-> +                               "I/O Error in DMA RX. len %d, line = %d\n",
-> +                                       transfer->len,
-> +                                       __LINE__);
-> +                       spi_imx->devtype_data->reset(spi_imx);
-> +                       dmaengine_terminate_all(spi_imx->dma_chan_rx);
-> +               }
-> +       }
-> +
-> +       /* Move the transfered data to rx buf when it cannot be mapped.*/
-> +       if (transfer->rx_buf && (!virt_addr_valid(transfer->rx_buf)))
-> +               memcpy(transfer->rx_buf,
-> +                               spi_imx->dma_rx_tmpbuf,
-> +                               transfer->len);
-> +
-> +err_desc:
-> +       kfree(sg_rx);
-> +err_rx_sg:
-> +       dma_unmap_single(spi_imx->dev, transfer->rx_dma,
-> +               transfer->len, DMA_TO_DEVICE);
-> +err_rx:
-> +       kfree(sg_tx);
-> +err_tx_sg:
-> +       dma_unmap_single(spi_imx->dev, transfer->tx_dma,
-> +               transfer->len, DMA_FROM_DEVICE);
-> +err_tx:
-> +       spi_imx->dma_finished = 1;
-> +       spi_imx->devtype_data->trigger(spi_imx);
-> +       if ((!ret) || (-EFAULT == ret))
-> +               return -EIO;
-> +       else
-> +               return transfer->len;
-> +}
-> +
-> +static int spi_imx_pio_transfer(struct spi_device *spi,
->                                 struct spi_transfer *transfer)
->  {
->         struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> @@ -729,6 +1088,27 @@ static int spi_imx_transfer(struct spi_device *spi,
->         return transfer->len;
->  }
->
-> +static int spi_imx_transfer(struct spi_device *spi,
-> +                               struct spi_transfer *transfer)
-> +{
-> +       struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> +
-> +       if (spi_imx->dma_chan_tx && spi_imx->dma_chan_rx) {
-> +               /*
-> +                * Don't use sdma when the size of data to be transfered is
-> +                * lower then SDMA wartermark.
-> +                */
-> +               if ((transfer->len >= spi_imx->rx_wml) &&
-> +                               (transfer->len > spi_imx->tx_wml)) {
-> +                       spi_imx->usedma = 1;
-> +                       return spi_imx_sdma_transfer(spi, transfer);
-> +               }
-> +       }
-> +
-> +       spi_imx->usedma = 0;
-> +       return spi_imx_pio_transfer(spi, transfer);
-> +}
-> +
->  static int spi_imx_setup(struct spi_device *spi)
->  {
->         struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> @@ -778,6 +1158,56 @@ spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
->         return 0;
->  }
->
-> +static int spi_imx_sdma_init(struct spi_imx_data *spi_imx)
-> +{
-> +       struct dma_slave_config slave_config = {};
-> +       struct device *dev = spi_imx->dev;
-> +       int ret;
-> +
-> +
-> +       /* Prepare for TX : */
-> +       spi_imx->dma_chan_tx = dma_request_slave_channel(dev, "tx");
-> +       if (!spi_imx->dma_chan_tx) {
-> +               dev_err(dev, "cannot get the TX DMA channel!\n");
-> +               ret = -EINVAL;
-> +               goto err;
-> +       }
-> +
-> +       slave_config.direction = DMA_MEM_TO_DEV;
-> +       slave_config.dst_addr = spi_imx->mapbase + MXC_CSPITXDATA;
-> +       slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +       slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-> +       ret = dmaengine_slave_config(spi_imx->dma_chan_tx, &slave_config);
-> +       if (ret) {
-> +               dev_err(dev, "error in TX dma configuration.");
-> +               goto err;
-> +       }
-> +
-> +       /* Prepare for RX : */
-> +       spi_imx->dma_chan_rx = dma_request_slave_channel(dev, "rx");
-> +       if (!spi_imx->dma_chan_rx) {
-> +               dev_dbg(dev, "cannot get the DMA channel.\n");
-> +               ret = -EINVAL;
-> +               goto err;
-> +       }
-> +
-> +       slave_config.direction = DMA_DEV_TO_MEM;
-> +       slave_config.src_addr = spi_imx->mapbase + MXC_CSPIRXDATA;
-> +       slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +       slave_config.src_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-> +       ret = dmaengine_slave_config(spi_imx->dma_chan_rx, &slave_config);
-> +       if (ret) {
-> +               dev_err(dev, "error in RX dma configuration.\n");
-> +               goto err;
-> +       }
-> +       spi_imx->dma_is_inited = 1;
-> +
-> +       return 0;
-> +err:
-> +       spi_imx_sdma_exit(spi_imx);
-> +       return ret;
-> +}
-> +
->  static int spi_imx_probe(struct platform_device *pdev)
->  {
->         struct device_node *np = pdev->dev.of_node;
-> @@ -849,6 +1279,8 @@ static int spi_imx_probe(struct platform_device *pdev)
->                 (struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
->
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       if (res)
-> +               spi_imx->mapbase = res->start;
->         spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
->         if (IS_ERR(spi_imx->base)) {
->                 ret = PTR_ERR(spi_imx->base);
-> @@ -890,6 +1322,9 @@ static int spi_imx_probe(struct platform_device *pdev)
->
->         spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
->
-> +       spi_imx->dev = &pdev->dev;
-> +       spi_imx_sdma_init(spi_imx);
-> +
->         spi_imx->devtype_data->reset(spi_imx);
->
->         spi_imx->devtype_data->intctrl(spi_imx, 0);
-> --
-> 1.7.8
->
->
+Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Linus Walleij <linus.walleij@linaro.org>
+---
+   v3..v3.1
+   fixes according to Linus Walleij review comments:
+   * update commit message
+   * use state container instead of global variables
+   * get hardware irq nums from irq_data, don't calculate them
+   * use BIT() macro
+   * add defines for system irq register masks
+   * replace cycle control variable with break
+   * use better names for resource variables
+   * add a linear domain instead of a legacy one
+   * use irq_create_mapping() instead of irq_alloc_desc()
+
+   v2..v3
+   * no changes (except number 09/16 -> 11/21)
+
+   v0..v2
+   * extract irqchip and move to drivers/irqchip/
+   * use device tree
+   * use devm helpers where possible
+
+ .../bindings/interrupt-controller/irq-lp8x4x.txt   |  49 +++++
+ arch/arm/boot/dts/pxa27x-lp8x4x.dts                |  10 +
+ drivers/irqchip/Kconfig                            |   5 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-lp8x4x.c                       | 238 +++++++++++++++++++++
+ 5 files changed, 303 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/irq-lp8x4x.txt
+ create mode 100644 drivers/irqchip/irq-lp8x4x.c
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/irq-lp8x4x.txt b/Documentation/devicetree/bindings/interrupt-controller/irq-lp8x4x.txt
+new file mode 100644
+index 0000000..c8940d2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/irq-lp8x4x.txt
+@@ -0,0 +1,49 @@
++ICP DAS LP-8x4x FPGA Interrupt Controller
++
++ICP DAS LP-8x4x contains FPGA chip. The chip functions as a interrupt
++source providing 16 additional interrupts among other things.
++
++Required properties:
++- compatible : should be "icpdas,irq-lp8x4x"
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- interrupt-controller : identifies the node as an interrupt controller
++
++- #interrupt-cells : should be 1
++
++- interrupts : should provide interrupt
++
++- interrupt-parent : should provide a link to interrupt controller either
++		     explicitly and implicitly from a parent node
++
++Example:
++
++	fpga: fpga at 17000006 {
++		compatible = "icpdas,irq-lp8x4x";
++		reg = <0x17000006 0x16>;
++		interrupt-parent = <&gpio>;
++		interrupts = <3 IRQ_TYPE_EDGE_RISING>;
++		#interrupt-cells = <1>;
++		interrupt-controller;
++		status = "okay";
++	};
++
++	uart at 17009050 {
++		compatible = "icpdas,uart-lp8x4x";
++		reg = <0x17009050 0x10
++		       0x17009030 0x02>;
++		interrupt-parent = <&fpga>;
++		interrupts = <13>;
++		status = "okay";
++	};
++
++	uart at 17009060 {
++		compatible = "icpdas,uart-lp8x4x";
++		reg = <0x17009060 0x10
++		       0x17009032 0x02>;
++		interrupt-parent = <&fpga>;
++		interrupts = <14>;
++		status = "okay";
++	};
+diff --git a/arch/arm/boot/dts/pxa27x-lp8x4x.dts b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+index 07856e0..78dfd2e 100644
+--- a/arch/arm/boot/dts/pxa27x-lp8x4x.dts
++++ b/arch/arm/boot/dts/pxa27x-lp8x4x.dts
+@@ -167,6 +167,16 @@
+ 				reg = <0xa000 0x1000
+ 				       0x901e 0x1>;
+ 			};
++
++			fpgairq: irq at 9006 {
++				compatible = "icpdas,irq-lp8x4x";
++				reg = <0x9006 0x16>;
++				interrupt-parent = <&gpio>;
++				interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 3792a1a..7e22729 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -35,6 +35,11 @@ config IMGPDC_IRQ
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 
++config LP8X4X_IRQ
++	bool
++	depends on OF
++	select IRQ_DOMAIN
++
+ config ORION_IRQCHIP
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index c60b901..8a28927 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+ obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
+ obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
++obj-$(CONFIG_LP8X4X_IRQ)		+= irq-lp8x4x.o
+diff --git a/drivers/irqchip/irq-lp8x4x.c b/drivers/irqchip/irq-lp8x4x.c
+new file mode 100644
+index 0000000..61dfbed
+--- /dev/null
++++ b/drivers/irqchip/irq-lp8x4x.c
+@@ -0,0 +1,238 @@
++/*
++ *  linux/drivers/irqchip/irq-lp8x4x.c
++ *
++ *  Support for ICP DAS LP-8x4x FPGA irq
++ *  Copyright (C) 2013 Sergei Ianovich <ynvich@gmail.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation or any later version.
++ */
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#define EOI			0x00000000
++#define INSINT			0x00000002
++#define ENSYSINT		0x00000004
++#define PRIMINT			0x00000006
++#define PRIMINT_MASK		0xe0
++#define SECOINT			0x00000008
++#define SECOINT_MASK		0x1f
++#define ENRISEINT		0x0000000A
++#define CLRRISEINT		0x0000000C
++#define ENHILVINT		0x0000000E
++#define CLRHILVINT		0x00000010
++#define ENFALLINT		0x00000012
++#define CLRFALLINT		0x00000014
++#define IRQ_MEM_SIZE		0x00000016
++#define LP8X4X_NUM_IRQ_DEFAULT	16
++
++struct lp8x4x_irq_data {
++	void			*base;
++	struct irq_domain	*domain;
++	unsigned long		num_irq;
++	unsigned char		irq_sys_enabled;
++	unsigned char		irq_high_enabled;
++};
++
++static void lp8x4x_mask_irq(struct irq_data *d)
++{
++	unsigned mask;
++	unsigned long irq = d->hwirq;
++	struct lp8x4x_irq_data *host = irq_data_get_irq_chip_data(d);
++
++	if (!host) {
++		pr_err("lp8x4x: missing host data for irq %i\n", d->irq);
++		return;
++	}
++
++	if (irq >= host->num_irq) {
++		pr_err("lp8x4x: wrong irq handler for irq %i\n", d->irq);
++		return;
++	}
++
++	if (irq < 8) {
++		host->irq_high_enabled &= ~BIT(irq);
++
++		mask = ioread8(host->base + ENHILVINT);
++		mask &= ~BIT(irq);
++		iowrite8(mask, host->base + ENHILVINT);
++	} else {
++		irq -= 8;
++		host->irq_sys_enabled &= ~BIT(irq);
++
++		mask = ioread8(host->base + ENSYSINT);
++		mask &= ~BIT(irq);
++		iowrite8(mask, host->base + ENSYSINT);
++	}
++}
++
++static void lp8x4x_unmask_irq(struct irq_data *d)
++{
++	unsigned mask;
++	unsigned long irq = d->hwirq;
++	struct lp8x4x_irq_data *host = irq_data_get_irq_chip_data(d);
++
++	if (!host) {
++		pr_err("lp8x4x: missing host data for irq %i\n", d->irq);
++		return;
++	}
++
++	if (irq >= host->num_irq) {
++		pr_err("lp8x4x: wrong irq handler for irq %i\n", d->irq);
++		return;
++	}
++
++	if (irq < 8) {
++		host->irq_high_enabled |= BIT(irq);
++		mask = ioread8(host->base + CLRHILVINT);
++		mask |= BIT(irq);
++		iowrite8(mask, host->base + CLRHILVINT);
++
++		mask = ioread8(host->base + ENHILVINT);
++		mask |= BIT(irq);
++		iowrite8(mask, host->base + ENHILVINT);
++	} else {
++		irq -= 8;
++		host->irq_sys_enabled |= BIT(irq);
++
++		mask = ioread8(host->base + SECOINT);
++		mask |= BIT(irq);
++		iowrite8(mask, host->base + SECOINT);
++
++		mask = ioread8(host->base + ENSYSINT);
++		mask |= BIT(irq);
++		iowrite8(mask, host->base + ENSYSINT);
++	}
++}
++
++static struct irq_chip lp8x4x_irq_chip = {
++	.name			= "FPGA",
++	.irq_ack		= lp8x4x_mask_irq,
++	.irq_mask		= lp8x4x_mask_irq,
++	.irq_mask_ack		= lp8x4x_mask_irq,
++	.irq_unmask		= lp8x4x_unmask_irq,
++};
++
++static void lp8x4x_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	int n;
++	unsigned long mask;
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct lp8x4x_irq_data *host = irq_desc_get_handler_data(desc);
++
++	if (!host)
++		return;
++
++	chained_irq_enter(chip, desc);
++
++	for (;;) {
++		mask = ioread8(host->base + CLRHILVINT) & 0xff;
++		mask |= (ioread8(host->base + SECOINT) & SECOINT_MASK) << 8;
++		mask |= (ioread8(host->base + PRIMINT) & PRIMINT_MASK) << 8;
++		mask &= host->irq_high_enabled | (host->irq_sys_enabled << 8);
++		if (mask == 0)
++			break;
++		for_each_set_bit(n, &mask, BITS_PER_LONG)
++			generic_handle_irq(irq_find_mapping(host->domain, n));
++	}
++
++	iowrite8(0, host->base + EOI);
++	chained_irq_exit(chip, desc);
++}
++
++static int lp8x4x_irq_domain_map(struct irq_domain *d, unsigned int irq,
++				 irq_hw_number_t hw)
++{
++	struct lp8x4x_irq_data *host = d->host_data;
++	int err;
++
++	err = irq_set_chip_data(irq, host);
++	if (err < 0)
++		return err;
++
++	irq_set_chip_and_handler(irq, &lp8x4x_irq_chip, handle_level_irq);
++	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	return 0;
++}
++
++const struct irq_domain_ops lp8x4x_irq_domain_ops = {
++	.map	= lp8x4x_irq_domain_map,
++	.xlate	= irq_domain_xlate_onecell,
++};
++
++static struct of_device_id lp8x4x_irq_dt_ids[] = {
++	{ .compatible = "icpdas,irq-lp8x4x", },
++	{}
++};
++
++static int lp8x4x_irq_probe(struct platform_device *pdev)
++{
++	struct resource *res_mem, *res_irq;
++	struct device_node *np = pdev->dev.of_node;
++	struct lp8x4x_irq_data *host;
++	int i, err;
++
++	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!res_mem || !res_irq || resource_size(res_mem) < IRQ_MEM_SIZE)
++		return -ENODEV;
++
++	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
++	if (!host)
++		return -ENODEV;
++
++	host->num_irq = LP8X4X_NUM_IRQ_DEFAULT;
++	host->base = devm_ioremap_resource(&pdev->dev, res_mem);
++	if (!host->base) {
++		dev_err(&pdev->dev, "Failed to ioremap %p\n", host->base);
++		return -EFAULT;
++	}
++
++	host->domain = irq_domain_add_linear(np, host->num_irq,
++				       &lp8x4x_irq_domain_ops, host);
++	if (!host->domain) {
++		dev_err(&pdev->dev, "Failed to add IRQ domain\n");
++		return -ENOMEM;
++	}
++
++	for (i = 0; i < host->num_irq; i++) {
++		err = irq_create_mapping(host->domain, i);
++		if (err < 0)
++			dev_err(&pdev->dev, "Failed to map IRQ %i\n", i);
++	}
++
++	/* Initialize chip registers */
++	iowrite8(0, host->base + CLRRISEINT);
++	iowrite8(0, host->base + ENRISEINT);
++	iowrite8(0, host->base + CLRFALLINT);
++	iowrite8(0, host->base + ENFALLINT);
++	iowrite8(0, host->base + CLRHILVINT);
++	iowrite8(0, host->base + ENHILVINT);
++	iowrite8(0, host->base + ENSYSINT);
++	iowrite8(0, host->base + SECOINT);
++
++	irq_set_handler_data(res_irq->start, host);
++	irq_set_chained_handler(res_irq->start, lp8x4x_irq_handler);
++
++	return 0;
++}
++
++static struct platform_driver lp8x4x_irq_driver = {
++	.probe		= lp8x4x_irq_probe,
++	.driver		= {
++		.name	= "irq-lp8x4x",
++		.of_match_table = lp8x4x_irq_dt_ids,
++	},
++};
++
++static int __init lp8x4x_irq_init(void)
++{
++	return platform_driver_register(&lp8x4x_irq_driver);
++}
++postcore_initcall(lp8x4x_irq_init);
+-- 
+1.8.4.2
