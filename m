@@ -1,49 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jan 2014 12:27:09 +0000
-Subject: [PATCH v2 24/28] drm/i2c: tda998x: adjust the audio CTS to the
- mode clock
-In-Reply-To: <20140109120702.492c58d8@armhf>
-References: <20140109120702.492c58d8@armhf>
-Message-ID: <20140109122708.GB27432@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 9 Jan 2014 20:29:05 +0800
+Subject: [PATCH v4] ARM: prima2: move to generic reset controller driver
+ framework
+In-Reply-To: <201401091221.34496.arnd@arndb.de>
+References: <1389003878-10094-1-git-send-email-21cnbao@gmail.com>
+ <201401071653.49964.arnd@arndb.de>
+ <CAGsJ_4x=SdqCjcCwFYFXy88z0xhWaDp2rE_HXOhRxs_7miireQ@mail.gmail.com>
+ <201401091221.34496.arnd@arndb.de>
+Message-ID: <CAGsJ_4xfqQ+-gsSd2vrzPkEUVELmHDkQLGSu_2kx7F-JPgQ5vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 12:07:02PM +0100, Jean-Francois Moine wrote:
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index 68630b8..c2163f4 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -723,7 +723,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
->  		struct drm_display_mode *mode)
->  {
->  	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
-> -	uint32_t n;
-> +	uint32_t n, cts;
->  
->  	/* Enable audio ports */
->  	reg_write(priv, REG_ENA_AP, priv->audio_port);
-> @@ -777,9 +777,10 @@ tda998x_configure_audio(struct tda998x_priv *priv,
->  	n = 128 * AUDIO_SAMPLE;		/* acr_n = 128 * sample_rate / 1000 */
->  
->  	/* Write the CTS and N values */
-> -	buf[0] = 0x44;
-> -	buf[1] = 0x42;
-> -	buf[2] = 0x01;
-> +	cts = mode->clock;
-> +	buf[0] = cts;
-> +	buf[1] = cts >> 8;
-> +	buf[2] = cts >> 16;
+2014/1/9 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 09 January 2014, Barry Song wrote:
+>> 2014/1/7 Arnd Bergmann <arnd@arndb.de>:
+>> > On Tuesday 07 January 2014, Barry Song wrote:
+>> >> > Can't this be a regular platform device? Drivers that get the reference to
+>> >> > the reset controller should respect a -EPROBE_DEFER error message if they
+>> >> > get initialized in the wrong order.
+>> >>
+>> >> Arnd, it is ok if prima2 is not a platform for automotive. here prima2
+>> >> actually wants a "right" order for products.
+>> >> for example, there are some local hacking to move camera for rearview
+>> >> started earlier than other devices as this feature needs to be ready
+>> >> as early as possible.
+>> >> some earlier boot devices depend on reset module to be ready. so if we
+>> >> move to regular platform driver for upstream, it still requires some
+>> >> local hacking to move it earlier.
+>> >
+>> > I don't understand what you mean. It should be a matter of a few miliseconds
+>> > at most to retry initialization, more likely in the microseconds. How big
+>> > are the delays you are worried about?
+>>
+>> what i am worrried about is 100ms or more. device drivers need time to
+>> initialize and that will take time, if some devices initialization
+>> happen before the deferred probing, the deferred probing might be
+>> delayed 100ms.
+>> for example, we want camera begin to show rear-view in several
+>> hundreds of ms, there are some local hacking to move i2c and camera
+>> probe earlier than other devices.
+>> that means actually there is requirement for right order of probing
+>> but not defer probing sometimes.
+>
+> I see, this seems like a valid concern. I had not considered that other
+> drivers might need more time for initialization. In general of course
+> they should not, but I understand that hardware is not perfect and
+> some drivers you don't own may have bugs that cause unnecessary delays.
 
-NAK.  We use auto-CTS mode, so the actual programmed CTS value is
-entirely irrelevant.
+the functionality of defer probing is really working. but embedded
+systems with all kinds of hardware and various strange requirement
+will want the "right" order.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+>
+> We have discussed probe ordering a lot of times on the mailing lists
+> and also during the last kernel summit, but those discussions are usually
+> focused on trying to correctly boot up a system, which is hard enough
+> even without additional requirements like yours.
+>
+> Generally the hack that people use when things fail to work correctly
+> is to hijack an earlier initcall level, e.g. subsys_initcall rather
+> than using module_init. Please first see if that can solve your problem.
+> If it doesn't help, please resubmit your current patch with a detailed
+> description in the code on why you have to do it like this.
+
+that is ok if it moves to subsys_initcall. some people might think
+using subsys_initcall imports redundant function call for non-sirf
+platform in multi-platform and machine-specific hook will not import
+that :-)
+
+>
+>         Arnd
+
+-barry
