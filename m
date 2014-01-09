@@ -1,36 +1,54 @@
 From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 8 Jan 2014 23:52:24 -0800
-Subject: [GIT PULL] bcm driver updates for 3.14
-In-Reply-To: <20140109060432.GC8285@quad.lixom.net>
-References: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
- <20140109060432.GC8285@quad.lixom.net>
-Message-ID: <CAEPRUYpZTTX8bB68V5WMzBroj+arADsbbmXVSgBtn0At1SmRmw@mail.gmail.com>
+Date: Wed, 8 Jan 2014 23:54:44 -0800
+Subject: [PATCH v7 2/4] ARM: BCM5301X: add early debugging support
+In-Reply-To: <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
+References: <1389135492-11655-1-git-send-email-hauke@hauke-m.de>
+ <1389135492-11655-3-git-send-email-hauke@hauke-m.de>
+Message-ID: <CAEPRUYrWp3wSpOPKEQWTGMLKhrtpdumbvjEnTW_18s4gNx3+Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 10:04 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Jan 05, 2014 at 10:58:36PM -0800, Christian Daudt wrote:
->> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
->>
->>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
->>
->> are available in the git repository at:
->>
->>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-drivers
+On Tue, Jan 7, 2014 at 2:58 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> This adds support for early debugging of BCM5301X SoC.
 >
-> Hi,
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/Kconfig.debug |    7 +++++++
+>  1 file changed, 7 insertions(+)
 >
-> Is there a reason you're sending this through arm-soc instead of through Mike's
-> clk tree? I don't see any dependencies on SoC code so I think it can go
-> independently through clk?
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index bda94e4..eebd81e 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -102,6 +102,11 @@ choice
+>                   Say Y here if you want kernel low-level debugging support
+>                   on Marvell Berlin SoC based platforms.
 >
+> +       config DEBUG_BCM_5301X
+> +               bool "Kernel low-level debugging on BCM5301X UART1"
+> +               depends on ARCH_BCM_5301X
+> +               select DEBUG_UART_PL01X
+> +
+>         config DEBUG_CLPS711X_UART1
+>                 bool "Kernel low-level debugging messages via UART1"
+>                 depends on ARCH_CLPS711X
+> @@ -1005,6 +1010,7 @@ config DEBUG_UART_PHYS
+>         default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+>         default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+>         default 0x20201000 if DEBUG_BCM2835
+> +       default 0x18000300 if DEBUG_BCM_5301X
+>         default 0x4000e400 if DEBUG_LL_UART_EFM32
+>         default 0x40090000 if ARCH_LPC32XX
+>         default 0x40100000 if DEBUG_PXA_UART1
+> @@ -1047,6 +1053,7 @@ config DEBUG_UART_VIRT
+>         default 0xf0009000 if DEBUG_CNS3XXX
+>         default 0xf01fb000 if DEBUG_NOMADIK_UART
+>         default 0xf0201000 if DEBUG_BCM2835
+> +       default 0xf1000300 if DEBUG_BCM_5301X
+>         default 0xf11f1000 if ARCH_VERSATILE
+>         default 0xf1600000 if ARCH_INTEGRATOR
+>         default 0xf1c28000 if DEBUG_SUNXI_UART0
+> --
+> 1.7.10.4
 >
-> -Olof
-The reason for the clk patches is that the file
-include/dt-bindings/clock/bcm281xx.h is  used both by the driver and
-the by the bcm11351.dtsi file (which has other mods going through
-arm-soc). But now that you mentioned it, I looked and didn't find the
-patch that modifies dts to include it. Alex - did I miss it?
-
- thanks,
-   csd
