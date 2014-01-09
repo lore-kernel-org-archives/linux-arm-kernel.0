@@ -1,55 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 9 Jan 2014 12:43:36 -0600
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140109184059.GM2417@saruman.home>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
- <20140109172217.GH2417@saruman.home>
- <20140109184059.GM2417@saruman.home>
-Message-ID: <20140109184335.GN2417@saruman.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 9 Jan 2014 18:42:51 +0000
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+ <201401091204.17932.arnd@arndb.de>
+ <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+Message-ID: <20140109184251.GL17838@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 12:40:59PM -0600, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Jan 09, 2014 at 11:22:17AM -0600, Felipe Balbi wrote:
-> > > Changes compared to previous version:
-> > > - Dropped any changes to generic clock drivers, as it seems impossible
-> > >   to agree anything in short term, this means the patch set shrank in
-> > >   size from 49 patches to 40 (first 9 patches were dropped).
-> > > - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
-> > >   to drivers/clk/ti, and made the modifications needed to the TI version
-> > >   of the clock drivers only (based on discussions with Mike, this is fine)
-> > > - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
-> > >   with any generic implementation we might have at some point, migrating
-> > >   this to the generic version should be easy enough also.
-> > > - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
-> > >   versions and resulted into an orphan clock node
-> > > - Fixed compile problem for omap5 only build reported by Felipe
-> > > - Fixed a couple of sparse warnings
-> > > - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
-> > >   instead of __raw_readl / __raw_writel
+On Thu, Jan 09, 2014 at 12:47:24PM +0000, Stefano Stabellini wrote:
+> On Thu, 9 Jan 2014, Arnd Bergmann wrote:
+> > On Thursday 09 January 2014, Will Deacon wrote:
+> > > On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
+> > > > Remove !GENERIC_ATOMIC64 build dependency:
+> > > > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
+> > > >   GENERIC_ATOMIC64;
+> > > > - call armv7_atomic64_xchg directly from xen/events.h.
+> > > > 
+> > > > Remove !CPU_V6 build dependency:
+> > > > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+> > > >   CONFIG_CPU_V6;
+> > > > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
+> > > > 
+> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > CC: arnd at arndb.de
+> > > > CC: linux at arm.linux.org.uk
+> > > > CC: will.deacon at arm.com
+> > > > CC: gang.chen at asianux.com
+> > > > CC: catalin.marinas at arm.com
+> > > > CC: jaccon.bastiaansen at gmail.com
+> > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > CC: linux-kernel at vger.kernel.org
+> > > > 
+> > > 
+> > > I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
+> > > What am I missing?
 > > 
-> > just caught a build breakage. .config attached
+> > This is about being able to build a kernel that runs on ARMv6 and ARMv7
+> > and also includes Xen. Because of obvious hardware limitations, Xen
+> > will only run on v7, but currently you cannot even build it once you
+> > enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
+> > do atomic accesses in a generic way on non-32bit variables.
 > 
-> forgot to give you build errors found, they're here:
-> http://hastebin.com/jibuyuyoto.vbs
-> 
-> Also, just caught another build breakage:
-> 
-> http://hastebin.com/reravalupe.vbs
-> 
-> .config attached
+> Yep, that's right.
 
-hmm, quite a few configs are failing, seems like have DRA7xx without
-OMAP4 or OMAP5 breaks builds.
+Ok, thanks for the explanation. Looking at the patch, I wonder whether it's
+not cleaner just to implement xchg code separately for Xen? The Linux code
+isn't always sufficient (due to the GENERIC_ATOMIC64 stuff) and most of the
+churn coming out of this patch is an attempt to provide some small code
+reuse at the cost of code readability.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/84025fce/attachment.sig>
+What do others think?
+
+Will
