@@ -1,61 +1,61 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 9 Jan 2014 16:00:15 +0200
-Subject: [PATCHv13 04/40] CLK: TI: add autoidle support
+Date: Thu, 9 Jan 2014 16:00:18 +0200
+Subject: [PATCHv13 07/40] clk: ti: add support for TI fixed factor clock
 In-Reply-To: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
 References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1389276051-1326-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1389276051-1326-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TI clk driver now routes some of the basic clocks through own
-registration routine to allow autoidle support. This routine just
-checks a couple of device node properties and adds autoidle support
-if required, and just passes the registration forward to basic clocks.
+This behaves exactly in similar manner to basic fixed-factor-clock, but
+adds a few properties on top for handling clock hardware autoidling.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../devicetree/bindings/clock/ti/autoidle.txt      |   39 ++++++
- arch/arm/mach-omap2/clock.c                        |    6 +
+ .../bindings/clock/ti/fixed-factor-clock.txt       |   43 +++++++++++++
  drivers/clk/ti/Makefile                            |    2 +-
- drivers/clk/ti/autoidle.c                          |  133 ++++++++++++++++++++
- include/linux/clk/ti.h                             |    9 ++
- 5 files changed, 188 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/autoidle.txt
- create mode 100644 drivers/clk/ti/autoidle.c
+ drivers/clk/ti/fixed-factor.c                      |   66 ++++++++++++++++++++
+ 3 files changed, 110 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+ create mode 100644 drivers/clk/ti/fixed-factor.c
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/autoidle.txt b/Documentation/devicetree/bindings/clock/ti/autoidle.txt
+diff --git a/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
 new file mode 100644
-index 0000000..7c735dd
+index 0000000..662b36d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/autoidle.txt
-@@ -0,0 +1,39 @@
-+Binding for Texas Instruments autoidle clock.
++++ b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+@@ -0,0 +1,43 @@
++Binding for TI fixed factor rate clock sources.
 +
 +Binding status: Unstable - ABI compatibility may be broken in the future
 +
-+This binding uses the common clock binding[1]. It assumes a register mapped
-+clock which can be put to idle automatically by hardware based on the usage
-+and a configuration bit setting. Autoidle clock is never an individual
-+clock, it is always a derivative of some basic clock like a gate, divider,
-+or fixed-factor.
++This binding uses the common clock binding[1], and also uses the autoidle
++support from TI autoidle clock [2].
 +
 +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/clock/ti/autoidle.txt
 +
 +Required properties:
-+- reg : offset for the register controlling the autoidle
-+- ti,autoidle-shift : bit shift of the autoidle enable bit
-+- ti,invert-autoidle-bit : autoidle is enabled by setting the bit to 0
++- compatible : shall be "ti,fixed-factor-clock".
++- #clock-cells : from common clock binding; shall be set to 0.
++- ti,clock-div: fixed divider.
++- ti,clock-mult: fixed multiplier.
++- clocks: parent clock.
 +
-+Examples:
-+	dpll_core_m4_ck: dpll_core_m4_ck {
++Optional properties:
++- ti,autoidle-shift: bit shift of the autoidle enable bit for the clock,
++  see [2]
++- reg: offset for the autoidle register of this clock, see [2]
++- ti,invert-autoidle-bit: autoidle is enabled by setting the bit to 0, see [2]
++- ti,set-rate-parent: clk_set_rate is propagated to parent
++
++Example:
++	clock {
++		compatible = "ti,fixed-factor-clock";
++		clocks = <&parentclk>;
 +		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&dpll_core_x2_ck>;
-+		ti,max-div = <31>;
-+		ti,autoidle-shift = <8>;
-+		reg = <0x2d38>;
-+		ti,index-starts-at-one;
-+		ti,invert-autoidle-bit;
++		ti,clock-div = <2>;
++		ti,clock-mult = <1>;
 +	};
 +
 +	dpll_usb_clkdcoldo_ck: dpll_usb_clkdcoldo_ck {
@@ -68,47 +68,24 @@ index 0000000..7c735dd
 +		ti,clock-mult = <1>;
 +		ti,invert-autoidle-bit;
 +	};
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index c7c5d31..238be3f 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -520,6 +520,9 @@ int omap2_clk_enable_autoidle_all(void)
- 	list_for_each_entry(c, &clk_hw_omap_clocks, node)
- 		if (c->ops && c->ops->allow_idle)
- 			c->ops->allow_idle(c);
-+
-+	of_ti_clk_allow_autoidle_all();
-+
- 	return 0;
- }
- 
-@@ -539,6 +542,9 @@ int omap2_clk_disable_autoidle_all(void)
- 	list_for_each_entry(c, &clk_hw_omap_clocks, node)
- 		if (c->ops && c->ops->deny_idle)
- 			c->ops->deny_idle(c);
-+
-+	of_ti_clk_deny_autoidle_all();
-+
- 	return 0;
- }
- 
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 05af5d8..533efb4 100644
+index 640ebf9..f57fc4b 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -1,3 +1,3 @@
+@@ -1,4 +1,4 @@
  ifneq ($(CONFIG_OF),)
--obj-y					+= clk.o dpll.o
-+obj-y					+= clk.o dpll.o autoidle.o
+ obj-y					+= clk.o dpll.o autoidle.o divider.o \
+-					   composite.o
++					   fixed-factor.o composite.o
  endif
-diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
+diff --git a/drivers/clk/ti/fixed-factor.c b/drivers/clk/ti/fixed-factor.c
 new file mode 100644
-index 0000000..8912ff8
+index 0000000..c2c8a28
 --- /dev/null
-+++ b/drivers/clk/ti/autoidle.c
-@@ -0,0 +1,133 @@
++++ b/drivers/clk/ti/fixed-factor.c
+@@ -0,0 +1,66 @@
 +/*
-+ * TI clock autoidle support
++ * TI Fixed Factor Clock
 + *
 + * Copyright (C) 2013 Texas Instruments, Inc.
 + *
@@ -126,139 +103,52 @@ index 0000000..8912ff8
 +
 +#include <linux/clk-provider.h>
 +#include <linux/slab.h>
-+#include <linux/io.h>
++#include <linux/err.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/clk/ti.h>
 +
-+struct clk_ti_autoidle {
-+	void __iomem		*reg;
-+	u8			shift;
-+	u8			flags;
-+	const char		*name;
-+	struct list_head	node;
-+};
-+
-+#define AUTOIDLE_LOW		0x1
-+
-+static LIST_HEAD(autoidle_clks);
-+
-+static void ti_allow_autoidle(struct clk_ti_autoidle *clk)
-+{
-+	u32 val;
-+
-+	val = ti_clk_ll_ops->clk_readl(clk->reg);
-+
-+	if (clk->flags & AUTOIDLE_LOW)
-+		val &= ~(1 << clk->shift);
-+	else
-+		val |= (1 << clk->shift);
-+
-+	ti_clk_ll_ops->clk_writel(val, clk->reg);
-+}
-+
-+static void ti_deny_autoidle(struct clk_ti_autoidle *clk)
-+{
-+	u32 val;
-+
-+	val = ti_clk_ll_ops->clk_readl(clk->reg);
-+
-+	if (clk->flags & AUTOIDLE_LOW)
-+		val |= (1 << clk->shift);
-+	else
-+		val &= ~(1 << clk->shift);
-+
-+	ti_clk_ll_ops->clk_writel(val, clk->reg);
-+}
++#undef pr_fmt
++#define pr_fmt(fmt) "%s: " fmt, __func__
 +
 +/**
-+ * of_ti_clk_allow_autoidle_all - enable autoidle for all clocks
++ * of_ti_fixed_factor_clk_setup - Setup function for TI fixed factor clock
++ * @node: device node for this clock
 + *
-+ * Enables hardware autoidle for all registered DT clocks, which have
-+ * the feature.
++ * Sets up a simple fixed factor clock based on device tree info.
 + */
-+void of_ti_clk_allow_autoidle_all(void)
++static void __init of_ti_fixed_factor_clk_setup(struct device_node *node)
 +{
-+	struct clk_ti_autoidle *c;
++	struct clk *clk;
++	const char *clk_name = node->name;
++	const char *parent_name;
++	u32 div, mult;
++	u32 flags = 0;
 +
-+	list_for_each_entry(c, &autoidle_clks, node)
-+		ti_allow_autoidle(c);
-+}
-+
-+/**
-+ * of_ti_clk_deny_autoidle_all - disable autoidle for all clocks
-+ *
-+ * Disables hardware autoidle for all registered DT clocks, which have
-+ * the feature.
-+ */
-+void of_ti_clk_deny_autoidle_all(void)
-+{
-+	struct clk_ti_autoidle *c;
-+
-+	list_for_each_entry(c, &autoidle_clks, node)
-+		ti_deny_autoidle(c);
-+}
-+
-+/**
-+ * of_ti_clk_autoidle_setup - sets up hardware autoidle for a clock
-+ * @node: pointer to the clock device node
-+ *
-+ * Checks if a clock has hardware autoidle support or not (check
-+ * for presence of 'ti,autoidle-shift' property in the device tree
-+ * node) and sets up the hardware autoidle feature for the clock
-+ * if available. If autoidle is available, the clock is also added
-+ * to the autoidle list for later processing. Returns 0 on success,
-+ * negative error value on failure.
-+ */
-+int __init of_ti_clk_autoidle_setup(struct device_node *node)
-+{
-+	u32 shift;
-+	struct clk_ti_autoidle *clk;
-+
-+	/* Check if this clock has autoidle support or not */
-+	if (of_property_read_u32(node, "ti,autoidle-shift", &shift))
-+		return 0;
-+
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+
-+	if (!clk)
-+		return -ENOMEM;
-+
-+	clk->shift = shift;
-+	clk->name = node->name;
-+	clk->reg = ti_clk_get_reg_addr(node, 0);
-+
-+	if (!clk->reg) {
-+		kfree(clk);
-+		return -EINVAL;
++	if (of_property_read_u32(node, "ti,clock-div", &div)) {
++		pr_err("%s must have a clock-div property\n", node->name);
++		return;
 +	}
 +
-+	if (of_property_read_bool(node, "ti,invert-autoidle-bit"))
-+		clk->flags |= AUTOIDLE_LOW;
++	if (of_property_read_u32(node, "ti,clock-mult", &mult)) {
++		pr_err("%s must have a clock-mult property\n", node->name);
++		return;
++	}
 +
-+	list_add(&clk->node, &autoidle_clks);
++	if (of_property_read_bool(node, "ti,set-rate-parent"))
++		flags |= CLK_SET_RATE_PARENT;
 +
-+	return 0;
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
++					mult, div);
++
++	if (!IS_ERR(clk)) {
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++		of_ti_clk_autoidle_setup(node);
++	}
 +}
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 3f9de39..ca38ee3 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -242,6 +242,15 @@ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
- void ti_dt_clk_init_provider(struct device_node *np, int index);
- int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
- 		      ti_of_clk_init_cb_t func);
-+int of_ti_clk_autoidle_setup(struct device_node *node);
-+
-+#ifdef CONFIG_OF
-+void of_ti_clk_allow_autoidle_all(void);
-+void of_ti_clk_deny_autoidle_all(void);
-+#else
-+static inline void of_ti_clk_allow_autoidle_all(void) { }
-+static inline void of_ti_clk_deny_autoidle_all(void) { }
-+#endif
- 
- extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
- extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
++CLK_OF_DECLARE(ti_fixed_factor_clk, "ti,fixed-factor-clock",
++	       of_ti_fixed_factor_clk_setup);
 -- 
 1.7.9.5
