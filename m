@@ -1,191 +1,109 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu,  9 Jan 2014 17:05:04 +0000
-Subject: [PATCH v10 2/4] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <1389287106-29979-1-git-send-email-broonie@kernel.org>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
-Message-ID: <1389287106-29979-3-git-send-email-broonie@kernel.org>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Thu, 09 Jan 2014 18:06:52 +0100
+Subject: [PATCH 00/18] ARM: dts: Better support for Gumstix Overo
+In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <52CED72C.5050703@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Hi Florian,
 
-Add support for parsing the explicit topology bindings to discover the
-topology of the system.
+On 09/01/2014 17:47, Florian Vaussard wrote:
+> Hello,
+>
+> This series adds a number of improvements to Gumstix Overo.
 
-Since it is not currently clear how to map multi-level clusters for the
-scheduler all leaf clusters are presented to the scheduler at the same
-level. This should be enough to provide good support for current systems.
+Thanks for that nice series.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/kernel/topology.c | 145 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 145 insertions(+)
+> Patch 1+2: fix an issue with the vendor prefix (reported long ago by Javier Martinez Canillas)
+> Patch 3+4: add some missing pinctrl entries
+> Patch 5: completely turn off the PMIC on power off
+> Patch 6: enable the on-board Wifi
+> Patch 7: add the high-speed USB PHY
+> Patch 8: add specific timings for LAN9221 into a generic file
+> -> This might interest other people using the same chip, result in doubled bandwith
+>
+> Patch 9: simplify omap3-tobi by using patch 8
+> Patch 10: add support for AT24C01 EEPROM used on expansion boards
+> Patch 11: factorize parts common to all expansion boards
+> Patch 12: rename omap3-tobi to omap3-overo-tobi
+> -> I do not know to which extent this might qualify as an API breakage,
+>     but the new name is far better IMHO
+>
+> Patch 13 to 17: add new extension boards (Palo43, Gallop43, Alto35, Chestnut43, Summit)
+> Patch 18: add the HDMI output
+> -> this patch depends on Tomi Valkeinen's DT binding for OMAPDSS, which is
+>     not yet merged, so this patch will have to wait
+>
+>
+> The patches 13 to 17 are based on the hardware schematics and compile-tested, as I
+> do not have the necessary hardware (anyone willing to send me some boards ? :-)
+> We are mainly missing the support for the various LCDs, the accelerometer + probably
+> other small things.
+>
+> This series is based on Tony's omap-for-v3.14/dt branch + work from Tomi [1] for the patch 18.
+>
+> Benoit: I guess that I am too late for the 3.14... ?
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 20eef01a4707..b153bfe4cab9 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -17,10 +17,152 @@
- #include <linux/percpu.h>
- #include <linux/node.h>
- #include <linux/nodemask.h>
-+#include <linux/of.h>
- #include <linux/sched.h>
-+#include <linux/slab.h>
- 
- #include <asm/topology.h>
- 
-+#ifdef CONFIG_OF
-+static int __init get_cpu_for_node(struct device_node *node)
-+{
-+	struct device_node *cpu_node;
-+	int cpu;
-+
-+	cpu_node = of_parse_phandle(node, "cpu", 0);
-+	if (!cpu_node)
-+		return -1;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (of_get_cpu_node(cpu, NULL) == cpu_node)
-+			return cpu;
-+	}
-+
-+	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
-+	return -1;
-+}
-+
-+static void __init parse_core(struct device_node *core, int *cluster_id,
-+			      int core_id)
-+{
-+	char name[10];
-+	bool leaf = true;
-+	int i, cpu;
-+	struct device_node *t;
-+
-+	i = 0;
-+	do {
-+		snprintf(name, sizeof(name), "thread%d", i);
-+		t = of_get_child_by_name(core, name);
-+		if (t) {
-+			leaf = false;
-+			cpu = get_cpu_for_node(t);
-+			if (cpu >= 0) {
-+				cpu_topology[cpu].socket_id = *cluster_id;
-+				cpu_topology[cpu].core_id = core_id;
-+				cpu_topology[cpu].thread_id = i;
-+			} else {
-+				pr_err("%s: Can't get CPU for thread\n",
-+				       t->full_name);
-+			}
-+		}
-+		i++;
-+	} while (t);
-+
-+	cpu = get_cpu_for_node(core);
-+	if (cpu >= 0) {
-+		if (!leaf) {
-+			pr_err("%s: Core has both threads and CPU\n",
-+			       core->full_name);
-+			return;
-+		}
-+
-+		cpu_topology[cpu].socket_id = *cluster_id;
-+		cpu_topology[cpu].core_id = core_id;
-+	} else if (leaf) {
-+		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
-+	}
-+}
-+
-+static void __init parse_cluster(struct device_node *cluster,
-+				 int depth, int *cluster_id)
-+{
-+	char name[10];
-+	bool leaf = true;
-+	bool has_cores = false;
-+	struct device_node *c;
-+	int core_id = 0;
-+	int i;
-+
-+	/*
-+	 * First check for child clusters; we currently ignore any
-+	 * information about the nesting of clusters and present the
-+	 * scheduler with a flat list of them.
-+	 */
-+	i = 0;
-+	do {
-+		snprintf(name, sizeof(name), "cluster%d", i);
-+		c = of_get_child_by_name(cluster, name);
-+		if (c) {
-+			parse_cluster(c, depth + 1, cluster_id);
-+			leaf = false;
-+		}
-+		i++;
-+	} while (c);
-+
-+	/* Now check for cores */
-+	i = 0;
-+	do {
-+		snprintf(name, sizeof(name), "core%d", i);
-+		c = of_get_child_by_name(cluster, name);
-+		if (c) {
-+			has_cores = true;
-+
-+			if (depth == 0)
-+				pr_err("%s: cpu-map children should be clusters\n",
-+				       c->full_name);
-+
-+			if (leaf)
-+				parse_core(c, cluster_id, core_id++);
-+			else
-+				pr_err("%s: Non-leaf cluster with core %s\n",
-+				       cluster->full_name, name);
-+		}
-+		i++;
-+	} while (c);
-+
-+	if (leaf && !has_cores)
-+		pr_warn("%s: empty cluster\n", cluster->full_name);
-+
-+	if (leaf)
-+		*cluster_id = *cluster_id + 1;
-+}
-+
-+static void __init parse_dt_topology(void)
-+{
-+	struct device_node *cn;
-+	int cluster_id = 0;
-+
-+	cn = of_find_node_by_path("/cpus");
-+	if (!cn) {
-+		pr_err("No CPU information found in DT\n");
-+		return;
-+	}
-+
-+	/*
-+	 * If topology is provided as a cpu-map it is essentially a
-+	 * root cluster.
-+	 */
-+	cn = of_find_node_by_name(cn, "cpu-map");
-+	if (!cn)
-+		return;
-+	parse_cluster(cn, 0, &cluster_id);
-+}
-+
-+#else
-+static inline void parse_dt_topology(void) {}
-+#endif
-+
- /*
-  * cpu topology table
-  */
-@@ -87,5 +229,8 @@ void __init init_cpu_topology(void)
- 		cpumask_clear(&cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
- 	}
-+
-+	parse_dt_topology();
-+
- 	smp_wmb();
- }
+Yeah, I think so, even my 3.14 branch is too late for 3.14 :-)
+
+Thanks,
+Benoit
+
+>
+> Regards,
+>
+> Florian
+>
+>
+> Florian Vaussard (18):
+>    of: add vendor prefix for Gumstix
+>    ARM: dts: omap3-tobi: Use the correct vendor prefix
+>    ARM: dts: omap3-tobi: Add missing pinctrl
+>    ARM: dts: omap3-overo: Add missing pinctrl
+>    ARM: dts: omap3-overo: Use complete poweroff
+>    ARM: dts: omap3-overo: Enable MMC2
+>    ARM: dts: omap3-overo: Add HSUSB PHY
+>    ARM: dts: omap: Add common file for SMSC9221
+>    ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
+>    ARM: dts: omap3-tobi: Add AT24C01 EEPROM
+>    ARM: dts: omap3-tobi: Create a file for common Gumstix peripherals
+>    ARM: dts: omap3-tobi: Rename to omap3-overo-tobi
+>    ARM: dts: Add support for the Overo Palo43
+>    ARM: dts: Add support for the Overo Gallop43
+>    ARM: dts: Add support for the Overo Alto35
+>    ARM: dts: Add support for the Overo Chestnut43
+>    ARM: dts: Add support for the Overo Summit
+>    ARM: dts: overo: Add support for DVI output
+>
+>   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>   arch/arm/boot/dts/Makefile                         |   7 +-
+>   arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi          |  58 ++++++++++
+>   arch/arm/boot/dts/omap3-overo-alto35.dts           |  52 +++++++++
+>   arch/arm/boot/dts/omap3-overo-chestnut43.dts       |  76 +++++++++++++
+>   arch/arm/boot/dts/omap3-overo-common-dvi.dtsi      | 108 ++++++++++++++++++
+>   arch/arm/boot/dts/omap3-overo-common.dtsi          |  39 +++++++
+>   arch/arm/boot/dts/omap3-overo-gallop43.dts         |  51 +++++++++
+>   arch/arm/boot/dts/omap3-overo-palo43.dts           |  52 +++++++++
+>   arch/arm/boot/dts/omap3-overo-summit.dts           |  30 +++++
+>   .../dts/{omap3-tobi.dts => omap3-overo-tobi.dts}   |  41 +------
+>   arch/arm/boot/dts/omap3-overo.dtsi                 | 122 +++++++++++++++++++--
+>   12 files changed, 594 insertions(+), 43 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-alto35.dts
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-common-dvi.dtsi
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-common.dtsi
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-gallop43.dts
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-palo43.dts
+>   create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
+>   rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} (54%)
+>
+
+
 -- 
-1.8.5.2
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
