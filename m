@@ -1,36 +1,150 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 9 Jan 2014 18:32:13 +0000
-Subject: [PATCH v9 2/5] kernel: missing include in cputime.c
+Date: Thu, 9 Jan 2014 18:32:15 +0000
+Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
 In-Reply-To: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
-Message-ID: <1389292336-9292-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-steal_account_process_tick calls paravirt_steal_clock, but paravirt.h is
-currently missing amoung the included header files.
-Add include asm/paravirt.h.
+Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+Necessary duplication of paravirt.h and paravirt.c with ARM.
+
+The only paravirt interface supported is pv_time_ops.steal_clock, so no
+runtime pvops patching needed.
+
+This allows us to make use of steal_account_process_tick for stolen
+ticks accounting.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: mingo at redhat.com
-CC: peterz at infradead.org
----
- kernel/sched/cputime.c |    3 +++
- 1 file changed, 3 insertions(+)
+CC: will.deacon at arm.com
+CC: nico at linaro.org
+CC: marc.zyngier at arm.com
+CC: cov at codeaurora.org
+CC: arnd at arndb.de
+CC: olof at lixom.net
+CC: Catalin.Marinas at arm.com
 
-diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index 9994791..951833e 100644
---- a/kernel/sched/cputime.c
-+++ b/kernel/sched/cputime.c
-@@ -5,6 +5,9 @@
- #include <linux/static_key.h>
- #include <linux/context_tracking.h>
- #include "sched.h"
+---
+
+Changes in v7:
+- ifdef CONFIG_PARAVIRT the content of paravirt.h.
+---
+ arch/arm64/Kconfig                |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+ 4 files changed, 66 insertions(+)
+ create mode 100644 arch/arm64/include/asm/paravirt.h
+ create mode 100644 arch/arm64/kernel/paravirt.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6d4dd22..d1003ba 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -212,6 +212,25 @@ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 
+ source "mm/Kconfig"
+ 
++config PARAVIRT
++	bool "Enable paravirtualization code"
++	---help---
++	  This changes the kernel so it can modify itself when it is run
++	  under a hypervisor, potentially improving performance significantly
++	  over full virtualization.
++
++config PARAVIRT_TIME_ACCOUNTING
++	bool "Paravirtual steal time accounting"
++	select PARAVIRT
++	default n
++	---help---
++	  Select this option to enable fine granularity task steal time
++	  accounting. Time spent executing other tasks in parallel with
++	  the current vCPU is discounted from the vCPU power. To account for
++	  that, there can be a small performance impact.
++
++	  If in doubt, say N here.
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+@@ -220,6 +239,7 @@ config XEN
+ 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+ 	depends on ARM64 && OF
+ 	select SWIOTLB_XEN
++	select PARAVIRT
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+ 
+diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
+new file mode 100644
+index 0000000..fd5f428
+--- /dev/null
++++ b/arch/arm64/include/asm/paravirt.h
+@@ -0,0 +1,20 @@
++#ifndef _ASM_ARM64_PARAVIRT_H
++#define _ASM_ARM64_PARAVIRT_H
++
 +#ifdef CONFIG_PARAVIRT
-+#include <asm/paravirt.h>
++struct static_key;
++extern struct static_key paravirt_steal_enabled;
++extern struct static_key paravirt_steal_rq_enabled;
++
++struct pv_time_ops {
++	unsigned long long (*steal_clock)(int cpu);
++};
++extern struct pv_time_ops pv_time_ops;
++
++static inline u64 paravirt_steal_clock(int cpu)
++{
++	return pv_time_ops.steal_clock(cpu);
++}
 +#endif
++
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 5ba2fd4..1dee735 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
++arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
  
- 
- #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
+new file mode 100644
+index 0000000..53f371e
+--- /dev/null
++++ b/arch/arm64/kernel/paravirt.c
+@@ -0,0 +1,25 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2013 Citrix Systems
++ *
++ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
++ */
++
++#include <linux/export.h>
++#include <linux/jump_label.h>
++#include <linux/types.h>
++#include <asm/paravirt.h>
++
++struct static_key paravirt_steal_enabled;
++struct static_key paravirt_steal_rq_enabled;
++
++struct pv_time_ops pv_time_ops;
++EXPORT_SYMBOL_GPL(pv_time_ops);
 -- 
 1.7.10.4
