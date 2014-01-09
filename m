@@ -1,76 +1,102 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 9 Jan 2014 15:04:13 +0530
-Subject: [PATCH V3 Resend] cpufreq: create cpufreq_generic_get() routine
-In-Reply-To: <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
-References: <d9239e0a5df99392647ff8343673342f89d09476.1389059568.git.viresh.kumar@linaro.org>
- <CAOesGMgfFVoVJpOMXWtzVWj_F4pD-L9Osyv4u6=c8RUWOoLHFw@mail.gmail.com>
- <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
-Message-ID: <CAP245DV09bLe44yUPDtANa0PYR0Hxj-nLucgZaJpTo1ibNMYqQ@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 9 Jan 2014 10:35:15 +0100
+Subject: [PATCH 2/2] serial: fsl_lpuart: add eDMA support
+In-Reply-To: <1389236681-30372-3-git-send-email-yao.yuan@freescale.com>
+References: <1389236681-30372-1-git-send-email-yao.yuan@freescale.com>
+ <1389236681-30372-3-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20140109103515.164af26c@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 9, 2014 at 2:56 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> cc'ng Russell/LAKML/Fengguang..
->
-> On 9 January 2014 14:08, Olof Johansson <olof@lixom.net> wrote:
->> This patch breaks a bunch of ARM boards. In particular, the following
->> defconfigs no longer build:
->
-> That's really bad, Rafael will scold me again :)
->
->>           assabet_defconfig
->>           badge4_defconfig
->>           cerfcube_defconfig
->>           collie_defconfig
->>           h3600_defconfig
->>           hackkit_defconfig
->>           jornada720_defconfig
->>           lart_defconfig
->>           neponset_defconfig
->>           pleb_defconfig
->>           shannon_defconfig
->>           simpad_defconfig
->>
->> Error is:
->>
->> drivers/built-in.o: In function `cpufreq_generic_get':
->> drivers/cpufreq/cpufreq.c:189: undefined reference to `clk_get_rate'
->>
->> Seems like this needs to be guarded by HAVE_CLK?
->
-> Naah.. After some investigation I found this:
->
-> - We already have dummy implementations of clk routines in case
-> CONFIG_HAVE_CLK is not defined (I added them long back).
->
-> - There is one thing common among all above defconfigs, all
-> belong to SA1100 family :)
->
-> - And the problem is: SA1100 wanted to define its own clk routines
-> and selects CLKDEV_LOOKUP (which enables HAVE_CLK), but it
-> doesn't implement all clk routines. Which is *wrong*.
->
-> So, actually this patch brought an _existing_ bug in limelight. And
-> this should be fixed by adding dummy or meaningful implementation
-> of missing clk routines.
->
-> @Russell: If above looks correct then can you please communicate
-> what should we do here? I don't really know what exactly these
-> routines should have, simply a copy of dummy routines from clk.h
-> or some meaningful stuff. So, maybe you can write a patch, otherwise
-> let me know what to write and I will give it a try.
->
-> @Rafael: Please *don't* revert this patch, its not my fault this time :)
->
-> @Fengguang: Would it make sense to add build tests for all ARM
-> defconfigs in your build system? I thought its already there :)
-> That way I can always be sure that my stuff (would be helpful for
-> others as well though) isn't breaking build (Atleast) for any platform.
+Hi,
 
-You can also talk to Kevin to give you "beta" access to our build
-infrastructure for your trees. It is still in the process of being
-scaled up but should atleast handle all ARM defconfigs but we don't
-have anywhere near Fengguang's capacity.
+Yuan Yao wrote:
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
+>  .../devicetree/bindings/serial/fsl-lpuart.txt      |  17 +-
+>  drivers/tty/serial/fsl_lpuart.c                    | 434 +++++++++++++++++----
+>  2 files changed, 365 insertions(+), 86 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> index 6fd1dd1..311598d 100644
+> +static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count)
+[...]
+>  {
+> -	struct lpuart_port *sport = dev_id;
+> -	unsigned int flg, ignored = 0;
+> -	struct tty_port *port = &sport->port.state->port;
+> -	unsigned long flags;
+> -	unsigned char rx, sr;
+> +	struct circ_buf *xmit = &sport->port.state->xmit;
+> +	dma_addr_t tx_bus_addr;
+> +
+> +	dma_sync_single_for_device(sport->port.dev, sport->dma_tx_buf_bus,
+> +				UART_XMIT_SIZE, DMA_TO_DEVICE);
+> +	sport->dma_tx_bytes = count & ~(DMA_TX_MAXBURST_MASK);
+> +	tx_bus_addr = sport->dma_tx_buf_bus + xmit->tail;
+> +	sport->dma_tx_desc = dmaengine_prep_slave_single(sport->dma_tx_chan,
+> +					tx_bus_addr, sport->dma_tx_bytes,
+> +					DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
+> +
+> +	if (!sport->dma_tx_desc) {
+> +		dev_err(sport->port.dev, "Not able to get desc for Tx\n");
+s/Not able/unable/
+Also the capitalization of 'Tx' looks strange. IMO 'TX' or 'tx' would
+look better.
 
-Regards,
-Amit
+> +		return -EIO;
+> +	}
+>  
+> -	spin_lock_irqsave(&sport->port.lock, flags);
+> +	sport->dma_tx_desc->callback = lpuart_dma_tx_complete;
+> +	sport->dma_tx_desc->callback_param = sport;
+> +	sport->dma_tx_in_progress = 1;
+> +	sport->dma_tx_cookie = dmaengine_submit(sport->dma_tx_desc);
+> +	dma_async_issue_pending(sport->dma_tx_chan);
+>  
+> -	while (!(readb(sport->port.membase + UARTSFIFO) & UARTSFIFO_RXEMPT)) {
+> -		flg = TTY_NORMAL;
+> -		sport->port.icount.rx++;
+> -		/*
+> -		 * to clear the FE, OR, NF, FE, PE flags,
+> -		 * read SR1 then read DR
+> -		 */
+> -		sr = readb(sport->port.membase + UARTSR1);
+> -		rx = readb(sport->port.membase + UARTDR);
+> +	return 0;
+> +}
+>  
+> -		if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
+> -			continue;
+> +static int lpuart_dma_rx(struct lpuart_port *sport)
+> +{
+> +	dma_sync_single_for_device(sport->port.dev, sport->dma_rx_buf_bus,
+> +			DMA_RX_BUFFER_SIZE, DMA_TO_DEVICE);
+>
+dma_alloc_coherent() (which you use to allocate the DMA rx buffer) and
+dma_symc_*() are orthogonal to each other!
+You either allocate DMA coherent memory as DMA buffer or use ordinary
+memory with the DMA streaming API (dma_map_*(), dma_sync_*()).
+See Documentation/DMA-API-HOWTO.txt
+
+> +	sport->dma_rx_desc = dmaengine_prep_slave_single(sport->dma_rx_chan,
+> +			sport->dma_rx_buf_bus, DMA_RX_BUFFER_SIZE,
+> +			DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
+> +
+> +	if (!sport->dma_rx_desc) {
+> +		dev_err(sport->port.dev, "Not able to get desc for Rx\n");
+>
+Strange capitalization of 'Rx'.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
