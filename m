@@ -1,62 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 9 Jan 2014 08:40:30 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <CAOw6vbLBM77Rc554ZrXq_532zwLWyeJ7N_bC22QEaTtbmCUOWg@mail.gmail.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <CAOw6vbJNgdWJvb6t7zJ0Gm6gjXuq8Yd=ySgU+zqg-Kb1j1bBvw@mail.gmail.com>
- <20140108213647.GT27432@n2100.arm.linux.org.uk>
- <CAOw6vbLBM77Rc554ZrXq_532zwLWyeJ7N_bC22QEaTtbmCUOWg@mail.gmail.com>
-Message-ID: <20140109074030.GN6750@pengutronix.de>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 09 Jan 2014 09:34:59 +0200
+Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
+References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
+ <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+ <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
+Message-ID: <52CE5123.9050702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 05:39:31PM -0500, Sean Paul wrote:
-> On Wed, Jan 8, 2014 at 4:36 PM, Russell King - ARM Linux
-> > Which bits do you think would be useful to move into the core?
-> > imx_drm_add_components() is rather imx-drm specific, especially for
-> > the CRTCs - it carries the knowledge that the OF device to be matched
-> > can be found in the _parent_ device, rather than the device registered
-> > into the component helpers.
-> >
-> 
-> Yeah, I was thinking of imx_drm_add_components() actually. It probably
-> doesn't make sense to enforce the parent relationship in a generic
-> manner, but it would be nice to have a helper which added the various
-> drm components (crtc/encoder/bridge/connector) with a consistent
-> binding.
-> 
-> We have 3 different exynos boards which would have the following
-> superdevices (please forgive my hypothetical syntax/naming):
-> 
-> Board 1:
-> exynos-drm {
->         compatible = "exynos,drm";
->         crtcs = <&fimd1>, <&mixer1>;
->         encoders = <&dp1>, <&hdmi1>;
->         bridges = <&ptn3460 &dp1>;
->         connectors = <&ptn3460>, <&hdmi1>;
-> };
 
-Can we have an example with a different number of
-encoders/connectors/crtcs, like:
+On 09.01.2014 07:06, Hiremath, Vaibhav wrote:
+> Tomi,
+>
+> I am seeing underflow issue on AM43x device if I use omapfb_vram argument.
+> Did you see this on OMAP?
+>
+> I am using "omapfb_vram=10M at 0xA0000000", and I believe it is correct way of usage.
+>
+> Thanks,
+> Vaibhav
+>
 
-exynos-drm {
-        compatible = "exynos,drm";
-        crtcs = <&fimd1>;
-        encoders = <&dp1>, <&hdmi1>, <&lvds1>;
-        connectors = <&ptn3460>, <&hdmi1>;
-};
+AFAIK underflow interrupts could come from badly calculated DSS core 
+clock or bad HW resizer setup and should be unrelated to the memory 
+allocation. It might be something similar to the problem I have on N900 
+- see https://lkml.org/lkml/2014/1/6/173
 
-Otherwise I get the impression that there is some topology of the
-components or at least relationship between the components encoded
-into the binding.
+Is it possible to upload the video you have problems with, so me to test 
+it on N900? So far I didn't see any underflow issues on it (N900 is 
+OMAP3, in case you're not aware), no matter the resolution of the videos 
+I played(up to 720p), however I didn't test the part that allocates the 
+memory on a pre-defined address. Though I don't think that should matter.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ivo
