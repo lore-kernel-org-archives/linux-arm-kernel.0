@@ -1,33 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Jan 2014 13:35:33 +0000
-Subject: [RFC 10/18] regulator: vexpress: Use regmap instead of custom
- interface
-In-Reply-To: <1389205531.23721.40.camel@hornet>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
- <1387815830-8794-11-git-send-email-pawel.moll@arm.com>
- <20131224122455.GY30815@sirena.org.uk>
- <1389205531.23721.40.camel@hornet>
-Message-ID: <20140109133533.GO31886@sirena.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 9 Jan 2014 18:07:36 +0530
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+In-Reply-To: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+Message-ID: <20140109123736.GG16227@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 06:25:31PM +0000, Pawel Moll wrote:
-> On Tue, 2013-12-24 at 12:24 +0000, Mark Brown wrote:
+On Thu, Jan 02, 2014 at 03:08:36PM +0000, Russell King - ARM Linux wrote:
+> The following patch series moves code to setup the DMA hardware and
+> service interrupts from the hardware to the DMA engine driver.  This
+> reduces the dependency on the legacy DMA implementation.
+Didnt the code getting removed from legacy, are there any users still of
+the legacy driver in mainline?
 
-> > If this change is making the operations hardware agnostic regmap based
-> > ones then they should be being either replaced with standard operations
-> > or standard operations being added.  It looks like you should be able to
-> > use the existing linear map operations.
+--
+~Vinod
+> 
+> This series does not remove the channel allocation/freeing hooks which
+> are used to manage the allocation of physical channels - this is the
+> next step in the evolution.
+> 
+> The patches which move the interrupt handling are currently less than
+> perfect since they're writing to ENABLE_L0 under a different spinlock,
+> and hence RFC only at the moment.
+> 
+>  arch/arm/mach-omap1/dma.c |  183 +++++--------
+>  arch/arm/mach-omap2/dma.c |  183 ++++++--------
+>  arch/arm/plat-omap/dma.c  |   17 +-
+>  drivers/dma/omap-dma.c    |  653 ++++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/omap-dma.h  |   25 ++-
+>  5 files changed, 774 insertions(+), 287 deletions(-)
+> 
+> -- 
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
 
-> Bad wording on my side. What I meant was: it doesn't matter what wacky
-> VE-specific interface is hidden behind the regmap, not it's a generic
-> regulator driver.
-
-OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/43746391/attachment.sig>
+-- 
