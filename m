@@ -1,75 +1,31 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 9 Jan 2014 11:58:11 +0100
-Subject: [PATCH v2 3/28] drm/i2c: tda998x: code cleanup
-Message-ID: <20140109115811.779554cb@armhf>
+Date: Thu, 9 Jan 2014 11:58:51 +0100
+Subject: [PATCH v2 6/28] drm/i2c: tda998x: force the page register at
+ startup time
+Message-ID: <20140109115851.63a80859@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch forces the page register to be set on the first I/O operation.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c  | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 603f716..cd7ac58 100644
+index 0435752..c29c0b1 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -335,7 +335,7 @@ cec_write(struct tda998x_priv *priv, uint16_t addr, uint8_t val)
- 	uint8_t buf[] = {addr, val};
- 	int ret;
+@@ -1162,7 +1162,7 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
+ 	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
  
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to cec:0x%x\n", ret, addr);
- }
-@@ -372,7 +372,8 @@ set_page(struct tda998x_priv *priv, uint16_t reg)
- 		};
- 		int ret = i2c_master_send(client, buf, sizeof(buf));
- 		if (ret < 0) {
--			dev_err(&client->dev, "Error %d writing to REG_CURPAGE\n", ret);
-+			dev_err(&client->dev, "setpage %04x err %d\n",
-+					reg, ret);
- 			return ret;
- 		}
- 
-@@ -449,7 +450,7 @@ reg_write(struct tda998x_priv *priv, uint16_t reg, uint8_t val)
- 	if (ret < 0)
- 		return;
- 
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
- }
-@@ -465,7 +466,7 @@ reg_write16(struct tda998x_priv *priv, uint16_t reg, uint16_t val)
- 	if (ret < 0)
- 		return;
- 
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
- }
-@@ -998,7 +999,7 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
- 
- 	ret = reg_read_range(priv, REG_EDID_DATA_0, buf, EDID_LENGTH);
- 	if (ret != EDID_LENGTH) {
--		dev_err(encoder->dev->dev, "failed to read edid block %d: %d",
-+		dev_err(encoder->dev->dev, "failed to read edid block %d: %d\n",
- 				blk, ret);
- 		return ret;
- 	}
-@@ -1012,7 +1013,7 @@ static uint8_t *
- do_get_edid(struct drm_encoder *encoder)
- {
- 	struct tda998x_priv *priv = to_tda998x_priv(encoder);
--	int j = 0, valid_extensions = 0;
-+	int j, valid_extensions = 0;
- 	uint8_t *block, *new;
- 	bool print_bad_edid = drm_debug & DRM_UT_KMS;
- 
+-	priv->current_page = 0;
++	priv->current_page = 0xff;
+ 	priv->hdmi = client;
+ 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
+ 	priv->dpms = DRM_MODE_DPMS_OFF;
 
 -- 
 Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
