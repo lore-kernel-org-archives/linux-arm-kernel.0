@@ -1,62 +1,71 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Jan 2014 10:20:07 +0100
-Subject: [PATCH v5 4/4] [media] exynos-scaler: Add DT bindings for SCALER
- driver
-In-Reply-To: <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
-References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
- <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <2542868.mVreZlxTcT@amdc1032>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 9 Jan 2014 14:56:28 +0530
+Subject: [PATCH V3 Resend] cpufreq: create cpufreq_generic_get() routine
+In-Reply-To: <CAOesGMgfFVoVJpOMXWtzVWj_F4pD-L9Osyv4u6=c8RUWOoLHFw@mail.gmail.com>
+References: <d9239e0a5df99392647ff8343673342f89d09476.1389059568.git.viresh.kumar@linaro.org>
+ <CAOesGMgfFVoVJpOMXWtzVWj_F4pD-L9Osyv4u6=c8RUWOoLHFw@mail.gmail.com>
+Message-ID: <CAKohpo=EsaBPdF3wYsa2rEdjcpPagbhPcxWw1_PA=yVLDnjRiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+cc'ng Russell/LAKML/Fengguang..
 
-Hi,
+On 9 January 2014 14:08, Olof Johansson <olof@lixom.net> wrote:
+> This patch breaks a bunch of ARM boards. In particular, the following
+> defconfigs no longer build:
 
-On Thursday, January 09, 2014 08:58:14 AM Shaik Ameer Basha wrote:
-> This patch adds the DT binding documentation for the
-> Exynos5420/5410 based SCALER device driver.
-> 
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  .../devicetree/bindings/media/exynos5-scaler.txt   |   22 ++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/exynos5-scaler.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/exynos5-scaler.txt b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
-> new file mode 100644
-> index 0000000..9328e7d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
-> @@ -0,0 +1,22 @@
-> +* Samsung Exynos5 SCALER device
-> +
-> +SCALER is used for scaling, blending, color fill and color space
-> +conversion on EXYNOS[5420/5410] SoCs.
-> +
-> +Required properties:
-> +- compatible: should be "samsung,exynos5420-scaler" or
-> +			"samsung,exynos5410-scaler"
-> +- reg: should contain SCALER physical address location and length
-> +- interrupts: should contain SCALER interrupt number
-> +- clocks: should contain the SCALER clock specifier, from the
-> +			common clock bindings
-> +- clock-names: should be "scaler"
-> +
-> +Example:
-> +	scaler_0: scaler at 12800000 {
-> +		compatible = "samsung,exynos5420-scaler";
-> +		reg = <0x12800000 0x1000>;
-> +		interrupts = <0 220 0>;
-> +		clocks = <&clock 381>;
-> +		clock-names = "scaler";
-> +	};
+That's really bad, Rafael will scold me again :)
 
-Your patchset adds support for EXYNOS5 SCALER but doesn't add any real
-users of it yet.  Could you please explain why?
+>           assabet_defconfig
+>           badge4_defconfig
+>           cerfcube_defconfig
+>           collie_defconfig
+>           h3600_defconfig
+>           hackkit_defconfig
+>           jornada720_defconfig
+>           lart_defconfig
+>           neponset_defconfig
+>           pleb_defconfig
+>           shannon_defconfig
+>           simpad_defconfig
+>
+> Error is:
+>
+> drivers/built-in.o: In function `cpufreq_generic_get':
+> drivers/cpufreq/cpufreq.c:189: undefined reference to `clk_get_rate'
+>
+> Seems like this needs to be guarded by HAVE_CLK?
 
-Best regards,
+Naah.. After some investigation I found this:
+
+- We already have dummy implementations of clk routines in case
+CONFIG_HAVE_CLK is not defined (I added them long back).
+
+- There is one thing common among all above defconfigs, all
+belong to SA1100 family :)
+
+- And the problem is: SA1100 wanted to define its own clk routines
+and selects CLKDEV_LOOKUP (which enables HAVE_CLK), but it
+doesn't implement all clk routines. Which is *wrong*.
+
+So, actually this patch brought an _existing_ bug in limelight. And
+this should be fixed by adding dummy or meaningful implementation
+of missing clk routines.
+
+@Russell: If above looks correct then can you please communicate
+what should we do here? I don't really know what exactly these
+routines should have, simply a copy of dummy routines from clk.h
+or some meaningful stuff. So, maybe you can write a patch, otherwise
+let me know what to write and I will give it a try.
+
+@Rafael: Please *don't* revert this patch, its not my fault this time :)
+
+@Fengguang: Would it make sense to add build tests for all ARM
+defconfigs in your build system? I thought its already there :)
+That way I can always be sure that my stuff (would be helpful for
+others as well though) isn't breaking build (Atleast) for any platform.
+
+Thanks.
+
 --
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+viresh
