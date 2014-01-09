@@ -1,18 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 15:38:07 +0100
-Subject: [PATCH 3/3] clk: hisilicon: add hi3620_mmc_clks
-In-Reply-To: <1389278112-7099-4-git-send-email-zhangfei.gao@linaro.org>
+Date: Thu, 9 Jan 2014 15:38:47 +0100
+Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
+In-Reply-To: <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
 References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-4-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <201401091538.07496.arnd@arndb.de>
+ <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <201401091538.48127.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 09 January 2014, Zhangfei Gao wrote:
-> Suggest by Arnd: abstract mmc tuning as clock behavior,
-> also because different soc have different tuning method and registers.
-> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
+> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
+> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
+> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
 > 
 > Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c |   48 +++++++++++++++++++++++++++++++++------------
+>  1 file changed, 35 insertions(+), 13 deletions(-)
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
