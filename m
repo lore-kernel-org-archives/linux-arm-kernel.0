@@ -1,77 +1,103 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 Jan 2014 00:52:51 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.13
-Message-ID: <20140109085251.GA30534@quad.lixom.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Jan 2014 09:53:39 +0100
+Subject: [PATCH v2 4/8] arm: dts: sun4i: rename clock node names to clk@N
+In-Reply-To: <CAGb2v657=0Z+5e9zUYq5Tq9CB7XAGEwR1=2iw3L86s3SXnrU-Q@mail.gmail.com>
+References: <1388987892-23733-1-git-send-email-wens@csie.org>
+ <1388987892-23733-5-git-send-email-wens@csie.org>
+ <20140107223823.GH3103@lukather>
+ <CAGb2v657=0Z+5e9zUYq5Tq9CB7XAGEwR1=2iw3L86s3SXnrU-Q@mail.gmail.com>
+Message-ID: <20140109085339.GN2941@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Jan 08, 2014 at 09:38:52AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jan 8, 2014 at 6:38 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jan 06, 2014 at 01:58:08PM +0800, Chen-Yu Tsai wrote:
+> >> Device tree naming conventions state that node names should match
+> >> node function. Change fully functioning clock nodes to match.
+> >>
+> >> Also add the output name for pll5 to use as the clock name.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun4i-a10.dtsi | 26 +++++++++++++++-----------
+> >>  1 file changed, 15 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >> index 3ba2b46..45d5283 100644
+> >> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> >> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >> @@ -50,42 +50,46 @@
+> >>                       clock-frequency = <0>;
+> >>               };
+> >>
+> >> -             osc24M: osc24M at 01c20050 {
+> >> +             osc24M: clk at 01c20050 {
+> >>                       #clock-cells = <0>;
+> >>                       compatible = "allwinner,sun4i-osc-clk";
+> >>                       reg = <0x01c20050 0x4>;
+> >>                       clock-frequency = <24000000>;
+> >> +                     clock-output-names = "osc24M";
+> >>               };
+> >>
+> >> -             osc32k: osc32k {
+> >> +             osc32k: clk at 0 {
+> >>                       #clock-cells = <0>;
+> >>                       compatible = "fixed-clock";
+> >>                       clock-frequency = <32768>;
+> >> +                     clock-output-names = "osc32k";
+> >>               };
+> >>
+> >> -             pll1: pll1 at 01c20000 {
+> >> +             pll1: clk at 01c20000 {
+> >>                       #clock-cells = <0>;
+> >>                       compatible = "allwinner,sun4i-pll1-clk";
+> >>                       reg = <0x01c20000 0x4>;
+> >>                       clocks = <&osc24M>;
+> >> +                     clock-output-names = "pll1";
+> >>               };
+> >>
+> >> -             pll4: pll4 at 01c20018 {
+> >> +             pll4: clk at 01c20018 {
+> >>                       #clock-cells = <0>;
+> >>                       compatible = "allwinner,sun4i-pll1-clk";
+> >>                       reg = <0x01c20018 0x4>;
+> >>                       clocks = <&osc24M>;
+> >> +                     clock-output-names = "pll4";
+> >>               };
+> >>
+> >> -             pll5: pll5 at 01c20020 {
+> >> +             pll5: clk at 01c20020 {
+> >>                       #clock-cells = <1>;
+> >>                       compatible = "allwinner,sun4i-pll5-clk";
+> >>                       reg = <0x01c20020 0x4>;
+> >>                       clocks = <&osc24M>;
+> >> -                     clock-output-names = "pll5_ddr", "pll5_other";
+> >> +                     clock-output-names = "pll5_ddr", "pll5_other", "pll5";
+> >
+> > Hmmm, I don't really like that bit too much.
+> >
+> > This "pll5" clock doesn't actually exist at the hardware point of
+> > view, which is not really what the DT is used for.
+> 
+> You are right. pll5 only has 2 outputs. I was matching the format of
+> pll6, which I'd like to include in this discussion.
+> 
+> Does pll6 actually have 3 outputs? or are we just using the third
+> output as a shortcut for mbus input of pll6*2 ?
 
-The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
+Hmmm, indeed. I don't really get why pll6 has a third output
+either. Emilio?
 
-  Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 7c06abcb16e1a03270f70725d0c62e8cf818cf48:
-
-  Merge tag 'renesas-fixes3-for-v3.13' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2014-01-02 11:00:49 -0800)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.13-rc
-
-Hopefully the last set of arm-soc fixes for 3.13, or at least only a
-few stray patches after this.
-
-There are a few fixes for Renesas platforms to fixup DMA masks (this
-started causing errors once the DMA API added checks for valid masks in
-3.13). Two more dealing with resources for MMC and PWM setup.
-
-There's also a few TI/OMAP/DRA fixes for smaller stuff and a fix for
-compilation failures on a PXA platform.
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      ARM: shmobile: r8a7790: fix shdi resource sizes
-
-Kuninori Morimoto (1):
-      ARM: shmobile: bockw: fixup DMA mask
-
-Laurent Pinchart (4):
-      ARM: shmobile: armadillo: Add PWM backlight power supply
-      ARM: shmobile: armadillo: Fix coherent DMA mask
-      ARM: shmobile: kzm9g: Fix coherent DMA mask
-      ARM: shmobile: mackerel: Fix coherent DMA mask
-
-Linus Walleij (1):
-      ARM: pxa: fix USB gadget driver compilation regression
-
-Olof Johansson (3):
-      Merge tag 'renesas-fixes2-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'omap-for-v3.13/intc-ldp-fix' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'renesas-fixes3-for-v3.13' of git://git.kernel.org/.../horms/renesas into fixes
-
-Rajendra Nayak (1):
-      ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL
-
-Suman Anna (1):
-      ARM: OMAP2+: hwmod_data: fix missing OMAP_INTC_START in irq data
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Fix LCD panel backlight regression for LDP legacy booting
-      Merge tag 'for-v3.13-rc/hwmod-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into debug-ll-and-ldp-backlight-fix
-
- arch/arm/boot/dts/r8a7790.dtsi                     |  4 ++--
- arch/arm/mach-omap2/board-ldp.c                    |  7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  4 ++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  6 +++---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
- arch/arm/mach-pxa/include/mach/lubbock.h           |  2 ++
- arch/arm/mach-shmobile/board-armadillo800eva.c     | 11 +++++++++--
- arch/arm/mach-shmobile/board-bockw.c               |  2 +-
- arch/arm/mach-shmobile/board-kzm9g.c               |  2 +-
- arch/arm/mach-shmobile/board-mackerel.c            |  4 ++--
- 10 files changed, 29 insertions(+), 15 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/6051ae5c/attachment.sig>
