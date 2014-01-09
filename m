@@ -1,60 +1,141 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 8 Jan 2014 16:28:04 -0800
-Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
-In-Reply-To: <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
-References: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
- <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
-Message-ID: <CAAYSxhpgJwnq63fUdYBtmneRads_69c2mik8upofvAS1Y25fOA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 08 Jan 2014 16:49:56 -0800
+Subject: [GIT PULL] Samsung Clock changes for v3.14
+In-Reply-To: <20140108225943.6098.47795@quantum>
+References: <3518820.nAXoIq2LQG@amdc1227> <20140108220749.6098.18052@quantum>
+ <2008892.PW38q65uR0@flatron> <20140108225943.6098.47795@quantum>
+Message-ID: <20140109004956.7168.34121@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 3:38 PM, Christian Daudt <bcm@fixthebug.org> wrote:
-> On Tue, Jan 7, 2014 at 10:53 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
->> The board schematic states that the "SD_CARD_DET_N gets pulled to GND
->> when card is inserted" so the polarity has been updated to active low.
->>
->> Polarity is now specified with a GPIO define instead of a magic number.
->>
->> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
->> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->> ---
->>  arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
->> index 08e47c2..27dd110 100644
->> --- a/arch/arm/boot/dts/bcm28155-ap.dts
->> +++ b/arch/arm/boot/dts/bcm28155-ap.dts
->> @@ -13,6 +13,8 @@
->>
->>  /dts-v1/;
->>
->> +#include <dt-bindings/gpio/gpio.h>
->> +
->>  #include "bcm11351.dtsi"
->>
->>  / {
->> @@ -40,7 +42,7 @@
->>
->>         sdio4: sdio at 3f1b0000 {
->>                 max-frequency = <48000000>;
->> -               cd-gpios = <&gpio 14 0>;
->> +               cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
->>                 status = "okay";
->>         };
->>  };
->> --
->> 1.8.0.1
->>
-> Tim,
->  Does bcm11351-brt not also suffer from the same bug? If it does can
-> you pls update the patch to also fix it?
->
->  Thanks,
->    csd
+Quoting Mike Turquette (2014-01-08 14:59:43)
+> Quoting Tomasz Figa (2014-01-08 14:43:24)
+> > On Wednesday 08 of January 2014 14:07:49 Mike Turquette wrote:
+> > > Quoting Tomasz Figa (2014-01-08 11:13:38)
+> > > > Hi Mike,
+> > > > 
+> > > > Please consider pulling following Samsung Clock changes for v3.14.
+> > > > 
+> > > > The following changes since commit 2bb00c68e094271b79deac993893461cc051b721:
+> > > 
+> > > Hi Tomasz,
+> > > 
+> > > Commit 2bb00c68 is the tip of the Samsung clk fixes that I'm about to
+> > > send out. Can you rebase this request onto the tip of clk-next?
+> > 
+> > I guess I can do it, but wouldn't this introduce merge conflicts, since
+> > some of the fixes are changing the same parts of the code?
+> 
+> Yes it will cause conflicts, but that is sometimes OK.
+> 
+> > 
+> > I based my samsung-next branch on top of your clk-next with my fixes
+> > branch merged, since that's what will end up in Linus' tree anyway. Was it
+> > not the right thing to do?
+> 
+> Well maybe I am missing something, but I think it is not the best thing.
+> The problem is that those patches will sort of be merged twice. Again
+> maybe I am missing something. The same commit IDs will be used so
+> perhaps it is OK...
+> 
+> Part of this trouble is caused by the simple way that I fork clk-next
+> from v3.xx-rc1. Since I never rebase that branch to a more recent -rc
+> then there is a delta between the fixes that go in the queue of patches
+> for the next merge window.
+> 
+> I guess one way that other subsystems handle this is by having something
+> like clk-next-late which is a new branch based on a later -rc.
+> 
+> How awful is the merge conflict resolution?
 
-The BRT and AP boards are similar so it may have the same problem but
-I don't have a BRT and wouldn't be able to test any changes to its DTS
-file.
+Thanks for working this out on IRC. I've taken this pull request into
+clk-next for 3.14.
 
--Tim
+Regards,
+Mike
+
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > Best regards,
+> > Tomasz
+> > 
+> > > 
+> > > Thanks!
+> > > Mike
+> > > 
+> > > > 
+> > > >   Merge branch 'samsung-fixes' into samsung-next-base (2013-12-30 18:15:23 +0100)
+> > > > 
+> > > > are available in the git repository at:
+> > > > 
+> > > > 
+> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.14/samsung-clk
+> > > > 
+> > > > for you to fetch changes up to 59d711e9ddd2f68822a2a99fc939e11a9288b73e:
+> > > > 
+> > > >   ARM: dts: exynos5420: add input clocks to audss clock controller (2014-01-08 18:02:43 +0100)
+> > > > 
+> > > > ----------------------------------------------------------------
+> > > > (A bit late) first round of Samsung clock patches for v3.14.
+> > > > 
+> > > > ----------------------------------------------------------------
+> > > > Andrew Bresticker (7):
+> > > >       clk: exynos5250: register APLL rate table
+> > > >       clk: exynos-audss: convert to platform device
+> > > >       clk: exynos-audss: allow input clocks to be specified in device tree
+> > > >       clk: exynos5250: add clock ID for div_pcm0
+> > > >       ARM: dts: exynos5250: add input clocks to audss clock controller
+> > > >       clk: exynos-audss: add support for Exynos 5420
+> > > >       ARM: dts: exynos5420: add input clocks to audss clock controller
+> > > > 
+> > > > Andrzej Hajda (8):
+> > > >       ARM: exynos4: create a DT header defining CLK IDs
+> > > >       clk: exynos4: replace clock ID private enums with IDs from DT header
+> > > >       ARM: exynos5250: create a DT header defining CLK IDs
+> > > >       clk: exynos5250: replace clock ID private enums with IDs from DT header
+> > > >       ARM: exynos5420: create a DT header defining CLK IDs
+> > > >       clk: exynos5420: replace clock ID private enums with IDs from DT header
+> > > >       ARM: exynos5440: create a DT header defining CLK IDs
+> > > >       clk: exynos5440: replace clock ID private enums with IDs from DT header
+> > > > 
+> > > > Sachin Kamat (1):
+> > > >       clk: exynos5250: Add CLK_SET_RATE_PARENT flag to mout_apll
+> > > > 
+> > > > Tomasz Figa (7):
+> > > >       clk: samsung: exynos5250: Sort definitions by registers and bitfield
+> > > >       clk: samsung: exynos5250: Make names of mux and div clocks consistent
+> > > >       clk: samsung: exynos5250: Fix parents of gate clocks from GSCL domain
+> > > >       clk: samsung: exynos5250: Fix parent of gate clocks from DISP1 domain
+> > > >       clk: samsung: exynos5250: Add missing unpopulated mux parents
+> > > >       clk: samsung: exynos5250: Correct parent list of audio muxes
+> > > >       clk: samsung: exynos5250: Fix parents of gate clocks from MFC domain
+> > > > 
+> > > >  .../devicetree/bindings/clock/clk-exynos-audss.txt |  39 +-
+> > > >  .../devicetree/bindings/clock/exynos5250-clock.txt |   1 +
+> > > >  arch/arm/boot/dts/exynos5250.dtsi                  |   2 +
+> > > >  arch/arm/boot/dts/exynos5420.dtsi                  |   4 +-
+> > > >  drivers/clk/samsung/clk-exynos-audss.c             | 159 +++-
+> > > >  drivers/clk/samsung/clk-exynos4.c                  | 857 ++++++++++-----------
+> > > >  drivers/clk/samsung/clk-exynos5250.c               | 699 ++++++++++-------
+> > > >  drivers/clk/samsung/clk-exynos5420.c               | 648 ++++++++--------
+> > > >  drivers/clk/samsung/clk-exynos5440.c               |  81 +-
+> > > >  include/dt-bindings/clk/exynos-audss-clk.h         |   3 +-
+> > > >  include/dt-bindings/clock/exynos4.h                | 244 ++++++
+> > > >  include/dt-bindings/clock/exynos5250.h             | 160 ++++
+> > > >  include/dt-bindings/clock/exynos5420.h             | 188 +++++
+> > > >  include/dt-bindings/clock/exynos5440.h             |  42 +
+> > > >  14 files changed, 1957 insertions(+), 1170 deletions(-)
+> > > >  create mode 100644 include/dt-bindings/clock/exynos4.h
+> > > >  create mode 100644 include/dt-bindings/clock/exynos5250.h
+> > > >  create mode 100644 include/dt-bindings/clock/exynos5420.h
+> > > >  create mode 100644 include/dt-bindings/clock/exynos5440.h
+> > > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
