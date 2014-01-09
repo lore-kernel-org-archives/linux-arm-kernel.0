@@ -1,83 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 9 Jan 2014 18:32:16 +0000
-Subject: [PATCH v9 5/5] xen/arm: account for stolen ticks
-In-Reply-To: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
-Message-ID: <1389292336-9292-5-git-send-email-stefano.stabellini@eu.citrix.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 10:40:31 -0800
+Subject: [PATCH v2 6/7] drm/msm: Drop unnecessary mach include
+In-Reply-To: <20140109081352.GI8285@quad.lixom.net>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+ <1388438133-431-7-git-send-email-sboyd@codeaurora.org>
+ <CAF6AEGtortD9FQP-vDj7apsmdkXcoOiahJf++zPcSh=OYg7WfA@mail.gmail.com>
+ <CAF6AEGt7o65zpPPJa1chvYdp+K-dkSH9Buq=rDxyrUyS0zh3eA@mail.gmail.com>
+ <20131231051558.GB14405@codeaurora.org>
+ <20140109081352.GI8285@quad.lixom.net>
+Message-ID: <52CEED1F.3030906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the runstate_memory_area with the hypervisor.
-Use pv_time_ops.steal_clock to account for stolen ticks.
+On 01/09/14 00:13, Olof Johansson wrote:
+> On Mon, Dec 30, 2013 at 09:15:58PM -0800, Stephen Boyd wrote:
+>> On 12/30, Rob Clark wrote:
+>>> On Mon, Dec 30, 2013 at 8:12 PM, Rob Clark <robdclark@gmail.com> wrote:
+>>>> On Mon, Dec 30, 2013 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>>> This file doesn't use the clk_reset() API that is exposed in
+>>>>> mach-msm's mach/clk.h file. Remove the include so that this
+>>>>> driver can be compiled as part of the multi-platform kernel.
+>>>> Thanks!
+>>>>
+>>>> Signed-off-by: Rob Clark <robdclark@gmail.com>
+>> I think you mean Acked-by? Signed-off-by usually means you're
+>> sending the patch along.
+> I've held off applying this, but I have applied the others -- please
+> merge this through the DRM tree since it will need to go on top of
+> changes there.
+>
+> That also means that enabling the MSM DTM driver in a multiplatform
+> kernel will cause build breakages until the equivalent patch has been
+> picked up. Since it's not enabled by any defconfigs I'm not too worried,
+> but it will show up on randconfigs.
+>
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Ok. I think Rob's still planning to send his patch through the DRM tree
+so we should be ok on the other end of the merge window.
 
-
----
-
-Changes in v4:
-- don't use paravirt_steal_rq_enabled: we do not support retrieving
-stolen ticks for vcpus other than one we are running on.
-
-Changes in v3:
-- use BUG_ON and smp_processor_id.
----
- arch/arm/xen/enlighten.c |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8550123..fa8bdc0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -14,7 +14,10 @@
- #include <xen/xen-ops.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/arch_timer.h>
- #include <asm/system_misc.h>
-+#include <asm/paravirt.h>
-+#include <linux/jump_label.h>
- #include <linux/interrupt.h>
- #include <linux/irqreturn.h>
- #include <linux/module.h>
-@@ -154,6 +157,19 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
- 
-+unsigned long long xen_stolen_accounting(int cpu)
-+{
-+	struct vcpu_runstate_info state;
-+
-+	BUG_ON(cpu != smp_processor_id());
-+
-+	xen_get_runstate_snapshot(&state);
-+
-+	WARN_ON(state.state != RUNSTATE_running);
-+
-+	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
-+}
-+
- static void __init xen_percpu_init(void *unused)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -171,6 +187,8 @@ static void __init xen_percpu_init(void *unused)
- 	BUG_ON(err);
- 	per_cpu(xen_vcpu, cpu) = vcpup;
- 
-+	xen_setup_runstate_info(cpu);
-+
- 	enable_percpu_irq(xen_events_irq, 0);
- 	put_cpu();
- }
-@@ -313,6 +331,9 @@ static int __init xen_init_events(void)
- 
- 	on_each_cpu(xen_percpu_init, NULL, 0);
- 
-+	pv_time_ops.steal_clock = xen_stolen_accounting;
-+	static_key_slow_inc(&paravirt_steal_enabled);
-+
- 	return 0;
- }
- postcore_initcall(xen_init_events);
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
