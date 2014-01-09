@@ -1,86 +1,49 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:47:58 +0100
-Subject: [PATCH 04/18] ARM: dts: omap3-overo: Add missing pinctrl
+Date: Thu,  9 Jan 2014 17:48:06 +0100
+Subject: [PATCH 12/18] ARM: dts: omap3-tobi: Rename to omap3-overo-tobi
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-5-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-13-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pinctrl entries for:
-- i2c1
-- mmc1
+To enhance the clarity and coherence, rename omap3-tobi to omap3-overo-tobi.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-overo.dtsi | 40 +++++++++++++++++++++++++++++---------
- 1 file changed, 31 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/Makefile                                 | 2 +-
+ arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+ rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} (93%)
 
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index a461d2f..2d8b80c 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -34,7 +34,36 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b7af502..7b028e4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -189,7 +189,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-n900.dtb \
+ 	omap3-n9.dtb \
+ 	omap3-n950.dtb \
+-	omap3-tobi.dtb \
++	omap3-overo-tobi.dtb \
+ 	omap3-gta04.dtb \
+ 	omap3-igep0020.dtb \
+ 	omap3-igep0030.dtb \
+diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+similarity index 93%
+rename from arch/arm/boot/dts/omap3-tobi.dts
+rename to arch/arm/boot/dts/omap3-overo-tobi.dts
+index 928d12f..5072da2 100644
+--- a/arch/arm/boot/dts/omap3-tobi.dts
++++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+@@ -14,7 +14,7 @@
  
-+&omap3_pmx_core {
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-+			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-+		>;
-+	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT | MUX_MODE0)		/* i2c1_scl.i2c1_scl */
-+			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT | MUX_MODE0)		/* i2c1_sda.i2c1_sda */
-+		>;
-+	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_clk.sdmmc1_clk */
-+			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_cmd.sdmmc1_cmd */
-+			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat0.sdmmc1_dat0 */
-+			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat1.sdmmc1_dat1 */
-+			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat2.sdmmc1_dat2 */
-+			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
- 	clock-frequency = <2600000>;
+ / {
+ 	model = "TI OMAP3 Gumstix Overo on Tobi";
+-	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap3";
++	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3";
  
- 	twl: twl at 48 {
-@@ -60,6 +89,8 @@
- 
- /* on board microSD slot */
- &mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
- 	vmmc-supply = <&vmmc1>;
- 	bus-width = <4>;
- };
-@@ -82,15 +113,6 @@
- 	power = <50>;
- };
- 
--&omap3_pmx_core {
--	uart3_pins: pinmux_uart3_pins {
--		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx */
--		>;
--	};
--};
--
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
+ 	leds {
+ 		compatible = "gpio-leds";
 -- 
 1.8.1.2
