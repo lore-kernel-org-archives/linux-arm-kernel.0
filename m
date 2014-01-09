@@ -1,38 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Jan 2014 22:09:41 -0800
-Subject: [GIT PULL] ux500 devicetree fixups for v3.14
-In-Reply-To: <CACRpkdbORJi0Hp8A_MzCENwAqLn65bLLMJHNUiySqsbDJNWg_Q@mail.gmail.com>
-References: <CACRpkdbORJi0Hp8A_MzCENwAqLn65bLLMJHNUiySqsbDJNWg_Q@mail.gmail.com>
-Message-ID: <20140109060941.GF8285@quad.lixom.net>
+Date: Wed, 8 Jan 2014 22:10:43 -0800
+Subject: [GIT PULL] ux500 core changes for v3.14
+In-Reply-To: <CACRpkdbWx31fSy_m_ZcoX3ZQ86Zz_XaCuiCXDSU11ifsT8if3Q@mail.gmail.com>
+References: <CACRpkdbWx31fSy_m_ZcoX3ZQ86Zz_XaCuiCXDSU11ifsT8if3Q@mail.gmail.com>
+Message-ID: <20140109061043.GG8285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 04:18:05PM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Tue, Jan 07, 2014 at 04:24:21PM +0100, Linus Walleij wrote:
+> Hi ARM SoC people,
 > 
-> this fixes up and finalizes the stuff queued in linux-next for Ux500
-> devicetree migration/cleanups, most notably makes MMC/SD
-> cards work properly again.
-> 
-> Please pull in these 4 patches, they are based on top of what
-> is already in ARM SoC on the ux500/dt branch.
+> here is a rather late ux500 pull request for v3.14 (what's my exuse? vacation.)
+> It contains just two patches, so please consider pulling it in anyway I'm quite
+> certain they are both OK, else I'll just defer it to v3.15.
 > 
 > Yours,
 > Linus Walleij
 > 
-> The following changes since commit 089b5c9595eb3c516ab6af12802f16505cde271b:
 > 
->   ARM: ux500: decomission custom SMP TWD timer init (2013-11-26 21:01:59 +0100)
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 > 
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-devicetree-v3.14-2
+> tags/ux500-core-v3.14
 > 
-> for you to fetch changes up to 0e7a268a9e2d85d36f146f9dcf1f54488111f3d8:
+> for you to fetch changes up to ead9e2936b071a501f7c7ff709802ea4257cd23a:
 > 
->   ARM: ux500: regulators: Remove dead code for SD-card regulator
-> (2013-12-13 10:30:20 +0100)
+>   ARM: ux500: Enable system suspend with WFI support (2014-01-07 15:01:58 +0100)
 
 Pulled, thanks.
 
