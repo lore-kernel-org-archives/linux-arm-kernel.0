@@ -1,219 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 9 Jan 2014 17:15:53 -0600
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <52CF12FB.6000602@ti.com>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
- <52CF12FB.6000602@ti.com>
-Message-ID: <20140109231513.GA11648@saruman.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 15:59:27 -0800
+Subject: [PATCH 1/7] ARM: perf_event: Silence sparse warning
+In-Reply-To: <20140109104519.GA17838@mudshark.cambridge.arm.com>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-2-git-send-email-sboyd@codeaurora.org>
+ <20140109104519.GA17838@mudshark.cambridge.arm.com>
+Message-ID: <52CF37DF.4000309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/09/14 02:45, Will Deacon wrote:
+> Hi Stephen,
+>
+> On Wed, Jan 08, 2014 at 10:59:38PM +0000, Stephen Boyd wrote:
+>> arch/arm/kernel/perf_event_cpu.c:274:25: warning: incorrect type in assignment (different modifiers)
+>> arch/arm/kernel/perf_event_cpu.c:274:25: expected int ( *init_fn )( ... )
+>> arch/arm/kernel/perf_event_cpu.c:274:25: got void const *const data
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+> Given that the rest of the series depends on the change to the percpu IRQ
+> stuff, I think you can just send this patch to Russell's patch system with
+> my ack:
+>
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+>
 
-On Thu, Jan 09, 2014 at 03:22:03PM -0600, Nishanth Menon wrote:
-> > So, bad luck number release for this, as v12 wasn't sufficient still.
-> > 
-> > Changes compared to previous version:
-> > - Dropped any changes to generic clock drivers, as it seems impossible
-> >   to agree anything in short term, this means the patch set shrank in
-> >   size from 49 patches to 40 (first 9 patches were dropped).
-> > - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
-> >   to drivers/clk/ti, and made the modifications needed to the TI version
-> >   of the clock drivers only (based on discussions with Mike, this is fine)
-> > - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
-> >   with any generic implementation we might have at some point, migrating
-> >   this to the generic version should be easy enough also.
-> > - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
-> >   versions and resulted into an orphan clock node
-> > - Fixed compile problem for omap5 only build reported by Felipe
-> > - Fixed a couple of sparse warnings
-> > - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
-> >   instead of __raw_readl / __raw_writel
-> > 
-> > Testing done:
-> > - omap3-beagle: boot / suspend-resume (RET) / suspend-resume (OFF)
-> > - omap4-panda-es: boot / suspend-resume (RET)
-> > - omap5-uevm: boot
-> > - am335x-bone: boot
-> > - dra7-evm: boot
-> > 
-> > Maintainer friendly branches also available:
-> > 
-> > tree: https://github.com/t-kristo/linux-pm.git
-> > 
-> > clk driver only (Mike): clk-next-dt-clks-v13
-> > DTS data only (Benoit): dts_for_3.14-dt-clks-v13
-> > full-branch (Tony/Paul): 3.13-rc7-dt-clks-v13
-> > 
-> > -Tero
-> > 
-> 
-> Maintainer branches conflicts (using 3.13-rc7-dt-clks-v13):
-> =============================
-> Conflict resolution during rebase to maintainer's -14 branches:
-> 
-> 1. (trivial) Against mike's clk-next dbdf6ff Merge branch
-> 'clk-next-unregister' into clk-next
-> 
-> Could not apply 2edf7ad... CLK: TI: add DT alias clock registration
-> mechanism
-> conflict drivers/clk/Makefile (trivial fix)
-> 
-> 2. (manual, but changes are easy) Against Tony's omap-for-v3.14/be
-> fc6ca98 ARM: OMAP: debug-leds: raw read and write endian fix
-> 
-> ARM: OMAP2+: clock: use driver API instead of direct memory read/write
-> 
-> conflicts with be changes on Tony's be branch.
-> commit 80f304dd2360cf5d50953c4eb4e902536f6a1263
->     ARM: OMAP2+: raw read and write endian fix
-> 
-> Conflict:
-> arch/arm/mach-omap2/clkt_clksel.c
-> arch/arm/mach-omap2/clkt_dpll.c
-> arch/arm/mach-omap2/clkt_iclk.c
-> arch/arm/mach-omap2/clock.c
-> arch/arm/mach-omap2/clock36xx.c
-> arch/arm/mach-omap2/dpll3xxx.c
-> arch/arm/mach-omap2/dpll44xx.c
-> 
-> Both change raw_readls -> should now be just clk api instead which
-> already does readl_relaxed etc.. If Tony feels like, then we should
-> probably post a branch based on 'be' branch for easy merge.
-> 
-> 3. I could not detect any merge conflict against Benoit's queued up
-> series (but maybe he has'nt pushed everything to remote tree)..
-> 
-> 
-> Patch verification report:
-> ==========================
-> Report: http://pastebin.mozilla.org/3976492
-> 
-> 
-> * sparse warning added in [PATCH 06/40] CLK: ti: add support for ti
-> divider-clock, [PATCH 10/40] clk: ti: add support for basic mux clock
-> +drivers/clk/ti/divider.c: warning: context imbalance in
-> 'ti_clk_divider_set_rate' - different lock contexts for basic block
-> +drivers/clk/ti/mux.c: warning: context imbalance in
-> 'ti_clk_mux_set_parent' - different lock contexts for basic block
-> 
-> * checkpatch warning [PATCH 16/40] CLK: TI: add am33xx clock init
-> file, [PATCH 18/40] CLK: TI: add omap3 clock init file
-> WARNING: static const char * array should probably be static const
-> char * const
-> 
-> 
-> Boot reports:
-> =============
-> - previous orphan clocks seem solved.
-> - All available platforms seem to boot fine and no regression could be
-> seen on initial view
-> 
-> OMAP2430:
->   1. SDP2430
->     before: http://pastebin.mozilla.org/3976359
->     after: http://pastebin.mozilla.org/3976467
-> 
-> AM335x:
->   2. am335x-evm
->     before: http://pastebin.mozilla.org/3976284
->     after: http://pastebin.mozilla.org/3976374
->   3. am335x-sk
->     before: http://pastebin.mozilla.org/3976295
->     after: http://pastebin.mozilla.org/3976375
->   4. BeagleBone Black:
->     before: http://pastebin.mozilla.org/3976321
->     after: http://pastebin.mozilla.org/3976441
-> 
-> AM3517:
->   5. am3517-evm
->     before: http://pastebin.mozilla.org/3976297
->     after: http://pastebin.mozilla.org/3976397
->   6. craneboard
->     before: http://pastebin.mozilla.org/3976322
->     after: http://pastebin.mozilla.org/3976452
-> 
-> OMAP3430:
->   7. ldp
->     before: http://pastebin.mozilla.org/3976356
->     after: http://pastebin.mozilla.org/3976455
->   8. sdp3430
->     before: http://pastebin.mozilla.org/3976360
->     after: http://pastebin.mozilla.org/3976468
-> 
-> OMAP3630/DM3730:
->   9. am37x-evm
->     before: http://pastebin.mozilla.org/3976300
->     after: http://pastebin.mozilla.org/3976398
->   10. beagle-XM
->     before: http://pastebin.mozilla.org/3976319
->     after: http://pastebin.mozilla.org/3976440
-> 
-> OMAP4430:
->   11. SDP4430
->     before: http://pastebin.mozilla.org/3976361
->     after: http://pastebin.mozilla.org/3976470
-> 
-> OMAP4460:
->   12. PandaBoard-ES
->     before: http://pastebin.mozilla.org/3976358
->     after: http://pastebin.mozilla.org/3976456
-> 
-> OMAP5432:
->   13. OMAP5uEVM
->     before: http://pastebin.mozilla.org/3976362 (no boot)
->     after: http://pastebin.mozilla.org/3976471 (boot)
-> 
-> DRA7:
->   14. dra7evm
->     before: http://pastebin.mozilla.org/3976354 (no boot)
->     after: http://pastebin.mozilla.org/3976453 (boot)
-> 
-> AM437x:
->   15. am43xx-epos + out-of-tree patches for engineering samples
->     before: http://pastebin.mozilla.org/3976306 (no boot)
->     after: http://pastebin.mozilla.org/3976399 (boot)
-
-to add here, I ran 70 different randconfigs, all seeds are available on
-pastebin (took RMK's 4430sdp seed as a starting point):
-
-am33xx-only.config	http://pastebin.com/nVA3xSwb
-am43xx-only.config	http://pastebin.com/RbUdKuUh
-dra7xx-only.config	http://pastebin.com/ribnaSzS
-omap2-only.config	http://pastebin.com/QPUG0wqe
-omap3-only.config	http://pastebin.com/B8ctX8yM
-omap4-only.config	http://pastebin.com/3D8NAExm
-omap5-only.config	http://pastebin.com/3mtQN38Z
-
-Had a total of 16 failing builds, all .configs were also published on
-pastebin:
-
-config-am33xx-only.config-1	http://pastebin.com/5xhXZpev
-config-am33xx-only.config-2	http://pastebin.com/NsrruJcQ
-config-am33xx-only.config-3	http://pastebin.com/CGbB3qb8
-config-am33xx-only.config-4	http://pastebin.com/86cu0uZ1
-config-am43xx-only.config-1	http://pastebin.com/MCBCAd4X
-config-am43xx-only.config-3	http://pastebin.com/hVpCgwSn
-config-am43xx-only.config-4	http://pastebin.com/8SXAKHed
-config-am43xx-only.config-6	http://pastebin.com/59riPMfw
-config-am43xx-only.config-8	http://pastebin.com/03bt2VEZ
-config-am43xx-only.config-9	http://pastebin.com/tePGwtWA
-config-am43xx-only.config-10	http://pastebin.com/nrtXPqrF
-config-omap2-only.config-2	http://pastebin.com/AKyvMqQU
-config-omap2-only.config-4	http://paste.debian.net/75329
-config-omap2-only.config-5	http://paste.debian.net/75330/
-config-omap2-only.config-7	http://paste.debian.net/75332/
-config-omap2-only.config-10	http://paste.debian.net/75333/
-
-Failing configs all build fine on v3.13-rc7 except for
-config-omap2-only.config-10, which fails due to a broken staging driver.
+Thanks. It's 7937/1.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/6c356b93/attachment-0001.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
