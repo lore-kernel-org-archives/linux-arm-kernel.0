@@ -1,114 +1,86 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:48:10 +0100
-Subject: [PATCH 16/18] ARM: dts: Add support for the Overo Chestnut43
+Date: Thu,  9 Jan 2014 17:47:58 +0100
+Subject: [PATCH 04/18] ARM: dts: omap3-overo: Add missing pinctrl
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-17-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-5-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chestnut43 is an expansion board for Gumstix Overo products.
+Add missing pinctrl entries for:
+- i2c1
+- mmc1
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/Makefile                   |  1 +
- arch/arm/boot/dts/omap3-overo-chestnut43.dts | 76 ++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-overo-chestnut43.dts
+ arch/arm/boot/dts/omap3-overo.dtsi | 40 +++++++++++++++++++++++++++++---------
+ 1 file changed, 31 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 29432b0..3f6ef70 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -190,6 +190,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-n9.dtb \
- 	omap3-n950.dtb \
- 	omap3-overo-alto35.dtb \
-+	omap3-overo-chestnut43.dtb \
- 	omap3-overo-gallop43.dtb \
- 	omap3-overo-palo43.dtb \
- 	omap3-overo-tobi.dtb \
-diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43.dts b/arch/arm/boot/dts/omap3-overo-chestnut43.dts
-new file mode 100644
-index 0000000..3361c2d
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-overo-chestnut43.dts
-@@ -0,0 +1,76 @@
-+/*
-+ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Chestnut43 expansion board is manufactured by Gumstix Inc.
-+ */
-+
-+#include "omap3-overo-common.dtsi"
-+
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "TI OMAP3 Gumstix Overo on Chestnut43";
-+	compatible = "gumstix,omap3-overo-chestnut43", "gumstix,omap3-overo", "ti,omap3";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		heartbeat {
-+			label = "overo:red:gpio21";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		gpio22 {
-+			label = "overo:blue:gpio22";
-+			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
-+		};
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a461d2f..2d8b80c 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -34,7 +34,36 @@
+ 	};
+ };
+ 
++&omap3_pmx_core {
++	uart3_pins: pinmux_uart3_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
++			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
++		>;
 +	};
 +
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		button0 at 23 {
-+			label = "button0";
-+			linux,code = <BTN_0>;
-+			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
-+			gpio-key,wakeup;
-+		};
-+		button1 at 14 {
-+			label = "button1";
-+			linux,code = <BTN_1>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
-+			gpio-key,wakeup;
-+		};
++	i2c1_pins: pinmux_i2c1_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT | MUX_MODE0)		/* i2c1_scl.i2c1_scl */
++			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT | MUX_MODE0)		/* i2c1_sda.i2c1_sda */
++		>;
 +	};
 +
-+	vddvario: regulator-vddvario {
-+		  compatible = "regulator-fixed";
-+		  regulator-name = "vddvario";
-+		  regulator-always-on;
-+	};
-+
-+	vdd33a: regulator-vdd33a {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdd33a";
-+		regulator-always-on;
++	mmc1_pins: pinmux_mmc1_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_clk.sdmmc1_clk */
++			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_cmd.sdmmc1_cmd */
++			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat0.sdmmc1_dat0 */
++			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat1.sdmmc1_dat1 */
++			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat2.sdmmc1_dat2 */
++			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
++		>;
 +	};
 +};
 +
-+#include "omap-gpmc-smsc9221.dtsi"
-+
-+&gpmc {
-+	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
-+
-+	ethernet at gpmc {
-+		reg = <5 0 0xff>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176 */
-+	};
-+};
-+
+ &i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
+ 	clock-frequency = <2600000>;
+ 
+ 	twl: twl at 48 {
+@@ -60,6 +89,8 @@
+ 
+ /* on board microSD slot */
+ &mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&vmmc1>;
+ 	bus-width = <4>;
+ };
+@@ -82,15 +113,6 @@
+ 	power = <50>;
+ };
+ 
+-&omap3_pmx_core {
+-	uart3_pins: pinmux_uart3_pins {
+-		pinctrl-single,pins = <
+-			0x16e (PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
+-			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx */
+-		>;
+-	};
+-};
+-
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
 -- 
 1.8.1.2
