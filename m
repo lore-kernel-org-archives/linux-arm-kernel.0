@@ -1,32 +1,29 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 8 Jan 2014 20:16:20 -0800
-Subject: [GIT PULL] extcon next for 3.14
-In-Reply-To: <52CE0330.4090501@samsung.com>
-References: <52CE0330.4090501@samsung.com>
-Message-ID: <20140109041620.GB18621@kroah.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 9 Jan 2014 13:35:53 +0900
+Subject: [PATCH 04/04 v2] ARM: shmobile: Genmai I2C-over-GPIO support
+In-Reply-To: <20140108112359.GA2669@katana>
+References: <20131217050232.727.9552.sendpatchset@w520>
+ <20131217050324.727.61701.sendpatchset@w520>
+ <20131217163435.GC7071@katana> <20140108004157.GH5136@verge.net.au>
+ <20140108112359.GA2669@katana>
+Message-ID: <20140109043553.GB2132@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 11:02:24AM +0900, Chanwoo Choi wrote:
-> Dear Greg,
+On Wed, Jan 08, 2014 at 12:23:59PM +0100, Wolfram Sang wrote:
 > 
-> This is extcon-next full request for v3.14. I add detailed description of this
-> pull request on below. Please pull extcon with following updates.
+> > could you clarify the status of this patch for me?
+> > 
+> > I believe it is reverted by "[PATCH V2 4/5] arm: shmobile: genmai: adapt
+> > dts to use native i2c driver".
+> > 
+> > I'm fine with applying both patches at some point. But perhaps
+> > we can skip some dependencies by just applying a squashed version?
 > 
-> This patchset is rebased on 'Linux 3-13-rc4' because char-misc-next is based on
-> 'Linux 3-13-rc4'.
-> 
-> Best Regards,
-> Chanwoo Choi
-> 
-> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
-> 
->   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/extcon.git tags/extcon-next-for-3.14
+> If we keep this patch and my one on top of it, we need the PFC series.
+> If we skip this patch and use my native I2C right from the beginning, we
+> can skip the PFC series and have i2c support right away. I'd prefer the
+> latter. I am about to push a branch to my tree that does the latter
+> these minutes.
 
-Pulled and pushed out, thanks.
-
-greg k-h
+I think I prefer the latter too.
