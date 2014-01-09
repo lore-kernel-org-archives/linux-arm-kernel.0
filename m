@@ -1,27 +1,40 @@
-From: satish.patel@ti.com (Satish Patel)
-Date: Thu, 9 Jan 2014 13:41:52 +0530
-Subject: [RFC PATCH v1 0/2] clock and HWMOD changes for USIM module
-In-Reply-To: <1389010351-17320-1-git-send-email-satish.patel@ti.com>
-References: <1389010351-17320-1-git-send-email-satish.patel@ti.com>
-Message-ID: <52CE59C8.6040409@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 9 Jan 2014 00:11:42 -0800
+Subject: [PATCH v2 0/7] Allow MSM DT platforms to be built multi-platform
+In-Reply-To: <CAOesGMiFixweRT1R-y2Cxvx+p6tzf3Qr-TaAwqDBCgB=Ge8FfA@mail.gmail.com>
+References: <1388438133-431-1-git-send-email-sboyd@codeaurora.org>
+ <201401021913.25920.arnd@arndb.de>
+ <52C70698.2030004@codeaurora.org>
+ <CAOesGMiFixweRT1R-y2Cxvx+p6tzf3Qr-TaAwqDBCgB=Ge8FfA@mail.gmail.com>
+Message-ID: <20140109081142.GH8285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/6/2014 5:42 PM, Satish Patel wrote:
-> Patch set includes clock and HWMOD entries for AM43x's USIM modoule.
+On Fri, Jan 03, 2014 at 11:31:46AM -0800, Olof Johansson wrote:
+> On Fri, Jan 3, 2014 at 10:51 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 01/02/14 10:13, Arnd Bergmann wrote:
+> >> On Monday 30 December 2013, Stephen Boyd wrote:
+> >>> These patches allow the DT based MSM platforms to be built as part of the
+> >>> multi-platform kernel. I need acks from Chris Ball on the mmc patch and
+> >>> Rob/Dave on the drm patch. I dropped Arnd's ack on patch 6 because I've
+> >>> rebased that patch on top of the patchset David sent out (which this is in
+> >>> reply to). The rebase was fairly minor and the new patch for drm/msm is
+> >>> trivial. Please consider for v3.14.
+> >> Just for the record, I'm definitely happy with the way this is turning out,
+> >> don't see my question on the serial driver as a NAK. I assume we will apply
+> >> the patches for 3.14, but I first want to have a better understanding on
+> >> where we are with the stuff that is already queued up for 3.14.
+> >>
+> >
+> > It would be great if we could get these patches in for 3.14. Now that
+> > Olof has applied the collection of patches that David sent, these
+> > patches should apply cleanly on top of arm-soc.git qcom/soc. Can you
+> > apply them directly to the arm-soc tree?
 > 
-> Note: I am in process of mainlining usim driver.
-> 
-> Satish Patel (2):
->   ARM: dts: AM43xx-clocks: Entries added for ti-usim
->   ARM: OMAP: AM43xx: HWMOD changes added for ti-usim
-> 
+> Yeah, we'll get to it in a bit.
 
-Tony,
+Ok, I've applied all but the DRM patch since Rob needed that respun. It should
+probably be merged through the DRM tree given the conflicts.
 
-Can you pull in these patches if there are no comments?
 
-Thanks,
-Satish
+-Olof
