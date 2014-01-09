@@ -1,46 +1,101 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 9 Jan 2014 12:47:24 +0000
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <201401091204.17932.arnd@arndb.de>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109103004.GB11089@mudshark.cambridge.arm.com>
- <201401091204.17932.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 9 Jan 2014 12:50:52 +0000
+Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <1389208330-12495-2-git-send-email-broonie@kernel.org>
+References: <1389208330-12495-1-git-send-email-broonie@kernel.org>
+ <1389208330-12495-2-git-send-email-broonie@kernel.org>
+Message-ID: <20140109125052.GB6089@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jan 2014, Arnd Bergmann wrote:
-> On Thursday 09 January 2014, Will Deacon wrote:
-> > On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
-> > > Remove !GENERIC_ATOMIC64 build dependency:
-> > > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
-> > >   GENERIC_ATOMIC64;
-> > > - call armv7_atomic64_xchg directly from xen/events.h.
-> > > 
-> > > Remove !CPU_V6 build dependency:
-> > > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-> > >   CONFIG_CPU_V6;
-> > > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > CC: arnd at arndb.de
-> > > CC: linux at arm.linux.org.uk
-> > > CC: will.deacon at arm.com
-> > > CC: gang.chen at asianux.com
-> > > CC: catalin.marinas at arm.com
-> > > CC: jaccon.bastiaansen at gmail.com
-> > > CC: linux-arm-kernel at lists.infradead.org
-> > > CC: linux-kernel at vger.kernel.org
-> > > 
-> > 
-> > I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
-> > What am I missing?
-> 
-> This is about being able to build a kernel that runs on ARMv6 and ARMv7
-> and also includes Xen. Because of obvious hardware limitations, Xen
-> will only run on v7, but currently you cannot even build it once you
-> enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
-> do atomic accesses in a generic way on non-32bit variables.
+On Wed, Jan 08, 2014 at 07:12:08PM +0000, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 20eef01a4707..e77c6b0844be 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -17,10 +17,157 @@
+>  #include <linux/percpu.h>
+>  #include <linux/node.h>
+>  #include <linux/nodemask.h>
+> +#include <linux/of.h>
+>  #include <linux/sched.h>
+> +#include <linux/slab.h>
 
-Yep, that's right.
+It does not belong here either.
+
+>  #include <asm/topology.h>
+>  
+> +#ifdef CONFIG_OF
+> +static int cluster_id;
+
+This is __initdata. I think it is better to move it to parse_cluster
+and pass it to parse_core as a parameter instead of using a global.
+
+> +static int __init get_cpu_for_node(struct device_node *node)
+> +{
+> +	struct device_node *cpu_node;
+> +	int cpu;
+> +
+> +	cpu_node = of_parse_phandle(node, "cpu", 0);
+> +	if (!cpu_node) {
+> +		pr_crit("%s: Unable to parse CPU phandle\n", node->full_name);
+
+This messages is spit out anytime you try to grab a cpu phandle and it
+is not there. In particular, in parse_core if core is not a leaf but you
+still try to grab a cpu phandle this message is spit out and that's not
+nice at all. Either we remove the message or we do not check the phandle
+in core nodes that are not leaves.
+
+> +		return -1;
+> +	}
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		if (of_get_cpu_node(cpu, NULL) == cpu_node)
+> +			return cpu;
+> +	}
+> +
+> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
+> +	return -1;
+> +}
+> +
+> +static void __init parse_core(struct device_node *core, int core_id)
+> +{
+> +	char name[10];
+> +	bool leaf = true;
+> +	int i, cpu;
+> +	struct device_node *t;
+> +
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "thread%d", i);
+> +		t = of_get_child_by_name(core, name);
+> +		if (t) {
+> +			leaf = false;
+> +			cpu = get_cpu_for_node(t);
+> +			if (cpu >= 0) {
+> +				pr_info("CPU%d: socket %d core %d thread %d\n",
+> +					cpu, cluster_id, core_id, i);
+
+Since all these variables are internal values that have no real meaning
+I am not sure it is useful to print them out. Probably better to print
+the resulting cpu masks on every cpu, problem is when to do that.
+
+> +				cpu_topology[cpu].socket_id = cluster_id;
+> +				cpu_topology[cpu].core_id = core_id;
+> +				cpu_topology[cpu].thread_id = i;
+> +			} else {
+> +				pr_err("%s: Can't get CPU for thread\n",
+> +				       t->full_name);
+> +			}
+> +		}
+> +		i++;
+> +	} while (t);
+> +
+> +	cpu = get_cpu_for_node(core);
+
+This is what I am referring too above. For core nodes containing threads a
+message is spit out and that must not be there. Either we avoid parsing
+core nodes that are not leaves or we change get_cpu_core_for_node.
+
+Lorenzo
