@@ -1,39 +1,41 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 9 Jan 2014 15:31:19 -0600
-Subject: [PATCHv9 4/4] ARM: socfpga_defconfig: enable SD/MMC support
-In-Reply-To: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
-References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1389303079-19808-5-git-send-email-dinguyen@altera.com>
+Date: Thu, 9 Jan 2014 15:31:15 -0600
+Subject: [PATCHv9 0/4] socfpga: Enable SD/MMC support
+Message-ID: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Enables the dw_mmc driver for SOCFPGA.
+Hi,
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
-v9: none
-v8: none
-v7: none
-v6: none
-v5: Add dw_mmc driver into socfpga_defconfig
-v4: none
-v3: none
-v2: none
----
- arch/arm/configs/socfpga_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+This is v9 of that patch series to enable SD/MMC on the SOCFPGA platform.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 4e1ce21..8fff96ba 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -82,3 +82,5 @@ CONFIG_DEBUG_INFO=y
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
- CONFIG_XZ_DEC=y
-+CONFIG_MMC=y
-+CONFIG_MMC_DW=y
+V9 differences from v8:
+
+* Update the Makefile to remove the SOCFPGA DW platform specific build.
+
+Thanks,
+Dinh
+
+Dinh Nguyen (4):
+  clk: socfpga: Add a clk-phase property to the "altr,socfpga-gate-clk"
+  dts: socfpga: Add support for SD/MMC on the SOCFPGA platform
+  mmc: dw_mmc-socfpga: Remove the SOCFPGA specific platform for dw_mmc
+  ARM: socfpga_defconfig: enable SD/MMC support
+
+ .../devicetree/bindings/clock/altr_socfpga.txt     |    5 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   14 +-
+ arch/arm/boot/dts/socfpga_arria5.dtsi              |   11 ++
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi            |   11 ++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   11 ++
+ arch/arm/configs/socfpga_defconfig                 |    2 +
+ drivers/clk/socfpga/clk-gate.c                     |   68 ++++++++++
+ drivers/mmc/host/Kconfig                           |    8 --
+ drivers/mmc/host/Makefile                          |    1 -
+ drivers/mmc/host/dw_mmc-socfpga.c                  |  138 --------------------
+ 10 files changed, 121 insertions(+), 148 deletions(-)
+ delete mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+
 -- 
 1.7.9.5
