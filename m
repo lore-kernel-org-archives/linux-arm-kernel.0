@@ -1,57 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 9 Jan 2014 16:42:43 +0530
-Subject: [PATCH] watchdog: davinci: rename platform driver to davinci-wdt
-In-Reply-To: <20140109110852.GA4898@spo001.leaseweb.com>
-References: <1385559113-4354-1-git-send-email-ivan.khoronzhuk@ti.com>
- <5295FB0E.4070406@ti.com> <52961665.3060309@roeck-us.net>
- <5296DCD6.3030002@ti.com> <52973E40.4060400@roeck-us.net>
- <52984CE8.50803@ti.com> <52CE7F3F.1000201@ti.com>
- <20140109110852.GA4898@spo001.leaseweb.com>
-Message-ID: <52CE842B.3080500@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 9 Jan 2014 12:15:32 +0100
+Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
+In-Reply-To: <20140109051311.GH2132@verge.net.au>
+References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+ <20140109051311.GH2132@verge.net.au>
+Message-ID: <201401091215.33255.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014 04:38 PM, Wim Van Sebroeck wrote:
-> Hi Sekhar,
+On Thursday 09 January 2014, Simon Horman wrote:
+> On Tue, Jan 07, 2014 at 05:48:00PM +0900, Simon Horman wrote:
+> > Select the SMSC_PHY if ethernet is enabled on shmbile boards
+> > that have an SMSC phy. This allows the SMSC-specific phy driver
+> > to be used rather than relying on generic phy code.
+> > 
+> > Based on the renesas-devel-v3.13-rc7-20140107 tag
+> > of my renesas tree.
 > 
->> On Friday 29 November 2013 01:44 PM, Sekhar Nori wrote:
->>> Wim,
->>>
->>> On Thursday 28 November 2013 06:29 PM, Guenter Roeck wrote:
->>>> On 11/27/2013 10:04 PM, Sekhar Nori wrote:
->>>>> On Wednesday 27 November 2013 09:27 PM, Guenter Roeck wrote:
->>>>>> On 11/27/2013 06:00 AM, Sekhar Nori wrote:
->>>>>>> On Wednesday 27 November 2013 07:01 PM, Ivan Khoronzhuk wrote:
->>>>>>>> As we switch to use the watchdog core which permits more than one
->>>>>>>> active watchdog in the system, rename platform driver to
->>>>>>>> "davinci-wdt" to be identifiable.
->>>>>>>>
->>>>>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>>>>
->>>>>>> Looks good to me. Since bulk of this patch touches mach-davinci, I
->>>>>>> would
->>>>>>> like to take this through my tree to avoid conflicts with other
->>>>>>> mach-davinci patches I accept.
->>>>>>>
->>>>>>
->>>>>> Good idea, and makes sense.
->>>>>
->>>>> Added to v3.14/soc with your Reviewed-by
->>>>>
->>>>
->>>> You should get an Ack from Wim.
->>>
->>> Can you please provide your ack? I will add it to the existing commit.
->>
->> I never received an ack from Wim, but I am going to send this for
->> merging through ARM-SoC anyway. I will keep Wim copied on the pull
->> request so he knows.
+> I have queued up these changes.
 > 
-> This has my Ack. No issue with getting this through the ARM-SoC tree but bear in mind that there are allready other davinci pateches in the linux-watchdog-next tree+.
 
-Okay. I will add you ack (I just applied my signed tag, grr).
-I did a test merge of this patch with today's linux-next and see no
-conflicts.
+I don't have an objection to the patches themselves, but a general
+feeling that it would be better to have larger combined patches than
+splitting them out per board.
 
-Thanks,
-Sekhar
+I'm cautious with this comment because most people seem to do the
+opposite and combine too many things into large patches, but I think
+when you have identical changeset comments and change the same Kconfig
+file in all of them, you can save yourself and the reviewers some work.
+
+	Arnd
