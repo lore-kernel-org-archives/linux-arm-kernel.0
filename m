@@ -1,74 +1,44 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Thu, 9 Jan 2014 15:00:29 +0100
-Subject: [PATCH v2 3/3] ARM: sun7i: irqchip: Update the documentation
-In-Reply-To: <52CD4C89.1040604@redhat.com>
-References: <1389030097-10822-1-git-send-email-carlo.caione@gmail.com>
- <1389030097-10822-4-git-send-email-carlo.caione@gmail.com>
- <201401081229.45029.arnd@arndb.de>
- <CAOQ7t2bg7qmwnQ-7iqbKCqK8fNS5GC=G0BN2188FQhPLN3v9VQ@mail.gmail.com>
- <52CD4C89.1040604@redhat.com>
-Message-ID: <CAOQ7t2bXXTXfQoXTx5GOYksqWRwvQYmTRvRLSFYL3kKKCNSceA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 9 Jan 2014 16:00:11 +0200
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+Message-ID: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 2:03 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
->
-> On 01/08/2014 12:49 PM, Carlo Caione wrote:
->>
->> On Wed, Jan 8, 2014 at 12:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>> On Monday 06 January 2014, Carlo Caione wrote:
->>>>
->>>> +Allwinner Sunxi NMI Controller
->>>> +==============================
->>>> +
->>>> +Required properties:
->>>> +
->>>> +- compatible : should be "allwinner,sun7i-sc-nmi"
->>>> +- reg : Specifies base physical address and size of the registers.
->>>> +- interrupt-controller : Identifies the node as an interrupt controller
->>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
->>>> +  interrupt source. The value shall be 2.
->>>
->>>
->>> I think you should list what the two cells are so users know what to
->>> put in the irq specifier.
->>
->>
->> Agree, I'll fix in v3
->>
->>>> +sc-nmi-intc at 01c00030 {
->>>> +       compatible = "allwinner,sun7i-sc-nmi";
->>>> +       interrupt-controller;
->>>> +       #interrupt-cells = <2>;
->>>> +       reg = <0x01c00030 0x0c>;
->>>> +       interrupt-parent = <&gic>;
->>>> +       interrupts = <0 0 1>;
->>>> +};
->>>
->>>
->>> Is <0 0 1> the correct representation of the NMI? This question has
->>> recently
->>> come up on IRC and I didn't know the answer at the time.
->>
->>
->> Why shouldn't it be a correct representation? I think I missed the
->> discussion on IRC.
->
->
-> I did not see the discussion on irc either, but this almost certainly
-> should be <0 0 4>, as all interrupts on sun7i are level sensitive, not
-> edge sensitive, making it <0 0 1> and thus edge sensitive can cause
-> lost interrupts if an interrupt fires between the handler has reading
-> the interrupt status register, and it writing it to clear the bits it
-> has seen. In this case the interrupt line stays high, but the interrupt
-> handler won't get re-run when configured for level interrupts.
+Hi,
 
-Ouch, right! fix coming in v3.
+So, bad luck number release for this, as v12 wasn't sufficient still.
 
-Thanks,
+Changes compared to previous version:
+- Dropped any changes to generic clock drivers, as it seems impossible
+  to agree anything in short term, this means the patch set shrank in
+  size from 49 patches to 40 (first 9 patches were dropped).
+- Copy pasted implementation for clk-divider and clk-mux from drivers/clk
+  to drivers/clk/ti, and made the modifications needed to the TI version
+  of the clock drivers only (based on discussions with Mike, this is fine)
+- Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
+  with any generic implementation we might have at some point, migrating
+  this to the generic version should be easy enough also.
+- Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
+  versions and resulted into an orphan clock node
+- Fixed compile problem for omap5 only build reported by Felipe
+- Fixed a couple of sparse warnings
+- changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
+  instead of __raw_readl / __raw_writel
 
---
-Carlo Caione
+Testing done:
+- omap3-beagle: boot / suspend-resume (RET) / suspend-resume (OFF)
+- omap4-panda-es: boot / suspend-resume (RET)
+- omap5-uevm: boot
+- am335x-bone: boot
+- dra7-evm: boot
+
+Maintainer friendly branches also available:
+
+tree: https://github.com/t-kristo/linux-pm.git
+
+clk driver only (Mike): clk-next-dt-clks-v13
+DTS data only (Benoit): dts_for_3.14-dt-clks-v13
+full-branch (Tony/Paul): 3.13-rc7-dt-clks-v13
+
+-Tero
