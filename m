@@ -1,30 +1,28 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 9 Jan 2014 16:31:48 +0530
-Subject: [PATCH] ARM: tegra: add system-power-controller property for PMIC node
-Message-ID: <1389265308-26405-1-git-send-email-ldewangan@nvidia.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 9 Jan 2014 12:03:59 +0100
+Subject: [PATCH v4 3/6] ARM: Add Krait L2 accessor functions
+In-Reply-To: <52CE0154.4030803@codeaurora.org>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-4-git-send-email-sboyd@codeaurora.org>
+ <20140109005332.GB23276@sonymobile.com>
+ <52CE0154.4030803@codeaurora.org>
+Message-ID: <20140109110358.GB11594@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add system-power-controller property to system PMIC, ams AS3722,
-node to enable power off functionality through PMIC.
+On Wed, Jan 08, 2014 at 05:54:28PM -0800, Stephen Boyd wrote:
+> Ok. Borislav, should I resend to add krait_ before these functions?
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
- arch/arm/boot/dts/tegra124-venice2.dts |    2 ++
- 1 file changed, 2 insertions(+)
+Yes please - I can't even build-test here so I'm relying on you.
 
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index c6dcef5..1ad3f33 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -616,6 +616,8 @@
- 			reg = <0x40>;
- 			interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
- 
-+			ams,system-power-controller;
-+
- 			#interrupt-cells = <2>;
- 			interrupt-controller;
- 
+That's why I thought it might be a better idea for this purely arm patch
+to go through some other tree where it sees some build-testing at least.
+
+Thanks.
+
 -- 
-1.7.9.5
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
