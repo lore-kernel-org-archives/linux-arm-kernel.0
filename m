@@ -1,83 +1,38 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 09 Jan 2014 20:51:34 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Add omap specific pinctrl defines to
- use padconf addresses
-In-Reply-To: <20140107232018.GE5074@atomide.com>
-References: <1387554677-21100-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1387554677-21100-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <20140107223021.GA5074@atomide.com> <1562680.iFW31kAxBU@avalon>
- <20140107232018.GE5074@atomide.com>
-Message-ID: <52CEFDC6.4010408@epfl.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 09 Jan 2014 11:57:12 -0800
+Subject: [PATCH 3/7] ARM: perf_event: Add basic support for Krait CPU PMUs
+In-Reply-To: <20140109110440.GC17838@mudshark.cambridge.arm.com>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-4-git-send-email-sboyd@codeaurora.org>
+ <20140109110440.GC17838@mudshark.cambridge.arm.com>
+Message-ID: <52CEFF18.2070501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+(Adding DT reviewers)
 
-On 01/08/2014 12:20 AM, Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140107 15:10]:
->> Hi Tony,
->>
->> On Tuesday 07 January 2014 14:30:21 Tony Lindgren wrote:
->>> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131220 07:52]:
->>>> From: Tony Lindgren <tony@atomide.com>
->>>> +/*
->>>> + * Macros to allow using the absolute physical address instead of the
->>>> + * padconf registers instead of the offset from padconf base.
->>>> + */
->>>> +#define OMAP_IOPAD_OFFSET(pa, offset)	(((pa) & 0xffff) - (offset))
->>>> +
->>>> +#define OMAP2420_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x0030)
->>>> (val)
->>>> +#define OMAP2430_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030)
->>>> (val)
->>>> +#define OMAP3_CORE1_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x2030) (val)
->>>> +#define OMAP3_CORE2_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x25a0) (val)
->>>
->>> Sorry for the delay on these, I'm only now getting back to looking
->>> at all the emails since the holidays :)
->>>
->>> After looking at Nishant's omap3 pinctrl core2 patch, looks like we need
->>> to have separate OMAP3430_CORE2_IOPAD and OMAP3630_CORE2_IOPAD defines.
->>
->> That was my first impression as well, but I think we actually don't need to. 
->> The OMAP3430 just has no useful registers in the 0x25a0 - 0x25d7 area, so we 
->> can make the CORE2 macro span that for both 3430 and 3630.
-> 
-> Hmm well I already did it :) In general my gut feeling is along the lines
-> what you're saying, I think the padconf registers are all there on all
-> omap3 SoCs, but only some of the padconf registers are used depending on
-> the SoC revision and package.
-> 
-> Anyways, it should not hurt to have the padconf registers defined the
-> same way as the documentation has them, at least we may get some extra
-> warnings if people try to configure unused registers for 3430.
->  
+On 01/09/14 03:04, Will Deacon wrote:
+> On Wed, Jan 08, 2014 at 10:59:40PM +0000, Stephen Boyd wrote:
+>
+>> +static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+>> +{
+>> +	u32 id = read_cpuid_id() & 0xffffff00;
+>> +
+>> +	armv7pmu_init(cpu_pmu);
+>> +	cpu_pmu->name		= "ARMv7 Krait";
+>> +	/* Some early versions of Krait don't support PC write events */
+>> +	if (id == 0x511f0400 || id == 0x510f0600)
+>> +		cpu_pmu->map_event	= krait_map_event_no_branch;
+> Hmm, I'd really rather this information came via the DT. In fact, you could
+> just drop the branch event from your main map_event_function and keep things
+> simple. It depends how badly you want to advertise it in perf list :)
+>
 
-I can see one downside to this approach; if you update the revision of
-your processor from omap34xx to omap36xx, and if you are using pins from
-the overlapping range [0x25d8; 0x25fc], you will have to update all the
-macros, instead of simply updating the #include statement.
+Not every version of Krait is missing support for this event, so I'd
+like to keep it so things like perf stat show branch counts. How about I
+add a bool property to the pmu node indicating that this PMU is missing
+support for the PC write events? Something like "no-pc-write"?
 
-Let me introduce a real-life example. I am using Overo products. The
-processor board must be stacked onto an expansion board. I currently
-have only one include file for the processor board (omap3-overo.dtsi).
-But in reality, Gumstix is currently selling 14 models, with
-pin-compatible processors (omap35x3, dm3730, am3703) [1].
-
-So I #include omap34xx.dtsi (to be compatible with the omap35x3 models).
-The range [0x25d8; 0x25fc] defines a number of used features (hsusb2,
-gpios). To update to newer versions, I have to change the #include, but
-also all the OMAP3430_CORE2_IOPAD() macros spread across the expansion
-boards (omap3-tobi + future expansion boards, see my series from today).
-Even if the newer models do not use the omap36xx-specific features.
-
-Obviously, I currently do not have a straightforward way to support all
-the models/revisions with one single file. But if a solution is found in
-the future, it will be far easier if the expansions boards do not depend
-on the exact processor with such macros.
-
-Regards,
-
-Florian
-
-[1] https://store.gumstix.com/index.php/category/33/
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
