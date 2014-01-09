@@ -1,24 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Jan 2014 17:53:21 +0000
-Subject: [PATCH v2 2/2] spi:dspi:Remove some coding sytle not in standard
-In-Reply-To: <1389161655-21856-2-git-send-email-b44548@freescale.com>
-References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
- <1389161655-21856-2-git-send-email-b44548@freescale.com>
-Message-ID: <20140109175321.GL12858@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Jan 2014 17:53:51 +0000
+Subject: [PATCH v8 4/6] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <alpine.DEB.2.02.1401091750120.21510@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1401081845040.21510@kaball.uk.xensource.com>
+ <1389206998-27875-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109121308.GH3081@arm.com>
+ <1389269716.27473.73.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1401091750120.21510@kaball.uk.xensource.com>
+Message-ID: <20140109175351.GC19628@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 02:14:15PM +0800, Chao Fu wrote:
-> From: Chao Fu <B44548@freescale.com>
+On Thu, Jan 09, 2014 at 05:50:44PM +0000, Stefano Stabellini wrote:
+> On Thu, 9 Jan 2014, Ian Campbell wrote:
+> > On Thu, 2014-01-09 at 12:13 +0000, Catalin Marinas wrote:
+> > > On Wed, Jan 08, 2014 at 06:49:56PM +0000, Stefano Stabellini wrote:
+> > > >  arch/arm64/Kconfig         |   20 ++++++++++++++++++++
+> > > >  arch/arm64/kernel/Makefile |    1 +
+> > > >  2 files changed, 21 insertions(+)
+> > > [...]
+> > > > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > > > index 5ba2fd4..1dee735 100644
+> > > > --- a/arch/arm64/kernel/Makefile
+> > > > +++ b/arch/arm64/kernel/Makefile
+> > > > @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
+> > > >  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+> > > >  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+> > > >  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+> > > > +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+> > > 
+> > > Did you forget a git add?
+> > 
+> > I was just about to say the same thing for the previous arm patch too.
 > 
-> Remove some coding sytle not in standard in former code.
+> That is what I get for still using patch queues :-/
 
-This is OK but depends on your previous patch so can't be applied just
-yet.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140109/da0d504a/attachment-0001.sig>
+You should upgrade to stgit ;)
+
+-- 
+Catalin
