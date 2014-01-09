@@ -1,42 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 9 Jan 2014 17:53:51 +0000
-Subject: [PATCH v8 4/6] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1401091750120.21510@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401081845040.21510@kaball.uk.xensource.com>
- <1389206998-27875-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109121308.GH3081@arm.com>
- <1389269716.27473.73.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1401091750120.21510@kaball.uk.xensource.com>
-Message-ID: <20140109175351.GC19628@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu,  9 Jan 2014 18:57:04 +0100
+Subject: [PATCH v3 0/2] ohci and ehci-platform clks, phy and dt support
+Message-ID: <1389290226-6971-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 05:50:44PM +0000, Stefano Stabellini wrote:
-> On Thu, 9 Jan 2014, Ian Campbell wrote:
-> > On Thu, 2014-01-09 at 12:13 +0000, Catalin Marinas wrote:
-> > > On Wed, Jan 08, 2014 at 06:49:56PM +0000, Stefano Stabellini wrote:
-> > > >  arch/arm64/Kconfig         |   20 ++++++++++++++++++++
-> > > >  arch/arm64/kernel/Makefile |    1 +
-> > > >  2 files changed, 21 insertions(+)
-> > > [...]
-> > > > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > > > index 5ba2fd4..1dee735 100644
-> > > > --- a/arch/arm64/kernel/Makefile
-> > > > +++ b/arch/arm64/kernel/Makefile
-> > > > @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
-> > > >  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
-> > > >  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
-> > > >  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-> > > > +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
-> > > 
-> > > Did you forget a git add?
-> > 
-> > I was just about to say the same thing for the previous arm patch too.
-> 
-> That is what I get for still using patch queues :-/
+Hi All,
 
-You should upgrade to stgit ;)
+Here is v3 of my ohci and ehci-platform clks, phy and dt support patch-set.
 
--- 
-Catalin
+This version is mostly the result of some discussions on irc with Maxime to
+improve the dt-bindings. This has resulted in 2 changes:
+
+1) Drop the clock-names from the dt-bindings, instead get clocks by index.
+
+Since the intend is to be a generic ohci / ehci driver, the code does not
+give any special meaning to any of the clocks, so simply just get as many
+clocks as there are by index.
+
+2) Change the compatible string to "mmio-ohci" resp. "mmio-ehci"
+
+v2 was using allwinner,sun4i-ohci as compat string to avoid having to come
+up with a generic name, but in retrospect this is the wrong thing to do. This
+will likely lead to dts files for non allwinner boards using compatible =
+"allwinner,sun4i-ohci", and if we then ever need to do some allwinner specific
+quirks, these boards end up getting these quirks applied too.
+
+dts files should use the generic mmio-ehci compatible as least prefered option,
+ie: compatible = "allwinner,sun7i-a20-ehci", "mmio-ehci";
+
+This will allow use of the generic driver while leaving the option open to
+later add soc specific quirks without needing dt changes.
+
+Regards,
+
+Hans
