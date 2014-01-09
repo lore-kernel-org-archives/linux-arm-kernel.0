@@ -1,67 +1,78 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 9 Jan 2014 16:00:51 +0200
-Subject: [PATCHv13 40/40] ARM: OMAP3: use DT clock init if DT data is available
-In-Reply-To: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1389276051-1326-41-git-send-email-t-kristo@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 9 Jan 2014 09:10:32 -0500
+Subject: [PATCH v3 0/2] gpio: davinci: reuse for keystone arch
+In-Reply-To: <52CE7A9B.9000300@ti.com>
+References: <1387885284-8119-1-git-send-email-grygorii.strashko@ti.com>
+ <52CC3EDC.7070404@ti.com> <52CCCEB6.9050006@ti.com> <52CD5BD8.8090903@ti.com>
+ <52CE7A9B.9000300@ti.com>
+Message-ID: <52CEADD8.4070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 platforms support both DT and non-DT boot at the moment, make
-the clock init work according to the used setup.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/io.c |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index f28399f..b8097fe 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -488,21 +488,29 @@ void __init omap3_init_early(void)
- void __init omap3430_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_soc_init = omap3430_dt_clk_init;
- }
- 
- void __init omap35xx_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_soc_init = omap3430_dt_clk_init;
- }
- 
- void __init omap3630_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_soc_init = omap3630_dt_clk_init;
- }
- 
- void __init am35xx_init_early(void)
- {
- 	omap3_init_early();
-+	if (of_have_populated_dt())
-+		omap_clk_soc_init = am35xx_dt_clk_init;
- }
- 
- void __init ti81xx_init_early(void)
-@@ -520,7 +528,10 @@ void __init ti81xx_init_early(void)
- 	omap3xxx_clockdomains_init();
- 	omap3xxx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap_clk_soc_init = omap3xxx_clk_init;
-+	if (of_have_populated_dt())
-+		omap_clk_soc_init = ti81xx_dt_clk_init;
-+	else
-+		omap_clk_soc_init = omap3xxx_clk_init;
- }
- 
- void __init omap3_init_late(void)
--- 
-1.7.9.5
+On Thursday 09 January 2014 05:31 AM, Sekhar Nori wrote:
+> On Wednesday 08 January 2014 07:38 PM, Santosh Shilimkar wrote:
+>> On Tuesday 07 January 2014 11:06 PM, Sekhar Nori wrote:
+>>> On Tuesday 07 January 2014 11:22 PM, Santosh Shilimkar wrote:
+>>>> Sekhar,
+>>>>
+>>>> On Tuesday 24 December 2013 06:41 AM, Grygorii Strashko wrote:
+>>>>> This series is intended to update Davinci GPIO driver and reuse
+>>>>> it for Keystone SoCs, because Keystone uses the similar GPIO IP like Davinci.
+>>>>> Keystone GPIO IP: supports:
+>>>>> - up to 32 GPIO lines;
+>>>>> - only unbanked irqs;
+>>>>>
+>>>>> See Documentation:
+>>>>> Keystone - http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>>>>
+>>>>> This series based on:
+>>>>> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v3.14/gpio
+>>>>>
+>>>>> Changes in v3:
+>>>>> - fixed code, changed by mistake; fixed sparse warning 
+>>>>> Changes in v2:
+>>>>> - minor comments applied, no functional changes
+>>>>>
+>>>>> v2: https://lkml.org/lkml/2013/12/18/135
+>>>>> v1: https://lkml.org/lkml/2013/12/12/366
+>>>>>
+>>>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>>>> Cc: Alexandre Courbot <gnurou@gmail.com>
+>>>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>
+>>>>> Grygorii Strashko (2):
+>>>>>   gpio: davinci: don't create irq_domain in case of unbanked irqs
+>>>>>   gpio: davinci: reuse for Keystone SoC
+>>>>>
+>>>>>  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+>>>>>  drivers/gpio/gpio-davinci.c                        |   82 ++++++++++++++------
+>>>>>  2 files changed, 61 insertions(+), 25 deletions(-)
+>>>>>
+>>>> Have you picked up the $subject series in your queue ?
+>>>
+>>> Not yet, at least on the new compatible introduction, I need an ack from
+>>> DT folks.
+>>>
+>> I noticed that but the usual 2 weeks period to get ack is over I guess ;-)
+>> The DT part is really trivial as well but I let you decide.
+> 
+> I just realize that Rob's e-mail address bounces. I have added his
+> updated address now and hopefully he will see this to provide his ack.
+> 
+> Rob,
+> 
+> We need your ack on 2/2 of this series. If you do not have the patch, I
+> can forward it to you.
+> 
+>>
+>>> I am happy with the patches though and have tested them as well, In case
+>>> I do not get an ack from 2/2 in time, I can at least send 1/2 for
+>>> inclusion after my first gpio pull request to ARM-SoC gets pulled.
+>>>
+>> Would be great to get both of them but if not both at least 1/2.
+> 
+> I had already sent it with my first pull request. Hmph. Everything
+> except 2/2 of tis series should be in linux-next now.
+> 
+Thanks !!
