@@ -1,49 +1,65 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  9 Jan 2014 17:48:06 +0100
-Subject: [PATCH 12/18] ARM: dts: omap3-tobi: Rename to omap3-overo-tobi
+Date: Thu,  9 Jan 2014 17:48:11 +0100
+Subject: [PATCH 17/18] ARM: dts: Add support for the Overo Summit
 In-Reply-To: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1389286092-27087-13-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1389286092-27087-18-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enhance the clarity and coherence, rename omap3-tobi to omap3-overo-tobi.
+Summit is an expansion board for Gumstix Overo products.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/Makefile                                 | 2 +-
- arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi.dts} (93%)
+ arch/arm/boot/dts/Makefile               |  1 +
+ arch/arm/boot/dts/omap3-overo-summit.dts | 27 +++++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-summit.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b7af502..7b028e4 100644
+index 3f6ef70..d00f023 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -189,7 +189,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-n900.dtb \
- 	omap3-n9.dtb \
- 	omap3-n950.dtb \
--	omap3-tobi.dtb \
-+	omap3-overo-tobi.dtb \
+@@ -193,6 +193,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-overo-chestnut43.dtb \
+ 	omap3-overo-gallop43.dtb \
+ 	omap3-overo-palo43.dtb \
++	omap3-overo-summit.dtb \
+ 	omap3-overo-tobi.dtb \
  	omap3-gta04.dtb \
  	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
-diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-similarity index 93%
-rename from arch/arm/boot/dts/omap3-tobi.dts
-rename to arch/arm/boot/dts/omap3-overo-tobi.dts
-index 928d12f..5072da2 100644
---- a/arch/arm/boot/dts/omap3-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-@@ -14,7 +14,7 @@
- 
- / {
- 	model = "TI OMAP3 Gumstix Overo on Tobi";
--	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap3";
-+	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3";
- 
- 	leds {
- 		compatible = "gpio-leds";
+diff --git a/arch/arm/boot/dts/omap3-overo-summit.dts b/arch/arm/boot/dts/omap3-overo-summit.dts
+new file mode 100644
+index 0000000..fd8b47c
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-overo-summit.dts
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2014 Florian Vaussard, EPFL Mobots group
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * Summit expansion board is manufactured by Gumstix Inc.
++ */
++
++#include "omap3-overo-common.dtsi"
++
++/ {
++	model = "TI OMAP3 Gumstix Overo on Summit";
++	compatible = "gumstix,omap3-overo-summit", "gumstix,omap3-overo", "ti,omap3";
++
++	leds {
++		compatible = "gpio-leds";
++		heartbeat {
++			label = "overo:red:gpio21";
++			gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
 -- 
 1.8.1.2
