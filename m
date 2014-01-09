@@ -1,32 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Jan 2014 12:15:32 +0100
-Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
-In-Reply-To: <20140109051311.GH2132@verge.net.au>
-References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
- <20140109051311.GH2132@verge.net.au>
-Message-ID: <201401091215.33255.arnd@arndb.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 9 Jan 2014 11:59:03 +0100
+Subject: [PATCH v2 7/28] drm/i2c: tda998x: set the video mode from the
+ adjusted value
+Message-ID: <20140109115903.00517f15@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014, Simon Horman wrote:
-> On Tue, Jan 07, 2014 at 05:48:00PM +0900, Simon Horman wrote:
-> > Select the SMSC_PHY if ethernet is enabled on shmbile boards
-> > that have an SMSC phy. This allows the SMSC-specific phy driver
-> > to be used rather than relying on generic phy code.
-> > 
-> > Based on the renesas-devel-v3.13-rc7-20140107 tag
-> > of my renesas tree.
-> 
-> I have queued up these changes.
-> 
+This patch uses always the adjusted video mode instead of a mix of
+original and adjusted mode.
 
-I don't have an objection to the patches themselves, but a general
-feeling that it would be better to have larger combined patches than
-splitting them out per board.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c    | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-I'm cautious with this comment because most people seem to do the
-opposite and combine too many things into large patches, but I think
-when you have identical changeset comments and change the same Kconfig
-file in all of them, you can save yourself and the reviewers some work.
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index c29c0b1..1abf404 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -777,6 +777,8 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 	uint16_t de_pix_s, de_pix_e;
+ 	uint8_t reg, div, rep;
+ 
++	mode = adjusted_mode;
++
+ 	/*
+ 	 * Internally TDA998x is using ITU-R BT.656 style sync but
+ 	 * we get VESA style sync. TDA998x is using a reference pixel
+@@ -808,8 +810,8 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 	 * those to adjust the position of the rising VS edge by adding
+ 	 * HSKEW to ref_pix.
+ 	 */
+-	if (adjusted_mode->flags & DRM_MODE_FLAG_HSKEW)
+-		ref_pix += adjusted_mode->hskew;
++	if (mode->flags & DRM_MODE_FLAG_HSKEW)
++		ref_pix += mode->hskew;
+ 
+ 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) == 0) {
+ 		ref_line     = 1 + mode->vsync_start - mode->vdisplay;
+@@ -941,11 +943,10 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 		reg_write(priv, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(1));
+ 		reg_set(priv, REG_TX33, TX33_HDMI);
+ 
+-		tda998x_write_avi(priv, adjusted_mode);
++		tda998x_write_avi(priv, mode);
+ 
+ 		if (priv->params.audio_cfg)
+-			tda998x_configure_audio(priv, adjusted_mode,
+-						&priv->params);
++			tda998x_configure_audio(priv, mode, &priv->params);
+ 	}
+ }
+ 
 
-	Arnd
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
