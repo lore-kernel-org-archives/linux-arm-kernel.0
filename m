@@ -1,16 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Jan 2014 20:02:33 +0100
-Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
-In-Reply-To: <20140110005427.GD22965@verge.net.au>
-References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
- <201401091215.33255.arnd@arndb.de> <20140110005427.GD22965@verge.net.au>
-Message-ID: <201401102002.33684.arnd@arndb.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 10 Jan 2014 12:05:21 -0700
+Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
+ AX3-4 board
+In-Reply-To: <20140110182240.GK19878@titan.lakedaemon.net>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140110182240.GK19878@titan.lakedaemon.net>
+Message-ID: <20140110190521.GI18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 January 2014, Simon Horman wrote:
-> As I have already queued them up I'd rather not squash them at this point.
+On Fri, Jan 10, 2014 at 01:22:40PM -0500, Jason Cooper wrote:
 
-Yes, I wasn't expecting you to.
+> Do we create new compatible strings to indicate errata, or to indicate
+> 'from this version forward there are new features'?  The former would
+> indicate as Gregory has written '...-a0-i2c', the latter would warrant
+> '...-b0-i2c' and disabling offloading if we don't see '...-b0-i2c'.
 
-	Arnd
+IMHO the compatible string should represent a specific HW/SW ABI. So
+you need a unique compatible string for every variation of that ABI.
+
+We already have a compatible string defined for the ABI that B0
+presents.
+
+Jason
