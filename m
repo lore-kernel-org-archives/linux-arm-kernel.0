@@ -1,26 +1,64 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 14:51:54 +0000
-Subject: [RFC PATCH v2] staging: imx-hdmi: use rx sense status for plug
- detection if hpd is unreliable
-In-Reply-To: <1389363744-559-1-git-send-email-p.zabel@pengutronix.de>
-References: <1389363744-559-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140110145154.GD15937@n2100.arm.linux.org.uk>
+Date: Fri, 10 Jan 2014 14:54:44 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140103031055.GB28751@kroah.com>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <20140103031055.GB28751@kroah.com>
+Message-ID: <20140110145444.GE15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 03:22:24PM +0100, Philipp Zabel wrote:
-> Due to the voltage divider on the HPD line, the HDMI connector on
-> imx6q-sabrelite doesn't reliably detect connected DVI monitors.
-> This patch allows to use the RX_SENSE0 signal as a workaround when
-> enabled by a boolean device tree property 'hpd-unreliable'.
+On Thu, Jan 02, 2014 at 07:10:55PM -0800, Greg Kroah-Hartman wrote:
+> On Thu, Jan 02, 2014 at 09:27:58PM +0000, Russell King wrote:
+> > Subsystems such as ALSA, DRM and others require a single card-level
+> > device structure to represent a subsystem.  However, firmware tends to
+> > describe the individual devices and the connections between them.
+> > 
+> > Therefore, we need a way to gather up the individual component devices
+> > together, and indicate when we have all the component devices.
+> > 
+> > We do this in DT by providing a "superdevice" node which specifies
+> > the components, eg:
+> > 
+> > 	imx-drm {
+> > 		compatible = "fsl,drm";
+> > 		crtcs = <&ipu1>;
+> > 		connectors = <&hdmi>;
+> > 	};
+> > 
+> > The superdevice is declared into the component support, along with the
+> > subcomponents.  The superdevice receives callbacks to locate the
+> > subcomponents, and identify when all components are present.  At this
+> > point, we bind the superdevice, which causes the appropriate subsystem
+> > to be initialised in the conventional way.
+> > 
+> > When any of the components or superdevice are removed from the system,
+> > we unbind the superdevice, thereby taking the subsystem down.
+> 
+> This sounds a lot like the "containers" code that Rafael just submitted
+> and I acked for 3.14.  Look at the lkml post:
+> 	Subject: [PATCH 2/2] ACPI / hotplug / driver core: Handle containers in a special way
+> 	Message-ID: <1991202.gilW172FBV@vostro.rjw.lan>
+> 
+> And see if that could possibly be used instead?
 
-Yay, much nicer, easier to read, and smaller, thanks.  I'll add it to the
-series.
+Greg,
 
-I don't think we've had David Airlie's eyes on the series yet (but then
-I think he's rather Rob Clark looked at non-x86 DRM stuff).  Also I've
-yet to hear back from Greg wrt the component stuff, so I suspect this
-series won't be making this merge window.
+Not sure if you saw the outcome to your comment above.  My conclusion
+was:
+
+"Yes, I'm coming to that conclusion as well.  It looks like your "containers"
+aren't about collecting up several individual component devices into one
+super-device and probing the appropriate subsystem when all components are
+known.
+
+"Confused why Greg is pointing me at your patches."
+
+Does this mean you're happy with the patch?
+
+Thanks.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
