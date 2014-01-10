@@ -1,73 +1,41 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Thu, 9 Jan 2014 17:32:13 -0800
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <20140107183148.GD4227@obsidianresearch.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <201401031049.20932.arnd@arndb.de>
- <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
- <201401071635.02006.arnd@arndb.de>
- <20140107183148.GD4227@obsidianresearch.com>
-Message-ID: <CACoXjc=G1d7hEPUy_cC7bN63akJdKcQfpUQgEC+JcUdL-=0XBg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 10 Jan 2014 12:55:29 +1100
+Subject: linux-next: manual merge of the sh tree with the tree
+In-Reply-To: <20140110004724.GA22965@verge.net.au>
+References: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
+ <CAOesGMgJe9KR2muA4F9EaXYpDFDLxVZsKOj-8qZFbDZTiRBuww@mail.gmail.com>
+ <20140110004724.GA22965@verge.net.au>
+Message-ID: <20140110125529.9843f450bf79223164031b02@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 10:31 AM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Tue, Jan 07, 2014 at 04:35:01PM +0100, Arnd Bergmann wrote:
->
->> > >> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
->> > >
->> > > config space is not normally in the ranges property, and I think you will need
->> > > it in the pcie node itself as a 'reg' property so the code can access it.
->> >
->> > pcie-designware.c does it that way. I just followed their implementation.
->>
->> I don't remember what led to that, it still seems wrong and I can't
->> find anything in the PCI binding for host bridges telling their
->> config space this way.
->
-> When we discussed the mvebu PCI driver (which is, so far, the most
-> throughly discussed PCI binding) it was concluded that the config
-> space ranges like the above was OK only if it exactly described the
-> standard ECAM layout.
->
-> Idea being that standard/core code should be able to see that ranges,
-> map the range and issue config accesses via the ECAM rules.
+Hi all,
 
-Ok. Thanks.
+On Fri, 10 Jan 2014 09:47:24 +0900 Simon Horman <horms@verge.net.au> wrote:
+>
+> On Wed, Jan 08, 2014 at 11:11:03PM -0800, Olof Johansson wrote:
+> >
+> > The request to merge the sh code came through Simon with claimed
+> > agreement from SH maintainers to do so -- I didn't verify this since
+> > they have in the past been well-coordinated. Simon?
+> 
+> I spoke with Paul recently and my understanding is that
+> he hasn't been actively working in this area for over a year now.
+> 
+> I guess there are some stale patches in his tree.
 
->
->> > >> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
->> > >> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
->> > >
->> > > Only one IRQ for all devices?
->> >
->> > The node represents a port. I believe that Linux framework uses only
->> > one of the legacy IRQs per port. Rest all remain unused. Hence I
->> > removed them. Please correct me if I am wrong.
->>
->> Any PCI device can normally have four interrupts (IntA through
->> IntD), which are traditionally separate pins on a PCI bus, but get
->> emulated on PCIe. While it's not common for any normal device to use
->> more than one IRQ, a bridge device will swizzle these (virtual) IRQ
->> lines, so a device behind the bridge actually gets a different host
->> IRQ.
->
-> Agree, the binding should handle all four INTA,B,C,D assertions
-> delivered to the port.
->
-> If HW is able to decode the 4 ints into seperate Linux interrupt
-> numbers then that should be described. If HW routes them all to a
-> single number then interrupt-map-mask should be all 0.
->
-> Arnd's point about swizzling effects the layout of the
-> interrupt-map. When it is placed at the pcie-controller node level the
-> map will incorporate one swizzle of the on-the-wire INTx messages. If
-> the HW doesn't swizzle the INTx as the TLP passes through the bridge
-> then it probably makes more sense to put the interrupt-map in the DT
-> node of the bridge like mvebu does.
->
+That is certainly what it looks like.  So, do I remove the sh{,.-current)
+trees (git://github.com/pmundt/linux-sh.git#sh-{latest,fixes-for-linus})
+from linux-next permanently?  Will it be cleaned up any time soon?
 
-Ok.
-
-> Jason
+Is anyone maintaining/supporting sh now?  Is it a candidate for pruning?
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/16f407ca/attachment.sig>
