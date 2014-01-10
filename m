@@ -1,40 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 10 Jan 2014 08:04:25 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.13
-In-Reply-To: <CA+55aFx-+qP=8cz4xrwjde1sknObwjan3CUvg-n1StNMpr0Fcg@mail.gmail.com>
-References: <20140109085251.GA30534@quad.lixom.net>
- <CA+55aFx-+qP=8cz4xrwjde1sknObwjan3CUvg-n1StNMpr0Fcg@mail.gmail.com>
-Message-ID: <CAOesGMjSD1Ud3gFDoYSfTcCh5wK_xgd3zRKXn+DK2LJ=u4G3FQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Jan 2014 16:04:15 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140110153530.GA770@kroah.com>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <20140103031055.GB28751@kroah.com>
+ <20140110145444.GE15937@n2100.arm.linux.org.uk>
+ <20140110150702.GA22533@kroah.com>
+ <20140110151123.GG15937@n2100.arm.linux.org.uk>
+ <20140110153530.GA770@kroah.com>
+Message-ID: <20140110160415.GH15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 12:56 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, Jan 9, 2014 at 4:52 PM, Olof Johansson <olof@lixom.net> wrote:
->>
->> ARM: SoC fixes for 3.13-rc
->>
->> Hopefully the last set of arm-soc fixes for 3.13, or at least only a
->> few stray patches after this.
->>
->> There are a few fixes for Renesas platforms to fixup DMA masks (this
->> started causing errors once the DMA API added checks for valid masks in
->> 3.13). Two more dealing with resources for MMC and PWM setup.
->>
->> There's also a few TI/OMAP/DRA fixes for smaller stuff and a fix for
->> compilation failures on a PXA platform.
->
-> Hmm. Most of that was all in your _previous_ pull request. When I pull
-> this time, I just get the few fixes for  Renesas DMA masks.
+On Fri, Jan 10, 2014 at 07:35:30AM -0800, Greg Kroah-Hartman wrote:
+> On Fri, Jan 10, 2014 at 03:11:23PM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Jan 10, 2014 at 07:07:02AM -0800, Greg Kroah-Hartman wrote:
+> > > On Fri, Jan 10, 2014 at 02:54:44PM +0000, Russell King - ARM Linux wrote:
+> > > > Greg,
+> > > > 
+> > > > Not sure if you saw the outcome to your comment above.  My conclusion
+> > > > was:
+> > > > 
+> > > > "Yes, I'm coming to that conclusion as well.  It looks like your "containers"
+> > > > aren't about collecting up several individual component devices into one
+> > > > super-device and probing the appropriate subsystem when all components are
+> > > > known.
+> > > > 
+> > > > "Confused why Greg is pointing me at your patches."
+> > > 
+> > > Ah, sorry, I missed that in my "catch up on 2 weeks of email" flood.
+> > > 
+> > > > Does this mean you're happy with the patch?
+> > > 
+> > > Well, I will not object to it on the grounds of it being a duplicate of
+> > > Rafael's work now :)
+> > > 
+> > > I'll be glad to consider it on its own, when you feel the series is
+> > > ready to be submitted.
+> > 
+> > I'll sort out a new set of patches today, along with a branch to pull if
+> > you wish to take them that way.
+> 
+> It's too late for 3.14, as my tree is now closed for that because 3.13
+> should be out this weekend.  But I'll be glad to queue them up after
+> 3.14-rc1 is out.
 
-I had a stale remote for your tree when I generated the pull request,
-and I had forgotten that I sent most of it already so I didn't notice.
+That's rather annoying... I'll not put effort into this for a few months
+then.
 
-> I pulled that and edited up the resulting merge message, but you
-> should double-check that I now have what you expected. Because your
-> pull request seems a bit confused about what's been going on..
-
-Yeah, looks good. Apologies for the confusion.
-
-
--Olof
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
