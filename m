@@ -1,78 +1,160 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 11 Jan 2014 00:04:34 +0100
-Subject: [PATCH v5 4/4] i2c: mv64xxx: Document the newly introduced Armada
- XP A0 compatible
-In-Reply-To: <20140110215526.GB19878@titan.lakedaemon.net>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-5-git-send-email-gregory.clement@free-electrons.com>
- <20140110215526.GB19878@titan.lakedaemon.net>
-Message-ID: <52D07C82.2010106@free-electrons.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 11 Jan 2014 00:20:33 +0100
+Subject: [PATCH v6 3/6] ACPI: HW reduced mode does not allow use of the
+ FADT sci_interrupt field
+In-Reply-To: <1389394340-2680-4-git-send-email-al.stone@linaro.org>
+References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
+ <1389394340-2680-4-git-send-email-al.stone@linaro.org>
+Message-ID: <13769273.zu9PcWNH5N@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2014 22:55, Jason Cooper wrote:
-> Gregory,
+On Friday, January 10, 2014 03:52:17 PM al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>
 > 
-> On Wed, Jan 08, 2014 at 04:06:29PM +0100, Gregory CLEMENT wrote:
->> The first variants of Armada XP SoCs (A0 stepping) have issues related
->> to the i2c controller which prevent to use the offload mechanism and
->> ead to a kernel hang during boot.
+> In HW reduced mode, the use of the SCI interrupt is not allowed.  In
+> all those places that use the FADT sci_interrupt field, make sure we
+> do not execute that path when in HW reduced mode.
 > 
-> I'll fixup s/ead/lead/ here.
+> In the case of acpi_os_install_interrupt_handler() in osl.c, this allows
+> us to open up the routine to installing interrupt handlers other than
+> acpi_gbl_FADT.sci_interrupt regardless of whether we are in ACPI legacy
+> mode or reduced HW mode; acpi_os_remove_interrupt_handler() changes to
+> maintain symmetry.
 > 
->>
->> The commit introduces a new the compatible string
->> marvell,mv78230-a0-i2c for the i2c controller.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> cc: devicetree at vger.kernel.org
->> ---
->>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> index 82e8f6f17179..9410ed72ec45 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
->> @@ -5,7 +5,7 @@ Required properties :
->>  
->>   - reg             : Offset and length of the register set for the device
->>   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
->> -                     or "marvell,mv78230-i2c"
->> +                     or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  drivers/acpi/bus.c      | 30 ++++++++++++++++--------------
+>  drivers/acpi/osl.c      | 18 +++++++-----------
+>  drivers/acpi/pci_link.c |  2 ++
+>  3 files changed, 25 insertions(+), 25 deletions(-)
 > 
-> If it's ok with you Gregory, I'll amend this hunk as follows:
-> 
-> 			or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
-> 			Only use "marvell,mv78230-a0-i2c" for a very
-> 			rare, initial version of the SoC which had
-> 			broken offload support.  Linux auto-detects this
-> 			and sets it appropriately.
-> 
-Hi Jason,
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index 0710004..d871859 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -552,21 +552,23 @@ void __init acpi_early_init(void)
+>  	}
+>  
+>  #ifdef CONFIG_X86
+> -	if (!acpi_ioapic) {
+> -		/* compatible (0) means level (3) */
+> -		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
+> -			acpi_sci_flags &= ~ACPI_MADT_TRIGGER_MASK;
+> -			acpi_sci_flags |= ACPI_MADT_TRIGGER_LEVEL;
 
-I agree with your changes
+I wonder why exactly you want to make this change.  It surely doesn't matter
+for ARM and do you have any HW-reduced x86 hardware to test it?
 
-Thanks,
+> +	if (!acpi_gbl_reduced_hardware) {
+> +		if (!acpi_ioapic) {
+> +			/* compatible (0) means level (3) */
+> +			if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
+> +				acpi_sci_flags &= ~ACPI_MADT_TRIGGER_MASK;
+> +				acpi_sci_flags |= ACPI_MADT_TRIGGER_LEVEL;
+> +			}
+> +			/* Set PIC-mode SCI trigger type */
+> +			acpi_pic_sci_set_trigger(acpi_gbl_FADT.sci_interrupt,
+> +				(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK) >> 2);
+> +		} else {
+> +			/*
+> +			 * now that acpi_gbl_FADT is initialized,
+> +			 * update it with result from INT_SRC_OVR parsing
+> +			 */
+> +			acpi_gbl_FADT.sci_interrupt = acpi_sci_override_gsi;
+>  		}
+> -		/* Set PIC-mode SCI trigger type */
+> -		acpi_pic_sci_set_trigger(acpi_gbl_FADT.sci_interrupt,
+> -					 (acpi_sci_flags & ACPI_MADT_TRIGGER_MASK) >> 2);
+> -	} else {
+> -		/*
+> -		 * now that acpi_gbl_FADT is initialized,
+> -		 * update it with result from INT_SRC_OVR parsing
+> -		 */
+> -		acpi_gbl_FADT.sci_interrupt = acpi_sci_override_gsi;
+>  	}
+>  #endif
+>  
+> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+> index 44c07eb..c946a3a 100644
+> --- a/drivers/acpi/osl.c
+> +++ b/drivers/acpi/osl.c
+> @@ -84,6 +84,7 @@ static int (*__acpi_os_prepare_extended_sleep)(u8 sleep_state, u32 val_a,
+>  
+>  static acpi_osd_handler acpi_irq_handler;
+>  static void *acpi_irq_context;
+> +static u32 acpi_irq_number;
+>  static struct workqueue_struct *kacpid_wq;
+>  static struct workqueue_struct *kacpi_notify_wq;
+>  static struct workqueue_struct *kacpi_hotplug_wq;
+> @@ -178,6 +179,10 @@ static void __init acpi_request_region (struct acpi_generic_address *gas,
+>  
+>  static int __init acpi_reserve_resources(void)
+>  {
+> +	/* Handle hardware reduced mode: i.e., do nothing. */
+> +	if (acpi_gbl_reduced_hardware)
+> +		return 0;
 
-Gregory
+Does it actually break things if we do that?
 
-> 
->>   - interrupts      : The interrupt number
->>  
->>  Optional properties :
->> -- 
->> 1.8.1.2
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +
+>  	acpi_request_region(&acpi_gbl_FADT.xpm1a_event_block, acpi_gbl_FADT.pm1_event_length,
+>  		"ACPI PM1a_EVT_BLK");
+>  
+> @@ -795,13 +800,6 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
+>  
+>  	acpi_irq_stats_init();
+>  
+> -	/*
+> -	 * ACPI interrupts different from the SCI in our copy of the FADT are
+> -	 * not supported.
+> -	 */
+> -	if (gsi != acpi_gbl_FADT.sci_interrupt)
+> -		return AE_BAD_PARAMETER;
+> -
+>  	if (acpi_irq_handler)
+>  		return AE_ALREADY_ACQUIRED;
+>  
+> @@ -818,15 +816,13 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
+>  		acpi_irq_handler = NULL;
+>  		return AE_NOT_ACQUIRED;
+>  	}
+> +	acpi_irq_number = irq;
+>  
+>  	return AE_OK;
+>  }
+>  
+>  acpi_status acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
+>  {
+> -	if (irq != acpi_gbl_FADT.sci_interrupt)
+> -		return AE_BAD_PARAMETER;
+> -
+>  	free_irq(irq, acpi_irq);
+>  	acpi_irq_handler = NULL;
+>  
+> @@ -1806,7 +1802,7 @@ acpi_status __init acpi_os_initialize1(void)
+>  acpi_status acpi_os_terminate(void)
+>  {
+>  	if (acpi_irq_handler) {
+> -		acpi_os_remove_interrupt_handler(acpi_gbl_FADT.sci_interrupt,
+> +		acpi_os_remove_interrupt_handler(acpi_irq_number,
+>  						 acpi_irq_handler);
+>  	}
+>  
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index 2652a61..d5c155e 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -505,6 +505,8 @@ int __init acpi_irq_penalty_init(void)
+>  		}
+>  	}
+>  	/* Add a penalty for the SCI */
+> +	if (acpi_gbl_reduced_hardware)
+> +		return 0;
+>  	acpi_irq_penalty[acpi_gbl_FADT.sci_interrupt] += PIRQ_PENALTY_PCI_USING;
+>  	return 0;
+>  }
 
+Is ARM really going to use the code in pci_link.c?  If so, then how exactly?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Rafael
