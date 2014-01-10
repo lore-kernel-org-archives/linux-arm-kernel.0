@@ -1,77 +1,101 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 10 Jan 2014 15:00:02 +0800
-Subject: [PATCH v2 01/16] reset: add non CONFIG_RESET_CONTROLLER routines
+Date: Fri, 10 Jan 2014 15:00:03 +0800
+Subject: [PATCH v2 02/16] net: stmmac: Enable stmmac main clock when probing
+ hardware
 In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
 References: <1389337217-29032-1-git-send-email-wens@csie.org>
-Message-ID: <1389337217-29032-2-git-send-email-wens@csie.org>
+Message-ID: <1389337217-29032-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers are shared between platforms that may or may not
-have RESET_CONTROLLER selected for them. Add dummy functions
-when RESET_CONTROLLER is not selected, thereby eliminating the
-need for drivers to enclose reset_control_*() calls within
-#ifdef CONFIG_RESET_CONTROLLER, #endif
+Guiseppe previously stated that the "stmmaceth" clock is the main clock
+that drives the IP. The stmmac driver does not enable this clock during
+the probe phase. If the clock was not enabled by the boot loader or
+disabled by the kernel, hardware features and the MDIO bus would not be
+probed properly.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- include/linux/reset.h | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 26 +++++++++++------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index 6082247..38aa616 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -4,6 +4,8 @@
- struct device;
- struct reset_control;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 8a7a23a..786b51c 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -1604,8 +1604,6 @@ static int stmmac_open(struct net_device *dev)
+ 	struct stmmac_priv *priv = netdev_priv(dev);
+ 	int ret;
  
-+#ifdef CONFIG_RESET_CONTROLLER
-+
- int reset_control_reset(struct reset_control *rstc);
- int reset_control_assert(struct reset_control *rstc);
- int reset_control_deassert(struct reset_control *rstc);
-@@ -14,4 +16,41 @@ struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
+-	clk_prepare_enable(priv->stmmac_clk);
+-
+ 	stmmac_check_ether_addr(priv);
  
- int device_reset(struct device *dev);
- 
-+#else /* !CONFIG_RESET_CONTROLLER */
-+
-+static inline int reset_control_reset(struct reset_control *rstc)
-+{
-+	return 0;
-+}
-+
-+static inline int reset_control_assert(struct reset_control *rstc)
-+{
-+	return 0;
-+}
-+
-+static inline int reset_control_deassert(struct reset_control *rstc)
-+{
-+	return 0;
-+}
-+
-+static inline struct reset_control *reset_control_get(struct device *dev,
-+		const char *id)
-+{
-+	return NULL;
-+}
-+static inline void reset_control_put(struct reset_control *rstc) {}
-+
-+static inline struct reset_control *devm_reset_control_get(struct device *dev,
-+		const char *id)
-+{
-+	return NULL;
-+}
-+
-+static inline int device_reset(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+#endif
-+
+ 	if (priv->pcs != STMMAC_PCS_RGMII && priv->pcs != STMMAC_PCS_TBI &&
+@@ -1796,7 +1794,6 @@ static int stmmac_release(struct net_device *dev)
+ #ifdef CONFIG_STMMAC_DEBUG_FS
+ 	stmmac_exit_fs();
  #endif
+-	clk_disable_unprepare(priv->stmmac_clk);
+ 
+ 	stmmac_release_ptp(priv);
+ 
+@@ -2682,10 +2679,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	if ((phyaddr >= 0) && (phyaddr <= 31))
+ 		priv->plat->phy_addr = phyaddr;
+ 
++	priv->stmmac_clk = devm_clk_get(priv->device, STMMAC_RESOURCE_NAME);
++	if (IS_ERR(priv->stmmac_clk)) {
++		dev_warn(priv->device, "%s: warning: cannot get CSR clock\n",
++			 __func__);
++		goto error_clk_get;
++	}
++	clk_prepare_enable(priv->stmmac_clk);
++
+ 	/* Init MAC and get the capabilities */
+ 	ret = stmmac_hw_init(priv);
+ 	if (ret)
+-		goto error_free_netdev;
++		goto error_hw_init;
+ 
+ 	ndev->netdev_ops = &stmmac_netdev_ops;
+ 
+@@ -2723,12 +2728,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 		goto error_netdev_register;
+ 	}
+ 
+-	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
+-	if (IS_ERR(priv->stmmac_clk)) {
+-		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
+-		goto error_clk_get;
+-	}
+-
+ 	/* If a specific clk_csr value is passed from the platform
+ 	 * this means that the CSR Clock Range selection cannot be
+ 	 * changed at run-time and it is fixed. Viceversa the driver'll try to
+@@ -2756,12 +2755,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	return priv;
+ 
+ error_mdio_register:
+-	clk_put(priv->stmmac_clk);
+-error_clk_get:
+ 	unregister_netdev(ndev);
+ error_netdev_register:
+ 	netif_napi_del(&priv->napi);
+-error_free_netdev:
++error_hw_init:
++	clk_disable_unprepare(priv->stmmac_clk);
++error_clk_get:
+ 	free_netdev(ndev);
+ 
+ 	return NULL;
+@@ -2788,6 +2787,7 @@ int stmmac_dvr_remove(struct net_device *ndev)
+ 		stmmac_mdio_unregister(ndev);
+ 	netif_carrier_off(ndev);
+ 	unregister_netdev(ndev);
++	clk_disable_unprepare(priv->stmmac_clk);
+ 	free_netdev(ndev);
+ 
+ 	return 0;
 -- 
 1.8.5.2
