@@ -1,38 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 Jan 2014 12:40:14 +0000
-Subject: [PATCH v2 1/2] spi:fsl-dspi:add support of DSPI IP in big endian
-In-Reply-To: <e9c8019df2cf4d76ae2b77c5d1420050@BL2PR03MB163.namprd03.prod.outlook.com>
-References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
- <20140109175208.GK12858@sirena.org.uk>
- <e9c8019df2cf4d76ae2b77c5d1420050@BL2PR03MB163.namprd03.prod.outlook.com>
-Message-ID: <20140110124014.GI29039@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Jan 2014 12:46:53 +0000
+Subject: [PATCHv5][ 1/5] fbdev: Add the lacking FB_SYNC_* for matching
+ the DISPLAY_FLAGS_*
+In-Reply-To: <52CFE994.8070701@ti.com>
+References: <1383915693-9422-1-git-send-email-denis@eukrea.com>
+ <52CFE994.8070701@ti.com>
+Message-ID: <20140110124653.GA15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 08:11:33AM +0000, Chao Fu wrote:
-
-> [Chao Fu] Our CPUs are working on only ARM architecture. But DSPI have two endianness 
-> In different series CPU, so we use __raw_read that do not take of endianness.
-> We need observe ARM io methods  make sure avoid instructions executing reorder .
-> ARM IO methods :
-> #define readb(c)                ({ u8  __v = readb_relaxed(c); __iormb(); __v; })
-> #define readw(c)                ({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-> #define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+On Fri, Jan 10, 2014 at 02:37:40PM +0200, Tomi Valkeinen wrote:
+> I don't think this is better than the previous version where
+> FB_SYNC_DE_HIGH_ACT and FB_SYNC_PIXDAT_HIGH_ACT were in
+> include/uapi/linux/fb.h. Now those flag defines are not visible to the
+> userspace, but the actual flags are still visible from the var->sync field.
 > 
-> #define writeb(v,c)             ({ __iowmb(); writeb_relaxed(v,c); })
-> #define writew(v,c)             ({ __iowmb(); writew_relaxed(v,c); })
-> #define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
+> It's true what Russell replied to the previous version, that the
+> userspace has no idea how to handle those new flags. But then again, for
+> LCDs, the userspace has no idea how to handle, say, hsync polarity either.
 > 
-> So add barrier here. Could you give some suggestions? Many thanks!
+> In any case, splitting the FB_SYNC_ defines into uapi and
+> kernel-internal header files, but still giving the kernel-internal
+> values to userspace is surely wrong.
 
-OK that makes sense, please add comments explaining that this is due to
-the endinaness translation.  Given that people are starting to use big
-endian more it might be sensible to have these factored out into generic
-code but that can wait.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/7d8b491e/attachment.sig>
+The difference between the sync states and these other flags is that
+the sync states are part of the mode definition - as per the CEA-861
+documentation.
+
+However, that does not extend to LCD panels, which generally need to
+have one set of timings, with the various control signals at certain
+polarities - and those control signal polarities are a property of
+the panel itself, not of the displayed mode.  So, if you know that
+you have LCD panel X, and it needs control signals with a certain
+polarity, that is how you configure the hardware _irrespective_ of
+what userspace says that the sync states should be.
+
+The sync states specified by userspace should of course be used for
+the sync pulses being sent to a VGA display or HDMI sink.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
