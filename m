@@ -1,66 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 10 Jan 2014 12:45:00 +0530
-Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-In-Reply-To: <20140109163305.GC28655@norris-Latitude-E6410>
-References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com> <52BC1BB8.2070007@ti.com>
- <52CE7C44.1000803@ti.com> <20140109163305.GC28655@norris-Latitude-E6410>
-Message-ID: <52CF9DF4.8000607@ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 10 Jan 2014 08:38:25 +0100
+Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
+In-Reply-To: <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
+References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>	<1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
+ <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
+Message-ID: <52CFA371.8090103@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014 10:03 PM, Brian Norris wrote:
-> On Thu, Jan 09, 2014 at 04:09:00PM +0530, Sekhar Nori wrote:
->> On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
->>> On 12/18/2013 02:13 PM, Sekhar Nori wrote:
->>>> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
->>>>> Hi, Sekhar
->>>>>
->>>>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
->>>>> series.
->>>>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
->>>>> and can be found at http://git.infradead.org/l2-mtd.git
->>>>>
->>>>> This patch can be still applied on top of the series without conflicts.
->>>>>
->>>>> Can you please pick up the $subject patch if you are OK with it?
->>>>
->>>> I have no problems with the patch and can pick it too, but need ack from
->>>> MTD maintainer (David) as it touches drivers/mtd/ too.
->>>>
->>>> David,
->>>>
->>>> If you do not have the patch, we can resend it.
->>>>
->>>> Thanks,
->>>> Sekhar
->>>>
->>>
->>> Hi Brian,
->>>
->>> Do you agree if this patch will go through Davinci tree?
->>>
->>> This is the last one we need to reuse Davinci Nand driver for Keystone.
+Hello Javier,
+
+On 01/09/2014 09:43 PM, Javier Martinez Canillas wrote:
+> [adding Enric Balletbo to cc]
+> 
+> Hello Florian,
+> 
+> On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
+> <florian.vaussard@epfl.ch> wrote:
+>> MMC2 is used by the on-board WiFi module populated on some boards
+>> (based on Marvell Libertas 8688 SDIO).
 >>
->> Since we never got an ack from MTD folks, I am going and go ahead and
->> try pushing this through ARM-SoC regardless. I will CC the MTD
->> maintainers on the pull request so any objections could even be posted
->> there.
+>> Note: currently WiFi only works on cold boot, as the module is not
+>> properly reset (missing binding for the GPIO reset).
+>>
 > 
-> Sorry, I've been a little busy / out for vacation. The MTD parts look OK
-> to me. Feel free to take it in your tree.
+> Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
+> for LBEE1USJYC WiFi connected to SDIO") ?
 > 
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
+> If I remember correctly the LBEE1USJYC Wifi/BT combo module is
+> basically a Marvell Libertas 8688 Wlan and Enric got soft reset
+> working too by adding a GPIO property to the regulator for the reset
+> GPIO.
+> 
 
-Actually the NAND portion conflicts with some of the changes from Ivan
-you took recently. I think it will be better if you take this patch too
-with my ack. For me to take it through ARM-SoC, I need an immutable
-branch from you - with commits same as what you will eventually be
-sending to Linus, based on which I can send a pull request.
+Many thanks for the pointer. In the initial version, I had a regulator
+like you. But now I doubt if it was correctly added to the MMC node,
+which could be why it was not working... I will try again.
 
-In any case, there is a v4 needed to fix a build and checkpatch error I
-just noticed. I will send it out soon.
+Thanks for your help!
 
-Thanks,
-Sekhar
+Florian
