@@ -1,26 +1,41 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 10 Jan 2014 12:05:21 -0700
-Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
- AX3-4 board
-In-Reply-To: <20140110182240.GK19878@titan.lakedaemon.net>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
- <20140110182240.GK19878@titan.lakedaemon.net>
-Message-ID: <20140110190521.GI18269@obsidianresearch.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 10 Jan 2014 13:07:52 -0600
+Subject: [PATCH v2 0/2] Add Qualcomm BAM dmaengine driver
+Message-ID: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 01:22:40PM -0500, Jason Cooper wrote:
+This patch set introduces the dmaengine driver for the Qualcomm Bus Access
+Manager (BAM) DMA controller present on MSM 8x74 devices.  A number of the
+on-chip devices have their own BAM DMA controller and use it to move data
+between system memory and peripherals or between two peripherals.
 
-> Do we create new compatible strings to indicate errata, or to indicate
-> 'from this version forward there are new features'?  The former would
-> indicate as Gregory has written '...-a0-i2c', the latter would warrant
-> '...-b0-i2c' and disabling offloading if we don't see '...-b0-i2c'.
+The initial version of this driver will only support slave DMA operations
+between system memory and peripherals.
 
-IMHO the compatible string should represent a specific HW/SW ABI. So
-you need a unique compatible string for every variation of that ABI.
+Changes from v1:
+        - Converted driver to use virt-dma
+        - Reworked probe function per review comments
+        - tx_status function now computes and returns residuals
+        - Removed proprietary slave config.  Removed associated include file.
+        - Renamed files to reflect vendor name instead of specific device
+	- Converted to use (readl|writel)_relaxed w/ appropriate barriers
+	- Removed unions in favor of standard types.
 
-We already have a compatible string defined for the ABI that B0
-presents.
+Andy Gross (2):
+  dmaengine: add Qualcomm BAM dma driver
+  dmaengine: qcom_bam_dma: Add device tree binding
 
-Jason
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |  52 ++
+ drivers/dma/Kconfig                                |   9 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/qcom_bam_dma.c                         | 843 +++++++++++++++++++++
+ drivers/dma/qcom_bam_dma.h                         | 268 +++++++
+ 5 files changed, 1173 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+ create mode 100644 drivers/dma/qcom_bam_dma.c
+ create mode 100644 drivers/dma/qcom_bam_dma.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
