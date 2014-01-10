@@ -1,178 +1,196 @@
 From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 10 Jan 2014 13:03:57 +0100
-Subject: [PATCH 1/6] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
+Date: Fri, 10 Jan 2014 13:04:07 +0100
+Subject: [PATCH 2/6] clk: samsung: add infrastructure to register CPU
+ clocks
+In-Reply-To: <1389283165-17708-3-git-send-email-thomas.ab@samsung.com>
 References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140110130357.0f3014f1@amdc2363>
+ <1389283165-17708-3-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20140110130407.3390213d@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
 
-> On some platforms such as the Samsung Exynos, changing the frequency
-> of the CPU clock requires changing the frequency of the PLL that is
-> supplying the CPU clock. To change the frequency of the PLL, the CPU
-> clock is temporarily reparented to another parent clock.
-
-Please look into my comments about reparenting at PATCH 3/6.
-
+> The CPU clock provider supplies the clock to the CPU clock domain. The
+> composition and organization of the CPU clock provider could vary
+> among Exynos SoCs. A CPU clock provider can be composed of clock mux,
+> dividers and gates. This patch defines a new clock type for CPU clock
+> provider and adds infrastructure to register the CPU clock providers
+> for Samsung platforms.
 > 
-> The clock frequency of this temporary parent clock could be much
-> higher than the clock frequency of the PLL at the time of
-> reparenting. Due to the temporary increase in the CPU clock speed,
-> the CPU (and any other components in the CPU clock domain such as
-> dividers, mux, etc.) have to to be operated at a higher voltage
-> level, called the safe voltage level. This patch adds optional
-> support to temporarily switch to a safe voltage level during CPU
-> frequency transitions.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
 > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 > ---
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    5 ++
->  drivers/cpufreq/cpufreq-cpu0.c                     |   49
-> +++++++++++++++++++- 2 files changed, 52 insertions(+), 2 deletions(-)
+>  drivers/clk/samsung/clk.c |   71
+> +++++++++++++++++++++++++++++++++++++++++++++
+> drivers/clk/samsung/clk.h |   37 +++++++++++++++++++++++- 2 files
+> changed, 107 insertions(+), 1 deletions(-)
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt index
-> f055515..020d859 100644 ---
-> a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt +++
-> b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt @@ -19,6
-> +19,10 @@ Optional properties:
->  - cooling-min-level:
->  - cooling-max-level:
->       Please refer to
-> Documentation/devicetree/bindings/thermal/thermal.txt. +-
-> safe-opp-index: Certain platforms require that during a opp
-> transition,
-> +  a system should not go below a particular opp level. For such
-> systems,
-> +  this property specifies the minimum opp to be maintained during the
-> +  opp transitions.
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index f503f32..9ac9056 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -316,3 +316,74 @@ unsigned long _get_rate(const char *clk_name)
 >  
->  Examples:
->  
-> @@ -36,6 +40,7 @@ cpus {
->  			396000  950000
->  			198000  850000
->  		>;
-> +		safe-opp-index = <1>;
->  		clock-latency = <61036>; /* two CLK32 periods */
->  		#cooling-cells = <2>;
->  		cooling-min-level = <0>;
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c
-> b/drivers/cpufreq/cpufreq-cpu0.c index 0c12ffc..dda4b7b 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -27,6 +27,8 @@
->  
->  static unsigned int transition_latency;
->  static unsigned int voltage_tolerance; /* in percentage */
-> +static unsigned long safe_frequency;
-> +static unsigned long safe_voltage;
->  
->  static struct device *cpu_dev;
->  static struct clk *cpu_clk;
-> @@ -69,12 +71,26 @@ static int cpu0_set_target(struct cpufreq_policy
-> *policy, unsigned int index) new_freq / 1000, volt ? volt / 1000 :
-> -1); 
->  	/* scaling up?  scale voltage before frequency */
-> -	if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
-> +	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> +				new_freq >= safe_frequency) {
->  		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
->  		if (ret) {
->  			pr_err("failed to scale voltage up: %d\n",
-> ret); return ret;
->  		}
-> +	} else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
-> +		/*
-> +		 * the scaled up voltage level for the new_freq is
-> lower
-> +		 * than the safe voltage level. so set safe_voltage
-> +		 * as the intermediate voltage level and revert it
-> +		 * back after the frequency has been changed.
-> +		 */
-> +		ret = regulator_set_voltage(cpu_reg, safe_voltage,
-> +						safe_voltage);
-> +		if (ret) {
-> +			pr_err("failed to set safe voltage: %d\n",
-> ret);
-> +			return ret;
-> +		}
->  	}
->  
->  	ret = clk_set_rate(cpu_clk, freq_exact);
-> @@ -94,6 +110,19 @@ static int cpu0_set_target(struct cpufreq_policy
-> *policy, unsigned int index) }
->  	}
->  
-> +	/*
-> +	 * if safe voltage was applied during voltage scale up, then
-> set
-> +	 * the correct target voltage now.
-> +	 */
-> +	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> +					new_freq < safe_frequency) {
-> +		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
-> +		if (ret) {
-> +			pr_err("failed to scale voltage up: %d\n",
-> ret);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	return ret;
+>  	return clk_get_rate(clk);
 >  }
->  
-> @@ -116,7 +145,9 @@ static struct cpufreq_driver cpu0_cpufreq_driver
-> = { 
->  static int cpu0_cpufreq_probe(struct platform_device *pdev)
->  {
-> +	struct dev_pm_opp *opp;
->  	struct device_node *np;
-> +	unsigned int safe_opp_index;
->  	int ret;
->  
->  	cpu_dev = get_cpu_device(0);
-> @@ -165,13 +196,27 @@ static int cpu0_cpufreq_probe(struct
-> platform_device *pdev) goto out_put_node;
->  	}
->  
-> +	if (!of_property_read_u32(np, "safe-opp-index",
-> &safe_opp_index)) {
-> +		rcu_read_lock();
-> +		opp = dev_pm_opp_find_freq_exact(cpu_dev,
-> +			freq_table[safe_opp_index].frequency * 1000,
-> true);
-> +		if (IS_ERR(opp)) {
-> +			rcu_read_unlock();
-> +			pr_err("safe opp index %d is invalid\n",
 > +
-> safe_opp_index);
-> +			goto out_free_table;
-> +		}
-> +		safe_voltage = dev_pm_opp_get_voltage(opp);
-> +		safe_frequency =
-> freq_table[safe_opp_index].frequency;
-> +		rcu_read_unlock();
+> +/*
+> + * On most platform, the core clock rate is equal to the clock rate
+> of
+> + * parent pll. This is a simple helper function to support
+> recalc_rate
+> + * callback for such platforms.
+> + */
+> +unsigned long samsung_core_clock_recalc_rate(struct clk_hw *hw,
+> +				unsigned long parent_rate)
+> +{
+> +	/*
+> +	 * Assuming that the output of the parent pll is the output
+> clock
+> +	 * frequency of the core clock.
+> +	 */
+> +	return parent_rate;
+> +}
+> +
+> +/* This is a helper function to perform clock rounding for core
+> clocks. */ +long samsung_core_clk_round_rate(struct clk_hw *hw,
+> +			unsigned long drate, unsigned long *prate)
+> +{
+> +	struct samsung_core_clock *core_clk;
+> +	const struct samsung_core_clock_freq_table *freq_tbl;
+> +	int i;
+> +
+> +	core_clk = container_of(hw, struct samsung_core_clock, hw);
+> +	freq_tbl = core_clk->freq_table;
+> +	drate /= 1000;
+> +
+> +	for (i = 0; i < freq_tbl->freq_count; i++) {
+> +		if (drate >= freq_tbl->freq[i])
+> +			return freq_tbl->freq[i] * 1000;
+> +	}
+> +	return freq_tbl->freq[i - 1] * 1000;
+> +}
+> +
+> +/* helper function to register a core clock */
+> +void __init samsung_coreclk_register(const char *name, const char
+> **parents,
+> +			unsigned int num_parents, const char *pllclk,
+> +			const struct clk_ops *clk_ops, unsigned int
+> lookup_id,
+> +			const struct samsung_core_clock_freq_table
+> *freq_tbl) +{
+> +	struct samsung_core_clock *coreclk;
+> +	struct clk_init_data init;
+> +	struct clk *clk;
+> +
+> +	coreclk = kzalloc(sizeof(*coreclk), GFP_KERNEL);
+> +	if (!coreclk) {
+> +		pr_err("%s: could not allocate memory for coreclk
+> %s\n",
+> +					__func__, name);
+> +		return;
 > +	}
 > +
->  	of_property_read_u32(np, "voltage-tolerance",
-> &voltage_tolerance); 
->  	if (of_property_read_u32(np, "clock-latency",
-> &transition_latency)) transition_latency = CPUFREQ_ETERNAL;
->  
->  	if (!IS_ERR(cpu_reg)) {
-> -		struct dev_pm_opp *opp;
->  		unsigned long min_uV, max_uV;
->  		int i;
->  
+> +	init.name = name;
+> +	init.flags = CLK_GET_RATE_NOCACHE;
+> +	init.parent_names = parents;
+> +	init.num_parents = num_parents;
+> +	init.ops = clk_ops;
+> +
+> +	coreclk->hw.init = &init;
+> +	coreclk->ctrl_base = reg_base;
+> +	coreclk->fout_pll = __clk_lookup(pllclk);
+> +	coreclk->freq_table = freq_tbl;
+> +
+> +	clk = clk_register(NULL, &coreclk->hw);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: could not register coreclk %s\n",
+> __func__,	name);
+> +		kfree(coreclk);
+> +		return;
+> +	}
+> +	samsung_clk_add_lookup(clk, lookup_id);
+> +}
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+I think, that those definitions for samsung_core_clock shall be moved
+to a separate file (maybe clk-exynos-cpu.c)?
+
+Moreover, maybe you can choose a shorter name?
+
+> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+> index 31b4174..0e43023 100644
+> --- a/drivers/clk/samsung/clk.h
+> +++ b/drivers/clk/samsung/clk.h
+> @@ -312,6 +312,37 @@ struct samsung_pll_clock {
+>  	__PLL(_typ, _id, NULL, _name, _pname,
+> CLK_GET_RATE_NOCACHE,	\ _lock, _con, _rtable, _alias)
+>  
+> +/**
+> + * struct samsung_core_clock_freq_table: table of frequency
+> supported by
+> + * a core clock and associated data if any.
+> + * @freq: points to a table of supported frequencies (in KHz)
+> + * @freq_count: number of entries in the frequency table
+> + * @data: core clock specific data, if any
+> + */
+> +struct samsung_core_clock_freq_table {
+> +	const unsigned long	*freq;       /* in KHz */
+> +	unsigned long		freq_count;
+> +	const void		*data;
+> +};
+
+This is another instance of a structure, which holds the frequency for
+the system (like struct cpufreq_frequency_table). 
+
+Unfortunately, since the clk subsystem starts very early, the
+cpufreq_frequency_table is not yet parsed from "operating-points"
+attribute.
+
+Maybe we can defer the clock registration?
+
+> +
+> +/**
+> + * struct samsung_core_clock: information about clock supplied to a
+> CPU core.
+> + * @hw: handle between ccf and core clock.
+> + * @ctrl_base: base address of the clock controller.
+> + * @fout_pll: clock handle representing the clock output of the
+> associated PLL.
+> + */
+> +struct samsung_core_clock {
+> +	struct clk_hw		hw;
+> +	void __iomem		*ctrl_base;
+> +	struct clk		*fout_pll;
+> +	const struct samsung_core_clock_freq_table *freq_table;
+> +};
+> +
+> +extern unsigned long samsung_core_clock_recalc_rate(struct clk_hw
+> *hw,
+> +				unsigned long parent_rate);
+> +extern long samsung_core_clk_round_rate(struct clk_hw *hw,
+> +			unsigned long drate, unsigned long *prate);
+
+IMHO, those methods shall be defined as static in a separate file.
+
+> +
+>  extern void __init samsung_clk_init(struct device_node *np, void
+> __iomem *base, unsigned long nr_clks, unsigned long *rdump,
+>  		unsigned long nr_rdump, unsigned long *soc_rdump,
+> @@ -337,7 +368,11 @@ extern void __init samsung_clk_register_gate(
+>  		struct samsung_gate_clock *clk_list, unsigned int
+> nr_clk); extern void __init samsung_clk_register_pll(struct
+> samsung_pll_clock *pll_list, unsigned int nr_clk, void __iomem *base);
+> -
+> +extern void __init samsung_coreclk_register(const char *coreclk,
+> +		const char **parents, unsigned int num_parents,
+> +		const char *pllclk, const struct clk_ops *clk_ops,
+> +		unsigned int lookup_id,
+> +		const struct samsung_core_clock_freq_table
+> *freq_tbl); extern unsigned long _get_rate(const char *clk_name);
+>  
+>  #endif /* __SAMSUNG_CLK_H */
+
+
 
 -- 
 Best regards,
