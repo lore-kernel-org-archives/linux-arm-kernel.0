@@ -1,42 +1,73 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 10 Jan 2014 12:49:09 +0900
-Subject: [PATCHv9 4/4] ARM: socfpga_defconfig: enable SD/MMC support
-In-Reply-To: <1389303079-19808-5-git-send-email-dinguyen@altera.com>
-References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
- <1389303079-19808-5-git-send-email-dinguyen@altera.com>
-Message-ID: <52CF6DB5.7080903@samsung.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu,  9 Jan 2014 22:50:32 -0500
+Subject: [PATCH v3 5/6] arm64: initialize pgprot info earlier in boot
+In-Reply-To: <1389325833-16535-1-git-send-email-msalter@redhat.com>
+References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
+Message-ID: <1389325833-16535-6-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Presently, paging_init() calls init_mem_pgprot() to initialize pgprot
+values used by macros such as PAGE_KERNEL, PAGE_KERNEL_EXEC, etc. The
+new fixmap and early_ioremap support also needs to use these macros
+before paging_init() is called. This patch moves the init_mem_pgprot()
+call out of paging_init() and into setup_arch() so that pgprot_default
+gets initialized in time for fixmap and early_ioremap.
 
-On 01/10/2014 06:31 AM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Enables the dw_mmc driver for SOCFPGA.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> ---
-> v9: none
-> v8: none
-> v7: none
-> v6: none
-> v5: Add dw_mmc driver into socfpga_defconfig
-> v4: none
-> v3: none
-> v2: none
-> ---
->  arch/arm/configs/socfpga_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> index 4e1ce21..8fff96ba 100644
-> --- a/arch/arm/configs/socfpga_defconfig
-> +++ b/arch/arm/configs/socfpga_defconfig
-> @@ -82,3 +82,5 @@ CONFIG_DEBUG_INFO=y
->  CONFIG_ENABLE_DEFAULT_TRACERS=y
->  CONFIG_DEBUG_USER=y
->  CONFIG_XZ_DEC=y
-> +CONFIG_MMC=y
-> +CONFIG_MMC_DW=y
-> 
+Signed-off-by: Mark Salter <msalter@redhat.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/mmu.h | 1 +
+ arch/arm64/kernel/setup.c    | 2 ++
+ arch/arm64/mm/mmu.c          | 3 +--
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 2494fc0..f600d40 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -27,5 +27,6 @@ typedef struct {
+ extern void paging_init(void);
+ extern void setup_mm_for_reboot(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
++extern void init_mem_pgprot(void);
+ 
+ #endif
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index bd9bbd0..029ecfe 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -221,6 +221,8 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	*cmdline_p = boot_command_line;
+ 
++	init_mem_pgprot();
++
+ 	parse_early_param();
+ 
+ 	arm64_memblock_init();
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f557ebb..541c782 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -125,7 +125,7 @@ early_param("cachepolicy", early_cachepolicy);
+ /*
+  * Adjust the PMD section entries according to the CPU in use.
+  */
+-static void __init init_mem_pgprot(void)
++void __init init_mem_pgprot(void)
+ {
+ 	pteval_t default_pgprot;
+ 	int i;
+@@ -349,7 +349,6 @@ void __init paging_init(void)
+ {
+ 	void *zero_page;
+ 
+-	init_mem_pgprot();
+ 	map_mem();
+ 
+ 	/*
+-- 
+1.8.3.1
