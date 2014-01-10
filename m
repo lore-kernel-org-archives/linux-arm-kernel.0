@@ -1,33 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 09 Jan 2014 15:59:27 -0800
-Subject: [PATCH 1/7] ARM: perf_event: Silence sparse warning
-In-Reply-To: <20140109104519.GA17838@mudshark.cambridge.arm.com>
-References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
- <1389221984-10973-2-git-send-email-sboyd@codeaurora.org>
- <20140109104519.GA17838@mudshark.cambridge.arm.com>
-Message-ID: <52CF37DF.4000309@codeaurora.org>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Thu, 9 Jan 2014 16:09:06 -0800
+Subject: [LNG] [PATCH] ARM: traps: fix opcode endianness when read from
+ user memory
+In-Reply-To: <1387816927-4313-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1387816927-4313-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <CAA3XUr0A2jK0y-kfkpGE4mDNOCAhDi7AY0y9Fvmu5dgNygXXQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/14 02:45, Will Deacon wrote:
-> Hi Stephen,
->
-> On Wed, Jan 08, 2014 at 10:59:38PM +0000, Stephen Boyd wrote:
->> arch/arm/kernel/perf_event_cpu.c:274:25: warning: incorrect type in assignment (different modifiers)
->> arch/arm/kernel/perf_event_cpu.c:274:25: expected int ( *init_fn )( ... )
->> arch/arm/kernel/perf_event_cpu.c:274:25: got void const *const data
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
-> Given that the rest of the series depends on the change to the percpu IRQ
-> stuff, I think you can just send this patch to Russell's patch system with
-> my ack:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
+Taras, it looks good. Did you submit it into Russell's patch system? It
+would be good to have this fix in main line tree.
 
-Thanks. It's 7937/1.
+Anyone, is there any concerns about this patch? It is quite simple
+change.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+Victor
+
+On 23 December 2013 08:42, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
+> Currently code has an inverted logic: opcode from user memory
+> is swapped to a proper endianness only in case of read error.
+> While normally opcode should be swapped only if it was read
+> correctly from user memory.
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> ---
+>  arch/arm/kernel/traps.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 7940241..36a844e 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -425,9 +425,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>                         instr2 = __mem_to_opcode_thumb16(instr2);
+>                         instr = __opcode_thumb32_compose(instr, instr2);
+>                 }
+> -       } else if (get_user(instr, (u32 __user *)pc)) {
+> +       } else {
+> +               if (get_user(instr, (u32 __user *)pc))
+> +                       goto die_sig;
+>                 instr = __mem_to_opcode_arm(instr);
+> -               goto die_sig;
+>         }
+>
+>         if (call_undef_hook(regs, instr) == 0)
+> --
+> 1.7.9.5
+>
+> --
+> You received this message because you are subscribed to the Google Groups "Linaro Networking" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linaro-networking+unsubscribe at linaro.org.
+> To post to this group, send email to linaro-networking at linaro.org.
