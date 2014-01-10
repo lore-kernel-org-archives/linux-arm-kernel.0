@@ -1,58 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Jan 2014 10:37:58 +0000
-Subject: [PATCH v5 1/5] ACPI: introduce
- CONFIG_ACPI_REDUCED_HARDWARE_ONLY to enforce this ACPI mode
-In-Reply-To: <52CF1297.9030306@redhat.com>
-References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
- <1389142011-27356-2-git-send-email-al.stone@linaro.org>
- <201401081346.25767.arnd@arndb.de>
- <CAHkRjk50ctWV4Z13wRYh8n6urcTdkq4a8tgKi8k6hgNHA3cVVA@mail.gmail.com>
- <52CF1297.9030306@redhat.com>
-Message-ID: <20140110103757.GC925@arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 10 Jan 2014 11:54:32 +0100
+Subject: [PATCH] arm64: dts:  add <dt-bindings/> symlink
+In-Reply-To: <52CFCFA1.4080405@samsung.com>
+References: <1389346197-5127-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140110102226.63f5bf30@ipc1.ka-ro> <52CFCFA1.4080405@samsung.com>
+Message-ID: <20140110115432.21fb03af@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 09:20:23PM +0000, Al Stone wrote:
-> On 01/09/2014 10:38 AM, Catalin Marinas wrote:
-> > On 8 January 2014 12:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Wednesday 08 January 2014, al.stone at linaro.org wrote:
-> >>> Even though support for X86 in hardware reduced mode is possible, it
-> >>> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
-> >>> there is a single kernel image than can run on all x86 hardware; the kernel
-> >>> changes run-time behavior to adapt to the hardware being used.  This is not
-> >>> currently possible with the existing ACPICA infrastructure but only presents
-> >>> a problem on achitectures supporting both hardware-reduced and legacy modes
-> >>> of ACPI -- i.e., on x86 only.
+Hi,
+
+Pankaj Dubey wrote:
+> On 01/10/2014 06:22 PM, Lothar Wa?mann wrote:
+> > Hi,
+> >
+> > Pankaj Dubey wrote:
+> >> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
+> >> match the ones in ARM architectures so that preprocessed device
+> >> tree files can include various useful constant definitions.
 > >>
-> >> Not sure about the logic here: While it's certainly possible to build a kernel
-> >> that runs on all x86 machines, it's also possible to build one that only
-> >> runs on some of them when some basic options are turned off. I don't see
-> >> any difference between that and what we have on ARM64 or the multiplatform
-> >> subset of ARM32.
-> >
-> > Would we ever need !CONFIG_ACPI_REDUCED_HARDWARE_ONLY on ARM or ARM64?
-> > If not, we could even make this always on for these archs.
-> >
-> 
-> Not that I know of -- and I would hope not.  This mode is so much
-> more straightforward that it makes no sense to me to do anything
-> but reduced HW if you have the choice.
+> >> See commit c58299a (kbuild: create an "include chroot" for DT bindings)
+> >> merged in v3.10-rc1 for details.
+> >>
+> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> ---
+> >>   arch/arm64/boot/dts/include/dt-bindings |    1 +
+> >>   1 file changed, 1 insertion(+)
+> >>   create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+> >>
+> >> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+> >> new file mode 120000
+> >> index 0000000..08c00e4
+> >> --- /dev/null
+> >> +++ b/arch/arm64/boot/dts/include/dt-bindings
+> >> @@ -0,0 +1 @@
+> >> +../../../../../include/dt-bindings
+> >> \ No newline at end of file
+> > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> I just created symlink file to "include/dt-bindings", and when created 
+> patch it is showing this line
+> at the end of patch. I do not have much idea why this came in patch? But 
+> when I checked similar patches
+> it looks like it is required.
+>
+I noticed after sending the email, that the file in question was
+actually only a symlink. The message seems to be a 'feature' of
+'patch' when dealing with symlinks.
 
-Thanks for clarifying.
 
-> I assume you were thinking of something like this in the arch Kconfig
-> file:
-> 
-> config ARM64
-> 	....
-> 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> 	...
-> 
-> But, do let me know if you had something else in mind.  I think it does
-> make sense to add so I'll put this in the next version.
-
-The change makes sense but I think it should come with the patches for
-ACPI support on arm64 rather than your hw-reduced patches.
-
+Lothar Wa?mann
 -- 
-Catalin
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
