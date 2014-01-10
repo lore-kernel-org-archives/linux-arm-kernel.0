@@ -1,124 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jan 2014 09:30:32 -0600
-Subject: DT include files
-In-Reply-To: <52CFF57D.8060808@samsung.com>
-References: <20131231054427.GA22383@S2101-09.ap.freescale.net>
- <20140102202108.GF19720@quad.lixom.net>
- <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
- <20140103030455.GB25079@S2101-09.ap.freescale.net>
- <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
- <20140104011056.GA3282@S2101-09.ap.freescale.net>
- <20140110024124.GA6844@S2101-09.ap.freescale.net>
- <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
- <52CFF57D.8060808@samsung.com>
-Message-ID: <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Fri, 10 Jan 2014 23:31:00 +0800
+Subject: LSK merge linux-stable review
+In-Reply-To: <20140110105615.GD925@arm.com>
+References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
+ <20140110105615.GD925@arm.com>
+Message-ID: <52D01234.5040402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 7:28 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi,
->
-> On 10.01.2014 03:41, Olof Johansson wrote:
+On 01/10/2014 06:56 PM, Catalin Marinas wrote:
+> On Fri, Jan 10, 2014 at 02:58:20AM +0000, Alex Shi wrote:
+>> commit 450cdfa9c5713551ab1438ab210679868b52a994
+>> Merge: bf78886 8b4ed85
+>> Author: Alex Shi <alex.shi@linaro.org>
+>> Date:   Fri Jan 10 10:50:57 2014 +0800
 >>
->> On Thu, Jan 9, 2014 at 6:41 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>>
->>> On Sat, Jan 04, 2014 at 09:10:58AM +0800, Shawn Guo wrote:
->>>>
->>>> On Fri, Jan 03, 2014 at 11:29:35AM -0800, Olof Johansson wrote:
->>>>>
->>>>> On Thu, Jan 2, 2014 at 7:04 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>>>>>
->>>>>> On Thu, Jan 02, 2014 at 06:41:30PM -0800, Olof Johansson wrote:
->>>>>>>
->>>>>>> Ok, then it's probably just the location of the header files that
->>>>>>> should be adjusted. Other subsystems have placed them under
->>>>>>> include/dt-bindings/<subsystem>, so that's likely a better place for
->>>>>>> these as well, don't you think?
->>>>>>
->>>>>>
->>>>>> I had a little discussion with DT people when the headers were firstly
->>>>>> created.  These pinctrl headers are a little different from the
->>>>>> headers
->>>>>> in include/dt-bindings/<subsystem>.  The latter are used by both
->>>>>> kernel
->>>>>> and device tree sources, while the pinctrl headers are used by device
->>>>>> tree sources only, so I chose to put them just in the same folder as
->>>>>> dts files.  And DT people are fine with my take.
->>>>>
->>>>>
->>>>> Since you don't provide references to this I had to go searching for
->>>>> it. All I find is some discussion from 8 months ago, and quite a bit
->>>>> of that seems to have been about changing bindings, and some about the
->>>>> preprocessor behavior. Also, the patches seem to have been too big to
->>>>> make it out on the lists.
->>>>>
->>>>> I'd like a fresh look from DT people on this just to make sure no
->>>>> opinions have changed -- lots of things have changed in the last 8
->>>>> months w.r.t. DT.
->>>>
->>>>
->>>> Indeed, it's been quite a long time.  Let me restate my point.  The
->>>> include/dt-bindings is introduced as a folder to hold headers that are
->>>> referenced by both kernel and DTS.  That's why we create the folder in
->>>> the kernel include folder and have arch/arm/boot/dts/include/dt-bindings
->>>> being a symbol link to it.  All the headers in there need to be
->>>> duplicated between kernel and DTS tree, when we move DTS files into
->>>> a separated repository.  Putting DTS local headers into the folder is
->>>> absolutely unnecessary, and will only confuse people and bother
->>>> ourselves when moving DTS files out of kernel tree.
->>>
->>>
->>> Just a gentle ping to ensure we do not get the pull request lost.  Or do
->>> you have any further comment?
+>>     Merge remote-tracking branch 'stable/linux-3.10.y' into linux-linaro-lsk
+>>     
+>>     Conflicts:
+>>         arch/arm64/kernel/smp.c
+>>     
+>>     Signed-off-by: Alex Shi <alex.shi@linaro.org>
 >>
->>
->> Still waiting on DT maintainers to chime in.
+>> diff --cc arch/arm64/kernel/smp.c
+>> index 5e9d274,9c93e12..87340fd
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@@ -150,17 -187,17 +150,10 @@@ asmlinkage void __cpuinit secondary_sta
+>>         preempt_disable();
+>>         trace_hardirqs_off();
+>>   
+>>  -      /*
+>>  -       * Let the primary processor know we're out of the
+>>  -       * pen, then head off into the C entry point
+>>  -       */
+>>  -      write_pen_release(INVALID_HWID);
+>>  +      if (cpu_ops[cpu]->cpu_postboot)
+>>  +              cpu_ops[cpu]->cpu_postboot();
+>>   
+>> --      /*
+>> -        * Enable local interrupts.
+>> -        */
+>> -       notify_cpu_starting(cpu);
+> 
+> This kind of diff always confuses me but notify_cpu_starting() should be
+> present in the resulting file. Is it further down?
+> 
 
-It helps (slightly) to be copied directly.
+the first column '-/+' means contents was removed/added from file
+5e9d274. the 2nd column '-/+' means contents was removed/added from file
+9c93e12.
 
-> I'm not officially a DT maintainer, but let me share my thoughts on this.
+Yes, The notify_cpu_starting kept in final file later.
 
-We can fix that... :)
-
-> So what options we have for this:
->
->  1) include/dt-bindings - this directory is designed to contain headers
->     that define the ABI between firmware and kernel code, in other
->     words - DT bindings.
->
->  2) arch/*/boot/dts - we already have files that can be included by
->     other files in this directory, i.e. *.dtsi. Some are used to
->     implement hierarchies of devices (e.g. s3c64xx.dtsi), but some are
->     purely used as headers (s3c64xx-pinctrl.dtsi).
->
->  3) include/dts? - I'm not sure if this have any benefits, but I'm
->     listing it since it's one of the ideas that came to my mind.
->
-> Now 2) seems to be already used and doesn't seem to generate any problems,
-> so I'm all for it. Still, there is one more issue. For files to be included
-> merely by DTS files and so limited by DTS+CPP syntax, I don't think it's too
-> good idea to call them *.h. Let's stay with *.dtsi, since that's the file
-> extension supposed to be used for files that can be included from device
-> tree sources.
-
-I think having 1 and 2 is the right way. Minimizing the number of
-shared headers between dts and the kernel is a good thing.
-
-As for *.h vs. *.dtsi naming, if the include is only pre-processor
-defines, then I think using .h is the right way. Otherwise, if there
-is any dts syntax, then .dtsi is the right name. It looks to me like
-this style has been followed in both the imx and s3c64xx cases.
-
-On a side note, I'm not really a fan of this pattern:
-
-#define FOO1 1 2 3
-
-#define BAR FOO1 FOO2 FOO3
-
-While it definitely simplifies the dts files, it would never be used
-in C and obfuscates what the actual property size is. Reading a dts
-file, I would naturally assume the define was a single value while in
-fact it could expand to a very large property size.
-
-Rob
+-- 
+Thanks
+    Alex
