@@ -1,36 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Jan 2014 11:06:50 +0100
-Subject: [PATCH] ARM: imx6q: Add missing esai_ahb clock to current clock
- tree
-In-Reply-To: <20140109150141.GD27432@n2100.arm.linux.org.uk>
-References: <1389236699-10387-1-git-send-email-Guangyu.Chen@freescale.com>
- <20140109075525.GO6750@pengutronix.de>
- <20140109150141.GD27432@n2100.arm.linux.org.uk>
-Message-ID: <20140110100650.GA16215@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 10 Jan 2014 10:11:07 +0000
+Subject: [PATCH v5 3/9] mfd: omap-usb-host: Update DT clock binding
+ information
+In-Reply-To: <1389269303-30465-4-git-send-email-rogerq@ti.com>
+References: <1389269303-30465-1-git-send-email-rogerq@ti.com>
+ <1389269303-30465-4-git-send-email-rogerq@ti.com>
+Message-ID: <20140110101107.GF28141@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Thu, 09 Jan 2014, Roger Quadros wrote:
 
-On Thu, Jan 09, 2014 at 03:01:41PM +0000, Russell King - ARM Linux wrote:
-> Sascha, your messages have the Mail-Followup-To: header...
+> The omap-usb-host driver expects certained named clocks.
+> Add this information to the DT binding document.
 > 
-> Mail-Followup-To: Nicolin Chen <Guangyu.Chen@freescale.com>,                    
->         shawn.guo at linaro.org, kernel at pengutronix.de, linux at arm.linux.org.uk,    
->         linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org,     
->         rob.herring at calxeda.com, pawel.moll at arm.com, mark.rutland at arm.com,      
->         ijc+devicetree at hellion.org.uk, galak at codeaurora.org,                    
->         devicetree at vger.kernel.org, rob at landley.net, mturquette at linaro.org      
+> Use clock names as per function for reference clocks.
 > 
-> resulting in me (and others) getting mails marked as To: me where they're
-> not supposed to be To: me in the first place.
+> CC: Lee Jones <lee.jones@linaro.org>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
+>  drivers/mfd/omap-usb-host.c                        |  6 +++---
+>  2 files changed, 26 insertions(+), 3 deletions(-)
 
-This should be fixed with this mail.
+Please don't mix up binding changes with code ones.
 
-Sascha
+Separate patch please.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
