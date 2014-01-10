@@ -1,58 +1,100 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri, 10 Jan 2014 23:31:00 +0800
-Subject: LSK merge linux-stable review
-In-Reply-To: <20140110105615.GD925@arm.com>
-References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
- <20140110105615.GD925@arm.com>
-Message-ID: <52D01234.5040402@linaro.org>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 10 Jan 2014 16:30:00 +0100
+Subject: [PATCHv9 1/2] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <1389366444-29449-1-git-send-email-denis@eukrea.com>
+References: <1389366444-29449-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140110163000.64dbeba9@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 06:56 PM, Catalin Marinas wrote:
-> On Fri, Jan 10, 2014 at 02:58:20AM +0000, Alex Shi wrote:
->> commit 450cdfa9c5713551ab1438ab210679868b52a994
->> Merge: bf78886 8b4ed85
->> Author: Alex Shi <alex.shi@linaro.org>
->> Date:   Fri Jan 10 10:50:57 2014 +0800
->>
->>     Merge remote-tracking branch 'stable/linux-3.10.y' into linux-linaro-lsk
->>     
->>     Conflicts:
->>         arch/arm64/kernel/smp.c
->>     
->>     Signed-off-by: Alex Shi <alex.shi@linaro.org>
->>
->> diff --cc arch/arm64/kernel/smp.c
->> index 5e9d274,9c93e12..87340fd
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@@ -150,17 -187,17 +150,10 @@@ asmlinkage void __cpuinit secondary_sta
->>         preempt_disable();
->>         trace_hardirqs_off();
->>   
->>  -      /*
->>  -       * Let the primary processor know we're out of the
->>  -       * pen, then head off into the C entry point
->>  -       */
->>  -      write_pen_release(INVALID_HWID);
->>  +      if (cpu_ops[cpu]->cpu_postboot)
->>  +              cpu_ops[cpu]->cpu_postboot();
->>   
->> --      /*
->> -        * Enable local interrupts.
->> -        */
->> -       notify_cpu_starting(cpu);
+Hi,
+
+Denis Carikli wrote:
+> Cc: Richard Purdie <rpurdie@rpsys.net>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v8->v9:
+> - Added Shawn Guo in the Cc list.
+> - The default-brightness-level is now a boolean default-on property,
+>   the gpio is only touched if the gpio-backlight driver instance probes.
+> - The code and documentation was updated accordingly.
 > 
-> This kind of diff always confuses me but notify_cpu_starting() should be
-> present in the resulting file. Is it further down?
+> ChangeLog v7->v8:
+> - The default-state was renamed to default-brightness-level.
+> - default-brightness-level is now mandatory, like for backlight-pwm,
+>   That way we avoid having to handle the case where it's not set,
+>   which means that we would need not to set the gpio, but still
+>   report a brightness value for sysfs, when not all gpio controllers are
+>   able to read the gpio value.
+> - switched the default-brightness-level to boolean values (0 or 1) instead
+>   of using strings ("on", "off", "keep").
+> - The documentation was updated accordingly.
+> - The example in the documentation now uses the dts gpio defines.
+> - The "backlight: gpio_backlight: Use a default state enum." patch was then
+>   dropped, becuase it is not necessary anymore.
 > 
+> ChangeLog v6->v7:
+> - removed a compilation warning with the removal of the useless ret declaration.
+> 
+> ChangeLog v5->v6:
+> - The default state handling was reworked:
+>   - it's now called default-state, and looks like the gpio-leds default-state.
+>   - it now has a "keep" option, like for the gpio-leds.
+>   - that "keep" option is the default when the default-state property is not set.
+> - The documentation was updated accordingly.
+> 
+> ChangeLog v4->v5:
+> - The default-brightness property now defaults to 0 in the driver.
+> - def_value int becomes a bool.
+> - The check for the gpio validity has been reworked.
+> ---
+>  .../bindings/video/backlight/gpio-backlight.txt    |   19 +++++++
+>  drivers/video/backlight/gpio_backlight.c           |   60 +++++++++++++++++---
+>  2 files changed, 72 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+> 
+[...]
+> +static struct of_device_id gpio_backlight_of_match[] = {
+> +	{ .compatible = "gpio-backlight" },
+> +	{ /* sentinel */ }
+> +};
+> +
+>  static struct platform_driver gpio_backlight_driver = {
+>  	.driver		= {
+>  		.name		= "gpio-backlight",
+>  		.owner		= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(gpio_backlight_of_match),
+>
+useless use of of_match_ptr().
+This would make sense, if the gpio_backlight_of_match struct was
+conditionally compiled in depending on CONFIG_OF.
+Since you unconditionally provide it you can use
+&gpio_backlight_of_match directly.
 
-the first column '-/+' means contents was removed/added from file
-5e9d274. the 2nd column '-/+' means contents was removed/added from file
-9c93e12.
 
-Yes, The notify_cpu_starting kept in final file later.
-
+Lothar Wa?mann
 -- 
-Thanks
-    Alex
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
