@@ -1,37 +1,64 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri, 10 Jan 2014 19:30:21 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140110153530.GA770@kroah.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
- <20140110151123.GG15937@n2100.arm.linux.org.uk>
- <20140110153530.GA770@kroah.com>
-Message-ID: <20140110183021.GZ2400@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 10 Jan 2014 13:34:30 -0500
+Subject: [GIT PULL] irqchip: dove: drivers for v3.14
+In-Reply-To: <20131211175037.GY10053@titan.lakedaemon.net>
+References: <20131201172914.GV2879@titan.lakedaemon.net>
+ <20131211175037.GY10053@titan.lakedaemon.net>
+Message-ID: <20140110183430.GO19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 07:35:30AM -0800, Greg Kroah-Hartman wrote:
-> > I'll sort out a new set of patches today, along with a branch to pull if
-> > you wish to take them that way.
+Thomas,
+
+On Wed, Dec 11, 2013 at 12:50:37PM -0500, Jason Cooper wrote:
+> On Sun, Dec 01, 2013 at 12:29:14PM -0500, Jason Cooper wrote:
+> > Here's an mvebu driver we've had on the ML for a while, and it's been in
+> > -next for 5 days.
 > 
-> It's too late for 3.14, as my tree is now closed for that because 3.13
-> should be out this weekend.  But I'll be glad to queue them up after
-> 3.14-rc1 is out.
+> Just checking to make sure this hasn't slipped off of your plate.
+> 
 
-Didnt' Linus say there would be an -rc8?
+I'm not able to see where this one might have been pulled, could you
+please pull or let me know if it's not acceptable?
 
-However - there is a devicetree issue to be discussed anyway (see
-Sascha's comment). Although we'd personally like to see this series
-being merged sooner than later, it should be sorted out first.
-Devicetree issues are ugly to change once they are in mainline.
+thx,
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jason.
+
+> > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > 
+> >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
+> > 
+> > for you to fetch changes up to 40b367d95fb3d60fc1edb9ba8f6ef52272e48936:
+> > 
+> >   irqchip: irq-dove: Add PMU interrupt controller. (2013-11-26 15:04:53 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > mvebu irqchip changes for v3.14
+> > 
+> >  - add Dove PMU interrupt controller
+> > 
+> > ----------------------------------------------------------------
+> > Andrew Lunn (1):
+> >       irqchip: irq-dove: Add PMU interrupt controller.
+> > 
+> >  .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
+> >  drivers/irqchip/Makefile                           |   1 +
+> >  drivers/irqchip/irq-dove.c                         | 126 +++++++++++++++++++++
+> >  3 files changed, 144 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
+> >  create mode 100644 drivers/irqchip/irq-dove.c
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
