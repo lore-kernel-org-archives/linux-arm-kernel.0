@@ -1,119 +1,115 @@
 From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 10 Jan 2014 11:32:18 +0100
-Subject: [PATCH 6/6] arm: dts: add cpu nodes for Exynos4210 SoC
-In-Reply-To: <1389283165-17708-7-git-send-email-thomas.ab@samsung.com>
+Date: Fri, 10 Jan 2014 11:32:40 +0100
+Subject: [PATCH 0/6] cpufreq: use cpufreq-cpu0 driver for exynos4210 based
+ platforms
+In-Reply-To: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
 References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <1389283165-17708-7-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140110113218.423bc6e0@amdc2363>
+Message-ID: <20140110113240.797381e6@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
 
-> Add CPU nodes for Exynos4210 SoC and also properties required by the
-> cpufreq-cpu0 driver.
+I've investigated the topic for a while, so if you don't mind I will
+share my thoughts :-)
+
+> The patch series removes the use of Exynos4210 specific cpufreq driver
+> and enables to use the cpufreq-cpu0 driver for Exynos4210 based
+> platforms. This is being done for few reasons.
 > 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-origen.dts         |    6 ++++++
->  arch/arm/boot/dts/exynos4210-trats.dts          |    6 ++++++
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 ++++++
->  arch/arm/boot/dts/exynos4210.dtsi               |   22
-> ++++++++++++++++++++++ 4 files changed, 40 insertions(+), 0
-> deletions(-)
+> (a) The Exynos4210 cpufreq driver reads/writes clock controller
+> registers bypassing the Exynos4 CCF driver which is sort of
+> problematic.
+
+Also other, already supported devices suffer from it. Namely -
+Exynos4x12 and Exynos5250.
+
+That's why the solution shall be as generic as possible to also work
+with those two SoCs.
+
+> (b) Removes the need for having clock controller
+> register definitions in the cpufreq driver and also removes the need
+> for statically io-remapping clock controller address space (helps in
+> moving towards multiplatform kernel).
 > 
-> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts
-> b/arch/arm/boot/dts/exynos4210-origen.dts index 2aa13cb..afecd8f
-> 100644 --- a/arch/arm/boot/dts/exynos4210-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
-> @@ -32,6 +32,12 @@
->  		bootargs ="root=/dev/ram0 rw ramdisk=8192
-> initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc"; };
->  
-> +	cpus {
-> +		cpu: cpu at 0 {
-> +			cpu0-supply = <&buck1_reg>;
-> +		};
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
-> b/arch/arm/boot/dts/exynos4210-trats.dts index 63cc571..25487d7 100644
-> --- a/arch/arm/boot/dts/exynos4210-trats.dts
-> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
-> @@ -30,6 +30,12 @@
->  		bootargs = "console=ttySAC2,115200N8
-> root=/dev/mmcblk0p5 rootwait earlyprintk panic=5"; };
->  
-> +	cpus {
-> +		cpu: cpu at 0 {
-> +			cpu0-supply = <&varm_breg>;
-> +		};
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> b/arch/arm/boot/dts/exynos4210-universal_c210.dts index
-> d2e3f5f..74d5a70 100644 ---
-> a/arch/arm/boot/dts/exynos4210-universal_c210.dts +++
-> b/arch/arm/boot/dts/exynos4210-universal_c210.dts @@ -28,6 +28,12 @@
->  		bootargs = "console=ttySAC2,115200N8
-> root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1"; };
->  
-> +	cpus {
-> +		cpu: cpu at 0 {
-> +			cpu0-supply = <&vdd_arm_reg>;
-> +		};
-> +	};
-> +
->  	mct at 10050000 {
->  		compatible = "none";
->  	};
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
-> b/arch/arm/boot/dts/exynos4210.dtsi index 48ecd7a..3db2da8 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -36,6 +36,28 @@
->  		reg = <0x10023CA0 0x20>;
->  	};
->  
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0>;
-> +			clocks = <&clock 12>;
-> +			clock-names = "cpu";
-> +
-> +			operating-points = <
-> +				200000	950000
-> +				400000	975000
-> +				500000	975000
-> +				800000	1075000
-> +				1000000	1150000
-> +				1200000	1250000
-> +			>;
-
-On the ./arch/arm/boot/dts/highbank.dts the oop's order is decreasing. 
-
-That shouldn't be a problem for the cpufreq core, however in my opinion
-we shall stick to one convention.
-
-> +			safe-opp-index = <3>;
-> +		};
-> +	};
-> +
->  	gic: interrupt-controller at 10490000 {
->  		cpu-offset = <0x8000>;
->  	};
-
-
+> In order to use cpufreq-cpu0 driver and provide fast cpu clock
+> switching during dvfs operations, the following apporach has been
+> used.
+> 
+> (a) A new CPU clock provider type has been introduced in Samsung's CCF
+>     support. This clock provider type can be a compostion of multiple
+>     clock blocks such as mux, dividers and gates. Typically, in Exynos
+>     platforms, there are multiple clock blocks in between the output
+>     of the APLL and the CPU clock domain output. Representing these
+>     mutiple clock blocks within a opaque CPU clock provider type helps
+>     in reducing the time taken to perform a CPU clock frequency change
+>     operation, which is generally required during DVFS operations.
+>     This approach was suggested by Arnd Bergmann <arnd@arndb.de>
+> during LCE-2013.
+> 
+> (b) A new optional safe operating point property has been introduced
+>     in the cpufreq-cpu0 driver binding. On some platforms such as the
+>     Samsung Exynos, a change in CPU frequency requires a change in the
+>     PLL output that drives the CPU clock. A change in PLL output
+>     requires the PLL output be turned off, which implies that the CPU
+>     (and other components in the CPU clock domain) be supplied with
+>     an alternate clock source during the time the PLL output is
+> changed.
+> 
+>     The clock speed of this alternate clock source could be higher
+>     than the clock speed of the PLL at the time of switching over to
+>     the alternate clock source. This temporary increase in clock speed
+>     of the CPU clock domain implies that the blocks within the CPU
+>     clock domain should also be supplied with an appropriate voltage
+>     supply level as required to drive the CPU clock domain components
+>     at the speed of the alternative clock source. This temporary
+>     voltage level required during switching of CPU clock speed is
+>     called safe voltage level. And the cpufreq-cpu0 driver has been
+>     modified to setup the safe voltage levels during the changes
+>     in CPU clock speed.
+> 
+> (c) The CPU clock supply as been restructured as
+>     [ Output of APLL -> Opaque CPU clock provider -> CPU clock output
+> ] And with the changes in (a) and (b) above, the cpufreq-cpu0 driver
+>     can now be used and can remove the use of Exynos4210 specific
+>     cpufreq driver.
+> 
+> This approach is currently tried on Exynos4210 only. The same approach
+> can be adopted for other Exynos SoCs as well. This patch series is
+> based on linux-next master branch.
+> 
+> Thomas Abraham (6):
+>   cpufreq: cpufreq-cpu0: allow optional safe voltage during frequency
+> transitions clk: samsung: add infrastructure to register CPU clocks
+>   clk: samsung: register cpu clock provider for exynos4210 SoC
+>   cpufreq: exynos: remove Exynos4210 specific cpufreq driver support
+>   arm: exynos4-dt: statically add platform device for cpufreq-cpu0
+> platform driver arm: dts: add cpu nodes for Exynos4210 SoC
+> 
+>  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    5 +
+>  arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
+>  arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
+>  arch/arm/boot/dts/exynos4210.dtsi                  |   22 +++
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |    6 +
+>  drivers/clk/samsung/clk-exynos4.c                  |   96
+> ++++++++++++- drivers/clk/samsung/clk.c                          |
+> 71 +++++++++ drivers/clk/samsung/clk.h                          |
+> 37 +++++- drivers/cpufreq/Kconfig.arm                        |   11 --
+>  drivers/cpufreq/Makefile                           |    1 -
+>  drivers/cpufreq/cpufreq-cpu0.c                     |   49 ++++++-
+>  drivers/cpufreq/exynos-cpufreq.c                   |    4 +-
+>  drivers/cpufreq/exynos-cpufreq.h                   |    8 -
+>  drivers/cpufreq/exynos4210-cpufreq.c               |  157
+> -------------------- 15 files changed, 301 insertions(+), 184
+> deletions(-) delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe cpufreq" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
 -- 
 Best regards,
