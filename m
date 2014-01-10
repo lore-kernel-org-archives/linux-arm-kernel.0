@@ -1,69 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 10 Jan 2014 14:54:35 -0500
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20140110194437.GJ18269@obsidianresearch.com>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
- <20140102194924.GA3321@obsidianresearch.com>
- <1388702192.16958.54.camel@hastur.hellion.org.uk>
- <20140102230832.GB9339@obsidianresearch.com>
- <20140110192032.GQ19878@titan.lakedaemon.net>
- <20140110194437.GJ18269@obsidianresearch.com>
-Message-ID: <20140110195435.GU19878@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 10 Jan 2014 14:04:57 -0600
+Subject: [PATCH v3 4/6] arm: add early_ioremap support
+In-Reply-To: <20140110165847.GG925@arm.com>
+References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
+ <1389325833-16535-5-git-send-email-msalter@redhat.com>
+ <CAL_JsqLZQ=3gph4yaNSrZ5oPL3kasQKqA5C5+my0GwjGHsvMeQ@mail.gmail.com>
+ <20140110165847.GG925@arm.com>
+Message-ID: <CAL_JsqK-UppOnncr19dPEX8d8m0dvnONo_bzaXYX78rc2LfjwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 12:44:37PM -0700, Jason Gunthorpe wrote:
-> On Fri, Jan 10, 2014 at 02:20:32PM -0500, Jason Cooper wrote:
-> > > Jason C: What do you think about applying this [untested]?
-> > 
-> > I'm of the opinion that the kernel shouldn't assume the state of the
-> > system when it begins execution.  Sure it's nice to point fingers at the
-> > bootloader (especially since it's obviously wrong in this situation),
-> > but we need Linux to boot on systems with non-upgradeable bootloaders
-> > which may be broken.  I'm specifically thinking about hobbyists
-> > modifying boxes they bought at $bigbox stores.
-> 
-> I liked the idea of your impedance matcher fixing up bootloader
-> problems. It would be pretty easy to have a feroceon specific path in
-> the impedance matcher to disable the L2.
+On Fri, Jan 10, 2014 at 10:58 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Jan 10, 2014 at 04:11:03PM +0000, Rob Herring wrote:
+>> On Thu, Jan 9, 2014 at 9:50 PM, Mark Salter <msalter@redhat.com> wrote:
+>> > This patch uses the generic early_ioremap code to implement
+>> > early_ioremap for ARM. The ARM-specific bits come mostly from
+>> > an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
+>> > here:
+>> >
+>> >   https://lkml.org/lkml/2013/10/3/279
+>>
+>> I think this will be useful to implement an arm64 style earlycon for
+>> arm as the current DEBUG_LL doesn't really work with multi-platform
+>> kernels. I started on this and quickly realized I needed the fixmap
+>> support.
+>
+> It would be even better if you can make it more generic
+> (drivers/tty/serial/) and keep DEBUG_LL as a specialised case for
+> arch/arm (when !multi-platform).
 
-Agreed.
-
-> > So, I'd prefer to handle this more gracefully.  I don't have much
-> > experience at the low-level init of the caches, couldn't we enable and
-> > flush rather than throwing the error?
-> 
-> It cannot be solved in cache-feroceon-l2.c.
-> 
-> In many cases you won't even get that far:
-> - It will blow up in head.S when the cache is off: decompressor wrote
->   writeback data to into the L2 and uncached fetches see memory
->   content prior to decompression
-> - It will blow up after head.S enables the L1: decompressor wrote
->   data into the L2 but the relocation writes done with the L1 off
->   made changes to memory that were not captured in the L2.
-> 
-> So to solve it gracefully it has to be done before the decompressor
-> enables the L1. Which leaves the bootloader, impedance matcher or
-> decompressor startup code as possible places.
-> 
-> The code required is a flush invalidate and then disable of the L2
-> cache, which is only about 5 instructions, but they must be
-> conditionalized somehow on the CPU type :(
-
-And there's the problem.  Even at my young LKML age, I know that's a
-non-starter.  :)
-
-> The purpose of my patch is to highlight the problem to the bootloader
-> people. If you luck out and successfully boot with the L2 cache
-> enabled you can at least see the message that the bootloader is wrong.
-
-Sounds sane to me, feel free to add my Acked-by and put it in Russell's
-patch tracker.  I'd also ask that you add the above summary to the
-commit message.  I'm sure Russell doesn't need it, but it'll help
-someone doing a 'git blame ...' down the road.
-
-thx,
-
-Jason.
+Y
