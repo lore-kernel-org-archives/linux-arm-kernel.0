@@ -1,86 +1,124 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Fri, 10 Jan 2014 08:22:08 -0800
-Subject: BUG: bad unlock balance detected
-In-Reply-To: <52CFB091.5040707@linaro.org>
-References: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
- <52CFB091.5040707@linaro.org>
-Message-ID: <CACUGKYO=934LR5r0UrPht10Lvkj2rnz7Un83G=D+w-jgYh8xTA@mail.gmail.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 10 Jan 2014 08:30:09 -0800
+Subject: [PATCH V6 0/8] Add ARM EFI stub
+Message-ID: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It happened once and I am not sure how to re-produce...
+This patch series adds EFI stub support for the ARM architecture.  The 
+stub for ARM is implemented in a similar manner to x86 in that it is a 
+shim layer between EFI and the normal zImage/bzImage boot process, and 
+that an image with the stub configured is bootable as both a zImage and 
+EFI application.  This patchset adds common code that is shared with
+the ARM64 EFI stub.
 
-On Fri, Jan 10, 2014 at 12:34 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 01/10/2014 03:52 AM, John Tobias wrote:
->>
->> Hi Shawn,
->>
->> Any idea on these bug?.
->
->
-> Is this bug happening systematically or randomly ?
->
->
->
->
->> [ 559.972748] =====================================
->> [ 559.977457] [ BUG: bad unlock balance detected! ]
->> [ 559.982169] 3.13.0-rc1 #1 Tainted: G O
->> [ 559.986790] -------------------------------------
->> [ 559.991499] swapper/0 is trying to release lock (master_lock) at:
->> [ 559.997642] <8001d708> imx6q_enter_wait+0x80/0x8c
->> [ 560.002524] but there are no more locks to release!
->> [ 560.007404]
->> [ 560.007404] other info that might help us debug this:
->> [ 560.013939] no locks held by swapper/0.
->> [ 560.017779]
->> [ 560.017779] stack backtrace:
->> [ 560.022147] CPU: 0 PID: 0 Comm: swapper Tainted: G O 3.13.0-rc1 #1
->> [ 560.029200] Backtrace:
->> [ 560.031685] <80011fb4> (dump_backtrace+0x0/0x10c) from <80012150>
->> (show_stack+0x18/0x1c)
->> [ 560.040128] :806c00e8 :8001d708 :806bd1b0 :00000000
->> [ 560.045869] <80012138> (show_stack+0x0/0x1c) from <804eeef0>
->> (dump_stack+0x20/0x28)
->> [ 560.053889] <804eeed0> (dump_stack+0x0/0x28) from <8004b2a8>
->> (print_unlock_imbalance_bug+0xb4/0xe4)
->> [ 560.063296] <8004b1f4> (print_unlock_imbalance_bug+0x0/0xe4) from
->> <8004e338> (lock_release+0x184/0x1bc)
->> [ 560.073037] :80be210c :806bd1b0 :806b2000 :00000000
->> [ 560.078771] <8004e1b4> (lock_release+0x0/0x1bc) from <804f546c>
->> (_raw_spin_unlock+0x20/0x2c)
->> [ 560.087572] <804f544c> (_raw_spin_unlock+0x0/0x2c) from <8001d708>
->> (imx6q_enter_wait+0x80/0x8c)
->> [ 560.096620] :806f2f14 :806bd1b0
->> [ 560.100246] <8001d688> (imx6q_enter_wait+0x0/0x8c) from <80305d84>
->> (cpuidle_enter_state+0x44/0xfc)
->> [ 560.109554] :806dcae0 :00000082 :6128317f :8001d688
->> [ 560.115285] <80305d40> (cpuidle_enter_state+0x0/0xfc) from
->> <80305f28> (cpuidle_idle_call+0xec/0x15c)
->> [ 560.124767] :806b2000 :806dcae4 :806c00f8 :00000001 :80c37030
->> :806dcae0
->> [ 560.132701] <80305e3c> (cpuidle_idle_call+0x0/0x15c) from <8000fd08>
->> (arch_cpu_idle+0x10/0x44)
->> [ 560.141662] :00000001 :806e8d8a :806b2000 :806ba0dc :806b2000
->> :00000000
->> [ 560.149595] <8000fcf8> (arch_cpu_idle+0x0/0x44) from <80056be4>
->> (cpu_startup_entry+0x50/0x114)
->> [ 560.158568] <80056b94> (cpu_startup_entry+0x0/0x114) from <804ea1e0>
->> (rest_init+0xb4/0xdc)
->> [ 560.167181] :8181af00 :00000000
->> [ 560.170808] <804ea12c> (rest_init+0x0/0xdc) from <80684a98>
->> (start_kernel+0x2f0/0x348)
->> [ 560.179074] :ffffffff :806f2b80 :806ba158
->> [ 560.183750] <806847a8> (start_kernel+0x0/0x348) from <80008070>
->> (0x80008070)
->>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+This patch depends on Leif Lindholm's ARM v7 runtime services patchset, which 
+in turn depends on Mark Salter's early_io_remap() patchset.  This EFI stub 
+patchset can be tested without those by simply modifying the Kconfig for 
+EFI_STUB to not depend on EFI.  The kernel will boot using the stub, 
+however no EFI support will be available in the kernel.
+
+I have addressed all the feedback I have recieved to date, and I am hoping 
+that this patchset is acceptable for merging into 3.14.  It has been 
+functionally stable for some time, and provides useful functionality.  
+Further consolidation of the ARM/ARM64 stubs planned as part of the 
+ongoing development of the stubs and supporting tools for both 
+architectures (getting the FDT from a UEFI configuration table, using UEFI 
+memory map instead of FDT for memory description.) 
+
+
+
+Changes since v5:
+* Move more code dealing with the Device tree to common code shared by
+  ARM and ARM64.
+* move formatting of informative and error messaging to common code to
+  harmonize formatting between ARM/ARM64 stubs.
+
+Changes since v4:
+* Common and x86 EFI stub changes that this patch depends on were merged
+  in 3.13.
+* Updated FDT bindings to match agreed upon bindings in Leif's runtime
+  services patchset.  This includes adding the kernel_banner version string,
+  and changing how the EFI memory map is passed.  The EFI memory map is now
+  allocated as EFI_RUNTIME_SERVICES_DATA since it may be passed to the kernel.
+  The FDT bindings for arm/arm64 are identical.
+* Added space in PE/COFF header for signature to allow signing of the image
+  for EFI secure boot.
+* Moved shared FDT function to drivers/firmware/efi/fdt.c.  This will be shared
+  with arm64.  (Mark Salter has a patchset for the arm64 stub.)
+
+
+Changes since v3:
+* Common and x86 EFI stub changes have been broken out and submitted separately.
+  This patch series depends on the "[PATCH V5 00/18] ARM EFI stub common code"
+  series as merged by Matt Fleming. (Patch 10 of that series omitted)
+* Re-added -fno-stack-protector.  Needed for compilation with 
+  CONFIG_CC_STACKPROTECTOR option.  Cannot easily add support for stack 
+  protection since there are no functions in stub that never return, which 
+  is a requirement for use.  (x86 stub also disables stack protector.)
+  Note that even in the absense of -fno-stack-protector, stack protection
+  was never present in the decompressor, as the required functions are not
+  implemented.
+* Fixed long summaries in commit messages.
+* Further cleanups of assembly in head.S
+
+
+Changes since v2:
+* Now depends on "arm: Add [U]EFI runtime services support" patches by leif.lindholm at linaro.org.
+  The EFI memory map is the only memory map passed to the kernel, so EFI support
+  is now required.
+* remove "-fno-stack-protector" from decompressor Makefile.  The current code doesn't
+  trigger the stack protection, so the decompressor now compiles with it still
+  on.  Note that there has never been any stack protection in the decompressor
+  since the stack usage doesn't trigger the heuristic in GCC, so right now
+  the "-fno-stack-protector" is a noop.
+* Changed EFI command line handling to not have a fixed limit.
+* Change FDT memory allocation to retry with a larger allocation if
+  first educated guess is inadequate.
+* Correctly set 'SizeOfCode' in PE/COFF header.
+* Reviewed ".setup" section that is in x86 PE/COFF header.  This is used for x86
+  to account for code that is not in the .text section.  We don't need this
+  for ARM, as all of our code is in the .text section, or in the PE/COFF header
+  itself.
+* Moved EFI_STUB_ERROR #define to header file to share between stub C and ASM.
+* Variety of cleanups and fixes in head.S.
+* Changed update_fdt_and_exit_boot() to just update the device tree, and
+  renamed appropriately.  Memory allocations moved out of this function as
+  well, which enables the retries if the initial FDT size is too small.
+  Note that in order to do the retried allocations, the original FDT and 
+  command line memory regions are left allocated.  This is OK since the kernel
+  has the memory map and will free these allocations along with the initrd
+  and new fdt allocations.
+* Added prefix to all prints, reduced number of prints, and reviewed all
+  messages.
+* Change mixed usage of dtb/fdt to all be fdt or "device tree" in efi-stub.c
+* remove unnecessary zimage_size variable from relocate_kernel()
+* correct return types on EFI functions - should be efi_status_t, not int.
+Roy Franz (8):
+  efi-stub.txt updates for ARM
+  Add shared printk wrapper for consistent prefixing
+  Add helper function to get and convert EFI command line
+  Add shared FDT related functions for ARM/ARM64
+  Add strstr to compressed string.c for ARM.
+  Add EFI stub for ARM
+  Disable stack protection for decompressor/stub
+  Add config EFI_STUB for ARM to Kconfig
+
+ Documentation/efi-stub.txt             |   27 +++-
+ arch/arm/Kconfig                       |   11 ++
+ arch/arm/boot/compressed/Makefile      |   17 ++-
+ arch/arm/boot/compressed/efi-header.S  |  117 +++++++++++++++++
+ arch/arm/boot/compressed/efi-stub.c    |  214 ++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/efi-stub.h    |    5 +
+ arch/arm/boot/compressed/head.S        |   83 +++++++++++-
+ arch/arm/boot/compressed/string.c      |   21 +++
+ drivers/firmware/efi/efi-stub-helper.c |   55 ++++++--
+ drivers/firmware/efi/fdt.c             |  225 ++++++++++++++++++++++++++++++++
+ 10 files changed, 748 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/boot/compressed/efi-stub.c
+ create mode 100644 arch/arm/boot/compressed/efi-stub.h
+ create mode 100644 drivers/firmware/efi/fdt.c
+
+-- 
+1.7.10.4
