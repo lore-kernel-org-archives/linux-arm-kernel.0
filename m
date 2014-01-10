@@ -1,114 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 10 Jan 2014 13:22:40 -0500
-Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the
- OpenBlocks AX3-4 board
-In-Reply-To: <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140110182240.GK19878@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 10 Jan 2014 18:27:05 +0000
+Subject: [PATCH v10 1/4] arm64: topology: Implement basic CPU topology
+ support
+In-Reply-To: <20140110174558.GI925@arm.com>
+References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+ <1389287106-29979-2-git-send-email-broonie@kernel.org>
+ <20140110174558.GI925@arm.com>
+Message-ID: <20140110182705.GR29039@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory, Arnd,
+On Fri, Jan 10, 2014 at 05:45:59PM +0000, Catalin Marinas wrote:
 
-On Wed, Jan 08, 2014 at 04:06:27PM +0100, Gregory CLEMENT wrote:
-> The first variants of Armada XP SoCs (A0 stepping) have issues related
-> to the i2c controller which prevent to use the offload mechanism and
-> lead to a kernel hang during boot.
-> 
-> This commit add quirk in the mvebu platform code to check the SoC
-> version and then update the compatible string for the i2c controller
-> according to the revision of the SoC. Currently only some OpenBlocks
-> AX3-4 boards are known to use an A0 revision so the check is done only
-> for these boards.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index e2acff98e750..0f61a4f22fb5 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -21,6 +21,7 @@
->  #include <linux/clocksource.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/mbus.h>
-> +#include <linux/slab.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -28,6 +29,7 @@
->  #include "armada-370-xp.h"
->  #include "common.h"
->  #include "coherency.h"
-> +#include "mvebu-soc-id.h"
->  
->  static void __init armada_370_xp_map_io(void)
->  {
-> @@ -45,8 +47,38 @@ static void __init armada_370_xp_timer_and_clk_init(void)
->  #endif
->  }
->  
-> +static void __init i2c_quirk(void)
-> +{
-> +	struct device_node *np;
-> +	u32 dev, rev;
-> +
-> +	/*
-> +	 * Only revisons more recent than A0 support the offload
-> +	 * mechanism. We can exit only if we are sure that we can
-> +	 * get the SoC revision and it is more recent than A0.
-> +	 */
-> +	if (mvebu_get_soc_id(&rev, &dev) == 0 && dev > MV78XX0_A0_REV)
-> +		return;
-> +
-> +	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c") {
-> +		struct property *new_compat;
-> +
-> +		new_compat = kzalloc(sizeof(*new_compat), GFP_KERNEL);
-> +
-> +		new_compat->name =  kstrdup("compatible", GFP_KERNEL);
-> +		new_compat->length =  sizeof("marvell,mv78230-a0-i2c");
-> +		new_compat->value =  kstrdup("marvell,mv78230-a0-i2c",
-> +						GFP_KERNEL);
+> The patches seem fine otherwise, apart from the last one which I
+> won't merge until we get some real numbers.
 
-I'm still having some trouble with this compatible string choice...  But
-I have refined the problem :)
+As I previously said I am really concerned about diverging from what
+arm32 has done here and the numbers don't seem any less real than the
+ones we're using there (they were generated in an identical fashion).
+Given the hardware availability for arm64 in general is limited and
+likely to be even more so for big.LITTLE systems it seems like asking
+for problems down the line to do something different.
 
-Do we create new compatible strings to indicate errata, or to indicate
-'from this version forward there are new features'?  The former would
-indicate as Gregory has written '...-a0-i2c', the latter would warrant
-'...-b0-i2c' and disabling offloading if we don't see '...-b0-i2c'.
-
-I can see Gregory's approach if he were still using the property
-'offload-broken', but I suspect the compatible strings should be handled
-differently.
-
-thx,
-
-Jason.
-
-> +
-> +		of_update_property(np, new_compat);
-> +	}
-> +	return;
-> +}
-> +
->  static void __init armada_370_xp_dt_init(void)
->  {
-> +	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
-> +		i2c_quirk();
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->  
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Honestly I'm not sure there will ever be more real numbers that aren't
+benchmarked at runtime.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/9baebcba/attachment.sig>
