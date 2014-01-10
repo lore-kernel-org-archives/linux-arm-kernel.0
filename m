@@ -1,73 +1,96 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Fri, 10 Jan 2014 17:29:04 -0500
-Subject: [PATCH 0/6] arm64: Add EFI stub and runtime services support
-Message-ID: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+Date: Fri, 10 Jan 2014 17:29:06 -0500
+Subject: [PATCH 2/6] arm64: Add function to create identity mappings
+In-Reply-To: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+Message-ID: <1389392950-22457-3-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds EFI support to the arm64 kernel. This support has
-two main parts: an EFI stub and runtime support. The EFI stub support
-has the kernel masquerade as a PE/COFF application which can be directly
-booted by EFI firmware (or by secondary loaders with EFI support). The
-runtime services support provides access to various EFI firmware services
-such as reboot, real-time clock, boot variables, and others.
+At boot time, UEFI runtime support needs to call into the UEFI firmware
+to switch to a virtual address map. This call must be made with UEFI
+memory regions identity mapped. The exisitng early boot code creates
+an identity map of kernel text/data but this is not sufficient for UEFI.
+This patch adds a create_id_mapping() function which reuses the core
+code of create_mapping() used to create the kernel RAM mappings.
 
-Changes since v1:
+Signed-off-by: Mark Salter <msalter@redhat.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/include/asm/mmu.h |  1 +
+ arch/arm64/mm/mmu.c          | 34 ++++++++++++++++++++++++----------
+ 2 files changed, 25 insertions(+), 10 deletions(-)
 
-  * Added Acks (well, one anyway)
-
-  * The first 3 patches are new for v2 and provide more generic
-    support for for following EFI patches.
-
-  * Lots of changes based on feedback from Catalin mostly. I think
-    I addressed all of his comments.
-
-These patches have dependencies on other patches which are not yet in
-the kernel but have been posted and are currently under review. In
-particular:
-
-  - Generic fixmap support being discussed here:
-      http://lkml.org/lkml/2013/11/25/474
-    This is now in the akpm tree
-
-  - early_ioremap support being discussed here:
-      https://lkml.org/lkml/2014/1/9/708
-
-  - shared EFI update_fdt() function in this series:
-      http://news.gmane.org/gmane.linux.kernel.efi
-
-A repo with this patch series and the prerequisite patches is at:
-
-  git://github.com/mosalter/linux.git (arm64-efi-patches-v2 branch)
-
-Mark Salter (6):
-  efi: create memory map iteration helper
-  arm64: Add function to create identity mappings
-  efi: add helper function to get UEFI params from FDT
-  arm64: add EFI stub
-  doc: arm64: add description of EFI stub support
-  arm64: add EFI runtime services
-
- Documentation/arm64/booting.txt |   4 +
- Documentation/efi-stub.txt      |  12 +-
- arch/arm64/Kconfig              |  26 +++
- arch/arm64/include/asm/efi.h    |  12 ++
- arch/arm64/include/asm/mmu.h    |   1 +
- arch/arm64/kernel/Makefile      |   4 +
- arch/arm64/kernel/efi-entry.S   |  93 +++++++++++
- arch/arm64/kernel/efi-stub.c    | 181 ++++++++++++++++++++
- arch/arm64/kernel/efi.c         | 353 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/head.S        | 112 +++++++++++++
- arch/arm64/kernel/setup.c       |   6 +
- arch/arm64/mm/mmu.c             |  34 ++--
- drivers/firmware/efi/Kconfig    |   7 +
- drivers/firmware/efi/efi.c      |  79 +++++++++
- include/linux/efi.h             |  17 +-
- 15 files changed, 927 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm64/include/asm/efi.h
- create mode 100644 arch/arm64/kernel/efi-entry.S
- create mode 100644 arch/arm64/kernel/efi-stub.c
- create mode 100644 arch/arm64/kernel/efi.c
-
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index f600d40..9ad4dd4 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -28,5 +28,6 @@ extern void paging_init(void);
+ extern void setup_mm_for_reboot(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+ extern void init_mem_pgprot(void);
++extern void create_id_mapping(phys_addr_t addr, phys_addr_t size);
+ 
+ #endif
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7b345e3..ccfca44 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -228,22 +228,14 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
+  */
+-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+-				  phys_addr_t size)
++static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
++				    unsigned long virt, phys_addr_t size)
+ {
+ 	unsigned long addr, length, end, next;
+-	pgd_t *pgd;
+-
+-	if (virt < VMALLOC_START) {
+-		pr_warning("BUG: not creating mapping for 0x%016llx at 0x%016lx - outside kernel range\n",
+-			   phys, virt);
+-		return;
+-	}
+ 
+ 	addr = virt & PAGE_MASK;
+ 	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+ 
+-	pgd = pgd_offset_k(addr);
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+@@ -252,6 +244,28 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 	} while (pgd++, addr = next, addr != end);
+ }
+ 
++static void __init create_mapping(phys_addr_t phys, unsigned long virt,
++				  phys_addr_t size)
++{
++	if (virt < VMALLOC_START) {
++		pr_warn("BUG: not creating mapping for 0x%016llx@0x%016lx - outside kernel range\n",
++			phys, virt);
++		return;
++	}
++	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size);
++}
++
++void __init create_id_mapping(phys_addr_t addr, phys_addr_t size)
++{
++	pgd_t *pgd = &idmap_pg_dir[pgd_index(addr)];
++
++	if (pgd >= &idmap_pg_dir[ARRAY_SIZE(idmap_pg_dir)]) {
++		pr_warn("BUG: not creating id mapping for 0x%016llx\n", addr);
++		return;
++	}
++	__create_mapping(pgd, addr, addr, size);
++}
++
+ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
 -- 
 1.8.3.1
