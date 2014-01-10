@@ -1,49 +1,65 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Fri, 10 Jan 2014 15:52:20 -0700
-Subject: [PATCH v6 6/6] ACPI: make sure ECs do not use the ACPI global lock
+Date: Fri, 10 Jan 2014 15:52:19 -0700
+Subject: [PATCH v6 5/6] ACPI: do not map/unmap memory regions for FADT entries
+ in reduced HW mode
 In-Reply-To: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
 References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1389394340-2680-7-git-send-email-al.stone@linaro.org>
+Message-ID: <1389394340-2680-6-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-ACPI ECs (Embedded Controllers) are allowed to use the ACPI global
-lock in legacy mode.  Since there is no global lock in hardware
-reduced mode, make sure that ECs cannot inadvertently use it with
-older ACPI tables that may have defined an _GLK method for the
-EC device.  Since an individual lock can and should be defined for
-each EC, access to each EC should still be properly controlled.
+Several of the FADT fields are normally kept in specific memory
+regions.  Since these fields are to be ignored in hardware reduced
+ACPI mode, do not map those addresses when in that mode, and of
+course do not release the mappings that have not been made.
+
+The function acpi_os_initialize() could become a stub in the header
+file but is left here in case it can be of further use.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 ---
- drivers/acpi/ec.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ drivers/acpi/osl.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/acpi/ec.c b/drivers/acpi/ec.c
-index ba5b56d..3f15110 100644
---- a/drivers/acpi/ec.c
-+++ b/drivers/acpi/ec.c
-@@ -745,9 +745,17 @@ ec_parse_device(acpi_handle handle, u32 Level, void *context, void **retval)
- 	if (ACPI_FAILURE(status))
- 		return status;
- 	ec->gpe = tmp;
--	/* Use the global lock for all EC transactions? */
-+	/*
-+	 * Use the global lock for all EC transactions?
-+	 *
-+	 * If ACPI is in hardware reduced mode, there is no global lock.
-+	 * If a _GLK method is defined, it needs to be ignored, just
-+	 * in case it returns "true", which could happen if the ASL is
-+	 * written incorrectly.
-+	 */
- 	tmp = 0;
--	acpi_evaluate_integer(handle, "_GLK", NULL, &tmp);
-+	if (!acpi_gbl_reduced_hardware)
-+		acpi_evaluate_integer(handle, "_GLK", NULL, &tmp);
- 	ec->global_lock = tmp;
- 	ec->handle = handle;
- 	return AE_CTRL_TERMINATE;
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index c946a3a..7822821 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -1778,10 +1778,12 @@ __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
+ 
+ acpi_status __init acpi_os_initialize(void)
+ {
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+-	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
++	if (!acpi_gbl_reduced_hardware) {
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
++		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
++	}
+ 
+ 	return AE_OK;
+ }
+@@ -1806,10 +1808,12 @@ acpi_status acpi_os_terminate(void)
+ 						 acpi_irq_handler);
+ 	}
+ 
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++	if (!acpi_gbl_reduced_hardware) {
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
++		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
++	}
+ 
+ 	destroy_workqueue(kacpid_wq);
+ 	destroy_workqueue(kacpi_notify_wq);
 -- 
 1.8.4.2
