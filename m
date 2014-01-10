@@ -1,65 +1,146 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Fri, 10 Jan 2014 11:01:06 +1000
-Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
-In-Reply-To: <20140109165557.GB9681@lunn.ch>
-References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
- <52CE312B.3060108@killerwolves.net> <20140109165557.GB9681@lunn.ch>
-Message-ID: <52CF4652.3030207@killerwolves.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 10 Jan 2014 10:16:30 +0900
+Subject: [PATCH V5 1/2] PHY: Exynos: Add Exynos5250 SATA PHY driver
+In-Reply-To: <1389262005-30399-2-git-send-email-yuvaraj.cd@samsung.com>
+References: <1389262005-30399-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1389262005-30399-2-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <002901cf0da1$98335370$c899fa50$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 05:55:57PM +0100, Andrew Lunn wrote:
-> On Thu, Jan 09, 2014 at 03:18:35PM +1000, Ben Peddell wrote:
->> On 07/01/14 09:47, Andrew Lunn wrote:
->>> Request for Testing:
->>>
->>> This patch adds support for around 30 different boards. Most .dts
->>> files support a couple of different models. I don't have any of this
->>> hardware. None of this is tested.
->>
->> Tested by Ben Peddell <klightspeed@killerwolves.net> (specifically kirkwood-ds210.dts on DS211j)
+On Thursday, January 09, 2014 7:07 PM, Yuvaraj Kumar C D wrote:
 > 
-> Hi Ben
+> This patch adds the SATA PHY driver for Exynos5250.Exynos5250 SATA
+> PHY comprises of CMU and TRSV blocks which are of I2C register Map.
+> So this patch also adds a i2c client driver, which is used configure
+> the CMU and TRSV block of exynos5250 SATA PHY.
 > 
-> Thanks for testing. I will fix the gpo and send a v2 sometime. I
-> should also check if there are any more gpo's i have as gpio's.
-
-There are only a few pins that are GPOs - from 
-marvell,kirkwood-pinctrl.txt, they are 
-1, 2, 3, 5, 7, 10, 18, 19 and 33.
-
->  
->> To get running on the stock bootloader, I needed to extend the 
->> initramfs to fill the entire rd.gz flash partition, configure the 
->> kernel to use the dtb appended to it, configure it to ignore the 
->> information passed to it by the bootloader, and add the following 
->> nodes to the dts:
->>
->> /chosen {
->> 	linux,initrd-start = <0x800040>;
->> 	linux,initrd-end   = <0x940000>;
->> };
+> This patch incorporates the generic PHY framework to deal with SATA
+> PHY.
 > 
-> Do you know why these initrd properties are needed?  There is only one
-> other board in mainline that requires this. I also wonder what
-> implications this has. u-boot has the capability of reading the initrd
-> from disc to RAM and passing its location to the kernel. By hard
-> coding these values, are we blocking that?
+> This patch depends on the below patches
+> 	[1].drivers: phy: add generic PHY framework
+> 		by Kishon Vijay Abraham I<kishon@ti.com>
+> 	[2].ata: ahci_platform: Manage SATA PHY
+> 		by Roger Quadros <rogerq@ti.com>
+> 
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
+> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
 
-The stock Marvell bootloader is a little broken as it passes the kernel
-the _source_ address of the initrd rather than the _load_ address.
-Thus the bootloader passes the address 0xf8280040 rather than the address
-0x00800040.
+Hi Yuvaraj Kumar,
 
-It appears the initrd address in the devicetree structure (which is 
-filled in from what is passed by the bootloader when 
-CONFIG_ARM_ATAG_DTB_COMPAT is set) is processed _after_ the address in 
-the initrd= kernel parameter is processed.
+It looks good.
+However, I added some minor comments. :-)
 
-Rather than putting the initrd address into the DTS, it would probably be
-better to have the person compiling the kernel configure it with e.g.:
+Also, you need to base against the following Kishon's PHY git tree,
+next branch. Then, Kishon will apply your patch more easily.
 
-CONFIG_CMDLINE="initrd=0x00800040,0x0013FFC0 earlyprintk panic=5"
-CONFIG_CMDLINE_EXTEND=y
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=n
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git
+
+
+> ---
+> Changes from V4:
+> 	1.Made Exynos5250 SATA PHY driver by default selects
+> 	CONFIG_I2C and CONFIG_I2C_S3C2410, as SATA PHY driver
+> 	depends on I2C.
+> 	2.struct i2c_driver sataphy_i2c_driver made static which
+> 	was earlier global type.
+> 	3.Renamed the files to phy-exynos5250-sata.c and
+> 	phy-exynos5250-sata-i2c.c and CONFIG_EXYNOS5250_SATA_PHY
+> 	to CONFIG_PHY_EXYNOS5250_SATA.
+> 
+> Changes from V3:
+> 	1.Moved devm_phy_create before to devm_phy_provider_register.
+> 
+> Changes from V2:
+> 	1.Removed of_match_table
+> 	2.Moved to syscon interface for PMU handling.
+> 
+> Changes from V1:
+> 	1.Adapted to latest version of Generic PHY framework
+> 	2.Removed exynos_sata_i2c_remove function.
+> 
+>  drivers/phy/Kconfig                   |   13 ++
+>  drivers/phy/Makefile                  |    1 +
+>  drivers/phy/phy-exynos5250-sata-i2c.c |   40 ++++++
+>  drivers/phy/phy-exynos5250-sata.c     |  238 +++++++++++++++++++++++++++++++++
+>  4 files changed, 292 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos5250-sata-i2c.c
+>  create mode 100644 drivers/phy/phy-exynos5250-sata.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index d0611b8..de1c165 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -57,4 +57,17 @@ config PHY_EXYNOS_DP_VIDEO
+>  	help
+>  	  Support for Display Port PHY found on Samsung EXYNOS SoCs.
+> 
+> +config PHY_EXYNOS5250_SATA
+> +	tristate "Exynos5250 Sata SerDes/PHY driver"
+> +	depends on SOC_EXYNOS5250
+> +	select GENERIC_PHY
+> +	select I2C
+> +	select I2C_S3C2410
+> +	select MFD_SYSCON
+> +	help
+> +	  Enable this to support SATA SerDes/Phy found on Samsung's
+> +	  Exynos5250 based SoCs.This SerDes/Phy supports SATA 1.5 Gb/s,
+> +	  SATA 3.0 Gb/s, SATA 6.0 Gb/s speeds.It supports one SATA host
+                                                          ^
+One space between 'speeds.' and 'It' is needed as below.
+
++	  SATA 3.0 Gb/s, SATA 6.0 Gb/s speeds. It supports one SATA host
+
+> +	  port to accept one SATA device.
+> +
+>  endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 4e4adc9..8ccf8c3 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+>  obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
+>  obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
+>  obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+> +obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o phy-exynos5250-sata-i2c.o
+> diff --git a/drivers/phy/phy-exynos5250-sata-i2c.c b/drivers/phy/phy-exynos5250-sata-i2c.c
+> new file mode 100644
+> index 0000000..83bd6ee
+> --- /dev/null
+> +++ b/drivers/phy/phy-exynos5250-sata-i2c.c
+> @@ -0,0 +1,40 @@
+
+[.....]
+
+> +static struct i2c_driver sataphy_i2c_driver = {
+> +	.probe		= exynos_sata_i2c_probe,
+> +	.id_table	= sataphy_i2c_device_match,
+> +	.driver   = {
+> +		.name = "exynos-sataphy-i2c",
+> +		.owner = THIS_MODULE,
+> +		},
+
+There is an indent coding style issue.
+The following is right.
+
++	},
+
+
+[.....]
+
+> +
+> +MODULE_DESCRIPTION("Samsung SerDes PHY driver");
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("ks.giri <ks.giri@samsung.com>");
+
+The following is more preferable.
++MODULE_AUTHOR("Girish K S <ks.giri@samsung.com>");
+
+Best regards,
+Jingoo Han
+
+> +MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
+> --
+> 1.7.9.5
