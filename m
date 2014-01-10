@@ -1,128 +1,58 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 10 Jan 2014 08:30:11 -0800
-Subject: [PATCH V6 2/8] Add shared printk wrapper for consistent prefixing
+Date: Fri, 10 Jan 2014 08:30:12 -0800
+Subject: [PATCH V6 3/8] Add helper function to get and convert EFI command line
 In-Reply-To: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
 References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <1389371417-379-3-git-send-email-roy.franz@linaro.org>
+Message-ID: <1389371417-379-4-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a wrapper for printk to standardize the prefix for informational and
-error messages from the EFI stub.
+Add an EFI stub helper function to retrieve the EFI command line using
+the LOADED_IMAGE_PROTOCOL, and convert it to ASCII.  This function will
+be shared by the various EFI stub implementations.
 
 Signed-off-by: Roy Franz <roy.franz@linaro.org>
 ---
- drivers/firmware/efi/efi-stub-helper.c |   25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ drivers/firmware/efi/efi-stub-helper.c |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
 diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-index b6bffbf..eb5d2eb 100644
+index eb5d2eb..f657456 100644
 --- a/drivers/firmware/efi/efi-stub-helper.c
 +++ b/drivers/firmware/efi/efi-stub-helper.c
-@@ -45,6 +45,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
- 	}
+@@ -637,3 +637,33 @@ static char *efi_convert_cmdline_to_ascii(efi_system_table_t *sys_table_arg,
+ 	*cmd_line_len = options_size;
+ 	return (char *)cmdline_addr;
  }
- 
-+#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
-+#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
 +
- 
- static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
- 				       efi_memory_desc_t **map,
-@@ -324,7 +327,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 				nr_files * sizeof(*files),
- 				(void **)&files);
- 	if (status != EFI_SUCCESS) {
--		efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
-+		pr_efi_err(sys_table_arg, "Failed to alloc mem for file handle list\n");
- 		goto fail;
- 	}
- 
-@@ -376,13 +379,13 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 					image->device_handle, &fs_proto,
- 						(void **)&io);
- 			if (status != EFI_SUCCESS) {
--				efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
-+				pr_efi_err(sys_table_arg, "Failed to handle fs_proto\n");
- 				goto free_files;
- 			}
- 
- 			status = efi_call_phys2(io->open_volume, io, &fh);
- 			if (status != EFI_SUCCESS) {
--				efi_printk(sys_table_arg, "Failed to open volume\n");
-+				pr_efi_err(sys_table_arg, "Failed to open volume\n");
- 				goto free_files;
- 			}
- 		}
-@@ -390,7 +393,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 		status = efi_call_phys5(fh->open, fh, &h, filename_16,
- 					EFI_FILE_MODE_READ, (u64)0);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to open file: ");
-+			pr_efi_err(sys_table_arg, "Failed to open file: ");
- 			efi_char16_printk(sys_table_arg, filename_16);
- 			efi_printk(sys_table_arg, "\n");
- 			goto close_handles;
-@@ -402,7 +405,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 		status = efi_call_phys4(h->get_info, h, &info_guid,
- 					&info_sz, NULL);
- 		if (status != EFI_BUFFER_TOO_SMALL) {
--			efi_printk(sys_table_arg, "Failed to get file info size\n");
-+			pr_efi_err(sys_table_arg, "Failed to get file info size\n");
- 			goto close_handles;
- 		}
- 
-@@ -411,7 +414,7 @@ grow:
- 					EFI_LOADER_DATA, info_sz,
- 					(void **)&info);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
-+			pr_efi_err(sys_table_arg, "Failed to alloc mem for file info\n");
- 			goto close_handles;
- 		}
- 
-@@ -427,7 +430,7 @@ grow:
- 		efi_call_phys1(sys_table_arg->boottime->free_pool, info);
- 
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to get file info\n");
-+			pr_efi_err(sys_table_arg, "Failed to get file info\n");
- 			goto close_handles;
- 		}
- 
-@@ -446,13 +449,13 @@ grow:
- 		status = efi_high_alloc(sys_table_arg, file_size_total, 0x1000,
- 				    &file_addr, max_addr);
- 		if (status != EFI_SUCCESS) {
--			efi_printk(sys_table_arg, "Failed to alloc highmem for files\n");
-+			pr_efi_err(sys_table_arg, "Failed to alloc highmem for files\n");
- 			goto close_handles;
- 		}
- 
- 		/* We've run out of free low memory. */
- 		if (file_addr > max_addr) {
--			efi_printk(sys_table_arg, "We've run out of free low memory\n");
-+			pr_efi_err(sys_table_arg, "We've run out of free low memory\n");
- 			status = EFI_INVALID_PARAMETER;
- 			goto free_file_total;
- 		}
-@@ -473,7 +476,7 @@ grow:
- 							&chunksize,
- 							(void *)addr);
- 				if (status != EFI_SUCCESS) {
--					efi_printk(sys_table_arg, "Failed to read file\n");
-+					pr_efi_err(sys_table_arg, "Failed to read file\n");
- 					goto free_file_total;
- 				}
- 				addr += chunksize;
-@@ -558,7 +561,7 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
- 				       &new_addr);
- 	}
- 	if (status != EFI_SUCCESS) {
--		efi_printk(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
-+		pr_efi_err(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
- 		return status;
- 	}
- 
++/*
++ * get the command line from EFI, using the LOADED_IMAGE
++ * protocol, and convert to ASCII.
++ *
++ */
++static void efi_get_cmdline(efi_system_table_t *sys_table,
++			      efi_loaded_image_t **image,
++			      void *handle, char **cmdline_ptr)
++{
++	efi_guid_t proto = LOADED_IMAGE_PROTOCOL_GUID;
++	efi_status_t status;
++	int cmdline_size;
++
++	status = efi_call_phys3(sys_table->boottime->handle_protocol,
++				handle, &proto, (void *)image);
++	if (status != EFI_SUCCESS) {
++		pr_efi_err(sys_table, "Failed to get handle for LOADED_IMAGE_PROTOCOL\n");
++		*cmdline_ptr = NULL;
++		return;
++	}
++
++	/*
++	 * We are going to copy this into device tree, so we don't care where
++	 * in memory it is.
++	 */
++	*cmdline_ptr = efi_convert_cmdline_to_ascii(sys_table, *image,
++						    &cmdline_size);
++
++}
 -- 
 1.7.10.4
