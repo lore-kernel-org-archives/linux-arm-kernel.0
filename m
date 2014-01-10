@@ -1,36 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jan 2014 14:09:46 -0600
-Subject: [PATCH v3 4/6] arm: add early_ioremap support
-In-Reply-To: <20140110165847.GG925@arm.com>
-References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
- <1389325833-16535-5-git-send-email-msalter@redhat.com>
- <CAL_JsqLZQ=3gph4yaNSrZ5oPL3kasQKqA5C5+my0GwjGHsvMeQ@mail.gmail.com>
- <20140110165847.GG925@arm.com>
-Message-ID: <CAL_JsqKZawTKC2pvyR8_Fu0GsixkvvKLSwhkFghZ9rTuE8O3Lw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 10 Jan 2014 21:12:41 +0100
+Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
+ AX3-4 board
+In-Reply-To: <20140110200813.GV19878@titan.lakedaemon.net>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140110182240.GK19878@titan.lakedaemon.net>
+ <20140110190521.GI18269@obsidianresearch.com>
+ <20140110194550.GT19878@titan.lakedaemon.net>
+ <20140110200813.GV19878@titan.lakedaemon.net>
+Message-ID: <52D05439.7040905@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 10:58 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Jan 10, 2014 at 04:11:03PM +0000, Rob Herring wrote:
->> On Thu, Jan 9, 2014 at 9:50 PM, Mark Salter <msalter@redhat.com> wrote:
->> > This patch uses the generic early_ioremap code to implement
->> > early_ioremap for ARM. The ARM-specific bits come mostly from
->> > an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
->> > here:
->> >
->> >   https://lkml.org/lkml/2013/10/3/279
+Jason,
+On 10/01/2014 21:08, Jason Cooper wrote:
+> On Fri, Jan 10, 2014 at 02:45:50PM -0500, Jason Cooper wrote:
+>> On Fri, Jan 10, 2014 at 12:05:21PM -0700, Jason Gunthorpe wrote:
+>>> On Fri, Jan 10, 2014 at 01:22:40PM -0500, Jason Cooper wrote:
+>>>
+>>>> Do we create new compatible strings to indicate errata, or to indicate
+>>>> 'from this version forward there are new features'?  The former would
+>>>> indicate as Gregory has written '...-a0-i2c', the latter would warrant
+>>>> '...-b0-i2c' and disabling offloading if we don't see '...-b0-i2c'.
 >>
->> I think this will be useful to implement an arm64 style earlycon for
->> arm as the current DEBUG_LL doesn't really work with multi-platform
->> kernels. I started on this and quickly realized I needed the fixmap
->> support.
->
-> It would be even better if you can make it more generic
-> (drivers/tty/serial/) and keep DEBUG_LL as a specialised case for
-> arch/arm (when !multi-platform).
+>> s/-b0-i2c'./-b0-i2c' or newer./
+>>
+>>> IMHO the compatible string should represent a specific HW/SW ABI. So
+>>> you need a unique compatible string for every variation of that ABI.
+>>
+>> My concern is that we tend to do things like "marvell,orion-sata" for
+>> the first version of the IP block we can work with.  orion5x, kirkwood,
+>> dove, and armada 370/xp all use that compatible string to refer to that
+>> IP block.
+>>
+>> Given that we look at it as 'and newer', '...-a0-i2c' would mean no
+>> offloading until we introduce '-b0-i2c'.  Or am I mis-understanding what
+>> you're saying?
+>>
+>>> We already have a compatible string defined for the ABI that B0
+>>> presents.
+>>
+>> So 'mv78230-i2c' is newer than 'mv78230-a0-i2c', or are you referring to
+>> something else?
+> 
+> I think the crux of it is:  Is mv78230-i2c the first, or the default?
 
-Yes, probably can do that. Perhaps DEBUG_LL can go back to just really
-early debug as Russell desires.
+Here it's clearly the default
 
-Rob
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
