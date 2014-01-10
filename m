@@ -1,31 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Jan 2014 17:00:06 +0000
-Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20140110170005.GH925@arm.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Fri, 10 Jan 2014 18:03:19 +0100
+Subject: DT include files
+In-Reply-To: <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
+References: <20140102202108.GF19720@quad.lixom.net>
+ <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
+ <20140103030455.GB25079@S2101-09.ap.freescale.net>
+ <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
+ <20140104011056.GA3282@S2101-09.ap.freescale.net>
+ <20140110024124.GA6844@S2101-09.ap.freescale.net>
+ <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
+ <52CFF57D.8060808@samsung.com>
+ <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
+Message-ID: <20140110170319.GC20094@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 06:32:15PM +0000, Stefano Stabellini wrote:
-> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> Necessary duplication of paravirt.h and paravirt.c with ARM.
+On Fri, Jan 10, 2014 at 09:30 -0600, Rob Herring wrote:
 > 
-> The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> runtime pvops patching needed.
+> As for *.h vs. *.dtsi naming, if the include is only pre-processor
+> defines, then I think using .h is the right way. Otherwise, if there
+> is any dts syntax, then .dtsi is the right name. It looks to me like
+> this style has been followed in both the imx and s3c64xx cases.
 > 
-> This allows us to make use of steal_account_process_tick for stolen
-> ticks accounting.
+> On a side note, I'm not really a fan of this pattern:
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: will.deacon at arm.com
-> CC: nico at linaro.org
-> CC: marc.zyngier at arm.com
-> CC: cov at codeaurora.org
-> CC: arnd at arndb.de
-> CC: olof at lixom.net
-> CC: Catalin.Marinas at arm.com
+> #define FOO1 1 2 3
+> 
+> #define BAR FOO1 FOO2 FOO3
+> 
+> While it definitely simplifies the dts files, it would never be used
+> in C and obfuscates what the actual property size is. Reading a dts
+> file, I would naturally assume the define was a single value while in
+> fact it could expand to a very large property size.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+For more complex yet tedious repetitive cases like GPIO banks and
+pins I've seen #define directives which introduce "functions"
+(macros with parameters).  They appear to be rather useful, can
+reflect very well the essence of the information, don't
+necessarily pretend to be single values, but still may hide how
+many cells they expand to.  For example:
+
+  arch/arm/boot/dts/tegra30-cardhu.dtsi:
+    interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+
+
+virtually yours
+Gerhard Sittig
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
