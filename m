@@ -1,69 +1,104 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Fri, 10 Jan 2014 10:12:32 -0700
-Subject: [PATCH v5 1/5] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY
- to enforce this ACPI mode
-In-Reply-To: <20140110103757.GC925@arm.com>
-References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
- <1389142011-27356-2-git-send-email-al.stone@linaro.org>
- <201401081346.25767.arnd@arndb.de>
- <CAHkRjk50ctWV4Z13wRYh8n6urcTdkq4a8tgKi8k6hgNHA3cVVA@mail.gmail.com>
- <52CF1297.9030306@redhat.com> <20140110103757.GC925@arm.com>
-Message-ID: <52D02A00.3000209@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 10 Jan 2014 18:24:02 +0100
+Subject: [linux-sunxi] [PATCH 1/5] i2c: mv64xxx: Add reset deassert call
+In-Reply-To: <CAGb2v6663ARKwmJ4Ypzi=m-J7UMvUFRq1=qLbqgQ0vrN_gC18w@mail.gmail.com>
+References: <1389288003-23187-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1389288003-23187-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v6663ARKwmJ4Ypzi=m-J7UMvUFRq1=qLbqgQ0vrN_gC18w@mail.gmail.com>
+Message-ID: <20140110172402.GR2941@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 03:37 AM, Catalin Marinas wrote:
-> On Thu, Jan 09, 2014 at 09:20:23PM +0000, Al Stone wrote:
->> On 01/09/2014 10:38 AM, Catalin Marinas wrote:
->>> On 8 January 2014 12:46, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Wednesday 08 January 2014, al.stone at linaro.org wrote:
->>>>> Even though support for X86 in hardware reduced mode is possible, it
->>>>> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
->>>>> there is a single kernel image than can run on all x86 hardware; the kernel
->>>>> changes run-time behavior to adapt to the hardware being used.  This is not
->>>>> currently possible with the existing ACPICA infrastructure but only presents
->>>>> a problem on achitectures supporting both hardware-reduced and legacy modes
->>>>> of ACPI -- i.e., on x86 only.
->>>>
->>>> Not sure about the logic here: While it's certainly possible to build a kernel
->>>> that runs on all x86 machines, it's also possible to build one that only
->>>> runs on some of them when some basic options are turned off. I don't see
->>>> any difference between that and what we have on ARM64 or the multiplatform
->>>> subset of ARM32.
->>>
->>> Would we ever need !CONFIG_ACPI_REDUCED_HARDWARE_ONLY on ARM or ARM64?
->>> If not, we could even make this always on for these archs.
->>>
->>
->> Not that I know of -- and I would hope not.  This mode is so much
->> more straightforward that it makes no sense to me to do anything
->> but reduced HW if you have the choice.
->
-> Thanks for clarifying.
->
->> I assume you were thinking of something like this in the arch Kconfig
->> file:
->>
->> config ARM64
->> 	....
->> 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->> 	...
->>
->> But, do let me know if you had something else in mind.  I think it does
->> make sense to add so I'll put this in the next version.
->
-> The change makes sense but I think it should come with the patches for
-> ACPI support on arm64 rather than your hw-reduced patches.
->
+Hi,
 
-Ah.  Indeed.  That makes more sense; I'll pass it on to my colleagues.
+On Fri, Jan 10, 2014 at 01:48:41PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jan 10, 2014 at 1:19 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The Allwinner A31 SoC using that IP has a reset controller maintaining
+> > it reset unless told otherwise.
+> >
+> > Add some optional reset support to the driver.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 1 +
+> >  drivers/i2c/busses/Kconfig                            | 1 +
+> >  drivers/i2c/busses/i2c-mv64xxx.c                      | 6 ++++++
+> >  3 files changed, 8 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > index 82e8f6f..603003a 100644
+> > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> > @@ -12,6 +12,7 @@ Optional properties :
+> >
+> >   - clock-frequency : Desired I2C bus clock frequency in Hz. If not set the
+> >  default frequency is 100kHz
+> > + - resets          : phandle to the parent reset controller
+> >
+> >  Examples:
+> >
+> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> > index 3b26129..69aa599 100644
+> > --- a/drivers/i2c/busses/Kconfig
+> > +++ b/drivers/i2c/busses/Kconfig
+> > @@ -528,6 +528,7 @@ config I2C_MPC
+> >  config I2C_MV64XXX
+> >         tristate "Marvell mv64xxx I2C Controller"
+> >         depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
+> > +       select RESET_CONTROLLER
+> >         help
+> >           If you say yes to this option, support will be included for the
+> >           built-in I2C interface on the Marvell 64xxx line of host bridges.
+> > diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> > index 8be7e42..d4e2f32 100644
+> > --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> > +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> > @@ -17,6 +17,7 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/mv643xx_i2c.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/reset.h>
+> >  #include <linux/io.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> > @@ -743,6 +744,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> >  #else
+> >         const struct of_device_id *device;
+> >         struct device_node *np = dev->of_node;
+> > +       struct reset_control *rstc;
+> >         u32 bus_freq, tclk;
+> >         int rc = 0;
+> >
+> > @@ -763,6 +765,10 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> >         }
+> >         drv_data->irq = irq_of_parse_and_map(np, 0);
+> >
+> > +       rstc = devm_reset_control_get(dev, NULL);
+> > +       if (!IS_ERR(rstc))
+> > +               reset_control_deassert(rstc);
+> > +
+> 
+> Do we need to handle -EPROBE_DEFER here?
+
+Hmmm, true.
+
+> Also no reset_control_assert() in the exit path?
+> I'm asking because I have similar code in my stmmac patches.
+
+That might be a good idea indeed.
+
+Thanks!
+Maxime
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/db58a7cc/attachment-0001.sig>
