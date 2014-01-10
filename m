@@ -1,72 +1,76 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Fri, 10 Jan 2014 17:30:26 +0900
-Subject: [PATCH v4 0/7] ARM: S3C24XX: Convert s3c2416 and s3c2443 to common
- clock framework
-In-Reply-To: <201312101614.29781.heiko@sntech.de>
-References: <201312101614.29781.heiko@sntech.de>
-Message-ID: <093901cf0dde$36601100$a3203300$@kernel.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 10 Jan 2014 09:34:25 +0100
+Subject: BUG: bad unlock balance detected
+In-Reply-To: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
+References: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
+Message-ID: <52CFB091.5040707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Next try, this time with less time between submissions.
-> 
-> Tested on both non-dt and dt s3c2416.
-> 
-> Changes since v3:
-> - address comments from Tomasz Figa (binding documentation, etc)
-> - prevent conflicts with unconverted s3c24xx socs
-> Changes since v2
-> - address comments from Tomasz Figa
-> - use new pll registration mechanism
-> - use fixed-rate clocks for xti etc
-> 
-> Heiko Stuebner (7):
->   clk: samsung: add pll_6552 variant for s3c2416
->   clk: samsung: add plls used by the s3c2443
->   dt-bindings: add binding for clock-controller of s3c2443 and following
->   clk: samsung: add clock-driver for s3c2416, s3c2443 and s3c2450
->   ARM: S3C24XX: prevent conflicts between ccf and non-ccf s3c24xx-socs
->   ARM: dt: add clock data for s3c2416
->   ARM: S3C24XX: Convert s3c2416 and s3c2443 to common clock framework
-> 
->  .../bindings/clock/samsung,s3c2443-clock.txt       |   56 ++
->  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   13 +
->  arch/arm/boot/dts/s3c2416.dtsi                     |   42 ++
->  arch/arm/mach-s3c24xx/Kconfig                      |   18 +-
->  arch/arm/mach-s3c24xx/Makefile                     |    5 +-
->  arch/arm/mach-s3c24xx/clock-s3c2416.c              |  171 -----
->  arch/arm/mach-s3c24xx/clock-s3c2443.c              |  212 ------
->  arch/arm/mach-s3c24xx/common-s3c2443.c             |  675 -------------------
-> -
->  arch/arm/mach-s3c24xx/common.c                     |   18 +-
->  arch/arm/mach-s3c24xx/common.h                     |    6 +
->  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   39 +-
->  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    9 +-
->  arch/arm/mach-s3c24xx/mach-smdk2443.c              |    9 +-
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-pll.c                      |   84 ++-
->  drivers/clk/samsung/clk-pll.h                      |    3 +
->  drivers/clk/samsung/clk-s3c2443.c                  |  417 ++++++++++++
->  include/dt-bindings/clock/samsung,s3c2443-clock.h  |   92 +++
->  18 files changed, 756 insertions(+), 1114 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/samsung,s3c2443-clock.txt
->  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2416.c
->  delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2443.c
->  delete mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
->  create mode 100644 drivers/clk/samsung/clk-s3c2443.c
->  create mode 100644 include/dt-bindings/clock/samsung,s3c2443-clock.h
-> 
-> --
-> 1.7.10.4
+On 01/10/2014 03:52 AM, John Tobias wrote:
+> Hi Shawn,
+>
+> Any idea on these bug?.
 
-Heiko,
-Looks nice to me and I'm going to send this series to clk tree for v3.14.
+Is this bug happening systematically or randomly ?
 
-Mike,
-This series got you and Tomasz's ack for 3.14. Since major change is for clk stuff and there is no dependency with samsung tree, I'd like to send pull-request for this series to you for v3.14 tonight. If any problems, please kindly let me know.
 
-Thanks,
-Kukjin
+
+> [ 559.972748] =====================================
+> [ 559.977457] [ BUG: bad unlock balance detected! ]
+> [ 559.982169] 3.13.0-rc1 #1 Tainted: G O
+> [ 559.986790] -------------------------------------
+> [ 559.991499] swapper/0 is trying to release lock (master_lock) at:
+> [ 559.997642] <8001d708> imx6q_enter_wait+0x80/0x8c
+> [ 560.002524] but there are no more locks to release!
+> [ 560.007404]
+> [ 560.007404] other info that might help us debug this:
+> [ 560.013939] no locks held by swapper/0.
+> [ 560.017779]
+> [ 560.017779] stack backtrace:
+> [ 560.022147] CPU: 0 PID: 0 Comm: swapper Tainted: G O 3.13.0-rc1 #1
+> [ 560.029200] Backtrace:
+> [ 560.031685] <80011fb4> (dump_backtrace+0x0/0x10c) from <80012150>
+> (show_stack+0x18/0x1c)
+> [ 560.040128] :806c00e8 :8001d708 :806bd1b0 :00000000
+> [ 560.045869] <80012138> (show_stack+0x0/0x1c) from <804eeef0>
+> (dump_stack+0x20/0x28)
+> [ 560.053889] <804eeed0> (dump_stack+0x0/0x28) from <8004b2a8>
+> (print_unlock_imbalance_bug+0xb4/0xe4)
+> [ 560.063296] <8004b1f4> (print_unlock_imbalance_bug+0x0/0xe4) from
+> <8004e338> (lock_release+0x184/0x1bc)
+> [ 560.073037] :80be210c :806bd1b0 :806b2000 :00000000
+> [ 560.078771] <8004e1b4> (lock_release+0x0/0x1bc) from <804f546c>
+> (_raw_spin_unlock+0x20/0x2c)
+> [ 560.087572] <804f544c> (_raw_spin_unlock+0x0/0x2c) from <8001d708>
+> (imx6q_enter_wait+0x80/0x8c)
+> [ 560.096620] :806f2f14 :806bd1b0
+> [ 560.100246] <8001d688> (imx6q_enter_wait+0x0/0x8c) from <80305d84>
+> (cpuidle_enter_state+0x44/0xfc)
+> [ 560.109554] :806dcae0 :00000082 :6128317f :8001d688
+> [ 560.115285] <80305d40> (cpuidle_enter_state+0x0/0xfc) from
+> <80305f28> (cpuidle_idle_call+0xec/0x15c)
+> [ 560.124767] :806b2000 :806dcae4 :806c00f8 :00000001 :80c37030
+> :806dcae0
+> [ 560.132701] <80305e3c> (cpuidle_idle_call+0x0/0x15c) from <8000fd08>
+> (arch_cpu_idle+0x10/0x44)
+> [ 560.141662] :00000001 :806e8d8a :806b2000 :806ba0dc :806b2000
+> :00000000
+> [ 560.149595] <8000fcf8> (arch_cpu_idle+0x0/0x44) from <80056be4>
+> (cpu_startup_entry+0x50/0x114)
+> [ 560.158568] <80056b94> (cpu_startup_entry+0x0/0x114) from <804ea1e0>
+> (rest_init+0xb4/0xdc)
+> [ 560.167181] :8181af00 :00000000
+> [ 560.170808] <804ea12c> (rest_init+0x0/0xdc) from <80684a98>
+> (start_kernel+0x2f0/0x348)
+> [ 560.179074] :ffffffff :806f2b80 :806ba158
+> [ 560.183750] <806847a8> (start_kernel+0x0/0x348) from <80008070> (0x80008070)
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
