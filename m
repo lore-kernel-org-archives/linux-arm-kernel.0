@@ -1,35 +1,70 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 10 Jan 2014 11:57:29 +0200
-Subject: [PATCH 1/2] ARM: DRA7XX/AM43XX: randconfig fixes
+Date: Fri, 10 Jan 2014 11:57:30 +0200
+Subject: [PATCH 2/2] ARM: DRA7XX: Add support for DRA7XX only build
 In-Reply-To: <1389347850-22435-1-git-send-email-t-kristo@ti.com>
 References: <1389347850-22435-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1389347850-22435-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1389347850-22435-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7XX and AM43XX were missing common clock code from the Makefile, which
-causes build breakage in DRA7XX / AM43XX only builds once clock support
-for these SoCs is added. Add the missing entries to the Makefile as
-preparation of this.
+SOC_DRA7XX was under wrong menu within Kconfig file, which prevented
+DRA7XX only build. Fixed the kconfig options for this SoC as we are
+there. voltage.c needs to be added to the DRA7XX build also, otherwise
+DRA7XX only build will fail.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-omap2/Kconfig  |   18 ++++++++++--------
+ arch/arm/mach-omap2/Makefile |    1 +
+ 2 files changed, 11 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index dc21df1..e65948a 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -76,6 +76,16 @@ config SOC_AM43XX
+ 	select ARM_GIC
+ 	select MACH_OMAP_GENERIC
+ 
++config SOC_DRA7XX
++	bool "TI DRA7XX"
++	depends on ARCH_MULTI_V7
++	select ARCH_OMAP2PLUS
++	select ARM_CPU_SUSPEND if PM
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_SMP
++	select HAVE_ARM_ARCH_TIMER
++
+ config ARCH_OMAP2PLUS
+ 	bool
+ 	select ARCH_HAS_BANDGAP
+@@ -128,14 +138,6 @@ config SOC_HAS_REALTIME_COUNTER
+ 	depends on SOC_OMAP5 || SOC_DRA7XX
+ 	default y
+ 
+-config SOC_DRA7XX
+-	bool "TI DRA7XX"
+-	select ARM_ARCH_TIMER
+-	select CPU_V7
+-	select ARM_GIC
+-	select HAVE_SMP
+-	select COMMON_CLK
+-
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+ 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 088305f..96a990f 100644
+index 96a990f..8ebe9f3 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -191,6 +191,9 @@ obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o dpll44xx.o
- obj-$(CONFIG_SOC_AM33XX)		+= $(clock-common) dpll3xxx.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(clock-common)
- obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(clock-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_SOC_AM43XX)		+= $(clock-common) dpll3xxx.o
+@@ -132,6 +132,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_AM43XX)		+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_OMAP5)			+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_OMAP5)                += voltagedomains54xx_data.o
++obj-$(CONFIG_SOC_DRA7XX)		+= $(voltagedomain-common)
  
- # OMAP2 clock rate set data (old "OPP" data)
- obj-$(CONFIG_SOC_OMAP2420)		+= opp2420_data.o
+ # OMAP powerdomain framework
+ powerdomain-common			+= powerdomain.o powerdomain-common.o
 -- 
 1.7.9.5
