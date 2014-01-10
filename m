@@ -1,38 +1,65 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 10 Jan 2014 12:04:06 +0900
-Subject: [PATCH 1/1] drivers: net: silence compiler warning in smc91x.c
-Message-ID: <1389323046-4521-1-git-send-email-pankaj.dubey@samsung.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Thu, 9 Jan 2014 18:52:08 -0800
+Subject: BUG: bad unlock balance detected
+Message-ID: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If used 64 bit compiler GCC warns that:
+Hi Shawn,
 
-drivers/net/ethernet/smsc/smc91x.c:1897:7:
-warning: cast from pointer to integer of different
-size [-Wpointer-to-int-cast]
+Any idea on these bug?.
 
-This patch fixes this by changing typecase from "unsigned int" to "unsigned long"
+Regards,
 
-CC: "David S. Miller" <davem@davemloft.net>
-CC: Jingoo Han <jg1.han@samsung.com> 
-CC: netdev at vger.kernel.org
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- drivers/net/ethernet/smsc/smc91x.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+john
 
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 0c9b5d9..42e79b4 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -1894,7 +1894,7 @@ static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
- 	SMC_SELECT_BANK(lp, 1);
- 	val = SMC_GET_BASE(lp);
- 	val = ((val & 0x1F00) >> 3) << SMC_IO_SHIFT;
--	if (((unsigned int)ioaddr & (0x3e0 << SMC_IO_SHIFT)) != val) {
-+	if (((unsigned long)ioaddr & (0x3e0 << SMC_IO_SHIFT)) != val) {
- 		netdev_warn(dev, "%s: IOADDR %p doesn't match configuration (%x).\n",
- 			    CARDNAME, ioaddr, val);
- 	}
--- 
-1.7.10.4
+
+[ 559.972748] =====================================
+[ 559.977457] [ BUG: bad unlock balance detected! ]
+[ 559.982169] 3.13.0-rc1 #1 Tainted: G O
+[ 559.986790] -------------------------------------
+[ 559.991499] swapper/0 is trying to release lock (master_lock) at:
+[ 559.997642] <8001d708> imx6q_enter_wait+0x80/0x8c
+[ 560.002524] but there are no more locks to release!
+[ 560.007404]
+[ 560.007404] other info that might help us debug this:
+[ 560.013939] no locks held by swapper/0.
+[ 560.017779]
+[ 560.017779] stack backtrace:
+[ 560.022147] CPU: 0 PID: 0 Comm: swapper Tainted: G O 3.13.0-rc1 #1
+[ 560.029200] Backtrace:
+[ 560.031685] <80011fb4> (dump_backtrace+0x0/0x10c) from <80012150>
+(show_stack+0x18/0x1c)
+[ 560.040128] :806c00e8 :8001d708 :806bd1b0 :00000000
+[ 560.045869] <80012138> (show_stack+0x0/0x1c) from <804eeef0>
+(dump_stack+0x20/0x28)
+[ 560.053889] <804eeed0> (dump_stack+0x0/0x28) from <8004b2a8>
+(print_unlock_imbalance_bug+0xb4/0xe4)
+[ 560.063296] <8004b1f4> (print_unlock_imbalance_bug+0x0/0xe4) from
+<8004e338> (lock_release+0x184/0x1bc)
+[ 560.073037] :80be210c :806bd1b0 :806b2000 :00000000
+[ 560.078771] <8004e1b4> (lock_release+0x0/0x1bc) from <804f546c>
+(_raw_spin_unlock+0x20/0x2c)
+[ 560.087572] <804f544c> (_raw_spin_unlock+0x0/0x2c) from <8001d708>
+(imx6q_enter_wait+0x80/0x8c)
+[ 560.096620] :806f2f14 :806bd1b0
+[ 560.100246] <8001d688> (imx6q_enter_wait+0x0/0x8c) from <80305d84>
+(cpuidle_enter_state+0x44/0xfc)
+[ 560.109554] :806dcae0 :00000082 :6128317f :8001d688
+[ 560.115285] <80305d40> (cpuidle_enter_state+0x0/0xfc) from
+<80305f28> (cpuidle_idle_call+0xec/0x15c)
+[ 560.124767] :806b2000 :806dcae4 :806c00f8 :00000001 :80c37030
+:806dcae0
+[ 560.132701] <80305e3c> (cpuidle_idle_call+0x0/0x15c) from <8000fd08>
+(arch_cpu_idle+0x10/0x44)
+[ 560.141662] :00000001 :806e8d8a :806b2000 :806ba0dc :806b2000
+:00000000
+[ 560.149595] <8000fcf8> (arch_cpu_idle+0x0/0x44) from <80056be4>
+(cpu_startup_entry+0x50/0x114)
+[ 560.158568] <80056b94> (cpu_startup_entry+0x0/0x114) from <804ea1e0>
+(rest_init+0xb4/0xdc)
+[ 560.167181] :8181af00 :00000000
+[ 560.170808] <804ea12c> (rest_init+0x0/0xdc) from <80684a98>
+(start_kernel+0x2f0/0x348)
+[ 560.179074] :ffffffff :806f2b80 :806ba158
+[ 560.183750] <806847a8> (start_kernel+0x0/0x348) from <80008070> (0x80008070)
