@@ -1,23 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 10 Jan 2014 23:47:24 +0300
-Subject: [PATCH v2 05/16] blackfin: Update stmmac callback signatures
-In-Reply-To: <1389337217-29032-6-git-send-email-wens@csie.org>
-References: <1389337217-29032-1-git-send-email-wens@csie.org>
- <1389337217-29032-6-git-send-email-wens@csie.org>
-Message-ID: <52D05C5C.3030207@cogentembedded.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 10 Jan 2014 11:47:33 -0800
+Subject: [PATCH] ARM: msm_defconfig: Update for multi-platform
+In-Reply-To: <1389381128-28280-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Fri, 10 Jan 2014 11:12:08 -0800")
+References: <1389381128-28280-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <87d2jzaaay.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-On 01/10/2014 10:00 AM, Chen-Yu Tsai wrote:
+> ARCH_MSM is a hidden config option now so this defconfig needs to
+> be updated to select ARCH_MSM_DT instead. While we're here,
+> remove dead symbols (SSBI), drop selected symbols (ZRELADDR,
+> PHYLIB, USB_PHY) and enable the MSM random driver (HW_RANDOM_MSM).
+>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> stmmac callbacks have been extended for better seperation.
+Applied to next/soc, merged into for-next and pushed out.
 
-    Only "separation".
+Thanks for the quick fixup.
 
-> Update them to avoid breakage.
-
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-WBR, Sergei
+Kevin
