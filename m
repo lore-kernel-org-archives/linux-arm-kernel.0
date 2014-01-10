@@ -1,50 +1,54 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 10 Jan 2014 07:35:30 -0800
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140110151123.GG15937@n2100.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
- <20140110151123.GG15937@n2100.arm.linux.org.uk>
-Message-ID: <20140110153530.GA770@kroah.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Fri, 10 Jan 2014 16:40:39 +0100
+Subject: [PATCHv10][ 1/3] ARM i.MX35: build in pinctrl support.
+Message-ID: <1389368441-26310-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 03:11:23PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 10, 2014 at 07:07:02AM -0800, Greg Kroah-Hartman wrote:
-> > On Fri, Jan 10, 2014 at 02:54:44PM +0000, Russell King - ARM Linux wrote:
-> > > Greg,
-> > > 
-> > > Not sure if you saw the outcome to your comment above.  My conclusion
-> > > was:
-> > > 
-> > > "Yes, I'm coming to that conclusion as well.  It looks like your "containers"
-> > > aren't about collecting up several individual component devices into one
-> > > super-device and probing the appropriate subsystem when all components are
-> > > known.
-> > > 
-> > > "Confused why Greg is pointing me at your patches."
-> > 
-> > Ah, sorry, I missed that in my "catch up on 2 weeks of email" flood.
-> > 
-> > > Does this mean you're happy with the patch?
-> > 
-> > Well, I will not object to it on the grounds of it being a duplicate of
-> > Rafael's work now :)
-> > 
-> > I'll be glad to consider it on its own, when you feel the series is
-> > ready to be submitted.
-> 
-> I'll sort out a new set of patches today, along with a branch to pull if
-> you wish to take them that way.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v9->v10:
+- Added Fabio Estevam to the Cc list.
+- Removed the duplicated PINCTRL Kconfig selection for the I.MX35,
+  the remaining PINCTRL Kconfig selection is now ordered alphabetically.
 
-It's too late for 3.14, as my tree is now closed for that because 3.13
-should be out this weekend.  But I'll be glad to queue them up after
-3.14-rc1 is out.
+ChangeLog v8->v9:
+- patch refreshed when applying it.
 
-thanks,
+ChangeLog v7->v8:
+- The addition of the imx35 pinctrl driver selection in Kconfig that was in the
+  patch adding the devicetree support for the imx35 was moved here.
+---
+ arch/arm/mach-imx/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-greg k-h
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index b0c6eb3..7778b16c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -125,8 +125,9 @@ config SOC_IMX35
+ 	select CPU_V6K
+ 	select HAVE_EPIT
+ 	select MXC_AVIC
+-	select SMP_ON_UP if SMP
+ 	select PINCTRL
++	select PINCTRL_IMX35
++	select SMP_ON_UP if SMP
+ 
+ config SOC_IMX5
+ 	bool
+-- 
+1.7.9.5
