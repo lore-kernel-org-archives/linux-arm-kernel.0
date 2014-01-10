@@ -1,70 +1,35 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 10 Jan 2014 02:38:55 +0200
-Subject: [LNG] [PATCH] ARM: traps: fix opcode endianness when read from
- user memory
-In-Reply-To: <CAA3XUr0A2jK0y-kfkpGE4mDNOCAhDi7AY0y9Fvmu5dgNygXXQQ@mail.gmail.com>
-References: <1387816927-4313-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAA3XUr0A2jK0y-kfkpGE4mDNOCAhDi7AY0y9Fvmu5dgNygXXQQ@mail.gmail.com>
-Message-ID: <CAArO44uXBmnz3Cn9n5bBCfw_AHcX2B0OqPZpVzbOT9Nu5sEq2A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Jan 2014 09:47:24 +0900
+Subject: linux-next: manual merge of the sh tree with the tree
+In-Reply-To: <CAOesGMgJe9KR2muA4F9EaXYpDFDLxVZsKOj-8qZFbDZTiRBuww@mail.gmail.com>
+References: <20140106121317.bada4233ec3fec40f79735cc@canb.auug.org.au>
+ <CAOesGMgJe9KR2muA4F9EaXYpDFDLxVZsKOj-8qZFbDZTiRBuww@mail.gmail.com>
+Message-ID: <20140110004724.GA22965@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've just put it into tracker with your Reviewed-by.
+On Wed, Jan 08, 2014 at 11:11:03PM -0800, Olof Johansson wrote:
+> On Sun, Jan 5, 2014 at 5:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> > Hi Paul,
+> >
+> > Today's linux-next merge of the sh tree got conflicts in
+> > drivers/tty/serial/sh-sci.c and include/linux/serial_sci.h between
+> > commits 8fb9631c517b ("serial: sh-sci: Sort headers alphabetically"),
+> > 20bdcab8268c ("serial: sh-sci: Add OF support") and probably others from
+> > the arm-soc tree and commits ada80ee7fa60 ("serial: sh-sci: Add OF
+> > support") and b19ef75c56e9 ("serial: sh-sci: OF definitions need
+> > linux/of.h") from the sh tree.
+> >
+> > The arm-soc tree version is dated much more recently than
+> > the sh tree version and conflicts badly, so for today I have just dropped
+> > the sh tree (everything in there was committed before April 2013).  Please
+> > figure this out.
+> 
+> The request to merge the sh code came through Simon with claimed
+> agreement from SH maintainers to do so -- I didn't verify this since
+> they have in the past been well-coordinated. Simon?
 
-On 10 January 2014 02:09, Victor Kamensky <victor.kamensky@linaro.org> wrote:
-> Taras, it looks good. Did you submit it into Russell's patch system? It
-> would be good to have this fix in main line tree.
->
-> Anyone, is there any concerns about this patch? It is quite simple
-> change.
->
-> Thanks,
-> Victor
->
-> On 23 December 2013 08:42, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
->> Currently code has an inverted logic: opcode from user memory
->> is swapped to a proper endianness only in case of read error.
->> While normally opcode should be swapped only if it was read
->> correctly from user memory.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->> ---
->>  arch/arm/kernel/traps.c |    5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 7940241..36a844e 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -425,9 +425,10 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->>                         instr2 = __mem_to_opcode_thumb16(instr2);
->>                         instr = __opcode_thumb32_compose(instr, instr2);
->>                 }
->> -       } else if (get_user(instr, (u32 __user *)pc)) {
->> +       } else {
->> +               if (get_user(instr, (u32 __user *)pc))
->> +                       goto die_sig;
->>                 instr = __mem_to_opcode_arm(instr);
->> -               goto die_sig;
->>         }
->>
->>         if (call_undef_hook(regs, instr) == 0)
->> --
->> 1.7.9.5
->>
->> --
->> You received this message because you are subscribed to the Google Groups "Linaro Networking" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linaro-networking+unsubscribe at linaro.org.
->> To post to this group, send email to linaro-networking at linaro.org.
->
-> --
-> You received this message because you are subscribed to the Google Groups "Linaro Networking" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linaro-networking+unsubscribe at linaro.org.
-> To post to this group, send email to linaro-networking at linaro.org.
+I spoke with Paul recently and my understanding is that
+he hasn't been actively working in this area for over a year now.
 
-
-
--- 
-Regards,
-Taras Kondratiuk
+I guess there are some stale patches in his tree.
