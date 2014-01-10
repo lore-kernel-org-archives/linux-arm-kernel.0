@@ -1,65 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 10 Jan 2014 15:00:16 +0800
-Subject: [PATCH v2 15/16] ARM: dts: sun7i: olinuxino-micro: Enable GMAC
- instead of EMAC
-In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
-References: <1389337217-29032-1-git-send-email-wens@csie.org>
-Message-ID: <1389337217-29032-16-git-send-email-wens@csie.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Jan 2014 15:04:19 +0800
+Subject: [PATCH V3] ARM: imx: add cpuidle support for i.mx6sl
+In-Reply-To: <1389254596-20173-1-git-send-email-b20788@freescale.com>
+References: <1389254596-20173-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140110070417.GJ21717@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GMAC has better performance and fewer hardware issues.
-Use the GMAC in MII mode for ethernet instead of the EMAC.
+On Thu, Jan 09, 2014 at 04:03:16PM +0800, Anson Huang wrote:
+> Add cpuidle support for i.MX6SL, currently only support
+> two cpuidle levels(ARM wfi and WAIT mode), and add software
+> workaround for WAIT mode errata as below:
+> 
+> ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
+>           during WAIT mode entry process could cause cache memory
+>           corruption.
+> 
+> Software workaround:
+>     To prevent this issue from occurring, software should ensure that
+> the ARM to IPG clock ratio is less than 12:5 (that is < 2.4x), before
+> entering WAIT mode.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 27 +++++++++++--------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index ead3013..b02a796 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -19,21 +19,6 @@
- 	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
--		emac: ethernet at 01c0b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&emac_pins_a>;
--			phy = <&phy1>;
--			status = "okay";
--		};
--
--		mdio at 01c0b080 {
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
--
- 		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PH2";
-@@ -78,6 +63,18 @@
- 			pinctrl-0 = <&i2c2_pins_a>;
- 			status = "okay";
- 		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_mii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "mii";
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
- 	};
- 
- 	leds {
--- 
-1.8.5.2
+Applied, thanks.
