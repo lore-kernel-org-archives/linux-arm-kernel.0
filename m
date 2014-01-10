@@ -1,86 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 11 Jan 2014 00:02:48 +0100
-Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
-In-Reply-To: <20140110194437.GJ18269@obsidianresearch.com>
-References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
- <20131228170114.GH19878@titan.lakedaemon.net>
- <20140102194924.GA3321@obsidianresearch.com>
- <1388702192.16958.54.camel@hastur.hellion.org.uk>
- <20140102230832.GB9339@obsidianresearch.com>
- <20140110192032.GQ19878@titan.lakedaemon.net>
- <20140110194437.GJ18269@obsidianresearch.com>
-Message-ID: <20140110230248.GO9681@lunn.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 11 Jan 2014 00:04:34 +0100
+Subject: [PATCH v5 4/4] i2c: mv64xxx: Document the newly introduced Armada
+ XP A0 compatible
+In-Reply-To: <20140110215526.GB19878@titan.lakedaemon.net>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-5-git-send-email-gregory.clement@free-electrons.com>
+ <20140110215526.GB19878@titan.lakedaemon.net>
+Message-ID: <52D07C82.2010106@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > So, I'd prefer to handle this more gracefully.  I don't have much
-> > experience at the low-level init of the caches, couldn't we enable and
-> > flush rather than throwing the error?
+On 10/01/2014 22:55, Jason Cooper wrote:
+> Gregory,
 > 
-> It cannot be solved in cache-feroceon-l2.c.
+> On Wed, Jan 08, 2014 at 04:06:29PM +0100, Gregory CLEMENT wrote:
+>> The first variants of Armada XP SoCs (A0 stepping) have issues related
+>> to the i2c controller which prevent to use the offload mechanism and
+>> ead to a kernel hang during boot.
 > 
-> In many cases you won't even get that far:
-> - It will blow up in head.S when the cache is off: decompressor wrote
->   writeback data to into the L2 and uncached fetches see memory
->   content prior to decompression
-> - It will blow up after head.S enables the L1: decompressor wrote
->   data into the L2 but the relocation writes done with the L1 off
->   made changes to memory that were not captured in the L2.
+> I'll fixup s/ead/lead/ here.
+> 
+>>
+>> The commit introduces a new the compatible string
+>> marvell,mv78230-a0-i2c for the i2c controller.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> cc: devicetree at vger.kernel.org
+>> ---
+>>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>> index 82e8f6f17179..9410ed72ec45 100644
+>> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+>> @@ -5,7 +5,7 @@ Required properties :
+>>  
+>>   - reg             : Offset and length of the register set for the device
+>>   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
+>> -                     or "marvell,mv78230-i2c"
+>> +                     or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
+> 
+> If it's ok with you Gregory, I'll amend this hunk as follows:
+> 
+> 			or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
+> 			Only use "marvell,mv78230-a0-i2c" for a very
+> 			rare, initial version of the SoC which had
+> 			broken offload support.  Linux auto-detects this
+> 			and sets it appropriately.
+> 
+Hi Jason,
 
-My impression with booting a lot of times while doing i bisect, was
-that it got as far as:
+I agree with your changes
 
-Uncompressing Linux... done, booting the kernel.
-Booting Linux on physical CPU 0x0
-Linux version 3.13.0-rc1-dirty (lunn at laptop) (gcc version 4.4.5 (Debian 4.4.5-8) ) #7 PREEMPT Fri Jan 3 09:25:07 CST 2014           
-CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053977
-CPU: VIVT data cache, VIVT instruction cache
-Machine: Marvell Kirkwood (Flattened Device Tree), model: QNAP TS219 family
-Memory policy: ECC disabled, Data cache writeback
+Thanks,
 
-every time.
+Gregory
 
-It frequently got as far as
+> 
+>>   - interrupts      : The interrupt number
+>>  
+>>  Optional properties :
+>> -- 
+>> 1.8.1.2
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
-Kernel command line: root=/dev/sda2 console=ttyS0,115200 earlyprintk
-PID hash table entries: 2048 (order: 1, 8192 bytes)
-Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
-Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
-Memory: 512704K/524288K available (4693K kernel code, 247K rwdata, 1264K rodata, 154K init, 616K bss, 11584K reserved)              
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
-    lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
-    modules : 0xbf000000 - 0xc0000000   (  16 MB)
-      .text : 0xc0008000 - 0xc05d9678   (5958 kB)
-      .init : 0xc05da000 - 0xc0600ab0   ( 155 kB)
-      .data : 0xc0602000 - 0xc063fcc0   ( 248 kB)
-       .bss : 0xc063fccc - 0xc06d9ef0   ( 617 kB)
-SLUB: HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-Preemptible hierarchical RCU implementation.
-NR_IRQS:114  
-sched_clock: 32 bits at 200MHz, resolution 5ns, wraps every 21474ms
 
-And never made it past
-
-Console: colour dummy device 80x30
-Calibrating delay loop... 1587.60 BogoMIPS (lpj=7938048)
-
-with L2 enabled.
-
-Now clearly there is a difference between how far it got before
-everything stops, and the point where corruption has occurred and
-unavoidable death is going to happen sometime in the future.
-
-It does however seem possible to insert platform specific code soon
-after it prints:
-
-Machine: Marvell Kirkwood (Flattened Device Tree), model: QNAP TS219 family
-
-but i never got around to trying to disable and flush L2 at that
-point. And the hardware is now also on the other side of the pond, and
-i have no way to remotely power cycle it.
-
-  Andrew
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
