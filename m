@@ -1,76 +1,129 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 10 Jan 2014 09:34:25 +0100
-Subject: BUG: bad unlock balance detected
-In-Reply-To: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
-References: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
-Message-ID: <52CFB091.5040707@linaro.org>
+From: jbe@pengutronix.de (=?utf-8?q?J=C3=BCrgen_Beisert?=)
+Date: Fri, 10 Jan 2014 09:55:45 +0100
+Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <52CEA4AA.8050503@free-electrons.com>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <52CEA4AA.8050503@free-electrons.com>
+Message-ID: <201401100955.45885.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 03:52 AM, John Tobias wrote:
-> Hi Shawn,
+Hi Alexandre,
+
+On Thursday 09 January 2014 14:31:22 Alexandre Belloni wrote:
+> Sorry to chime in only now but it seems that this series is breaking the
+> touchscreen calibration on 3.13 (and -rc7 is out so it might be too
+> late).
 >
-> Any idea on these bug?.
-
-Is this bug happening systematically or randomly ?
-
-
-
-> [ 559.972748] =====================================
-> [ 559.977457] [ BUG: bad unlock balance detected! ]
-> [ 559.982169] 3.13.0-rc1 #1 Tainted: G O
-> [ 559.986790] -------------------------------------
-> [ 559.991499] swapper/0 is trying to release lock (master_lock) at:
-> [ 559.997642] <8001d708> imx6q_enter_wait+0x80/0x8c
-> [ 560.002524] but there are no more locks to release!
-> [ 560.007404]
-> [ 560.007404] other info that might help us debug this:
-> [ 560.013939] no locks held by swapper/0.
-> [ 560.017779]
-> [ 560.017779] stack backtrace:
-> [ 560.022147] CPU: 0 PID: 0 Comm: swapper Tainted: G O 3.13.0-rc1 #1
-> [ 560.029200] Backtrace:
-> [ 560.031685] <80011fb4> (dump_backtrace+0x0/0x10c) from <80012150>
-> (show_stack+0x18/0x1c)
-> [ 560.040128] :806c00e8 :8001d708 :806bd1b0 :00000000
-> [ 560.045869] <80012138> (show_stack+0x0/0x1c) from <804eeef0>
-> (dump_stack+0x20/0x28)
-> [ 560.053889] <804eeed0> (dump_stack+0x0/0x28) from <8004b2a8>
-> (print_unlock_imbalance_bug+0xb4/0xe4)
-> [ 560.063296] <8004b1f4> (print_unlock_imbalance_bug+0x0/0xe4) from
-> <8004e338> (lock_release+0x184/0x1bc)
-> [ 560.073037] :80be210c :806bd1b0 :806b2000 :00000000
-> [ 560.078771] <8004e1b4> (lock_release+0x0/0x1bc) from <804f546c>
-> (_raw_spin_unlock+0x20/0x2c)
-> [ 560.087572] <804f544c> (_raw_spin_unlock+0x0/0x2c) from <8001d708>
-> (imx6q_enter_wait+0x80/0x8c)
-> [ 560.096620] :806f2f14 :806bd1b0
-> [ 560.100246] <8001d688> (imx6q_enter_wait+0x0/0x8c) from <80305d84>
-> (cpuidle_enter_state+0x44/0xfc)
-> [ 560.109554] :806dcae0 :00000082 :6128317f :8001d688
-> [ 560.115285] <80305d40> (cpuidle_enter_state+0x0/0xfc) from
-> <80305f28> (cpuidle_idle_call+0xec/0x15c)
-> [ 560.124767] :806b2000 :806dcae4 :806c00f8 :00000001 :80c37030
-> :806dcae0
-> [ 560.132701] <80305e3c> (cpuidle_idle_call+0x0/0x15c) from <8000fd08>
-> (arch_cpu_idle+0x10/0x44)
-> [ 560.141662] :00000001 :806e8d8a :806b2000 :806ba0dc :806b2000
-> :00000000
-> [ 560.149595] <8000fcf8> (arch_cpu_idle+0x0/0x44) from <80056be4>
-> (cpu_startup_entry+0x50/0x114)
-> [ 560.158568] <80056b94> (cpu_startup_entry+0x0/0x114) from <804ea1e0>
-> (rest_init+0xb4/0xdc)
-> [ 560.167181] :8181af00 :00000000
-> [ 560.170808] <804ea12c> (rest_init+0x0/0xdc) from <80684a98>
-> (start_kernel+0x2f0/0x348)
-> [ 560.179074] :ffffffff :806f2b80 :806ba158
-> [ 560.183750] <806847a8> (start_kernel+0x0/0x348) from <80008070> (0x80008070)
+> At first, I though I became a terrible clicker ;) but I found some
+> evidences:
 >
+> xinput_calibrator is complaining about misclicks, debug output:
+> DEBUG: Adding click 0 (X=105, Y=59)
+> DEBUG: Not adding click 1 (X=100, Y=59): within 7 pixels of previous click
+> DEBUG: Adding click 1 (X=696, Y=58)
+> DEBUG: Not adding click 2 (X=700, Y=55): within 7 pixels of previous click
+> DEBUG: Adding click 2 (X=103, Y=422)
+> DEBUG: Mis-click detected, click 3 (X=438, Y=415) not aligned with click 1 (X=696, Y=58) or click 2 (X=103, Y=422) (threshold=15)
+> DEBUG: Adding click 0 (X=424, Y=411)
+>
+> Do you see the confusion ? At some point one of the coordinates is not
+> updated. Successful calibration with 3.12.6 gives:
+> DEBUG: Adding click 0 (X=126, Y=405)
+> DEBUG: Adding click 1 (X=684, Y=399)
+> DEBUG: Adding click 2 (X=128, Y=77)
+> DEBUG: Adding click 3 (X=683, Y=77)
+>
+>
+> With ts_calibrate:
+> xres = 800, yres = 480
+> Took 1 samples...
+> Top left : X =  435 Y = 3572
+> Took 2 samples...
+> Top right : X = 2094 Y = 3553
+> Took 2 samples...
+> Bot right : X = 2939 Y = 2077
+> Took 2 samples...
+> Bot left : X = 2060 Y =  644
+> Took 2 samples...
+> Center : X = 1279 Y = 1346
+>
+> We experience the same thing, when changing position on an axis, we get
+> an average between the previous and the new position (probably because
+> we got 2 samples):
+>  - Top Left is ok
+>  - Top right is almost ok: X should be around 3500/3700
+>  - Bot right is starting to get really wrong: X is getting better (it
+>    should still be around 3500/3700) but Y should be quite lower
+>  - Bot left: Y is ok but X should be lower
+>  - Center is completely wrong, both values should be around 2000
+>
+> Last test with evtest which is always difficult because it outputs a lot
+> of debug. Two separate touchs, bottom left and then top right (note that
+> this is with fsl,ave-ctrl = <8>;):
+>
+> Event: time 1389210862.451000, type 3 (Absolute), code 0 (X), value 2183
+> Event: time 1389210862.451000, type 3 (Absolute), code 1 (Y), value 720
+> Event: time 1389210862.451000, type 3 (Absolute), code 24 (Pressure), value 6
+> Event: time 1389210862.451000, type 1 (Key), code 330 (Touch), value 1 
+> Event: time 1389210862.451000, -------------- Report Sync ------------
+> Event: time 1389210862.477721, type 3 (Absolute), code 0 (X), value 448
+> Event: time 1389210862.477721, type 3 (Absolute), code 1 (Y), value 667
+> Event: time 1389210862.477721, type 3 (Absolute), code 24 (Pressure), value 595
+> Event: time 1389210862.477721, -------------- Report Sync ------------ 
+> Event: time 1389210862.504718, type 3 (Absolute), code 0 (X), value 434
+> Event: time 1389210862.504718, type 3 (Absolute), code 1 (Y), value 704
+> Event: time 1389210862.504718, type 3 (Absolute), code 24 (Pressure), value 580
+> Event: time 1389210862.504718, -------------- Report Sync ------------ 
+> Event: time 1389210862.536688, type 1 (Key), code 330 (Touch), value 0
+> Event: time 1389210862.536688, -------------- Report Sync ------------
+> Event: time 1389210863.359697, type 3 (Absolute), code 0 (X), value 432
+> Event: time 1389210863.359697, type 3 (Absolute), code 1 (Y), value 726
+> Event: time 1389210863.359697, type 3 (Absolute), code 24 (Pressure), value 210
+> Event: time 1389210863.359697, type 1 (Key), code 330 (Touch), value 1 
+> Event: time 1389210863.359697, -------------- Report Sync ------------
+> Event: time 1389210863.391687, type 1 (Key), code 330 (Touch), value 0
+> Event: time 1389210863.391687, -------------- Report Sync ------------
+>
+> We get 3 reports for bottom left, then pen up, then one report for top
+> right that is almost exactly the same a bottom left !
+>
+> Output from 3.12:
+> Event: time 1389210022.146809, type 3 (Absolute), code 0 (X), value 286
+> Event: time 1389210022.146809, type 3 (Absolute), code 1 (Y), value 504
+> Event: time 1389210022.146809, type 3 (Absolute), code 24 (Pressure), value 3045
+> Event: time 1389210022.146809, type 1 (Key), code 330 (Touch), value 1 
+> Event: time 1389210022.146809, -------------- Report Sync ------------
+> Event: time 1389210022.166830, type 3 (Absolute), code 0 (X), value 256
+> Event: time 1389210022.166830, type 3 (Absolute), code 1 (Y), value 489
+> Event: time 1389210022.166830, type 3 (Absolute), code 24 (Pressure), value 3033
+> Event: time 1389210022.166830, -------------- Report Sync ------------ 
+> Event: time 1389210022.186812, type 3 (Absolute), code 24 (Pressure), value 0
+> Event: time 1389210022.186812, type 1 (Key), code 330 (Touch), value 0 
+> Event: time 1389210022.186812, -------------- Report Sync ------------
+> Event: time 1389210025.196808, type 3 (Absolute), code 0 (X), value 3812
+> Event: time 1389210025.196808, type 3 (Absolute), code 1 (Y), value 3637
+> Event: time 1389210025.196808, type 3 (Absolute), code 24 (Pressure), value 4032
+> Event: time 1389210025.196808, type 1 (Key), code 330 (Touch), value 1 
+> Event: time 1389210025.196808, -------------- Report Sync ------------
+> Event: time 1389210025.216819, type 3 (Absolute), code 24 (Pressure), value 0
+> Event: time 1389210025.216819, type 1 (Key), code 330 (Touch), value 0 
+> Event: time 1389210025.216819, -------------- Report Sync ------------
+>
+>
+> While this is not necessarily an issue with ts_calibrate (it is possible
+> to click longer so it collects more samples), I don't see that working
+> with xinput_calibrator.
+>
+> While I don't have much experience with the TS part of the code but I
+> can investigate if you don't have any idea.
 
+You are right. I have seen the same behaviour here a few times. Currently I'm
+short in time to dig deeper into this issue, but I will try to do so.
+
+Juergen
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
