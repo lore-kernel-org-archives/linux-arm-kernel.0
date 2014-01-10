@@ -1,96 +1,170 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Fri, 10 Jan 2014 17:29:06 -0500
-Subject: [PATCH 2/6] arm64: Add function to create identity mappings
+Date: Fri, 10 Jan 2014 17:29:07 -0500
+Subject: [PATCH 3/6] efi: add helper function to get UEFI params from FDT
 In-Reply-To: <1389392950-22457-1-git-send-email-msalter@redhat.com>
 References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
-Message-ID: <1389392950-22457-3-git-send-email-msalter@redhat.com>
+Message-ID: <1389392950-22457-4-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At boot time, UEFI runtime support needs to call into the UEFI firmware
-to switch to a virtual address map. This call must be made with UEFI
-memory regions identity mapped. The exisitng early boot code creates
-an identity map of kernel text/data but this is not sufficient for UEFI.
-This patch adds a create_id_mapping() function which reuses the core
-code of create_mapping() used to create the kernel RAM mappings.
+ARM and ARM64 architectures use the device tree to pass UEFI parameters
+from stub to kernel. These parameters are things known to the stub but
+not discoverable by the kernel after the stub calls ExitBootSerives().
+There is a helper function in:
+
+   drivers/firmware/efi/fdt.c
+
+which the stub uses to add the UEFI parameters to the device tree.
+This patch adds a complimentary helper function which UEFI runtime
+support may use to retrieve the parameters from the device tree.
+If an architecture wants to use this helper, it should select
+CONFIG_UEFI_PARAMS_FROM_FDT.
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/mmu.c          | 34 ++++++++++++++++++++++++----------
- 2 files changed, 25 insertions(+), 10 deletions(-)
+ drivers/firmware/efi/Kconfig |  7 ++++
+ drivers/firmware/efi/efi.c   | 79 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/efi.h          |  9 +++++
+ 3 files changed, 95 insertions(+)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index f600d40..9ad4dd4 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -28,5 +28,6 @@ extern void paging_init(void);
- extern void setup_mm_for_reboot(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
-+extern void create_id_mapping(phys_addr_t addr, phys_addr_t size);
+diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
+index 6aecbc8..d5101e6 100644
+--- a/drivers/firmware/efi/Kconfig
++++ b/drivers/firmware/efi/Kconfig
+@@ -36,6 +36,13 @@ config EFI_VARS_PSTORE_DEFAULT_DISABLE
+ 	  backend for pstore by default. This setting can be overridden
+ 	  using the efivars module's pstore_disable parameter.
  
- #endif
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7b345e3..ccfca44 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -228,22 +228,14 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-  * Create the page directory entries and any necessary page tables for the
-  * mapping specified by 'md'.
-  */
--static void __init create_mapping(phys_addr_t phys, unsigned long virt,
--				  phys_addr_t size)
-+static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
-+				    unsigned long virt, phys_addr_t size)
- {
- 	unsigned long addr, length, end, next;
--	pgd_t *pgd;
--
--	if (virt < VMALLOC_START) {
--		pr_warning("BUG: not creating mapping for 0x%016llx at 0x%016lx - outside kernel range\n",
--			   phys, virt);
--		return;
--	}
++config UEFI_PARAMS_FROM_FDT
++	bool
++	help
++	  Select this config option from the architecture Kconfig if
++	  the EFI runtime support gets system table address, memory
++          map address, and other parameters from the device tree.
++
+ endmenu
  
- 	addr = virt & PAGE_MASK;
- 	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+ config UEFI_CPER
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 2e2fbde..4f1372b 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -20,6 +20,8 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/efi.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
+ #include <linux/io.h>
  
--	pgd = pgd_offset_k(addr);
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
-@@ -252,6 +244,28 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 	} while (pgd++, addr = next, addr != end);
+ struct efi __read_mostly efi = {
+@@ -272,3 +274,80 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+ 	early_iounmap(config_tables, efi.systab->nr_tables * sz);
+ 	return 0;
  }
++
++#ifdef CONFIG_UEFI_PARAMS_FROM_FDT
++
++#define UEFI_PARAM(name, prop, field)			   \
++	{						   \
++		{ name },				   \
++		{ prop },				   \
++		offsetof(struct efi_fdt_params, field),    \
++		FIELD_SIZEOF(struct efi_fdt_params, field) \
++	}
++
++static __initdata struct {
++	const char name[32];
++	const char propname[32];
++	int offset;
++	int size;
++} dt_params[] = {
++	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
++};
++
++struct param_info {
++	int verbose;
++	void *params;
++};
++
++static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
++				       int depth, void *data)
++{
++	struct param_info *info = data;
++	void *prop, *dest;
++	unsigned long len;
++	u64 val;
++	int i;
++
++	if (depth != 1 ||
++	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
++		return 0;
++
++	pr_info("Getting parameters from FDT:\n");
++
++	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
++		if (!prop) {
++			pr_err("Can't find %s in device tree!\n",
++			       dt_params[i].name);
++			return 0;
++		}
++		dest = info->params + dt_params[i].offset;
++
++		val = of_read_number(prop, len / sizeof(u32));
++
++		if (dt_params[i].size == sizeof(u32))
++			*(u32 *)dest = val;
++		else
++			*(u64 *)dest = val;
++
++		if (info->verbose)
++			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
++				dt_params[i].size * 2, val);
++	}
++	return 1;
++}
++
++int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
++{
++	struct param_info info;
++
++	info.verbose = verbose;
++	info.params = params;
++
++	return of_scan_flat_dt(fdt_find_uefi_params, &info);
++}
++#endif /* CONFIG_UEFI_PARAMS_FROM_FDT */
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 9dc5b05..ff8524e 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -483,6 +483,14 @@ struct efi_memory_map {
+ 	unsigned long desc_size;
+ };
  
-+static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-+				  phys_addr_t size)
-+{
-+	if (virt < VMALLOC_START) {
-+		pr_warn("BUG: not creating mapping for 0x%016llx@0x%016lx - outside kernel range\n",
-+			phys, virt);
-+		return;
-+	}
-+	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size);
-+}
++struct efi_fdt_params {
++	u64 system_table;
++	u64 mmap;
++	u32 mmap_size;
++	u32 desc_size;
++	u32 desc_ver;
++};
 +
-+void __init create_id_mapping(phys_addr_t addr, phys_addr_t size)
-+{
-+	pgd_t *pgd = &idmap_pg_dir[pgd_index(addr)];
-+
-+	if (pgd >= &idmap_pg_dir[ARRAY_SIZE(idmap_pg_dir)]) {
-+		pr_warn("BUG: not creating id mapping for 0x%016llx\n", addr);
-+		return;
-+	}
-+	__create_mapping(pgd, addr, addr, size);
-+}
-+
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
+ typedef struct {
+ 	u32 revision;
+ 	void *parent_handle;
+@@ -616,6 +624,7 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
+ extern void efi_get_time(struct timespec *now);
+ extern int efi_set_rtc_mmss(const struct timespec *now);
+ extern void efi_reserve_boot_services(void);
++extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
+ extern struct efi_memory_map memmap;
+ 
+ /* Iterate through an efi_memory_map */
 -- 
 1.8.3.1
