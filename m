@@ -1,101 +1,102 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 10 Jan 2014 15:00:03 +0800
-Subject: [PATCH v2 02/16] net: stmmac: Enable stmmac main clock when probing
- hardware
-In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
-References: <1389337217-29032-1-git-send-email-wens@csie.org>
-Message-ID: <1389337217-29032-3-git-send-email-wens@csie.org>
+Date: Fri, 10 Jan 2014 15:00:01 +0800
+Subject: [PATCH v2 00/16] net: stmmac: Add Allwinner A20 GMAC ethernet
+ controller glue layer
+Message-ID: <1389337217-29032-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guiseppe previously stated that the "stmmaceth" clock is the main clock
-that drives the IP. The stmmac driver does not enable this clock during
-the probe phase. If the clock was not enabled by the boot loader or
-disabled by the kernel, hardware features and the MDIO bus would not be
-probed properly.
+Hi,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 26 +++++++++++------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+This is v2 of the  Allwinner A20 GMAC glue layer for stmmac.
+The clock and DT patches should be applied after my clock
+rename[1] series.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index 8a7a23a..786b51c 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -1604,8 +1604,6 @@ static int stmmac_open(struct net_device *dev)
- 	struct stmmac_priv *priv = netdev_priv(dev);
- 	int ret;
- 
--	clk_prepare_enable(priv->stmmac_clk);
--
- 	stmmac_check_ether_addr(priv);
- 
- 	if (priv->pcs != STMMAC_PCS_RGMII && priv->pcs != STMMAC_PCS_TBI &&
-@@ -1796,7 +1794,6 @@ static int stmmac_release(struct net_device *dev)
- #ifdef CONFIG_STMMAC_DEBUG_FS
- 	stmmac_exit_fs();
- #endif
--	clk_disable_unprepare(priv->stmmac_clk);
- 
- 	stmmac_release_ptp(priv);
- 
-@@ -2682,10 +2679,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 	if ((phyaddr >= 0) && (phyaddr <= 31))
- 		priv->plat->phy_addr = phyaddr;
- 
-+	priv->stmmac_clk = devm_clk_get(priv->device, STMMAC_RESOURCE_NAME);
-+	if (IS_ERR(priv->stmmac_clk)) {
-+		dev_warn(priv->device, "%s: warning: cannot get CSR clock\n",
-+			 __func__);
-+		goto error_clk_get;
-+	}
-+	clk_prepare_enable(priv->stmmac_clk);
-+
- 	/* Init MAC and get the capabilities */
- 	ret = stmmac_hw_init(priv);
- 	if (ret)
--		goto error_free_netdev;
-+		goto error_hw_init;
- 
- 	ndev->netdev_ops = &stmmac_netdev_ops;
- 
-@@ -2723,12 +2728,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 		goto error_netdev_register;
- 	}
- 
--	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
--	if (IS_ERR(priv->stmmac_clk)) {
--		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
--		goto error_clk_get;
--	}
--
- 	/* If a specific clk_csr value is passed from the platform
- 	 * this means that the CSR Clock Range selection cannot be
- 	 * changed at run-time and it is fixed. Viceversa the driver'll try to
-@@ -2756,12 +2755,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 	return priv;
- 
- error_mdio_register:
--	clk_put(priv->stmmac_clk);
--error_clk_get:
- 	unregister_netdev(ndev);
- error_netdev_register:
- 	netif_napi_del(&priv->napi);
--error_free_netdev:
-+error_hw_init:
-+	clk_disable_unprepare(priv->stmmac_clk);
-+error_clk_get:
- 	free_netdev(ndev);
- 
- 	return NULL;
-@@ -2788,6 +2787,7 @@ int stmmac_dvr_remove(struct net_device *ndev)
- 		stmmac_mdio_unregister(ndev);
- 	netif_carrier_off(ndev);
- 	unregister_netdev(ndev);
-+	clk_disable_unprepare(priv->stmmac_clk);
- 	free_netdev(ndev);
- 
- 	return 0;
+  [1] ARM: sunxi: rename DT clock node names to clk at N
+
+The Allwinner A20 SoC integrates an early version of dwmac
+IP from Synopsys. On top of that is a hardware glue layer.
+This layer needs to be configured before the dwmac can be
+used.
+
+Part of the glue layer is a clock mux, which controls the
+source and direction of the TX clock used by GMAC. The clock
+module driver is added in patch #9.
+
+The remaining glue layer code is in patch #10.
+
+The glue layer is implemented with existing feature flags 
+and callbacks found in stmmac driver core. A new stmmac_of_data
+structure, which is a subset of the original platform data,
+has been added to tie these values with compatible strings.
+The purpose of this is to avoid future glue layers assuming
+they can pass other data or directly modify values used by
+the driver core. This is found in patch #7.
+
+The callbacks have also been extended to pass board specific
+data. This is found in patch #4.
+
+This version of dwmac IP requires store and forward DMA mode.
+The relevant device tree property was documented, but not
+implemented. Patch #6 adds this to stmmac platform driver.
+
+Changes since v1:
+
+  * Added optional reset control to stmmac driver core
+  * Added non CONFIG_RESET_CONROLLER routines for the above change
+  * Extended callback API, as discussed with Srinivas
+  * Used new stmmac_of_data to pass features and callbacks,
+    instead of platform data, as discussed
+  * Seperated clock module glue layer into clock driver
+
+Comments?
+
+Thanks,
+
+ChenYu
+
+
+Chen-Yu Tsai (16):
+  reset: add non CONFIG_RESET_CONTROLLER routines
+  net: stmmac: Enable stmmac main clock when probing hardware
+  net: stmmac: Add support for optional reset control
+  net: stmmac: Allocate and pass soc/board specific data to callbacks
+  blackfin: Update stmmac callback signatures
+  net: stmmac: Honor DT parameter to force DMA store and forward mode
+  net: stmmac: Use driver data and callbacks tied with compatible
+    strings
+  net: stmmac: sunxi platform extensions for GMAC in Allwinner A20 SoC's
+  clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
+  ARM: dts: sun7i: Add GMAC clock node to sun7i DTSI
+  ARM: dts: sun7i: Add GMAC controller node to sun7i DTSI
+  ARM: dts: sun7i: Add pin muxing options for the GMAC
+  ARM: dts: sun7i: cubietruck: Enable the GMAC
+  ARM: dts: sun7i: cubieboard2: Enable GMAC instead of EMAC
+  ARM: dts: sun7i: olinuxino-micro: Enable GMAC instead of EMAC
+  ARM: dts: sun7i: Add ethernet alias for GMAC
+
+ Documentation/devicetree/bindings/clock/sunxi.txt  |  26 ++++
+ .../bindings/net/allwinner,sun7i-a20-gmac.txt      |  27 +++++
+ Documentation/devicetree/bindings/net/stmmac.txt   |   3 +
+ Documentation/networking/stmmac.txt                |  12 +-
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  27 ++---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  12 ++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  27 ++---
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  71 ++++++++++-
+ arch/blackfin/mach-bf609/boards/ezkit.c            |   2 +-
+ drivers/clk/sunxi/clk-sunxi.c                      |  74 ++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 133 +++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |   5 +
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  45 ++++---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   |   4 +-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  73 ++++++++---
+ include/linux/reset.h                              |  39 ++++++
+ include/linux/stmmac.h                             |  24 +++-
+ 19 files changed, 547 insertions(+), 70 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
+
 -- 
 1.8.5.2
