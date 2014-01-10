@@ -1,61 +1,69 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 10 Jan 2014 11:54:32 +0100
-Subject: [PATCH] arm64: dts:  add <dt-bindings/> symlink
-In-Reply-To: <52CFCFA1.4080405@samsung.com>
-References: <1389346197-5127-1-git-send-email-pankaj.dubey@samsung.com>
- <20140110102226.63f5bf30@ipc1.ka-ro> <52CFCFA1.4080405@samsung.com>
-Message-ID: <20140110115432.21fb03af@ipc1.ka-ro>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Jan 2014 10:54:51 +0000
+Subject: [PATCH v4 4/6] devicetree: bindings: Document Krait L1/L2 EDAC
+In-Reply-To: <52CF0C05.1080308@codeaurora.org>
+References: <1388434457-4194-1-git-send-email-sboyd@codeaurora.org>
+ <1388434457-4194-5-git-send-email-sboyd@codeaurora.org>
+ <20140107105439.GC5906@e102568-lin.cambridge.arm.com>
+ <20140107201239.GD14405@codeaurora.org>
+ <20140108100538.GA2927@e102568-lin.cambridge.arm.com>
+ <52CF0C05.1080308@codeaurora.org>
+Message-ID: <20140110105451.GB1086@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Pankaj Dubey wrote:
-> On 01/10/2014 06:22 PM, Lothar Wa?mann wrote:
-> > Hi,
-> >
-> > Pankaj Dubey wrote:
-> >> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-> >> match the ones in ARM architectures so that preprocessed device
-> >> tree files can include various useful constant definitions.
+On Thu, Jan 09, 2014 at 08:52:21PM +0000, Stephen Boyd wrote:
+> On 01/08/14 02:05, Lorenzo Pieralisi wrote:
+> > On Tue, Jan 07, 2014 at 08:12:39PM +0000, Stephen Boyd wrote:
+> >> On 01/07, Lorenzo Pieralisi wrote:
 > >>
-> >> See commit c58299a (kbuild: create an "include chroot" for DT bindings)
-> >> merged in v3.10-rc1 for details.
+> >>> I have a problem with the cache level definition, and in
+> >>> particular the numbering, ie what the level number represents. If we
+> >>> mean the cache level seen through the CLIDR and co., it is hard to use
+> >>> it for shared caches since the level seen by different CPUs can actually
+> >>> be different, or put it differently the level number might not be unique for
+> >>> a shared cache. I need to think about a proper way to sort this out.
+> >>>
+> >> Ok. I don't even use this property in my driver. All I really
+> >> need is the phandle from cpus pointing to the L2 and the
+> >> interrupts property in the L2 node.
 > >>
-> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> >> ---
-> >>   arch/arm64/boot/dts/include/dt-bindings |    1 +
-> >>   1 file changed, 1 insertion(+)
-> >>   create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-> >>
-> >> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-> >> new file mode 120000
-> >> index 0000000..08c00e4
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/include/dt-bindings
-> >> @@ -0,0 +1 @@
-> >> +../../../../../include/dt-bindings
-> >> \ No newline at end of file
-> > ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> I just created symlink file to "include/dt-bindings", and when created 
-> patch it is showing this line
-> at the end of patch. I do not have much idea why this came in patch? But 
-> when I checked similar patches
-> it looks like it is required.
->
-I noticed after sending the email, that the file in question was
-actually only a symlink. The message seems to be a 'feature' of
-'patch' when dealing with symlinks.
+> >> How do you want to proceed here? If your cache binding goes
+> >> through I would just need to add the interrupts part. Or you
+> >> could even add that part in the same patch, you could have my
+> >> signed-off-by for that.
+> > Ok, I will try to update the bindings with the interrupt part and copy
+> > you in, even though the level definition worries me a bit, it is an
+> > important property for power management and I need to find a proper
+> > solution before bindings can get accepted (basically the problem is:
+> > if different CPUs can see a cache at different levels as defined in the
+> > CLIDR we cannot describe a cache with a single cache level or put it
+> > differently, level can not represent the value in the CLIDR hence we
+> > need to describe it differently).
+> 
+> Ok. I've dropped the cache part from this patch. I left the example as
+> is minus the cache-level attribute.
+> 
+> Understanding how the cache-level value would be used might help. I
+> wonder if the cache-level can just be a number that describes the
+> largest value that the cache could be assigned. Then if you have
+> different CPUs seeing different levels of cache they can traverse from
+> their CPU node to the cache and count how many phandles they went through.
 
+Yes, that's one of the solutions I envisaged, and likely to be the one
+that I will put forward since it requires almost no changes. If we go that way
+cache-level becomes pretty useless though (which might be a good thing) and I
+do not like the implicit cache level obtained by counting phandles.
+Another option would be making cache-level a list and add a property
+"cache-level-affinity" as 1:1 map list of phandles to cpu-map node to define for
+each CPU the level at which that cache is mapped, somthing like the bindings
+described here for IRQ affinity:
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162466.html
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+I would say I tend to prefer the latter option, since I do not like relying
+on unwritten rules (implicit level numbering implied by phandle traversal) but
+I am open to suggestions.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Thanks,
+Lorenzo
