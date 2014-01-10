@@ -1,22 +1,19 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 11:28:46 +0000
-Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
-In-Reply-To: <52CF4652.3030207@killerwolves.net>
-References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
- <52CE312B.3060108@killerwolves.net> <20140109165557.GB9681@lunn.ch>
- <52CF4652.3030207@killerwolves.net>
-Message-ID: <20140110112846.GG27432@n2100.arm.linux.org.uk>
+Date: Fri, 10 Jan 2014 11:34:15 +0000
+Subject: [PATCH v3 4/6] arm: add early_ioremap support
+In-Reply-To: <1389325833-16535-5-git-send-email-msalter@redhat.com>
+References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
+ <1389325833-16535-5-git-send-email-msalter@redhat.com>
+Message-ID: <20140110113415.GH27432@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 11:01:06AM +1000, Ben Peddell wrote:
-> It appears the initrd address in the devicetree structure (which is 
-> filled in from what is passed by the bootloader when 
-> CONFIG_ARM_ATAG_DTB_COMPAT is set) is processed _after_ the address in 
-> the initrd= kernel parameter is processed.
+On Thu, Jan 09, 2014 at 10:50:31PM -0500, Mark Salter wrote:
+> +#define FIXMAP_PAGE_NORMAL (L_PTE_MT_WRITEBACK | L_PTE_YOUNG | L_PTE_PRESENT)
+> +#define FIXMAP_PAGE_IO (L_PTE_MT_DEV_NONSHARED | L_PTE_YOUNG | L_PTE_PRESENT)
 
-That's wrong.  Kernel parameters should always override what's passed by
-boot loaders etc.
+Doesn't this also want L_PTE_XN for at least IO mappings - maybe for the
+normal too if no code is expected to be run from it.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
