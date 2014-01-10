@@ -1,51 +1,80 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 10 Jan 2014 10:34:20 +0100
-Subject: [RFC PATCH] tty/serial: at91: disable uart timer at start of
- shutdown
-In-Reply-To: <CAJjB1qJez363RAaNg1bzE3QTsaGDFfAqOJux=VttNXCyaQTy3A@mail.gmail.com>
-References: <CAJjB1qLBoXA_XeEV+qU6pi0JVS+==kVA7mEDuAufrYup3htU2g@mail.gmail.com>
- <1389176916-6114-1-git-send-email-nicolas.ferre@atmel.com>
- <CAJjB1q+0cMqGRX8e5ssvvvo1pSw4KY7n38vWOh-PnE8GRC2Pug@mail.gmail.com>
- <CAJjB1qJez363RAaNg1bzE3QTsaGDFfAqOJux=VttNXCyaQTy3A@mail.gmail.com>
-Message-ID: <52CFBE9C.8080204@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 10 Jan 2014 10:47:20 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 1/2] ohci-platform: Add support for
+ devicetree instantiation
+In-Reply-To: <52CF0FB1.1010109@cogentembedded.com>
+References: <1389290226-6971-1-git-send-email-hdegoede@redhat.com>
+ <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
+ <52CF0326.1090407@cogentembedded.com> <52CEFCFE.7080308@redhat.com>
+ <52CF0FB1.1010109@cogentembedded.com>
+Message-ID: <52CFC1A8.4010505@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 08:08, Mark Roszko :
-> Just to sumarize the bug after poking before the patch:
->    systemd calls open/close on /dev/ttyS0 per line
->    atmel_shutdown executes on close
->    uart_timer_callback may fire during shutdown before timer is killed
->    tasklet gets scheduled after tasklet_kill
->    atmel_shutdown returns back to uart_close
-> dice roll:
->    if the tasklet executes before uart_close kills the tty references,
-> the kernel is fine           <--- I saw this happening more often than
-> panics, around once every 3 resets
->    if the tasklet executes after uart_close kills the tty references, it panics
-> 
-> I tested the patch by old fashion way of manual board resets with a
-> total of 70 resets each on two individual SAMA5D34-EK boards I have in
-> my possession programmed with the same patched kernel image and
-> rootfs. They did not panic once with the patch applied. Typically
-> before the patch the panic would occur around once every 10 resets if
-> not more often to the point it occured for 4 resets straight.
-> 
-> I have been trying to automate the testing, even If I make sure
-> nothing is using ttyS0 and then run a program that spams open()
-> writev() and close() (systemd uses the syscalls) to print messages, it
-> will never panic so I'm possibly misunderstanding how the driver
-> startup/shutdown ops get triggered(which should just be open/close
-> respectively) or variable length of messages from systemd and timing
-> between messages contributes to being unlucky and having the timer
-> fire at the wrong time.
-> 
-> But from manual testing I'm pretty confident the bug is fixed.
+Hi,
 
-Nice, thanks for the detailed feedback.
+On 01/09/2014 10:08 PM, Sergei Shtylyov wrote:
+> On 01/09/2014 10:48 PM, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 01/09/2014 09:14 PM, Sergei Shtylyov wrote:
+>>> Hello.
+>>>
+>>> On 01/09/2014 08:57 PM, Hans de Goede wrote:
+>>>
+>>>> Add support for ohci-platform instantiation from devicetree, including
+>>>> optionally getting clks and a phy from devicetree, and enabling / disabling
+>>>> those on power_on / off.
+>>>
+>>>> This should allow using ohci-platform from devicetree in various cases.
+>>>> Specifically after this commit it can be used for the ohci controller found
+>>>> on Allwinner sunxi SoCs.
+>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>   .../devicetree/bindings/usb/mmio-ohci.txt          |  22 +++
+>>>>   drivers/usb/host/ohci-platform.c                   | 150
+>>>> ++++++++++++++++++---
+>>>>   2 files changed, 152 insertions(+), 20 deletions(-)
+>>>>   create mode 100644 Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>>>> b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>>>> new file mode 100644
+>>>> index 0000000..9c776ed
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>>>> @@ -0,0 +1,22 @@
+>>>> +Generic MMIO OHCI controller
+>
+>>>     OHCI controller always uses MMIO, and likewise EHCI. You don't need to
+>>> specifically mention it.
+>
+>> Right, I'm only using it here because it is also used in the compatible string.
+>
+>     Please drop it.
+>
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : "mmio-ohci"
+>
+>>>     Likewise, it's not a good name. Why not call it "platform-ohci"?
+>
+>> Because, as you would have known had you read the entire thread, people objected
+>> against exactly that name because the "platform" bus thing is a Linux invention,
+>> and other operating systems don't use the platform nomenclature for non pci
+>> busses.
+>
+>     I wonder where were all those people when "xhci-platform" compatible got adopted in drivers/usb/host/xhci-plat.c? :-P
+>
+>     Anyway, I want to suggest "usb-[eo]hci" of which "usb-ehci" binding has even already documented in Documentation/devicetree/bindings/usb/usb-ehci.txt.
+> Both these "compatible" values are used as backups in the multiple described bindings of the platform-specific [EO]HCI controllers. I really don't see why you should invent anything new (and so poorly named).
 
-So I send the patch for inclusion to Greg.
+This too has already been discussed, again please read the entire thread including review of earlier versions of the patch.
 
-Thanks for your help Mark. Best regards,
--- 
-Nicolas Ferre
+We cannot usb usb-ehci, because the existing usb-ehci compatible string is not used for a generic usb controller, but
+for a ppc specific one which needs model specific setup, see the driver currently implementing compatible = usb-ehci.
+
+Regards,
+
+Hans
