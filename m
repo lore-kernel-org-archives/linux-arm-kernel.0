@@ -1,35 +1,419 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 10 Jan 2014 13:52:57 +0100
-Subject: [PATCH 0/2] ARM: i.MX53: add support for MCIMX53-START-R
-Message-ID: <1389358379-26196-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Fri, 10 Jan 2014 13:52:58 +0100
+Subject: [PATCH 1/2] ARM: i.MX53: dts: move common QSB nodes to new file
+In-Reply-To: <1389358379-26196-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1389358379-26196-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1389358379-26196-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+There are (atleast) two versions of the i.MX53 LOCO:
+            - the MCIMX53-START board
+            - the MCIMX53-START-R board
+The MCIMX53-START-R has a mc34708 pmic and is otherwise the similar to the
+MCIMX53-START. To prepare for the START-R, move all common nodes to a new
+imx53-qsb-common.dtsi and remove everything but the board name and pmic from
+the imx53-qsb.dts.
 
-The START-R is almost the same as the START (aka qsb), but has a different
-pmic.
-
-To support both, this series moves the common nodes to a new dtsi and has only
-the pmic nodes with their respective i2c1 pinctrl in the dts.
-Patch 2/2 is based on earlier work from Paul Liu.
-
-The series is rebased to the tag imx-dt-3.14 on Shawns tree.
-
-Regards,
-Steffen
-
-Steffen Trumtrar (2):
-  ARM: i.MX53: dts: move common QSB nodes to new file
-  ARM: i.MX53: dts: add support for MCIMX53-START-R
-
- arch/arm/boot/dts/Makefile                         |   1 +
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
  .../dts/{imx53-qsb.dts => imx53-qsb-common.dtsi}   |  98 --------
  arch/arm/boot/dts/imx53-qsb.dts                    | 249 +--------------------
- arch/arm/boot/dts/imx53-qsrb.dts                   | 158 +++++++++++++
- 4 files changed, 160 insertions(+), 346 deletions(-)
+ 2 files changed, 1 insertion(+), 346 deletions(-)
  copy arch/arm/boot/dts/{imx53-qsb.dts => imx53-qsb-common.dtsi} (69%)
- create mode 100644 arch/arm/boot/dts/imx53-qsrb.dts
 
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+similarity index 69%
+copy from arch/arm/boot/dts/imx53-qsb.dts
+copy to arch/arm/boot/dts/imx53-qsb-common.dtsi
+index 4c04459..b89aa50 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -10,13 +10,9 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
+-/dts-v1/;
+ #include "imx53.dtsi"
+ 
+ / {
+-	model = "Freescale i.MX53 Quick Start Board";
+-	compatible = "fsl,imx53-qsb", "fsl,imx53";
+-
+ 	memory {
+ 		reg = <0x70000000 0x40000000>;
+ 	};
+@@ -232,100 +228,6 @@
+ 		compatible = "fsl,mma8450";
+ 		reg = <0x1c>;
+ 	};
+-
+-	pmic: dialog at 48 {
+-		compatible = "dlg,da9053-aa", "dlg,da9052";
+-		reg = <0x48>;
+-		interrupt-parent = <&gpio7>;
+-		interrupts = <11 0x8>; /* low-level active IRQ at GPIO7_11 */
+-
+-		regulators {
+-			buck1_reg: buck1 {
+-				regulator-min-microvolt = <500000>;
+-				regulator-max-microvolt = <2075000>;
+-				regulator-always-on;
+-			};
+-
+-			buck2_reg: buck2 {
+-				regulator-min-microvolt = <500000>;
+-				regulator-max-microvolt = <2075000>;
+-				regulator-always-on;
+-			};
+-
+-			buck3_reg: buck3 {
+-				regulator-min-microvolt = <925000>;
+-				regulator-max-microvolt = <2500000>;
+-				regulator-always-on;
+-			};
+-
+-			buck4_reg: buck4 {
+-				regulator-min-microvolt = <925000>;
+-				regulator-max-microvolt = <2500000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo1_reg: ldo1 {
+-				regulator-min-microvolt = <600000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo2_reg: ldo2 {
+-				regulator-min-microvolt = <600000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo3_reg: ldo3 {
+-				regulator-min-microvolt = <600000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo4_reg: ldo4 {
+-				regulator-min-microvolt = <1725000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo5_reg: ldo5 {
+-				regulator-min-microvolt = <1725000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo6_reg: ldo6 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo7_reg: ldo7 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo8_reg: ldo8 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo9_reg: ldo9 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
+-				regulator-always-on;
+-			};
+-
+-			ldo10_reg: ldo10 {
+-				regulator-min-microvolt = <1250000>;
+-				regulator-max-microvolt = <3650000>;
+-				regulator-always-on;
+-			};
+-		};
+-	};
+ };
+ 
+ &audmux {
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 4c04459..dec4b07 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -11,228 +11,14 @@
+  */
+ 
+ /dts-v1/;
+-#include "imx53.dtsi"
++#include "imx53-qsb-common.dtsi"
+ 
+ / {
+ 	model = "Freescale i.MX53 Quick Start Board";
+ 	compatible = "fsl,imx53-qsb", "fsl,imx53";
+-
+-	memory {
+-		reg = <0x70000000 0x40000000>;
+-	};
+-
+-	display at di0 {
+-		compatible = "fsl,imx-parallel-display";
+-		crtcs = <&ipu 0>;
+-		interface-pix-fmt = "rgb565";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu_disp0>;
+-		status = "disabled";
+-		display-timings {
+-			claawvga {
+-				native-mode;
+-				clock-frequency = <27000000>;
+-				hactive = <800>;
+-				vactive = <480>;
+-				hback-porch = <40>;
+-				hfront-porch = <60>;
+-				vback-porch = <10>;
+-				vfront-porch = <10>;
+-				hsync-len = <20>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
+-		};
+-	};
+-
+-	gpio-keys {
+-		compatible = "gpio-keys";
+-
+-		power {
+-			label = "Power Button";
+-			gpios = <&gpio1 8 0>;
+-			linux,code = <116>; /* KEY_POWER */
+-		};
+-
+-		volume-up {
+-			label = "Volume Up";
+-			gpios = <&gpio2 14 0>;
+-			linux,code = <115>; /* KEY_VOLUMEUP */
+-			gpio-key,wakeup;
+-		};
+-
+-		volume-down {
+-			label = "Volume Down";
+-			gpios = <&gpio2 15 0>;
+-			linux,code = <114>; /* KEY_VOLUMEDOWN */
+-			gpio-key,wakeup;
+-		};
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&led_pin_gpio7_7>;
+-
+-		user {
+-			label = "Heartbeat";
+-			gpios = <&gpio7 7 0>;
+-			linux,default-trigger = "heartbeat";
+-		};
+-	};
+-
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_3p2v: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "3P2V";
+-			regulator-min-microvolt = <3200000>;
+-			regulator-max-microvolt = <3200000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_usb_vbus: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "usb_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio7 8 0>;
+-			enable-active-high;
+-		};
+-	};
+-
+-	sound {
+-		compatible = "fsl,imx53-qsb-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "imx53-qsb-sgtl5000";
+-		ssi-controller = <&ssi2>;
+-		audio-codec = <&sgtl5000>;
+-		audio-routing =
+-			"MIC_IN", "Mic Jack",
+-			"Mic Jack", "Mic Bias",
+-			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <2>;
+-		mux-ext-port = <5>;
+-	};
+-};
+-
+-&esdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc1>;
+-	status = "okay";
+-};
+-
+-&ssi2 {
+-	fsl,mode = "i2s-slave";
+-	status = "okay";
+-};
+-
+-&esdhc3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_esdhc3>;
+-	cd-gpios = <&gpio3 11 0>;
+-	wp-gpios = <&gpio3 12 0>;
+-	bus-width = <8>;
+-	status = "okay";
+-};
+-
+-&iomuxc {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hog>;
+-
+-	imx53-qsb {
+-		pinctrl_hog: hoggrp {
+-			fsl,pins = <
+-				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+-				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+-				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+-				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+-				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
+-				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+-				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+-				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
+-				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+-			>;
+-		};
+-
+-		led_pin_gpio7_7: led_gpio7_7 at 0 {
+-			fsl,pins = <
+-				MX53_PAD_PATA_DA_1__GPIO7_7 0x80000000
+-			>;
+-		};
+-
+-		pinctrl_audmux: audmuxgrp {
+-			fsl,pins = <MX53_AUDMUX_PINGRP1>;
+-		};
+-
+-		pinctrl_esdhc1: esdhc1grp {
+-			fsl,pins = <MX53_ESDHC1_PINGRP1>;
+-		};
+-
+-		pinctrl_esdhc3: esdhc3grp {
+-			fsl,pins = <MX53_ESDHC3_PINGRP1>;
+-		};
+-
+-		pinctrl_fec: fecgrp {
+-			fsl,pins = <MX53_FEC_PINGRP1>;
+-		};
+-
+-		pinctrl_i2c1: i2c1grp {
+-			fsl,pins = <MX53_I2C1_PINGRP1>;
+-		};
+-
+-		pinctrl_i2c2: i2c2grp {
+-			fsl,pins = <MX53_I2C2_PINGRP1>;
+-		};
+-
+-		pinctrl_ipu_disp0: ipudisp0grp {
+-			fsl,pins = <MX53_IPU_DISP0_PINGRP1>;
+-		};
+-
+-		pinctrl_uart1: uart1grp {
+-			fsl,pins = <MX53_UART1_PINGRP1>;
+-		};
+-	};
+-};
+-
+-&uart1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart1>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2>;
+-	status = "okay";
+-
+-	sgtl5000: codec at 0a {
+-		compatible = "fsl,sgtl5000";
+-		reg = <0x0a>;
+-		VDDA-supply = <&reg_3p2v>;
+-		VDDIO-supply = <&reg_3p2v>;
+-		clocks = <&clks IMX5_CLK_SSI_EXT1_GATE>;
+-	};
+ };
+ 
+ &i2c1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c1>;
+-	status = "okay";
+-
+-	accelerometer: mma8450 at 1c {
+-		compatible = "fsl,mma8450";
+-		reg = <0x1c>;
+-	};
+-
+ 	pmic: dialog at 48 {
+ 		compatible = "dlg,da9053-aa", "dlg,da9052";
+ 		reg = <0x48>;
+@@ -327,36 +113,3 @@
+ 		};
+ 	};
+ };
+-
+-&audmux {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_audmux>;
+-	status = "okay";
+-};
+-
+-&fec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_fec>;
+-	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio7 6 0>;
+-	status = "okay";
+-};
+-
+-&sata {
+-	status = "okay";
+-};
+-
+-&vpu {
+-	status = "okay";
+-};
+-
+-&usbh1 {
+-	vbus-supply = <&reg_usb_vbus>;
+-	phy_type = "utmi";
+-	status = "okay";
+-};
+-
+-&usbotg {
+-	dr_mode = "peripheral";
+-	status = "okay";
+-};
 -- 
 1.8.5.2
