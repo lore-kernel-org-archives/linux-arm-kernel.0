@@ -1,87 +1,131 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 10 Jan 2014 14:28:29 +0100
-Subject: DT include files
-In-Reply-To: <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
-References: <20131231054427.GA22383@S2101-09.ap.freescale.net>
- <20140102202108.GF19720@quad.lixom.net>
- <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
- <20140103030455.GB25079@S2101-09.ap.freescale.net>
- <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
- <20140104011056.GA3282@S2101-09.ap.freescale.net>
- <20140110024124.GA6844@S2101-09.ap.freescale.net>
- <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
-Message-ID: <52CFF57D.8060808@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 10 Jan 2014 14:30:37 +0100
+Subject: [PATCH v2 01/16] reset: add non CONFIG_RESET_CONTROLLER routines
+In-Reply-To: <1389337217-29032-2-git-send-email-wens@csie.org>
+References: <1389337217-29032-1-git-send-email-wens@csie.org>
+ <1389337217-29032-2-git-send-email-wens@csie.org>
+Message-ID: <1389360637.5854.53.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 10.01.2014 03:41, Olof Johansson wrote:
-> On Thu, Jan 9, 2014 at 6:41 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Sat, Jan 04, 2014 at 09:10:58AM +0800, Shawn Guo wrote:
->>> On Fri, Jan 03, 2014 at 11:29:35AM -0800, Olof Johansson wrote:
->>>> On Thu, Jan 2, 2014 at 7:04 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>>>> On Thu, Jan 02, 2014 at 06:41:30PM -0800, Olof Johansson wrote:
->>>>>> Ok, then it's probably just the location of the header files that
->>>>>> should be adjusted. Other subsystems have placed them under
->>>>>> include/dt-bindings/<subsystem>, so that's likely a better place for
->>>>>> these as well, don't you think?
->>>>>
->>>>> I had a little discussion with DT people when the headers were firstly
->>>>> created.  These pinctrl headers are a little different from the headers
->>>>> in include/dt-bindings/<subsystem>.  The latter are used by both kernel
->>>>> and device tree sources, while the pinctrl headers are used by device
->>>>> tree sources only, so I chose to put them just in the same folder as
->>>>> dts files.  And DT people are fine with my take.
->>>>
->>>> Since you don't provide references to this I had to go searching for
->>>> it. All I find is some discussion from 8 months ago, and quite a bit
->>>> of that seems to have been about changing bindings, and some about the
->>>> preprocessor behavior. Also, the patches seem to have been too big to
->>>> make it out on the lists.
->>>>
->>>> I'd like a fresh look from DT people on this just to make sure no
->>>> opinions have changed -- lots of things have changed in the last 8
->>>> months w.r.t. DT.
->>>
->>> Indeed, it's been quite a long time.  Let me restate my point.  The
->>> include/dt-bindings is introduced as a folder to hold headers that are
->>> referenced by both kernel and DTS.  That's why we create the folder in
->>> the kernel include folder and have arch/arm/boot/dts/include/dt-bindings
->>> being a symbol link to it.  All the headers in there need to be
->>> duplicated between kernel and DTS tree, when we move DTS files into
->>> a separated repository.  Putting DTS local headers into the folder is
->>> absolutely unnecessary, and will only confuse people and bother
->>> ourselves when moving DTS files out of kernel tree.
->>
->> Just a gentle ping to ensure we do not get the pull request lost.  Or do
->> you have any further comment?
->
-> Still waiting on DT maintainers to chime in.
+[Added Ivan, Stephen and Barry to Cc:]
 
-I'm not officially a DT maintainer, but let me share my thoughts on this.
+Am Freitag, den 10.01.2014, 15:00 +0800 schrieb Chen-Yu Tsai:
+> Some drivers are shared between platforms that may or may not
+> have RESET_CONTROLLER selected for them.
 
-So what options we have for this:
+I expected that drivers compiled for platforms without reset controllers
+but use the reset API should select or depend on RESET_CONTROLLER.
+Stubbing out device_reset and reset_control_get will turn a compile time
+error into a runtime error for everyone forgetting to do this when
+writing a new driver that needs the reset.
 
-  1) include/dt-bindings - this directory is designed to contain headers
-     that define the ABI between firmware and kernel code, in other
-     words - DT bindings.
+>  Add dummy functions
+> when RESET_CONTROLLER is not selected, thereby eliminating the
+> need for drivers to enclose reset_control_*() calls within
+> #ifdef CONFIG_RESET_CONTROLLER, #endif
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-  2) arch/*/boot/dts - we already have files that can be included by
-     other files in this directory, i.e. *.dtsi. Some are used to
-     implement hierarchies of devices (e.g. s3c64xx.dtsi), but some are
-     purely used as headers (s3c64xx-pinctrl.dtsi).
+This was already proposed by Ivan and Barry earlier, and so far we
+didn't get to a proper conclusion:
 
-  3) include/dts? - I'm not sure if this have any benefits, but I'm
-     listing it since it's one of the ideas that came to my mind.
+https://lkml.org/lkml/2013/10/10/179
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/174758.html
 
-Now 2) seems to be already used and doesn't seem to generate any 
-problems, so I'm all for it. Still, there is one more issue. For files 
-to be included merely by DTS files and so limited by DTS+CPP syntax, I 
-don't think it's too good idea to call them *.h. Let's stay with *.dtsi, 
-since that's the file extension supposed to be used for files that can 
-be included from device tree sources.
+If included, the stubs should at least return an error to indicate a
+reset couldn't be performed, but then I lose the compile time error for
+drivers which should select RESET_CONTROLLER but don't.
 
-Best regards,
-Tomasz
+Also this alone won't help you if you build multi-arch kernels where one
+platform enables RESET_CONTROLLER and the other expects it to be
+disabled.
+
+regards
+Philipp
+
+> ---
+>  include/linux/reset.h | 39 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/include/linux/reset.h b/include/linux/reset.h
+> index 6082247..38aa616 100644
+> --- a/include/linux/reset.h
+> +++ b/include/linux/reset.h
+> @@ -4,6 +4,8 @@
+>  struct device;
+>  struct reset_control;
+>  
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +
+>  int reset_control_reset(struct reset_control *rstc);
+>  int reset_control_assert(struct reset_control *rstc);
+>  int reset_control_deassert(struct reset_control *rstc);
+> @@ -14,4 +16,41 @@ struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
+>  
+>  int device_reset(struct device *dev);
+>  
+> +#else /* !CONFIG_RESET_CONTROLLER */
+> +
+> +static inline int reset_control_reset(struct reset_control *rstc)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int reset_control_assert(struct reset_control *rstc)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int reset_control_deassert(struct reset_control *rstc)
+> +{
+> +	return 0;
+> +}
+
+Those should probably have a WARN_ON(1) like the GPIO API stubs.
+
+> +
+> +static inline struct reset_control *reset_control_get(struct device *dev,
+> +		const char *id)
+> +{
+> +	return NULL;
+> +}
+[...]
+> +static inline struct reset_control *devm_reset_control_get(struct device *dev,
+> +		const char *id)
+> +{
+> +	return NULL;
+> +}
+
+These should return ERR_PTR(-ENOSYS).
+
+> +
+> +static inline int device_reset(struct device *dev)
+> +{
+> +	return 0;
+> +}
+
+And this should return -ENOSYS.
+
+Drivers that also need to run on platforms with CONFIG_RESET_CONTROLLER
+disabled (and that don't need the reset) should ignore -ENOSYS and
+-ENOENT return values from device_reset/(devm_)reset_control_get.
+
+I wonder if it might be a good idea to add a RESET_CONTROLLER_OPTIONAL
+that drivers need to select to enable the API stubs? That way we could
+keep the compile time error for new drivers that need resets but forget
+to select RESET_CONTROLLER.
+Or add a
+#warning If this driver can work without reset, please select CONFIG_RESET_CONTROLLER_OPTIONAL
+
+Another possibility would be to add device_reset_optional and
+(devm_)reset_control_get_optional variants and only provide stubs for
+those, but not for device_reset/(devm_)reset_control_get. Then drivers
+that need to work on platforms without the reset controller API enabled
+could explicitly use the _optional variants, and all other drivers would
+still be checked at compile time.
+
+regards
+Philipp
