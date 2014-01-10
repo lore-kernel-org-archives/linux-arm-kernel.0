@@ -1,40 +1,40 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Fri, 10 Jan 2014 23:53:50 +0800
-Subject: LSK merge linux-stable review
-In-Reply-To: <52D01702.1080909@linaro.org>
-References: <20140110013011.GA6447@alex-shi>	<52CF61CC.40305@linaro.org>
- <CADRr18M=sNsSD1PtoPeQw+DuQtn=p2uwFOLjEE-ztea3SnFHEQ@mail.gmail.com>
- <52D01702.1080909@linaro.org>
-Message-ID: <52D0178E.5080109@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 10 Jan 2014 08:04:25 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.13
+In-Reply-To: <CA+55aFx-+qP=8cz4xrwjde1sknObwjan3CUvg-n1StNMpr0Fcg@mail.gmail.com>
+References: <20140109085251.GA30534@quad.lixom.net>
+ <CA+55aFx-+qP=8cz4xrwjde1sknObwjan3CUvg-n1StNMpr0Fcg@mail.gmail.com>
+Message-ID: <CAOesGMjSD1Ud3gFDoYSfTcCh5wK_xgd3zRKXn+DK2LJ=u4G3FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 11:51 PM, Alex Shi wrote:
-> On 01/10/2014 06:41 PM, Mark Brown wrote:
->> On 10 January 2014 02:58, Alex Shi <alex.shi@linaro.org
->> <mailto:alex.shi@linaro.org>> wrote:
+On Fri, Jan 10, 2014 at 12:56 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Thu, Jan 9, 2014 at 4:52 PM, Olof Johansson <olof@lixom.net> wrote:
 >>
->>     Mark & Catalin,
+>> ARM: SoC fixes for 3.13-rc
 >>
->>     Could you like to review the merge conflict patch, which at:
->>     git://git.linaro.org/kernel/linux-linaro-stable.git
->>     <http://git.linaro.org/kernel/linux-linaro-stable.git>
->>     linux-linaro-lsk-test
+>> Hopefully the last set of arm-soc fixes for 3.13, or at least only a
+>> few stray patches after this.
 >>
+>> There are a few fixes for Renesas platforms to fixup DMA masks (this
+>> started causing errors once the DMA API added checks for valid masks in
+>> 3.13). Two more dealing with resources for MMC and PWM setup.
 >>
->> This looks good (if nothing else it ends up with the same thing we have
->> in mainline) providing it tests out OK.
-> 
-> Thanks for review. The build for -test branch is fine. guess that means
-> compile and reboot is fine.
+>> There's also a few TI/OMAP/DRA fixes for smaller stuff and a fix for
+>> compilation failures on a PXA platform.
+>
+> Hmm. Most of that was all in your _previous_ pull request. When I pull
+> this time, I just get the few fixes for  Renesas DMA masks.
 
-Anyway, I updated this merge into lsk.
-> But test result link still can not show test cases results. :(
-> 
-> https://ci.linaro.org/jenkins/job/linux-linaro-stable-lsk-pre-merge/
-> 
+I had a stale remote for your tree when I generated the pull request,
+and I had forgotten that I sent most of it already so I didn't notice.
+
+> I pulled that and edited up the resulting merge message, but you
+> should double-check that I now have what you expected. Because your
+> pull request seems a bit confused about what's been going on..
+
+Yeah, looks good. Apologies for the confusion.
 
 
--- 
-Thanks
-    Alex
+-Olof
