@@ -1,60 +1,42 @@
 From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 10 Jan 2014 19:58:26 +0200
-Subject: [PATCH v2 5/5] ARM: kprobes-test: Workaround GAS .align bug
-In-Reply-To: <1389376706-30051-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1389376706-30051-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <1389376706-30051-6-git-send-email-taras.kondratiuk@linaro.org>
+Date: Fri, 10 Jan 2014 19:58:21 +0200
+Subject: [PATCH v2 0/5] ARM: kprobes: big endian support
+Message-ID: <1389376706-30051-1-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default if no fill symbol is given to .align directive in a code
-section it fills gap with NOPs. If previous fragment is not
-instruction-aligned, additional pre-alignment is done by zero bytes
-before NOPs. These zero bytes are marked as data by special symbol $d in
-symbol table. Unfortunately GAS assumes that there is only code in the
-code section so it "puts back" code symbol $a at the end of this
-pre-alignment. So if there is some data after alignment it will be
-interpreted as code and will be swapped back to LE for BE8 system during
-a final linking.
+Reworked initial Ben's series for big endian support [1].
+Dropped patches that are not directly related to kprobes.
+Current set of patches is enough to have functional BE kprobes.
 
-If explicit fill value is given to .align, the NOP-padding code is
-skipped and symbol table does not get messed-up.
+One ARM kprobe test fails on Cortex-A15 boards (TC2 and Keystone2 EVM),
+while it passes on Pandaboard. The issue is not related to this series
+and already present in v3.13-rc7. I'll try to look into it later.
 
-So the workaround for this issue:
-Use explicit fill value if data should be aligned in the code section.
+v1..v2: Fixed coprocessor instruction building for ARM tests in the patch 
+        "ARM: kprobes-test: use <asm/opcodes.h> for ARM instruction building"
 
-Acked-by: Jon Medhurst <tixy@linaro.org>
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
- arch/arm/kernel/kprobes-test.c |    2 +-
- arch/arm/kernel/kprobes-test.h |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Based on v3.13-rc7.
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 0850c72..d2c2174 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -113,7 +113,7 @@
-  *	@ start of inline data...
-  *	.ascii "mov r0, r7"	@ text title for test case
-  *	.byte	0
-- *	.align	2
-+ *	.align	2, 0
-  *
-  *	@ TEST_ARG_REG
-  *	.byte	ARG_TYPE_REG
-diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
-index e28a869..eecc90a 100644
---- a/arch/arm/kernel/kprobes-test.h
-+++ b/arch/arm/kernel/kprobes-test.h
-@@ -115,7 +115,7 @@ struct test_arg_end {
- 	/* multiple strings to be concatenated.  */		\
- 	".ascii "#title"				\n\t"	\
- 	".byte	0					\n\t"	\
--	".align	2					\n\t"
-+	".align	2, 0					\n\t"
- 
- #define	TEST_ARG_REG(reg, val)					\
- 	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
+[1] http://www.spinics.net/lists/arm-kernel/msg285210.html
+
+Ben Dooks (4):
+  ARM: kprobes: fix instruction fetch order with <asm/opcodes.h>
+  ARM: kprobes-test: use <asm/opcodes.h> for instruction accesses
+  ARM: kprobes-test: use <asm/opcodes.h> for ARM instruction building
+  ARM: kprobes-test: use <asm/opcodes.h> for Thumb instruction building
+
+Taras Kondratiuk (1):
+  ARM: kprobes-test: Workaround GAS .align bug
+
+ arch/arm/kernel/kprobes-common.c     |   19 +-
+ arch/arm/kernel/kprobes-test-arm.c   |  603 +++++++++++++++++-----------------
+ arch/arm/kernel/kprobes-test-thumb.c |  447 ++++++++++++-------------
+ arch/arm/kernel/kprobes-test.c       |   13 +-
+ arch/arm/kernel/kprobes-test.h       |    2 +-
+ arch/arm/kernel/kprobes-thumb.c      |   20 +-
+ arch/arm/kernel/kprobes.c            |    9 +-
+ 7 files changed, 562 insertions(+), 551 deletions(-)
+
 -- 
 1.7.9.5
