@@ -1,104 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Jan 2014 18:24:02 +0100
-Subject: [linux-sunxi] [PATCH 1/5] i2c: mv64xxx: Add reset deassert call
-In-Reply-To: <CAGb2v6663ARKwmJ4Ypzi=m-J7UMvUFRq1=qLbqgQ0vrN_gC18w@mail.gmail.com>
-References: <1389288003-23187-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389288003-23187-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v6663ARKwmJ4Ypzi=m-J7UMvUFRq1=qLbqgQ0vrN_gC18w@mail.gmail.com>
-Message-ID: <20140110172402.GR2941@lukather>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 10 Jan 2014 12:44:12 -0500
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801C034BF2AD1@IL-MB01.marvell.com>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131231121214.GB3985@htj.dyndns.org>
+ <20131231170515.GG32537@lunn.ch>
+ <EE71107DF0D1F24FA2D95041E64AB9E801C034BF2AD1@IL-MB01.marvell.com>
+Message-ID: <20140110174412.GJ19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Lior, Simon,
 
-On Fri, Jan 10, 2014 at 01:48:41PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jan 10, 2014 at 1:19 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The Allwinner A31 SoC using that IP has a reset controller maintaining
-> > it reset unless told otherwise.
-> >
-> > Add some optional reset support to the driver.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 1 +
-> >  drivers/i2c/busses/Kconfig                            | 1 +
-> >  drivers/i2c/busses/i2c-mv64xxx.c                      | 6 ++++++
-> >  3 files changed, 8 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > index 82e8f6f..603003a 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> > @@ -12,6 +12,7 @@ Optional properties :
-> >
-> >   - clock-frequency : Desired I2C bus clock frequency in Hz. If not set the
-> >  default frequency is 100kHz
-> > + - resets          : phandle to the parent reset controller
-> >
-> >  Examples:
-> >
-> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > index 3b26129..69aa599 100644
-> > --- a/drivers/i2c/busses/Kconfig
-> > +++ b/drivers/i2c/busses/Kconfig
-> > @@ -528,6 +528,7 @@ config I2C_MPC
-> >  config I2C_MV64XXX
-> >         tristate "Marvell mv64xxx I2C Controller"
-> >         depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
-> > +       select RESET_CONTROLLER
-> >         help
-> >           If you say yes to this option, support will be included for the
-> >           built-in I2C interface on the Marvell 64xxx line of host bridges.
-> > diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> > index 8be7e42..d4e2f32 100644
-> > --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> > +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> > @@ -17,6 +17,7 @@
-> >  #include <linux/interrupt.h>
-> >  #include <linux/mv643xx_i2c.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/reset.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > @@ -743,6 +744,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
-> >  #else
-> >         const struct of_device_id *device;
-> >         struct device_node *np = dev->of_node;
-> > +       struct reset_control *rstc;
-> >         u32 bus_freq, tclk;
-> >         int rc = 0;
-> >
-> > @@ -763,6 +765,10 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
-> >         }
-> >         drv_data->irq = irq_of_parse_and_map(np, 0);
-> >
-> > +       rstc = devm_reset_control_get(dev, NULL);
-> > +       if (!IS_ERR(rstc))
-> > +               reset_control_deassert(rstc);
-> > +
+On Wed, Jan 08, 2014 at 03:45:31PM +0200, Lior Amsalem wrote:
+> Hi Andrew,
 > 
-> Do we need to handle -EPROBE_DEFER here?
+> > From: Andrew Lunn [mailto:andrew at lunn.ch]
+> > Sent: Tuesday, December 31, 2013 7:05 PM
+> > 
+> > On Tue, Dec 31, 2013 at 07:12:14AM -0500, Tejun Heo wrote:
+> > > On Mon, Dec 23, 2013 at 01:07:35PM +0100, Simon Guinot wrote:
+> > > > @@ -1358,6 +1359,7 @@ static int mv_scr_write(struct ata_link *link,
+> > > > unsigned int sc_reg_in, u32 val)
+> > > >
+> > > >  	if (ofs != 0xffffffffU) {
+> > > >  		void __iomem *addr = mv_ap_base(link->ap) + ofs;
+> > > > +		void __iomem *lp_phy_addr = mv_ap_base(link->ap) +
+> > LP_PHY_CTL;
+> > > >  		if (sc_reg_in == SCR_CONTROL) {
+> > > >  			/*
+> > > >  			 * Workaround for 88SX60x1 FEr SATA#26:
+> > > > @@ -1374,6 +1376,14 @@ static int mv_scr_write(struct ata_link *link,
+> > unsigned int sc_reg_in, u32 val)
+> > > >  			 */
+> > > >  			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
+> > > >  				val |= 0xf000;
+> > > > +
+> > > > +			/*
+> > > > +			 * Setting PHY speed according to SControl speed
+> > > > +			 */
+> > > > +			if ((val & 0xf0) == 0x10)
+> > > > +				writelfl(0x7, lp_phy_addr);
+> > > > +			else
+> > > > +				writelfl(0x227, lp_phy_addr);
+> > >
+> > > Do we know that this is safe for all sata_mvs?  If other sata_mvs
+> > > haven't had the described issue, maybe this should be applied
+> > > selectively to the said soc?  I'd actually prefer to avoid such
+> > > conditionals but we need to confirm this is okay for other
+> > > implementations.
+> > 
+> > Hi Tejun
+> > 
+> > I've tested on Kirkwood, and not had problems. But i agree with you. We
+> > need somebody in Marvell to say this is safe with all sata_mv variants.
+> > 
+> > Lior, can you comment?
+> 
+> This register (0x58) was introduced in a370/axp (with a new SATA PHY version).
+> In other SoCs the register does not exist.
+> 
+> Writing/reading the registers on A300/A310 will not cause any harm (I haven't
+> tried A510).
+> But, I think it's better to check if we're running on A370/AXP. (maybe with a new
+> compatibility string in DT?)
 
-Hmmm, true.
+Lior, thanks for the clarification.  Simon, care to respin this with a
+check for "marvell,armada-370-xp" root compatible string?  It should be
+safe to say that if there is no DT, don't write the register.
 
-> Also no reset_control_assert() in the exit path?
-> I'm asking because I have similar code in my stmmac patches.
+Alternatively, we could do as Lior suggests, and create a new sata
+compatible string.  But I think that is overkill.
 
-That might be a good idea indeed.
+Also, I'm growing more leery creating compatible strings for IP blocks
+which are tied to the SoC revision.  If the IP block doesn't get issued
+it's own version number/codename, we should just use the root compatible
+strings to determine which SoC we are on.  I'll expand on this though as
+I get caught up with Gregory's series's. 
 
-Thanks!
-Maxime
+thx,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/db58a7cc/attachment-0001.sig>
+Jason.
