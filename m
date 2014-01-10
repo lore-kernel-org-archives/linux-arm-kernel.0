@@ -1,52 +1,31 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 10 Jan 2014 11:23:41 +0100
-Subject: [PATCH 5/6] arm: exynos4-dt: statically add platform device for
- cpufreq-cpu0 platform driver
-In-Reply-To: <1389283165-17708-6-git-send-email-thomas.ab@samsung.com>
-References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <1389283165-17708-6-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140110112341.64049da3@amdc2363>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Fri, 10 Jan 2014 11:23:51 +0100
+Subject: [PATCH] mvebu : pcie: dt: potential issue in range parsing
+Message-ID: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The second parameter of of_read_number is not the index, but a size.
+As it happens, in this case it may work just fine because of the the conversion
+to u32 and the favorable endianness on this architecture.
 
-> In order to use the cpufreq-cpu0 driver on Exynos4 based platforms,
-> statically add the platform device for cpufreq-cpu0 platform driver.
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-exynos/mach-exynos4-dt.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> b/arch/arm/mach-exynos/mach-exynos4-dt.c index d3e54b7..8b8ad41 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -19,11 +19,17 @@
->  
->  #include "common.h"
->  
-> +static struct platform_device cpufreq_device = {
-> +	.name		= "cpufreq-cpu0",
-> +	.id		= -1,
-> +};
-> +
->  static void __init exynos4_dt_machine_init(void)
->  {
->  	exynos_cpuidle_init();
->  	exynos_cpufreq_init();
->  
-> +	platform_device_register(&cpufreq_device);
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> NULL); }
->  
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ drivers/pci/host/pci-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index c269e43..877e8ce 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -768,7 +768,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 
+ 	for (i = 0; i < nranges; i++) {
+ 		u32 flags = of_read_number(range, 1);
+-		u32 slot = of_read_number(range, 2);
++		u32 slot = of_read_number(range + 1, 1);
+ 		u64 cpuaddr = of_read_number(range + na, pna);
+ 		unsigned long rtype;
+ 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+1.8.5.2
