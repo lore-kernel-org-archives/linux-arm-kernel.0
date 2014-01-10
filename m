@@ -1,102 +1,126 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 10 Jan 2014 15:00:01 +0800
-Subject: [PATCH v2 00/16] net: stmmac: Add Allwinner A20 GMAC ethernet
- controller glue layer
-Message-ID: <1389337217-29032-1-git-send-email-wens@csie.org>
+Date: Fri, 10 Jan 2014 15:00:05 +0800
+Subject: [PATCH v2 04/16] net: stmmac: Allocate and pass soc/board specific
+ data to callbacks
+In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
+References: <1389337217-29032-1-git-send-email-wens@csie.org>
+Message-ID: <1389337217-29032-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current .init and .exit callbacks requires access to driver
+private data structures. This is not a good seperation and abstraction.
 
-This is v2 of the  Allwinner A20 GMAC glue layer for stmmac.
-The clock and DT patches should be applied after my clock
-rename[1] series.
+Instead, we add a new .setup callback for allocating private data, and
+pass the returned pointer to the other callbacks.
 
-  [1] ARM: sunxi: rename DT clock node names to clk at N
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/networking/stmmac.txt                   | 12 ++++++++----
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 18 ++++++++++++++----
+ include/linux/stmmac.h                                |  6 ++++--
+ 3 files changed, 26 insertions(+), 10 deletions(-)
 
-The Allwinner A20 SoC integrates an early version of dwmac
-IP from Synopsys. On top of that is a hardware glue layer.
-This layer needs to be configured before the dwmac can be
-used.
-
-Part of the glue layer is a clock mux, which controls the
-source and direction of the TX clock used by GMAC. The clock
-module driver is added in patch #9.
-
-The remaining glue layer code is in patch #10.
-
-The glue layer is implemented with existing feature flags 
-and callbacks found in stmmac driver core. A new stmmac_of_data
-structure, which is a subset of the original platform data,
-has been added to tie these values with compatible strings.
-The purpose of this is to avoid future glue layers assuming
-they can pass other data or directly modify values used by
-the driver core. This is found in patch #7.
-
-The callbacks have also been extended to pass board specific
-data. This is found in patch #4.
-
-This version of dwmac IP requires store and forward DMA mode.
-The relevant device tree property was documented, but not
-implemented. Patch #6 adds this to stmmac platform driver.
-
-Changes since v1:
-
-  * Added optional reset control to stmmac driver core
-  * Added non CONFIG_RESET_CONROLLER routines for the above change
-  * Extended callback API, as discussed with Srinivas
-  * Used new stmmac_of_data to pass features and callbacks,
-    instead of platform data, as discussed
-  * Seperated clock module glue layer into clock driver
-
-Comments?
-
-Thanks,
-
-ChenYu
-
-
-Chen-Yu Tsai (16):
-  reset: add non CONFIG_RESET_CONTROLLER routines
-  net: stmmac: Enable stmmac main clock when probing hardware
-  net: stmmac: Add support for optional reset control
-  net: stmmac: Allocate and pass soc/board specific data to callbacks
-  blackfin: Update stmmac callback signatures
-  net: stmmac: Honor DT parameter to force DMA store and forward mode
-  net: stmmac: Use driver data and callbacks tied with compatible
-    strings
-  net: stmmac: sunxi platform extensions for GMAC in Allwinner A20 SoC's
-  clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
-  ARM: dts: sun7i: Add GMAC clock node to sun7i DTSI
-  ARM: dts: sun7i: Add GMAC controller node to sun7i DTSI
-  ARM: dts: sun7i: Add pin muxing options for the GMAC
-  ARM: dts: sun7i: cubietruck: Enable the GMAC
-  ARM: dts: sun7i: cubieboard2: Enable GMAC instead of EMAC
-  ARM: dts: sun7i: olinuxino-micro: Enable GMAC instead of EMAC
-  ARM: dts: sun7i: Add ethernet alias for GMAC
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |  26 ++++
- .../bindings/net/allwinner,sun7i-a20-gmac.txt      |  27 +++++
- Documentation/devicetree/bindings/net/stmmac.txt   |   3 +
- Documentation/networking/stmmac.txt                |  12 +-
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  27 ++---
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  12 ++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  27 ++---
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  71 ++++++++++-
- arch/blackfin/mach-bf609/boards/ezkit.c            |   2 +-
- drivers/clk/sunxi/clk-sunxi.c                      |  74 ++++++++++++
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 133 +++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       |   5 +
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  45 ++++---
- drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   |   4 +-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  73 ++++++++---
- include/linux/reset.h                              |  39 ++++++
- include/linux/stmmac.h                             |  24 +++-
- 19 files changed, 547 insertions(+), 70 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-
+diff --git a/Documentation/networking/stmmac.txt b/Documentation/networking/stmmac.txt
+index cdd916d..2090895 100644
+--- a/Documentation/networking/stmmac.txt
++++ b/Documentation/networking/stmmac.txt
+@@ -127,8 +127,9 @@ struct plat_stmmacenet_data {
+ 	int riwt_off;
+ 	void (*fix_mac_speed)(void *priv, unsigned int speed);
+ 	void (*bus_setup)(void __iomem *ioaddr);
+-	int (*init)(struct platform_device *pdev);
+-	void (*exit)(struct platform_device *pdev);
++	void *(*setup)(struct platform_device *pdev);
++	int (*init)(struct platform_device *pdev, void *priv);
++	void (*exit)(struct platform_device *pdev, void *priv);
+ 	void *custom_cfg;
+ 	void *custom_data;
+ 	void *bsp_priv;
+@@ -169,10 +170,13 @@ Where:
+  o bus_setup: perform HW setup of the bus. For example, on some ST platforms
+ 	     this field is used to configure the AMBA  bridge to generate more
+ 	     efficient STBus traffic.
+- o init/exit: callbacks used for calling a custom initialization;
++ o setup/init/exit: callbacks used for calling a custom initialization;
+ 	     this is sometime necessary on some platforms (e.g. ST boxes)
+ 	     where the HW needs to have set some PIO lines or system cfg
+-	     registers.
++	     registers. setup should return a pointer to private data,
++	     which will be stored in bsp_priv, and then passed to init and
++	     exit callbacks. init/exit callbacks should not use or modify
++	     platform data.
+  o custom_cfg/custom_data: this is a custom configuration that can be passed
+ 			   while initializing the resources.
+  o bsp_priv: another private pointer.
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 3974586..86ee903 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -140,9 +140,16 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* Custom setup (if needed) */
++	if (plat_dat->setup) {
++		plat_dat->bsp_priv = plat_dat->setup(pdev);
++		if (IS_ERR(plat_dat->bsp_priv))
++			return PTR_ERR(plat_dat->bsp_priv);
++	}
++
+ 	/* Custom initialisation (if needed)*/
+ 	if (plat_dat->init) {
+-		ret = plat_dat->init(pdev);
++		ret = plat_dat->init(pdev, plat_dat->bsp_priv);
+ 		if (unlikely(ret))
+ 			return ret;
+ 	}
+@@ -199,7 +206,10 @@ static int stmmac_pltfr_remove(struct platform_device *pdev)
+ 	int ret = stmmac_dvr_remove(ndev);
+ 
+ 	if (priv->plat->exit)
+-		priv->plat->exit(pdev);
++		priv->plat->exit(pdev, priv->plat->bsp_priv);
++
++	if (priv->plat->free)
++		priv->plat->free(pdev, priv->plat->bsp_priv);
+ 
+ 	return ret;
+ }
+@@ -228,7 +238,7 @@ int stmmac_pltfr_freeze(struct device *dev)
+ 
+ 	ret = stmmac_freeze(ndev);
+ 	if (plat_dat->exit)
+-		plat_dat->exit(pdev);
++		plat_dat->exit(pdev, plat_dat->bsp_priv);
+ 
+ 	return ret;
+ }
+@@ -240,7 +250,7 @@ int stmmac_pltfr_restore(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 
+ 	if (plat_dat->init)
+-		plat_dat->init(pdev);
++		plat_dat->init(pdev, plat_dat->bsp_priv);
+ 
+ 	return stmmac_restore(ndev);
+ }
+diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
+index bb5deb0..c407791 100644
+--- a/include/linux/stmmac.h
++++ b/include/linux/stmmac.h
+@@ -112,8 +112,10 @@ struct plat_stmmacenet_data {
+ 	int riwt_off;
+ 	void (*fix_mac_speed)(void *priv, unsigned int speed);
+ 	void (*bus_setup)(void __iomem *ioaddr);
+-	int (*init)(struct platform_device *pdev);
+-	void (*exit)(struct platform_device *pdev);
++	void *(*setup)(struct platform_device *pdev);
++	void (*free)(struct platform_device *pdev, void *priv);
++	int (*init)(struct platform_device *pdev, void *priv);
++	void (*exit)(struct platform_device *pdev, void *priv);
+ 	void *custom_cfg;
+ 	void *custom_data;
+ 	void *bsp_priv;
 -- 
 1.8.5.2
