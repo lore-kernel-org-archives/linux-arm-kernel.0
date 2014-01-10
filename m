@@ -1,65 +1,154 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 10 Jan 2014 15:00:15 +0800
-Subject: [PATCH v2 14/16] ARM: dts: sun7i: cubieboard2: Enable GMAC instead of
- EMAC
+Date: Fri, 10 Jan 2014 15:00:10 +0800
+Subject: [PATCH v2 09/16] clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
 In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
 References: <1389337217-29032-1-git-send-email-wens@csie.org>
-Message-ID: <1389337217-29032-15-git-send-email-wens@csie.org>
+Message-ID: <1389337217-29032-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GMAC has better performance and fewer hardware issues.
-Use the GMAC in MII mode for ethernet instead of the EMAC.
+The Allwinner A20/A31 clock module controls the transmit clock source
+and interface type of the GMAC ethernet controller. Model this as
+a single clock for GMAC drivers to use.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 27 ++++++++++++---------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 26 ++++++++
+ drivers/clk/sunxi/clk-sunxi.c                     | 74 +++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 5c51cb8..7bf4935 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -19,21 +19,6 @@
- 	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 8a9147d..a1fbf53 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -37,6 +37,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks on A20
++	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
  
- 	soc at 01c00000 {
--		emac: ethernet at 01c0b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&emac_pins_a>;
--			phy = <&phy1>;
--			status = "okay";
--		};
--
--		mdio at 01c0b080 {
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
--
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard2: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-@@ -60,6 +45,18 @@
- 			pinctrl-0 = <&i2c1_pins_a>;
- 			status = "okay";
- 		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_mii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "mii";
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
- 	};
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+@@ -57,6 +58,9 @@ Additionally, most clocks require "clock-output-names":
+   do not need "clock-output-names"
+ - all others clocks : the corresponding module name of that clock
  
- 	leds {
++For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
++dummy clocks at 25 MHz and 125 MHz, respectively. See example.
++
+ Clock consumers should specify the desired clocks they use with a
+ "clocks" phandle cell. Consumers that are using a gated clock should
+ provide an additional ID in their clock property. This ID is the
+@@ -102,3 +106,25 @@ mmc0_clk: clk at 01c20088 {
+ 	clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 	clock-output-names = "mmc0";
+ };
++
++mii_phy_tx_clk: clk at 2 {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <25000000>;
++	clock-output-names = "mii_phy_tx";
++};
++
++gmac_int_tx_clk: clk at 3 {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <125000000>;
++	clock-output-names = "gmac_int_tx";
++};
++
++gmac_clk: clk at 01c20164 {
++	#clock-cells = <0>;
++	compatible = "allwinner,sun7i-a20-gmac-clk";
++	reg = <0x01c20164 0x4>;
++	clocks = <&mii_phy_tx_clk>, <&gmac_int_tx_clk>;
++	clock-output-names = "gmac";
++};
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index a741683..2ae2300 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -373,6 +373,80 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
+ 
+ 
+ /**
++ * sun7i_a20_gmac_clk_setup - Setup function for A20/A31 GMAC clock module
++ *
++ * This clock looks something like this
++ *                               ________________________
++ *  MII TX clock from PHY >-----|___________    _________|----> to GMAC core
++ *  GMAC Int. RGMII TX clk >----|___________\__/__gate---|----> to PHY
++ *  Ext. 125MHz RGMII TX clk >--|__divider__/            |
++ *                              |________________________|
++ *
++ * The external 125 MHz reference is optional, i.e. GMAC can use its
++ * internal TX clock just fine. The A31 GMAC clock module does not have
++ * the divider controls for the external reference.
++ *
++ * To keep it simple, let the GMAC use either the MII TX clock for MII mode,
++ * and its internal TX clock for GMII and RGMII modes. The GMAC driver should
++ * select the appropriate source and gate/ungate the output to the PHY.
++ */
++
++#define SUN7I_A20_GMAC_GPIT	2
++#define SUN7I_A20_GMAC_MASK	0x3
++
++static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct clk_mux *mux;
++	struct clk_gate *gate;
++	const char *clk_name = node->name;
++	const char *parents[2];
++	void *reg;
++	int i = 0;
++
++	/* allocate mux and gate clock structs */
++	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++	if (!mux)
++		return;
++	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	if (!gate) {
++		kfree(mux);
++		return;
++	}
++
++	reg = of_iomap(node, 0);
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	while (i < 2 && (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
++		i++;
++
++	/* set up gate and fixed rate properties */
++	gate->reg = reg;
++	gate->bit_idx = SUN7I_A20_GMAC_GPIT;
++	gate->lock = &clk_lock;
++	mux->reg = reg;
++	mux->mask = SUN7I_A20_GMAC_MASK;
++	mux->flags = CLK_MUX_INDEX_BIT;
++	mux->lock = &clk_lock;
++
++	clk = clk_register_composite(NULL, clk_name,
++			parents, i,
++			&mux->hw, &clk_mux_ops,
++			NULL, NULL,
++			&gate->hw, &clk_gate_ops,
++			CLK_SET_PARENT_GATE);
++
++	if (!IS_ERR(clk)) {
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++		clk_register_clkdev(clk, clk_name, NULL);
++	}
++}
++CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk", sun7i_a20_gmac_clk_setup);
++
++
++
++/**
+  * sunxi_factors_clk_setup() - Setup function for factor clocks
+  */
+ 
 -- 
 1.8.5.2
