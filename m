@@ -1,46 +1,191 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 14:58:41 +0000
-Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
-In-Reply-To: <20140110142548.GG9681@lunn.ch>
-References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
- <52CE312B.3060108@killerwolves.net> <20140109165557.GB9681@lunn.ch>
- <52CF4652.3030207@killerwolves.net>
- <20140110112846.GG27432@n2100.arm.linux.org.uk>
- <52CFFF07.5080806@killerwolves.net> <20140110142548.GG9681@lunn.ch>
-Message-ID: <20140110145841.GF15937@n2100.arm.linux.org.uk>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Fri, 10 Jan 2014 16:02:51 +0100
+Subject: [alsa-devel] [PATCH v2 28/28] drm/i2c: tda998x: add a
+ CODEC	interface
+In-Reply-To: <20140109120803.6c26b401@armhf>
+References: <20140109120803.6c26b401@armhf>
+Message-ID: <s5h38kvyj50.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 03:25:48PM +0100, Andrew Lunn wrote:
-> On Sat, Jan 11, 2014 at 12:09:11AM +1000, Ben Peddell wrote:
-> > Bytes transferred = 1954736 (1dd3b0 hex)
-> > Marvell>> setenv bootargs console=ttyS0,115200 ip=off initrd=0x00800040,0x0013FFC0 root=/dev/md0 rw syno_hw_version=DS211j ihd_num=2 netif_num=1 earlyprintk
+At Thu, 9 Jan 2014 12:08:03 +0100,
+Jean-Francois Moine wrote:
 > 
-> I don't see you loading the initrd into RAM at 0x0080 0000.
-
-However, the kernel _is_ being told that the initrd is at 0x00800040.
-
-> > Uncompressing Linux... done, booting the kernel.
-> > [    0.000000] Booting Linux on physical CPU 0x0
-> > [    0.000000] Linux version 3.13.0-rc7-ds211j+ (root at lurch) (gcc version 4.8.2 (Gentoo 4.8.2 p1.3, pie-0.5.8) ) #2 Thu Jan 9 08:52:24 EST 2014
-> > [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053977
-> > [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> > [    0.000000] Machine model: Synology DS210 v10, v20, v30, DS211j
-> > [    0.000000] bootconsole [earlycon0] enabled
-> > [    0.000000] INITRD: 0xf8280040+0x000f993c is not a memory region - disabling initrd
+> The TDA998x chips may get audio input from I2S or S/PDIF and this input
+> is defined by the audio subsystem.
 > 
-> The kernel is correct. There is no RAM here. That is in the IOMEM
-> space.
+> In the other way, the audio subsystem may need to know if audio output
+> may be done through the HDMI connector.
+> 
+> This patch adds a CODEC interface for exchanges between the HDMI transmitter and the audio subsystem.
 
-But here the kernel has ignored the command line parameter and instead
-used the one passed via DT.  That is not correct - command line parameters
-must always override ATAGs or DT.
+So this is a kind of hotplug event to be notified to the audio stack,
+right?  This reminds me of the discussion I had with Dave and Daniel
+at the previous LCE/KS.  Even for PCs with HD-audio, a similar thin
+layer would be preferred instead of the current indirect way via ELD,
+hardware IRQ and HD-audio unsolicited events.
 
-(That's irrespective of whether what's actually being asked of the kernel
-is correct or not - the principle here applies that command line parameters
-override, and in this case they aren't.)
+I guess in the end we'd need some common layer, e.g. a platform
+device, to provide a graphics/audio communication like hotplug
+notification, EDID and port assignment sharing, refcounting for PM,
+etc.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+That said, my comment isn't about your patch (which looks simple
+enough), but just for future works to chat for now :)
+
+
+thanks,
+
+Takashi
+
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/gpu/drm/i2c/tda998x_drv.c  | 70 ++++++++++++++++++++--
+>  1 file changed, 65 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> index 67d7450..5a186e4 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -42,7 +42,8 @@ struct tda998x_priv {
+>  	u8 vip_cntrl_1;
+>  	u8 vip_cntrl_2;
+>  
+> -	u8 audio_type;		/* audio type */
+> +	u8 audio_type;		/* audio type and 'active' flag */
+> +#define AUDIO_ACTIVE 0x80
+>  	u8 audio_frame[6];
+>  	u32 audio_port;
+>  
+> @@ -50,6 +51,9 @@ struct tda998x_priv {
+>  	wait_queue_head_t wq_edid;
+>  	volatile int wq_edid_wait;
+>  	struct drm_encoder *encoder;
+> +
+> +	struct snd_soc_codec *codec;
+> +	void (*event)(struct snd_soc_codec *codec, int activate);
+>  };
+>  
+>  #define to_tda998x_priv(x)  ((struct tda998x_priv *)to_encoder_slave(x)->slave_priv)
+> @@ -731,14 +735,14 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+>  
+>  	/* Set audio input source */
+>  	switch (priv->audio_type) {
+> -	case AFMT_SPDIF:
+> +	case AFMT_SPDIF | AUDIO_ACTIVE:
+>  		reg_write(priv, REG_MUX_AP, MUX_AP_SELECT_SPDIF);
+>  		clksel_aip = AIP_CLKSEL_AIP(SEL_AIP_SPDIF);
+>  		clksel_fs = AIP_CLKSEL_FS(CTSREF_FS64SPDIF);
+>  		cts_n = CTS_N_M(3) | CTS_N_K(3);
+>  		break;
+>  
+> -	case AFMT_I2S:
+> +	case AFMT_I2S | AUDIO_ACTIVE:
+>  		reg_write(priv, REG_MUX_AP, MUX_AP_SELECT_I2S);
+>  		clksel_aip = AIP_CLKSEL_AIP(SEL_AIP_I2S);
+>  		clksel_fs = AIP_CLKSEL_FS(CTSREF_ACLK);
+> @@ -813,6 +817,58 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+>  	tda998x_write_aif(priv);
+>  }
+>  
+> +/* tda998x codec interface */
+> +void tda998x_audio_register(struct i2c_client *client,
+> +			struct snd_soc_codec *codec,
+> +			void (*event)(struct snd_soc_codec *codec, int activate))
+> +{
+> +	struct tda998x_priv *priv = i2c_get_clientdata(client);
+> +
+> +	/* memorize the codec and the callback function */
+> +	priv->codec = codec;
+> +	priv->event = event;
+> +}
+> +EXPORT_SYMBOL_GPL(tda998x_audio_register);
+> +
+> +void tda998x_audio_update(struct i2c_client *client,
+> +			int type,
+> +			u32 port)
+> +{
+> +	struct tda998x_priv *priv = i2c_get_clientdata(client);
+> +
+> +	/* if the audio output is active, it may be a second start or a stop */
+> +	if (type == 0 || (priv->audio_type & AUDIO_ACTIVE)) {
+> +		if (type == 0) {
+> +			priv->audio_type &= ~AUDIO_ACTIVE;	/* stop */
+> +			reg_write(priv, REG_ENA_AP, 0);
+> +		}
+> +		return;
+> +	}
+> +
+> +	priv->audio_port = port;
+> +
+> +	/* don't restart audio if same input type */
+> +	if (type == priv->audio_type) {
+> +		priv->audio_type |= AUDIO_ACTIVE;
+> +		reg_write(priv, REG_ENA_AP, priv->audio_port);
+> +		return;
+> +	}
+> +
+> +	priv->audio_type = type | AUDIO_ACTIVE;
+> +
+> +	tda998x_configure_audio(priv, &priv->encoder->crtc->hwmode);
+> +}
+> +EXPORT_SYMBOL_GPL(tda998x_audio_update);
+> +
+> +/* send an audio event to the tda codec */
+> +static void send_audio_event(struct tda998x_priv *priv,
+> +				int event)
+> +{
+> +	if (!priv->event)
+> +		return;
+> +	priv->event(priv->codec, event);
+> +}
+> +
+>  /* DRM encoder functions */
+>  
+>  /* this function is not called when no info->platform (DT support) */
+> @@ -840,7 +896,7 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
+>  
+>  	if (p->audio_cfg) {
+>  		priv->audio_port = p->audio_cfg;
+> -		priv->audio_type = p->audio_format;
+> +		priv->audio_type = p->audio_format | AUDIO_ACTIVE;
+>  	}
+>  }
+>  
+> @@ -1105,9 +1161,10 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+>  
+>  		tda998x_write_avi(priv, mode);
+>  
+> -		if (priv->audio_type)
+> +		if (priv->audio_type & AUDIO_ACTIVE)
+>  			tda998x_configure_audio(priv, mode);
+>  	}
+> +	send_audio_event(priv, priv->is_hdmi_sink);
+>  
+>  	/* must be last register set: */
+>  	reg_write(priv, REG_TBG_CNTRL_0, 0);
+> @@ -1263,6 +1320,7 @@ tda998x_encoder_get_modes(struct drm_encoder *encoder,
+>  		drm_mode_connector_update_edid_property(connector, edid);
+>  		n = drm_add_edid_modes(connector, edid);
+>  		priv->is_hdmi_sink = drm_detect_hdmi_monitor(edid);
+> +		send_audio_event(priv, priv->is_hdmi_sink);
+>  		kfree(edid);
+>  	}
+>  
+> @@ -1349,6 +1407,8 @@ tda998x_encoder_init(struct i2c_client *client,
+>  	if (!priv)
+>  		return -ENOMEM;
+>  
+> +	i2c_set_clientdata(client, priv);
+> +
+>  	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
+>  	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
+>  	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
+> -- 
+> Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+> Jef		|		http://moinejf.free.fr/
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
