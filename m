@@ -1,129 +1,88 @@
 From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Thu, 9 Jan 2014 17:20:50 -0800
-Subject: [RFC PATCH 1/3] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <201401071028.00225.arnd@arndb.de>
+Date: Thu, 9 Jan 2014 17:30:43 -0800
+Subject: [RFC PATCH 2/3] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <20140107172734.GC4227@obsidianresearch.com>
 References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <201401031307.50312.arnd@arndb.de>
- <CACoXjck9KvQjB-8t3GYa95pZ6AwAyhyRKVg=5CYog_nFAfCiAQ@mail.gmail.com>
- <201401071028.00225.arnd@arndb.de>
-Message-ID: <CACoXjc=GCXSKuQBohf8-6vCsxxM3EJf72mriBaS0iaKhiCAuoQ@mail.gmail.com>
+ <1387785725-24262-3-git-send-email-tinamdar@apm.com>
+ <20131223174634.GD25089@obsidianresearch.com>
+ <CACoXjcnPvgDX3s8OywLHP6Tu2OrpNzM1Phx+s3RLmKDgu3t8gA@mail.gmail.com>
+ <20140103005253.GB12098@obsidianresearch.com>
+ <CACoXjcnykxdjekfmz6B3Ovk-+naCCOCWFZ3t=ZaMWAEPyVs_eQ@mail.gmail.com>
+ <20140107172734.GC4227@obsidianresearch.com>
+Message-ID: <CACoXjc=9csFNtW=FaPK-3q5fnCMz_5MApTMjwivQ7DDpsFA2yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 1:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 07 January 2014, Tanmay Inamdar wrote:
->> > Also, the implementation is wrong since the I/O port range already needs
->> > to be ioremapped in order for inb/outb to work. There is already a
->> > generic implementation of this in include/asm-generic/iomap.h, which
->> > correctly calls ioport_map. Make sure that arm64 uses this implementation
->> > and provides an ioport_map() function like
+On Tue, Jan 7, 2014 at 9:27 AM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Mon, Jan 06, 2014 at 06:56:21PM -0800, Tanmay Inamdar wrote:
+>
+>> > There is some kind of an addressing problem because you've done this:
 >> >
->> > static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
->> > {
->> >         return PCI_IOBASE + port;
->> > }
+>> > +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+>> > +{
+>> > +       int i;
+>> > +
+>> > +       for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+>> > +               dev->resource[i].start = dev->resource[i].end = 0;
+>> > +               dev->resource[i].flags = 0;
+>> > +       }
+>> > +}
+>> > +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_BRIDGE_DEVICEID,
+>> > +                        xgene_pcie_fixup_bridge);
+>> >
+>> > Which is usually a sign that something is wonky with how the HW is
+>> > being fit into the PCI core.
 >>
->> For X-Gene, IO regions are memory mapped IO regions. So I am not sure
->> if 'ioport_map'
->> would work.
+>> We map the whole DDR range (eg 256 GB) into host's BAR. The Linux PCI
+>> resource management tries to fit the host's memory into the ranges
+>> provided (eg 0xe000000000).
+>> Please let me know if there is any use case to do this mapping.
 >
-> It should. In fact all ARM and ARM64 platforms I have seen (and most powerpc
-> ones) have their IO region memory mapped. The way we handle this in Linux
-> is to map the IO space to a fixed virtual address at the time the host
-> controller is initialized, and all accesses to an IO port translate to
-> a access in this virtual address. See the inb()/outb() implementation on
-> arm and arm64, as well as the arm pci_ioremap_io() function for more
-> details.
->
+> If you need to set the bridge's BAR like this, then the bridge is not
+> non-conforming.. Bridge BAR's should be 0 size unless the bridge
+> itself has registers.
 
-Yes. arm64 has to support pci_ioremap_io and pci_iomap in order to
-support IO regions. Thanks.
-
->> >> +static void xgene_pcie_setup_lanes(struct xgene_pcie_port *port)
->> >> +{
->> >> +     void *csr_base = port->csr_base;
->> >> +     u32 val;
->> >> +
->> > ...
->> >> +static void xgene_pcie_setup_link(struct xgene_pcie_port *port)
->> >> +{
->> >> +     void *csr_base = port->csr_base;
->> >> +     u32 val;
->> >> +
->> >
->> > Don't these belong into the PHY driver? Can the setup be done in the
->> > firmware instead so we don't have to bother with it in Linux?
->> > Presumably you already need PCI support at boot time already if
->> > you want to boot from a PCI device.
->>
->> They do look like phy setup functions but they are part of PCIe core
->> register space.
->
-> Ok.
->
->> >> +static void xgene_pcie_config_pims(void *csr_base, u32 addr,
->> >> +                                u64 pim, resource_size_t size)
->> >> +{
->> >> +     u32 val;
->> >> +
->> >> +     xgene_pcie_out32(csr_base + addr, lower_32_bits(pim));
->> >> +     val = upper_32_bits(pim) | EN_COHERENCY;
->> >> +     xgene_pcie_out32(csr_base + addr + 0x04, val);
->> >> +     xgene_pcie_out32(csr_base + addr + 0x08, 0x0);
->> >> +     xgene_pcie_out32(csr_base + addr + 0x0c, 0x0);
->> >> +     val = lower_32_bits(size);
->> >> +     xgene_pcie_out32(csr_base + addr + 0x10, val);
->> >> +     val = upper_32_bits(size);
->> >> +     xgene_pcie_out32(csr_base + addr + 0x14, val);
->> >> +}
->> >
->> > I suspect this is for programming the inbound translation window for
->> > DMA transactions (maybe add a comment?), and the second 64-bit word is
->> > for the bus-side address. Are you sure you want a translation starting
->> > at zero, rather than an identity-mapping like this?
->>
->> Actually it is an unused sub-region. I will remove setting to 0. It
->> defaults to 0 anyways.
->
-> Is it always an identity-mapping then?
->
-Yes.
-
->> >> +struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
->> >> +{
->> >> +     struct xgene_pcie_port *port = xgene_pcie_bus_to_port(bus);
->> >> +
->> >> +     return of_node_get(port->node);
->> >> +}
->> >
->> > Another pointless wrapper to remove.
->>
->> If I remove this, then we get a failure while parsing irqs
->> "pci 0000:00:00.0: of_irq_parse_pci() failed with rc=-22"
->
-> I mean it would be just as easy to open-code the function in the
-> callers, and more readable.
->
->> >> +static int xgene_pcie_populate_inbound_regions(struct xgene_pcie_port *port)
->> >> +{
->> >> +     struct resource *msi_res = &port->res[XGENE_MSI];
->> >> +     phys_addr_t ddr_size = memblock_phys_mem_size();
->> >> +     phys_addr_t ddr_base = memblock_start_of_DRAM();
->> >
->> > This looks fragile. What about discontiguous memory? It's probably better to
->> > leave this setup to the firmware, which already has to do it.
->>
->> Idea is to map whole RAM. The memory controller in X-Gene does not
->> allow holes or discontinuity in RAM.
->
-> There might be holes in the memory map for other reasons, e.g. some part of
-> memory could be reserved for use by a particular piece of software.
-> There is actually a definition for a "dma-ranges" property that is normally
-> use to communicate this information, i.e. which bus addresses for DMA
-> translate into which parent bus (or memory) addresses. I think it would
-> be more logical to use that property.
-
-Yes. You are right. We will get more flexibility with this.
+They are not set to 0 as per our hardware implementation. We have to
+hide it using the fixup API. I don't know the reason but
+"arch/powerpc/sysdev/xilinx_pci.c" is doing the same thing.
 
 >
->         Arnd
+> Do any registers in this config space work properly? Does the
+> secondary status reflect the physical link status properly?
+
+Link status information is seen correctly.
+
+>
+> If it is *really* broken you might just consider hiding it from the
+> Linux core.
+>
+>> >>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+>> >> <TAbort- <MAbort- >SERR- <PERR- INTx-
+>> >>         Latency: 0, Cache Line Size: 64 bytes
+>> >>         Region 0: Memory at <ignored> (64-bit, prefetchable)
+>> >>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>> >>         I/O behind bridge: 0000f000-00000fff
+>> >>         Memory behind bridge: 00c00000-00cfffff
+>> >
+>> > [..]
+>> >
+>> >> 01:00.0 Class 0200: Device 15b3:1003
+>> >>         Region 0: Memory at e000c00000 (64-bit, non-prefetchable) [size=1M]
+>> >>         Region 2: Memory at e000000000 (64-bit, prefetchable)
+>> >>         [size=8M]
+>> >
+>> > Something funky is going on here too, the 64 bit address e000000000
+>> > should be reflected in the 'memory behind bridge' above, not
+>> > truncated.
+>>
+>> That's the Mellanox device that is plugged into the system. The
+>> device's memory gets mapped at '0xe0xxxxxxxx'
+>
+> Right, but the bridge setup above has:
+>
+>> >>         Memory behind bridge: 00c00000-00cfffff
+>
+> Which is wrong, it doesn't include the range '0xe0xxxxxxxx'
+>
+> Jason
