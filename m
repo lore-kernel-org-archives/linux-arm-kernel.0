@@ -1,124 +1,71 @@
 From: roy.franz@linaro.org (Roy Franz)
-Date: Fri, 10 Jan 2014 08:30:09 -0800
-Subject: [PATCH V6 0/8] Add ARM EFI stub
-Message-ID: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
+Date: Fri, 10 Jan 2014 08:30:10 -0800
+Subject: [PATCH V6 1/8] efi-stub.txt updates for ARM
+In-Reply-To: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
+References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
+Message-ID: <1389371417-379-2-git-send-email-roy.franz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds EFI stub support for the ARM architecture.  The 
-stub for ARM is implemented in a similar manner to x86 in that it is a 
-shim layer between EFI and the normal zImage/bzImage boot process, and 
-that an image with the stub configured is bootable as both a zImage and 
-EFI application.  This patchset adds common code that is shared with
-the ARM64 EFI stub.
+Update efi-stub.txt documentation to be more general
+and not x86 specific.  Add ARM only "dtb=" command
+line option description.
 
-This patch depends on Leif Lindholm's ARM v7 runtime services patchset, which 
-in turn depends on Mark Salter's early_io_remap() patchset.  This EFI stub 
-patchset can be tested without those by simply modifying the Kconfig for 
-EFI_STUB to not depend on EFI.  The kernel will boot using the stub, 
-however no EFI support will be available in the kernel.
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
+Acked-by: Grant Likely <grant.likely@linaro.org>
+---
+ Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-I have addressed all the feedback I have recieved to date, and I am hoping 
-that this patchset is acceptable for merging into 3.14.  It has been 
-functionally stable for some time, and provides useful functionality.  
-Further consolidation of the ARM/ARM64 stubs planned as part of the 
-ongoing development of the stubs and supporting tools for both 
-architectures (getting the FDT from a UEFI configuration table, using UEFI 
-memory map instead of FDT for memory description.) 
-
-
-
-Changes since v5:
-* Move more code dealing with the Device tree to common code shared by
-  ARM and ARM64.
-* move formatting of informative and error messaging to common code to
-  harmonize formatting between ARM/ARM64 stubs.
-
-Changes since v4:
-* Common and x86 EFI stub changes that this patch depends on were merged
-  in 3.13.
-* Updated FDT bindings to match agreed upon bindings in Leif's runtime
-  services patchset.  This includes adding the kernel_banner version string,
-  and changing how the EFI memory map is passed.  The EFI memory map is now
-  allocated as EFI_RUNTIME_SERVICES_DATA since it may be passed to the kernel.
-  The FDT bindings for arm/arm64 are identical.
-* Added space in PE/COFF header for signature to allow signing of the image
-  for EFI secure boot.
-* Moved shared FDT function to drivers/firmware/efi/fdt.c.  This will be shared
-  with arm64.  (Mark Salter has a patchset for the arm64 stub.)
-
-
-Changes since v3:
-* Common and x86 EFI stub changes have been broken out and submitted separately.
-  This patch series depends on the "[PATCH V5 00/18] ARM EFI stub common code"
-  series as merged by Matt Fleming. (Patch 10 of that series omitted)
-* Re-added -fno-stack-protector.  Needed for compilation with 
-  CONFIG_CC_STACKPROTECTOR option.  Cannot easily add support for stack 
-  protection since there are no functions in stub that never return, which 
-  is a requirement for use.  (x86 stub also disables stack protector.)
-  Note that even in the absense of -fno-stack-protector, stack protection
-  was never present in the decompressor, as the required functions are not
-  implemented.
-* Fixed long summaries in commit messages.
-* Further cleanups of assembly in head.S
-
-
-Changes since v2:
-* Now depends on "arm: Add [U]EFI runtime services support" patches by leif.lindholm at linaro.org.
-  The EFI memory map is the only memory map passed to the kernel, so EFI support
-  is now required.
-* remove "-fno-stack-protector" from decompressor Makefile.  The current code doesn't
-  trigger the stack protection, so the decompressor now compiles with it still
-  on.  Note that there has never been any stack protection in the decompressor
-  since the stack usage doesn't trigger the heuristic in GCC, so right now
-  the "-fno-stack-protector" is a noop.
-* Changed EFI command line handling to not have a fixed limit.
-* Change FDT memory allocation to retry with a larger allocation if
-  first educated guess is inadequate.
-* Correctly set 'SizeOfCode' in PE/COFF header.
-* Reviewed ".setup" section that is in x86 PE/COFF header.  This is used for x86
-  to account for code that is not in the .text section.  We don't need this
-  for ARM, as all of our code is in the .text section, or in the PE/COFF header
-  itself.
-* Moved EFI_STUB_ERROR #define to header file to share between stub C and ASM.
-* Variety of cleanups and fixes in head.S.
-* Changed update_fdt_and_exit_boot() to just update the device tree, and
-  renamed appropriately.  Memory allocations moved out of this function as
-  well, which enables the retries if the initial FDT size is too small.
-  Note that in order to do the retried allocations, the original FDT and 
-  command line memory regions are left allocated.  This is OK since the kernel
-  has the memory map and will free these allocations along with the initrd
-  and new fdt allocations.
-* Added prefix to all prints, reduced number of prints, and reviewed all
-  messages.
-* Change mixed usage of dtb/fdt to all be fdt or "device tree" in efi-stub.c
-* remove unnecessary zimage_size variable from relocate_kernel()
-* correct return types on EFI functions - should be efi_status_t, not int.
-Roy Franz (8):
-  efi-stub.txt updates for ARM
-  Add shared printk wrapper for consistent prefixing
-  Add helper function to get and convert EFI command line
-  Add shared FDT related functions for ARM/ARM64
-  Add strstr to compressed string.c for ARM.
-  Add EFI stub for ARM
-  Disable stack protection for decompressor/stub
-  Add config EFI_STUB for ARM to Kconfig
-
- Documentation/efi-stub.txt             |   27 +++-
- arch/arm/Kconfig                       |   11 ++
- arch/arm/boot/compressed/Makefile      |   17 ++-
- arch/arm/boot/compressed/efi-header.S  |  117 +++++++++++++++++
- arch/arm/boot/compressed/efi-stub.c    |  214 ++++++++++++++++++++++++++++++
- arch/arm/boot/compressed/efi-stub.h    |    5 +
- arch/arm/boot/compressed/head.S        |   83 +++++++++++-
- arch/arm/boot/compressed/string.c      |   21 +++
- drivers/firmware/efi/efi-stub-helper.c |   55 ++++++--
- drivers/firmware/efi/fdt.c             |  225 ++++++++++++++++++++++++++++++++
- 10 files changed, 748 insertions(+), 27 deletions(-)
- create mode 100644 arch/arm/boot/compressed/efi-header.S
- create mode 100644 arch/arm/boot/compressed/efi-stub.c
- create mode 100644 arch/arm/boot/compressed/efi-stub.h
- create mode 100644 drivers/firmware/efi/fdt.c
-
+diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+index 44e6bb6..a55a0cd 100644
+--- a/Documentation/efi-stub.txt
++++ b/Documentation/efi-stub.txt
+@@ -1,13 +1,16 @@
+ 			  The EFI Boot Stub
+ 		     ---------------------------
+ 
+-On the x86 platform, a bzImage can masquerade as a PE/COFF image,
+-thereby convincing EFI firmware loaders to load it as an EFI
+-executable. The code that modifies the bzImage header, along with the
+-EFI-specific entry point that the firmware loader jumps to are
+-collectively known as the "EFI boot stub", and live in
++On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
++as a PE/COFF image, thereby convincing EFI firmware loaders to load
++it as an EFI executable. The code that modifies the bzImage header,
++along with the EFI-specific entry point that the firmware loader
++jumps to are collectively known as the "EFI boot stub", and live in
+ arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+-respectively.
++respectively. For ARM the EFI stub is implemented in
++arch/arm/boot/compressed/efi-header.S and
++arch/arm/boot/compressed/efi-stub.c. EFI stub code that is shared
++between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+ 
+ By using the EFI boot stub it's possible to boot a Linux kernel
+ without the use of a conventional EFI boot loader, such as grub or
+@@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+ System Partiion (ESP) and renamed with the extension ".efi". Without
+ the extension the EFI firmware loader will refuse to execute it. It's
+ not possible to execute bzImage.efi from the usual Linux file systems
+-because EFI firmware doesn't have support for them.
++because EFI firmware doesn't have support for them. For ARM the
++arch/arm/boot/zImage should be copied to the system partition, and it
++may not need to be renamed.
+ 
+ 
+ **** Passing kernel parameters from the EFI shell
+@@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
+ because the image we're executing is interpreted by the EFI shell,
+ which understands relative paths, whereas the rest of the command line
+ is passed to bzImage.efi.
++
++
++**** The "dtb=" option
++
++For the ARM architecture, we also need to be able to provide a device
++tree to the kernel. This is done with the "dtb=" command line option,
++and is processed in the same manner as the "initrd=" option that is
++described above.
 -- 
 1.7.10.4
