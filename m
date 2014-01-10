@@ -1,78 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Jan 2014 22:21:29 +0100
-Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
- AX3-4 board
-In-Reply-To: <20140110211417.GX19878@titan.lakedaemon.net>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
- <20140110182240.GK19878@titan.lakedaemon.net>
- <20140110190521.GI18269@obsidianresearch.com>
- <20140110194550.GT19878@titan.lakedaemon.net>
- <20140110200813.GV19878@titan.lakedaemon.net>
- <52D05439.7040905@free-electrons.com>
- <20140110211417.GX19878@titan.lakedaemon.net>
-Message-ID: <52D06459.5000403@free-electrons.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Fri, 10 Jan 2014 15:26:05 -0600
+Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the "altr,
+ socfpga-gate-clk"
+In-Reply-To: <201401102000.25484.arnd@arndb.de>
+References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
+ <003501cf0e06$9c194c50$d44be4f0$%jun@samsung.com>
+ <1389369111.13556.29.camel@linux-builds1> <201401102000.25484.arnd@arndb.de>
+Message-ID: <52D0656D.6010307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2014 22:14, Jason Cooper wrote:
-> On Fri, Jan 10, 2014 at 09:12:41PM +0100, Gregory CLEMENT wrote:
->> Jason,
->> On 10/01/2014 21:08, Jason Cooper wrote:
->>> On Fri, Jan 10, 2014 at 02:45:50PM -0500, Jason Cooper wrote:
->>>> On Fri, Jan 10, 2014 at 12:05:21PM -0700, Jason Gunthorpe wrote:
->>>>> On Fri, Jan 10, 2014 at 01:22:40PM -0500, Jason Cooper wrote:
->>>>>
->>>>>> Do we create new compatible strings to indicate errata, or to indicate
->>>>>> 'from this version forward there are new features'?  The former would
->>>>>> indicate as Gregory has written '...-a0-i2c', the latter would warrant
->>>>>> '...-b0-i2c' and disabling offloading if we don't see '...-b0-i2c'.
->>>>
->>>> s/-b0-i2c'./-b0-i2c' or newer./
->>>>
->>>>> IMHO the compatible string should represent a specific HW/SW ABI. So
->>>>> you need a unique compatible string for every variation of that ABI.
->>>>
->>>> My concern is that we tend to do things like "marvell,orion-sata" for
->>>> the first version of the IP block we can work with.  orion5x, kirkwood,
->>>> dove, and armada 370/xp all use that compatible string to refer to that
->>>> IP block.
->>>>
->>>> Given that we look at it as 'and newer', '...-a0-i2c' would mean no
->>>> offloading until we introduce '-b0-i2c'.  Or am I mis-understanding what
->>>> you're saying?
->>>>
->>>>> We already have a compatible string defined for the ABI that B0
->>>>> presents.
->>>>
->>>> So 'mv78230-i2c' is newer than 'mv78230-a0-i2c', or are you referring to
->>>> something else?
->>>
->>> I think the crux of it is:  Is mv78230-i2c the first, or the default?
->>
->> Here it's clearly the default
-> 
-> So we should default to no offloading when we see it?  Since it has been
-> deployed referring to -a0 revision i2c IP blocks?
-> 
+Hi Arnd,
 
-But this assumption is wrong as I already wrote few days ago, mv78230-i2c
-has been deployed referring to -b0 revision i2c IP blocks since the begining.
+On 1/10/14 1:00 PM, Arnd Bergmann wrote:
+> On Friday 10 January 2014, Dinh Nguyen wrote:
+>>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>>>> index f936476..e776512 100644
+>>>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>>>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>>>> @@ -413,6 +413,7 @@
+>>>>                                             compatible = "altr,socfpga-gate-clk";
+>>>>                                             clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>,
+>>>> <&per_nand_mmc_clk>;
+>>>>                                             clk-gate = <0xa0 8>;
+>>>> +                                           clk-phase = <0 135>;
+>>> Can clk-phase be applicable commonly for various board?
+>>> Isn't specific timing values?
+>> No, the clock-phase does not change for various board. It is a
+>> SoC-specific property.
+> I'm curious about this: If the setting is fixed per soc, why is it even
+> configurable, rather than hardwired to the correct setting, or set up
+> by the boot loader?
+Yes, I guess it can be hardwired, but currently it is not and the values
+all default
+to 0. The bootloader does set it up, but only when the system is booting
+from
+the SD/MMC source. When booting from other flash medium(i.e. NAND,
+QSPI), these SD/MMC settings are not set, so they must be set by the OS
+if SD/MMC is to work correctly.
 
-It was developed on and for B0 version, and this compatible was created for
-this specific version. It was latter that we realized that it was not fully
-compatible with A0. But for sure:
-
-mv78230-i2c == I2C IP running on Armada XP B0 (or latter)
-
-> thx,
-> 
-> Jason.
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Dinh
+>
+> 	Arnd
