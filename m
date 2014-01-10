@@ -1,31 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Jan 2014 10:44:03 +0800
-Subject: [PATCH 1/2] Revert "ARM: dts: imx: use dual-fifo sdma script for
- ssi"
-In-Reply-To: <1389170756-22351-2-git-send-email-Guangyu.Chen@freescale.com>
-References: <1389170756-22351-1-git-send-email-Guangyu.Chen@freescale.com>
- <1389170756-22351-2-git-send-email-Guangyu.Chen@freescale.com>
-Message-ID: <20140110024359.GB6844@S2101-09.ap.freescale.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 10 Jan 2014 11:45:34 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.14
+Message-ID: <cover.1389321620.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 04:45:55PM +0800, Nicolin Chen wrote:
-> This reverts commit b1d27c79c8377df1880447375deffa3bb82c7bd3.
-> 
-> Previously we switched the SSI scriprt to dual-fifo mode to reduce playback
-> underrun issue, which is only included by SDMA firmware version 2. However,
-> there are quite a lot people still using version 1 or default firmware in
-> the ROM code of SoC while these two kinds of firmwares do not support the
-> dual-fifo script and the audio function on their platform would be broken.
-> 
-> Thus this patch provisionally reverts the dual-fifo script to the original
-> single fifo script to meet all kinds of users' requirements, including the
-> version 1/2 or inner ROM firmware.
-> 
-> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-If Vinod's tree can be rebased, the patch can just be dropped.
-Otherwise,
+please consider these renesas ARM Based SoC Fixes for v3.14.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+This pull-request is based on the Third Round of Renesas ARM Based SoC
+Updates for v3.14, tagged as renesas-soc3-for-v3.14, which you have
+previously pulled.
+
+It resolves a problem introduced by a patch included in the second round of such
+changes, tagged as renesas-soc2-for-v3.14, which you have also previously
+pulled.
+
+renesas-soc3-for-v3.14 is based on renesas-soc2-for-v3.14.
+
+
+
+The following changes since commit d85bcfa916ffdf078f188aeab60f738b290f4309:
+
+  arm: shmobile: r7s72100: add i2c clocks (2013-12-24 21:09:19 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v3.14
+
+for you to fetch changes up to db455c786886465c4d7fcd012fe2684b4c887776:
+
+  ARM: shmobile: r8a7790: Fix I2C controller names (2014-01-06 14:25:39 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v3.14
+
+* r8a7790 (R-Car H2) SoC
+
+  - Correct I2C controller names
+
+    This fixes the issue introduced by
+    b448c904f5058b6c "ARM: shmobile: r8a7790: add I2C support"
+    which is queued-up for v3.14.
+
+----------------------------------------------------------------
+Valentine Barshak (1):
+      ARM: shmobile: r8a7790: Fix I2C controller names
+
+ arch/arm/mach-shmobile/clock-r8a7790.c | 8 ++++----
+ arch/arm/mach-shmobile/setup-r8a7790.c | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
