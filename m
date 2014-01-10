@@ -1,192 +1,281 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Fri, 10 Jan 2014 22:19:36 +0900
-Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the
- "altr,socfpga-gate-clk"
-In-Reply-To: <1389303079-19808-2-git-send-email-dinguyen@altera.com>
-References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
- <1389303079-19808-2-git-send-email-dinguyen@altera.com>
-Message-ID: <003501cf0e06$9c194c50$d44be4f0$%jun@samsung.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 10 Jan 2014 14:25:46 +0100
+Subject: [PATCH 2/6] clk: samsung: add infrastructure to register CPU
+ clocks
+In-Reply-To: <CAJuA9ah7Owfo7yrZqN+iU6KYEkeoncL4AZ8rEKddNXAu6tC4aQ@mail.gmail.com>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+ <1389283165-17708-3-git-send-email-thomas.ab@samsung.com>
+ <20140110130407.3390213d@amdc2363>
+ <CAJuA9ah7Owfo7yrZqN+iU6KYEkeoncL4AZ8rEKddNXAu6tC4aQ@mail.gmail.com>
+Message-ID: <20140110142546.1e8583d6@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Hi Thomas,
 
-On Fri, January 10, 2014, Dinh Nguyen wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+> Hi Lukasz,
 > 
-> The clk-phase property is used to represent the 2 clock phase values that is
-> needed for the SD/MMC driver. Add a prepare function to the clk_ops, that will
-> use the syscon driver to set sdmmc_clk's phase shift that is located in the
-> system manager.
+> On Fri, Jan 10, 2014 at 5:34 PM, Lukasz Majewski
+> <l.majewski@samsung.com> wrote:
+> > Hi Thomas,
+> >
+> >> The CPU clock provider supplies the clock to the CPU clock domain.
+> >> The composition and organization of the CPU clock provider could
+> >> vary among Exynos SoCs. A CPU clock provider can be composed of
+> >> clock mux, dividers and gates. This patch defines a new clock type
+> >> for CPU clock provider and adds infrastructure to register the CPU
+> >> clock providers for Samsung platforms.
+> >>
+> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> >> ---
+> >>  drivers/clk/samsung/clk.c |   71
+> >> +++++++++++++++++++++++++++++++++++++++++++++
+> >> drivers/clk/samsung/clk.h |   37 +++++++++++++++++++++++- 2 files
+> >> changed, 107 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> >> index f503f32..9ac9056 100644
+> >> --- a/drivers/clk/samsung/clk.c
+> >> +++ b/drivers/clk/samsung/clk.c
+> >> @@ -316,3 +316,74 @@ unsigned long _get_rate(const char *clk_name)
+> >>
+> >>       return clk_get_rate(clk);
+> >>  }
+> >> +
+> >> +/*
+> >> + * On most platform, the core clock rate is equal to the clock
+> >> rate of
+> >> + * parent pll. This is a simple helper function to support
+> >> recalc_rate
+> >> + * callback for such platforms.
+> >> + */
+> >> +unsigned long samsung_core_clock_recalc_rate(struct clk_hw *hw,
+> >> +                             unsigned long parent_rate)
+> >> +{
+> >> +     /*
+> >> +      * Assuming that the output of the parent pll is the output
+> >> clock
+> >> +      * frequency of the core clock.
+> >> +      */
+> >> +     return parent_rate;
+> >> +}
+> >> +
+> >> +/* This is a helper function to perform clock rounding for core
+> >> clocks. */ +long samsung_core_clk_round_rate(struct clk_hw *hw,
+> >> +                     unsigned long drate, unsigned long *prate)
+> >> +{
+> >> +     struct samsung_core_clock *core_clk;
+> >> +     const struct samsung_core_clock_freq_table *freq_tbl;
+> >> +     int i;
+> >> +
+> >> +     core_clk = container_of(hw, struct samsung_core_clock, hw);
+> >> +     freq_tbl = core_clk->freq_table;
+> >> +     drate /= 1000;
+> >> +
+> >> +     for (i = 0; i < freq_tbl->freq_count; i++) {
+> >> +             if (drate >= freq_tbl->freq[i])
+> >> +                     return freq_tbl->freq[i] * 1000;
+> >> +     }
+> >> +     return freq_tbl->freq[i - 1] * 1000;
+> >> +}
+> >> +
+> >> +/* helper function to register a core clock */
+> >> +void __init samsung_coreclk_register(const char *name, const char
+> >> **parents,
+> >> +                     unsigned int num_parents, const char *pllclk,
+> >> +                     const struct clk_ops *clk_ops, unsigned int
+> >> lookup_id,
+> >> +                     const struct samsung_core_clock_freq_table
+> >> *freq_tbl) +{
+> >> +     struct samsung_core_clock *coreclk;
+> >> +     struct clk_init_data init;
+> >> +     struct clk *clk;
+> >> +
+> >> +     coreclk = kzalloc(sizeof(*coreclk), GFP_KERNEL);
+> >> +     if (!coreclk) {
+> >> +             pr_err("%s: could not allocate memory for coreclk
+> >> %s\n",
+> >> +                                     __func__, name);
+> >> +             return;
+> >> +     }
+> >> +
+> >> +     init.name = name;
+> >> +     init.flags = CLK_GET_RATE_NOCACHE;
+> >> +     init.parent_names = parents;
+> >> +     init.num_parents = num_parents;
+> >> +     init.ops = clk_ops;
+> >> +
+> >> +     coreclk->hw.init = &init;
+> >> +     coreclk->ctrl_base = reg_base;
+> >> +     coreclk->fout_pll = __clk_lookup(pllclk);
+> >> +     coreclk->freq_table = freq_tbl;
+> >> +
+> >> +     clk = clk_register(NULL, &coreclk->hw);
+> >> +     if (IS_ERR(clk)) {
+> >> +             pr_err("%s: could not register coreclk %s\n",
+> >> __func__,     name);
+> >> +             kfree(coreclk);
+> >> +             return;
+> >> +     }
+> >> +     samsung_clk_add_lookup(clk, lookup_id);
+> >> +}
+> >
+> > I think, that those definitions for samsung_core_clock shall be
+> > moved to a separate file (maybe clk-exynos-cpu.c)?
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
-> v9: none
-> v8: Use degrees in the clk-phase binding property
-> v7: Add dts property to represent the clk phase of the sdmmc_clk. Add a
->     prepare function to the gate clk that will toggle clock phase setting.
->     Remove the "altr,socfpga-sdmmc-sdr-clk" clock type.
-> v6: Add a new clock type "altr,socfpga-sdmmc-sdr-clk" that will be used to
->     set the phase shift settings.
-> v5: Use the "snps,dw-mshc" binding
-> v4: Use the sdmmc_clk prepare function to set the phase shift settings
-> v3: Not use the syscon driver because as of 3.13-rc1, the syscon driver is
->     loaded after the clock driver.
-> v2: Use the syscon driver
-> ---
->  .../devicetree/bindings/clock/altr_socfpga.txt     |    5 ++
->  arch/arm/boot/dts/socfpga.dtsi                     |    1 +
->  drivers/clk/socfpga/clk-gate.c                     |   68 ++++++++++++++++++++
->  3 files changed, 74 insertions(+)
+> The additions were not really much and the samsung/clk.c file is used
+> to hold all the common code for Samsung SoCs. So the additions were
+> put into this existing file itself.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-> b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-> index 0045433..5dfd145 100644
-> --- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-> +++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
-> @@ -23,3 +23,8 @@ Optional properties:
->          and the bit index.
->  - div-reg : For "socfpga-gate-clk", div-reg contains the divider register, bit shift,
->          and width.
-> +- clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
-> +	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
-> +	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
-> +	hold/delay times that is needed for the SD/MMC CIU clock. The values of both
-> +	can be 0-315 degrees, in 45 degree increments.
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index f936476..e776512 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -413,6 +413,7 @@
->  						compatible = "altr,socfpga-gate-clk";
->  						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>,
-> <&per_nand_mmc_clk>;
->  						clk-gate = <0xa0 8>;
-> +						clk-phase = <0 135>;
+> >
+> > Moreover, maybe you can choose a shorter name?
+> 
+> Ok, I will try to find a shorter name for in the next version.
+> 
+> >
+> >> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+> >> index 31b4174..0e43023 100644
+> >> --- a/drivers/clk/samsung/clk.h
+> >> +++ b/drivers/clk/samsung/clk.h
+> >> @@ -312,6 +312,37 @@ struct samsung_pll_clock {
+> >>       __PLL(_typ, _id, NULL, _name, _pname,
+> >> CLK_GET_RATE_NOCACHE, \ _lock, _con, _rtable, _alias)
+> >>
+> >> +/**
+> >> + * struct samsung_core_clock_freq_table: table of frequency
+> >> supported by
+> >> + * a core clock and associated data if any.
+> >> + * @freq: points to a table of supported frequencies (in KHz)
+> >> + * @freq_count: number of entries in the frequency table
+> >> + * @data: core clock specific data, if any
+> >> + */
+> >> +struct samsung_core_clock_freq_table {
+> >> +     const unsigned long     *freq;       /* in KHz */
+> >> +     unsigned long           freq_count;
+> >> +     const void              *data;
+> >> +};
+> >
+> > This is another instance of a structure, which holds the frequency
+> > for the system (like struct cpufreq_frequency_table).
+> >
+> > Unfortunately, since the clk subsystem starts very early, the
+> > cpufreq_frequency_table is not yet parsed from "operating-points"
+> > attribute.
+> >
+> > Maybe we can defer the clock registration?
+> 
+> The core clock is not limited to support only those frequencies which
+> the CPU operating point specifies. The core clock type can be used
+> independent of the cpufreq driver and hence has its own set of
+> supported frequencies. The cpufreq driver, depending the operating
+> points allowed, can request the core clock to setup the requested
+> clock speed.
 
-Can clk-phase be applicable commonly for various board?
-Isn't specific timing values?
+The above would be true if it could have been possible to use this
+clock without cpufreq.
 
-Thanks,
-Seungwon Jeon
->  					};
+Since, justification of this whole change is the clean up of cpufreq for
+Exynos, I assume that it will be only used with cpufreq. Is there any
+use case to use this clock without cpufreq?
+
+For this reason Exynos SoCs can only change frequency to the one, which
+is defined at cpufreq_frequency_table.
+
+And since the cpufreq_frequency_table is dynamically build from
+operating-points attribute, then in my opinion we shall refer to only
+one place for frequency.
+
+Similar approach - of reusing cpufreq_frequency_table is used at
+thermal core driver.
+
 > 
->  					nand_x_clk: nand_x_clk {
-> diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-> index 4efcf4e..501d513 100644
-> --- a/drivers/clk/socfpga/clk-gate.c
-> +++ b/drivers/clk/socfpga/clk-gate.c
-> @@ -19,7 +19,9 @@
->  #include <linux/clkdev.h>
->  #include <linux/clk-provider.h>
->  #include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
->  #include <linux/of.h>
-> +#include <linux/regmap.h>
+> >
+> >> +
+> >> +/**
+> >> + * struct samsung_core_clock: information about clock supplied to
+> >> a CPU core.
+> >> + * @hw: handle between ccf and core clock.
+> >> + * @ctrl_base: base address of the clock controller.
+> >> + * @fout_pll: clock handle representing the clock output of the
+> >> associated PLL.
+> >> + */
+> >> +struct samsung_core_clock {
+> >> +     struct clk_hw           hw;
+> >> +     void __iomem            *ctrl_base;
+> >> +     struct clk              *fout_pll;
+> >> +     const struct samsung_core_clock_freq_table *freq_table;
+> >> +};
+> >> +
+> >> +extern unsigned long samsung_core_clock_recalc_rate(struct clk_hw
+> >> *hw,
+> >> +                             unsigned long parent_rate);
+> >> +extern long samsung_core_clk_round_rate(struct clk_hw *hw,
+> >> +                     unsigned long drate, unsigned long *prate);
+> >
+> > IMHO, those methods shall be defined as static in a separate file.
 > 
->  #include "clk.h"
+> These two functions are generic enough to be reused for core clock
+> implementations on multiple exynos platforms. 
+
+I thought that you are going to implement this clock in a generic way,
+so by using the DT we could use it for Exynos4210/4x12 and 5250.
+
+> Only the set_rate
+> callback is the one that will be specific to SoC and core clock. The
+> SoC specific implementation can reuse these two callback funcitons
+> when registering the core clock type. That is the reason these are not
+> static functions. The 3/6 patch of this series includes the usage of
+> these functions.
+
+In my opinion we shall not duplicate per SoC constructs like for
+example:
+
+static struct apll_freq apll_freq_4412[]
+static struct apll_freq apll_freq_4212[]
+static struct apll_freq apll_freq_4210[]
+
+which would be used at different ->set_rate() callbacks.
+
+I think that the best solution would be to use one ->set_rate() with
+data parsed from DT.
+
 > 
-> @@ -35,6 +37,11 @@
+> Thanks,
+> Thomas.
 > 
->  #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
-> 
-> +/* SDMMC Group for System Manager defines */
-> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
-> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
-> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-> +
->  static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
->  {
->  	u32 l4_src;
-> @@ -115,7 +122,61 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
->  	return parent_rate / div;
->  }
-> 
-> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
-> +{
-> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
-> +	struct regmap *sys_mgr_base_addr;
-> +	int i;
-> +	u32 hs_timing;
-> +	u32 clk_phase[2];
-> +
-> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
-> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-> +		if (IS_ERR(sys_mgr_base_addr)) {
-> +			pr_err("%s: failed to find altr,sys-mgr regmap!\n", __func__);
-> +			return -EINVAL;
-> +		}
-> +
-> +		for (i = 0; i < 2; i++) {
-> +			switch (socfpgaclk->clk_phase[i]) {
-> +			case 0:
-> +				clk_phase[i] = 0;
-> +				break;
-> +			case 45:
-> +				clk_phase[i] = 1;
-> +				break;
-> +			case 90:
-> +				clk_phase[i] = 2;
-> +				break;
-> +			case 135:
-> +				clk_phase[i] = 3;
-> +				break;
-> +			case 180:
-> +				clk_phase[i] = 4;
-> +				break;
-> +			case 225:
-> +				clk_phase[i] = 5;
-> +				break;
-> +			case 270:
-> +				clk_phase[i] = 6;
-> +				break;
-> +			case 315:
-> +				clk_phase[i] = 7;
-> +				break;
-> +			default:
-> +				clk_phase[i] = 0;
-> +				break;
-> +			}
-> +		}
-> +		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
-> +		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
-> +			hs_timing);
-> +	}
-> +	return 0;
-> +}
-> +
->  static struct clk_ops gateclk_ops = {
-> +	.prepare = socfpga_clk_prepare,
->  	.recalc_rate = socfpga_clk_recalc_rate,
->  	.get_parent = socfpga_clk_get_parent,
->  	.set_parent = socfpga_clk_set_parent,
-> @@ -126,6 +187,7 @@ static void __init __socfpga_gate_init(struct device_node *node,
->  {
->  	u32 clk_gate[2];
->  	u32 div_reg[3];
-> +	u32 clk_phase[2];
->  	u32 fixed_div;
->  	struct clk *clk;
->  	struct socfpga_gate_clk *socfpga_clk;
-> @@ -166,6 +228,12 @@ static void __init __socfpga_gate_init(struct device_node *node,
->  		socfpga_clk->div_reg = 0;
->  	}
-> 
-> +	rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
-> +	if (!rc) {
-> +		socfpga_clk->clk_phase[0] = clk_phase[0];
-> +		socfpga_clk->clk_phase[1] = clk_phase[1];
-> +	}
-> +
->  	of_property_read_string(node, "clock-output-names", &clk_name);
-> 
->  	init.name = clk_name;
-> --
-> 1.7.9.5
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> >> +
+> >>  extern void __init samsung_clk_init(struct device_node *np, void
+> >> __iomem *base, unsigned long nr_clks, unsigned long *rdump,
+> >>               unsigned long nr_rdump, unsigned long *soc_rdump,
+> >> @@ -337,7 +368,11 @@ extern void __init samsung_clk_register_gate(
+> >>               struct samsung_gate_clock *clk_list, unsigned int
+> >> nr_clk); extern void __init samsung_clk_register_pll(struct
+> >> samsung_pll_clock *pll_list, unsigned int nr_clk, void __iomem
+> >> *base); -
+> >> +extern void __init samsung_coreclk_register(const char *coreclk,
+> >> +             const char **parents, unsigned int num_parents,
+> >> +             const char *pllclk, const struct clk_ops *clk_ops,
+> >> +             unsigned int lookup_id,
+> >> +             const struct samsung_core_clock_freq_table
+> >> *freq_tbl); extern unsigned long _get_rate(const char *clk_name);
+> >>
+> >>  #endif /* __SAMSUNG_CLK_H */
+> >
+> >
+> >
+> > --
+> > Best regards,
+> >
+> > Lukasz Majewski
+> >
+> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
