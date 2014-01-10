@@ -1,118 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 11 Jan 2014 01:02:21 +0300
-Subject: [linux-sunxi] Re: [PATCH v3 1/2] ohci-platform: Add support for
- devicetree instantiation
-In-Reply-To: <52CFC1A8.4010505@redhat.com>
-References: <1389290226-6971-1-git-send-email-hdegoede@redhat.com>
- <1389290226-6971-2-git-send-email-hdegoede@redhat.com>
- <52CF0326.1090407@cogentembedded.com> <52CEFCFE.7080308@redhat.com>
- <52CF0FB1.1010109@cogentembedded.com> <52CFC1A8.4010505@redhat.com>
-Message-ID: <52D06DED.1040409@cogentembedded.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 10 Jan 2014 14:06:34 -0700
+Subject: [PATCH v5 2/4] ARM: mvebu: Add quirk for i2c for the OpenBlocks
+ AX3-4 board
+In-Reply-To: <20140110194550.GT19878@titan.lakedaemon.net>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <1389193589-18485-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140110182240.GK19878@titan.lakedaemon.net>
+ <20140110190521.GI18269@obsidianresearch.com>
+ <20140110194550.GT19878@titan.lakedaemon.net>
+Message-ID: <20140110210634.GL18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jan 10, 2014 at 02:45:50PM -0500, Jason Cooper wrote:
 
-On 01/10/2014 12:47 PM, Hans de Goede wrote:
+> > IMHO the compatible string should represent a specific HW/SW ABI. So
+> > you need a unique compatible string for every variation of that ABI.
+> 
+> My concern is that we tend to do things like "marvell,orion-sata" for
+> the first version of the IP block we can work with.  orion5x, kirkwood,
+> dove, and armada 370/xp all use that compatible string to refer to that
+> IP block.
 
-> Hi,
+Right, absent guidance from the originators of the IP block that is
+sort of all we are left with. But something like 'marvell,orion-sata'
+is just a label to describe the ABI implemented by the HW on that
+particular chip.
 
-    I would like to know why you dropped me from the To: list when replying. I 
-have hardly noticed your reply.
+> Given that we look at it as 'and newer', '...-a0-i2c' would mean no
+> offloading until we introduce '-b0-i2c'.  Or am I mis-understanding what
+> you're saying?
 
->>>>> Add support for ohci-platform instantiation from devicetree, including
->>>>> optionally getting clks and a phy from devicetree, and enabling / disabling
->>>>> those on power_on / off.
+I would stop thinking of this in terms of 'is newer' / 'is older'.
 
->>>>> This should allow using ohci-platform from devicetree in various cases.
->>>>> Specifically after this commit it can be used for the ohci controller found
->>>>> on Allwinner sunxi SoCs.
+marvell,orion-sata means any HW that implements the same ABI as the
+orion chip. 
 
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> ---
->>>>>   .../devicetree/bindings/usb/mmio-ohci.txt          |  22 +++
->>>>>   drivers/usb/host/ohci-platform.c                   | 150
->>>>> ++++++++++++++++++---
->>>>>   2 files changed, 152 insertions(+), 20 deletions(-)
->>>>>   create mode 100644 Documentation/devicetree/bindings/usb/mmio-ohci.txt
->>>>
->>>>> diff --git a/Documentation/devicetree/bindings/usb/mmio-ohci.txt
->>>>> b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
->>>>> new file mode 100644
->>>>> index 0000000..9c776ed
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
->>>>> @@ -0,0 +1,22 @@
->>>>> +Generic MMIO OHCI controller
+When we get a different chip that has a compatible, but extended ABI
+we introduce a new label:
 
->>>>     OHCI controller always uses MMIO, and likewise EHCI. You don't need to
->>>> specifically mention it.
+ compatible = "marvell,foobar-sata", "marvell,orion-sata";
 
->>> Right, I'm only using it here because it is also used in the compatible
->>> string.
+And if we get one that has a very similar, but incompatible ABI, we
+still introduce a new label:
 
->>     Please drop it.
+ compatible = "marvell,foobar2-sata";
 
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible : "mmio-ohci"
+And everything works properly.
 
->>>>     Likewise, it's not a good name. Why not call it "platform-ohci"?
+> > We already have a compatible string defined for the ABI that B0
+> > presents.
+> 
+> So 'mv78230-i2c' is newer than 'mv78230-a0-i2c', or are you referring to
+> something else?
 
->>> Because, as you would have known had you read the entire thread, people
->>> objected
->>> against exactly that name because the "platform" bus thing is a Linux
->>> invention,
->>> and other operating systems don't use the platform nomenclature for non pci
->>> busses.
+'mv78230-i2c' is the name that was picked to describe the ABI that
+works as-documented in the manual
+'mv78230-a0-i2c' is the name that was picked to describe the ABI that
+works as-implemented in the A0 chip :)
 
->>     I wonder where were all those people when "xhci-platform" compatible got
->> adopted in drivers/usb/host/xhci-plat.c? :-P
+There is no newer/older, they are just two different ABIs.
 
-    I remember I suggested "usb-xhci" but the author didn't want to do it and 
-I said that I have no strong opinion (along with Alan Stern, IIRC), so we have 
-it now...
+I guess it turns out that 'mv78230-a0-i2c' is a strict compatible
+subset of 'mv78230-i2c' - but that doesn't really make a difference.
 
->>     Anyway, I want to suggest "usb-[eo]hci" of which "usb-ehci" binding has
->> even already documented in Documentation/devicetree/bindings/usb/usb-ehci.txt.
->> Both these "compatible" values are used as backups in the multiple described
->> bindings of the platform-specific [EO]HCI controllers. I really don't see
->> why you should invent anything new (and so poorly named).
+The 'mv78230-i2c' driver is guarenteed avaialble in all places where
+the 'mv78230-a0-i2c' driver would be available.
 
-> This too has already been discussed, again please read the entire thread
-> including review of earlier versions of the patch.
-
-    Sorry, I have been generally lacking the time to read linux-usb recently.
-I only bumped into your patch randomly, despite me being interested in this 
-matter for my own platform...
-
-> We cannot usb usb-ehci, because the existing usb-ehci compatible string is not
-> used for a generic usb controller, but
-> for a ppc specific one  which needs model specific setup, see the driver
-> currently implementing compatible = usb-ehci.
-
-    Not true about it being entirely PPC specific: the driver actually looks 
-for another "compatible" property to make it truly PPC specific (and apply 
-some errata fixes for that specific PPC platform) and "usb-ehci" is used in 
-many non-PPC binding examples as a backup still. Valentine Barshak's did his 
-work on ehci-ppc-of.c when DT was used only on PPC and SPARC, so it was kind 
-of a honest mistake on his part to name the driver so that people would think 
-it's PPC specific (not only his, it seems, as the driver was based on the 
-other two). This does not seem a fatal mistake, and we could limit the driver 
-to match only on that IBM 440EPx platform it was designed for and tested on, 
-making ehci-platform.c handle "usb-ehci". This is more work but I believe it's 
-the Right Thing. The problem is that we'll have to do this atomically with 
-ehci-platform.c change since 2 other PPC platforms use "usb-ehci" as a backup 
-to their specific "compatible" props and don't have the platform-specific 
-drivers for them, and we probably wouldn't want to break them.
-I would like to help you here but the matter is not urgent for me, so cannot 
-work on it right now... :-(
-    Anyway, I'm strongly against such names as "mmio-[eo]hci". But I could 
-live with just "[eo]hci" if you don't follow my advice and unravel the 
-ehci-ppc-of.c knot...
-
-> Regards,
-
-> Hans
-
-WBR, Sergei
+Jason
