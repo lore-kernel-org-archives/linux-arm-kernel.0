@@ -1,31 +1,31 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Jan 2014 16:58:47 +0000
-Subject: [PATCH v3 4/6] arm: add early_ioremap support
-In-Reply-To: <CAL_JsqLZQ=3gph4yaNSrZ5oPL3kasQKqA5C5+my0GwjGHsvMeQ@mail.gmail.com>
-References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
- <1389325833-16535-5-git-send-email-msalter@redhat.com>
- <CAL_JsqLZQ=3gph4yaNSrZ5oPL3kasQKqA5C5+my0GwjGHsvMeQ@mail.gmail.com>
-Message-ID: <20140110165847.GG925@arm.com>
+Date: Fri, 10 Jan 2014 17:00:06 +0000
+Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
+ <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20140110170005.GH925@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 04:11:03PM +0000, Rob Herring wrote:
-> On Thu, Jan 9, 2014 at 9:50 PM, Mark Salter <msalter@redhat.com> wrote:
-> > This patch uses the generic early_ioremap code to implement
-> > early_ioremap for ARM. The ARM-specific bits come mostly from
-> > an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
-> > here:
-> >
-> >   https://lkml.org/lkml/2013/10/3/279
+On Thu, Jan 09, 2014 at 06:32:15PM +0000, Stefano Stabellini wrote:
+> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+> Necessary duplication of paravirt.h and paravirt.c with ARM.
 > 
-> I think this will be useful to implement an arm64 style earlycon for
-> arm as the current DEBUG_LL doesn't really work with multi-platform
-> kernels. I started on this and quickly realized I needed the fixmap
-> support.
+> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> runtime pvops patching needed.
+> 
+> This allows us to make use of steal_account_process_tick for stolen
+> ticks accounting.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: will.deacon at arm.com
+> CC: nico at linaro.org
+> CC: marc.zyngier at arm.com
+> CC: cov at codeaurora.org
+> CC: arnd at arndb.de
+> CC: olof at lixom.net
+> CC: Catalin.Marinas at arm.com
 
-It would be even better if you can make it more generic
-(drivers/tty/serial/) and keep DEBUG_LL as a specialised case for
-arch/arm (when !multi-platform).
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
