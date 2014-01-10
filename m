@@ -1,123 +1,54 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 11 Jan 2014 00:40:47 +0100
-Subject: [PATCH v6 1/6] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY
- to enforce this ACPI mode
-In-Reply-To: <52D07EB2.6020801@redhat.com>
-References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
- <1934585.8FgTJADASZ@vostro.rjw.lan> <52D07EB2.6020801@redhat.com>
-Message-ID: <1728182.2Up5nPGMKz@vostro.rjw.lan>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 11 Jan 2014 07:55:57 +0800
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20140110174412.GJ19878@titan.lakedaemon.net>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131231121214.GB3985@htj.dyndns.org>
+ <20131231170515.GG32537@lunn.ch>
+ <EE71107DF0D1F24FA2D95041E64AB9E801C034BF2AD1@IL-MB01.marvell.com>
+ <20140110174412.GJ19878@titan.lakedaemon.net>
+Message-ID: <20140111075557.353478fa@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 10, 2014 04:13:54 PM Al Stone wrote:
-> On 01/10/2014 04:11 PM, Rafael J. Wysocki wrote:
-> > On Friday, January 10, 2014 03:52:15 PM al.stone at linaro.org wrote:
-> >> From: Al Stone <al.stone@linaro.org>
-> >>
-> >> Hardware reduced mode, despite the name, exists primarily to allow
-> >> newer platforms to use a much simpler form of ACPI that does not
-> >> require supporting the legacy of previous versions of the specification.
-> >> This mode was first introduced in the ACPI 5.0 specification, but because
-> >> it is so much simpler and reduces the size of the object code needed to
-> >> support ACPI, it is likely to be used more often in the near future.
-> >>
-> >> To enable the hardware reduced mode of ACPI on some platforms (such as
-> >> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
-> >> to TRUE in the ACPICA source.  For ARM/ARM64, hardware reduced ACPI
-> >> should be the only mode used; legacy mode would require modifications
-> >> to SoCs in order to provide several x86-specific hardware features (e.g.,
-> >> an NMI and SMI support).
-> >>
-> >> We set ACPI_REDUCED_HARDWARE to TRUE in the ACPICA source by introducing
-> >> a kernel config item to enable/disable ACPI_REDUCED_HARDWARE.  We can then
-> >> change the kernel config instead of having to modify the kernel source
-> >> directly to enable the reduced hardware mode of ACPI.
-> >>
-> >> Lv Zheng suggested that this configuration item does not belong in ACPICA,
-> >> the upstream source for much of the ACPI internals, but rather to the
-> >> Linux kernel itself.  Hence, we introduce this flag so that we can make
-> >> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
-> >> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
-> >>
-> >> Even though support for X86 in hardware reduced mode is possible, it
-> >> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
-> >> there is a single kernel image than can run on all x86 hardware; the kernel
-> >> changes run-time behavior to adapt to the hardware being used.  This is not
-> >> currently possible with the existing ACPICA infrastructure but only presents
-> >> a problem on achitectures supporting both hardware-reduced and legacy modes
-> >> of ACPI -- i.e., on x86 only.
-> >>
-> >> The problem with the current ACPICA code base is that if one builds legacy
-> >> ACPI (a proper superset of hardware-reduced), the kernel can run in hardware-
-> >> reduced with the proper ACPI tables, but there is still ACPICA code that could
-> >> be executed even though it is not allowed by the specification.  If one builds
-> >> a hardware-reduced only ACPI, the kernel cannot run with ACPI tables that are
-> >> for legacy mode.  To ensure compliance with ACPI, one must therefore build
-> >> two separate kernels.  Once this problem has been properly fixed, we can then
-> >> enable x86 hardware-reduced mode and use a single kernel.
-> >>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Signed-off-by: Al Stone <al.stone@linaro.org>
-> >> ---
-> >>   drivers/acpi/Kconfig            | 12 ++++++++++++
-> >>   include/acpi/platform/aclinux.h |  6 ++++++
-> >>   2 files changed, 18 insertions(+)
-> >>
-> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> >> index 4770de5..75dd38a 100644
-> >> --- a/drivers/acpi/Kconfig
-> >> +++ b/drivers/acpi/Kconfig
-> >> @@ -343,6 +343,18 @@ config ACPI_BGRT
-> >>   	  data from the firmware boot splash. It will appear under
-> >>   	  /sys/firmware/acpi/bgrt/ .
-> >>
-> >> +config ACPI_REDUCED_HARDWARE_ONLY
-> >> +	bool "Hardware-reduced ACPI support only"
-> >> +	depends on !X86 && !IA64 || EXPERT
-> >> +	help
-> >> +	This config item changes the way the ACPI code is built.  When this
-> >> +	option is selected, the kernel will use a specialized version of
-> >> +	ACPICA that ONLY supports the ACPI "reduced hardware" mode.  The
-> >> +	resulting kernel will be smaller but it will also be restricted to
-> >> +	running in ACPI reduced hardware mode ONLY.
-> >> +
-> >> +	If you are unsure what to do, do not enable this option.
-> >
-> > I'm still not exactly convinced this is the best way to do that.
-> >
-> > In particular, I wonder if it would be viable to make it disabled by default
-> > and then make the interested architectures do
-> >
-> > 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> >
-> > in their top-level Kconfig files?
-> 
-> Hrm.  Do you mean something like this:
-> 
-> config ACPI_REDUCED_HARDWARE_ONLY
-> 	bool "Hardware-reduced ACPI support only"
-> 	default n
-> 	depends on EXPERT
-> 	help
-> 	...
-> 
-> and remove any mention of architecture?
+Dear Jason Cooper,
 
-Yes.
+On Fri, 10 Jan 2014 12:44:12 -0500, Jason Cooper wrote:
 
-> Or forgo the "depends" entirely?  From my perspective, any of the above is sufficient
-> so I'll defer to your broader view of ACPI.
+> Lior, thanks for the clarification.  Simon, care to respin this with a
+> check for "marvell,armada-370-xp" root compatible string?  It should be
+> safe to say that if there is no DT, don't write the register.
 
-Well, I thought about something like this:
+Why check a root compatible string? If we do this, then we will have to
+change the SATA driver for each and every new Marvell SoC that has this
+PHY speed control register (and these new SOCs will not use the
+"marvell,armada-370-xp" root compatible string, since they are clearly
+not Armada 370/XP).
 
-config ACPI_REDUCED_HARDWARE_ONLY
-	def_bool n
-	depends on ACPI && EXPERT
+Instead, we should introduce an additional compatible string for the
+SATA driver itself.
 
-and then do the above select in arch-level Kconfigs where necessary.
+> Alternatively, we could do as Lior suggests, and create a new sata
+> compatible string.  But I think that is overkill.
 
-Thanks!
+No, this is the right thing to do, IMO.
 
+> Also, I'm growing more leery creating compatible strings for IP blocks
+> which are tied to the SoC revision.  If the IP block doesn't get issued
+> it's own version number/codename, we should just use the root compatible
+> strings to determine which SoC we are on.  I'll expand on this though as
+> I get caught up with Gregory's series's. 
+
+I really disagree. It means that whenever a new root compatible string
+is created for a new SOC, we will have to edit gazillions of drivers.
+It's not because two SOCs have the same SATA IP that they are globally
+compatible, and can therefore share the same root compatible strings.
+
+Best regards,
+
+Thomas
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
