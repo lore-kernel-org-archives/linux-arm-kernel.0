@@ -1,46 +1,95 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 10 Jan 2014 10:22:26 +0100
-Subject: [PATCH] arm64: dts:  add <dt-bindings/> symlink
-In-Reply-To: <1389346197-5127-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389346197-5127-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20140110102226.63f5bf30@ipc1.ka-ro>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 10 Jan 2014 10:33:11 +0100
+Subject: [PATCH] tty/serial: at91: disable uart timer at start of shutdown
+Message-ID: <1389346391-26145-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Marek Roszko <mark.roszko@gmail.com>
 
-Pankaj Dubey wrote:
-> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-> match the ones in ARM architectures so that preprocessed device
-> tree files can include various useful constant definitions.
-> 
-> See commit c58299a (kbuild: create an "include chroot" for DT bindings)
-> merged in v3.10-rc1 for details.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm64/boot/dts/include/dt-bindings |    1 +
->  1 file changed, 1 insertion(+)
->  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-> 
-> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..08c00e4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings
-> \ No newline at end of file
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The uart timer will schedule a tasklet when it fires. It is possible that it
+can fire inside _shutdown before it is killed in the dma and pdc cleanup
+routines. This causes a tasklet that exists after the port is shutdown, so when
+the kernel finally executes it, it panics as the tty port is NULL.
 
-Lothar Wa?mann
+This is a somewhat rare condition but its possible if a program keeps on
+opening/closing the port. It has been observed in particular with systemd
+boot messages that were causing a kernel panic because of this behavior.
+
+Moving the timer deletion to the beginning of the function stops a tasklet from
+being scheduled unexpectedly.
+
+Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+Cc: stable <stable@vger.kernel.org> # v3.12
+[nicolas.ferre at atmel.com: modify commit message, call setup_timer() in any case]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 2b6ac1be00d3..a49f10d269b2 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -825,9 +825,6 @@ static void atmel_release_rx_dma(struct uart_port *port)
+ 	atmel_port->desc_rx = NULL;
+ 	atmel_port->chan_rx = NULL;
+ 	atmel_port->cookie_rx = -EINVAL;
+-
+-	if (!atmel_port->is_usart)
+-		del_timer_sync(&atmel_port->uart_timer);
+ }
+ 
+ static void atmel_rx_from_dma(struct uart_port *port)
+@@ -1229,9 +1226,6 @@ static void atmel_release_rx_pdc(struct uart_port *port)
+ 				 DMA_FROM_DEVICE);
+ 		kfree(pdc->buf);
+ 	}
+-
+-	if (!atmel_port->is_usart)
+-		del_timer_sync(&atmel_port->uart_timer);
+ }
+ 
+ static void atmel_rx_from_pdc(struct uart_port *port)
+@@ -1604,12 +1598,13 @@ static int atmel_startup(struct uart_port *port)
+ 	/* enable xmit & rcvr */
+ 	UART_PUT_CR(port, ATMEL_US_TXEN | ATMEL_US_RXEN);
+ 
++	setup_timer(&atmel_port->uart_timer,
++			atmel_uart_timer_callback,
++			(unsigned long)port);
++
+ 	if (atmel_use_pdc_rx(port)) {
+ 		/* set UART timeout */
+ 		if (!atmel_port->is_usart) {
+-			setup_timer(&atmel_port->uart_timer,
+-					atmel_uart_timer_callback,
+-					(unsigned long)port);
+ 			mod_timer(&atmel_port->uart_timer,
+ 					jiffies + uart_poll_timeout(port));
+ 		/* set USART timeout */
+@@ -1624,9 +1619,6 @@ static int atmel_startup(struct uart_port *port)
+ 	} else if (atmel_use_dma_rx(port)) {
+ 		/* set UART timeout */
+ 		if (!atmel_port->is_usart) {
+-			setup_timer(&atmel_port->uart_timer,
+-					atmel_uart_timer_callback,
+-					(unsigned long)port);
+ 			mod_timer(&atmel_port->uart_timer,
+ 					jiffies + uart_poll_timeout(port));
+ 		/* set USART timeout */
+@@ -1652,6 +1644,12 @@ static void atmel_shutdown(struct uart_port *port)
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+ 	/*
++	 * Prevent any tasklets being scheduled during
++	 * cleanup
++	 */
++	del_timer_sync(&atmel_port->uart_timer);
++
++	/*
+ 	 * Clear out any scheduled tasklets before
+ 	 * we destroy the buffers
+ 	 */
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.8.2.2
