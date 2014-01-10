@@ -1,40 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Jan 2014 12:40:29 -0800
-Subject: [PATCH v3 4/6] arm: add early_ioremap support
-In-Reply-To: <1389325833-16535-5-git-send-email-msalter@redhat.com>
-References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
- <1389325833-16535-5-git-send-email-msalter@redhat.com>
-Message-ID: <52D05ABD.30904@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 10 Jan 2014 12:42:59 -0800
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140110183021.GZ2400@pengutronix.de>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <20140103031055.GB28751@kroah.com>
+ <20140110145444.GE15937@n2100.arm.linux.org.uk>
+ <20140110150702.GA22533@kroah.com>
+ <20140110151123.GG15937@n2100.arm.linux.org.uk>
+ <20140110153530.GA770@kroah.com>
+ <20140110183021.GZ2400@pengutronix.de>
+Message-ID: <20140110204259.GC10235@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just some minor nitpicks
+On Fri, Jan 10, 2014 at 07:30:21PM +0100, Robert Schwebel wrote:
+> On Fri, Jan 10, 2014 at 07:35:30AM -0800, Greg Kroah-Hartman wrote:
+> > > I'll sort out a new set of patches today, along with a branch to pull if
+> > > you wish to take them that way.
+> > 
+> > It's too late for 3.14, as my tree is now closed for that because 3.13
+> > should be out this weekend.  But I'll be glad to queue them up after
+> > 3.14-rc1 is out.
+> 
+> Didnt' Linus say there would be an -rc8?
 
-On 01/09/14 19:50, Mark Salter wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c1f1a7e..78a79a6a 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1842,6 +1842,17 @@ config UACCESS_WITH_MEMCPY
->  	  However, if the CPU data cache is using a write-allocate mode,
->  	  this option is unlikely to provide any performance gain.
->  
-> +config EARLY_IOREMAP
-> +	depends on MMU
-> +	bool "Provide early_ioremap() support for kernel initialization."
+Ah, you are right, nevermind then :)
 
-Please drop the full stop.
+Russell, if you want to send me just the driver core patch, I can take
+that now and get that into 3.14 so that you don't have any cross-tree
+dependancies on the rest of this patch series.
 
-> +	select GENERIC_EARLY_IOREMAP
-> +	help
-> +	  Provide a mechanism for kernel initialisation code to temporarily
-> +	  map, in a highmem-agnostic way, memory pages in before ioremap()
-> +	  and friends are available (before paging_init() has run). It uses
-> +	  the same virtual memory range as kmap so all early mappings must
-> +	  be unapped before paging_init() is called.
+thanks,
 
-s/unapped/unmapped/
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+greg k-h
