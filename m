@@ -1,59 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 10 Jan 2014 16:55:26 -0500
-Subject: [PATCH v5 4/4] i2c: mv64xxx: Document the newly introduced
- Armada XP A0 compatible
-In-Reply-To: <1389193589-18485-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <1389193589-18485-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140110215526.GB19878@titan.lakedaemon.net>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 10 Jan 2014 17:29:05 -0500
+Subject: [PATCH 1/6] efi: create memory map iteration helper
+In-Reply-To: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+Message-ID: <1389392950-22457-2-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+There are a lot of places in the kernel which iterate through an
+EFI memory map. Most of these places use essentially the same
+for-loop code. This patch adds a for_each_efi_memory_desc()
+helper to clean up all of the existing duplicate code and avoid
+more in the future.
 
-On Wed, Jan 08, 2014 at 04:06:29PM +0100, Gregory CLEMENT wrote:
-> The first variants of Armada XP SoCs (A0 stepping) have issues related
-> to the i2c controller which prevent to use the offload mechanism and
-> ead to a kernel hang during boot.
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ include/linux/efi.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-I'll fixup s/ead/lead/ here.
-
-> 
-> The commit introduces a new the compatible string
-> marvell,mv78230-a0-i2c for the i2c controller.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index 82e8f6f17179..9410ed72ec45 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -5,7 +5,7 @@ Required properties :
->  
->   - reg             : Offset and length of the register set for the device
->   - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-> -                     or "marvell,mv78230-i2c"
-> +                     or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
-
-If it's ok with you Gregory, I'll amend this hunk as follows:
-
-			or "marvell,mv78230-i2c" or "marvell,mv78230-a0-i2c"
-			Only use "marvell,mv78230-a0-i2c" for a very
-			rare, initial version of the SoC which had
-			broken offload support.  Linux auto-detects this
-			and sets it appropriately.
-
-thx,
-
-Jason.
-
->   - interrupts      : The interrupt number
->  
->  Optional properties :
-> -- 
-> 1.8.1.2
-> 
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 11ce678..9dc5b05 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -618,6 +618,12 @@ extern int efi_set_rtc_mmss(const struct timespec *now);
+ extern void efi_reserve_boot_services(void);
+ extern struct efi_memory_map memmap;
+ 
++/* Iterate through an efi_memory_map */
++#define for_each_efi_memory_desc(m, md)					   \
++	for ((md) = (m)->map;						   \
++	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
++	     (md) = (void *)(md) + (m)->desc_size)
++
+ /**
+  * efi_range_is_wc - check the WC bit on an address range
+  * @start: starting kvirt address
+-- 
+1.8.3.1
