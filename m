@@ -1,46 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jan 2014 10:53:06 -0800
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140109222322.7168.74522@quantum>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
- <20140109222322.7168.74522@quantum>
-Message-ID: <20140110185305.GN31323@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Jan 2014 10:57:44 -0800
+Subject: [PATCH 3/7] ARM: perf_event: Add basic support for Krait CPU PMUs
+In-Reply-To: <20140110110114.GC10455@mudshark.cambridge.arm.com>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-4-git-send-email-sboyd@codeaurora.org>
+ <20140109110440.GC17838@mudshark.cambridge.arm.com>
+ <52CEFF18.2070501@codeaurora.org>
+ <20140110110114.GC10455@mudshark.cambridge.arm.com>
+Message-ID: <20140110185744.GF14405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [140109 14:25]:
-> Quoting Tero Kristo (2014-01-09 06:00:11)
-> > Hi,
+On 01/10, Will Deacon wrote:
+> On Thu, Jan 09, 2014 at 07:57:12PM +0000, Stephen Boyd wrote:
+> > (Adding DT reviewers)
 > > 
-> > So, bad luck number release for this, as v12 wasn't sufficient still.
+> > On 01/09/14 03:04, Will Deacon wrote:
+> > > On Wed, Jan 08, 2014 at 10:59:40PM +0000, Stephen Boyd wrote:
+> > >
+> > >> +static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+> > >> +{
+> > >> +	u32 id = read_cpuid_id() & 0xffffff00;
+> > >> +
+> > >> +	armv7pmu_init(cpu_pmu);
+> > >> +	cpu_pmu->name		= "ARMv7 Krait";
+> > >> +	/* Some early versions of Krait don't support PC write events */
+> > >> +	if (id == 0x511f0400 || id == 0x510f0600)
+> > >> +		cpu_pmu->map_event	= krait_map_event_no_branch;
+> > > Hmm, I'd really rather this information came via the DT. In fact, you could
+> > > just drop the branch event from your main map_event_function and keep things
+> > > simple. It depends how badly you want to advertise it in perf list :)
+> > >
 > > 
-> > Changes compared to previous version:
-> > - Dropped any changes to generic clock drivers, as it seems impossible
-> >   to agree anything in short term, this means the patch set shrank in
-> >   size from 49 patches to 40 (first 9 patches were dropped).
-> > - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
-> >   to drivers/clk/ti, and made the modifications needed to the TI version
-> >   of the clock drivers only (based on discussions with Mike, this is fine)
-> > - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
-> >   with any generic implementation we might have at some point, migrating
-> >   this to the generic version should be easy enough also.
-> > - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
-> >   versions and resulted into an orphan clock node
-> > - Fixed compile problem for omap5 only build reported by Felipe
-> > - Fixed a couple of sparse warnings
-> > - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
-> >   instead of __raw_readl / __raw_writel
+> > Not every version of Krait is missing support for this event, so I'd
+> > like to keep it so things like perf stat show branch counts. How about I
+> > add a bool property to the pmu node indicating that this PMU is missing
+> > support for the PC write events? Something like "no-pc-write"?
 > 
-> Hi Tero,
+> Perhaps, although I think it should be qualcomm-specific, so something like
+> "qcom,krait-no-pc-write"? Again, I'd be glad to hear something from a DT
+> reviewer on this.
 > 
-> This approach takes care of all of my concerns with this series. Thanks
-> for your long suffering patience on it.
-> 
-> It seems some build errors are cropping up, so once those are fixed then
-> I'll be happy to merge clk-next-dt-clks-v13 into clk-next for 3.14.
 
-I'm fine with Mike merging these all via the clock tree assuming no more
-pending comments. For the patches changed from the last time around,
-please feel free to add:
+Yes a vendor prefix is probably a good idea. I'll add that in.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
