@@ -1,524 +1,123 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 23:23:37 +0000
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140110204259.GC10235@kroah.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
- <20140110151123.GG15937@n2100.arm.linux.org.uk>
- <20140110153530.GA770@kroah.com> <20140110183021.GZ2400@pengutronix.de>
- <20140110204259.GC10235@kroah.com>
-Message-ID: <20140110232336.GI15937@n2100.arm.linux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 11 Jan 2014 00:40:47 +0100
+Subject: [PATCH v6 1/6] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY
+ to enforce this ACPI mode
+In-Reply-To: <52D07EB2.6020801@redhat.com>
+References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
+ <1934585.8FgTJADASZ@vostro.rjw.lan> <52D07EB2.6020801@redhat.com>
+Message-ID: <1728182.2Up5nPGMKz@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 12:42:59PM -0800, Greg Kroah-Hartman wrote:
-> On Fri, Jan 10, 2014 at 07:30:21PM +0100, Robert Schwebel wrote:
-> > On Fri, Jan 10, 2014 at 07:35:30AM -0800, Greg Kroah-Hartman wrote:
-> > > > I'll sort out a new set of patches today, along with a branch to pull if
-> > > > you wish to take them that way.
-> > > 
-> > > It's too late for 3.14, as my tree is now closed for that because 3.13
-> > > should be out this weekend.  But I'll be glad to queue them up after
-> > > 3.14-rc1 is out.
-> > 
-> > Didnt' Linus say there would be an -rc8?
+On Friday, January 10, 2014 04:13:54 PM Al Stone wrote:
+> On 01/10/2014 04:11 PM, Rafael J. Wysocki wrote:
+> > On Friday, January 10, 2014 03:52:15 PM al.stone at linaro.org wrote:
+> >> From: Al Stone <al.stone@linaro.org>
+> >>
+> >> Hardware reduced mode, despite the name, exists primarily to allow
+> >> newer platforms to use a much simpler form of ACPI that does not
+> >> require supporting the legacy of previous versions of the specification.
+> >> This mode was first introduced in the ACPI 5.0 specification, but because
+> >> it is so much simpler and reduces the size of the object code needed to
+> >> support ACPI, it is likely to be used more often in the near future.
+> >>
+> >> To enable the hardware reduced mode of ACPI on some platforms (such as
+> >> ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
+> >> to TRUE in the ACPICA source.  For ARM/ARM64, hardware reduced ACPI
+> >> should be the only mode used; legacy mode would require modifications
+> >> to SoCs in order to provide several x86-specific hardware features (e.g.,
+> >> an NMI and SMI support).
+> >>
+> >> We set ACPI_REDUCED_HARDWARE to TRUE in the ACPICA source by introducing
+> >> a kernel config item to enable/disable ACPI_REDUCED_HARDWARE.  We can then
+> >> change the kernel config instead of having to modify the kernel source
+> >> directly to enable the reduced hardware mode of ACPI.
+> >>
+> >> Lv Zheng suggested that this configuration item does not belong in ACPICA,
+> >> the upstream source for much of the ACPI internals, but rather to the
+> >> Linux kernel itself.  Hence, we introduce this flag so that we can make
+> >> ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
+> >> please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
+> >>
+> >> Even though support for X86 in hardware reduced mode is possible, it
+> >> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
+> >> there is a single kernel image than can run on all x86 hardware; the kernel
+> >> changes run-time behavior to adapt to the hardware being used.  This is not
+> >> currently possible with the existing ACPICA infrastructure but only presents
+> >> a problem on achitectures supporting both hardware-reduced and legacy modes
+> >> of ACPI -- i.e., on x86 only.
+> >>
+> >> The problem with the current ACPICA code base is that if one builds legacy
+> >> ACPI (a proper superset of hardware-reduced), the kernel can run in hardware-
+> >> reduced with the proper ACPI tables, but there is still ACPICA code that could
+> >> be executed even though it is not allowed by the specification.  If one builds
+> >> a hardware-reduced only ACPI, the kernel cannot run with ACPI tables that are
+> >> for legacy mode.  To ensure compliance with ACPI, one must therefore build
+> >> two separate kernels.  Once this problem has been properly fixed, we can then
+> >> enable x86 hardware-reduced mode and use a single kernel.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Signed-off-by: Al Stone <al.stone@linaro.org>
+> >> ---
+> >>   drivers/acpi/Kconfig            | 12 ++++++++++++
+> >>   include/acpi/platform/aclinux.h |  6 ++++++
+> >>   2 files changed, 18 insertions(+)
+> >>
+> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >> index 4770de5..75dd38a 100644
+> >> --- a/drivers/acpi/Kconfig
+> >> +++ b/drivers/acpi/Kconfig
+> >> @@ -343,6 +343,18 @@ config ACPI_BGRT
+> >>   	  data from the firmware boot splash. It will appear under
+> >>   	  /sys/firmware/acpi/bgrt/ .
+> >>
+> >> +config ACPI_REDUCED_HARDWARE_ONLY
+> >> +	bool "Hardware-reduced ACPI support only"
+> >> +	depends on !X86 && !IA64 || EXPERT
+> >> +	help
+> >> +	This config item changes the way the ACPI code is built.  When this
+> >> +	option is selected, the kernel will use a specialized version of
+> >> +	ACPICA that ONLY supports the ACPI "reduced hardware" mode.  The
+> >> +	resulting kernel will be smaller but it will also be restricted to
+> >> +	running in ACPI reduced hardware mode ONLY.
+> >> +
+> >> +	If you are unsure what to do, do not enable this option.
+> >
+> > I'm still not exactly convinced this is the best way to do that.
+> >
+> > In particular, I wonder if it would be viable to make it disabled by default
+> > and then make the interested architectures do
+> >
+> > 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> >
+> > in their top-level Kconfig files?
 > 
-> Ah, you are right, nevermind then :)
+> Hrm.  Do you mean something like this:
 > 
-> Russell, if you want to send me just the driver core patch, I can take
-> that now and get that into 3.14 so that you don't have any cross-tree
-> dependancies on the rest of this patch series.
+> config ACPI_REDUCED_HARDWARE_ONLY
+> 	bool "Hardware-reduced ACPI support only"
+> 	default n
+> 	depends on EXPERT
+> 	help
+> 	...
+> 
+> and remove any mention of architecture?
 
-Thanks, here it is.  Only change from the previously posted one is a
-few checkpatch cleanups.
+Yes.
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH] drivers/base: provide an infrastructure for componentised
- subsystems
+> Or forgo the "depends" entirely?  From my perspective, any of the above is sufficient
+> so I'll defer to your broader view of ACPI.
 
-Subsystems such as ALSA, DRM and others require a single card-level
-device structure to represent a subsystem.  However, firmware tends to
-describe the individual devices and the connections between them.
+Well, I thought about something like this:
 
-Therefore, we need a way to gather up the individual component devices
-together, and indicate when we have all the component devices.
+config ACPI_REDUCED_HARDWARE_ONLY
+	def_bool n
+	depends on ACPI && EXPERT
 
-We do this in DT by providing a "superdevice" node which specifies
-the components, eg:
+and then do the above select in arch-level Kconfigs where necessary.
 
-	imx-drm {
-		compatible = "fsl,drm";
-		crtcs = <&ipu1>;
-		connectors = <&hdmi>;
-	};
-
-The superdevice is declared into the component support, along with the
-subcomponents.  The superdevice receives callbacks to locate the
-subcomponents, and identify when all components are present.  At this
-point, we bind the superdevice, which causes the appropriate subsystem
-to be initialised in the conventional way.
-
-When any of the components or superdevice are removed from the system,
-we unbind the superdevice, thereby taking the subsystem down.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/Makefile     |   2 +-
- drivers/base/component.c  | 382 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/component.h |  32 ++++
- 3 files changed, 415 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/component.c
- create mode 100644 include/linux/component.h
-
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 94e8a80e87f8..870ecfd503af 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -1,6 +1,6 @@
- # Makefile for the Linux device tree
- 
--obj-y			:= core.o bus.o dd.o syscore.o \
-+obj-y			:= component.o core.o bus.o dd.o syscore.o \
- 			   driver.o class.o platform.o \
- 			   cpu.o firmware.o init.o map.o devres.o \
- 			   attribute_container.o transport_class.o \
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-new file mode 100644
-index 000000000000..c53efe6c6d8e
---- /dev/null
-+++ b/drivers/base/component.c
-@@ -0,0 +1,382 @@
-+/*
-+ * Componentized device handling.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This is work in progress.  We gather up the component devices into a list,
-+ * and bind them when instructed.  At the moment, we're specific to the DRM
-+ * subsystem, and only handles one master device, but this doesn't have to be
-+ * the case.
-+ */
-+#include <linux/component.h>
-+#include <linux/device.h>
-+#include <linux/kref.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/slab.h>
-+
-+struct master {
-+	struct list_head node;
-+	struct list_head components;
-+	bool bound;
-+
-+	const struct component_master_ops *ops;
-+	struct device *dev;
-+};
-+
-+struct component {
-+	struct list_head node;
-+	struct list_head master_node;
-+	struct master *master;
-+	bool bound;
-+
-+	const struct component_ops *ops;
-+	struct device *dev;
-+};
-+
-+static DEFINE_MUTEX(component_mutex);
-+static LIST_HEAD(component_list);
-+static LIST_HEAD(masters);
-+
-+static struct master *__master_find(struct device *dev,
-+	const struct component_master_ops *ops)
-+{
-+	struct master *m;
-+
-+	list_for_each_entry(m, &masters, node)
-+		if (m->dev == dev && (!ops || m->ops == ops))
-+			return m;
-+
-+	return NULL;
-+}
-+
-+/* Attach an unattached component to a master. */
-+static void component_attach_master(struct master *master, struct component *c)
-+{
-+	c->master = master;
-+
-+	list_add_tail(&c->master_node, &master->components);
-+}
-+
-+/* Detach a component from a master. */
-+static void component_detach_master(struct master *master, struct component *c)
-+{
-+	list_del(&c->master_node);
-+
-+	c->master = NULL;
-+}
-+
-+int component_master_add_child(struct master *master,
-+	int (*compare)(struct device *, void *), void *compare_data)
-+{
-+	struct component *c;
-+	int ret = -ENXIO;
-+
-+	list_for_each_entry(c, &component_list, node) {
-+		if (c->master)
-+			continue;
-+
-+		if (compare(c->dev, compare_data)) {
-+			component_attach_master(master, c);
-+			ret = 0;
-+			break;
-+		}
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(component_master_add_child);
-+
-+/* Detach all attached components from this master */
-+static void master_remove_components(struct master *master)
-+{
-+	while (!list_empty(&master->components)) {
-+		struct component *c = list_first_entry(&master->components,
-+					struct component, master_node);
-+
-+		WARN_ON(c->master != master);
-+
-+		component_detach_master(master, c);
-+	}
-+}
-+
-+/*
-+ * Try to bring up a master.  If component is NULL, we're interested in
-+ * this master, otherwise it's a component which must be present to try
-+ * and bring up the master.
-+ *
-+ * Returns 1 for successful bringup, 0 if not ready, or -ve errno.
-+ */
-+static int try_to_bring_up_master(struct master *master,
-+	struct component *component)
-+{
-+	int ret = 0;
-+
-+	if (!master->bound) {
-+		/*
-+		 * Search the list of components, looking for components that
-+		 * belong to this master, and attach them to the master.
-+		 */
-+		if (master->ops->add_components(master->dev, master)) {
-+			/* Failed to find all components */
-+			master_remove_components(master);
-+			ret = 0;
-+			goto out;
-+		}
-+
-+		if (component && component->master != master) {
-+			master_remove_components(master);
-+			ret = 0;
-+			goto out;
-+		}
-+
-+		/* Found all components */
-+		ret = master->ops->bind(master->dev);
-+		if (ret < 0) {
-+			master_remove_components(master);
-+			goto out;
-+		}
-+
-+		master->bound = true;
-+		ret = 1;
-+	}
-+out:
-+
-+	return ret;
-+}
-+
-+static int try_to_bring_up_masters(struct component *component)
-+{
-+	struct master *m;
-+	int ret = 0;
-+
-+	list_for_each_entry(m, &masters, node) {
-+		ret = try_to_bring_up_master(m, component);
-+		if (ret != 0)
-+			break;
-+	}
-+
-+	return ret;
-+}
-+
-+static void take_down_master(struct master *master)
-+{
-+	if (master->bound) {
-+		master->ops->unbind(master->dev);
-+		master->bound = false;
-+	}
-+
-+	master_remove_components(master);
-+}
-+
-+int component_master_add(struct device *dev,
-+	const struct component_master_ops *ops)
-+{
-+	struct master *master;
-+	int ret;
-+
-+	master = kzalloc(sizeof(*master), GFP_KERNEL);
-+	if (!master)
-+		return -ENOMEM;
-+
-+	master->dev = dev;
-+	master->ops = ops;
-+	INIT_LIST_HEAD(&master->components);
-+
-+	/* Add to the list of available masters. */
-+	mutex_lock(&component_mutex);
-+	list_add(&master->node, &masters);
-+
-+	ret = try_to_bring_up_master(master, NULL);
-+
-+	if (ret < 0) {
-+		/* Delete off the list if we weren't successful */
-+		list_del(&master->node);
-+		kfree(master);
-+	}
-+	mutex_unlock(&component_mutex);
-+
-+	return ret < 0 ? ret : 0;
-+}
-+EXPORT_SYMBOL_GPL(component_master_add);
-+
-+void component_master_del(struct device *dev,
-+	const struct component_master_ops *ops)
-+{
-+	struct master *master;
-+
-+	mutex_lock(&component_mutex);
-+	master = __master_find(dev, ops);
-+	if (master) {
-+		take_down_master(master);
-+
-+		list_del(&master->node);
-+		kfree(master);
-+	}
-+	mutex_unlock(&component_mutex);
-+}
-+EXPORT_SYMBOL_GPL(component_master_del);
-+
-+static void component_unbind(struct component *component,
-+	struct master *master, void *data)
-+{
-+	WARN_ON(!component->bound);
-+
-+	component->ops->unbind(component->dev, master->dev, data);
-+	component->bound = false;
-+
-+	/* Release all resources claimed in the binding of this component */
-+	devres_release_group(component->dev, component);
-+}
-+
-+void component_unbind_all(struct device *master_dev, void *data)
-+{
-+	struct master *master;
-+	struct component *c;
-+
-+	WARN_ON(!mutex_is_locked(&component_mutex));
-+
-+	master = __master_find(master_dev, NULL);
-+	if (!master)
-+		return;
-+
-+	list_for_each_entry_reverse(c, &master->components, master_node)
-+		component_unbind(c, master, data);
-+}
-+EXPORT_SYMBOL_GPL(component_unbind_all);
-+
-+static int component_bind(struct component *component, struct master *master,
-+	void *data)
-+{
-+	int ret;
-+
-+	/*
-+	 * Each component initialises inside its own devres group.
-+	 * This allows us to roll-back a failed component without
-+	 * affecting anything else.
-+	 */
-+	if (!devres_open_group(master->dev, NULL, GFP_KERNEL))
-+		return -ENOMEM;
-+
-+	/*
-+	 * Also open a group for the device itself: this allows us
-+	 * to release the resources claimed against the sub-device
-+	 * at the appropriate moment.
-+	 */
-+	if (!devres_open_group(component->dev, component, GFP_KERNEL)) {
-+		devres_release_group(master->dev, NULL);
-+		return -ENOMEM;
-+	}
-+
-+	dev_dbg(master->dev, "binding %s (ops %ps)\n",
-+		dev_name(component->dev), component->ops);
-+
-+	ret = component->ops->bind(component->dev, master->dev, data);
-+	if (!ret) {
-+		component->bound = true;
-+
-+		/*
-+		 * Close the component device's group so that resources
-+		 * allocated in the binding are encapsulated for removal
-+		 * at unbind.  Remove the group on the DRM device as we
-+		 * can clean those resources up independently.
-+		 */
-+		devres_close_group(component->dev, NULL);
-+		devres_remove_group(master->dev, NULL);
-+
-+		dev_info(master->dev, "bound %s (ops %ps)\n",
-+			 dev_name(component->dev), component->ops);
-+	} else {
-+		devres_release_group(component->dev, NULL);
-+		devres_release_group(master->dev, NULL);
-+
-+		dev_err(master->dev, "failed to bind %s (ops %ps): %d\n",
-+			dev_name(component->dev), component->ops, ret);
-+	}
-+
-+	return ret;
-+}
-+
-+int component_bind_all(struct device *master_dev, void *data)
-+{
-+	struct master *master;
-+	struct component *c;
-+	int ret = 0;
-+
-+	WARN_ON(!mutex_is_locked(&component_mutex));
-+
-+	master = __master_find(master_dev, NULL);
-+	if (!master)
-+		return -EINVAL;
-+
-+	list_for_each_entry(c, &master->components, master_node) {
-+		ret = component_bind(c, master, data);
-+		if (ret)
-+			break;
-+	}
-+
-+	if (ret != 0) {
-+		list_for_each_entry_continue_reverse(c, &master->components,
-+						     master_node)
-+			component_unbind(c, master, data);
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(component_bind_all);
-+
-+int component_add(struct device *dev, const struct component_ops *ops)
-+{
-+	struct component *component;
-+	int ret;
-+
-+	component = kzalloc(sizeof(*component), GFP_KERNEL);
-+	if (!component)
-+		return -ENOMEM;
-+
-+	component->ops = ops;
-+	component->dev = dev;
-+
-+	dev_dbg(dev, "adding component (ops %ps)\n", ops);
-+
-+	mutex_lock(&component_mutex);
-+	list_add_tail(&component->node, &component_list);
-+
-+	ret = try_to_bring_up_masters(component);
-+	if (ret < 0) {
-+		list_del(&component->node);
-+
-+		kfree(component);
-+	}
-+	mutex_unlock(&component_mutex);
-+
-+	return ret < 0 ? ret : 0;
-+}
-+EXPORT_SYMBOL_GPL(component_add);
-+
-+void component_del(struct device *dev, const struct component_ops *ops)
-+{
-+	struct component *c, *component = NULL;
-+
-+	mutex_lock(&component_mutex);
-+	list_for_each_entry(c, &component_list, node)
-+		if (c->dev == dev && c->ops == ops) {
-+			list_del(&c->node);
-+			component = c;
-+			break;
-+		}
-+
-+	if (component && component->master)
-+		take_down_master(component->master);
-+
-+	mutex_unlock(&component_mutex);
-+
-+	WARN_ON(!component);
-+	kfree(component);
-+}
-+EXPORT_SYMBOL_GPL(component_del);
-+
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/component.h b/include/linux/component.h
-new file mode 100644
-index 000000000000..68870182ca1e
---- /dev/null
-+++ b/include/linux/component.h
-@@ -0,0 +1,32 @@
-+#ifndef COMPONENT_H
-+#define COMPONENT_H
-+
-+struct device;
-+
-+struct component_ops {
-+	int (*bind)(struct device *, struct device *, void *);
-+	void (*unbind)(struct device *, struct device *, void *);
-+};
-+
-+int component_add(struct device *, const struct component_ops *);
-+void component_del(struct device *, const struct component_ops *);
-+
-+int component_bind_all(struct device *, void *);
-+void component_unbind_all(struct device *, void *);
-+
-+struct master;
-+
-+struct component_master_ops {
-+	int (*add_components)(struct device *, struct master *);
-+	int (*bind)(struct device *);
-+	void (*unbind)(struct device *);
-+};
-+
-+int component_master_add(struct device *, const struct component_master_ops *);
-+void component_master_del(struct device *,
-+	const struct component_master_ops *);
-+
-+int component_master_add_child(struct master *master,
-+	int (*compare)(struct device *, void *), void *compare_data);
-+
-+#endif
--- 
-1.8.3.1
-
+Thanks!
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
