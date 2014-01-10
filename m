@@ -1,42 +1,40 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 10 Jan 2014 08:38:25 +0100
-Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
-In-Reply-To: <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>	<1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
- <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
-Message-ID: <52CFA371.8090103@epfl.ch>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Fri, 10 Jan 2014 00:06:17 -0800
+Subject: Tegra baseline test results for v3.13-rc7
+Message-ID: <52CFA9F9.4090900@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Javier,
+Here are some basic Tegra test results for Linux v3.13-rc7.
+Logs and other details at:
 
-On 01/09/2014 09:43 PM, Javier Martinez Canillas wrote:
-> [adding Enric Balletbo to cc]
-> 
-> Hello Florian,
-> 
-> On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
-> <florian.vaussard@epfl.ch> wrote:
->> MMC2 is used by the on-board WiFi module populated on some boards
->> (based on Marvell Libertas 8688 SDIO).
->>
->> Note: currently WiFi only works on cold boot, as the module is not
->> properly reset (missing binding for the GPIO reset).
->>
-> 
-> Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
-> for LBEE1USJYC WiFi connected to SDIO") ?
-> 
-> If I remember correctly the LBEE1USJYC Wifi/BT combo module is
-> basically a Marvell Libertas 8688 Wlan and Enric got soft reset
-> working too by adding a GPIO property to the regulator for the reset
-> GPIO.
-> 
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.13-rc7/20140104153107/
 
-Many thanks for the pointer. In the initial version, I had a regulator
-like you. But now I doubt if it was correctly added to the MMC node,
-which could be why it was not working... I will try again.
 
-Thanks for your help!
+Test summary
+------------
 
-Florian
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.13-rc6 (802eee95bde72fd0cd0f3a5b2098375a487d1eda)):
+    text     data      bss    total  kernel
+    +256       +8        0     +264  multi_v7_defconfig
+    +216       +8        0     +224  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc6 (802eee95bde72fd0cd0f3a5b2098375a487d1eda))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
