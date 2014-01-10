@@ -1,27 +1,86 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 10 Jan 2014 17:19:34 +0100
-Subject: [PATCH 1/3] irqchip: exynos-combiner: call handle_bad_irq directly
-In-Reply-To: <1389321142-4073-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389321142-4073-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <52D01D96.8000401@samsung.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Fri, 10 Jan 2014 08:22:08 -0800
+Subject: BUG: bad unlock balance detected
+In-Reply-To: <52CFB091.5040707@linaro.org>
+References: <CACUGKYMKe37F4VQVi9ZFL1ks+uCC8_ERN5O+y_MLV6G19uVjDw@mail.gmail.com>
+ <52CFB091.5040707@linaro.org>
+Message-ID: <CACUGKYO=934LR5r0UrPht10Lvkj2rnz7Un83G=D+w-jgYh8xTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+It happened once and I am not sure how to re-produce...
 
-On 10.01.2014 03:32, Pankaj Dubey wrote:
-> This patch is inspired from following commit
->   aec0095653: (irqchip: gic: Call handle_bad_irq() directly)
+On Fri, Jan 10, 2014 at 12:34 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 01/10/2014 03:52 AM, John Tobias wrote:
+>>
+>> Hi Shawn,
+>>
+>> Any idea on these bug?.
 >
-> Also this will help in removing unwanted inclusion
-> of header file "asm/mach/irq.h"
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   drivers/irqchip/exynos-combiner.c |    3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+> Is this bug happening systematically or randomly ?
+>
+>
+>
+>
+>> [ 559.972748] =====================================
+>> [ 559.977457] [ BUG: bad unlock balance detected! ]
+>> [ 559.982169] 3.13.0-rc1 #1 Tainted: G O
+>> [ 559.986790] -------------------------------------
+>> [ 559.991499] swapper/0 is trying to release lock (master_lock) at:
+>> [ 559.997642] <8001d708> imx6q_enter_wait+0x80/0x8c
+>> [ 560.002524] but there are no more locks to release!
+>> [ 560.007404]
+>> [ 560.007404] other info that might help us debug this:
+>> [ 560.013939] no locks held by swapper/0.
+>> [ 560.017779]
+>> [ 560.017779] stack backtrace:
+>> [ 560.022147] CPU: 0 PID: 0 Comm: swapper Tainted: G O 3.13.0-rc1 #1
+>> [ 560.029200] Backtrace:
+>> [ 560.031685] <80011fb4> (dump_backtrace+0x0/0x10c) from <80012150>
+>> (show_stack+0x18/0x1c)
+>> [ 560.040128] :806c00e8 :8001d708 :806bd1b0 :00000000
+>> [ 560.045869] <80012138> (show_stack+0x0/0x1c) from <804eeef0>
+>> (dump_stack+0x20/0x28)
+>> [ 560.053889] <804eeed0> (dump_stack+0x0/0x28) from <8004b2a8>
+>> (print_unlock_imbalance_bug+0xb4/0xe4)
+>> [ 560.063296] <8004b1f4> (print_unlock_imbalance_bug+0x0/0xe4) from
+>> <8004e338> (lock_release+0x184/0x1bc)
+>> [ 560.073037] :80be210c :806bd1b0 :806b2000 :00000000
+>> [ 560.078771] <8004e1b4> (lock_release+0x0/0x1bc) from <804f546c>
+>> (_raw_spin_unlock+0x20/0x2c)
+>> [ 560.087572] <804f544c> (_raw_spin_unlock+0x0/0x2c) from <8001d708>
+>> (imx6q_enter_wait+0x80/0x8c)
+>> [ 560.096620] :806f2f14 :806bd1b0
+>> [ 560.100246] <8001d688> (imx6q_enter_wait+0x0/0x8c) from <80305d84>
+>> (cpuidle_enter_state+0x44/0xfc)
+>> [ 560.109554] :806dcae0 :00000082 :6128317f :8001d688
+>> [ 560.115285] <80305d40> (cpuidle_enter_state+0x0/0xfc) from
+>> <80305f28> (cpuidle_idle_call+0xec/0x15c)
+>> [ 560.124767] :806b2000 :806dcae4 :806c00f8 :00000001 :80c37030
+>> :806dcae0
+>> [ 560.132701] <80305e3c> (cpuidle_idle_call+0x0/0x15c) from <8000fd08>
+>> (arch_cpu_idle+0x10/0x44)
+>> [ 560.141662] :00000001 :806e8d8a :806b2000 :806ba0dc :806b2000
+>> :00000000
+>> [ 560.149595] <8000fcf8> (arch_cpu_idle+0x0/0x44) from <80056be4>
+>> (cpu_startup_entry+0x50/0x114)
+>> [ 560.158568] <80056b94> (cpu_startup_entry+0x0/0x114) from <804ea1e0>
+>> (rest_init+0xb4/0xdc)
+>> [ 560.167181] :8181af00 :00000000
+>> [ 560.170808] <804ea12c> (rest_init+0x0/0xdc) from <80684a98>
+>> (start_kernel+0x2f0/0x348)
+>> [ 560.179074] :ffffffff :806f2b80 :806ba158
+>> [ 560.183750] <806847a8> (start_kernel+0x0/0x348) from <80008070>
+>> (0x80008070)
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
