@@ -1,359 +1,59 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu,  9 Jan 2014 22:50:29 -0500
-Subject: [PATCH v3 2/6] mm: create generic early_ioremap() support
-In-Reply-To: <1389325833-16535-1-git-send-email-msalter@redhat.com>
-References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
-Message-ID: <1389325833-16535-3-git-send-email-msalter@redhat.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 10 Jan 2014 09:49:57 +0530
+Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
+ dependency on aemif
+In-Reply-To: <20140109163305.GC28655@norris-Latitude-E6410>
+References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com> <52BC1BB8.2070007@ti.com>
+ <52CE7C44.1000803@ti.com> <20140109163305.GC28655@norris-Latitude-E6410>
+Message-ID: <52CF74ED.2030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch creates a generic implementation of early_ioremap() support
-based on the existing x86 implementation. early_ioremp() is useful for
-early boot code which needs to temporarily map I/O or memory regions
-before normal mapping functions such as ioremap() are available.
+On Thursday 09 January 2014 10:03 PM, Brian Norris wrote:
+> On Thu, Jan 09, 2014 at 04:09:00PM +0530, Sekhar Nori wrote:
+>> On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
+>>> On 12/18/2013 02:13 PM, Sekhar Nori wrote:
+>>>> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
+>>>>> Hi, Sekhar
+>>>>>
+>>>>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
+>>>>> series.
+>>>>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
+>>>>> and can be found at http://git.infradead.org/l2-mtd.git
+>>>>>
+>>>>> This patch can be still applied on top of the series without conflicts.
+>>>>>
+>>>>> Can you please pick up the $subject patch if you are OK with it?
+>>>>
+>>>> I have no problems with the patch and can pick it too, but need ack from
+>>>> MTD maintainer (David) as it touches drivers/mtd/ too.
+>>>>
+>>>> David,
+>>>>
+>>>> If you do not have the patch, we can resend it.
+>>>>
+>>>> Thanks,
+>>>> Sekhar
+>>>>
+>>>
+>>> Hi Brian,
+>>>
+>>> Do you agree if this patch will go through Davinci tree?
+>>>
+>>> This is the last one we need to reuse Davinci Nand driver for Keystone.
+>>
+>> Since we never got an ack from MTD folks, I am going and go ahead and
+>> try pushing this through ARM-SoC regardless. I will CC the MTD
+>> maintainers on the pull request so any objections could even be posted
+>> there.
+> 
+> Sorry, I've been a little busy / out for vacation. The MTD parts look OK
+> to me. Feel free to take it in your tree.
+> 
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: x86 at kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-CC: Andrew Morton <akpm@linux-foundation.org>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Ingo Molnar <mingo@kernel.org>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: "H. Peter Anvin" <hpa@zytor.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
----
- include/asm-generic/early_ioremap.h |  41 ++++++
- mm/Kconfig                          |   3 +
- mm/Makefile                         |   1 +
- mm/early_ioremap.c                  | 249 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 294 insertions(+)
- create mode 100644 include/asm-generic/early_ioremap.h
- create mode 100644 mm/early_ioremap.c
+Thanks Brian!
 
-diff --git a/include/asm-generic/early_ioremap.h b/include/asm-generic/early_ioremap.h
-new file mode 100644
-index 0000000..d43e187
---- /dev/null
-+++ b/include/asm-generic/early_ioremap.h
-@@ -0,0 +1,41 @@
-+#ifndef _ASM_EARLY_IOREMAP_H_
-+#define _ASM_EARLY_IOREMAP_H_
-+
-+#include <linux/types.h>
-+
-+#ifdef CONFIG_GENERIC_EARLY_IOREMAP
-+/*
-+ * early_ioremap() and early_iounmap() are for temporary early boot-time
-+ * mappings, before the real ioremap() is functional.
-+ */
-+extern void __iomem *early_ioremap(resource_size_t phys_addr,
-+				   unsigned long size);
-+extern void *early_memremap(resource_size_t phys_addr,
-+			    unsigned long size);
-+extern void early_iounmap(void __iomem *addr, unsigned long size);
-+extern void early_memunmap(void *addr, unsigned long size);
-+
-+/* Arch-specific initialization */
-+extern void early_ioremap_init(void);
-+
-+/* Generic initialization called by architecture code */
-+extern void early_ioremap_setup(void);
-+
-+/*
-+ * Called as last step in paging_init() so library can act
-+ * accordingly for subsequent map/unmap requests.
-+ */
-+extern void early_ioremap_reset(void);
-+
-+/*
-+ * Weak function called by early_ioremap_reset(). It does nothing, but
-+ * architectures may provide their own version to do any needed cleanups.
-+ */
-+extern void early_ioremap_shutdown(void);
-+#else
-+static inline void early_ioremap_init(void) { }
-+static inline void early_ioremap_setup(void) { }
-+static inline void early_ioremap_reset(void) { }
-+#endif
-+
-+#endif /* _ASM_EARLY_IOREMAP_H_ */
-diff --git a/mm/Kconfig b/mm/Kconfig
-index 723bbe0..0dcebf2a 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -552,3 +552,6 @@ config MEM_SOFT_DIRTY
- 	  it can be cleared by hands.
- 
- 	  See Documentation/vm/soft-dirty.txt for more details.
-+
-+config GENERIC_EARLY_IOREMAP
-+	bool
-diff --git a/mm/Makefile b/mm/Makefile
-index 305d10a..4e102e9 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -60,3 +60,4 @@ obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
- obj-$(CONFIG_CLEANCACHE) += cleancache.o
- obj-$(CONFIG_MEMORY_ISOLATION) += page_isolation.o
- obj-$(CONFIG_ZBUD)	+= zbud.o
-+obj-$(CONFIG_GENERIC_EARLY_IOREMAP) += early_ioremap.o
-diff --git a/mm/early_ioremap.c b/mm/early_ioremap.c
-new file mode 100644
-index 0000000..8c1ac48
---- /dev/null
-+++ b/mm/early_ioremap.c
-@@ -0,0 +1,249 @@
-+/*
-+ * Provide common bits of early_ioremap() support for architectures needing
-+ * temporary mappings during boot before ioremap() is available.
-+ *
-+ * This is mostly a direct copy of the x86 early_ioremap implementation.
-+ *
-+ * (C) Copyright 1995 1996 Linus Torvalds
-+ *
-+ */
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include <linux/vmalloc.h>
-+#include <asm/fixmap.h>
-+
-+static int early_ioremap_debug __initdata;
-+
-+static int __init early_ioremap_debug_setup(char *str)
-+{
-+	early_ioremap_debug = 1;
-+
-+	return 0;
-+}
-+early_param("early_ioremap_debug", early_ioremap_debug_setup);
-+
-+static int after_paging_init __initdata;
-+
-+void __init __attribute__((weak)) early_ioremap_shutdown(void)
-+{
-+}
-+
-+void __init early_ioremap_reset(void)
-+{
-+	early_ioremap_shutdown();
-+	after_paging_init = 1;
-+}
-+
-+/*
-+ * Generally, ioremap() is available after paging_init() has been called.
-+ * Architectures wanting to allow early_ioremap after paging_init() can
-+ * define __late_set_fixmap and __late_clear_fixmap to do the right thing.
-+ */
-+#ifndef __late_set_fixmap
-+static inline void __init __late_set_fixmap(enum fixed_addresses idx,
-+					    phys_addr_t phys, pgprot_t prot)
-+{
-+	BUG();
-+}
-+#endif
-+
-+#ifndef __late_clear_fixmap
-+static inline void __init __late_clear_fixmap(enum fixed_addresses idx)
-+{
-+	BUG();
-+}
-+#endif
-+
-+static void __iomem *prev_map[FIX_BTMAPS_SLOTS] __initdata;
-+static unsigned long prev_size[FIX_BTMAPS_SLOTS] __initdata;
-+static unsigned long slot_virt[FIX_BTMAPS_SLOTS] __initdata;
-+
-+void __init early_ioremap_setup(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
-+		if (prev_map[i]) {
-+			WARN_ON(1);
-+			break;
-+		}
-+	}
-+
-+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
-+		slot_virt[i] = __fix_to_virt(FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*i);
-+}
-+
-+static int __init check_early_ioremap_leak(void)
-+{
-+	int count = 0;
-+	int i;
-+
-+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
-+		if (prev_map[i])
-+			count++;
-+
-+	if (!count)
-+		return 0;
-+	WARN(1, KERN_WARNING
-+	       "Debug warning: early ioremap leak of %d areas detected.\n",
-+		count);
-+	pr_warn("please boot with early_ioremap_debug and report the dmesg.\n");
-+
-+	return 1;
-+}
-+late_initcall(check_early_ioremap_leak);
-+
-+static void __init __iomem *
-+__early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
-+{
-+	unsigned long offset;
-+	resource_size_t last_addr;
-+	unsigned int nrpages;
-+	enum fixed_addresses idx;
-+	int i, slot;
-+
-+	WARN_ON(system_state != SYSTEM_BOOTING);
-+
-+	slot = -1;
-+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
-+		if (!prev_map[i]) {
-+			slot = i;
-+			break;
-+		}
-+	}
-+
-+	if (slot < 0) {
-+		pr_info("%s(%08llx, %08lx) not found slot\n",
-+			__func__, (u64)phys_addr, size);
-+		WARN_ON(1);
-+		return NULL;
-+	}
-+
-+	if (early_ioremap_debug) {
-+		pr_info("%s(%08llx, %08lx) [%d] => ",
-+			__func__, (u64)phys_addr, size, slot);
-+		dump_stack();
-+	}
-+
-+	/* Don't allow wraparound or zero size */
-+	last_addr = phys_addr + size - 1;
-+	if (!size || last_addr < phys_addr) {
-+		WARN_ON(1);
-+		return NULL;
-+	}
-+
-+	prev_size[slot] = size;
-+	/*
-+	 * Mappings have to be page-aligned
-+	 */
-+	offset = phys_addr & ~PAGE_MASK;
-+	phys_addr &= PAGE_MASK;
-+	size = PAGE_ALIGN(last_addr + 1) - phys_addr;
-+
-+	/*
-+	 * Mappings have to fit in the FIX_BTMAP area.
-+	 */
-+	nrpages = size >> PAGE_SHIFT;
-+	if (nrpages > NR_FIX_BTMAPS) {
-+		WARN_ON(1);
-+		return NULL;
-+	}
-+
-+	/*
-+	 * Ok, go for it..
-+	 */
-+	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
-+	while (nrpages > 0) {
-+		if (after_paging_init)
-+			__late_set_fixmap(idx, phys_addr, prot);
-+		else
-+			__early_set_fixmap(idx, phys_addr, prot);
-+		phys_addr += PAGE_SIZE;
-+		--idx;
-+		--nrpages;
-+	}
-+	if (early_ioremap_debug)
-+		pr_cont("%08lx + %08lx\n", offset, slot_virt[slot]);
-+
-+	prev_map[slot] = (void __iomem *)(offset + slot_virt[slot]);
-+	return prev_map[slot];
-+}
-+
-+/* Remap an IO device */
-+void __init __iomem *
-+early_ioremap(resource_size_t phys_addr, unsigned long size)
-+{
-+	return __early_ioremap(phys_addr, size, FIXMAP_PAGE_IO);
-+}
-+
-+/* Remap memory */
-+void __init *
-+early_memremap(resource_size_t phys_addr, unsigned long size)
-+{
-+	return (__force void *)__early_ioremap(phys_addr, size,
-+					       FIXMAP_PAGE_NORMAL);
-+}
-+
-+void __init early_iounmap(void __iomem *addr, unsigned long size)
-+{
-+	unsigned long virt_addr;
-+	unsigned long offset;
-+	unsigned int nrpages;
-+	enum fixed_addresses idx;
-+	int i, slot;
-+
-+	slot = -1;
-+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
-+		if (prev_map[i] == addr) {
-+			slot = i;
-+			break;
-+		}
-+	}
-+
-+	if (slot < 0) {
-+		pr_info("early_iounmap(%p, %08lx) not found slot\n",
-+			addr, size);
-+		WARN_ON(1);
-+		return;
-+	}
-+
-+	if (prev_size[slot] != size) {
-+		pr_info("early_iounmap(%p, %08lx) [%d] size not consistent %08lx\n",
-+			addr, size, slot, prev_size[slot]);
-+		WARN_ON(1);
-+		return;
-+	}
-+
-+	if (early_ioremap_debug) {
-+		pr_info("early_iounmap(%p, %08lx) [%d]\n", addr,
-+			size, slot);
-+		dump_stack();
-+	}
-+
-+	virt_addr = (unsigned long)addr;
-+	if (virt_addr < fix_to_virt(FIX_BTMAP_BEGIN)) {
-+		WARN_ON(1);
-+		return;
-+	}
-+	offset = virt_addr & ~PAGE_MASK;
-+	nrpages = PAGE_ALIGN(offset + size) >> PAGE_SHIFT;
-+
-+	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
-+	while (nrpages > 0) {
-+		if (after_paging_init)
-+			__late_clear_fixmap(idx);
-+		else
-+			__early_set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR);
-+		--idx;
-+		--nrpages;
-+	}
-+	prev_map[slot] = NULL;
-+}
-+
-+void __init early_memunmap(void *addr, unsigned long size)
-+{
-+	early_iounmap((__force void __iomem *)addr, size);
-+}
--- 
-1.8.3.1
+Regards,
+Sekhar
