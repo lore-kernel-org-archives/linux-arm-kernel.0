@@ -1,100 +1,50 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 10 Jan 2014 16:30:00 +0100
-Subject: [PATCHv9 1/2] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <1389366444-29449-1-git-send-email-denis@eukrea.com>
-References: <1389366444-29449-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140110163000.64dbeba9@ipc1.ka-ro>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 10 Jan 2014 07:35:30 -0800
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140110151123.GG15937@n2100.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <20140103031055.GB28751@kroah.com>
+ <20140110145444.GE15937@n2100.arm.linux.org.uk>
+ <20140110150702.GA22533@kroah.com>
+ <20140110151123.GG15937@n2100.arm.linux.org.uk>
+Message-ID: <20140110153530.GA770@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Denis Carikli wrote:
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v8->v9:
-> - Added Shawn Guo in the Cc list.
-> - The default-brightness-level is now a boolean default-on property,
->   the gpio is only touched if the gpio-backlight driver instance probes.
-> - The code and documentation was updated accordingly.
+On Fri, Jan 10, 2014 at 03:11:23PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 10, 2014 at 07:07:02AM -0800, Greg Kroah-Hartman wrote:
+> > On Fri, Jan 10, 2014 at 02:54:44PM +0000, Russell King - ARM Linux wrote:
+> > > Greg,
+> > > 
+> > > Not sure if you saw the outcome to your comment above.  My conclusion
+> > > was:
+> > > 
+> > > "Yes, I'm coming to that conclusion as well.  It looks like your "containers"
+> > > aren't about collecting up several individual component devices into one
+> > > super-device and probing the appropriate subsystem when all components are
+> > > known.
+> > > 
+> > > "Confused why Greg is pointing me at your patches."
+> > 
+> > Ah, sorry, I missed that in my "catch up on 2 weeks of email" flood.
+> > 
+> > > Does this mean you're happy with the patch?
+> > 
+> > Well, I will not object to it on the grounds of it being a duplicate of
+> > Rafael's work now :)
+> > 
+> > I'll be glad to consider it on its own, when you feel the series is
+> > ready to be submitted.
 > 
-> ChangeLog v7->v8:
-> - The default-state was renamed to default-brightness-level.
-> - default-brightness-level is now mandatory, like for backlight-pwm,
->   That way we avoid having to handle the case where it's not set,
->   which means that we would need not to set the gpio, but still
->   report a brightness value for sysfs, when not all gpio controllers are
->   able to read the gpio value.
-> - switched the default-brightness-level to boolean values (0 or 1) instead
->   of using strings ("on", "off", "keep").
-> - The documentation was updated accordingly.
-> - The example in the documentation now uses the dts gpio defines.
-> - The "backlight: gpio_backlight: Use a default state enum." patch was then
->   dropped, becuase it is not necessary anymore.
-> 
-> ChangeLog v6->v7:
-> - removed a compilation warning with the removal of the useless ret declaration.
-> 
-> ChangeLog v5->v6:
-> - The default state handling was reworked:
->   - it's now called default-state, and looks like the gpio-leds default-state.
->   - it now has a "keep" option, like for the gpio-leds.
->   - that "keep" option is the default when the default-state property is not set.
-> - The documentation was updated accordingly.
-> 
-> ChangeLog v4->v5:
-> - The default-brightness property now defaults to 0 in the driver.
-> - def_value int becomes a bool.
-> - The check for the gpio validity has been reworked.
-> ---
->  .../bindings/video/backlight/gpio-backlight.txt    |   19 +++++++
->  drivers/video/backlight/gpio_backlight.c           |   60 +++++++++++++++++---
->  2 files changed, 72 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-> 
-[...]
-> +static struct of_device_id gpio_backlight_of_match[] = {
-> +	{ .compatible = "gpio-backlight" },
-> +	{ /* sentinel */ }
-> +};
-> +
->  static struct platform_driver gpio_backlight_driver = {
->  	.driver		= {
->  		.name		= "gpio-backlight",
->  		.owner		= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(gpio_backlight_of_match),
->
-useless use of of_match_ptr().
-This would make sense, if the gpio_backlight_of_match struct was
-conditionally compiled in depending on CONFIG_OF.
-Since you unconditionally provide it you can use
-&gpio_backlight_of_match directly.
+> I'll sort out a new set of patches today, along with a branch to pull if
+> you wish to take them that way.
 
+It's too late for 3.14, as my tree is now closed for that because 3.13
+should be out this weekend.  But I'll be glad to queue them up after
+3.14-rc1 is out.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+thanks,
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+greg k-h
