@@ -1,49 +1,192 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 12:53:59 +0000
-Subject: [PATCH v2 1/2] spi:fsl-dspi:add support of DSPI IP in big endian
-In-Reply-To: <20140110124014.GI29039@sirena.org.uk>
-References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
- <20140109175208.GK12858@sirena.org.uk>
- <e9c8019df2cf4d76ae2b77c5d1420050@BL2PR03MB163.namprd03.prod.outlook.com>
- <20140110124014.GI29039@sirena.org.uk>
-Message-ID: <20140110125359.GB15937@n2100.arm.linux.org.uk>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 10 Jan 2014 22:19:36 +0900
+Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the
+ "altr,socfpga-gate-clk"
+In-Reply-To: <1389303079-19808-2-git-send-email-dinguyen@altera.com>
+References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
+ <1389303079-19808-2-git-send-email-dinguyen@altera.com>
+Message-ID: <003501cf0e06$9c194c50$d44be4f0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 12:40:14PM +0000, Mark Brown wrote:
-> On Fri, Jan 10, 2014 at 08:11:33AM +0000, Chao Fu wrote:
+Hi Dinh,
+
+On Fri, January 10, 2014, Dinh Nguyen wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> > [Chao Fu] Our CPUs are working on only ARM architecture. But DSPI have two endianness 
-> > In different series CPU, so we use __raw_read that do not take of endianness.
-> > We need observe ARM io methods  make sure avoid instructions executing reorder .
-> > ARM IO methods :
-> > #define readb(c)                ({ u8  __v = readb_relaxed(c); __iormb(); __v; })
-> > #define readw(c)                ({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-> > #define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-> > 
-> > #define writeb(v,c)             ({ __iowmb(); writeb_relaxed(v,c); })
-> > #define writew(v,c)             ({ __iowmb(); writew_relaxed(v,c); })
-> > #define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
-> > 
-> > So add barrier here. Could you give some suggestions? Many thanks!
+> The clk-phase property is used to represent the 2 clock phase values that is
+> needed for the SD/MMC driver. Add a prepare function to the clk_ops, that will
+> use the syscon driver to set sdmmc_clk's phase shift that is located in the
+> system manager.
 > 
-> OK that makes sense, please add comments explaining that this is due to
-> the endinaness translation.  Given that people are starting to use big
-> endian more it might be sensible to have these factored out into generic
-> code but that can wait.
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+> v9: none
+> v8: Use degrees in the clk-phase binding property
+> v7: Add dts property to represent the clk phase of the sdmmc_clk. Add a
+>     prepare function to the gate clk that will toggle clock phase setting.
+>     Remove the "altr,socfpga-sdmmc-sdr-clk" clock type.
+> v6: Add a new clock type "altr,socfpga-sdmmc-sdr-clk" that will be used to
+>     set the phase shift settings.
+> v5: Use the "snps,dw-mshc" binding
+> v4: Use the sdmmc_clk prepare function to set the phase shift settings
+> v3: Not use the syscon driver because as of 3.13-rc1, the syscon driver is
+>     loaded after the clock driver.
+> v2: Use the syscon driver
+> ---
+>  .../devicetree/bindings/clock/altr_socfpga.txt     |    5 ++
+>  arch/arm/boot/dts/socfpga.dtsi                     |    1 +
+>  drivers/clk/socfpga/clk-gate.c                     |   68 ++++++++++++++++++++
+>  3 files changed, 74 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> index 0045433..5dfd145 100644
+> --- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> +++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+> @@ -23,3 +23,8 @@ Optional properties:
+>          and the bit index.
+>  - div-reg : For "socfpga-gate-clk", div-reg contains the divider register, bit shift,
+>          and width.
+> +- clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
+> +	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
+> +	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
+> +	hold/delay times that is needed for the SD/MMC CIU clock. The values of both
+> +	can be 0-315 degrees, in 45 degree increments.
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index f936476..e776512 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -413,6 +413,7 @@
+>  						compatible = "altr,socfpga-gate-clk";
+>  						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>,
+> <&per_nand_mmc_clk>;
+>  						clk-gate = <0xa0 8>;
+> +						clk-phase = <0 135>;
 
-Accesses to device memory are guaranteed by the architecture to be in
-program order when they're within the same 1K block of memory.  Larger
-blocks are permissible, and depends on the SoC.  (The ARM ARM is a little
-unclear on this statement, and I believe the statement is/has been fixed.)
+Can clk-phase be applicable commonly for various board?
+Isn't specific timing values?
 
-The barriers above are not about ensuring correct program order (we have
-that anyway), they're about ensuring the visibility externally given the
-ARM ARM mess-up, and _primerily_ ensuring proper order between DMA
-coherent memory and a DMA agent being enabled, or the DMA agent status
-being read vs DMA coherent memory.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thanks,
+Seungwon Jeon
+>  					};
+> 
+>  					nand_x_clk: nand_x_clk {
+> diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
+> index 4efcf4e..501d513 100644
+> --- a/drivers/clk/socfpga/clk-gate.c
+> +++ b/drivers/clk/socfpga/clk-gate.c
+> @@ -19,7 +19,9 @@
+>  #include <linux/clkdev.h>
+>  #include <linux/clk-provider.h>
+>  #include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+>  #include <linux/of.h>
+> +#include <linux/regmap.h>
+> 
+>  #include "clk.h"
+> 
+> @@ -35,6 +37,11 @@
+> 
+>  #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
+> 
+> +/* SDMMC Group for System Manager defines */
+> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
+> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
+> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+> +
+>  static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
+>  {
+>  	u32 l4_src;
+> @@ -115,7 +122,61 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
+>  	return parent_rate / div;
+>  }
+> 
+> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
+> +{
+> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
+> +	struct regmap *sys_mgr_base_addr;
+> +	int i;
+> +	u32 hs_timing;
+> +	u32 clk_phase[2];
+> +
+> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
+> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+> +		if (IS_ERR(sys_mgr_base_addr)) {
+> +			pr_err("%s: failed to find altr,sys-mgr regmap!\n", __func__);
+> +			return -EINVAL;
+> +		}
+> +
+> +		for (i = 0; i < 2; i++) {
+> +			switch (socfpgaclk->clk_phase[i]) {
+> +			case 0:
+> +				clk_phase[i] = 0;
+> +				break;
+> +			case 45:
+> +				clk_phase[i] = 1;
+> +				break;
+> +			case 90:
+> +				clk_phase[i] = 2;
+> +				break;
+> +			case 135:
+> +				clk_phase[i] = 3;
+> +				break;
+> +			case 180:
+> +				clk_phase[i] = 4;
+> +				break;
+> +			case 225:
+> +				clk_phase[i] = 5;
+> +				break;
+> +			case 270:
+> +				clk_phase[i] = 6;
+> +				break;
+> +			case 315:
+> +				clk_phase[i] = 7;
+> +				break;
+> +			default:
+> +				clk_phase[i] = 0;
+> +				break;
+> +			}
+> +		}
+> +		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
+> +		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
+> +			hs_timing);
+> +	}
+> +	return 0;
+> +}
+> +
+>  static struct clk_ops gateclk_ops = {
+> +	.prepare = socfpga_clk_prepare,
+>  	.recalc_rate = socfpga_clk_recalc_rate,
+>  	.get_parent = socfpga_clk_get_parent,
+>  	.set_parent = socfpga_clk_set_parent,
+> @@ -126,6 +187,7 @@ static void __init __socfpga_gate_init(struct device_node *node,
+>  {
+>  	u32 clk_gate[2];
+>  	u32 div_reg[3];
+> +	u32 clk_phase[2];
+>  	u32 fixed_div;
+>  	struct clk *clk;
+>  	struct socfpga_gate_clk *socfpga_clk;
+> @@ -166,6 +228,12 @@ static void __init __socfpga_gate_init(struct device_node *node,
+>  		socfpga_clk->div_reg = 0;
+>  	}
+> 
+> +	rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
+> +	if (!rc) {
+> +		socfpga_clk->clk_phase[0] = clk_phase[0];
+> +		socfpga_clk->clk_phase[1] = clk_phase[1];
+> +	}
+> +
+>  	of_property_read_string(node, "clock-output-names", &clk_name);
+> 
+>  	init.name = clk_name;
+> --
+> 1.7.9.5
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
