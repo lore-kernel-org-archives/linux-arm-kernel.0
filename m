@@ -1,21 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 11:34:15 +0000
-Subject: [PATCH v3 4/6] arm: add early_ioremap support
-In-Reply-To: <1389325833-16535-5-git-send-email-msalter@redhat.com>
-References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
- <1389325833-16535-5-git-send-email-msalter@redhat.com>
-Message-ID: <20140110113415.GH27432@n2100.arm.linux.org.uk>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Fri, 10 Jan 2014 12:46:49 +0100
+Subject: imx-drm and pwm-backlight
+In-Reply-To: <CAH9NwWeCQWKdCWGFkn4kYym0znF+Z3-TNUAVkVCaj4U_tV4-Aw@mail.gmail.com>
+References: <CAH9NwWeCQWKdCWGFkn4kYym0znF+Z3-TNUAVkVCaj4U_tV4-Aw@mail.gmail.com>
+Message-ID: <CAH9NwWetYCXPRUZMNdgc_thZge2vNYRGiv19NvmebB-0+PWasg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 10:50:31PM -0500, Mark Salter wrote:
-> +#define FIXMAP_PAGE_NORMAL (L_PTE_MT_WRITEBACK | L_PTE_YOUNG | L_PTE_PRESENT)
-> +#define FIXMAP_PAGE_IO (L_PTE_MT_DEV_NONSHARED | L_PTE_YOUNG | L_PTE_PRESENT)
+ping
 
-Doesn't this also want L_PTE_XN for at least IO mappings - maybe for the
-normal too if no code is expected to be run from it.
+2014/1/7 Christian Gmeiner <christian.gmeiner@gmail.com>:
+> Hi all.
+>
+> I am working on a product based on the imx6 where a display is
+> connected via ldb.
+> There are two gpio pins which are used to control the LCD_ON and the
+> BACKLIGHT_ON
+> of the used display.
+>
+> Now I run into two issues:
+>
+> 1) The backlight gets turned on before the imx-drm driver is loaded/ready.
+> For a fraction of a second the last or random framebuffer content gets shown.
+>
+> 2) If the backlight gets turned off and on the shown picture flickers
+> for some seconds
+> until it gets back to normal. I have talked to the display vendor and they told
+> me that I need to use the correct timings for LCD_ON etc.
+>
+> Do I need to use a regulator to archive this?
+>
+> thanks
+> --
+> Christian Gmeiner, MSc
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+
+--
+Christian Gmeiner, MSc
