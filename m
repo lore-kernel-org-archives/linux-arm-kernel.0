@@ -1,32 +1,25 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 10 Jan 2014 10:11:07 +0000
-Subject: [PATCH v5 3/9] mfd: omap-usb-host: Update DT clock binding
- information
-In-Reply-To: <1389269303-30465-4-git-send-email-rogerq@ti.com>
+Date: Fri, 10 Jan 2014 10:12:56 +0000
+Subject: [PATCH v5 1/9] mfd: omap-usb-host: Use resource managed clk_get()
+In-Reply-To: <1389269303-30465-2-git-send-email-rogerq@ti.com>
 References: <1389269303-30465-1-git-send-email-rogerq@ti.com>
- <1389269303-30465-4-git-send-email-rogerq@ti.com>
-Message-ID: <20140110101107.GF28141@lee--X1>
+ <1389269303-30465-2-git-send-email-rogerq@ti.com>
+Message-ID: <20140110101256.GG28141@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Jan 2014, Roger Quadros wrote:
-
-> The omap-usb-host driver expects certained named clocks.
-> Add this information to the DT binding document.
-> 
-> Use clock names as per function for reference clocks.
+> Use devm_clk_get() instead of clk_get().
 > 
 > CC: Lee Jones <lee.jones@linaro.org>
 > CC: Samuel Ortiz <sameo@linux.intel.com>
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
 > ---
->  .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
->  drivers/mfd/omap-usb-host.c                        |  6 +++---
->  2 files changed, 26 insertions(+), 3 deletions(-)
+>  drivers/mfd/omap-usb-host.c | 81 +++++++++------------------------------------
+>  1 file changed, 16 insertions(+), 65 deletions(-)
 
-Please don't mix up binding changes with code ones.
+Nice clean up.
 
-Separate patch please.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
 Lee Jones
