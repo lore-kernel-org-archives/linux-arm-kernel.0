@@ -1,119 +1,58 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 10 Jan 2014 11:32:40 +0100
-Subject: [PATCH 0/6] cpufreq: use cpufreq-cpu0 driver for exynos4210 based
- platforms
-In-Reply-To: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
-References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140110113240.797381e6@amdc2363>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Jan 2014 10:37:58 +0000
+Subject: [PATCH v5 1/5] ACPI: introduce
+ CONFIG_ACPI_REDUCED_HARDWARE_ONLY to enforce this ACPI mode
+In-Reply-To: <52CF1297.9030306@redhat.com>
+References: <1389142011-27356-1-git-send-email-al.stone@linaro.org>
+ <1389142011-27356-2-git-send-email-al.stone@linaro.org>
+ <201401081346.25767.arnd@arndb.de>
+ <CAHkRjk50ctWV4Z13wRYh8n6urcTdkq4a8tgKi8k6hgNHA3cVVA@mail.gmail.com>
+ <52CF1297.9030306@redhat.com>
+Message-ID: <20140110103757.GC925@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Jan 09, 2014 at 09:20:23PM +0000, Al Stone wrote:
+> On 01/09/2014 10:38 AM, Catalin Marinas wrote:
+> > On 8 January 2014 12:46, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Wednesday 08 January 2014, al.stone at linaro.org wrote:
+> >>> Even though support for X86 in hardware reduced mode is possible, it
+> >>> is NOT enabled.  Extensive effort has gone into the Linux kernel so that
+> >>> there is a single kernel image than can run on all x86 hardware; the kernel
+> >>> changes run-time behavior to adapt to the hardware being used.  This is not
+> >>> currently possible with the existing ACPICA infrastructure but only presents
+> >>> a problem on achitectures supporting both hardware-reduced and legacy modes
+> >>> of ACPI -- i.e., on x86 only.
+> >>
+> >> Not sure about the logic here: While it's certainly possible to build a kernel
+> >> that runs on all x86 machines, it's also possible to build one that only
+> >> runs on some of them when some basic options are turned off. I don't see
+> >> any difference between that and what we have on ARM64 or the multiplatform
+> >> subset of ARM32.
+> >
+> > Would we ever need !CONFIG_ACPI_REDUCED_HARDWARE_ONLY on ARM or ARM64?
+> > If not, we could even make this always on for these archs.
+> >
+> 
+> Not that I know of -- and I would hope not.  This mode is so much
+> more straightforward that it makes no sense to me to do anything
+> but reduced HW if you have the choice.
 
-I've investigated the topic for a while, so if you don't mind I will
-share my thoughts :-)
+Thanks for clarifying.
 
-> The patch series removes the use of Exynos4210 specific cpufreq driver
-> and enables to use the cpufreq-cpu0 driver for Exynos4210 based
-> platforms. This is being done for few reasons.
+> I assume you were thinking of something like this in the arch Kconfig
+> file:
 > 
-> (a) The Exynos4210 cpufreq driver reads/writes clock controller
-> registers bypassing the Exynos4 CCF driver which is sort of
-> problematic.
+> config ARM64
+> 	....
+> 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> 	...
+> 
+> But, do let me know if you had something else in mind.  I think it does
+> make sense to add so I'll put this in the next version.
 
-Also other, already supported devices suffer from it. Namely -
-Exynos4x12 and Exynos5250.
-
-That's why the solution shall be as generic as possible to also work
-with those two SoCs.
-
-> (b) Removes the need for having clock controller
-> register definitions in the cpufreq driver and also removes the need
-> for statically io-remapping clock controller address space (helps in
-> moving towards multiplatform kernel).
-> 
-> In order to use cpufreq-cpu0 driver and provide fast cpu clock
-> switching during dvfs operations, the following apporach has been
-> used.
-> 
-> (a) A new CPU clock provider type has been introduced in Samsung's CCF
->     support. This clock provider type can be a compostion of multiple
->     clock blocks such as mux, dividers and gates. Typically, in Exynos
->     platforms, there are multiple clock blocks in between the output
->     of the APLL and the CPU clock domain output. Representing these
->     mutiple clock blocks within a opaque CPU clock provider type helps
->     in reducing the time taken to perform a CPU clock frequency change
->     operation, which is generally required during DVFS operations.
->     This approach was suggested by Arnd Bergmann <arnd@arndb.de>
-> during LCE-2013.
-> 
-> (b) A new optional safe operating point property has been introduced
->     in the cpufreq-cpu0 driver binding. On some platforms such as the
->     Samsung Exynos, a change in CPU frequency requires a change in the
->     PLL output that drives the CPU clock. A change in PLL output
->     requires the PLL output be turned off, which implies that the CPU
->     (and other components in the CPU clock domain) be supplied with
->     an alternate clock source during the time the PLL output is
-> changed.
-> 
->     The clock speed of this alternate clock source could be higher
->     than the clock speed of the PLL at the time of switching over to
->     the alternate clock source. This temporary increase in clock speed
->     of the CPU clock domain implies that the blocks within the CPU
->     clock domain should also be supplied with an appropriate voltage
->     supply level as required to drive the CPU clock domain components
->     at the speed of the alternative clock source. This temporary
->     voltage level required during switching of CPU clock speed is
->     called safe voltage level. And the cpufreq-cpu0 driver has been
->     modified to setup the safe voltage levels during the changes
->     in CPU clock speed.
-> 
-> (c) The CPU clock supply as been restructured as
->     [ Output of APLL -> Opaque CPU clock provider -> CPU clock output
-> ] And with the changes in (a) and (b) above, the cpufreq-cpu0 driver
->     can now be used and can remove the use of Exynos4210 specific
->     cpufreq driver.
-> 
-> This approach is currently tried on Exynos4210 only. The same approach
-> can be adopted for other Exynos SoCs as well. This patch series is
-> based on linux-next master branch.
-> 
-> Thomas Abraham (6):
->   cpufreq: cpufreq-cpu0: allow optional safe voltage during frequency
-> transitions clk: samsung: add infrastructure to register CPU clocks
->   clk: samsung: register cpu clock provider for exynos4210 SoC
->   cpufreq: exynos: remove Exynos4210 specific cpufreq driver support
->   arm: exynos4-dt: statically add platform device for cpufreq-cpu0
-> platform driver arm: dts: add cpu nodes for Exynos4210 SoC
-> 
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    5 +
->  arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
->  arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
->  arch/arm/boot/dts/exynos4210.dtsi                  |   22 +++
->  arch/arm/mach-exynos/mach-exynos4-dt.c             |    6 +
->  drivers/clk/samsung/clk-exynos4.c                  |   96
-> ++++++++++++- drivers/clk/samsung/clk.c                          |
-> 71 +++++++++ drivers/clk/samsung/clk.h                          |
-> 37 +++++- drivers/cpufreq/Kconfig.arm                        |   11 --
->  drivers/cpufreq/Makefile                           |    1 -
->  drivers/cpufreq/cpufreq-cpu0.c                     |   49 ++++++-
->  drivers/cpufreq/exynos-cpufreq.c                   |    4 +-
->  drivers/cpufreq/exynos-cpufreq.h                   |    8 -
->  drivers/cpufreq/exynos4210-cpufreq.c               |  157
-> -------------------- 15 files changed, 301 insertions(+), 184
-> deletions(-) delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe cpufreq" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+The change makes sense but I think it should come with the patches for
+ACPI support on arm64 rather than your hw-reduced patches.
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Catalin
