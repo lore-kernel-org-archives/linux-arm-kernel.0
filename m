@@ -1,151 +1,147 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 10 Jan 2014 15:43:46 +0100
-Subject: [PATCH RFC RFT 0/2] ARM: Kirkwood: Synology DT files
-In-Reply-To: <52D005E1.6000308@killerwolves.net>
-References: <1389052027-16819-1-git-send-email-andrew@lunn.ch>
- <52CE312B.3060108@killerwolves.net> <20140109165557.GB9681@lunn.ch>
- <52CF4652.3030207@killerwolves.net>
- <20140110112846.GG27432@n2100.arm.linux.org.uk>
- <52CFFF07.5080806@killerwolves.net> <20140110142548.GG9681@lunn.ch>
- <52D005E1.6000308@killerwolves.net>
-Message-ID: <20140110144346.GH9681@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 10 Jan 2014 08:47:50 -0600
+Subject: [PATCH v3 0/2] PSCI system off and reset for KVM ARM/ARM64
+In-Reply-To: <20140107115024.GB4180@e106331-lin.cambridge.arm.com>
+References: <1387280136-13622-1-git-send-email-anup.patel@linaro.org>
+ <20131217185154.GN5711@cbox>
+ <87wqj2ql57.fsf@e102391-lin.cambridge.arm.com>
+ <52B1C251.9040801@gmail.com>
+ <87eh5aowrw.fsf@e102391-lin.cambridge.arm.com>
+ <20140107115024.GB4180@e106331-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqJQfQ2GdsgpRp=wUZKuAE3gTc87gOwWg3hmYFsBZZR1Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 11, 2014 at 12:38:25AM +1000, Ben Peddell wrote:
-> On 11/01/14 00:25, Andrew Lunn wrote:
-> > On Sat, Jan 11, 2014 at 12:09:11AM +1000, Ben Peddell wrote:
-> >> On 10/01/14 21:28, Russell King - ARM Linux wrote:
-> >>> On Fri, Jan 10, 2014 at 11:01:06AM +1000, Ben Peddell wrote:
-> >>>> It appears the initrd address in the devicetree structure (which is 
-> >>>> filled in from what is passed by the bootloader when 
-> >>>> CONFIG_ARM_ATAG_DTB_COMPAT is set) is processed _after_ the address in 
-> >>>> the initrd= kernel parameter is processed.
-> >>>
-> >>> That's wrong.  Kernel parameters should always override what's passed by
-> >>> boot loaders etc.
-> >>
-> >> In that case, what I saw was a bug - note that this only occurs when
-> >> DeviceTree is enabled:
-> >>
-> >>
-> >>          __  __                      _ _
-> >>         |  \/  | __ _ _ ____   _____| | |
-> >>         | |\/| |/ _` | '__\ \ / / _ \ | |
-> >>         | |  | | (_| | |   \ V /  __/ | |
-> >>         |_|  |_|\__,_|_|    \_/ \___|_|_|
-> >>  _   _     ____              _
-> >> | | | |   | __ )  ___   ___ | |_
-> >> | | | |___|  _ \ / _ \ / _ \| __|
-> >> | |_| |___| |_) | (_) | (_) | |_
-> >>  \___/    |____/ \___/ \___/ \__|  ** LOADER **
-> >>  ** MARVELL BOARD: Synology Disk Station LE
-> >>
-> >> U-Boot 1.1.4 (Jul  6 2010 - 19:26:08) Marvell version: 3.4.4
-> >>
-> >> U-Boot code: 00600000 -> 0067FFF0  BSS: -> 0068B43C
-> >>
-> >> Soc: 88F6281 A1 (DDR2)
-> >> CPU running @ 1200Mhz L2 running @ 480Mhz
-> >> SysClock = 400Mhz , TClock = 200Mhz
-> >>
-> >> DRAM CAS Latency = 6 tRP = 6 tRAS = 18 tRCD=6
-> >> DRAM CS[0] base 0x00000000   size 128MB
-> >> DRAM Total size 128MB  16bit width
-> >> [4096kB at f8000000] Flash:  4 MB
-> >> Addresses 8M - 0M are saved for the U-Boot usage.
-> >> Mem malloc Initialization (8M - 7M): Done
-> >> Using default environment
-> >>
-> >>
-> >> CPU : Marvell Feroceon (Rev 1)
-> >>
-> >> Streaming disabled
-> >> Write allocate disabled
-> >>
-> >> Module 1 is AUDIO
-> >>
-> >> USB 0: host mode
-> >>
-> >> Synology Model: DS211j
-> >> Fan Status: Good
-> >>
-> >> Net:   egiga0 [PRIME]
-> >> Hit any key to stop autoboot:  0
-> >> Marvell>> setenv ipaddr 192.168.200.62
-> >> Marvell>> setenv serverip 192.168.200.16
-> >> Marvell>> tftp 0x01000000 uImage-3.13-rc7-ds211j-git-fdt
-> >> Using egiga0 device
-> >> TFTP from server 192.168.200.16; our IP address is 192.168.200.62
-> >> Filename 'uImage-3.13-rc7-ds211j-git-fdt'.
-> >> Load address: 0x1000000
-> >> Loading: #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #########################################################
-> >> done
-> > 
-> > So here you load the kernel into RAM at 0x0100 0000.
-> > 
-> > 
-> >> Bytes transferred = 1954736 (1dd3b0 hex)
-> >> Marvell>> setenv bootargs console=ttyS0,115200 ip=off initrd=0x00800040,0x0013FFC0 root=/dev/md0 rw syno_hw_version=DS211j ihd_num=2 netif_num=1 earlyprintk
-> > 
-> > I don't see you loading the initrd into RAM at 0x0080 0000.
-> 
-> See below
-> 
-> > 
-> >> Marvell>> bootm 0x01000000 0xf8280000
-> > 
-> > And here you tell it the initrd is at 0xf8280000.
-> 
-> This is because I am using the initrd in flash.
-> 
-> > 
-> >> ## Booting image at 01000000 ...
-> >> Bad Magic Number
-> >> Marvell>> tftp 0x01000000 uImage-3.13-rc7-ds211j-git-fdt
-> >> Using egiga0 device
-> >> TFTP from server 192.168.200.16; our IP address is 192.168.200.62
-> >> Filename 'uImage-3.13-rc7-ds211j-git-fdt'.
-> >> Load address: 0x1000000
-> >> Loading: #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #################################################################
-> >>          #########################################################
-> >> done
-> >> Bytes transferred = 1954800 (1dd3f0 hex)
-> >> Marvell>> bootm 0x01000000 0xf8280000
-> >> ## Booting image at 01000000 ...
-> >>    Image Name:   linux-3.13-rc7-ds211j+
-> >>    Image Type:   ARM Linux Kernel Image (uncompressed)
-> >>    Data Size:    1954736 Bytes =  1.9 MB
-> >>    Load Address: 00008000
-> >>    Entry Point:  00008000
-> >>    Verifying Checksum ... OK
-> >> OK
-> >> ## Loading Ramdisk Image at f8280000 ...
-> >>    Image Name:   altair-boot
-> >>    Image Type:   ARM Linux RAMDisk Image (unknown compression)
-> >>    Data Size:    1022268 Bytes = 998.3 kB
-> >>    Load Address: 00800000
-> >>    Entry Point:  00800000
-> >>    Verifying Checksum ... OK
-> 
-> Here the bootloader copies the initrd to 0x00800040, yet passes
-> 0xf8280040 to the kernel.
+On Tue, Jan 7, 2014 at 5:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Dec 18, 2013 at 06:10:27PM +0000, Marc Zyngier wrote:
+>> Hi Rob,
+>>
+>> On Wed, Dec 18 2013 at 03:42:09 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> > Adding Mark Rutland.
+>> >
+>> > On 12/18/2013 08:38 AM, Marc Zyngier wrote:
+>> >> Christoffer Dall <christoffer.dall@linaro.org> writes:
+>> >>
+>> >>> On Tue, Dec 17, 2013 at 05:05:34PM +0530, Anup Patel wrote:
+>> >>>> The Power State and Coordination Interface (PSCI) specification defines
+>> >>>> SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
+>> >>>>
+>> >>>> This patchset adds emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions
+>> >>>> in KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL) using
+>> >>>> KVM_EXIT_SYSTEM_EVENT exit reason.
+>> >>>>
+>> >>>> To try this patch from guest kernel, we will need PSCI-based restart and
+>> >>>> poweroff support in the guest kenel for both ARM and ARM64.
+>> >>>>
+>> >>>> Rob Herring has already submitted patches for PSCI-based restart and
+>> >>>> poweroff in ARM kernel but these are not merged yet due unstable device
+>> >>>> tree bindings of kernel PSCI support. We will be having similar patches
+>> >>>> for PSCI-based restart and poweroff in ARM64 kernel.
+>> >>>> (Refer http://www.spinics.net/lists/arm-kernel/msg262217.html)
+>> >>>> (Refer http://www.spinics.net/lists/devicetree/msg05348.html)
+>> >>>
+>> >>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> >>>
+>> >>> I can merge this series if Marc acks it as well.
+>> >>
+>> >> The patches themselves are mostly fine. One issue though: They implement
+>> >> part of the v0.2 spec, but keep on using the range of function IDs that
+>> >> we made up for v0.1.
+>> >>
+>> >> I just had a chat with the person responsible for the spec, and realized
+>> >> that the Function IDs mentionned in the v0.2 spec are not optional, and
+>> >> not using them would be in direct violation of the spec (the new numbers
+>> >> now come directly from the SMC calling convention).
+>> >
+>> > News to me. That is exactly the opposite of what Mark Rutland told me.
+>> > This would certainly simplify things since the SMC calling convention
+>> > IDs encode the size and there would be no reason to put the IDs into
+>> > DT.
+>
+> Hi Rob,
+>
+> Sorry for the confusion here. My position changed over the course of the
+> discussion, so I'm probably arguing against my original side now.
+>
+> I think the key point was that I wanted a PSCI 0.2 system to function
+> with an existing kernel if possible, as all the existing calls still
+> exist. That implied placing the numbers (redundantly) into the DT. This
+> is important for extending KVM with PSCI 0.2 support without breaking
+> support for existing guests and having to have a load of messy flags
+> depending on the guest you want to boot.
+>
+> I agree that we should use the specified function IDs, and therefore we
+> do not need to specify the IDs. A new system that old kernels can't run
+> on anyway can just have:
+>
+> psci {
+>         compatible = "arm,psci-0.2";
+>         methoc = "smc";
+> };
+>
+> However, it would be nice to have a set of function IDs in the DT for
+> existing clients as a fallback. Preferably in the same node (we have the
+> compatible list, we may as well use it and make it clear we expect
+> clients to use one or the other):
+>
+> psci {
+>         compatible = "arm,psci-0.2", "arm,psci";
+>         method = "smc";
+>
+>         /*
+>          * The mandated PSCI 0.2 IDs are used by the client if it
+>          * understands PSCI 0.2. These IDs are for older clients that
+>          * only support the kernel's old PSCI version.
+>          *
+>          * These IDs might not match any of the PSCI 0.2 IDs, and are
+>          * purely here for compatibility with existing software.
+>          */
+>         cpu_off = <...>;
+>         cpu_on = <...>;
+>         cpu_suspend = <...>;
+> };
+>
+> I believe KVM currently uses the same ID numbers regardless of guest
+> register-width, which is unfortunately different from what PSCI 0.2 says
+> it should. As KVM can figure out the register width of the caller it
+> might be able to do the right thing (unless that's in conflict with PSCI
+> 0.2). At worst we should be able to allocate a third set of
+> width-agnostic IDs for older clients that imply the current behaviour.
+>
+> Does that sound reasonable? Sorry for leading you in circles.
 
-But does it pass 0xf8280040 because you used:
+Yes. Certainly the simplest solution is the best.
 
-bootm 0x01000000 0xf8280000
+>>
+>> Mark (assuming you're reading this): what were your objections about
+>> following the ID mentioned in the spec?
+>
+> Originally I was worried about more spectacularly bad implementations
+> with wrong IDs or a subset of IDs supported. Now I agree that we can
+> handle those later if and when they arise, and using the correct IDs is
+> a far better option.
+>
+> The other issue was KVM forwards-compatibility, but I think the above
+> covers that.
+>
+>>
+>> >> So I rekon we need to create a separate range for those. Also, I'd like
+>> >> to progress the DT and kernel side of things as well (otherwise this is
+>> >> all a bit pointless).
+>> >>
+>> >> Rob: what are your plans regarding your PSCI v0.2 patches?
+>> >
+>> > My plan was to simply add 2 optional properties for reset/off and be
+>> > done with it like is done here. I'll leave it to ARM to sort out all of
+>> > v0.2 ID and 32-bit vs. 64-bit issues.
+>
+> Does the above sound OK for adding that support?
 
-What happens if you use
+Yes, but this doesn't actually work for highbank/midway without a
+firmware update because they are using IDs from a pre-release of the
+v0.2 spec. Fortunately, they do not claim v0.2 compatibility, so we
+should be okay. It is only a question of removing the highbank
+reset/poweroff code from the kernel and I guess that will just not
+happen now.
 
-bootm 0x01000000 0x00800000
-
-      Andrew
+Rob
