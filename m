@@ -1,59 +1,63 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 10 Jan 2014 09:49:57 +0530
-Subject: [PATCH v3] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-In-Reply-To: <20140109163305.GC28655@norris-Latitude-E6410>
-References: <1386267092-18615-1-git-send-email-ivan.khoronzhuk@ti.com>
- <52B18C44.2000305@ti.com> <52B1915A.7060309@ti.com> <52BC1BB8.2070007@ti.com>
- <52CE7C44.1000803@ti.com> <20140109163305.GC28655@norris-Latitude-E6410>
-Message-ID: <52CF74ED.2030503@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 10 Jan 2014 10:55:41 +0530
+Subject: 3.13-rc2 phy-twl4030-usb.c - Timeout setting T2 HSUSB PHY DPLL
+In-Reply-To: <52CE32AB.1050204@ti.com>
+References: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>	<529F1E89.6080700@ti.com>
+ <CAAfyv36sNyEiEHEOKfZWN1xRYLGUt-NW18uhcJbSTWRBA5=2BA@mail.gmail.com>
+ <52CE32AB.1050204@ti.com>
+Message-ID: <52CF8455.5090506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 January 2014 10:03 PM, Brian Norris wrote:
-> On Thu, Jan 09, 2014 at 04:09:00PM +0530, Sekhar Nori wrote:
->> On Thursday 26 December 2013 05:36 PM, ivan.khoronzhuk wrote:
->>> On 12/18/2013 02:13 PM, Sekhar Nori wrote:
->>>> On Wednesday 18 December 2013 05:21 PM, ivan.khoronzhuk wrote:
->>>>> Hi, Sekhar
->>>>>
->>>>> This patch is based on "Reuse davinci-nand driver for Keystone arch"
->>>>> series.
->>>>> The series has passed review at https://lkml.org/lkml/2013/12/17/241
->>>>> and can be found at http://git.infradead.org/l2-mtd.git
->>>>>
->>>>> This patch can be still applied on top of the series without conflicts.
->>>>>
->>>>> Can you please pick up the $subject patch if you are OK with it?
->>>>
->>>> I have no problems with the patch and can pick it too, but need ack from
->>>> MTD maintainer (David) as it touches drivers/mtd/ too.
->>>>
->>>> David,
->>>>
->>>> If you do not have the patch, we can resend it.
->>>>
->>>> Thanks,
->>>> Sekhar
->>>>
->>>
->>> Hi Brian,
->>>
->>> Do you agree if this patch will go through Davinci tree?
->>>
->>> This is the last one we need to reuse Davinci Nand driver for Keystone.
+Hi,
+
+On Thursday 09 January 2014 10:54 AM, Roger Quadros wrote:
+> Hi Marek,
+> 
+> I have no idea what is happening there. Have you tried using device tree boot?
+> Board file boot support would be dropped eventually.
+> 
+> Did you try if I2C read write to the twl4030 device works and all necessary clocks/supplies are
+> present?
+> 
+> Kishon, do you know what is causing the USB DPLL failure there?
+
+Not sure what's causing those failures :-s
+
+-Kishon
+
+> 
+> cheers,
+> -roger
+> 
+> On 01/09/2014 02:31 AM, Belisko Marek wrote:
+>> Any pointers? Still present in 3.13-rc7.
 >>
->> Since we never got an ack from MTD folks, I am going and go ahead and
->> try pushing this through ARM-SoC regardless. I will CC the MTD
->> maintainers on the pull request so any objections could even be posted
->> there.
+>> On Wed, Dec 4, 2013 at 1:22 PM, Roger Quadros <rogerq@ti.com> wrote:
+>>> +Kishon
+>>>
+>>> On 12/03/2013 11:33 PM, Belisko Marek wrote:
+>>>> Hi,
+>>>>
+>>>> current 3.13-rcX break usb support on gta04 board (similar to
+>>>> beagleboard) when booting via board file.
+>>>>
+>>>> In console we can see messages:
+>>>>  [ 5227.287841] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
+>>>> [ 5232.936096] omap_musb_mailbox: musb core is not yet ready
+>>>> [ 5233.958160] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
+>>>> [ 5235.058227] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
+>>>>
+>>>> Any pointer what could cause that? (in 3.12 usb works fine)
+>>>>
+>>>> BR,
+>>>>
+>>>> marek
+>>>>
+>>>
+>>
+>> BR,
+>>
+>> marek
+>>
 > 
-> Sorry, I've been a little busy / out for vacation. The MTD parts look OK
-> to me. Feel free to take it in your tree.
-> 
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
-
-Thanks Brian!
-
-Regards,
-Sekhar
