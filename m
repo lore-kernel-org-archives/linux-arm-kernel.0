@@ -1,47 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jan 2014 15:11:23 +0000
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140110150702.GA22533@kroah.com>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
-Message-ID: <20140110151123.GG15937@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 10 Jan 2014 10:29:27 -0500 (EST)
+Subject: [PATCH v3 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52CFC7DC.3010406@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1401101025401.1399-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 07:07:02AM -0800, Greg Kroah-Hartman wrote:
-> On Fri, Jan 10, 2014 at 02:54:44PM +0000, Russell King - ARM Linux wrote:
-> > Greg,
-> > 
-> > Not sure if you saw the outcome to your comment above.  My conclusion
-> > was:
-> > 
-> > "Yes, I'm coming to that conclusion as well.  It looks like your "containers"
-> > aren't about collecting up several individual component devices into one
-> > super-device and probing the appropriate subsystem when all components are
-> > known.
-> > 
-> > "Confused why Greg is pointing me at your patches."
-> 
-> Ah, sorry, I missed that in my "catch up on 2 weeks of email" flood.
-> 
-> > Does this mean you're happy with the patch?
-> 
-> Well, I will not object to it on the grounds of it being a duplicate of
-> Rafael's work now :)
-> 
-> I'll be glad to consider it on its own, when you feel the series is
-> ready to be submitted.
+On Fri, 10 Jan 2014, Hans de Goede wrote:
 
-I'll sort out a new set of patches today, along with a branch to pull if
-you wish to take them that way.
+> >> +static struct usb_ohci_pdata ohci_platform_defaults = {
+> >> +	.power_on =		ohci_platform_power_on,
+> >> +	.power_suspend =	ohci_platform_power_off,
+> >> +	.power_off =		ohci_platform_power_off,
+> >>   };
+> >
+> > I wonder if these routines couldn't be shared with non-DT setups.  We
+> > could add an array of 3 struct clk pointers to the usb_ohci_pdata
+> > structure.  Then if any of them are set, store these routines in the
+> > power_* pointers.  (And likewise for ehci-platform.)  Something to
+> > consider for a future patch...
+> 
+> I don't like automatically setting the power_ platform_data members much.
 
-Thanks.
+Me either.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> But I've already been thinking about moving the clks member to platform_data,
+> and simply exporting ohci_platform_power_* so that other drivers can use them
+> and put them in the platform_data members themselves. That is indeed something
+> for another patch though.
+
+It would require building ohci-platform into the kernel instead of 
+making it a separate module.  That shouldn't matter much for 
+embedded/SoC systems, though.  It seems like a good approach.
+
+> >>   	if (!pdata) {
+> >> -		WARN_ON(1);
+> >> -		return -ENODEV;
+> >> +		pdata = dev->dev.platform_data = &ohci_platform_defaults;
+> >
+> > This has a subtle bug.  Consider what will happen if ohci-platform is
+> > loaded, then unloaded and loaded again.
+> 
+> Right, so we need to add a "dev->dev.platform_data == &ohci_platform_defaults"
+> check on remove an then set platform_data to NULL, good point, will fix in the
+> next version.
+
+Exactly.
+
+> > The existing ehci-platform driver has this same bug.  I definitely
+> > remember discussing at once or twice in the past, but evidently it has
+> > never been fixed.
+> 
+> If you agree with the above fix I'll also throw it into the next revision
+> of the ehci patch.
+
+Thank you.
+
+> Before I do a v4, one question:
+> 
+> Ma Haijun does not like the use of OHCI_MAX_CLKS:
+> 
+>  >> +#define OHCI_MAX_CLKS 3
+>  >
+>  > I still recommend using of_count_phandle_with_args(np, "clocks",
+>  > "#clock-cells") to determine the number of clocks or the existence of clocks
+>  > property (-ENOENT)
+> 
+> His suggestion would mean dynamically allocating the clks array and having
+> clks_count variable. I still think this is a bit overkill, but I can do that for
+> v4 if you want, so what do you prefer ?
+
+Space isn't a big consideration, because we're not likely to see a 
+system with more a few controllers.  I say keep it simple.  If someone 
+comes up with a controller using more than 3 clocks, we can change to 
+dynamic allocation then.
+
+Alan Stern
