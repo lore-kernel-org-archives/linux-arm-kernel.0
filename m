@@ -1,49 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Jan 2014 10:56:16 +0000
-Subject: LSK merge linux-stable review
-In-Reply-To: <52CF61CC.40305@linaro.org>
-References: <20140110013011.GA6447@alex-shi>
- <52CF61CC.40305@linaro.org>
-Message-ID: <20140110105615.GD925@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 10 Jan 2014 10:58:13 +0000
+Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
+In-Reply-To: <52CEF5C9.1010701@codeaurora.org>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
+ <20140109104943.GB17838@mudshark.cambridge.arm.com>
+ <52CEF5C9.1010701@codeaurora.org>
+Message-ID: <20140110105813.GB10455@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 02:58:20AM +0000, Alex Shi wrote:
-> commit 450cdfa9c5713551ab1438ab210679868b52a994
-> Merge: bf78886 8b4ed85
-> Author: Alex Shi <alex.shi@linaro.org>
-> Date:   Fri Jan 10 10:50:57 2014 +0800
+On Thu, Jan 09, 2014 at 07:17:29PM +0000, Stephen Boyd wrote:
+> On 01/09/14 02:49, Will Deacon wrote:
+> >
+> >> +static irq_handler_t cpu_handler;
+> >> +
+> >> +static irqreturn_t cpu_pmu_dispatch_irq(int irq, void *dev)
+> >> +{
+> >> +	struct arm_pmu *arm_pmu = *(struct arm_pmu **)dev;
+> >> +	return cpu_handler(irq, arm_pmu);
+> >> +}
+> > I don't like this bit -- having a global cpu_handler field is going to
+> > interfere with the big.LITTLE work and casting the per-cpu dev token is also
+> > pretty hacky.
+> >
+> > However, you're forced down this route by the need to invoke the armpmu IRQ
+> > dispatcher. Now, that only exists as a workaround for the braindead
+> > interrupt routing on the u8500 (they OR'd all the PMU SPIs together) -- it's
+> > not a problem that will affect a system using PPIs. If you look, there is
+> > only one use of the thing in: arch/arm/mach-ux500/cpu-db8500.c.
+> >
+> > So, we could rename that callback to make it clear that it's not so much an
+> > IRQ handler wrapper as a specific hack to deal with broken SPIs. Then the
+> > cpu_pmu code can neglect to make the callback if it's using PPI.
+> >
+> > What do you think?
 > 
->     Merge remote-tracking branch 'stable/linux-3.10.y' into linux-linaro-lsk
->     
->     Conflicts:
->         arch/arm64/kernel/smp.c
->     
->     Signed-off-by: Alex Shi <alex.shi@linaro.org>
-> 
-> diff --cc arch/arm64/kernel/smp.c
-> index 5e9d274,9c93e12..87340fd
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@@ -150,17 -187,17 +150,10 @@@ asmlinkage void __cpuinit secondary_sta
->         preempt_disable();
->         trace_hardirqs_off();
->   
->  -      /*
->  -       * Let the primary processor know we're out of the
->  -       * pen, then head off into the C entry point
->  -       */
->  -      write_pen_release(INVALID_HWID);
->  +      if (cpu_ops[cpu]->cpu_postboot)
->  +              cpu_ops[cpu]->cpu_postboot();
->   
-> --      /*
-> -        * Enable local interrupts.
-> -        */
-> -       notify_cpu_starting(cpu);
+> Yeah I hate this bouncing layer too but it was the best I could come up
+> with. I'll rename it to 'armpmu_dispatch_spi_irq' (bikeshedding welcome).
 
-This kind of diff always confuses me but notify_cpu_starting() should be
-present in the resulting file. Is it further down?
+That sounds fine.
 
--- 
-Catalin
+> We can avoid the hacky cast of the per-cpu dev token by using the
+> cpu_pmu pointer directly, but we'll still need to pass something to the
+> percpu interrupt handler otherwise the genirq layer doesn't allow us to
+> request the PPI. I can pass hw_events I guess. Is that what you're
+> thinking? Or were you thinking that we could just use
+> cpu_pmu->handle_irq as the handler argument in request_percpu_irq()? I
+> can't figure out how that is supposed to work.
+
+Actually, I was thinking you could remove cpu_pmu_dispatch_irq completely
+and just pass the actual handler straight through to request_percpu_irq. On
+arm64 we pass the hw_events as the pcpu token, so I'd be inclined to do the
+same here unless there's a good reason not to.
+
+Cheers,
+
+Will
