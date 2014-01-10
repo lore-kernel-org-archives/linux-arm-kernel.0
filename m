@@ -1,32 +1,34 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 10 Jan 2014 19:16:10 +0900
-Subject: [PATCH 2/2] arm64: dts: use #include for all ARM fast model device
- tree file
-In-Reply-To: <1389348970-5498-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389348970-5498-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1389348970-5498-3-git-send-email-pankaj.dubey@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 10 Jan 2014 11:04:57 +0100
+Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
+In-Reply-To: <CAK9yfHx+=X+DiLe_WsiDkYonKCssPTOGqR76=+7N6eyAHXyQGQ@mail.gmail.com>
+References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
+ <CAK9yfHx+=X+DiLe_WsiDkYonKCssPTOGqR76=+7N6eyAHXyQGQ@mail.gmail.com>
+Message-ID: <52CFC5C9.4000006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-convert /include/ (dtc) with #include (C pre-processor) for
-device tree file of ARM fast model.
+On 08/01/14 05:44, Sachin Kamat wrote:
+> Hi Sylwester,
+> 
+> On 7 January 2014 17:33, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>> Ensure clk->kref is dereferenced only when clk is not NULL.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>> Hi Sachin,
+>>
+>> please try if this patch fixes the exyno5420 boot crash.
+> 
+> Confirmed that this patch works fine on 5420 as well as already
+> working 4210 and 5250 boards.
+> Thanks for the quick fix.
+> 
+> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks Sachin. Mike, it seems we need this patch on top of
+my clk-unregister branch. Sorry for overlooking this issue.
+Could you add the $subject patch to your clk-next tree ?
 
-diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-index 572005e..024f51e 100644
---- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-+++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-@@ -154,6 +154,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "rtsm_ve-motherboard.dtsi"
-+		#include "rtsm_ve-motherboard.dtsi"
- 	};
- };
--- 
-1.7.10.4
+Regards,
+Sylwester
