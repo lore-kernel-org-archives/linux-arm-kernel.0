@@ -1,87 +1,77 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Fri, 10 Jan 2014 07:55:48 +0100
-Subject: 3.13-rc2 phy-twl4030-usb.c - Timeout setting T2 HSUSB PHY DPLL
-In-Reply-To: <52CF8455.5090506@ti.com>
-References: <CAAfyv37aM6SrpuU9fzKA6GKsWn=To5ANOpG_kSX509NjMjdecA@mail.gmail.com>
- <529F1E89.6080700@ti.com>
- <CAAfyv36sNyEiEHEOKfZWN1xRYLGUt-NW18uhcJbSTWRBA5=2BA@mail.gmail.com>
- <52CE32AB.1050204@ti.com> <52CF8455.5090506@ti.com>
-Message-ID: <CAAfyv34ce=V_nheonE0HLGPNEF=Z_Ep-hj64dSuKrRqehNfOCw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 10 Jan 2014 15:00:02 +0800
+Subject: [PATCH v2 01/16] reset: add non CONFIG_RESET_CONTROLLER routines
+In-Reply-To: <1389337217-29032-1-git-send-email-wens@csie.org>
+References: <1389337217-29032-1-git-send-email-wens@csie.org>
+Message-ID: <1389337217-29032-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some drivers are shared between platforms that may or may not
+have RESET_CONTROLLER selected for them. Add dummy functions
+when RESET_CONTROLLER is not selected, thereby eliminating the
+need for drivers to enclose reset_control_*() calls within
+#ifdef CONFIG_RESET_CONTROLLER, #endif
 
-On Fri, Jan 10, 2014 at 6:25 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Thursday 09 January 2014 10:54 AM, Roger Quadros wrote:
->> Hi Marek,
->>
->> I have no idea what is happening there. Have you tried using device tree boot?
->> Board file boot support would be dropped eventually.
->>
->> Did you try if I2C read write to the twl4030 device works and all necessary clocks/supplies are
->> present?
->>
->> Kishon, do you know what is causing the USB DPLL failure there?
-Issue was fixed. There was in 3.13-rc7 issue with unable to find phy
-(phy was twl4030_usb). After that
-issue is gone.
->
-> Not sure what's causing those failures :-s
->
-> -Kishon
->
->>
->> cheers,
->> -roger
->>
->> On 01/09/2014 02:31 AM, Belisko Marek wrote:
->>> Any pointers? Still present in 3.13-rc7.
->>>
->>> On Wed, Dec 4, 2013 at 1:22 PM, Roger Quadros <rogerq@ti.com> wrote:
->>>> +Kishon
->>>>
->>>> On 12/03/2013 11:33 PM, Belisko Marek wrote:
->>>>> Hi,
->>>>>
->>>>> current 3.13-rcX break usb support on gta04 board (similar to
->>>>> beagleboard) when booting via board file.
->>>>>
->>>>> In console we can see messages:
->>>>>  [ 5227.287841] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>>>> [ 5232.936096] omap_musb_mailbox: musb core is not yet ready
->>>>> [ 5233.958160] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>>>> [ 5235.058227] twl4030_usb twl4030_usb: Timeout setting T2 HSUSB PHY DPLL clock
->>>>>
->>>>> Any pointer what could cause that? (in 3.12 usb works fine)
->>>>>
->>>>> BR,
->>>>>
->>>>> marek
->>>>>
->>>>
->>>
->>> BR,
->>>
->>> marek
->>>
->>
->
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ include/linux/reset.h | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-BR,
-
-marek
-
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index 6082247..38aa616 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -4,6 +4,8 @@
+ struct device;
+ struct reset_control;
+ 
++#ifdef CONFIG_RESET_CONTROLLER
++
+ int reset_control_reset(struct reset_control *rstc);
+ int reset_control_assert(struct reset_control *rstc);
+ int reset_control_deassert(struct reset_control *rstc);
+@@ -14,4 +16,41 @@ struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
+ 
+ int device_reset(struct device *dev);
+ 
++#else /* !CONFIG_RESET_CONTROLLER */
++
++static inline int reset_control_reset(struct reset_control *rstc)
++{
++	return 0;
++}
++
++static inline int reset_control_assert(struct reset_control *rstc)
++{
++	return 0;
++}
++
++static inline int reset_control_deassert(struct reset_control *rstc)
++{
++	return 0;
++}
++
++static inline struct reset_control *reset_control_get(struct device *dev,
++		const char *id)
++{
++	return NULL;
++}
++static inline void reset_control_put(struct reset_control *rstc) {}
++
++static inline struct reset_control *devm_reset_control_get(struct device *dev,
++		const char *id)
++{
++	return NULL;
++}
++
++static inline int device_reset(struct device *dev)
++{
++	return 0;
++}
++
++#endif
++
+ #endif
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+1.8.5.2
