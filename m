@@ -1,53 +1,38 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 10 Jan 2014 14:37:40 +0200
-Subject: [PATCHv5][ 1/5] fbdev: Add the lacking FB_SYNC_* for matching
- the DISPLAY_FLAGS_*
-In-Reply-To: <1383915693-9422-1-git-send-email-denis@eukrea.com>
-References: <1383915693-9422-1-git-send-email-denis@eukrea.com>
-Message-ID: <52CFE994.8070701@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 10 Jan 2014 12:40:14 +0000
+Subject: [PATCH v2 1/2] spi:fsl-dspi:add support of DSPI IP in big endian
+In-Reply-To: <e9c8019df2cf4d76ae2b77c5d1420050@BL2PR03MB163.namprd03.prod.outlook.com>
+References: <1389161655-21856-1-git-send-email-b44548@freescale.com>
+ <20140109175208.GK12858@sirena.org.uk>
+ <e9c8019df2cf4d76ae2b77c5d1420050@BL2PR03MB163.namprd03.prod.outlook.com>
+Message-ID: <20140110124014.GI29039@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-11-08 15:01, Denis Carikli wrote:
-> Without that fix, drivers using the fb_videomode_from_videomode
->   function will not be able to get certain information because
->   some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
+On Fri, Jan 10, 2014 at 08:11:33AM +0000, Chao Fu wrote:
 
-> diff --git a/include/linux/fb.h b/include/linux/fb.h
-> index ffac70a..cf2ad5d 100644
-> --- a/include/linux/fb.h
-> +++ b/include/linux/fb.h
-> @@ -45,6 +45,9 @@ struct device_node;
->  #define FB_SIGNAL_SYNC_ON_GREEN	8
->  #define FB_SIGNAL_SERRATION_ON	16
->  
-> +#define FB_SYNC_DE_HIGH_ACT     64      /* data enable active high flag */
-> +#define FB_SYNC_PIXDAT_HIGH_ACT 128     /* drive data on positive edge */
-> +
->  #define FB_MISC_PRIM_COLOR	1
->  #define FB_MISC_1ST_DETAIL	2	/* First Detailed Timing is preferred */
->  struct fb_chroma {
+> [Chao Fu] Our CPUs are working on only ARM architecture. But DSPI have two endianness 
+> In different series CPU, so we use __raw_read that do not take of endianness.
+> We need observe ARM io methods  make sure avoid instructions executing reorder .
+> ARM IO methods :
+> #define readb(c)                ({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+> #define readw(c)                ({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+> #define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+> 
+> #define writeb(v,c)             ({ __iowmb(); writeb_relaxed(v,c); })
+> #define writew(v,c)             ({ __iowmb(); writew_relaxed(v,c); })
+> #define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
+> 
+> So add barrier here. Could you give some suggestions? Many thanks!
 
-I don't think this is better than the previous version where
-FB_SYNC_DE_HIGH_ACT and FB_SYNC_PIXDAT_HIGH_ACT were in
-include/uapi/linux/fb.h. Now those flag defines are not visible to the
-userspace, but the actual flags are still visible from the var->sync field.
-
-It's true what Russell replied to the previous version, that the
-userspace has no idea how to handle those new flags. But then again, for
-LCDs, the userspace has no idea how to handle, say, hsync polarity either.
-
-In any case, splitting the FB_SYNC_ defines into uapi and
-kernel-internal header files, but still giving the kernel-internal
-values to userspace is surely wrong.
-
- Tomi
-
-
+OK that makes sense, please add comments explaining that this is due to
+the endinaness translation.  Given that people are starting to use big
+endian more it might be sensible to have these factored out into generic
+code but that can wait.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/f2ef0407/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140110/7d8b491e/attachment.sig>
