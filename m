@@ -1,38 +1,131 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 11 Jan 2014 14:31:04 -0500
-Subject: [PATCH v8 3/4] ata: Add APM X-Gene SoC SATA host controller driver
-In-Reply-To: <52D052F9.8050703@redhat.com>
-References: <1389031922-4309-1-git-send-email-lho@apm.com>
- <1389031922-4309-2-git-send-email-lho@apm.com>
- <1389031922-4309-3-git-send-email-lho@apm.com>
- <1389031922-4309-4-git-send-email-lho@apm.com>
- <52D052F9.8050703@redhat.com>
-Message-ID: <20140111193104.GD3257@mtj.dyndns.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 11 Jan 2014 20:42:43 +0100
+Subject: [PATCH RFC 01/10] ARM: s3c64xx: pm: Use name field of
+ generic_pm_domain
+In-Reply-To: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1389469372-17199-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, David.
+This patch removes name field from private s3c64xx_pm_domain struct and
+moves domain name to dedicated field of generic_pm_domain struct.
 
-On Fri, Jan 10, 2014 at 02:07:21PM -0600, David Milburn wrote:
-> Tejun, to avoid some of the interrupt handling code duplication, would
-> it better to have a AHCI_HFLAG_FLUSH and then change
-> 
-> this driver to set flush
-> 
-> hpriv->hpriv.flush = (void *) xgene_ahci_iob_flush;
-> 
-> and then standard code flush when necessary
-> 
-> ahci_handle_port_interrupt
-> 
->        /* board-specific flush before servicing completed cmds */
->        if (hpriv-> flags & AHCI_HFLAG_FLUSH)
->                hpriv->flush(hpriv);
+When at it, beautify the names a bit, since they are used by genpd core
+as message prefixes.
 
-And this would be the only spot that this would be necessary?  If so,
-why not just wrap the interrupt handler?
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ arch/arm/mach-s3c64xx/pm.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-Thanks.
-
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 8cdb824..5238d66 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -35,7 +35,6 @@
+ #include "regs-syscon-power.h"
+ 
+ struct s3c64xx_pm_domain {
+-	char *const name;
+ 	u32 ena;
+ 	u32 pwr_stat;
+ 	struct generic_pm_domain pd;
+@@ -76,7 +75,7 @@ static int s3c64xx_pd_on(struct generic_pm_domain *domain)
+ 		} while (retry--);
+ 
+ 		if (!retry) {
+-			pr_err("Failed to start domain %s\n", pd->name);
++			pr_err("Failed to start domain %s\n", pd->pd.name);
+ 			return -EBUSY;
+ 		}
+ 	}
+@@ -85,78 +84,78 @@ static int s3c64xx_pd_on(struct generic_pm_domain *domain)
+ }
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_irom = {
+-	.name = "IROM",
+ 	.ena = S3C64XX_NORMALCFG_IROM_ON,
+ 	.pd = {
++		.name = "domain_irom",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_etm = {
+-	.name = "ETM",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_ETM_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_ETM,
+ 	.pd = {
++		.name = "domain_etm",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_s = {
+-	.name = "S",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_S_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_S,
+ 	.pd = {
++		.name = "domain_s",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_f = {
+-	.name = "F",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_F_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_F,
+ 	.pd = {
++		.name = "domain_f",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_p = {
+-	.name = "P",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_P_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_P,
+ 	.pd = {
++		.name = "domain_p",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_i = {
+-	.name = "I",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_I_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_I,
+ 	.pd = {
++		.name = "domain_i",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_g = {
+-	.name = "G",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_G_ON,
+ 	.pd = {
++		.name = "domain_g",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
+ };
+ 
+ static struct s3c64xx_pm_domain s3c64xx_pm_v = {
+-	.name = "V",
+ 	.ena = S3C64XX_NORMALCFG_DOMAIN_V_ON,
+ 	.pwr_stat = S3C64XX_BLKPWRSTAT_V,
+ 	.pd = {
++		.name = "domain_v",
+ 		.power_off = s3c64xx_pd_off,
+ 		.power_on = s3c64xx_pd_on,
+ 	},
 -- 
-tejun
+1.8.5.2
