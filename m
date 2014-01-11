@@ -1,103 +1,35 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Sat, 11 Jan 2014 13:05:22 +0000
-Subject: [PATCH v4 3/5] Documentation: arm: add UEFI support documentation
+Date: Sat, 11 Jan 2014 13:05:24 +0000
+Subject: [PATCH v4 5/5] init: efi: arm: enable (U)EFI runtime services on arm
 In-Reply-To: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
 References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1389445524-30623-4-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1389445524-30623-6-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides documentation of the [U]EFI runtime service and
-configuration features for the arm architecture.
-
-Cc: Rob Landley <rob@landley.net>
-Cc: linux-doc at vger.kernel.org
+Since the efi_set_virtual_address_map call has strict init ordering
+requirements, add an explicit hook in the required place.
 
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- Documentation/arm/00-INDEX |    3 +++
- Documentation/arm/uefi.txt |   61 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
- create mode 100644 Documentation/arm/uefi.txt
+ init/main.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
-index 36420e1..b3af704 100644
---- a/Documentation/arm/00-INDEX
-+++ b/Documentation/arm/00-INDEX
-@@ -34,3 +34,6 @@ nwfpe/
- 	- NWFPE floating point emulator documentation
- swp_emulation
- 	- SWP/SWPB emulation handler/logging description
+diff --git a/init/main.c b/init/main.c
+index febc511..1331829 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -905,6 +905,10 @@ static noinline void __init kernel_init_freeable(void)
+ 	smp_prepare_cpus(setup_max_cpus);
+ 
+ 	do_pre_smp_initcalls();
 +
-+uefi.txt
-+	- [U]EFI configuration and runtime services documentation
-diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-new file mode 100644
-index 0000000..04da9ce
---- /dev/null
-+++ b/Documentation/arm/uefi.txt
-@@ -0,0 +1,61 @@
-+UEFI, the Unified Extensible Firmware Interface, is a specification
-+governing the behaviours of compatible firmware interfaces. It is
-+maintained by the UEFI Forum - http://www.uefi.org/.
++	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
++		efi_enter_virtual_mode();
 +
-+UEFI is an evolution of its predecessor 'EFI', so the terms EFI and
-+UEFI are used somewhat interchangeably in this document and associated
-+source code. As a rule, anything new uses 'UEFI', whereas 'EFI' refers
-+to legacy code or specifications.
-+
-+UEFI support in Linux
-+=====================
-+Booting on a platform with firmware compliant with the UEFI specification
-+makes it possible for the kernel to support additional features:
-+- UEFI Runtime Services
-+- Retrieving various configuration information through the standardised
-+  interface of UEFI configuration tables. (ACPI, SMBIOS, ...)
-+
-+For actually enabling [U]EFI support, enable:
-+- CONFIG_EFI=y
-+- CONFIG_EFI_VARS=y or m
-+
-+The implementation depends on receiving information about the UEFI environment
-+in a Flattened Device Tree (FDT) - so is only available with CONFIG_OF.
-+
-+UEFI stub
-+=========
-+The "stub" is a feature that extends the Image/zImage into a valid UEFI
-+PE/COFF executable, including a loader application that makes it possible to
-+load the kernel directly from the UEFI shell, boot menu, or one of the
-+lightweight bootloaders like Gummiboot or rEFInd.
-+
-+The kernel image built with stub support remains a valid kernel image for
-+booting in non-UEFI environments.
-+
-+UEFI kernel support on ARM
-+==========================
-+UEFI kernel support on the ARM architectures (arm and arm64) is only available
-+when boot is performed through the stub.
-+
-+The stub populates the FDT /chosen node with (and the kernel scans for) the
-+following parameters:
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-+--------------------------------------------------------------------------------
-+linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
-+                          |        | populated by the UEFI GetMemoryMap() call.
-+--------------------------------------------------------------------------------
-+linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
-+linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
-+--------------------------------------------------------------------------------
-+
-+For verbose debug messages, specify 'uefi_debug' on the kernel command line.
+ 	lockup_detector_init();
+ 
+ 	smp_init();
 -- 
 1.7.10.4
