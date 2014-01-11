@@ -1,27 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Jan 2014 16:13:42 +0000
-Subject: [PATCH REPOST] ARM: Fix regression in IXP4xx network drivers
- DMA masks.
-In-Reply-To: <m3d2k4x5vo.fsf@t19.piap.pl>
-References: <m338l6vldf.fsf@t19.piap.pl> <m3d2k4x5vo.fsf@t19.piap.pl>
-Message-ID: <20140111161342.GM15937@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 11 Jan 2014 14:16:16 -0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Select CONFIG_AT803X_PHY
+Message-ID: <1389456976-5110-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 08:33:15PM +0100, Krzysztof Ha?asa wrote:
-> Russell et al.,
-> 
-> anything wrong with this fix?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Well, I don't understand why moving this code around fixes a problem.
-After all, if PCI is enabled, then presumably common-pci.c will always
-be built and run - it has to be for the PCI bus to be probed.
+Select CONFIG_AT803X_PHY so that we can boot hummingboard via NFS.
 
-Oh, are you trying to use the platform notify callback to set the
-DMA mask on statically defined platform devices?  No, don't do that,
-initialise it in the declarations instead.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e2c0734..7a48a00 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -114,6 +114,7 @@ CONFIG_R8169=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_TI_CPSW=y
++CONFIG_AT803X_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.1.2
