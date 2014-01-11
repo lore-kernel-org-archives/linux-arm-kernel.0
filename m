@@ -1,85 +1,40 @@
-From: wigyori@uid0.hu (Zoltan HERPAI)
-Date: Sat, 11 Jan 2014 16:54:52 +0100 (CET)
-Subject: [PATCH] ARM: sun4i: dt: Add basic board support for LinkSprite pcDuino
-Message-ID: <alpine.DEB.2.02.1401111509430.13932@trabant.deployis.eu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Jan 2014 15:59:00 +0000
+Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <20140110192032.GQ19878@titan.lakedaemon.net>
+References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
+ <20131228170114.GH19878@titan.lakedaemon.net>
+ <20140102194924.GA3321@obsidianresearch.com>
+ <1388702192.16958.54.camel@hastur.hellion.org.uk>
+ <20140102230832.GB9339@obsidianresearch.com>
+ <20140110192032.GQ19878@titan.lakedaemon.net>
+Message-ID: <20140111155900.GL15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will add a basic board support DT for the
-LinkSprite pcDuino.
+On Fri, Jan 10, 2014 at 02:20:32PM -0500, Jason Cooper wrote:
+> I'm of the opinion that the kernel shouldn't assume the state of the
+> system when it begins execution.
 
-Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
----
-  arch/arm/boot/dts/Makefile              |    1 +
-  arch/arm/boot/dts/sun4i-a10-pcduino.dts |   48 +++++++++++++++++++++++++++++++
-  2 files changed, 49 insertions(+), 0 deletions(-)
-  create mode 100644 arch/arm/boot/dts/sun4i-a10-pcduino.dts
+Rubbish.  The kernel's requirements are well documented, and have been for
+years.  The reason we've documented it is because it _matters_, and it's
+hard to sort out this crap before the kernel starts.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b663ed7..a2e3620 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -253,6 +253,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
-  	sun4i-a10-cubieboard.dtb \
-  	sun4i-a10-mini-xplus.dtb \
-  	sun4i-a10-hackberry.dtb \
-+	sun4i-a10-pcduino.dtb \
-  	sun5i-a10s-olinuxino-micro.dtb \
-  	sun5i-a13-olinuxino.dtb \
-  	sun5i-a13-olinuxino-micro.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-new file mode 100644
-index 0000000..752f002
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-@@ -0,0 +1,48 @@
-+/*
-+ * Copyright 2014 Zoltan HERPAI
-+ * Zoltan HERPAI <wigyori@uid0.hu>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun4i-a10.dtsi"
-+
-+/ {
-+	model = "LinkSprite pcDuino";
-+	compatible = "pcduino,a10-pcduino", "allwinner,sun4i-a10";
-+
-+	soc at 01c00000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy1>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+};
+Think about it - think about how many different L2 caches there are out
+there.
+
+Think about how difficult it is to locate the L2 cache controller when
+you don't know what platform you're running on.
+
+Think about how difficult it is to disable the L2 cache.
+
+Think about how difficult it is to flush the L2 cache, when you don't
+know what sort it is, where it's located, or what instructions to use
+to do that.
+
+The kernel cares about its boot environment beacuse of these issues.
+
 -- 
-1.7.0.4
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
