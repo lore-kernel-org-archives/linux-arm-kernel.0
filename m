@@ -1,41 +1,76 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 11 Jan 2014 13:27:36 +0800
-Subject: [PATCH v2] clk: sirf: re-arch to make the codes support both
- prima2 and atlas6
-In-Reply-To: <1388986699-6470-1-git-send-email-21cnbao@gmail.com>
-References: <1388986699-6470-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAGsJ_4wxBak6aL-G_YsGe7_r1yaH927_jUvGeBBdfaSZ0HaYag@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 11 Jan 2014 10:54:19 +0400
+Subject: [PATCH] ARM: dts: i.MX51: Switch to use standard definitions for
+ input subsystem
+Message-ID: <1389423259-28870-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/6 Barry Song <21cnbao@gmail.com>:
-> From: Barry Song <Baohua.Song@csr.com>
->
-> sirfprima2 and sirfatlas6 are two different SoCs in CSR SiRF series. for
-> prima2 and atlas6, there are many shared clocks but there are still
-> some different register layout and hardware clocks, then result in
-> different clock table.
->
-> here we re-arch the driver to
-> 1. clk-common.c provides common clocks for prima2 and atlas6,
-> 2. clk-prima2.h describles registers of prima2 and clk-prima2.c provides
-> prima2 specific clocks and clock table.
-> 3. clk-atlas6.h describles registers of atlas6 and clk-atlas6.c provides
-> atlas6 specific clocks and clock table.
-> 4. clk.h and clk.c expose external interfaces and provide uniform entry
-> for both prima2 and atlas6.
->
-> so both prima2 and atlas6 will get support by drivers/clk/sirf.
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-> ---
->  -v2:
->  rebase to 3.13-rc;
->  use CLK_OF_DECLARE and make init function static
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 34 ++++++++++++++++++----------------
+ arch/arm/boot/dts/imx51.dtsi        |  3 ++-
+ 2 files changed, 20 insertions(+), 17 deletions(-)
 
-Hi Mike,
-any feedback for this? i sent v1 some time ago and didn't get your
-answer. and here it has been v2.
-
--barry
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 483178a..587ee58 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -388,21 +388,23 @@
+ &kpp {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_kpp>;
+-	linux,keymap = <0x00000067	/* KEY_UP */
+-			0x0001006c	/* KEY_DOWN */
+-			0x00020072	/* KEY_VOLUMEDOWN */
+-			0x00030066	/* KEY_HOME */
+-			0x0100006a	/* KEY_RIGHT */
+-			0x01010069	/* KEY_LEFT */
+-			0x0102001c	/* KEY_ENTER */
+-			0x01030073	/* KEY_VOLUMEUP */
+-			0x02000040	/* KEY_F6 */
+-			0x02010042	/* KEY_F8 */
+-			0x02020043	/* KEY_F9 */
+-			0x02030044	/* KEY_F10 */
+-			0x0300003b	/* KEY_F1 */
+-			0x0301003c	/* KEY_F2 */
+-			0x0302003d	/* KEY_F3 */
+-			0x03030074>;	/* KEY_POWER */
++	linux,keymap = <
++		MATRIX_KEY(0, 0, KEY_UP)
++		MATRIX_KEY(0, 1, KEY_DOWN)
++		MATRIX_KEY(0, 2, KEY_VOLUMEDOWN)
++		MATRIX_KEY(0, 3, KEY_HOME)
++		MATRIX_KEY(1, 0, KEY_RIGHT)
++		MATRIX_KEY(1, 1, KEY_LEFT)
++		MATRIX_KEY(1, 2, KEY_ENTER)
++		MATRIX_KEY(1, 3, KEY_VOLUMEUP)
++		MATRIX_KEY(2, 0, KEY_F6)
++		MATRIX_KEY(2, 1, KEY_F8)
++		MATRIX_KEY(2, 2, KEY_F9)
++		MATRIX_KEY(2, 3, KEY_F10)
++		MATRIX_KEY(3, 0, KEY_F1)
++		MATRIX_KEY(3, 1, KEY_F2)
++		MATRIX_KEY(3, 2, KEY_F3)
++		MATRIX_KEY(3, 3, KEY_POWER)
++		>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 61a2552..bced7bc 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -12,9 +12,10 @@
+ 
+ #include "skeleton.dtsi"
+ #include "imx51-pingrp.h"
+-#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/imx5-clock.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+ 	aliases {
+-- 
+1.8.3.2
