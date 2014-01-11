@@ -1,55 +1,45 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 11 Jan 2014 20:42:49 +0100
-Subject: [PATCH RFC 07/10] ARM: s3c64xx: dt: Enable SoC-level power management
+Date: Sat, 11 Jan 2014 20:52:17 +0100
+Subject: [PATCH RFC 00/10] Generic Device Tree based power domain look-up
 In-Reply-To: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
 References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1389469372-17199-8-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1743034.81eWccWixG@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds call to s3c64xx_pm_init() from init_machine() callback
-of mach-s3c64xx-dt to enable SoC-level power management features, such
-as power domain management and sleep support.
+On Saturday 11 of January 2014 20:42:42 Tomasz Figa wrote:
+> Up till now there was no single generic method to bind devices to their
+> power domains using Device Tree. Each platform has been doing this using
+> its own way, example of which are Exynos power domain bindings [1] and
+> look-up code [2].
+> 
+> This series is intended to change this and provide generic DT bindings for
+> power domain specification and generic code performing look-up of power
+> domains and binding them to devices.
+> 
+> Patches 1, 2, 3 are not directly related to this series, but they are
+> dependencies of further patches making mach-s3c64xx a user of introduced
+> code. Patch 4 is the most important part of this series, as it's the one
+> introducing $subject. Further patches are fixing and adding two users,
+> mach-exynos (removing the legacy code) and mach-s3c64xx (no DT support for
+> power domains before). Last two patches are adding display support for
+> Mini6410 board, including a node for display controller (FIMD) which is
+> a power domain consumer.
+> 
+> Successfully tested on S3C6410-based Mini6410 board.
+> 
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I left the references for the end of this cover letter and finally forgot
+about them. Please accept my apologies ;).
 
-diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-index 2fddf38..45a4ddc 100644
---- a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-+++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-@@ -15,6 +15,7 @@
- #include <asm/system_misc.h>
- 
- #include <plat/cpu.h>
-+#include <plat/pm.h>
- #include <plat/watchdog-reset.h>
- 
- #include <mach/map.h>
-@@ -49,9 +50,15 @@ static void __init s3c64xx_dt_map_io(void)
- static void __init s3c64xx_dt_init_machine(void)
- {
- 	samsung_wdt_reset_of_init();
-+	s3c64xx_pm_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-+static void __init s3c64xx_dt_init_late(void)
-+{
-+	s3c64xx_pm_late_initcall();
-+}
-+
- static void s3c64xx_dt_restart(enum reboot_mode mode, const char *cmd)
- {
- 	if (mode != REBOOT_SOFT)
-@@ -72,5 +79,6 @@ DT_MACHINE_START(S3C6400_DT, "Samsung S3C64xx (Flattened Device Tree)")
- 	.dt_compat	= s3c64xx_dt_compat,
- 	.map_io		= s3c64xx_dt_map_io,
- 	.init_machine	= s3c64xx_dt_init_machine,
-+	.init_late	= s3c64xx_dt_init_late,
- 	.restart        = s3c64xx_dt_restart,
- MACHINE_END
--- 
-1.8.5.2
+[1] Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+[2] arch/arm/mach-exynos/pm_domains.c
+
+Also it might be good to mention that I was heavily inspired by
+implementation of clock providers in Common Clock Framework in case of
+provider registration and look-up and also by my Exynos power domain
+implementation (now removed by this series ;)) in case of code binding
+devices to power domains.
+
+Best regards,
+Tomasz
