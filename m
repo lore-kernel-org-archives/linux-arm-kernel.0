@@ -1,64 +1,45 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 11 Jan 2014 22:39:00 +0100
-Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
-Message-ID: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+Date: Sat, 11 Jan 2014 22:39:06 +0100
+Subject: [PATCH 6/6] mmc: sdhci-s3c: Do not allow frequencies higher than
+ requested
+In-Reply-To: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1389476346-20396-7-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms prior to Exynos the SDHCI block used internal clock
-divider controlled by SELFREQ field of CLKCON register to divide base
-clock selected from several external clocks fed to the block by
-SELBASECLK bitfield of CONTROL2 register. Depending on wanted clock
-frequency, different external clock may be the best choice and so
-the driver needs to switch the SELBASECLK mux on the fly.
+This patch modifies sdhci_s3c_consider_clock() to fail if bus clock
+being considered can not provide frequency lower or equal requested,
+instead of returning the lowest supported.
 
-However the selection logic has been broken for quite some time leaving
-the controller using always clock 0, which is not always the right
-source and leading to suboptimal performance of the SDHCI block on
-affected platforms.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/mmc/host/sdhci-s3c.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-This series intends to fix the problems mentioned above and also clean-up
-clock management code slightly.
-
-Tested on S3C6410-based Mini6410 board, with following performance
-figures:
-
-* Before this series (133 MHz HCLK always selected, leading to at most
-  33 MHz card clock):
-
-root at tiny6410:~# hdparm -t /dev/mmcblk0
-
-/dev/mmcblk0:
- Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
-root at tiny6410:~# hdparm -t /dev/mmcblk0
-
-/dev/mmcblk0:
- Timing buffered disk reads:  44 MB in  3.11 seconds =  14.14 MB/sec
-root at tiny6410:~#
-
-* After this series (48 MHz EPLL clock selected, leading to 48 MHz card
-  clock):
-
-root at tiny6410:~# hdparm -t /dev/mmcblk0 
-
-/dev/mmcblk0:
- Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
-root at tiny6410:~# hdparm -t /dev/mmcblk0
-
-/dev/mmcblk0:
- Timing buffered disk reads:  60 MB in  3.06 seconds =  19.63 MB/sec
-root at tiny6410:~#
-
-Tomasz Figa (6):
-  mmc: sdhci-s3c: Use shifts to divide by powers of two
-  mmc: sdhci-s3c: Cache bus clock rates
-  mmc: sdhci-s3c: Use correct condition to check for clock presence
-  mmc: sdhci-s3c: Simplify min/max clock calculation
-  mmc: sdhci-s3c: Fix handling of bus clock switching
-  mmc: sdhci-s3c: Do not allow frequencies higher than requested
-
- drivers/mmc/host/sdhci-s3c.c | 170 ++++++++++++++++++++-----------------------
- 1 file changed, 77 insertions(+), 93 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index bad0e00..d61eb5a 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -126,11 +126,18 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
+ 
+ 	rate = ourhost->clk_rates[src];
+ 
+-	for (shift = 0; shift < 8; ++shift) {
++	for (shift = 0; shift <= 8; ++shift) {
+ 		if ((rate >> shift) <= wanted)
+ 			break;
+ 	}
+ 
++	if (shift > 8) {
++		dev_dbg(&ourhost->pdev->dev,
++			"clk %d: rate %ld, min rate %lu > wanted %u\n",
++			src, rate, rate / 256, wanted);
++		return UINT_MAX;
++	}
++
+ 	dev_dbg(&ourhost->pdev->dev, "clk %d: rate %ld, want %d, got %ld\n",
+ 		src, rate, wanted, rate >> shift);
+ 
 -- 
 1.8.5.2
