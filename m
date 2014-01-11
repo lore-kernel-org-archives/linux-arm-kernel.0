@@ -1,55 +1,52 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 11 Jan 2014 22:39:01 +0100
-Subject: [PATCH 1/6] mmc: sdhci-s3c: Use shifts to divide by powers of two
+Date: Sat, 11 Jan 2014 22:39:03 +0100
+Subject: [PATCH 3/6] mmc: sdhci-s3c: Use correct condition to check for clock
+ presence
 In-Reply-To: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
 References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1389476346-20396-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1389476346-20396-4-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current implementation of sdhci_s3c_consider_clock() is highly
-inefficient due to multiple integer divisions by variable performed in a
-loop. Since only divisors that are powers of two are considered, this
-patch replaces them with respective shifts, removing all the integer
-divisions.
+IS_ERR() must be used to make sure that not a valid clock was returned
+by clk_get() and company.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/mmc/host/sdhci-s3c.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/mmc/host/sdhci-s3c.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 6debda9..52770d5 100644
+index 9b78391..7fde938 100644
 --- a/drivers/mmc/host/sdhci-s3c.c
 +++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -144,7 +144,7 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
- {
- 	unsigned long rate;
+@@ -147,7 +147,7 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
  	struct clk *clksrc = ourhost->clk_bus[src];
--	int div;
-+	int shift;
+ 	int shift;
  
- 	if (!clksrc)
+-	if (!clksrc)
++	if (IS_ERR(clksrc))
  		return UINT_MAX;
-@@ -160,15 +160,15 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
  
- 	rate = clk_get_rate(clksrc);
+ 	/*
+@@ -567,16 +567,14 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(sc->clk_io);
  
--	for (div = 1; div < 256; div *= 2) {
--		if ((rate / div) <= wanted)
-+	for (shift = 0; shift < 8; ++shift) {
-+		if ((rate >> shift) <= wanted)
- 			break;
- 	}
+ 	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
+-		struct clk *clk;
+ 		char name[14];
  
- 	dev_dbg(&ourhost->pdev->dev, "clk %d: rate %ld, want %d, got %ld\n",
--		src, rate, wanted, rate / div);
-+		src, rate, wanted, rate >> shift);
+ 		snprintf(name, 14, "mmc_busclk.%d", ptr);
+-		clk = devm_clk_get(dev, name);
+-		if (IS_ERR(clk))
++		sc->clk_bus[ptr] = devm_clk_get(dev, name);
++		if (IS_ERR(sc->clk_bus[ptr]))
+ 			continue;
  
--	return wanted - (rate / div);
-+	return wanted - (rate >> shift);
- }
+ 		clks++;
+-		sc->clk_bus[ptr] = clk;
  
- /**
+ 		/*
+ 		 * save current clock index to know which clock bus
 -- 
 1.8.5.2
