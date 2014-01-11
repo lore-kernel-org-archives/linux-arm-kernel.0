@@ -1,32 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Jan 2014 14:15:28 +0100
-Subject: DT include files
-In-Reply-To: <20140111031214.GK21717@S2101-09.ap.freescale.net>
-References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <CAOesGMhP5t=QHj7TdDY9Nq+=WHeQXv1V0n9TGmmEnqSG9SaFKg@mail.gmail.com>
- <20140111031214.GK21717@S2101-09.ap.freescale.net>
-Message-ID: <201401111415.29395.arnd@arndb.de>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Sat, 11 Jan 2014 15:28:08 +0200
+Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EDB141E@DBDE04.ent.ti.com>
+References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
+ <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+ <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
+ <52CE5123.9050702@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EDB141E@DBDE04.ent.ti.com>
+Message-ID: <52D146E8.4090105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 January 2014, Shawn Guo wrote:
-> While I agree such macro usage should be avoided or limited, it really
-> helps IMX pinctrl case to improve the readability and make the handwriting
-> of these pinctrl entries less error prone.  Isn't it the whole point of
-> introducing macro support for DTC?
+On 09.01.2014 10:08, Hiremath, Vaibhav wrote:
 
-The macros are useful for all cases where the binding defines an
-arbitrary number space, e.g. for the interrupt flags or when a
-clock or pin controller provides a set of pins/clocks that don't
-already have a number assigned to them. In this case, the header
-file can be shared between the dts and kernel source files to ensure
-that they are talking about the same things.
+>
+> No, that's what is causing issue to me. Can you try predefined address flow?
+>
+> Thanks,
+> Vaibhav
+>
 
-However, I don't like to see uses of such macros where the definition
-is done to match a hardware constant (bit number, register index, etc),
-like in the recently posted eDMA driver case. Here the macro /reduces/
-readability of the dts source IMHO, because you cannot easily check
-the dts file against the data sheet without cross-referencing the
-header file as well.
+Booting Linux on physical CPU 0x0
+Initializing cgroup subsys cpu
+Linux version 3.13.0-rc7+ (maemo at maemo-desktop) (gcc version 4.7.2 
+20120701 (prerelease) (Linaro GCC 4.7-2012.07) ) #24 PREEMPT Sat Jan 11 
+17:06:39 EET 2014
+CPU: ARMv7 Processor [411fc083] revision 3 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
+Machine: Nokia RX-51 board
+omapfb: reserved 0x00800000 bytes at 0x8f100000
+Memory policy: Data cache writeback
+On node 0 totalpages: 61696
+free_area_init_node: node 0, pgdat c05b73b4, node_mem_map c061b000
+   Normal zone: 512 pages used for memmap
+   Normal zone: 0 pages reserved
+   Normal zone: 61696 pages, LIFO batch:15
+CPU: All CPU(s) started in SVC mode.
+OMAP3430/3530 ES3.1 (l2cache iva sgx neon isp )
+pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
+pcpu-alloc: [0] 0
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 61184
+Kernel command line: init=/sbin/preinit ubi.mtd=rootfs root=ubi0:rootfs 
+rootfstype=ubifs rootflags=bulk_read,no_chk_data_crc rw 
+mtdoops.mtddev=log console=tty0 console=ttyO2 omapfb_vram=8M at 0x8F100000 
+omapfb.mode=lcd:848x480-16
 
-	Arnd
+
+There are no (UNDERFLOW) errors on OMAP3 when predefined address is 
+used, I am still able to play every video I try.
+
+Ivo
