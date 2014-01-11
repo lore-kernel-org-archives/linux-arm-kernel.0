@@ -1,70 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Jan 2014 11:40:04 +0000
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140111113119.GC2400@pengutronix.de>
-References: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
- <20140110151123.GG15937@n2100.arm.linux.org.uk>
- <20140110153530.GA770@kroah.com> <20140110183021.GZ2400@pengutronix.de>
- <20140110204259.GC10235@kroah.com>
- <20140110232336.GI15937@n2100.arm.linux.org.uk>
- <20140111113119.GC2400@pengutronix.de>
-Message-ID: <20140111114004.GJ15937@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 11 Jan 2014 13:55:05 +0100
+Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for
+ i.MX27/i.MX31 CPUs
+In-Reply-To: <1384153756.15403316@f304.i.mail.ru>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <1384148852.19743495@f117.i.mail.ru>
+ <528074C2.9070707@gtsys.com.hk>
+ <1384153756.15403316@f304.i.mail.ru>
+Message-ID: <20140111125505.GA24479@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 11, 2014 at 12:31:19PM +0100, Robert Schwebel wrote:
-> On Fri, Jan 10, 2014 at 11:23:37PM +0000, Russell King - ARM Linux wrote:
-> > We do this in DT by providing a "superdevice" node which specifies
-> > the components, eg:
-> > 
-> > 	imx-drm {
-> > 		compatible = "fsl,drm";
-> > 		crtcs = <&ipu1>;
-> > 		connectors = <&hdmi>;
-> > 	};
+On Mon, Nov 11, 2013 at 11:09:16AM +0400, Alexander Shiyan wrote:
+> Hello.
 > 
-> Saschas comment from 20140109074030.GN6750 at pengutronix.de isn't
-> addressed yet:
-
-This is not a comment against _this_ patch.  It was a question for Sean
-Paul.  You can tell this by the contents of the To: and Cc: headers on
-Sascha's email.  If that's not what was intended, then the email headers
-are misleading.
-
-> Sascha Hauer wrote:
-> > Can we have an example with a different number of
-> > encoders/connectors/crtcs, like:
-> > 
-> > exynos-drm {
-> >         compatible = "exynos,drm";
-> >         crtcs = <&fimd1>;
-> >         encoders = <&dp1>, <&hdmi1>, <&lvds1>;
-> >         connectors = <&ptn3460>, <&hdmi1>;
-> > };
-> > 
-> > Otherwise I get the impression that there is some topology of the
-> > components or at least relationship between the components encoded
-> > into the binding.
+> > >>>> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
+> > >>>>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+> > >>>>>
+> > >>>>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
+> > >>>>> ---
+> > >>>>>     drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+> > >>>>>     1 file changed, 42 insertions(+)
+> ...
+> > At this point might be good to patch the imx27.dtsi with the usb defines.
+> ...
 > 
-> If I remember correctly, Sascha+Philipp+Lucas still had issues with the
-> bindings, but I'm not sure if they have been already addressed.
+> I have a working configuration for i.MX27 USB, but I prefer to make a few more
+> tests before the addition of definitions in DTS. This will be a next step.
+> Thanks.
+Any news here?
 
-The bindings are not part of this patch.  This patch doesn't even care
-about DT one bit - that's part of the design goal of it.  It doesn't
-care about platform devices either.
-
-All it cares about is maintaining lists of struct device pointers,
-asking the master device(s) whether they have all their components, and
-binding/unbinding the components at the appropriate moment.  It's
-completely up to the master device operations to decide how to make
-these decisions, and how those decisions are made, whether it be by
-looking up in DT, or ACPI, or whatever.
+Best regards
+Uwe
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
