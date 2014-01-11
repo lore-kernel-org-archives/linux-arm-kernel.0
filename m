@@ -1,60 +1,52 @@
-From: dailemon.gl@gmail.com (Lemon Dai)
-Date: Sat, 11 Jan 2014 17:15:58 +0800
-Subject: Add .determine_rate to composite clk
-Message-ID: <CAJiWf8W6rCnnF9Tv+cpcqqshEb4ALD+J_RnYeLkaNVG-Rcd+QA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Sat, 11 Jan 2014 11:54:45 +0200
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140110185305.GN31323@atomide.com>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+ <20140109222322.7168.74522@quantum> <20140110185305.GN31323@atomide.com>
+Message-ID: <52D114E5.7060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 01/10/2014 08:53 PM, Tony Lindgren wrote:
+> * Mike Turquette <mturquette@linaro.org> [140109 14:25]:
+>> Quoting Tero Kristo (2014-01-09 06:00:11)
+>>> Hi,
+>>>
+>>> So, bad luck number release for this, as v12 wasn't sufficient still.
+>>>
+>>> Changes compared to previous version:
+>>> - Dropped any changes to generic clock drivers, as it seems impossible
+>>>    to agree anything in short term, this means the patch set shrank in
+>>>    size from 49 patches to 40 (first 9 patches were dropped).
+>>> - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
+>>>    to drivers/clk/ti, and made the modifications needed to the TI version
+>>>    of the clock drivers only (based on discussions with Mike, this is fine)
+>>> - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
+>>>    with any generic implementation we might have at some point, migrating
+>>>    this to the generic version should be easy enough also.
+>>> - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
+>>>    versions and resulted into an orphan clock node
+>>> - Fixed compile problem for omap5 only build reported by Felipe
+>>> - Fixed a couple of sparse warnings
+>>> - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
+>>>    instead of __raw_readl / __raw_writel
+>>
+>> Hi Tero,
+>>
+>> This approach takes care of all of my concerns with this series. Thanks
+>> for your long suffering patience on it.
+>>
+>> It seems some build errors are cropping up, so once those are fixed then
+>> I'll be happy to merge clk-next-dt-clks-v13 into clk-next for 3.14.
+>
+> I'm fine with Mike merging these all via the clock tree assuming no more
+> pending comments. For the patches changed from the last time around,
+> please feel free to add:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-As .determine_rate was added to struct clk and clk_mux_ops, maybe we
-should also copy determine_rate operation from mux_ops to
-clk_composite_ops in clk_register_composite( ),
-to make composite clk implementation more generic.
+How about the dts data patches? Should these also go via Mike's tree? 
+Otherwise we will have boot failures until the dts patches are merged.
 
-Patch:
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index a33f46f..d224d6e 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -43,6 +43,20 @@ static int clk_composite_set_parent(struct clk_hw
-*hw, u8 index)
-        return mux_ops->set_parent(mux_hw, index);
- }
-
-+static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
-+                               unsigned long *best_parent_rate,
-+                               struct clk **best_parent_p)
-+{
-+       struct clk_composite *composite = to_clk_composite(hw);
-+       const struct clk_ops *mux_ops = composite->mux_ops;
-+       struct clk_hw *mux_hw = composite->mux_hw;
-+
-+       mux_hw->clk = hw->clk;
-+
-+       return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
-+                               best_parent_p);
-+}
-+
- static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
-                                            unsigned long parent_rate)
- {
-@@ -147,6 +161,11 @@ struct clk *clk_register_composite(struct device
-*dev, const char *name,
-                composite->mux_ops = mux_ops;
-                clk_composite_ops->get_parent = clk_composite_get_parent;
-                clk_composite_ops->set_parent = clk_composite_set_parent;
-+
-+               if (mux_ops->determine_rate) {
-+                       clk_composite_ops->determine_rate =
-+                                       clk_composite_determine_rate;
-+               }
-        }
-
-        if (rate_hw && rate_ops) {
-
-
---
-Best regards,
-
-Lemon Dai
+-Tero
