@@ -1,61 +1,66 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 11 Jan 2014 16:29:09 +0000
-Subject: [PATCH] iio: at91: document ADC clock properties
-In-Reply-To: <52B729FD.7020507@kernel.org>
-References: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
- <52B316A9.1060407@atmel.com> <52B729FD.7020507@kernel.org>
-Message-ID: <52D17155.8070009@kernel.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 11 Jan 2014 17:35:23 +0100
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+Message-ID: <CAGhQ9Vz8i2EEG+GgFwXFj3vgeV_Eg0dDfRvKn-XRRVBjwJkDXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/12/13 18:05, Jonathan Cameron wrote:
-> On 12/19/13 15:54, Nicolas Ferre wrote:
->> On 17/12/2013 17:16, Boris BREZILLON :
->>> Document the clock properties required by the at91 ADC driver.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Looks fine to me.  I'm just waiting on an ack from a device tree maintainer
-> (or the 3 weeks to pass so I can pick it up anyway ;)
-That's near enough 3 weeks (one day short) so applied to the togreg branch of iio.git.
-Thanks
+On 9 January 2014 15:00, Tero Kristo <t-kristo@ti.com> wrote:
+> Hi,
 >
->>
->>> ---
->>>   .../devicetree/bindings/arm/atmel-adc.txt          |    5 +++++
->>>   1 file changed, 5 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->>> index d106146..9a1175b 100644
->>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
->>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
->>> @@ -5,6 +5,9 @@ Required properties:
->>>       <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
->>>     - reg: Should contain ADC registers location and length
->>>     - interrupts: Should contain the IRQ line for the ADC
->>> +  - clock-names: tuple listing input clock names.
->>> +	Required elements: "adc_clk", "adc_op_clk".
->>> +  - clocks: phandles to input clocks.
->>>     - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
->>>       device
->>>     - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
->>> @@ -44,6 +47,8 @@ adc0: adc at fffb0000 {
->>>   	compatible = "atmel,at91sam9260-adc";
->>>   	reg = <0xfffb0000 0x100>;
->>>   	interrupts = <20 4>;
->>> +	clocks = <&adc_clk>, <&adc_op_clk>;
->>> +	clock-names = "adc_clk", "adc_op_clk";
->>>   	atmel,adc-channel-base = <0x30>;
->>>   	atmel,adc-channels-used = <0xff>;
->>>   	atmel,adc-drdy-mask = <0x10000>;
->>>
->>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> So, bad luck number release for this, as v12 wasn't sufficient still.
 >
+> Changes compared to previous version:
+> - Dropped any changes to generic clock drivers, as it seems impossible
+>   to agree anything in short term, this means the patch set shrank in
+>   size from 49 patches to 40 (first 9 patches were dropped).
+> - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
+>   to drivers/clk/ti, and made the modifications needed to the TI version
+>   of the clock drivers only (based on discussions with Mike, this is fine)
+> - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
+>   with any generic implementation we might have at some point, migrating
+>   this to the generic version should be easy enough also.
+> - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
+>   versions and resulted into an orphan clock node
+> - Fixed compile problem for omap5 only build reported by Felipe
+> - Fixed a couple of sparse warnings
+> - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
+>   instead of __raw_readl / __raw_writel
+>
+> Testing done:
+> - omap3-beagle: boot / suspend-resume (RET) / suspend-resume (OFF)
+> - omap4-panda-es: boot / suspend-resume (RET)
+> - omap5-uevm: boot
+> - am335x-bone: boot
+> - dra7-evm: boot
+>
+> Maintainer friendly branches also available:
+>
+> tree: https://github.com/t-kristo/linux-pm.git
+>
+> clk driver only (Mike): clk-next-dt-clks-v13
+> DTS data only (Benoit): dts_for_3.14-dt-clks-v13
+> full-branch (Tony/Paul): 3.13-rc7-dt-clks-v13
+
+I tested 3.13-rc7-dt-clks-v13 on top of a next branch I am working on
+with a OMAP4460 and it's working fine.
+
+A couple of things I noticed in the boot log:
+[ 0.000000] ti_dt_clocks_register: failed to lookup clock node bandgap_fclk
+[ 0.000000] smp_twd: clock not found -2
+
+I am get the bandgap_fclk clock lookup fail since it doesn't exist on
+4460 and I guess the bandgap_ts_fclk clock will fail the same way on
+4430. So maybe you need to differentiate between 4460 and 4430 in
+clk-44xx.c to get rid of this warning.
+
+As for the smp_twd clock I assume we can add "clocks =
+<&mpu_periphclk>" to local-timer at 48240600 in omap4.dtsi to get rid of
+the warning. I can cook up a patch here if it is the right thing to
+do.
+I think the smp_twd warning existed before I applied this patch set.
+
+regards
+Joachim Eastwood
