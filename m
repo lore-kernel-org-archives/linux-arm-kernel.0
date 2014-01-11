@@ -1,42 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Jan 2014 14:06:52 +0100
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <CACoXjckkovQdB5Pk3Tn4uGkm5+HuEfWYb6E1MiUOPpuZ2b7qNA@mail.gmail.com>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <201401071635.02006.arnd@arndb.de>
- <CACoXjckkovQdB5Pk3Tn4uGkm5+HuEfWYb6E1MiUOPpuZ2b7qNA@mail.gmail.com>
-Message-ID: <201401111406.52935.arnd@arndb.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Sat, 11 Jan 2014 13:05:20 +0000
+Subject: [PATCH v4 1/5] arm: break part of __soft_restart out into separate
+ function
+In-Reply-To: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1389445524-30623-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 January 2014, Tanmay Inamdar wrote:
-> On Tue, Jan 7, 2014 at 7:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 07 January 2014, Tanmay Inamdar wrote:
-> >> On Fri, Jan 3, 2014 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Certain operations can be considered mandatory for any piece of code
+preparing to switch off the MMU. Break this out into separate function
+dmap_prepare().
 
-> >> >
-> >> > Better use an anonymous clock?
-> >>
-> >> Sorry. Can you please elaborate?
-> >
-> > I mean drop the "clock-names" property.
-> >
-> Did you mean clock-names in pcie-clock node or pcie node? I can drop
-> clock-names from pcie clock node. However if I drop clock-names from
-> pcie node, then clk_get call from pcie host driver would result in
-> failure. Right?
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/idmap.h |    1 +
+ arch/arm/kernel/process.c    |   12 +-----------
+ arch/arm/mm/idmap.c          |   15 +++++++++++++++
+ 3 files changed, 17 insertions(+), 11 deletions(-)
 
-I meant drop it from the pcie node, and change the clk_get call
-to pass NULL instead of the name, which will get the handle for
-the only clock provided. You only need clock-names if you have
-more than one clock in the device node and want to identify them.
-
-The pcie-clock node should not have a "clock-names" property at
-all, unless it has a "clocks" property as well and refers to
-its clock parent with it.
-
-I already noticed in another review that the xgene clocks get this
-part wrong and that should be fixed for all those clock provides,
-but it's unrelated to what I was talking about here.
-
-	Arnd
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+index bf863ed..2e914a8 100644
+--- a/arch/arm/include/asm/idmap.h
++++ b/arch/arm/include/asm/idmap.h
+@@ -10,5 +10,6 @@
+ extern pgd_t *idmap_pgd;
+ 
+ void setup_mm_for_reboot(void);
++void idmap_prepare(void);
+ 
+ #endif	/* __ASM_IDMAP_H */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 92f7b15..91b4cec 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -75,17 +75,7 @@ static void __soft_restart(void *addr)
+ {
+ 	phys_reset_t phys_reset;
+ 
+-	/* Take out a flat memory mapping. */
+-	setup_mm_for_reboot();
+-
+-	/* Clean and invalidate caches */
+-	flush_cache_all();
+-
+-	/* Turn off caching */
+-	cpu_proc_fin();
+-
+-	/* Push out any further dirty data, and ensure cache is empty */
+-	flush_cache_all();
++	idmap_prepare();
+ 
+ 	/* Switch to the identity mapping. */
+ 	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 8e0e52e..5c85779 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -122,3 +122,18 @@ void setup_mm_for_reboot(void)
+ 	local_flush_tlb_all();
+ #endif
+ }
++
++void idmap_prepare(void)
++{
++	/* Take out a flat memory mapping. */
++	setup_mm_for_reboot();
++
++	/* Clean and invalidate caches */
++	flush_cache_all();
++
++	/* Turn off caching */
++	cpu_proc_fin();
++
++	/* Push out any further dirty data, and ensure cache is empty */
++	flush_cache_all();
++}
+-- 
+1.7.10.4
