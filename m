@@ -1,47 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Jan 2014 15:49:02 +0000
-Subject: [PATCH] Harden OABI epoll_wait() against trinity
-Message-ID: <20140111154902.GK15937@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 11 Jan 2014 16:52:24 +0100
+Subject: [PATCH] ARM: parameter initrd must override FDT initrd
+In-Reply-To: <2b2c04$57762f@icp-osb-irony-out4.iinet.net.au>
+References: <2b2c04$57762f@icp-osb-irony-out4.iinet.net.au>
+Message-ID: <20140111155224.GP9681@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While running trinity on the OMAP4430 SDP, an issue was noticed with
-the OABI epoll helper causing memory allocation failure warnings.
+On Sat, Jan 11, 2014 at 10:03:58AM +1000, klightspeed at killerwolves.net wrote:
+> The initrd_start and initrd_end as set by FDT was overriding
+> the phys_initrd_start and phys_initrd_size set by the initrd=
+> kernel parameter.  This patch will ignore the initrd_start
+> and initrd_end set earlier if phys_initrd_start and
+> phys_initrd_size (as set by the initrd= parameter) are set.
+> 
+> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
 
-There are two issues here - the first is what happens when a very
-large number of events is passed, but the user address does not allow
-them to be stored.  This is simple to address, since we can just use
-access_ok() to verify that the memory is writable.
+Hi Ben
 
-The second is what happens when the user address is valid, but still
-a large number of events has been passed.  This can still cause
-kmalloc() to fail.  So, let it fail, but without warning, thereby
-causing userspace to be given an ENOMEM error.
+Since this is a fix, it is a good idea to put Fix somewhere in the
+subject.  You should also try to say which patch broke it. Looking at
+the git logs, i think it was 65939301acdb1e593fdb424bd356f0b9bc7ba5be
+"arm: set initrd_start/initrd_end for fdt scan" which came from Rob
+Herring <rob.herring@calxeda.com>. I added Rob to CC.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/sys_oabi-compat.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+	Andrew
 
-diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
-index 3e94811..4e34405 100644
---- a/arch/arm/kernel/sys_oabi-compat.c
-+++ b/arch/arm/kernel/sys_oabi-compat.c
-@@ -277,7 +277,11 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
- 
- 	if (maxevents <= 0 || maxevents > (INT_MAX/sizeof(struct epoll_event)))
- 		return -EINVAL;
--	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
-+
-+	if (!access_ok(VERIFY_WRITE, events, maxevents * sizeof(*events)))
-+		return -EFAULT;
-+
-+	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL | __GFP_NOWARN);
- 	if (!kbuf)
- 		return -ENOMEM;
- 	fs = get_fs();
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> ---
+>  arch/arm/mm/init.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 1f7b19a..819c539 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -345,10 +345,11 @@ void __init arm_memblock_init(struct meminfo *mi,
+>  #endif
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  	/* FDT scan will populate initrd_start */
+> -	if (initrd_start) {
+> +	if (initrd_start && !phys_initrd_size) {
+>  		phys_initrd_start = __virt_to_phys(initrd_start);
+>  		phys_initrd_size = initrd_end - initrd_start;
+>  	}
+> +	initrd_start = initrd_end = 0;
+>  	if (phys_initrd_size &&
+>  	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+>  		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
