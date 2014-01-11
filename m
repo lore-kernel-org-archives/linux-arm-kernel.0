@@ -1,32 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 Jan 2014 19:35:21 +0100
-Subject: [PATCH v2 13/28] drm/i2c: tda998x: use irq for connection status
- and EDID read
-In-Reply-To: <20140111181432.GB15937@n2100.arm.linux.org.uk>
-References: <20140109120412.7697d23c@armhf>
- <20140111181432.GB15937@n2100.arm.linux.org.uk>
-Message-ID: <52D18EE9.5030305@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Jan 2014 18:36:48 +0000
+Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
+ register setting
+In-Reply-To: <20140109120607.6a33bee5@armhf>
+References: <20140109120607.6a33bee5@armhf>
+Message-ID: <20140111183648.GH15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2014 07:14 PM, Russell King - ARM Linux wrote:
-> On Thu, Jan 09, 2014 at 12:04:12PM +0100, Jean-Francois Moine wrote:
->> @@ -1250,6 +1311,39 @@ tda998x_encoder_init(struct i2c_client *client,
->>   		priv->vip_cntrl_2 = video;
->>   	}
->>
->> +	/* install the optional HDMI connect IRQ */
->> +	priv->int_irq = irq_of_parse_and_map(np, 0);
->> +	if (priv->int_irq < 0)
->> +		priv->int_irq = NO_IRQ;
->> +	if (priv->int_irq != NO_IRQ) {
->
-> NAK.  Do not use NO_IRQ.  Use <= 0 instead, or just test against zero for
-> no IRQ.  It would also be nice to offer this facility to non-DT platforms
-> via client->irq.  Not every arch in the Linux kernel uses DT.
+On Thu, Jan 09, 2014 at 12:06:07PM +0100, Jean-Francois Moine wrote:
+> According to the comment, the TBG_CNTRL_0 register must be set at the
+> end of the mode change sequence.
 
-At least for the DT part, I'd suggest to not ask for interrupt directly
-but use a proper gpios property. The can of course be converted to
-priv->int_irq in some tda998x_dt_probe.
+So you believe comments without understanding the history, and you move
+code around due to those.
 
-Sebastian
+No, this is again wrong.  That write to REG_TBG_CNTRL_0 in the sequence
+writing the video information to the chip.  This doesn't encompass the
+HDMI/DVI mode setting nor the audio configuration - the audio configuration
+can change independently of the video setting, and does not require this
+register to be written.
+
+This also brings up a bug in one of your previous patches which I now
+must go back and comment upon.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
