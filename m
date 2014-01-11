@@ -1,90 +1,76 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Fri, 10 Jan 2014 16:12:34 -0800
-Subject: [RFC PATCH 3/3] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <201401071635.02006.arnd@arndb.de>
-References: <1387785725-24262-1-git-send-email-tinamdar@apm.com>
- <201401031049.20932.arnd@arndb.de>
- <CACoXjc=h8W=9jx4d2Y+F9hmgQsuMTgG4080jZGbtddv10OgtMA@mail.gmail.com>
- <201401071635.02006.arnd@arndb.de>
-Message-ID: <CACoXjckkovQdB5Pk3Tn4uGkm5+HuEfWYb6E1MiUOPpuZ2b7qNA@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 10 Jan 2014 17:19:32 -0700
+Subject: [PATCH] ARM: Kirkwood: Add support for Excito Bubba B3
+In-Reply-To: <20140110230248.GO9681@lunn.ch>
+References: <1388247131-19301-1-git-send-email-andrew@lunn.ch>
+ <20131228170114.GH19878@titan.lakedaemon.net>
+ <20140102194924.GA3321@obsidianresearch.com>
+ <1388702192.16958.54.camel@hastur.hellion.org.uk>
+ <20140102230832.GB9339@obsidianresearch.com>
+ <20140110192032.GQ19878@titan.lakedaemon.net>
+ <20140110194437.GJ18269@obsidianresearch.com>
+ <20140110230248.GO9681@lunn.ch>
+Message-ID: <20140111001931.GM18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 7:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 07 January 2014, Tanmay Inamdar wrote:
->> On Fri, Jan 3, 2014 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> +Required properties:
->> >> +- status: Either "ok" or "disabled".
->> >> +- device_type: set to "pci"
->> >> +- compatible: should contain "xgene,pcie" to identify the core.
->> >> +- reg: base addresses and lengths of the pcie controller configuration
->> >> +     space register.
->> >> +- #address-cells: set to <3>
->> >> +- #size-cells: set to <2>
->> >> +- ranges: ranges for the PCI memory, I/O regions, config and MSI regions
->> >> +- #interrupt-cells: set to <1>
->> >> +- interrupt-map-mask and interrupt-map: standard PCI properties
->> >> +     to define the mapping of the PCIe interface to interrupt
->> >> +     numbers.
->> >> +- clocks: from common clock binding: handle to pci clock.
->> >> +- clock-names: from common clock binding. Should be "pcieclk".
->> >> +
->> >
->> > Better use an anonymous clock?
->>
->> Sorry. Can you please elaborate?
->
-> I mean drop the "clock-names" property.
->
-Did you mean clock-names in pcie-clock node or pcie node? I can drop
-clock-names from pcie clock node. However if I drop clock-names from
-pcie node, then clk_get call from pcie host driver would result in
-failure. Right?
+On Sat, Jan 11, 2014 at 12:02:48AM +0100, Andrew Lunn wrote:
+> > > So, I'd prefer to handle this more gracefully.  I don't have much
+> > > experience at the low-level init of the caches, couldn't we enable and
+> > > flush rather than throwing the error?
+> > 
+> > It cannot be solved in cache-feroceon-l2.c.
+> > 
+> > In many cases you won't even get that far:
+> > - It will blow up in head.S when the cache is off: decompressor wrote
+> >   writeback data to into the L2 and uncached fetches see memory
+> >   content prior to decompression
+> > - It will blow up after head.S enables the L1: decompressor wrote
+> >   data into the L2 but the relocation writes done with the L1 off
+> >   made changes to memory that were not captured in the L2.
+> 
+> My impression with booting a lot of times while doing i bisect, was
+> that it got as far as:
+> 
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0x0
+> Linux version 3.13.0-rc1-dirty (lunn at laptop) (gcc version 4.4.5 (Debian 4.4.5-8) ) #7 PREEMPT Fri Jan 3 09:25:07 CST 2014           
+> CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053977
+> CPU: VIVT data cache, VIVT instruction cache
+> Machine: Marvell Kirkwood (Flattened Device Tree), model: QNAP TS219 family
+> Memory policy: ECC disabled, Data cache writeback
+> 
+> every time.
 
->> >> +SoC specific DT Entry:
->> >> +     pcie0: pcie at 1f2b0000 {
->> >> +             status = "disabled";
->> >> +             device_type = "pci";
->> >> +             compatible = "xgene,pcie";
->> >> +             #interrupt-cells = <1>;
->> >> +             #size-cells = <2>;
->> >> +             #address-cells = <3>;
->> >> +             reg = < 0x00 0x1f2b0000 0x0 0x00010000>;
->> >> +             ranges = <0x02000000 0x0 0x00000000 0xe0 0x00000000 0x0 0x10000000 /* mem*/
->> >
->> >
->> > Also, do you support no prefetchable memory?
->>
->> HW has either IO or Memory regions for mapping device's memory space.
->> There is no separate prefetchable memory space.
->
-> Are you sure the memory is non-prefetchable then? I would have expected
-> 0x42000000 rather than 0x02000000, but I could be misremembering it.
->
->> >
->> >> +                       0x00000000 0x0 0xd0000000 0xe0 0xd0000000 0x0 0x00200000 /* cfg */
->> >
->> > config space is not normally in the ranges property, and I think you will need
->> > it in the pcie node itself as a 'reg' property so the code can access it.
->>
->> pcie-designware.c does it that way. I just followed their implementation.
->
-> I don't remember what led to that, it still seems wrong and I can't find anything
-> in the PCI binding for host bridges telling their config space this way.
->
->> >> +             interrupt-map-mask = <0x0 0x0 0x0 0x7>;
->> >> +             interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1>;
->> >
->> > Only one IRQ for all devices?
->>
->> The node represents a port. I believe that Linux framework uses only
->> one of the legacy IRQs per port. Rest all remain unused. Hence I
->> removed them. Please correct me if I am wrong.
->
-> Any PCI device can normally have four interrupts (IntA through IntD), which are
-> traditionally separate pins on a PCI bus, but get emulated on PCIe. While it's
-> not common for any normal device to use more than one IRQ, a bridge device
-> will swizzle these (virtual) IRQ lines, so a device behind the bridge actually
-> gets a different host IRQ.
->
->         Arnd
+It should be deterministic, but 'random' in the sense it is sensitive
+to exactly the data pattern generated by the decompressor and exactly
+the data pattern generated by the relocation writes - so the
+corruption will vary depending on the kernel image content (position
+of the relocations) and also the size of the L2.
+
+You are likely seeing the 2nd failure I predicted, which is a failure
+when a cache line containing a relocation is used, and happened to be
+in the L2.
+
+The first failure would require the kernel image to be smaller than
+the cache or the cache eviction policy to be such that the initial
+part of the decompressed image remains dirty and unevicted in the
+L2.
+
+> It does however seem possible to insert platform specific code soon
+> after it prints:
+> 
+> Machine: Marvell Kirkwood (Flattened Device Tree), model: QNAP TS219 family
+
+So if you attempt to do the flush/disable at this point you are
+relying on the L2 containing no dirty lines that overlap with lines
+that were changed by the relocator while the cache was off.
+
+This is *probably* true in many cases, but it is sktechy, and creates
+a hidden hard to find pitfall. This is basically the same 'probably'
+that enables non-relocated kernels to boot.
+
+Basically, you might get a bootable system, but it is technically
+wrong and has a theoretical hole.
+
+Jason
