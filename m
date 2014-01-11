@@ -1,61 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 11 Jan 2014 15:27:39 -0500 (EST)
-Subject: [PATCH] Harden OABI epoll_wait() against trinity
-In-Reply-To: <20140111154902.GK15937@n2100.arm.linux.org.uk>
-References: <20140111154902.GK15937@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.10.1401111527160.28907@knanqh.ubzr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 11 Jan 2014 22:04:43 +0100
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <1389174517.12612.87.camel@kazak.uk.xensource.com>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <1389174517.12612.87.camel@kazak.uk.xensource.com>
+Message-ID: <20140111210443.GT9681@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jan 2014, Russell King - ARM Linux wrote:
+On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
+> On Mon, 2014-01-06 at 23:49 +0100, Andrew Lunn wrote:
 
-> While running trinity on the OMAP4430 SDP, an issue was noticed with
-> the OABI epoll helper causing memory allocation failure warnings.
-> 
-> There are two issues here - the first is what happens when a very
-> large number of events is passed, but the user address does not allow
-> them to be stored.  This is simple to address, since we can just use
-> access_ok() to verify that the memory is writable.
-> 
-> The second is what happens when the user address is valid, but still
-> a large number of events has been passed.  This can still cause
-> kmalloc() to fail.  So, let it fail, but without warning, thereby
-> causing userspace to be given an ENOMEM error.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Ian
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+I added in the devicetree list and the input list and added my
+thoughts below.
+ 
+> The other issue I spotted is
+> that /dev/input/by-path/platform-gpio-keys-event has
+> become /dev/input/by-path/platform-gpio_keys.3-event. Is it considered
+> valid for a by-path name to change? In particular the 3 here is
+> apparently the node depth in the DTB, which doesn't make much logical
+> sense as a "path" in this context I don't think (I expect it to be some
+> sort of path through the hardware buses, perhaps my expectation is
+> wrong?).
 
+The ts41x-setup.c board file creates the gpio keys platform device
+using the following structure:
 
-> ---
->  arch/arm/kernel/sys_oabi-compat.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
-> index 3e94811..4e34405 100644
-> --- a/arch/arm/kernel/sys_oabi-compat.c
-> +++ b/arch/arm/kernel/sys_oabi-compat.c
-> @@ -277,7 +277,11 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
->  
->  	if (maxevents <= 0 || maxevents > (INT_MAX/sizeof(struct epoll_event)))
->  		return -EINVAL;
-> -	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL);
-> +
-> +	if (!access_ok(VERIFY_WRITE, events, maxevents * sizeof(*events)))
-> +		return -EFAULT;
-> +
-> +	kbuf = kmalloc(sizeof(*kbuf) * maxevents, GFP_KERNEL | __GFP_NOWARN);
->  	if (!kbuf)
->  		return -ENOMEM;
->  	fs = get_fs();
-> 
-> -- 
-> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-> Estimate before purchase was "up to 13.2Mbit".
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+static struct platform_device qnap_ts41x_button_device = {
+        .name           = "gpio-keys",
+        .id             = -1,
+        .num_resources  = 0,
+        .dev            = {
+                .platform_data  = &qnap_ts41x_button_data,
+        }
+};
+
+The id of -1 causes platform_device_add() to set the device name to
+plain "gpio-keys".
+
+When using DT, the device name is created by the function
+of_device_make_bus_id(). It has the following comment:
+
+ * This routine will first try using either the dcr-reg or the reg property
+ * value to derive a unique name.  As a last resort it will use the node
+ * name followed by a unique number.
+
+Since the gpio_keys node does not have a reg properties, it gets a
+unique number appended to it. We end up with the device name
+"gpio_keys.3"
+
+So as it stands, it does not appear i can make the DT system use the
+same device name as a board system.
+
+But i'm also a little bit concerned by the "unique number" and this
+ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
+path supposed to be stable? This unique number is not stable. An
+unwitting change to the DT could cause its value to change. Do we need
+to make it stable?
+
+   Andrew
