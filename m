@@ -1,76 +1,42 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Sat, 11 Jan 2014 09:35:52 +0800
-Subject: LSK merge linux-stable review
-In-Reply-To: <20140110163239.GF925@arm.com>
-References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
- <20140110105615.GD925@arm.com> <52D01234.5040402@linaro.org>
- <20140110163239.GF925@arm.com>
-Message-ID: <52D09FF8.8060308@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 11 Jan 2014 11:12:16 +0800
+Subject: DT include files
+In-Reply-To: <CAOesGMhP5t=QHj7TdDY9Nq+=WHeQXv1V0n9TGmmEnqSG9SaFKg@mail.gmail.com>
+References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
+ <20140103030455.GB25079@S2101-09.ap.freescale.net>
+ <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
+ <20140104011056.GA3282@S2101-09.ap.freescale.net>
+ <20140110024124.GA6844@S2101-09.ap.freescale.net>
+ <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
+ <52CFF57D.8060808@samsung.com>
+ <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
+ <CAOesGMhP5t=QHj7TdDY9Nq+=WHeQXv1V0n9TGmmEnqSG9SaFKg@mail.gmail.com>
+Message-ID: <20140111031214.GK21717@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->>
->> the first column '-/+' means contents was removed/added from file
->> 5e9d274. the 2nd column '-/+' means contents was removed/added from file
->> 9c93e12.
->>
->> Yes, The notify_cpu_starting kept in final file later.
+On Fri, Jan 10, 2014 at 10:37:01AM -0800, Olof Johansson wrote:
+> > On a side note, I'm not really a fan of this pattern:
+> >
+> > #define FOO1 1 2 3
+> >
+> > #define BAR FOO1 FOO2 FOO3
+> >
+> > While it definitely simplifies the dts files, it would never be used
+> > in C and obfuscates what the actual property size is. Reading a dts
+> > file, I would naturally assume the define was a single value while in
+> > fact it could expand to a very large property size.
 > 
-> Just make sure it is in line with commit 7ade67b5984d0a (arm64: move
-> enabling of GIC before CPUs are set online)
-> 
+> Hmm. Shawn?
 
-Give you the part of modified smp.c file here :)
-====
+What I read from Rob is that he does not like it but he does not hate it
+so much either.  And that's probably why I did not get either ACK or
+NACK from him when the usage was firstly introduced :)
 
-        printk("CPU%u: Booted secondary processor\n", cpu);
+While I agree such macro usage should be avoided or limited, it really
+helps IMX pinctrl case to improve the readability and make the handwriting
+of these pinctrl entries less error prone.  Isn't it the whole point of
+introducing macro support for DTC?
 
-        /*
-         * All kernel threads share the same mm context; grab a
-         * reference and switch to it.
-         */
-        atomic_inc(&mm->mm_count);
-        current->active_mm = mm;
-        cpumask_set_cpu(cpu, mm_cpumask(mm));
-
-        /*
-         * TTBR0 is only used for the identity mapping at this stage. Make it
-         * point to zero page to avoid speculatively fetching new entries.
-         */
-        cpu_set_reserved_ttbr0();
-        flush_tlb_all();
-
-        preempt_disable();
-        trace_hardirqs_off();
-
-        if (cpu_ops[cpu]->cpu_postboot)
-                cpu_ops[cpu]->cpu_postboot();
-
-        smp_store_cpu_info(cpu);
-
-        /*
-         * OK, now it's safe to let the boot CPU continue.  Wait for
-         * the CPU migration code to notice that the CPU is online
-         * before we continue.
-         */
-        set_cpu_online(cpu, true);
-        complete(&cpu_running);
-
-        /*
-         * Enable GIC and timers.
-         */
-        notify_cpu_starting(cpu);
-
-        local_irq_enable();
-        local_fiq_enable();
-
-        /*
-         * OK, it's off to the idle thread for us
-         */
-        cpu_startup_entry(CPUHP_ONLINE);
-}
-
--- 
-Thanks
-    Alex
+Shawn
