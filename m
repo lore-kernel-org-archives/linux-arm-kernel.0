@@ -1,41 +1,32 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Sat, 11 Jan 2014 13:05:21 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Jan 2014 14:15:28 +0100
+Subject: DT include files
+In-Reply-To: <20140111031214.GK21717@S2101-09.ap.freescale.net>
+References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <CAOesGMhP5t=QHj7TdDY9Nq+=WHeQXv1V0n9TGmmEnqSG9SaFKg@mail.gmail.com>
+ <20140111031214.GK21717@S2101-09.ap.freescale.net>
+Message-ID: <201401111415.29395.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new macro for setting/clearing bits in the SCTLR.
+On Saturday 11 January 2014, Shawn Guo wrote:
+> While I agree such macro usage should be avoided or limited, it really
+> helps IMX pinctrl case to improve the readability and make the handwriting
+> of these pinctrl entries less error prone.  Isn't it the whole point of
+> introducing macro support for DTC?
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Suggested-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/assembler.h |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+The macros are useful for all cases where the binding defines an
+arbitrary number space, e.g. for the interrupt flags or when a
+clock or pin controller provides a set of pins/clocks that don't
+already have a number assigned to them. In this case, the header
+file can be shared between the dts and kernel source files to ensure
+that they are talking about the same things.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 5c22851..aba6458 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -383,4 +383,17 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
- 
-+#ifdef CONFIG_CPU_CP15
-+/* Macro for setting/clearing bits in sctlr */
-+	.macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
-+	mrc	p15, 0, \tmp, c1, c0, 0
-+	ldr	\tmp2, =\set
-+	orr	\tmp, \tmp, \tmp2
-+	ldr	\tmp2, =\clear
-+	mvn	\tmp2, \tmp2
-+	and	\tmp, \tmp, \tmp2
-+	mcr	p15, 0, \tmp, c1, c0, 0
-+	.endm
-+#endif
-+
- #endif /* __ASM_ASSEMBLER_H__ */
--- 
-1.7.10.4
+However, I don't like to see uses of such macros where the definition
+is done to match a hardware constant (bit number, register index, etc),
+like in the recently posted eDMA driver case. Here the macro /reduces/
+readability of the dts source IMHO, because you cannot easily check
+the dts file against the data sheet without cross-referencing the
+header file as well.
+
+	Arnd
