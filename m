@@ -1,140 +1,309 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 11 Jan 2014 11:23:30 +0800
-Subject: [RFC PATCH v2] staging: imx-hdmi: use rx sense status for plug
- detection if hpd is unreliable
-In-Reply-To: <1389363744-559-1-git-send-email-p.zabel@pengutronix.de>
-References: <1389363744-559-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140111032328.GL21717@S2101-09.ap.freescale.net>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Sat, 11 Jan 2014 10:13:42 +0530
+Subject: [PATCH 2/6] clk: samsung: add infrastructure to register CPU
+ clocks
+In-Reply-To: <20140110142546.1e8583d6@amdc2363>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+ <1389283165-17708-3-git-send-email-thomas.ab@samsung.com>
+ <20140110130407.3390213d@amdc2363>
+ <CAJuA9ah7Owfo7yrZqN+iU6KYEkeoncL4AZ8rEKddNXAu6tC4aQ@mail.gmail.com>
+ <20140110142546.1e8583d6@amdc2363>
+Message-ID: <CAJuA9aiYKb42frkE=2qDzh4Jo_mnFVm3wABJQ-3vn4Uek_AMBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 03:22:24PM +0100, Philipp Zabel wrote:
-> Due to the voltage divider on the HPD line, the HDMI connector on
-> imx6q-sabrelite doesn't reliably detect connected DVI monitors.
-> This patch allows to use the RX_SENSE0 signal as a workaround when
-> enabled by a boolean device tree property 'hpd-unreliable'.
+On Fri, Jan 10, 2014 at 6:55 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Thomas,
+>
+>> Hi Lukasz,
+>>
+>> On Fri, Jan 10, 2014 at 5:34 PM, Lukasz Majewski
+>> <l.majewski@samsung.com> wrote:
+>> > Hi Thomas,
+>> >
+>> >> The CPU clock provider supplies the clock to the CPU clock domain.
+>> >> The composition and organization of the CPU clock provider could
+>> >> vary among Exynos SoCs. A CPU clock provider can be composed of
+>> >> clock mux, dividers and gates. This patch defines a new clock type
+>> >> for CPU clock provider and adds infrastructure to register the CPU
+>> >> clock providers for Samsung platforms.
+>> >>
+>> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> >> ---
+>> >>  drivers/clk/samsung/clk.c |   71
+>> >> +++++++++++++++++++++++++++++++++++++++++++++
+>> >> drivers/clk/samsung/clk.h |   37 +++++++++++++++++++++++- 2 files
+>> >> changed, 107 insertions(+), 1 deletions(-)
+>> >>
+>> >> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+>> >> index f503f32..9ac9056 100644
+>> >> --- a/drivers/clk/samsung/clk.c
+>> >> +++ b/drivers/clk/samsung/clk.c
+>> >> @@ -316,3 +316,74 @@ unsigned long _get_rate(const char *clk_name)
+>> >>
+>> >>       return clk_get_rate(clk);
+>> >>  }
+>> >> +
+>> >> +/*
+>> >> + * On most platform, the core clock rate is equal to the clock
+>> >> rate of
+>> >> + * parent pll. This is a simple helper function to support
+>> >> recalc_rate
+>> >> + * callback for such platforms.
+>> >> + */
+>> >> +unsigned long samsung_core_clock_recalc_rate(struct clk_hw *hw,
+>> >> +                             unsigned long parent_rate)
+>> >> +{
+>> >> +     /*
+>> >> +      * Assuming that the output of the parent pll is the output
+>> >> clock
+>> >> +      * frequency of the core clock.
+>> >> +      */
+>> >> +     return parent_rate;
+>> >> +}
+>> >> +
+>> >> +/* This is a helper function to perform clock rounding for core
+>> >> clocks. */ +long samsung_core_clk_round_rate(struct clk_hw *hw,
+>> >> +                     unsigned long drate, unsigned long *prate)
+>> >> +{
+>> >> +     struct samsung_core_clock *core_clk;
+>> >> +     const struct samsung_core_clock_freq_table *freq_tbl;
+>> >> +     int i;
+>> >> +
+>> >> +     core_clk = container_of(hw, struct samsung_core_clock, hw);
+>> >> +     freq_tbl = core_clk->freq_table;
+>> >> +     drate /= 1000;
+>> >> +
+>> >> +     for (i = 0; i < freq_tbl->freq_count; i++) {
+>> >> +             if (drate >= freq_tbl->freq[i])
+>> >> +                     return freq_tbl->freq[i] * 1000;
+>> >> +     }
+>> >> +     return freq_tbl->freq[i - 1] * 1000;
+>> >> +}
+>> >> +
+>> >> +/* helper function to register a core clock */
+>> >> +void __init samsung_coreclk_register(const char *name, const char
+>> >> **parents,
+>> >> +                     unsigned int num_parents, const char *pllclk,
+>> >> +                     const struct clk_ops *clk_ops, unsigned int
+>> >> lookup_id,
+>> >> +                     const struct samsung_core_clock_freq_table
+>> >> *freq_tbl) +{
+>> >> +     struct samsung_core_clock *coreclk;
+>> >> +     struct clk_init_data init;
+>> >> +     struct clk *clk;
+>> >> +
+>> >> +     coreclk = kzalloc(sizeof(*coreclk), GFP_KERNEL);
+>> >> +     if (!coreclk) {
+>> >> +             pr_err("%s: could not allocate memory for coreclk
+>> >> %s\n",
+>> >> +                                     __func__, name);
+>> >> +             return;
+>> >> +     }
+>> >> +
+>> >> +     init.name = name;
+>> >> +     init.flags = CLK_GET_RATE_NOCACHE;
+>> >> +     init.parent_names = parents;
+>> >> +     init.num_parents = num_parents;
+>> >> +     init.ops = clk_ops;
+>> >> +
+>> >> +     coreclk->hw.init = &init;
+>> >> +     coreclk->ctrl_base = reg_base;
+>> >> +     coreclk->fout_pll = __clk_lookup(pllclk);
+>> >> +     coreclk->freq_table = freq_tbl;
+>> >> +
+>> >> +     clk = clk_register(NULL, &coreclk->hw);
+>> >> +     if (IS_ERR(clk)) {
+>> >> +             pr_err("%s: could not register coreclk %s\n",
+>> >> __func__,     name);
+>> >> +             kfree(coreclk);
+>> >> +             return;
+>> >> +     }
+>> >> +     samsung_clk_add_lookup(clk, lookup_id);
+>> >> +}
+>> >
+>> > I think, that those definitions for samsung_core_clock shall be
+>> > moved to a separate file (maybe clk-exynos-cpu.c)?
+>>
+>> The additions were not really much and the samsung/clk.c file is used
+>> to hold all the common code for Samsung SoCs. So the additions were
+>> put into this existing file itself.
+>>
+>> >
+>> > Moreover, maybe you can choose a shorter name?
+>>
+>> Ok, I will try to find a shorter name for in the next version.
+>>
+>> >
+>> >> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+>> >> index 31b4174..0e43023 100644
+>> >> --- a/drivers/clk/samsung/clk.h
+>> >> +++ b/drivers/clk/samsung/clk.h
+>> >> @@ -312,6 +312,37 @@ struct samsung_pll_clock {
+>> >>       __PLL(_typ, _id, NULL, _name, _pname,
+>> >> CLK_GET_RATE_NOCACHE, \ _lock, _con, _rtable, _alias)
+>> >>
+>> >> +/**
+>> >> + * struct samsung_core_clock_freq_table: table of frequency
+>> >> supported by
+>> >> + * a core clock and associated data if any.
+>> >> + * @freq: points to a table of supported frequencies (in KHz)
+>> >> + * @freq_count: number of entries in the frequency table
+>> >> + * @data: core clock specific data, if any
+>> >> + */
+>> >> +struct samsung_core_clock_freq_table {
+>> >> +     const unsigned long     *freq;       /* in KHz */
+>> >> +     unsigned long           freq_count;
+>> >> +     const void              *data;
+>> >> +};
+>> >
+>> > This is another instance of a structure, which holds the frequency
+>> > for the system (like struct cpufreq_frequency_table).
+>> >
+>> > Unfortunately, since the clk subsystem starts very early, the
+>> > cpufreq_frequency_table is not yet parsed from "operating-points"
+>> > attribute.
+>> >
+>> > Maybe we can defer the clock registration?
+>>
+>> The core clock is not limited to support only those frequencies which
+>> the CPU operating point specifies. The core clock type can be used
+>> independent of the cpufreq driver and hence has its own set of
+>> supported frequencies. The cpufreq driver, depending the operating
+>> points allowed, can request the core clock to setup the requested
+>> clock speed.
+>
+> The above would be true if it could have been possible to use this
+> clock without cpufreq.
+>
+> Since, justification of this whole change is the clean up of cpufreq for
+> Exynos, I assume that it will be only used with cpufreq. Is there any
+> use case to use this clock without cpufreq?
+>
+> For this reason Exynos SoCs can only change frequency to the one, which
+> is defined at cpufreq_frequency_table.
+>
+> And since the cpufreq_frequency_table is dynamically build from
+> operating-points attribute, then in my opinion we shall refer to only
+> one place for frequency.
+>
+> Similar approach - of reusing cpufreq_frequency_table is used at
+> thermal core driver.
 
-If it's a fsl/imx specific property, it should have a 'fsl,' prefix.
-It should be added into binding doc.  Oh, we do not even have a binding
-doc for this imx-hdmi yet.
+One of the reasons for keeping the supported frequencies independent
+of the cpufreq table was ensure that platforms are free to use only a
+subset of the supported clock speed due to certain performance/power
+requirements particular to that platform Two or more platforms based
+on the same SoC can have different power/performance requirements. The
+case of thermal is different, it can only request for the CPU to be
+clocked at speeds supported by the cpufreq driver.
 
-Shawn
+Also, the core clock type is not limited to be used only by the
+cpufreq driver. It should be possible to use a platform without the
+cpufreq driver but still have the flexibility to change the cpu clock
+speed.
 
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> This patch is based on Russell's recent 46-patch imx-drm cleanup series.
-> Changes since v1:
->  - Store the status and polarity bits in struct imx_hdmi
-> ---
->  drivers/staging/imx-drm/imx-hdmi.c | 36 ++++++++++++++++++++++++++----------
->  1 file changed, 26 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-> index fb3177d..62cb531 100644
-> --- a/drivers/staging/imx-drm/imx-hdmi.c
-> +++ b/drivers/staging/imx-drm/imx-hdmi.c
-> @@ -140,6 +140,9 @@ struct imx_hdmi {
->  	struct regmap *regmap;
->  	struct i2c_adapter *ddc;
->  	void __iomem *regs;
-> +	u8 sink_detect_polarity;
-> +	u8 sink_detect_status;
-> +	u8 sink_detect_mask;
->  
->  	unsigned int sample_rate;
->  	int ratio;
-> @@ -1317,10 +1320,10 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
->  		    HDMI_PHY_I2CM_CTLINT_ADDR);
->  
->  	/* enable cable hot plug irq */
-> -	hdmi_writeb(hdmi, (u8)~HDMI_PHY_HPD, HDMI_PHY_MASK0);
-> +	hdmi_writeb(hdmi, hdmi->sink_detect_mask, HDMI_PHY_MASK0);
->  
->  	/* Clear Hotplug interrupts */
-> -	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
-> +	hdmi_writeb(hdmi, hdmi->sink_detect_status, HDMI_IH_PHY_STAT0);
->  
->  	return 0;
->  }
-> @@ -1392,6 +1395,7 @@ static enum drm_connector_status imx_hdmi_connector_detect(struct drm_connector
->  {
->  	struct imx_hdmi *hdmi = container_of(connector, struct imx_hdmi,
->  					     connector);
-> +
->  	return hdmi->connector_status;
->  }
->  
-> @@ -1530,18 +1534,20 @@ static irqreturn_t imx_hdmi_irq(int irq, void *dev_id)
->  
->  	phy_int_pol = hdmi_readb(hdmi, HDMI_PHY_POL0);
->  
-> -	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-> -		if (phy_int_pol & HDMI_PHY_HPD) {
-> +	if (intr_stat & hdmi->sink_detect_status) {
-> +		int pol_bit = hdmi->sink_detect_polarity;
-> +
-> +		if (phy_int_pol & pol_bit) {
->  			dev_dbg(hdmi->dev, "EVENT=plugin\n");
->  
-> -			hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
-> +			hdmi_modb(hdmi, 0, pol_bit, HDMI_PHY_POL0);
->  
->  			hdmi->connector_status = connector_status_connected;
->  			imx_hdmi_poweron(hdmi);
->  		} else {
->  			dev_dbg(hdmi->dev, "EVENT=plugout\n");
->  
-> -			hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD, HDMI_PHY_POL0);
-> +			hdmi_modb(hdmi, pol_bit, pol_bit, HDMI_PHY_POL0);
->  
->  			hdmi->connector_status = connector_status_disconnected;
->  			imx_hdmi_poweroff(hdmi);
-> @@ -1550,7 +1556,7 @@ static irqreturn_t imx_hdmi_irq(int irq, void *dev_id)
->  	}
->  
->  	hdmi_writeb(hdmi, intr_stat, HDMI_IH_PHY_STAT0);
-> -	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
-> +	hdmi_writeb(hdmi, ~hdmi->sink_detect_status, HDMI_IH_MUTE_PHY_STAT0);
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -1702,14 +1708,24 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
->  	 */
->  	hdmi_init_clk_regenerator(hdmi);
->  
-> +	hdmi->sink_detect_status = HDMI_IH_PHY_STAT0_HPD;
-> +	hdmi->sink_detect_polarity = HDMI_PHY_HPD;
-> +	hdmi->sink_detect_mask = ~HDMI_PHY_HPD;
-> +
-> +	if (of_property_read_bool(np, "hpd-unreliable")) {
-> +		hdmi->sink_detect_status = HDMI_IH_PHY_STAT0_RX_SENSE0;
-> +		hdmi->sink_detect_polarity = HDMI_PHY_RX_SENSE0;
-> +		hdmi->sink_detect_mask = ~HDMI_PHY_RX_SENSE0;
-> +	}
-> +
->  	/*
->  	 * Configure registers related to HDMI interrupt
->  	 * generation before registering IRQ.
->  	 */
-> -	hdmi_writeb(hdmi, HDMI_PHY_HPD, HDMI_PHY_POL0);
-> +	hdmi_writeb(hdmi, hdmi->sink_detect_polarity, HDMI_PHY_POL0);
->  
->  	/* Clear Hotplug interrupts */
-> -	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
-> +	hdmi_writeb(hdmi, hdmi->sink_detect_status, HDMI_IH_PHY_STAT0);
->  
->  	ret = imx_hdmi_fb_registered(hdmi);
->  	if (ret)
-> @@ -1720,7 +1736,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
->  		goto err_iahb;
->  
->  	/* Unmute interrupts */
-> -	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
-> +	hdmi_writeb(hdmi, ~hdmi->sink_detect_status, HDMI_IH_MUTE_PHY_STAT0);
->  
->  	ret = snd_dw_hdmi_probe(&hdmi->audio, dev, hdmi->regs, irq, hdmi);
->  	if (ret)
-> -- 
-> 1.8.5.2
-> 
+>
+>>
+>> >
+>> >> +
+>> >> +/**
+>> >> + * struct samsung_core_clock: information about clock supplied to
+>> >> a CPU core.
+>> >> + * @hw: handle between ccf and core clock.
+>> >> + * @ctrl_base: base address of the clock controller.
+>> >> + * @fout_pll: clock handle representing the clock output of the
+>> >> associated PLL.
+>> >> + */
+>> >> +struct samsung_core_clock {
+>> >> +     struct clk_hw           hw;
+>> >> +     void __iomem            *ctrl_base;
+>> >> +     struct clk              *fout_pll;
+>> >> +     const struct samsung_core_clock_freq_table *freq_table;
+>> >> +};
+>> >> +
+>> >> +extern unsigned long samsung_core_clock_recalc_rate(struct clk_hw
+>> >> *hw,
+>> >> +                             unsigned long parent_rate);
+>> >> +extern long samsung_core_clk_round_rate(struct clk_hw *hw,
+>> >> +                     unsigned long drate, unsigned long *prate);
+>> >
+>> > IMHO, those methods shall be defined as static in a separate file.
+>>
+>> These two functions are generic enough to be reused for core clock
+>> implementations on multiple exynos platforms.
+>
+> I thought that you are going to implement this clock in a generic way,
+> so by using the DT we could use it for Exynos4210/4x12 and 5250.
+>
+>> Only the set_rate
+>> callback is the one that will be specific to SoC and core clock. The
+>> SoC specific implementation can reuse these two callback funcitons
+>> when registering the core clock type. That is the reason these are not
+>> static functions. The 3/6 patch of this series includes the usage of
+>> these functions.
+>
+> In my opinion we shall not duplicate per SoC constructs like for
+> example:
+>
+> static struct apll_freq apll_freq_4412[]
+> static struct apll_freq apll_freq_4212[]
+> static struct apll_freq apll_freq_4210[]
+>
+> which would be used at different ->set_rate() callbacks.
+>
+> I think that the best solution would be to use one ->set_rate() with
+> data parsed from DT.
+
+Yes, I agree with you. The ->set_rate() callback code is not going to
+be repeated if the code can be reused for other Exynos SoCs.
+
+And about the values of the registers for set_rate coming in from DT,
+these are SoC specific values and are not different for two or more
+platforms using the same SoC. So why put this into DT? The same was
+the argument about populating all the clocks from DT. Clock blocks are
+not going to change from one platform to another platform which use
+the same SoC. They are SoC specific and not platform specific and
+hence there is little use in putting them into DT.
+
+>
+>>
+>> Thanks,
+>> Thomas.
+>>
+>> >
+>> >> +
+>> >>  extern void __init samsung_clk_init(struct device_node *np, void
+>> >> __iomem *base, unsigned long nr_clks, unsigned long *rdump,
+>> >>               unsigned long nr_rdump, unsigned long *soc_rdump,
+>> >> @@ -337,7 +368,11 @@ extern void __init samsung_clk_register_gate(
+>> >>               struct samsung_gate_clock *clk_list, unsigned int
+>> >> nr_clk); extern void __init samsung_clk_register_pll(struct
+>> >> samsung_pll_clock *pll_list, unsigned int nr_clk, void __iomem
+>> >> *base); -
+>> >> +extern void __init samsung_coreclk_register(const char *coreclk,
+>> >> +             const char **parents, unsigned int num_parents,
+>> >> +             const char *pllclk, const struct clk_ops *clk_ops,
+>> >> +             unsigned int lookup_id,
+>> >> +             const struct samsung_core_clock_freq_table
+>> >> *freq_tbl); extern unsigned long _get_rate(const char *clk_name);
+>> >>
+>> >>  #endif /* __SAMSUNG_CLK_H */
+>> >
+>> >
+>> >
+>> > --
+>> > Best regards,
+>> >
+>> > Lukasz Majewski
+>> >
+>> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+>
+>
+>
+> --
+> Best regards,
+>
+> Lukasz Majewski
+>
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
