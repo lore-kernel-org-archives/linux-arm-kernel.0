@@ -1,54 +1,76 @@
-From: fkan@apm.com (Feng Kan)
-Date: Fri, 10 Jan 2014 17:11:53 -0800
-Subject: [PATCH V2 1/6] Documentation: add dts binding for X-Gene reboot
- dts node.
-In-Reply-To: <20140108100549.GE6701@e106331-lin.cambridge.arm.com>
-References: <1389135041-16062-1-git-send-email-fkan@apm.com>
- <1389135041-16062-2-git-send-email-fkan@apm.com>
- <20140108100549.GE6701@e106331-lin.cambridge.arm.com>
-Message-ID: <CAL85gmCEk3c1qbo978qHssrz0toxbCT3LiTinX5ZZcwg-Q-FnA@mail.gmail.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Sat, 11 Jan 2014 09:35:52 +0800
+Subject: LSK merge linux-stable review
+In-Reply-To: <20140110163239.GF925@arm.com>
+References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
+ <20140110105615.GD925@arm.com> <52D01234.5040402@linaro.org>
+ <20140110163239.GF925@arm.com>
+Message-ID: <52D09FF8.8060308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 2:05 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jan 07, 2014 at 10:50:36PM +0000, Feng Kan wrote:
->> Add X-Gene reboot device tree node documentation.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>  .../devicetree/bindings/arm64/xgene/reboot.txt     |   10 ++++++++++
->>  1 files changed, 10 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm64/xgene/reboot.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm64/xgene/reboot.txt b/Documentation/devicetree/bindings/arm64/xgene/reboot.txt
->> new file mode 100644
->> index 0000000..51d23c1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm64/xgene/reboot.txt
->> @@ -0,0 +1,10 @@
->> +Reboot property to control system reboot on storm platforms:
->> +
->> +The register attribute contain the address of the reset register.
->
-> Required properties:
->
-> - compatible: should contain "apm,xgene-reboot"
->
-> - reg: the base address and size of the reset register.
->
->> +
->> +Example:
->> +
->> +     reboot at 0 {
->> +             compatible = "apm,xgene-reboot";
->> +             reg = <0x0 0x17000014 0x0 0x4>;
->> +     };
->
-> Given this seems to be a 64-bit address, the unit address should
-> preferably be 0,17000014 rather than just 0.
 
-FKAN: Mark, can I keep this as it is to be consistent with the reset
-of the file?
->
-> Thanks,
-> Mark.
+>>
+>> the first column '-/+' means contents was removed/added from file
+>> 5e9d274. the 2nd column '-/+' means contents was removed/added from file
+>> 9c93e12.
+>>
+>> Yes, The notify_cpu_starting kept in final file later.
+> 
+> Just make sure it is in line with commit 7ade67b5984d0a (arm64: move
+> enabling of GIC before CPUs are set online)
+> 
+
+Give you the part of modified smp.c file here :)
+====
+
+        printk("CPU%u: Booted secondary processor\n", cpu);
+
+        /*
+         * All kernel threads share the same mm context; grab a
+         * reference and switch to it.
+         */
+        atomic_inc(&mm->mm_count);
+        current->active_mm = mm;
+        cpumask_set_cpu(cpu, mm_cpumask(mm));
+
+        /*
+         * TTBR0 is only used for the identity mapping at this stage. Make it
+         * point to zero page to avoid speculatively fetching new entries.
+         */
+        cpu_set_reserved_ttbr0();
+        flush_tlb_all();
+
+        preempt_disable();
+        trace_hardirqs_off();
+
+        if (cpu_ops[cpu]->cpu_postboot)
+                cpu_ops[cpu]->cpu_postboot();
+
+        smp_store_cpu_info(cpu);
+
+        /*
+         * OK, now it's safe to let the boot CPU continue.  Wait for
+         * the CPU migration code to notice that the CPU is online
+         * before we continue.
+         */
+        set_cpu_online(cpu, true);
+        complete(&cpu_running);
+
+        /*
+         * Enable GIC and timers.
+         */
+        notify_cpu_starting(cpu);
+
+        local_irq_enable();
+        local_fiq_enable();
+
+        /*
+         * OK, it's off to the idle thread for us
+         */
+        cpu_startup_entry(CPUHP_ONLINE);
+}
+
+-- 
+Thanks
+    Alex
