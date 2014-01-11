@@ -1,30 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 11 Jan 2014 14:16:16 -0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Select CONFIG_AT803X_PHY
-Message-ID: <1389456976-5110-1-git-send-email-festevam@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 11 Jan 2014 16:29:09 +0000
+Subject: [PATCH] iio: at91: document ADC clock properties
+In-Reply-To: <52B729FD.7020507@kernel.org>
+References: <1387296973-7779-1-git-send-email-b.brezillon@overkiz.com>
+ <52B316A9.1060407@atmel.com> <52B729FD.7020507@kernel.org>
+Message-ID: <52D17155.8070009@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Select CONFIG_AT803X_PHY so that we can boot hummingboard via NFS.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e2c0734..7a48a00 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -114,6 +114,7 @@ CONFIG_R8169=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
- CONFIG_TI_CPSW=y
-+CONFIG_AT803X_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_USBNET=y
--- 
-1.8.1.2
+On 22/12/13 18:05, Jonathan Cameron wrote:
+> On 12/19/13 15:54, Nicolas Ferre wrote:
+>> On 17/12/2013 17:16, Boris BREZILLON :
+>>> Document the clock properties required by the at91 ADC driver.
+>>>
+>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Looks fine to me.  I'm just waiting on an ack from a device tree maintainer
+> (or the 3 weeks to pass so I can pick it up anyway ;)
+That's near enough 3 weeks (one day short) so applied to the togreg branch of iio.git.
+Thanks
+>
+>>
+>>> ---
+>>>   .../devicetree/bindings/arm/atmel-adc.txt          |    5 +++++
+>>>   1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>> index d106146..9a1175b 100644
+>>> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+>>> @@ -5,6 +5,9 @@ Required properties:
+>>>       <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+>>>     - reg: Should contain ADC registers location and length
+>>>     - interrupts: Should contain the IRQ line for the ADC
+>>> +  - clock-names: tuple listing input clock names.
+>>> +	Required elements: "adc_clk", "adc_op_clk".
+>>> +  - clocks: phandles to input clocks.
+>>>     - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
+>>>       device
+>>>     - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+>>> @@ -44,6 +47,8 @@ adc0: adc at fffb0000 {
+>>>   	compatible = "atmel,at91sam9260-adc";
+>>>   	reg = <0xfffb0000 0x100>;
+>>>   	interrupts = <20 4>;
+>>> +	clocks = <&adc_clk>, <&adc_op_clk>;
+>>> +	clock-names = "adc_clk", "adc_op_clk";
+>>>   	atmel,adc-channel-base = <0x30>;
+>>>   	atmel,adc-channels-used = <0xff>;
+>>>   	atmel,adc-drdy-mask = <0x10000>;
+>>>
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
