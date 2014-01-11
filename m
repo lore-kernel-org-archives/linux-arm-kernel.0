@@ -1,49 +1,62 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Jan 2014 18:26:02 +0000
-Subject: [PATCH v2 17/28] drm/i2c: tda998x: set the repeat PLL value in
- range 0..3
-In-Reply-To: <20140109120513.0965ddad@armhf>
-References: <20140109120513.0965ddad@armhf>
-Message-ID: <20140111182602.GF15937@n2100.arm.linux.org.uk>
+Date: Sat, 11 Jan 2014 18:34:22 +0000
+Subject: [PATCH v2 19/28] drm/i2c: tda998x: fix the value of the
+ TBG_CNTRL_1 register
+In-Reply-To: <20140109120543.1e3c9581@armhf>
+References: <20140109120543.1e3c9581@armhf>
+Message-ID: <20140111183422.GG15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 12:05:13PM +0100, Jean-Francois Moine wrote:
+On Thu, Jan 09, 2014 at 12:05:43PM +0100, Jean-Francois Moine wrote:
+> This patch fixes the 'toggle flag enable' bit of the TBG_CNTRL_1
+> register which was set when no toggle was needed.
 > 
 > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->  drivers/gpu/drm/i2c/tda998x_drv.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index f60aef9..8a7d8a2 100644
+> index 192ddd2..7dbbc6b 100644
 > --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 > +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -220,7 +220,7 @@ struct tda998x_priv {
->  # define PLL_SERIAL_1_SRL_IZ(x)   (((x) & 3) << 1)
->  # define PLL_SERIAL_1_SRL_MAN_IZ  (1 << 6)
->  #define REG_PLL_SERIAL_2          REG(0x02, 0x01)     /* read/write */
-> -# define PLL_SERIAL_2_SRL_NOSC(x) (((x) & 3) << 0)
-> +# define PLL_SERIAL_2_SRL_NOSC(x) ((x) << 0)
->  # define PLL_SERIAL_2_SRL_PR(x)   (((x) & 0xf) << 4)
->  #define REG_PLL_SERIAL_3          REG(0x02, 0x02)     /* read/write */
->  # define PLL_SERIAL_3_SRL_CCIR    (1 << 0)
-> @@ -972,6 +972,11 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
->  	}
->  
->  	div = 148500 / mode->clock;
-> +	if (div != 0) {
-> +		div--;
-> +		if (div > 3)
-> +			div = 3;
-> +	}
+> @@ -1080,11 +1080,11 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+>  	 * Always generate sync polarity relative to input sync and
+>  	 * revert input stage toggled sync at output stage
+>  	 */
+> -	reg = TBG_CNTRL_1_DWIN_DIS | TBG_CNTRL_1_TGL_EN;
+> +	reg = TBG_CNTRL_1_DWIN_DIS;
+>  	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+> -		reg |= TBG_CNTRL_1_H_TGL;
+> +		reg |= TBG_CNTRL_1_H_TGL | TBG_CNTRL_1_TGL_EN;
+>  	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+> -		reg |= TBG_CNTRL_1_V_TGL;
+> +		reg |= TBG_CNTRL_1_V_TGL | TBG_CNTRL_1_TGL_EN;
+>  	reg_write(priv, REG_TBG_CNTRL_1, reg);
 
-As the driver currently stands, we know that the clock divider works for
-the lower resolution modes.  So, as things stand, for 74.25MHz modes,
-we get a divisor of one.
+This has me wondering whether you understand the meaning of TGL_EN here,
+and what it means.
 
-Your patch changes this, the divider becomes zero.  I wonder whether
-you've tested 720p modes at all with this?
+When TGL_EN is set, the inversion of the syncs is determined by the
+settings of the H_TGL and V_TGL bits.  When they're zero, no inversion
+happens.
+
+However, when TGL_EN is clear, the inversion is determined by the CEA
+mode setting in REG_VIDFORMAT.
+
+What your code above means is that if a mode setting valuates as matching
+a CEA mode, but has different syncs (eg, no inversion required) then we
+don't set the enable bit, and we fall back to whatever is in the TDA998x
+device's internal tables for the CEA mode.  This is wrong behaviour.
+
+If we want to do this, then the right way would be to detect whether a
+sync polarity has been specified (iow, whether any [NP][HV]SYNC flags
+have been set) and set the TGL_EN if they have.  Otherwise, the TGL_EN
+flag can be cleared.
+
+I'm not saying that this will ever result in the TGL_EN flag being
+cleared, but to me, your change above is incorrect.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
