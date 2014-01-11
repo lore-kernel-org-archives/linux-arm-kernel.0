@@ -1,138 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 11 Jan 2014 13:59:45 +0100
-Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for
- i.MX27/i.MX31 CPUs
-In-Reply-To: <528074C2.9070707@gtsys.com.hk>
-References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
- <1384145140.400290349@f353.i.mail.ru>
- <52806C24.8040100@gtsys.com.hk>
- <1384148852.19743495@f117.i.mail.ru>
- <528074C2.9070707@gtsys.com.hk>
-Message-ID: <20140111125945.GB24479@pengutronix.de>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Sat, 11 Jan 2014 13:05:19 +0000
+Subject: [PATCH v4 0/5] arm: add UEFI runtime services support
+Message-ID: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In systems based on [U]EFI-conformant firmware, runtime services provide
+a standardised way for the kernel to update firmware environment
+variables. This is used for example by efibootmgr to update which image
+should be loaded on next boot.
 
-On Mon, Nov 11, 2013 at 02:10:10PM +0800, Chris Ruehl wrote:
-> On Monday, November 11, 2013 01:47 PM, Alexander Shiyan wrote:
-> >>On Monday, November 11, 2013 12:45 PM, Alexander Shiyan wrote:
-> >>>>Hi Alexander,
-> >>>>
-> >>>>On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
-> >>>>>This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
-> >>>>>
-> >>>>>Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
-> >>>>>---
-> >>>>>    drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
-> >>>>>    1 file changed, 42 insertions(+)
-> >>>>>
-> >>>>>diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> >>>...
-> >>>>>+static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
-> >>>>>+{
-> >>>>>+	unsigned long flags;
-> >>>>>+	u32 val;
-> >>>>>+
-> >>>>>+	switch (data->index) {
-> >>>>>+	case 0:
-> >>>>>+		val = MX27_OTG_PM_BIT;
-> >>>>>+		break;
-> >>>>>+	case 1:
-> >>>>>+		val = MX27_H1_PM_BIT;
-> >>>>>+		break;
-> >>>>>+	case 2:
-> >>>>>+		val = MX27_H2_PM_BIT;
-> >>>>>+		break;
-> >>>>>+	default:
-> >>>>>+		return -EINVAL;
-> >>>>>+	};
-> >>>>>+
-> >>>>
-> >>>>     From my understanding this can not work, the usbmisc->base not point into the
-> >>>>usb control register (USB_CTRL). Reference manual 30.5.1.1 says
-> >>>>BASE + 0x600
-> >>>>you must add the offset to the readl instruction.
-> >>>
-> >>>Why not work?
-> >>>usbotg: usb at 10024000
-> >>>usbh1: usb at 10024200
-> >>>usbh2: usb at 10024400
-> >>>usbmisc: usbmisc at 10024600
-> >>>So, offset to USB_CTRL should already be defined by DTS.
-> >>
-> >>in the usbmisc_imx_probe() the base pointer is loaded from
-> >>
-> >>res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>data->base = devm_ioremap_resource(&pdev->dev, res);
-> >>
-> >>(and I did not see any of_ operations)
-> >
-> >Yes, and this is an address of usbmisc node, not otg.
-> 
-> Sorry, you are right. I misunderstood because I didn't see any of
-> sample DTS files define usbmisc yet.
-> 
-> At this point might be good to patch the imx27.dtsi with the usb defines.
-> 
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -30,6 +30,9 @@
->                 spi0 = &cspi1;
->                 spi1 = &cspi2;
->                 spi2 = &cspi3;
-> +               usb0 = &usbotg;
-> +               usb1 = &usbh1;
-> +               usb2 = &usbh2;
->         };
-> 
-> @@ -404,6 +419,44 @@
->                                 iram = <&iram>;
->                         };
-> 
-> +                       usbotg: usb at 10024000 {
-> +                               compatible = "fsl,imx27-usb";
-> +                               reg = <0x10024000 0x200>;
-> +                               interrupts = <56>;
-> +                               clocks = <&clks 75>, <&clks 62>;
-> +                               clock-names = "ipg", "ahb";
-> +                               dr_mode = "host";
-> +                               phy_type = "ulpi";
-> +                               status = "disabled";
-> +                       };
-> +
-> +                       usbh1: usb at 10024200 {
-> +                               compatible = "fsl,imx27-usb";
-> +                               reg = <0x10024200 0x200>;
-> +                               interrupts = <54>;
-> +                               clocks = <&clks 75>, <&clks 62>;
-> +                               clock-names = "ipg", "ahb";
-> +                               dr_mode = "host";
-> +                               phy_type = "serial";
-> +                               status = "disabled";
-> +                       };
-> +
-> +                       usbh2: usb at 10024400 {
-> +                               compatible = "fsl,imx27-usb";
-> +                               reg = <0x10024400 0x200>;
-> +                               interrupts = <55>;
-> +                               clocks = <&clks 75>, <&clks 62>;
-> +                               clock-names = "ipg", "ahb";
-> +                               dr_mode = "host";
-> +                               phy_type = "ulpi";
-> +                               status = "disabled";
-> +                       };
-> +
-> +                       usbmisc: usbmisc at 10024600 {
-> +                               compatible = "fsl,imx27-usb";
-> +                               reg = <0x10024600 0x4>;
-> +                       };
-I didn't try to get this up yet, but I wonder if the last compatible
-here should better be fsl,imx27-usbmisc?!
+This patchset implements basic support for UEFI runtime services on ARM
+platforms, as well as the basic underlying EFI support. It also defines
+a mechanism by which the required information is passed from the
+bootloader (the EFI stub submitted separately) to the kernel via FDT
+entries.
 
-Best regards
-Uwe
+This patchset depends on the presence of early_ioremap(). It has been
+validated against Mark Salter's generic implementation.
+It also depends on Mark's "efi: add helper function to get UEFI params
+from FDT" patch.
+
+Changes since v3:
+- Use new common function (from arm64 set) for extracting UEFI params
+  from FDT.
+- Use new generic early_ioremap implementation (with early_memunmap).
+- Reworked/simplified phys_call code, using new shared functions/macros.
+- Slightly refactored to reduce number of explicit casts.
+- Also preserve and map EFI_ACPI_MEMORY_NVS regions.
+- Added some ACKs.
+
+Change since v2:
+- Updated FDT bindings.
+- Preserve regions marked RESERVED (but don't map them).
+- Rename 'efi' -> 'uefi' within this new port (leaving core code as is).
+
+Leif Lindholm (5):
+  arm: break part of __soft_restart out into separate function
+  arm: add new asm macro update_sctlr
+  Documentation: arm: add UEFI support documentation
+  arm: Add [U]EFI runtime services support
+  init: efi: arm: enable (U)EFI runtime services on arm
+
+ Documentation/arm/00-INDEX       |    3 +
+ Documentation/arm/uefi.txt       |   61 ++++++
+ arch/arm/Kconfig                 |   16 ++
+ arch/arm/include/asm/assembler.h |   13 ++
+ arch/arm/include/asm/idmap.h     |    1 +
+ arch/arm/include/asm/uefi.h      |   28 +++
+ arch/arm/kernel/Makefile         |    2 +
+ arch/arm/kernel/process.c        |   12 +-
+ arch/arm/kernel/setup.c          |    4 +
+ arch/arm/kernel/uefi.c           |  418 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/uefi_phys.S      |   67 ++++++
+ arch/arm/mm/idmap.c              |   15 ++
+ include/linux/efi.h              |    2 +-
+ init/main.c                      |    4 +
+ 14 files changed, 634 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/arm/uefi.txt
+ create mode 100644 arch/arm/include/asm/uefi.h
+ create mode 100644 arch/arm/kernel/uefi.c
+ create mode 100644 arch/arm/kernel/uefi_phys.S
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.10.4
