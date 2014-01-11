@@ -1,48 +1,60 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 11 Jan 2014 16:48:43 +0800
-Subject: [PATCH 2/2] pinctrl: sirf: put gpio interrupt pin into input status
- automatically
-In-Reply-To: <1389430123-8036-1-git-send-email-21cnbao@gmail.com>
-References: <1389430123-8036-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1389430123-8036-2-git-send-email-21cnbao@gmail.com>
+From: dailemon.gl@gmail.com (Lemon Dai)
+Date: Sat, 11 Jan 2014 17:15:58 +0800
+Subject: Add .determine_rate to composite clk
+Message-ID: <CAJiWf8W6rCnnF9Tv+cpcqqshEb4ALD+J_RnYeLkaNVG-Rcd+QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Hi Mike,
 
-busses like i2c, spi and so on can parse the virq of their subnode automatically by
-irq_of_parse_and_map(). for example, i2c will do that in of_i2c_register_devices().
-people can put hwirq number attached to a gpio controller in dts, and drivers can
-directly request the parsed virq.
+As .determine_rate was added to struct clk and clk_mux_ops, maybe we
+should also copy determine_rate operation from mux_ops to
+clk_composite_ops in clk_register_composite( ),
+to make composite clk implementation more generic.
 
-for example, for an i2c client as below,
-tangoc-ts at 5c{
-	compatible = "pixcir,tangoc-ts";
-	interrupt-parent = <&gpio>;
-	interrupts = <3 0>;
-	reg = <0x5c>;
-};
-in i2c client probe(), it will request_irq(client->irq, ...) without
-calling gpio_direction_input().
-so here when we set irq type, we also put the pin to input direction.
+Patch:
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index a33f46f..d224d6e 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -43,6 +43,20 @@ static int clk_composite_set_parent(struct clk_hw
+*hw, u8 index)
+        return mux_ops->set_parent(mux_hw, index);
+ }
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
++static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
++                               unsigned long *best_parent_rate,
++                               struct clk **best_parent_p)
++{
++       struct clk_composite *composite = to_clk_composite(hw);
++       const struct clk_ops *mux_ops = composite->mux_ops;
++       struct clk_hw *mux_hw = composite->mux_hw;
++
++       mux_hw->clk = hw->clk;
++
++       return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
++                               best_parent_p);
++}
++
+ static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+                                            unsigned long parent_rate)
+ {
+@@ -147,6 +161,11 @@ struct clk *clk_register_composite(struct device
+*dev, const char *name,
+                composite->mux_ops = mux_ops;
+                clk_composite_ops->get_parent = clk_composite_get_parent;
+                clk_composite_ops->set_parent = clk_composite_set_parent;
++
++               if (mux_ops->determine_rate) {
++                       clk_composite_ops->determine_rate =
++                                       clk_composite_determine_rate;
++               }
+        }
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index 53a3bc5..b637f5a 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -560,7 +560,7 @@ static int sirfsoc_gpio_irq_type(struct irq_data *d, unsigned type)
- 	spin_lock_irqsave(&sgpio_lock, flags);
- 
- 	val = readl(bank->chip.regs + offset);
--	val &= ~SIRFSOC_GPIO_CTL_INTR_STS_MASK;
-+	val &= ~(SIRFSOC_GPIO_CTL_INTR_STS_MASK | SIRFSOC_GPIO_CTL_OUT_EN_MASK);
- 
- 	switch (type) {
- 	case IRQ_TYPE_NONE:
--- 
-1.7.5.4
+        if (rate_hw && rate_ops) {
+
+
+--
+Best regards,
+
+Lemon Dai
