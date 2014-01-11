@@ -1,36 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Jan 2014 18:55:09 +0000
-Subject: [PATCH v2 26/28] drm/i2c: tda998x: code optimization
-In-Reply-To: <20140109120725.0b0f3e55@armhf>
-References: <20140109120725.0b0f3e55@armhf>
-Message-ID: <20140111185509.GL15937@n2100.arm.linux.org.uk>
+Date: Sat, 11 Jan 2014 18:58:50 +0000
+Subject: [PATCH v2 0/28] drm/i2c: tda998x: add DT support and other
+ improvements
+In-Reply-To: <20140109115651.482e2db1@armhf>
+References: <20140109115651.482e2db1@armhf>
+Message-ID: <20140111185850.GM15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 12:07:25PM +0100, Jean-Francois Moine wrote:
-> This patch reduces the number of I2C exchanges by setting many bits in
-> one write and removing a useless write.
+On Thu, Jan 09, 2014 at 11:56:51AM +0100, Jean-Francois Moine wrote:
+> This patch set contains various extensions to the tda998x driver:
 > 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c   | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
+> - simplify the i2c read/write
+> - code cleanup and fix some small errors
+> - use HDMI constants
+> - don't read write-only registers
+> - add DT support
+> - use irq for connection status and EDID read
+> - get a better status of the HDMI connector
+> - use the tda998x video format when cea mode
+> - add tda998x codec interface
 > 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index 6b4f6d2..d3b3f3a 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -751,10 +751,10 @@ tda998x_configure_audio(struct tda998x_priv *priv,
->  	}
->  
->  	reg_write(priv, REG_AIP_CLKSEL, clksel_aip);
-> -	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_LAYOUT);
-> +	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_LAYOUT |
+> - v2
+> 	- decompose patches with different topics
+> 	- fix some bad i2c register values
+> 	- add audio codec interface
+> 
 
-This patch clearly hasn't even been build tested, so I doubt there's
-much point reviewing this or the following patches.  From a quick scan
-of the following patches, this never got fixed so the following patches
-can't have been build tested either.
+Next time you post patches, please ensure that each patch is a reply
+to your series covering message, so that they can be easily threaded
+together.  It's a pain to have to search around for all the individual
+patches amongst other people's traffic.
 
 Thanks.
 
