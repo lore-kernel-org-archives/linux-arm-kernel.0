@@ -1,32 +1,63 @@
-From: juergen@kreuzholzen.de (Juergen Beisert)
-Date: Sat, 11 Jan 2014 22:20:48 +0100
-Subject: Mini6410 build fails with confusing CONFIG parameters
-Message-ID: <201401112220.48693.juergen@kreuzholzen.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 11 Jan 2014 22:39:02 +0100
+Subject: [PATCH 2/6] mmc: sdhci-s3c: Cache bus clock rates
+In-Reply-To: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1389476346-20396-3-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-with PM_GENERIC_DOMAINS=y and CONFIG_PM=N
+To fix scheduling while atomic happening in sdhci_s3c_set_clock() caused
+by calling clk_get_rate() that might sleep, this patch modifies the
+driver to cache rates of all bus clocks at probe time and then only use
+those cache values.
 
-[...]
-  CC      drivers/base/power/domain.o
-drivers/base/power/domain.c: In function '__pm_genpd_add_device':
-drivers/base/power/domain.c:1422:2: error: implicit declaration of function 'genpd_acquire_lock' [-Werror=implicit-function-declaration]
-drivers/base/power/domain.c:1466:2: error: implicit declaration of function 'genpd_release_lock' [-Werror=implicit-function-declaration]
-drivers/base/power/domain.c: In function 'pm_genpd_add_subdomain':
-drivers/base/power/domain.c:1649:3: error: implicit declaration of function 'genpd_sd_counter_inc' [-Werror=implicit-function-declaration]
-drivers/base/power/domain.c: In function 'pm_genpd_remove_subdomain':
-drivers/base/power/domain.c:1721:4: error: implicit declaration of function 'genpd_sd_counter_dec' [-Werror=implicit-function-declaration]
-drivers/base/power/domain.c: In function 'pm_genpd_attach_cpuidle':
-drivers/base/power/domain.c:1887:2: error: implicit declaration of function 'genpd_recalc_cpu_exit_latency' [-Werror=implicit-function-declaration]
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/mmc/host/sdhci-s3c.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-How can this happen?
-
-Symbol: PM_GENERIC_DOMAINS [=y]
-    Type  : boolean
-      Defined at kernel/power/Kconfig:277
-      Depends on: PM [=n]
-      Selected by: ARCH_SHMOBILE [=n] && <choice> && PM [=n] || ARCH_S3C64XX [=y] && <choice> || CPU [...]
-
-Shouldn't PM_GENERIC_DOMAINS be forced to "n", because it depends on PM?
-
-jbe
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 52770d5..9b78391 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -57,6 +57,7 @@ struct sdhci_s3c {
+ 
+ 	struct clk		*clk_io;
+ 	struct clk		*clk_bus[MAX_BUS_CLK];
++	unsigned long		clk_rates[MAX_BUS_CLK];
+ };
+ 
+ /**
+@@ -158,7 +159,7 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
+ 		return wanted - rate;
+ 	}
+ 
+-	rate = clk_get_rate(clksrc);
++	rate = ourhost->clk_rates[src];
+ 
+ 	for (shift = 0; shift < 8; ++shift) {
+ 		if ((rate >> shift) <= wanted)
+@@ -215,7 +216,7 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
+ 		writew(0, host->ioaddr + SDHCI_CLOCK_CONTROL);
+ 
+ 		ourhost->cur_clk = best_src;
+-		host->max_clk = clk_get_rate(clk);
++		host->max_clk = ourhost->clk_rates[best_src];
+ 
+ 		ctrl = readl(host->ioaddr + S3C_SDHCI_CONTROL2);
+ 		ctrl &= ~S3C_SDHCI_CTRL2_SELBASECLK_MASK;
+@@ -583,8 +584,10 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
+ 		 */
+ 		sc->cur_clk = ptr;
+ 
++		sc->clk_rates[ptr] = clk_get_rate(sc->clk_bus[ptr]);
++
+ 		dev_info(dev, "clock source %d: %s (%ld Hz)\n",
+-			 ptr, name, clk_get_rate(clk));
++				ptr, name, sc->clk_rates[ptr]);
+ 	}
+ 
+ 	if (clks == 0) {
+-- 
+1.8.5.2
