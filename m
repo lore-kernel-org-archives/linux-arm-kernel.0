@@ -1,24 +1,27 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 12 Jan 2014 19:51:13 +0100
-Subject: [PATCH v2 13/28] drm/i2c: tda998x: use irq for connection
- status and EDID read
-In-Reply-To: <52D18EE9.5030305@gmail.com>
-References: <20140109120412.7697d23c@armhf>
- <20140111181432.GB15937@n2100.arm.linux.org.uk>
- <52D18EE9.5030305@gmail.com>
-Message-ID: <20140112195113.316d0c98@armhf>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 12 Jan 2014 19:53:37 +0100
+Subject: [PATCH RFC 01/10] ARM: s3c64xx: pm: Use name field of
+ generic_pm_domain
+In-Reply-To: <52D287B1.3090106@gmail.com>
+References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+ <1389469372-17199-2-git-send-email-tomasz.figa@gmail.com>
+ <20140112114717.GA31318@amd.pavel.ucw.cz>
+ <52D287B1.3090106@gmail.com>
+Message-ID: <20140112185337.GA6810@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jan 2014 19:35:21 +0100
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+Hi!
 
-> At least for the DT part, I'd suggest to not ask for interrupt directly
-> but use a proper gpios property. The can of course be converted to
-> priv->int_irq in some tda998x_dt_probe.
+> >Could we get some more descriptive names for the domains?
+> 
+> They are listed like this in user's manual, e.g. DOMAIN_F, DOMAIN_I,
+> DOMAIN_G, etc.
 
-May you give me more information?
+I guessed so. So the manual sucks. Would it be feasible to get it more
+descriptive (like "Domain_G (GPU)")?
 
+									Pavel
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
