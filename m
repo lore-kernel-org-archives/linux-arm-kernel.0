@@ -1,60 +1,160 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 12 Jan 2014 10:46:53 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-In-Reply-To: <52D2B7C8.4060103@ti.com>
-References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
- <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
- <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
- <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
- <20140112105958.GA9791@n2100.arm.linux.org.uk> <52D2B7C8.4060103@ti.com>
-Message-ID: <52D2B8ED.2010006@ti.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sun, 12 Jan 2014 17:33:18 +0100
+Subject: [GIT PULL] clockevents/clocksource : new material for 3.14
+In-Reply-To: <52C1479E.80808@linaro.org>
+References: <52C1479E.80808@linaro.org>
+Message-ID: <20140112163318.GA21054@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 12 January 2014 10:42 AM, Santosh Shilimkar wrote:
-> On Sunday 12 January 2014 05:59 AM, Russell King - ARM Linux wrote:
->> On Mon, Dec 09, 2013 at 08:02:30PM -0500, Santosh Shilimkar wrote:
->>> On Monday 09 December 2013 07:54 PM, Russell King - ARM Linux wrote:
->>>> The underlying reason is that - as I've already explained - ARM's __ffs()
->>>> differs from other architectures in that it ends up being an int, whereas
->>>> almost everyone else is unsigned long.
->>>>
->>>> The fix is to fix ARMs __ffs() to conform to other architectures.
->>>>
->>> I was just about to cross-post your reply here. Obviously I didn't think
->>> this far when I made  $subject fix.
->>>
->>> So lets ignore the $subject patch which is not correct. Sorry for noise
->>
->> Well, here we are, a month on, and this still remains unfixed despite
->> my comments pointing to what the problem is.  So, here's a patch to fix
->> this problem the correct way.  I took the time to add some comments to
->> these functions as I find that I wonder about their return values, and
->> these comments make the patch a little larger than it otherwise would be.
->>
-> The $subject warning fix [1] is already picked by Andrew with your ack
-> and its in his queue [2]
+
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+
 > 
->> This patch makes their types match exactly with x86's definitions of
->> the same, which is the basic problem: on ARM, they all took "int" values
->> and returned "int"s, which leads to min() in nobootmem.c complaining.
->>
-> Not sure if you missed the thread but the right fix was picked. Ofcourse
-> you do have additional clz optimisation in updated patch and some comments
-> on those functions.
+> Hi Thomas and Ingo,
 > 
-> Regards,
-> Santosh
+> here is the new material for 3.14. I created a branch for Simon
+> Horman as requested [1] where he can pull from and merged it in the
+> clockevents/3.14 branch.	
 > 
-> [1] https://lkml.org/lkml/2013/12/9/811
-fixing the link since above was the link to the $subject thread and below is
-the correct link for updated patch
-[1] https://lkml.org/lkml/2013/12/20/497
-> [2] http://ozlabs.org/~akpm/mmotm/broken-out/mm-arm-fix-arms-__ffs-to-conform-to-avoid-warning-with-no_bootmem.patch
+>  * Axel Lin removed an unused structure defining the ids for the bcm
+> kona driver
+> 
+>  * Ezequiel Garcia enabled the timer divider only when the 25MHz
+> timer is not used for the armada 370 XP
+> 
+>  * Jingoo Han removed a pointless platform data initialization for
+> the sh_mtu and sh_mtu2
+> 
+>  * Laurent Pinchart added the clk_prepare/clk_unprepare for sh_cmt
+> 
+>  * Linus Walleij added an useful warning in clk_of when no clocks
+> are found while the old behavior was to silently hang at boot time
+> 
+>  * Maxime Ripard added the high speed timer drivers for the
+> Allwinner SoCs (A10, A13, A20). He increased the rating, shared the
+> irq across all available cpus and fixed the clockevent's irq
+> initialization for the sun4i
+> 
+>  * Michael Opdenacker removed the usage of the IRQF_DISABLED for the
+> all the timers driver located in drivers/clocksource
+> 
+>  * Stephen Boyd switched to sched_clock_register for the
+> arm_global_timer, cadence_ttc, sun4i and orion timers
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Resolved conflicts:
 > 
+>  * (31f8ad387) "sun7i: a20: Add support for the High Speed Timers"
+> and (428abbb8) "Enable the I2C controllers"
+> 
+>  * (67905540) "clocksource: Add Allwinner SoCs HS timers driver" and
+> (b788beda) "Order Kconfig options alphabetically"
+> 
+> Thanks and happy new year !
+> 
+>   -- Daniel
+> 
+> [1] http://www.spinics.net/lists/linux-sh/msg26645.html
+> 
+> -------------------------------------------------------------------------
+> 
+> The following changes since commit 0e6601eee039893a3f6420596ae4588d90d13cbe:
+> 
+>   Merge branch 'timers/posix-timers-for-tip-v2' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/frederic/linux-dynticks
+> into timers/core (2013-12-10 12:32:36 +0100)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.linaro.org/people/daniel.lezcano/linux.git clockevents/3.14
+> 
+> for you to fetch changes up to 98aefbe72ec6015f90fe045ed16c5cf755da283d:
+> 
+>   Merge branch 'clockevents/for-Simon-3.13-rc2' into
+> clockevents/3.14 (2013-12-18 15:14:36 +0100)
+> 
+> ----------------------------------------------------------------
+> 
+> Axel Lin (1):
+>       clocksource: bcm_kona_timer: Remove unused bcm_timer_ids
+> 
+> Daniel Lezcano (1):
+>       Merge branch 'clockevents/for-Simon-3.13-rc2' into clockevents/3.14
+> 
+> Ezequiel Garcia (1):
+>       clocksource: armada-370-xp: Enable timer divider only when needed
+> 
+> Jingoo Han (2):
+>       clocksource: sh_tmu: Remove unnecessary platform_set_drvdata()
+>       clocksource: sh_mtu2: Remove unnecessary platform_set_drvdata()
+> 
+> Laurent Pinchart (1):
+>       clocksource: sh_cmt: Add clk_prepare/unprepare support
+> 
+> Linus Walleij (1):
+>       clocksource: clksrc-of: Warn if no clock sources are found
+> 
+> Maxime Ripard (7):
+>       clockevent: sun4i: Fill the irq field in the clockevent structure
+>       clocksource: sun4i: Change CPU mask to cpu_possible_mask
+>       clocksource: sun4i: Increase a bit the clock event and sources rating
+>       clocksource: Add Allwinner SoCs HS timers driver
+>       ARM: sun5i: a10s: Add support for the High Speed Timers
+>       ARM: sun5i: a13: Add support for the High Speed Timers
+>       ARM: sun7i: a20: Add support for the High Speed Timers
+> 
+> Michael Opdenacker (3):
+>       clocksource: misc drivers: Remove deprecated IRQF_DISABLED
+>       clocksource: tegra: Remove deprecated IRQF_DISABLED
+>       clocksource: vt8500: Remove deprecated IRQF_DISABLED
+> 
+> Stephen Boyd (4):
+>       clocksource: arm_global_timer: Switch to sched_clock_register()
+>       clocksource: cadence_ttc_timer: Switch to sched_clock_register()
+>       clocksource: sun4i: Switch to sched_clock_register()
+>       clocksource: orion: Switch to sched_clock_register()
+> 
+>  .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |   22 +++
+>  arch/arm/boot/dts/sun5i-a10s.dtsi                  |    7 +
+>  arch/arm/boot/dts/sun5i-a13.dtsi                   |    7 +
+>  arch/arm/boot/dts/sun7i-a20.dtsi                   |   10 +
+>  arch/arm/mach-sunxi/Kconfig                        |    1 +
+>  drivers/clocksource/Kconfig                        |    4 +
+>  drivers/clocksource/Makefile                       |    1 +
+>  drivers/clocksource/arm_global_timer.c             |    4 +-
+>  drivers/clocksource/bcm_kona_timer.c               |    6 -
+>  drivers/clocksource/cadence_ttc_timer.c            |    7 +-
+>  drivers/clocksource/clksrc-of.c                    |    4 +
+>  drivers/clocksource/cs5535-clockevt.c              |    2 +-
+>  drivers/clocksource/dw_apb_timer.c                 |    3 +-
+>  drivers/clocksource/nomadik-mtu.c                  |    2 +-
+>  drivers/clocksource/samsung_pwm_timer.c            |    2 +-
+>  drivers/clocksource/sh_cmt.c                       |   23 ++-
+>  drivers/clocksource/sh_mtu2.c                      |    4 +-
+>  drivers/clocksource/sh_tmu.c                       |    4 +-
+>  drivers/clocksource/sun4i_timer.c                  |   11 +-
+>  drivers/clocksource/tegra20_timer.c                |    2 +-
+>  drivers/clocksource/time-armada-370-xp.c           |   18 +-
+>  drivers/clocksource/time-orion.c                   |    4 +-
+>  drivers/clocksource/timer-sun5i.c                  |  192
+> ++++++++++++++++++++
+>  drivers/clocksource/vt8500_timer.c                 |    2 +-
+>  24 files changed, 295 insertions(+), 47 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
+>  create mode 100644 drivers/clocksource/timer-sun5i.c
+
+Pulled into tip:timers/core, thanks Daniel!
+
+Note that there was a conflict in drivers/clocksource/clksrc-of.c, 
+caused by interaction with this commit:
+
+  4c4b053235fa clocksource: clksrc-of: Do not drop unheld reference on device node
+
+I've resolved it, but please double check the end result once I've 
+pushed it all out.
+
+Thanks,
+
+	Ingo
