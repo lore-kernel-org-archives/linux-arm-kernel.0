@@ -1,31 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 12 Jan 2014 19:24:51 +0000
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 12 Jan 2014 20:25:38 +0100
 Subject: [PATCH RFC 01/10] ARM: s3c64xx: pm: Use name field of
  generic_pm_domain
-In-Reply-To: <52D2E716.8040403@gmail.com>
+In-Reply-To: <20140112192040.GU29039@sirena.org.uk>
 References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
  <1389469372-17199-2-git-send-email-tomasz.figa@gmail.com>
- <20140112114717.GA31318@amd.pavel.ucw.cz>
- <52D287B1.3090106@gmail.com>
- <20140112185337.GA6810@amd.pavel.ucw.cz>
- <52D2E716.8040403@gmail.com>
-Message-ID: <20140112192451.GV29039@sirena.org.uk>
+ <20140112192040.GU29039@sirena.org.uk>
+Message-ID: <52D2EC32.6000306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 08:03:50PM +0100, Tomasz Figa wrote:
 
-> Also, there are multiple devices in most domains, so that would
-> rather end up being "Domain_I (JPEG, Cam I/F)", "Domain_P (2D, TV
-> Enc., Scaler)", "Domain_F (Rot, Post, LCD)".
 
-It's not just that there's multiple devices either, it's also the fact
-that the groupings are a bit random and probably more to do with chip
-layout or something than function.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140112/9b5f90d9/attachment-0001.sig>
+On 12.01.2014 20:20, Mark Brown wrote:
+> On Sat, Jan 11, 2014 at 08:42:43PM +0100, Tomasz Figa wrote:
+>
+>>   static struct s3c64xx_pm_domain s3c64xx_pm_irom = {
+>> -	.name = "IROM",
+>>   	.ena = S3C64XX_NORMALCFG_IROM_ON,
+>>   	.pd = {
+>> +		.name = "domain_irom",
+>
+> This is nitpicking a bit but are you sure this is actually a
+> beautification of the name?  It's mainly the domain_ bit, mostly since
+> I'd expect that if it's not obvious that this is a power domain the core
+> logging would be changed rather than tweaking the name of every power
+> domain user.
+>
+
+Hmm, that's a really good point. A separate patch might change this and 
+I could drop the "controversial" part of this patch ;).
+
+Best regards,
+Tomasz
