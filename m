@@ -1,72 +1,41 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sun, 12 Jan 2014 03:57:07 +0000
-Subject: [PATCH 1/2] ARM: mvebu: Add support to get the ID and the
- revision of a SoC
-In-Reply-To: <1388678476-12875-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1388678476-12875-1-git-send-email-gregory.clement@free-electrons.com>
- <1388678476-12875-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1389499027.3720.42.camel@deadeye.wl.decadent.org.uk>
+From: lho@apm.com (Loc Ho)
+Date: Sat, 11 Jan 2014 19:58:04 -0800
+Subject: [PATCH v8 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <20140111193104.GD3257@mtj.dyndns.org>
+References: <1389031922-4309-1-git-send-email-lho@apm.com>
+ <1389031922-4309-2-git-send-email-lho@apm.com>
+ <1389031922-4309-3-git-send-email-lho@apm.com>
+ <1389031922-4309-4-git-send-email-lho@apm.com> <52D052F9.8050703@redhat.com>
+ <20140111193104.GD3257@mtj.dyndns.org>
+Message-ID: <6EB44142-06DA-4C9D-8999-CFA9EE30E03D@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-02 at 17:01 +0100, Gregory CLEMENT wrote:
-> All the mvebu SoCs have information related to their variant and
-> revision that can be read from the PCI control register.
+Hi,
+
+> On Jan 11, 2014, at 11:31 AM, Tejun Heo <tj@kernel.org> wrote:
 > 
-> This patch adds support for Armada XP and Armada 370. This reading of
-> the revision and the ID are done before the PCI initialization to
-> avoid any conflicts. Once these data are retrieved, the resources are
-> freed to let the PCI subsystem use it.
-[...]
-> --- /dev/null
-> +++ b/include/linux/mvebu-soc-id.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Marvell EBU SoC ID and revision definitions.
-> + *
-> + * Copyright (C) 2014 Marvell Semiconductor
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __LINUX_MVEBU_SOC_ID_H
-> +#define __LINUX_MVEBU_SOC_ID_H
-> +
-> +/* Armada XP ID */
-> +#define MV78230_DEV_ID	    0x7823
-> +#define MV78260_DEV_ID	    0x7826
-> +#define MV78460_DEV_ID	    0x7846
-> +
-> +/* Armada XP Revision */
-> +#define MV78XX0_A0_REV	    0x1
-> +#define MV78XX0_B0_REV	    0x2
-> +
-> +#ifdef CONFIG_ARCH_MVEBU
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev);
-> +#else
-> +int mvebu_get_soc_id(u32 *dev, u32 *rev)
+> Hello, David.
+> 
+>> On Fri, Jan 10, 2014 at 02:07:21PM -0600, David Milburn wrote:
+>> Tejun, to avoid some of the interrupt handling code duplication, would
+>> it better to have a AHCI_HFLAG_FLUSH and then change
+>> 
+>> this driver to set flush
+>> 
+>> hpriv->hpriv.flush = (void *) xgene_ahci_iob_flush;
+>> 
+>> and then standard code flush when necessary
+>> 
+>> ahci_handle_port_interrupt
+>> 
+>>       /* board-specific flush before servicing completed cmds */
+>>       if (hpriv-> flags & AHCI_HFLAG_FLUSH)
+>>               hpriv->flush(hpriv);
+> 
+> And this would be the only spot that this would be necessary?  If so,
+> why not just wrap the interrupt handler?
 
-This definition needs to be static inline, assuming anything will
-actually include this header when !defined(CONFIG_ARCH_MVEBU).
+The flush has to occurred immediately after reading the CI register. It can not wrap around the isr routine and issue the flush after or before the library ahci isr routine.
 
-Ben.
-
-> +{
-> +	return -1;
-> +}
-> +#endif
-> +
-> +#endif /* __LINUX_MVEBU_SOC_ID_H */
-
--- 
-Ben Hutchings
-Quantity is no substitute for quality, but it's the only one we've got.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140112/0c7921e9/attachment.sig>
+-Loc
