@@ -1,107 +1,120 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:44 +0200
-Subject: [PATCH 01/12] ARM: dts: sbc-t3x: use omap specific pinctrl defines
+Date: Sun, 12 Jan 2014 15:22:53 +0200
+Subject: [PATCH 10/12] ARM: dts: sbc-t3530: add support for sbc-t3530
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-2-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-11-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use omap specific pinctrl defines (OMAP3_CORE1_IOPAD) to configure
-the padconf register offset.
-
-This simplify further support of CompuLab's boards based on omap36xx,
-omap34xx and am35x.
+Add support for CM-T3530 CoM and SBC-T3530 board.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-cm-t3730.dts  |   36 ++++++++++++++++----------------
- arch/arm/boot/dts/omap3-sbc-t3730.dts |    6 ++--
- 2 files changed, 21 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/Makefile            |    2 +
+ arch/arm/boot/dts/omap3-cm-t3530.dts  |   12 +++++++++++
+ arch/arm/boot/dts/omap3-sbc-t3530.dts |   36 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c    |    6 +++++
+ 4 files changed, 56 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
+ create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-index 486f4d6..508cd9b 100644
---- a/arch/arm/boot/dts/omap3-cm-t3730.dts
-+++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-@@ -34,44 +34,44 @@
- &omap3_pmx_core {
- 	mmc1_pins: pinmux_mmc1_pins {
- 		pinctrl-single,pins = <
--			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
--			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
--			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
--			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
--			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
--			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2144, PIN_OUTPUT_PULLUP | MUX_MODE0)/* sdmmc1_clk.sdmmc1_clk */
-+			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-+			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat0.sdmmc1_dat0 */
-+			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat1.sdmmc1_dat1 */
-+			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat2.sdmmc1_dat2 */
-+			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat3.sdmmc1_dat3 */
- 		>;
- 	};
- 
- 	mmc2_pins: pinmux_mmc2_pins {
- 		pinctrl-single,pins = <
--			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
--			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
--			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
--			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
--			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
--			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
- 		>;
- 	};
- 
- 	smsc1_pins: pinmux_smsc1_pins {
- 		pinctrl-single,pins = <
--			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
--			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
-+			OMAP3_CORE1_IOPAD(0x20b8, PIN_OUTPUT | MUX_MODE0)	/* gpmc_ncs5.gpmc_ncs5 */
-+			OMAP3_CORE1_IOPAD(0x219a, PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
- 		>;
- 	};
- 
- 	uart3_pins: pinmux_uart3_pins {
- 		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-+			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
-+			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx.uart3_tx_irtx */
- 		>;
- 	};
- 
- 	wl12xx_gpio: pinmux_wl12xx_gpio {
- 		pinctrl-single,pins = <
--			0xb2 (PIN_OUTPUT | MUX_MODE4)		/* dss_data3.gpio_73 */
--			0x134 (PIN_INPUT | MUX_MODE4)		/* sdmmc2_dat4.gpio_136 */
-+			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE4)	/* dss_data3.gpio_73 */
-+			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT | MUX_MODE4)	/* sdmmc2_dat4.gpio_136 */
- 		>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
-index c119bd5..0a8849f 100644
---- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
-+++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
-@@ -23,8 +23,8 @@
- &omap3_pmx_core {
- 	smsc2_pins: pinmux_smsc2_pins {
- 		pinctrl-single,pins = <
--			0x86 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs4.gpmc_ncs4 */
--			0xa2 (PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
-+			OMAP3_CORE1_IOPAD(0x20b6, PIN_OUTPUT | MUX_MODE0)	/* gpmc_ncs4.gpmc_ncs4 */
-+			OMAP3_CORE1_IOPAD(0x20d2, PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
- 		>;
- 	};
--};
-\ No newline at end of file
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b7af502..fb8c397 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -179,6 +179,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap2420-n810-wimax.dtb \
+ 	omap3430-sdp.dtb \
+ 	omap3-beagle.dtb \
++	omap3-cm-t3530.dtb \
++	omap3-sbc-t3530.dtb \
+ 	omap3-cm-t3730.dtb \
+ 	omap3-sbc-t3730.dtb \
+ 	omap3-devkit8000.dtb \
+diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
+new file mode 100644
+index 0000000..9faf1cd
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
+@@ -0,0 +1,12 @@
++/*
++ * Support for CompuLab CM-T3530
++ */
++/dts-v1/;
++
++#include "omap34xx.dtsi"
++#include "omap3-cm-t3x30.dtsi"
++
++/ {
++	model = "CompuLab CM-T3530";
++	compatible = "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
 +};
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+new file mode 100644
+index 0000000..bbbeea6
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+@@ -0,0 +1,36 @@
++/*
++ * Suppport for CompuLab SBC-T3530 with CM-T3530
++ */
++
++#include "omap3-cm-t3530.dts"
++#include "omap3-sb-t35.dtsi"
++
++/ {
++	model = "CompuLab SBC-T3530 with CM-T3530";
++	compatible = "compulab,omap3-sbc-t3530", "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sb_t35_usb_hub_pins>;
++
++	sb_t35_usb_hub_pins: pinmux_sb_t35_usb_hub_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2130, PIN_OUTPUT | MUX_MODE4) /* ccdc_wen.gpio_167 - SB-T35 USB HUB RST */
++		>;
++	};
++};
++
++/*
++ * The following ranges correspond to SMSC9x eth chips on CM-T3530 CoM and
++ * SB-T35 baseboard respectively.
++ * This setting includes both chips in SBC-T3530 board device tree.
++ */
++&gpmc {
++	ranges = <5 0 0x2c000000 0x01000000>,
++		 <4 0 0x2d000000 0x01000000>;
++};
++
++&mmc1 {
++	cd-gpios =  <&twl_gpio 0 GPIO_ACTIVE_HIGH>;
++};
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 0748ade..4f2591e 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -119,6 +119,11 @@ static void __init omap3_sbc_t3730_legacy_init(void)
+ 	omap_ads7846_init(1, 57, 0, NULL);
+ }
+ 
++static void __init omap3_sbc_t3530_legacy_init(void)
++{
++	omap_ads7846_init(1, 57, 0, NULL);
++}
++
+ static void __init omap3_igep0020_legacy_init(void)
+ {
+ 	omap3_igep2_display_init_of();
+@@ -258,6 +263,7 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+  */
+ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP3
++	{ "compulab,omap3-sbc-t3530", omap3_sbc_t3530_legacy_init, },
+ 	{ "compulab,omap3-sbc-t3730", omap3_sbc_t3730_legacy_init, },
+ 	{ "nokia,omap3-n900", hsmmc2_internal_input_clk, },
+ 	{ "nokia,omap3-n9", hsmmc2_internal_input_clk, },
 -- 
 1.7.5.4
