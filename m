@@ -1,89 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 12 Jan 2014 22:19:11 +0100
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <CAN1v_PuySRzi6r9aT_SJrQRMBh9gj-5yXOOY1QpyZ6V4wXyZCA@mail.gmail.com>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <CAN1v_PsaAeDiLaiP7FfTHFbNRG=UHuom6-2L6NMwzyOOyB+5cA@mail.gmail.com>
- <CAN1v_PuySRzi6r9aT_SJrQRMBh9gj-5yXOOY1QpyZ6V4wXyZCA@mail.gmail.com>
-Message-ID: <201401122219.11593.arnd@arndb.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 12 Jan 2014 22:32:27 +0100
+Subject: [PATCH V3 0/5] SoC and board integration for RSPI on
+ r7s72100/genmai
+In-Reply-To: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
+References: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <2996587.8yFdzmUGOy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 January 2014, Ravi Patel wrote:
+Hi Geert,
 
-> Do you want any further clarification or document related to QMTM.
-> We want to make sure everyone is on same page, understand and
-> conclude upon that QMTM is a device and and not a bus or a dma
-> engine.
+Thank you for the patches.
 
-I have a much better understanding now, but there are still a few open
-questions from my side. Let me try to explain in my own words what I
-think is the relevant information (part of this is still guessing).
-It took me a while to figure out what it does from your description,
-and then some more time to see what it's actually good for (as
-opposed to adding complexity).
+On Sunday 12 January 2014 11:48:38 Geert Uytterhoeven wrote:
+> This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
+> and the Genmai development board.
+> 
+> The series is based on renesas-devel-v3.13-rc7-20140109v2, with Magnus'
+> pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
+> [Simon: I don't know in which order you will merge these. If you want me
+>  to rebase my patches, just ask! Thanks!]
+> 
+> It was tested on the Genmai development board (genmai-reference), using
+> an in-kernel version of Documentation/spi/spidev_test.c, exercising
+> loopback mode on rspi1, with the same outcome as the SDK reference code.
+> 
+> It will not yet work with the non-reference version of genmai, due to
+> missing pinmux configuration in setup-r7s72100.c.
 
-Please confirm or correct the individual statements in this
-description:
+The whole series looks good to me. The first patch depends on r7s72100 pinmux 
+support, for which I'm still waiting a new version from Magnus. The rest could 
+already be applied as far as I'm concerned.
 
-The QMTM serves as a relay for short (a few bytes) messages between
-the OS software and various slave hardware blocks on the SoC.
-The messages are typically but not always DMA descriptors used by the
-slave device used for starting bus master transactions by the slave,
-or for notifying sofware about the competion of a DMA transaction.
+>     [1/5] pinctrl: sh-pfc: r7s72100: Add RSPI support
+>     [2/5] ARM: shmobile: r7s72100: Add RSPI clocks
+>     [3/5] ARM: shmobile: genmai: Add RSPI support
+>     [4/5] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux
+>     [5/5] ARM: shmobile: genmai: Enable RSPI in defconfig
+> 
+> Changes in V2:
+>   - Add "ARM: shmobile: genmai: Add RSPI children"
+>   - Add "[RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux"
+> 
+> Changes in V3:
+>   - Implement review comments
+>   - Add defconfig update
+>   - Remove DT support patches, they will be sent in a separate series
+>   - Merge "ARM: shmobile: r7s72100: Add RSPI platform devices" and
+>     "ARM: shmobile: genmai: Add RSPI children"
 
-The message format is specific to the slave device and the QMTM
-only understands the common header of the message.
+-- 
+Regards,
 
-OS software sees the messages in cache-coherent memory and does
-not require any cache flushes or MMIO access for inbound messages
-and only a single posted MMIO write for outbound messages.
-
-The queues are likely designed to be per-thread and don't require
-software-side locking.
-
-For outbound messages, the QMTM is the bus master of a device-to-device
-DMA transaction that gets started once a message is queued and the
-device has signaled that it is ready for receiving it. The QMTM needs
-to know the bus address of the device as well as a slave ID for
-the signal pin.
-For inbound messages, the QMTM slave initiates a busmaster transaction
-and needs to know the bus address of its QMTM port, while the QMTM
-needs to know only the slave ID that is associated with the queue.
-
-In addition to those hardware properties, the QMTM driver needs to
-set up a memory buffer for the message queue as seen by the CPU,
-and needs tell the QMTM the location as well as some other
-properties such as the message length.
-
-For inbound messages, the QMTM serves a similar purpose as an MSI
-controller, ensuring that inbound DMA data has arrived in RAM
-before an interrupt is delivered to the CPU and thereby avoiding
-the need for an expensive MMIO read to serialize the DMA.
-
-The resources managed by the QMTM are both SoC-global (e.g. bus
-bandwidth) and slave specific (e.g. ethernet bandwith or buffer space).
-Global resource management is performed to prevent one slave
-device from monopolizing the system or preventing other slaves
-from making forward progress.
-Examples for local resource management (I had to think about this 
-a long time, but probably some of these are wrong) would be
-* balancing between multiple non-busmaster devices connected to
-  a dma-engine
-* distributing incoming ethernet data to the available CPUs based on
-  a flow classifier in the MAC, e.g. by IOV MAC address, VLAN tag
-  or even individual TCP connection depending on the NIC's capabilities.
-* 802.1p flow control for incoming ethernet data based on the amount
-  of data queued up between the MAC and the driver
-* interrupt mitigation for both inbound data and outbound completion,
-  by delaying the IRQ to the OS until multiple messages have arrived
-  or a queue specific amount of time has passed.
-* controlling the amount of outbound buffer space per flow to minimize
-  buffer-bloat between an ethernet driver and the NIC hardware.
-* reordering data from outbound flows based on priority.
-
-This is basically my current interpretation, I hope I got at least
-some of it right this time ;-)
-
-	Arnd
+Laurent Pinchart
