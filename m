@@ -1,103 +1,150 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 11:48:41 +0100
-Subject: [PATCH V3 3/5] ARM: shmobile: genmai: Add RSPI support
+Date: Sun, 12 Jan 2014 11:48:39 +0100
+Subject: [PATCH V3 1/5] pinctrl: sh-pfc: r7s72100: Add RSPI support
 In-Reply-To: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
 References: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389523723-2288-4-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389523723-2288-2-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Add RSPI platform device, resources, platform data, and SPI child.
-
-On this board, only rspi4 is in use. Its bus contains a single device
-(a wm8978 audio codec).
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
 V2:
-  - Correct platform device names ("rspi%u.0" -> "rspi.%u")
-  - Add missing platform data
-  - Correct summary (resources -> platform devices)
+  - No changes
 V3:
-  - Move platform devices from setup-r7s72100.c to board-genmai.c, as
-    genmai-reference will use devices instantiated from DT
-  - Merge with "ARM: shmobile: genmai: Add RSPI children", as this now
-    touches the same file
-  - Instantiate SPI children in C on genmai only, as genmai-reference will
-    instantiate them from DT
+  - No changes
 
- arch/arm/mach-shmobile/board-genmai.c |   45 +++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r7s72100.c |   94 +++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index a1f6fe1fb06f..f85628e24de4 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -21,6 +21,8 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/sh_eth.h>
-+#include <linux/spi/rspi.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r7s72100.h>
-@@ -41,11 +43,54 @@ static const struct resource ether_resources[] __initconst = {
- 	DEFINE_RES_IRQ(gic_iid(359)),
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+index 267677c683c5..5e0f03c14fcc 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r7s72100.c
+@@ -138,6 +138,70 @@ RIIC1(RZ_PIN_AND_MUX)
+ RIIC2(RZ_PIN_AND_MUX)
+ RIIC3(RZ_PIN_AND_MUX)
+ 
++#define RSPI0(fn)			\
++	fn(rspi0, rspck,  2, 12, 2)	\
++	fn(rspi0, ssl0,   2, 13, 2)	\
++	fn(rspi0, mosi,   2, 14, 2)	\
++	fn(rspi0, miso,   2, 15, 2)	\
++	fn(rspi0, rspck,  7, 15, 2)	\
++	fn(rspi0, ssl0,   8,  0, 2)	\
++	fn(rspi0, mosi,   8,  1, 2)	\
++	fn(rspi0, miso,   8,  2, 2)	\
++	fn(rspi0, rspck, 10, 12, 4)	\
++	fn(rspi0, ssl0,  10, 13, 4)	\
++	fn(rspi0, mosi,  10, 14, 4)	\
++	fn(rspi0, miso,  10, 15, 4)	\
++
++#define RSPI1(fn)			\
++	fn(rspi1, rspck,  4,  4, 2)	\
++	fn(rspi1, ssl0,   4,  5, 2)	\
++	fn(rspi1, mosi,   4,  6, 2)	\
++	fn(rspi1, miso,   4,  7, 2)	\
++	fn(rspi1, rspck,  6,  4, 7)	\
++	fn(rspi1, ssl0,   6,  5, 7)	\
++	fn(rspi1, mosi,   6,  6, 7)	\
++	fn(rspi1, miso,   6,  7, 7)	\
++	fn(rspi1, rspck, 11, 12, 2)	\
++	fn(rspi1, ssl0,  11, 13, 2)	\
++	fn(rspi1, mosi,  11, 14, 2)	\
++	fn(rspi1, miso,  11, 15, 2)	\
++
++#define RSPI2(fn)			\
++	fn(rspi2, rspck,  8,  3, 3)	\
++	fn(rspi2, ssl0,   8,  4, 3)	\
++	fn(rspi2, mosi,   8,  5, 3)	\
++	fn(rspi2, miso,   8,  6, 3)	\
++	fn(rspi2, rspck,  8, 14, 5)	\
++	fn(rspi2, ssl0,   8, 15, 5)	\
++	fn(rspi2, mosi,   9,  0, 5)	\
++	fn(rspi2, miso,   9,  1, 5)	\
++
++#define RSPI3(fn)			\
++	fn(rspi3, rspck,  3,  0, 8)	\
++	fn(rspi3, ssl0,   3,  1, 8)	\
++	fn(rspi3, mosi,   3,  2, 8)	\
++	fn(rspi3, miso,   3,  3, 8)	\
++	fn(rspi3, rspck,  5,  0, 8)	\
++	fn(rspi3, ssl0,   5,  1, 8)	\
++	fn(rspi3, mosi,   5,  2, 8)	\
++	fn(rspi3, miso,   5,  3, 8)	\
++
++#define RSPI4(fn)			\
++	fn(rspi4, rspck,  2,  8, 8)	\
++	fn(rspi4, ssl0,   2,  9, 8)	\
++	fn(rspi4, mosi,   2, 10, 8)	\
++	fn(rspi4, miso,   2, 11, 8)	\
++	fn(rspi4, rspck,  4,  0, 7)	\
++	fn(rspi4, ssl0,   4,  1, 7)	\
++	fn(rspi4, mosi,   4,  2, 7)	\
++	fn(rspi4, miso,   4,  3, 7)	\
++
++RSPI0(RZ_PIN_AND_MUX)
++RSPI1(RZ_PIN_AND_MUX)
++RSPI2(RZ_PIN_AND_MUX)
++RSPI3(RZ_PIN_AND_MUX)
++RSPI4(RZ_PIN_AND_MUX)
++
+ #define SCIF0(fn)			\
+ 	fn(scif0, clk, 2, 13, 6)	\
+ 	fn(scif0, txd, 2, 14, 6)	\
+@@ -312,6 +376,11 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	RIIC1(RZ_PMX_GROUP)
+ 	RIIC2(RZ_PMX_GROUP)
+ 	RIIC3(RZ_PMX_GROUP)
++	RSPI0(RZ_PMX_GROUP)
++	RSPI1(RZ_PMX_GROUP)
++	RSPI2(RZ_PMX_GROUP)
++	RSPI3(RZ_PMX_GROUP)
++	RSPI4(RZ_PMX_GROUP)
+ 	SCIF0(RZ_PMX_GROUP)
+ 	SCIF1(RZ_PMX_GROUP)
+ 	SCIF2(RZ_PMX_GROUP)
+@@ -339,6 +408,26 @@ static const char * const riic3_groups[] = {
+ 	RIIC3(RZ_GROUPS)
  };
  
-+/* RSPI */
-+#define RSPI_RESOURCE(idx, baseaddr, irq)				\
-+static const struct resource rspi##idx##_resources[] __initconst = {	\
-+	DEFINE_RES_MEM(baseaddr, 0x24),					\
-+	DEFINE_RES_IRQ(irq),		/* SPEI */			\
-+	DEFINE_RES_IRQ(irq + 1),	/* SPRI */			\
-+	DEFINE_RES_IRQ(irq + 2),	/* SPTI */			\
-+}
-+
-+RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
-+RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
-+RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
-+RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
-+RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
-+
-+static const struct rspi_plat_data rspi_pdata __initconst = {
-+	.data_width	= 8,
-+	.txmode		= false,
-+	.spcr2		= false,
-+	.num_chipselect	= 1,
++static const char * const rspi0_groups[] = {
++	RSPI0(RZ_GROUPS)
 +};
 +
-+#define r7s72100_register_rspi(idx)					\
-+	platform_device_register_resndata(&platform_bus, "rspi", idx,	\
-+					rspi##idx##_resources,		\
-+					ARRAY_SIZE(rspi##idx##_resources), \
-+					&rspi_pdata, sizeof(rspi_pdata))
-+
-+static const struct spi_board_info spi_info[] __initconst = {
-+	{
-+		.modalias               = "wm8978",
-+		.max_speed_hz           = 5000000,
-+		.bus_num                = 4,
-+		.chip_select            = 0,
-+	},
++static const char * const rspi1_groups[] = {
++	RSPI1(RZ_GROUPS)
 +};
 +
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
- 	r7s72100_add_dt_devices();
- 
-+	r7s72100_register_rspi(0);
-+	r7s72100_register_rspi(1);
-+	r7s72100_register_rspi(2);
-+	r7s72100_register_rspi(3);
-+	r7s72100_register_rspi(4);
-+	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
- 	platform_device_register_resndata(&platform_bus, "r7s72100-ether", -1,
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
++static const char * const rspi2_groups[] = {
++	RSPI2(RZ_GROUPS)
++};
++
++static const char * const rspi3_groups[] = {
++	RSPI3(RZ_GROUPS)
++};
++
++static const char * const rspi4_groups[] = {
++	RSPI4(RZ_GROUPS)
++};
++
+ static const char * const scif0_groups[] = {
+ 	SCIF0(RZ_GROUPS)
+ };
+@@ -380,6 +469,11 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(riic1),
+ 	SH_PFC_FUNCTION(riic2),
+ 	SH_PFC_FUNCTION(riic3),
++	SH_PFC_FUNCTION(rspi0),
++	SH_PFC_FUNCTION(rspi1),
++	SH_PFC_FUNCTION(rspi2),
++	SH_PFC_FUNCTION(rspi3),
++	SH_PFC_FUNCTION(rspi4),
+ 	SH_PFC_FUNCTION(scif0),
+ 	SH_PFC_FUNCTION(scif1),
+ 	SH_PFC_FUNCTION(scif2),
 -- 
 1.7.9.5
