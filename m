@@ -1,57 +1,88 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:47 +0200
-Subject: [PATCH 04/12] ARM: dts: sb-t35: fix Ethernet power supply
+Date: Sun, 12 Jan 2014 15:22:50 +0200
+Subject: [PATCH 07/12] ARM: dts: cm-t3x30: add HS USB Host support
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-5-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-8-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SB-T35 baseboard features SMSC9220 Ethernet chip which requires
-its own power supply regulators.
-
-Add baseboard specific regulators for the SB-T35 Ethernet chip.
+Add HS USB Host support along with USB PHYs and power supply regulators
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-sb-t35.dtsi |   18 ++++++++++++++++--
- 1 files changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   38 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi |    8 +++++++
+ 2 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-index b3b6e43..7909c51 100644
---- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
-+++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-@@ -2,6 +2,20 @@
-  * Common support for CompuLab SB-T35 used on SBC-T3530, SBC-T3517 and SBC-T3730
-  */
- 
-+/ {
-+	vddvario_sb_t35: regulator-vddvario-sb-t35 {
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index abda493..c671a22 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -19,6 +19,36 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	/* HS USB Port 1 Power */
++	hsusb1_power: hsusb1_power_reg {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vddvario";
-+		regulator-always-on;
++		regulator-name = "hsusb1_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <70000>;
 +	};
 +
-+	vdd33a_sb_t35: regulator-vdd33a-sb-t35 {
++	/* HS USB Port 2 Power */
++	hsusb2_power: hsusb2_power_reg {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vdd33a";
-+		regulator-always-on;
++		regulator-name = "hsusb2_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <70000>;
 +	};
++
++	/* HS USB Host PHY on PORT 1 */
++	hsusb1_phy: hsusb1_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&hsusb1_power>;
++	};
++
++	/* HS USB Host PHY on PORT 2 */
++	hsusb2_phy: hsusb2_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&hsusb2_power>;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -70,3 +100,11 @@
+ &i2c3 {
+ 	clock-frequency = <400000>;
+ };
++&usbhshost {
++	port1-mode = "ehci-phy";
++	port2-mode = "ehci-phy";
 +};
 +
- &omap3_pmx_core {
- 	smsc2_pins: pinmux_smsc2_pins {
- 		pinctrl-single,pins = <
-@@ -43,8 +57,8 @@
- 		gpmc,wr-access-ns = <186>;
- 		gpmc,cycle2cycle-samecsen;
- 		gpmc,cycle2cycle-diffcsen;
--		vddvario-supply = <&vddvario>;
--		vdd33a-supply = <&vdd33a>;
-+		vddvario-supply = <&vddvario_sb_t35>;
-+		vdd33a-supply = <&vdd33a_sb_t35>;
- 		reg-io-width = <4>;
- 		smsc,save-mac-address;
- 	};
++&usbhsehci {
++	phys = <&hsusb1_phy &hsusb2_phy>;
++};
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+index a56d082..cb43929 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+@@ -93,3 +93,11 @@
+ 	/* pullups: BIT(0) */
+ 	ti,pullups = <0x000001>;
+ };
++
++&hsusb1_phy {
++	reset-gpios = <&twl_gpio 6 GPIO_ACTIVE_LOW>;
++};
++
++&hsusb2_phy {
++	reset-gpios = <&twl_gpio 7 GPIO_ACTIVE_LOW>;
++};
 -- 
 1.7.5.4
