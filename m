@@ -1,77 +1,107 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:55 +0200
-Subject: [PATCH 12/12] ARM: OMAP2+: make reset pulse for sbc-t3x usb hubs
+Date: Sun, 12 Jan 2014 15:22:44 +0200
+Subject: [PATCH 01/12] ARM: dts: sbc-t3x: use omap specific pinctrl defines
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-13-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-2-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sbc-t3x boards features two external USB ports on SB-T35 baseboard.
-The baseboardi USB hub reset signal should be de-asserted to make
-those ports functional.
+Use omap specific pinctrl defines (OMAP3_CORE1_IOPAD) to configure
+the padconf register offset.
 
-sbc-t3517 features additional (assembled on CoM) USB hub which also
-requires reset signal handling.
-
-Add quirks code to handle proper reset pulse signal.
+This simplify further support of CompuLab's boards based on omap36xx,
+omap34xx and am35x.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/mach-omap2/pdata-quirks.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-cm-t3730.dts  |   36 ++++++++++++++++----------------
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |    6 ++--
+ 2 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 1ee831f..3e1407c 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -108,6 +108,23 @@ static int omap3_sbc_t3730_twl_callback(struct device *dev,
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
+index 486f4d6..508cd9b 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3730.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
+@@ -34,44 +34,44 @@
+ &omap3_pmx_core {
+ 	mmc1_pins: pinmux_mmc1_pins {
+ 		pinctrl-single,pins = <
+-			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
+-			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
+-			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
+-			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
+-			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
+-			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
++			OMAP3_CORE1_IOPAD(0x2144, PIN_OUTPUT_PULLUP | MUX_MODE0)/* sdmmc1_clk.sdmmc1_clk */
++			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
++			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat0.sdmmc1_dat0 */
++			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat1.sdmmc1_dat1 */
++			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat2.sdmmc1_dat2 */
++			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat3.sdmmc1_dat3 */
+ 		>;
+ 	};
  
-+static void __init omap3_sbc_t3x_usb_hub_init(int gpio, char *hub_name)
-+{
-+	int err = gpio_request_one(gpio, GPIOF_OUT_INIT_LOW, hub_name);
-+
-+	if (err) {
-+		pr_err("SBC-T3x: %s reset gpio request failed: %d\n",
-+			hub_name, err);
-+		return;
-+	}
-+
-+	gpio_export(gpio, 0);
-+
-+	udelay(10);
-+	gpio_set_value(gpio, 1);
-+	msleep(1);
-+}
-+
- static void __init omap3_sbc_t3730_twl_init(void)
- {
- 	twl_gpio_auxdata.setup = omap3_sbc_t3730_twl_callback;
-@@ -115,12 +132,14 @@ static void __init omap3_sbc_t3730_twl_init(void)
+ 	mmc2_pins: pinmux_mmc2_pins {
+ 		pinctrl-single,pins = <
+-			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
+-			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
+-			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
+-			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
+-			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
+-			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
++			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
++			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
++			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
++			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
++			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
++			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
+ 		>;
+ 	};
  
- static void __init omap3_sbc_t3730_legacy_init(void)
- {
-+	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 136);
- 	omap_ads7846_init(1, 57, 0, NULL);
- }
+ 	smsc1_pins: pinmux_smsc1_pins {
+ 		pinctrl-single,pins = <
+-			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
+-			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
++			OMAP3_CORE1_IOPAD(0x20b8, PIN_OUTPUT | MUX_MODE0)	/* gpmc_ncs5.gpmc_ncs5 */
++			OMAP3_CORE1_IOPAD(0x219a, PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
+ 		>;
+ 	};
  
- static void __init omap3_sbc_t3530_legacy_init(void)
- {
-+	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
- 	omap_ads7846_init(1, 57, 0, NULL);
- }
+ 	uart3_pins: pinmux_uart3_pins {
+ 		pinctrl-single,pins = <
+-			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
+-			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
++			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
++			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx.uart3_tx_irtx */
+ 		>;
+ 	};
  
-@@ -198,6 +217,8 @@ static void __init omap3_sbc_t3517_wifi_init(void)
- 
- static void __init omap3_sbc_t3517_legacy_init(void)
- {
-+	omap3_sbc_t3x_usb_hub_init(152, "cm-t3517 usb hub");
-+	omap3_sbc_t3x_usb_hub_init(98, "sb-t35 usb hub");
- 	am35xx_emac_reset();
- 	hsmmc2_internal_input_clk();
- 	omap3_sbc_t3517_wifi_init();
+ 	wl12xx_gpio: pinmux_wl12xx_gpio {
+ 		pinctrl-single,pins = <
+-			0xb2 (PIN_OUTPUT | MUX_MODE4)		/* dss_data3.gpio_73 */
+-			0x134 (PIN_INPUT | MUX_MODE4)		/* sdmmc2_dat4.gpio_136 */
++			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE4)	/* dss_data3.gpio_73 */
++			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT | MUX_MODE4)	/* sdmmc2_dat4.gpio_136 */
+ 		>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+index c119bd5..0a8849f 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+@@ -23,8 +23,8 @@
+ &omap3_pmx_core {
+ 	smsc2_pins: pinmux_smsc2_pins {
+ 		pinctrl-single,pins = <
+-			0x86 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs4.gpmc_ncs4 */
+-			0xa2 (PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
++			OMAP3_CORE1_IOPAD(0x20b6, PIN_OUTPUT | MUX_MODE0)	/* gpmc_ncs4.gpmc_ncs4 */
++			OMAP3_CORE1_IOPAD(0x20d2, PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
+ 		>;
+ 	};
+-};
+\ No newline at end of file
++};
 -- 
 1.7.5.4
