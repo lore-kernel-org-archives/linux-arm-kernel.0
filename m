@@ -1,68 +1,42 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 12:13:40 +0100
-Subject: [PATCH V3 7/9] ARM: shmobile: genmai reference: Add RSPI nodes
+Date: Sun, 12 Jan 2014 12:13:36 +0100
+Subject: [PATCH 3/9] spi: rspi: Use NULL as the clock ID
 In-Reply-To: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
 References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389525222-3482-8-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389525222-3482-4-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Add pinctrl and SPI devices for RSPI on Genmai.
-
-On this board, only rspi4 is in use. Its bus contains a single device
-(a wm8978 audio codec), for which no bindings are defined yet.
+There's only one RSPI/QSPI clock, so we can use NULL as the clock ID
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
-V2:
-  - Use generic "codec" instead of specific "wm8978" node name.
-V3:
-  - No changes
+ drivers/spi/spi-rspi.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
- arch/arm/boot/dts/r7s72100-genmai-reference.dts |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-index 367af5c133e0..c2cc4bd5a470 100644
---- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
-@@ -43,7 +43,7 @@
- };
+diff --git a/drivers/spi/spi-rspi.c b/drivers/spi/spi-rspi.c
+index b6439c9505ac..6fd4770d22bd 100644
+--- a/drivers/spi/spi-rspi.c
++++ b/drivers/spi/spi-rspi.c
+@@ -1078,7 +1078,6 @@ static int rspi_probe(struct platform_device *pdev)
+ 	struct rspi_data *rspi;
+ 	int ret, irq;
+ 	unsigned int i;
+-	char clk_name[16];
+ 	const struct rspi_plat_data *rspi_pd = dev_get_platdata(&pdev->dev);
+ 	const struct spi_ops *ops;
+ 	const struct platform_device_id *id_entry = pdev->id_entry;
+@@ -1108,8 +1107,7 @@ static int rspi_probe(struct platform_device *pdev)
+ 		goto error1;
+ 	}
  
- &pfc {
--	pinctrl-0 = <&scif2_pins &ethernet_pins>;
-+	pinctrl-0 = <&scif2_pins &ethernet_pins &rspi4_pins>;
- 	pinctrl-names = "default";
- 
- 	scif2_pins: serial2 {
-@@ -73,6 +73,12 @@
- 				 "ethernet_int_p1_15";
- 		renesas,function = "ethernet";
- 	};
-+
-+	rspi4_pins: spi4 {
-+		renesas,groups = "rspi4_rspck_p4_0", "rspi4_ssl0_p4_1",
-+				 "rspi4_mosi_p4_2", "rspi4_miso_p4_3";
-+		renesas,function = "rspi4";
-+	};
- };
- 
- &i2c2 {
-@@ -85,3 +91,13 @@
- 		pagesize = <64>;
- 	};
- };
-+
-+&spi4 {
-+	status = "okay";
-+
-+	codec: codec at 0 {
-+		compatible = "wlf,wm8978";
-+		reg = <0>;
-+		spi-max-frequency = <5000000>;
-+	};
-+};
+-	snprintf(clk_name, sizeof(clk_name), "%s%d", id_entry->name, pdev->id);
+-	rspi->clk = devm_clk_get(&pdev->dev, clk_name);
++	rspi->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(rspi->clk)) {
+ 		dev_err(&pdev->dev, "cannot get clock\n");
+ 		ret = PTR_ERR(rspi->clk);
 -- 
 1.7.9.5
