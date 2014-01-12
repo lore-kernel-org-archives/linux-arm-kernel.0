@@ -1,56 +1,255 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Jan 2014 12:31:59 +0000
-Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
- register setting
-In-Reply-To: <20140112132321.757f3fa7@armhf>
-References: <20140109120607.6a33bee5@armhf>
- <20140111183648.GH15937@n2100.arm.linux.org.uk>
- <20140112132321.757f3fa7@armhf>
-Message-ID: <20140112123159.GS15937@n2100.arm.linux.org.uk>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Sun, 12 Jan 2014 13:41:52 +0100
+Subject: [PATCH 3/6] clk: samsung: register cpu clock provider for
+ exynos4210 SoC
+In-Reply-To: <52D2851B.50200@gmail.com>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+ <1389283165-17708-4-git-send-email-thomas.ab@samsung.com>
+ <20140110130424.6aa78438@amdc2363>
+ <CAJuA9aidWvkPPXFfOysqQCQ4d7q_y51zbYxHCK9d-E8+ojfN_w@mail.gmail.com>
+ <20140110151812.5104cc92@amdc2363>
+ <CAJuA9aj3ca9VNsQ9cadVH8pUpyYeaht3DufT3DW4jXuEN5BudA@mail.gmail.com>
+ <52D1FB94.1030006@gmail.com> <20140112092330.4baa2c77@jawa>
+ <52D2851B.50200@gmail.com>
+Message-ID: <20140112134152.58d393f0@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 01:23:21PM +0100, Jean-Francois Moine wrote:
-> On Sat, 11 Jan 2014 18:36:48 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Thu, Jan 09, 2014 at 12:06:07PM +0100, Jean-Francois Moine wrote:
-> > > According to the comment, the TBG_CNTRL_0 register must be set at the
-> > > end of the mode change sequence.
-> > 
-> > So you believe comments without understanding the history, and you move
-> > code around due to those.
-> > 
-> > No, this is again wrong.  That write to REG_TBG_CNTRL_0 in the sequence
-> > writing the video information to the chip.  This doesn't encompass the
-> > HDMI/DVI mode setting nor the audio configuration - the audio configuration
-> > can change independently of the video setting, and does not require this
-> > register to be written.
-> > 
-> > This also brings up a bug in one of your previous patches which I now
-> > must go back and comment upon.
-> 
-> Well, I have not the full spec of the TDA998x's, and I don't know what
-> is important or not. I was hoping that Rob had a better knowledge than I.
-> 
-> So, in my patch 9, I was writing the REG_TBG_CNTRL_1 after writing
-> REG_TBG_CNTRL_0, and you refused it. Here, I write REG_TBG_CNTRL_0
-> after the write of REG_TBG_CNTRL_1 in the HDMI sequence, and you still
-> don't agree.
-> 
-> What is the right way?
+On Sun, 12 Jan 2014 13:05:47 +0100
+Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-No, both NAKS are for the exact same issue.
+> On 12.01.2014 09:23, Lukasz Majewski wrote:
+> > Dear All,
+> >
+> >> On 11.01.2014 06:25, Thomas Abraham wrote:
+> >>> On Fri, Jan 10, 2014 at 7:48 PM, Lukasz Majewski
+> >>> <l.majewski@samsung.com> wrote:
+> >>>>> On Fri, Jan 10, 2014 at 5:34 PM, Lukasz Majewski
+> >>>>> <l.majewski@samsung.com> wrote:
+> [snip]
+> >>>>>>> +
+> >>>>>>> +static const struct samsung_core_clock_freq_table
+> >>>>>>> exyno4210_armclk_table = {
+> >>>>>>> +     .freq           = exynos4210_armclk_freqs,
+> >>>>>>> +     .freq_count     = ARRAY_SIZE(exynos4210_armclk_freqs),
+> >>>>>>> +     .data           = (void *)exynos4210_armclk_data,
+> >>>>>>> +};
+> >>>>>>> +
+> >>>>>>> +static int exynos4210_armclk_set_rate(struct clk_hw *hw,
+> >>>>>>> unsigned long drate,
+> >>>>>>> +                                     unsigned long prate)
+> >>>>>>> +{
+> >>>>>>> +     struct samsung_core_clock *armclk;
+> >>>>>>> +     const struct samsung_core_clock_freq_table *freq_tbl;
+> >>>>>>> +     unsigned long *freq_data;
+> >>>>>>> +     unsigned long mux_reg, idx;
+> >>>>>>> +     void __iomem *base;
+> >>>>>>> +
+> >>>>>>> +     if (drate == prate)
+> >>>>>>> +             return 0;
+> >>>>>>> +
+> >>>>>>> +     armclk = container_of(hw, struct samsung_core_clock,
+> >>>>>>> hw);
+> >>>>>>> +     freq_tbl = armclk->freq_table;
+> >>>>>>> +     freq_data = (unsigned long *)freq_tbl->data;
+> >>>>>>> +     base = armclk->ctrl_base;
+> >>>>>>> +
+> >>>>>>> +     for (idx = 0; idx < freq_tbl->freq_count; idx++,
+> >>>>>>> freq_data += 2)
+> >>>>>>> +             if ((freq_tbl->freq[idx] * 1000) == drate)
+> >>>>>>> +                     break;
+> >>>>>>> +
+> >>>>>>> +     if (!armclk->fout_pll)
+> >>>>>>> +             armclk->fout_pll = __clk_lookup("fout_apll");\
+> >>>>>>                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[*]
+> >>>>>>
+> >>>>>> I'm a bit confused here for two reasons. Please correct me if
+> >>>>>> I'm wrong.
+> >>>>>>
+> >>>>>> 1. You go into this ->set_rate() because of calling
+> >>>>>> clk_set_rate at "arm_clk" clock (numbered as 12 at
+> >>>>>> clk-exynos4.c) at cpufreq-cpu0.c
+> >>>>>>
+> >>>>>> In a Exynos4210 we have:
+> >>>>>> XXTI-> APLL -> fout_apll -> mout_apll -> mout_core -> div_core
+> >>>>>> -> div_core2 -> arm_clk
+> >>>>>>
+> >>>>>> In the code you call directly the fout_apll which changes
+> >>>>>> frequency. Then the change shall be propagated to all
+> >>>>>> registered clocks.
+> >>>>>> I think, that DIV and DIV1 shall be reduced before PLL change
+> >>>>>> [*], to reflect the changes at CCF.
+> >>>>>
+> >>>>> The core clock implementation encapsulates multiple clock blocks
+> >>>>> (such as dividers and muxes) which are in between the output of
+> >>>>> the APLL and the point that actually is the cpu domain clock
+> >>>>> output.
+> >>>>
+> >>>> No problem with that. I mostly agree...
+> >>>>
+> >>>>> When a clock
+> >>>>> frequency change has to be made, all these clock blocks
+> >>>>> encapsulated within the core clock are programmed by
+> >>>>> pre-determined values.
+> >>>>
+> >>>> And what about the situation with already defined clocks (like
+> >>>> "div_core" and "div_core2"). Those will not be updated when you
+> >>>> first call clk_set_rate() and change by hand DIV and DIV1.
+> >>>>
+> >>>> What if you would like to have the PCLK_DBG clock used in the
+> >>>> future? You would add it to CCF and the change will not
+> >>>> propagate.
+> >>>
+> >>> I did intend to remove individual clock blocks which are now
+> >>> encapsulated within the core clock type from the clock driver
+> >>> file. I missed doing that in this patch series.
+> >>
+> >> Yes, they should be removed, since they are encapsulated inside the
+> >> core clock now.
+> >
+> > This was not my point here.
+> >
+> > You are creating an opaque clock for cpu (like
+> > "samsung_clock_cpu" [*]) , which encapsulates many other clocks
+> > (mostly DIVs and MUXes to be more precise).
+> >
+> > I don't think, that those clocks shall be removed from CCF.
+> >
+> > I do believe, that they shall be passed as the argument to [*] and
+> > recalculated.
+> >
+> > Why the advent of [*] clock forbids me from creating and using
+> > clocks based on "div_core", "div_core2" and PCLK_DBG?
+> >
+> > What if I would like to see output of those particular clocks
+> > at /sys/kernel/debug/ or use them at a custom driver?
+> 
+> Having those clocks defined as separate entities in CCF would make
+> them accessible outside the core clock, including changing their 
+> configuration, but they should be only changed on APLL change and 
+> atomically. By registering them as standard CCF clocks you are
+> providing an interface to something that is not allowed.
+> 
+> If there was a _real_ need to have them defined as separate clocks,
+> you would have to implement a separate clock type that would only
+> allow retrieving the rate from it. Maybe a read-only flag for the
+> divider clock could do, as mux clock already has such.
 
-Patch 9 inserted the write to REG_TBG_CNTRL_1 after REG_TBG_CNTRL_0.
-Then in this patch you move REG_TBG_CNTRL_0 after all writes.
+To not create unrealistic use cases, we can export those clocks as read
+only (to allow them to be visible at /sys/kernel/debug).
 
-Had you appropriately placed the write to REG_TBG_CNTRL_1 in patch 9
-in the first place, _this_ patch (patch 20) would not be required to
-then move REG_TBG_CNTRL_0 after it.  So, fixing patch 9 removes the
-need for patch 20.
+Also we can design the code with future write extension in back of our
+heads.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> 
+> >
+> >>
+> >>>
+> >>>>
+> >>>>> This
+> >>>>> approach allows very fast clock speed switching, instead of
+> >>>>> traversing the entire CCF clock tree searching for individual
+> >>>>> clock blocks to be programmed.
+> >>>>
+> >>>> Those are mostly DIV and MUXes. Recalculation shouldn't be time
+> >>>> consuming.
+> >>>
+> >>> I was mainly referring to the time taken to search the clock tree
+> >>> for these individual clock blocks.
+> >>
+> >> Hmm, why couldn't you simply look-up all the needed clock at
+> >> initialization and keep references to them?
+> >
+> > +1
+> >
+> >>
+> >> Still, I think it is fine to directly program registers of
+> >> encapsulated clocks,
+> >
+> > And then recalculate values of relevant clocks build on top of those
+> > registers.
+> >
+> >> since they are not visible outside anymore and
+> >> there is no need for them to be visible.
+> >
+> > Why do you assume, that those clocks won't be needed anymore? For me
+> > clocks like [*] are valid clocks from CCF/user point of view.
+> 
+> I fail to see any use cases for them. Even now from 7 of core clock 
+> dividers of Exynos4210, in clk-exynos4.c only div_core and div_core2
+> are defined.
+> 
+> Then as I noted above, the values set to those internal blocks are 
+> completely tied to used APLL setting and you can't change them 
+> separately. Any potential use case would be limited to reading the 
+> frequency.
+> 
+> >
+> >>
+> >>>
+> >>>>
+> >>>>>
+> >>>>>>
+> >>>>>>
+> >>>>>>> +
+> >>>>>>> +     if (drate < prate) {
+> >>>>>>> +             mux_reg = readl(base + SRC_CPU);
+> >>>>>>> +             writel(mux_reg | (1 << 16), base + SRC_CPU);
+> >>>>>>> +             while (((readl(base + STAT_CPU) >> 16) & 0x7) !=
+> >>>>>>> 2)
+> >>>>>>> +                     ;
+> >>>>>>                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ [**]
+> >>>>>>
+> >>>>>> 2. I think, the above shall be done in a following way:
+> >>>>>>
+> >>>>>>           clk_set_parent(mout_core, mout_mpll);
+> >>>>>>           clk_set_rate(armclk->fout_pll, drate);
+> >>>>>>           clk_set_parent(mout_core, mout_apll);
+> >>>>>>
+> >>>>>> The direct write to registers [**] doesn't look compliant to
+> >>>>>> CCF.
+> >>>>>>
+> >>>>>
+> >>>>> As mentioned above, the clock block encapsulates these clock
+> >>>>> blocks into a single clock and only this single encapsulated
+> >>>>> clock is registered with CCF. The internal implementation of how
+> >>>>> the different clock blocks are managed within this clock is
+> >>>>> independent of the CCF.
+> >>>>
+> >>>> I agree, that the CPU_DIV and CPU_DIV1 shall be changed
+> >>>> atomically (without CCF).
+> >>>>
+> >>>> But on the situation [**] the MUX can be changed by
+> >>>> clk_set_parent() as it is now done at exynosXXXX-cpufreq.c code.
+> >>>
+> >>> The mux is also encapsulated into a larger clock type and this new
+> >>> clock type know how the mux has to be configured.
+> >>
+> >> IMHO it's fine to encapsulate the mux as well. There are no users
+> >> of it other than the core clock.
+> >
+> > In spite of the above comment, it looks far more better to change
+> > clocks with CCF API (like clk_set_parent), not by writing directly
+> > to registers.
+> 
+> This also depends on whether other entities should be able to 
+> reconfigure the mux in question. If it needs to be switched only when 
+> the APLL is reconfigured by core clock, then I don't think there is a 
+> need to provide access to it outside.
+
+The mout_apll and mout_mpll are important clocks for the platform. For
+this reason I'd prefer them to be exported and up to date.
+
+> 
+> Best regards,
+> Tomasz
+
+Best regards,
+Lukasz Majewski
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140112/5c36ca16/attachment-0001.sig>
