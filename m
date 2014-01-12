@@ -1,38 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 12 Jan 2014 20:03:50 +0100
-Subject: [PATCH RFC 01/10] ARM: s3c64xx: pm: Use name field of
- generic_pm_domain
-In-Reply-To: <20140112185337.GA6810@amd.pavel.ucw.cz>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-2-git-send-email-tomasz.figa@gmail.com>
- <20140112114717.GA31318@amd.pavel.ucw.cz> <52D287B1.3090106@gmail.com>
- <20140112185337.GA6810@amd.pavel.ucw.cz>
-Message-ID: <52D2E716.8040403@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 12 Jan 2014 19:20:41 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+Message-ID: <1389554441-27335-5-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2014 19:53, Pavel Machek wrote:
-> Hi!
->
->>> Could we get some more descriptive names for the domains?
->>
->> They are listed like this in user's manual, e.g. DOMAIN_F, DOMAIN_I,
->> DOMAIN_G, etc.
->
-> I guessed so. So the manual sucks. Would it be feasible to get it more
-> descriptive (like "Domain_G (GPU)")?
+From: Mark Brown <broonie@linaro.org>
 
-Does the name really matter that much? I changed original ones in this 
-patch simply to make it easier to grep for domain related messages in 
-kernel output (e.g. dmesg | grep domain). It was not the main part of 
-this patch.
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-Also, there are multiple devices in most domains, so that would rather 
-end up being "Domain_I (JPEG, Cam I/F)", "Domain_P (2D, TV Enc., 
-Scaler)", "Domain_F (Rot, Post, LCD)".
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8. These numbers are just an initial and basic
+approximation for use with the current scheduler, it is likely that both
+experience with silicon and ongoing work on improving the scheduler will
+lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-If you really insist, I can change this, but I fail to see what effect 
-it would really have.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 2748b252d4e7..99347a7659c3 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -177,6 +177,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.2
