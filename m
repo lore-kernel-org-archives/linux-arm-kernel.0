@@ -1,45 +1,33 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:48 +0200
-Subject: [PATCH 05/12] ARM: dts: cm-t3x: add gpio-led pinmux
+Date: Sun, 12 Jan 2014 15:22:46 +0200
+Subject: [PATCH 03/12] ARM: dts: sbc-t3x: disable mmc3
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-6-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-4-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO186 is used for the heartbeat led.
-Setup the pinmux for the GPIO186.
+Disable mmc3 interface, since is not used on sbc-t3x boards.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-cm-t3x.dtsi |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index 842201c..abda493 100644
+index ca6090d..842201c 100644
 --- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
 +++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -11,6 +11,8 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&green_led_pins>;
- 		ledb {
- 			label = "cm-t3x:green";
- 			gpios = <&gpio6 26 GPIO_ACTIVE_HIGH>;  /* gpio186 */
-@@ -38,6 +40,12 @@
- 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3.sdmmc1_dat3 */
- 		>;
- 	};
-+
-+	green_led_pins: pinmux_green_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21e2, PIN_OUTPUT | MUX_MODE4)	/* sys_clkout2.gpio_186 */
-+		>;
-+	};
+@@ -51,6 +51,10 @@
+ 	bus-width = <4>;
  };
  
- &uart3 {
++&mmc3 {
++	status = "disabled";
++};
++
+ &i2c1 {
+ 	clock-frequency = <400000>;
+ };
 -- 
 1.7.5.4
