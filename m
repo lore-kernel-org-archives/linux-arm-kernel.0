@@ -1,33 +1,57 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:46 +0200
-Subject: [PATCH 03/12] ARM: dts: sbc-t3x: disable mmc3
+Date: Sun, 12 Jan 2014 15:22:47 +0200
+Subject: [PATCH 04/12] ARM: dts: sb-t35: fix Ethernet power supply
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-4-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-5-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable mmc3 interface, since is not used on sbc-t3x boards.
+SB-T35 baseboard features SMSC9220 Ethernet chip which requires
+its own power supply regulators.
+
+Add baseboard specific regulators for the SB-T35 Ethernet chip.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-cm-t3x.dtsi |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-sb-t35.dtsi |   18 ++++++++++++++++--
+ 1 files changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index ca6090d..842201c 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -51,6 +51,10 @@
- 	bus-width = <4>;
- };
+diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+index b3b6e43..7909c51 100644
+--- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
++++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+@@ -2,6 +2,20 @@
+  * Common support for CompuLab SB-T35 used on SBC-T3530, SBC-T3517 and SBC-T3730
+  */
  
-+&mmc3 {
-+	status = "disabled";
++/ {
++	vddvario_sb_t35: regulator-vddvario-sb-t35 {
++		compatible = "regulator-fixed";
++		regulator-name = "vddvario";
++		regulator-always-on;
++	};
++
++	vdd33a_sb_t35: regulator-vdd33a-sb-t35 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd33a";
++		regulator-always-on;
++	};
 +};
 +
- &i2c1 {
- 	clock-frequency = <400000>;
- };
+ &omap3_pmx_core {
+ 	smsc2_pins: pinmux_smsc2_pins {
+ 		pinctrl-single,pins = <
+@@ -43,8 +57,8 @@
+ 		gpmc,wr-access-ns = <186>;
+ 		gpmc,cycle2cycle-samecsen;
+ 		gpmc,cycle2cycle-diffcsen;
+-		vddvario-supply = <&vddvario>;
+-		vdd33a-supply = <&vdd33a>;
++		vddvario-supply = <&vddvario_sb_t35>;
++		vdd33a-supply = <&vdd33a_sb_t35>;
+ 		reg-io-width = <4>;
+ 		smsc,save-mac-address;
+ 	};
 -- 
 1.7.5.4
