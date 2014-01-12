@@ -1,81 +1,76 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 12 Jan 2014 14:39:48 +0100
-Subject: [PATCH 1/6] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
-References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
-Message-ID: <52D29B24.3070601@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 12 Jan 2014 13:38:50 +0000
+Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
+ register setting
+In-Reply-To: <20140112142000.1f3e5ab5@armhf>
+References: <20140109120607.6a33bee5@armhf>
+ <20140111183648.GH15937@n2100.arm.linux.org.uk>
+ <20140112132321.757f3fa7@armhf>
+ <20140112123159.GS15937@n2100.arm.linux.org.uk>
+ <20140112142000.1f3e5ab5@armhf>
+Message-ID: <20140112133849.GT15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Sun, Jan 12, 2014 at 02:20:00PM +0100, Jean-Francois Moine wrote:
+> On Sun, 12 Jan 2014 12:31:59 +0000
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > > So, in my patch 9, I was writing the REG_TBG_CNTRL_1 after writing
+> > > REG_TBG_CNTRL_0, and you refused it. Here, I write REG_TBG_CNTRL_0
+> > > after the write of REG_TBG_CNTRL_1 in the HDMI sequence, and you still
+> > > don't agree.
+> > > 
+> > > What is the right way?  
+> > 
+> > No, both NAKS are for the exact same issue.
+> > 
+> > Patch 9 inserted the write to REG_TBG_CNTRL_1 after REG_TBG_CNTRL_0.
+> > Then in this patch you move REG_TBG_CNTRL_0 after all writes.
+> > 
+> > Had you appropriately placed the write to REG_TBG_CNTRL_1 in patch 9
+> > in the first place, _this_ patch (patch 20) would not be required to
+> > then move REG_TBG_CNTRL_0 after it.  So, fixing patch 9 removes the
+> > need for patch 20.
+> 
+> Fixing the patch 9 gives:
+> 
+> 	/*
+> 	 * Always generate sync polarity relative to input sync and
+> 	 * revert input stage toggled sync at output stage
+> 	 */
+> 	reg = TBG_CNTRL_1_DWIN_DIS | TBG_CNTRL_1_TGL_EN;
+> 	if (adj_mode->flags & DRM_MODE_FLAG_NHSYNC)
+> 		reg |= TBG_CNTRL_1_H_TGL;
+> 	if (adj_mode->flags & DRM_MODE_FLAG_NVSYNC)
+> 		reg |= TBG_CNTRL_1_V_TGL;
+> 	reg_write(priv, REG_TBG_CNTRL_1, reg);
+> 
+> 	/* must be last register set: */
+> 	reg_clear(priv, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
+> 
+> 	/* Only setup the info frames if the sink is HDMI */
+> 	if (priv->is_hdmi_sink) {
+> 		/* We need to turn HDMI HDCP stuff on to get audio through */
+> 		reg &= ~TBG_CNTRL_1_DWIN_DIS;
+> 		reg_write(priv, REG_TBG_CNTRL_1, reg);
+> 		reg_write(priv, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(1));
+> 		reg_set(priv, REG_TX33, TX33_HDMI);
+> 
+> 		tda998x_write_avi(priv, adj_mode);
+> 
+> 		if (priv->params.audio_cfg)
+> 			tda998x_configure_audio(priv, adj_mode, &priv->params);
+> 	}
+> 
+> and REG_TBG_CNTRL_1 is set in the HDMI branch (with REG_ENC_CNTRL and
+> REG_TX33).
+> 
+> Is this OK?
 
-Please see my comments inline.
+I would find that acceptable to ack it as a replacement patch 9, thanks.
 
-On 09.01.2014 16:59, Thomas Abraham wrote:
-[snip]
-> @@ -69,12 +71,26 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->   		 new_freq / 1000, volt ? volt / 1000 : -1);
->
->   	/* scaling up?  scale voltage before frequency */
-> -	if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
-> +	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> +				new_freq >= safe_frequency) {
->   		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
->   		if (ret) {
->   			pr_err("failed to scale voltage up: %d\n", ret);
->   			return ret;
->   		}
-> +	} else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
-> +		/*
-> +		 * the scaled up voltage level for the new_freq is lower
-> +		 * than the safe voltage level. so set safe_voltage
-> +		 * as the intermediate voltage level and revert it
-> +		 * back after the frequency has been changed.
-> +		 */
-> +		ret = regulator_set_voltage(cpu_reg, safe_voltage,
-> +						safe_voltage);
-
-Shouldn't the tolerance be used here as well?
-
-> +		if (ret) {
-> +			pr_err("failed to set safe voltage: %d\n", ret);
-> +			return ret;
-> +		}
->   	}
->
->   	ret = clk_set_rate(cpu_clk, freq_exact);
-> @@ -94,6 +110,19 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->   		}
->   	}
->
-> +	/*
-> +	 * if safe voltage was applied during voltage scale up, then set
-> +	 * the correct target voltage now.
-> +	 */
-> +	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> +					new_freq < safe_frequency) {
-> +		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
-> +		if (ret) {
-> +			pr_err("failed to scale voltage up: %d\n", ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-
-I believe that it would be enough to reuse the if block of scaling down 
-instead of repeating the same code, just the condition must be slightly 
-modified:
-
--	/* scaling down?  scale voltage after frequency */
--	if (!IS_ERR(cpu_reg) && new_freq < old_freq) {
-+	/*
-+	 * scaling down or below safe frequency?
-+	 * scale voltage after frequency
-+	 */
-+	if (!IS_ERR(cpu_reg)
-+	    && (new_freq < old_freq || new_freq < safe_frequency)) {
-
-Best regards,
-Tomasz
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
