@@ -1,39 +1,46 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 12:00:29 +0100
-Subject: [PATCH V2 0/3] SoC and board integration for QSPI on r8a7791/koelsch
-Message-ID: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+Date: Sun, 12 Jan 2014 12:00:33 +0100
+Subject: [PATCH V2 4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80 in
+ defconfig
+In-Reply-To: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389524433-2823-5-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the Spansion s25fl512s SPI FLASH on the
-r8a7791-based Koelsch board. It is based on
-renesas-devel-v3.13-rc7-20140109v2, with Valentine's i2c pinctrl and
-Laurent's SCIF DT work applied on top.
-[Simon: I don't know in which order you will merge these. If you want me
- to rebase my patches, just ask! Thanks!]
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This applies to non-multiplatform Koelsch only.  Multi-platform Koelsch
-support will be added in a separate series.
+This enables support for the Spansion s25fl512s SPI FLASH on QSPI.
 
-    [1/4] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
-    [2/4] ARM: shmobile: r8a7791: add QSPI clocks
-    [3/4] ARM: shmobile: koelsch: Add QSPI support
-    [4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80 in
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+V2:
+  - No changes
 
-Changes in V2:
-  - Split QSPI pins in 2 sets of 3 pin groups
-  - Add "[PATCH V2 4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80
-    in defconfig"
+ arch/arm/configs/koelsch_defconfig |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index f795ea42a8fc..8f283f725a12 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -36,6 +36,8 @@ CONFIG_UNIX=y
+ CONFIG_INET=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
++CONFIG_MTD=y
++CONFIG_MTD_M25P80=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+@@ -58,6 +60,8 @@ CONFIG_SH_ETH=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=20
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
++CONFIG_SPI=y
++CONFIG_SPI_RSPI=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+-- 
+1.7.9.5
