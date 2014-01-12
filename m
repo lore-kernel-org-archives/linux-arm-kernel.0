@@ -1,43 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 14:10:28 +0100
-Subject: [PATCH TRIVIAL] ARM: KVM: Spelling s/auxilliary/auxiliary/
-Message-ID: <1389532228-6690-1-git-send-email-geert@linux-m68k.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 12 Jan 2014 14:20:00 +0100
+Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
+ register setting
+In-Reply-To: <20140112123159.GS15937@n2100.arm.linux.org.uk>
+References: <20140109120607.6a33bee5@armhf>
+ <20140111183648.GH15937@n2100.arm.linux.org.uk>
+ <20140112132321.757f3fa7@armhf>
+ <20140112123159.GS15937@n2100.arm.linux.org.uk>
+Message-ID: <20140112142000.1f3e5ab5@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Sun, 12 Jan 2014 12:31:59 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/include/asm/kvm_asm.h   |    2 +-
- arch/arm64/include/asm/kvm_asm.h |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> > So, in my patch 9, I was writing the REG_TBG_CNTRL_1 after writing
+> > REG_TBG_CNTRL_0, and you refused it. Here, I write REG_TBG_CNTRL_0
+> > after the write of REG_TBG_CNTRL_1 in the HDMI sequence, and you still
+> > don't agree.
+> > 
+> > What is the right way?  
+> 
+> No, both NAKS are for the exact same issue.
+> 
+> Patch 9 inserted the write to REG_TBG_CNTRL_1 after REG_TBG_CNTRL_0.
+> Then in this patch you move REG_TBG_CNTRL_0 after all writes.
+> 
+> Had you appropriately placed the write to REG_TBG_CNTRL_1 in patch 9
+> in the first place, _this_ patch (patch 20) would not be required to
+> then move REG_TBG_CNTRL_0 after it.  So, fixing patch 9 removes the
+> need for patch 20.
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 661da11f76f4..cc185243c7f7 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -23,7 +23,7 @@
- #define c0_MPIDR	1	/* MultiProcessor ID Register */
- #define c0_CSSELR	2	/* Cache Size Selection Register */
- #define c1_SCTLR	3	/* System Control Register */
--#define c1_ACTLR	4	/* Auxilliary Control Register */
-+#define c1_ACTLR	4	/* Auxiliary Control Register */
- #define c1_CPACR	5	/* Coprocessor Access Control */
- #define c2_TTBR0	6	/* Translation Table Base Register 0 */
- #define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index b25763bc0ec4..6643c1f5a38c 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -25,7 +25,7 @@
- #define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
- #define	CSSELR_EL1	2	/* Cache Size Selection Register */
- #define	SCTLR_EL1	3	/* System Control Register */
--#define	ACTLR_EL1	4	/* Auxilliary Control Register */
-+#define	ACTLR_EL1	4	/* Auxiliary Control Register */
- #define	CPACR_EL1	5	/* Coprocessor Access Control */
- #define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
- #define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
+Fixing the patch 9 gives:
+
+	/*
+	 * Always generate sync polarity relative to input sync and
+	 * revert input stage toggled sync at output stage
+	 */
+	reg = TBG_CNTRL_1_DWIN_DIS | TBG_CNTRL_1_TGL_EN;
+	if (adj_mode->flags & DRM_MODE_FLAG_NHSYNC)
+		reg |= TBG_CNTRL_1_H_TGL;
+	if (adj_mode->flags & DRM_MODE_FLAG_NVSYNC)
+		reg |= TBG_CNTRL_1_V_TGL;
+	reg_write(priv, REG_TBG_CNTRL_1, reg);
+
+	/* must be last register set: */
+	reg_clear(priv, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
+
+	/* Only setup the info frames if the sink is HDMI */
+	if (priv->is_hdmi_sink) {
+		/* We need to turn HDMI HDCP stuff on to get audio through */
+		reg &= ~TBG_CNTRL_1_DWIN_DIS;
+		reg_write(priv, REG_TBG_CNTRL_1, reg);
+		reg_write(priv, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(1));
+		reg_set(priv, REG_TX33, TX33_HDMI);
+
+		tda998x_write_avi(priv, adj_mode);
+
+		if (priv->params.audio_cfg)
+			tda998x_configure_audio(priv, adj_mode, &priv->params);
+	}
+
+and REG_TBG_CNTRL_1 is set in the HDMI branch (with REG_ENC_CNTRL and
+REG_TX33).
+
+Is this OK?
+
 -- 
-1.7.9.5
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
