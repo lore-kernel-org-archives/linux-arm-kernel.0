@@ -1,68 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jan 2014 00:16:10 +0100
-Subject: DT include files
-In-Reply-To: <201401122121.20084.arnd@arndb.de>
-References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <201401111415.29395.arnd@arndb.de>
- <20140112032516.GA23525@S2101-09.ap.freescale.net>
- <201401122121.20084.arnd@arndb.de>
-Message-ID: <CACRpkdYPrso7KSfWPhZC6chA4z=+YSjKb_SCLx4B-aMmYZYb4A@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 13 Jan 2014 00:43:11 +0100
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio
+ A701
+In-Reply-To: <87zjn9v7xx.fsf@free.fr> (Robert Jarzmik's message of "Mon, 06
+ Jan 2014 09:19:22 +0100")
+References: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+ <87zjn9v7xx.fsf@free.fr>
+Message-ID: <87txd8vka8.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 9:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 12 January 2014, Shawn Guo wrote:
+Hi Arnd,
 
->> , and then code these numbers in their <board>.dts by hand.  It's
->> boring and error prone.  As a comparison, we generate these numbers
->> from reference manual database using a tool and define a macro
->> MX6QDL_PAD_GPIO_17__SPDIF_OUT for these numbers.  The authors only need
->> to find out this macro from imx6q-pinfunc.dtsi and fill it into his dts.
->> Isn't the macro use here helping to ease everyone's life and make the
->> coding less error prone, since the macro is generated from database?
->
-> I was under the impression that the generic pinctrl binding was designed
-> in a way to let you assign labels to each possible (reasonable)
-> configuration so you didn't have get to this level of detail at the
-> driver.
+I cannot reach Haojian, and my platform is currently screen-broken without
+Thierry's patch (see [1] and [2]). I'm trying to have it since -rc6, with no luck.
 
-There is a binding for handles and states tied to a device.
+Could you handle it in arm-soc fixes for -rc9 (if it happens) please ?
 
-There is no generic pinctrl binding for the definition of groups
-and functions and how they map, i.e. muxing.
+Cheers.
 
-The discussion around this ended up with everyone disagreeing
-and eventually everybody started writing their own bindings and
-have them merged.
+--
+Robert
 
-There is a generic pin config binding, not everyone uses it,
-as they defined their bindings before I got that in place. It
-is mostly a requirement for newer drivers.
+[1] http://www.spinics.net/lists/arm-kernel/msg298187.html
+[2] Patch :
 
-This Freescale driver does not use the generic binding but
-instead it's homebrew thing. The reason being that there was
-no generic binding around when it was defined and written.
+>From 7ca9a136dc67ac4c302b15a333e8cfa1c3fc051b Mon Sep 17 00:00:00 2001
+From: Thierry Reding <thierry.reding@gmail.com>
+Date: Fri, 20 Dec 2013 10:46:52 +0100
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio A701
 
-It is possible to migrate it to generic pinconf, which would
-be nice.
+Recent changes to the pwm-backlight driver have made the power supply
+mandatory. There is code in the regulator core to deal with situations
+where no regulator is specified and provide a dummy, but that works on
+DT-based boards only.
 
-> I'm also surprised that you have to know multiple constants
-> (mux register, input register, config register offsets) to select a
-> particular pin. I would have expected that you could have one constant
-> from which the driver is able to compute the other ones.
+The situation can be remedied by adding a dummy regulator during board
+initialization.
 
-I might have merged this but I was younger then :-/
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+---
+ arch/arm/mach-pxa/mioa701.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Now I don't like the looks of this. I think the DT typically shall not
-store register offsets and bitfield information. I think doing
-so is taking away the responsibility of the driver knowing the
-hardware and moving too close to Open Firmware.
-
-pinctrl-single does store such things, the reason being that
-the OMAP people did not even have a datasheet for these regs,
-all they get is datafiles from the ASIC engineers, so there is
-nothing sensible to encode in the driver in C. But I'm reluctant
-also about this driver.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index c2d8625..a8fdcb7 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -38,6 +38,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/reboot.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/max1586.h>
+ #include <linux/slab.h>
+ #include <linux/i2c/pxa-i2c.h>
+@@ -723,6 +724,10 @@ static struct gpio global_gpios[] = {
+ 	{ GPIO56_MT9M111_nOE, GPIOF_OUT_INIT_LOW, "Camera nOE" },
+ };
+ 
++static struct regulator_consumer_supply fixed_5v0_consumers[] = {
++	REGULATOR_SUPPLY("power", "pwm-backlight"),
++};
++
+ static void __init mioa701_machine_init(void)
+ {
+ 	int rc;
+@@ -762,6 +767,10 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_i2c_info(&i2c_pdata);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
++
++	regulator_register_always_on(0, "fixed-5.0V", fixed_5v0_consumers,
++				     ARRAY_SIZE(fixed_5v0_consumers),
++				     5000000);
+ }
+ 
+ static void mioa701_machine_exit(void)
+-- 
+1.7.10.4
