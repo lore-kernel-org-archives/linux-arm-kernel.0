@@ -1,101 +1,138 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 12 Jan 2014 22:36:56 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-References: <87eh4dot61.fsf@natisbad.org>
-Message-ID: <87sissopaf.fsf@natisbad.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 12 Jan 2014 22:42:16 +0100
+Subject: [PATCH V2 1/4] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
+In-Reply-To: <1389524433-2823-2-git-send-email-geert@linux-m68k.org>
+References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+ <1389524433-2823-2-git-send-email-geert@linux-m68k.org>
+Message-ID: <1480099.289e9Xmm12@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geert,
 
-arno at natisbad.org (Arnaud Ebalard) writes:
+Thank you for the patch.
 
-> Both with a LaCie 2.5" USB 3.0 Rugged Mini disk (powered by the port)
-> and a 3.5" SATA disk connected via an ICY DOCK MB981U3S-1S dock station
-> (external power), I can transfer huge files w/o issue but I get the
-> following when transferring small files (e.g. copy of some debian
-> directory to a folder on the disk):
->
-> # cp -rf /lib/ /bin/ /sbin/ /opt /var/ /usr/ test/
-> [  327.130045] xhci_hcd 0000:02:00.0: xHCI host not responding to stop endpoint command.
-> [  327.137899] xhci_hcd 0000:02:00.0: Assuming host is dying, halting host.
-> [  327.144644] xhci_hcd 0000:02:00.0: HC died; cleaning up
-> [  327.150065] usb 3-2: USB disconnect, device number 2
-> [  327.155190] sd 4:0:0:0: Device offlined - not ready after error recovery
-> [  327.170110] sd 4:0:0:0: [sdc] Unhandled error code
-> [  327.174921] sd 4:0:0:0: [sdc]  
-> [  327.178075] sd 4:0:0:0: [sdc] CDB: 
-> [  327.181601] end_request: I/O error, dev sdc, sector 4949712
-> [  327.187188] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 318767104 size 8388608 starting block 618744)
-> [  327.200604] Buffer I/O error on device sdc1, logical block 618458
-> [  327.206711] Buffer I/O error on device sdc1, logical block 618459
-> [  327.212818] Buffer I/O error on device sdc1, logical block 618460
-> [  327.218922] Buffer I/O error on device sdc1, logical block 618461
-> [  327.225030] Buffer I/O error on device sdc1, logical block 618462
-> [  327.231137] Buffer I/O error on device sdc1, logical block 618463
-> [  327.237240] Buffer I/O error on device sdc1, logical block 618464
-> [  327.243347] Buffer I/O error on device sdc1, logical block 618465
-> [  327.249451] Buffer I/O error on device sdc1, logical block 618466
-> [  327.255557] Buffer I/O error on device sdc1, logical block 618467
-> [  327.261717] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618782)
-> [  327.275162] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618812)
-> [  327.288603] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618842)
-> [  327.302043] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618872)
-> [  327.315483] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618902)
-> [  327.328922] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618932)
-> [  327.342362] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618962)
-> [  327.355803] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 618992)
-> [  327.369243] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7342793 (offset 327155712 size 8388608 starting block 619022)
-> [  327.390294] sd 4:0:0:0: [sdc] Unhandled error code
-> [  327.395102] sd 4:0:0:0: [sdc]  
-> [  327.398254] sd 4:0:0:0: [sdc] CDB: 
-> [  327.401775] end_request: I/O error, dev sdc, sector 4949952
-> [  327.413642] Aborting journal on device sdc1-8.
-> [  327.418381] EXT4-fs error (device sdc1): ext4_journal_check_start:56: Detected aborted journal
-> [  327.427057] EXT4-fs (sdc1): Remounting filesystem read-only
-> [  327.432645] EXT4-fs (sdc1): previous I/O error to superblock detected
-> [  327.439119] EXT4-fs (sdc1): ext4_writepages: jbd2_start: 0 pages, ino 7342793; err -30
-> [  327.447223] JBD2: Error -5 detected when updating journal superblock for sdc1-8.
-> [  327.465498] sd 4:0:0:0: [sdc] Synchronizing SCSI cache
-> [  327.470799] sd 4:0:0:0: [sdc]  
-> [  327.476202] EXT4-fs (sdc1): I/O error while writing superblock
->
->
-> Previous trace is obtained on a NETGEAR ReadyNAS 102 (Marvell Armada 370
-> based NAS) using current 3.13.0-rc7. The NAS has a Fresco Logic FL1009
-> XHCI controller: 
+On Sunday 12 January 2014 12:00:30 Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> 
+> A QSPI function set consists of 3 groups:
+>   - qspi_ctrl (2 control wires)
+>   - qspi_data2 (2 data wires, for Single/Dual SPI)
+>   - qspi_data4 (4 data wires, for Quad SPI)
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> Cc: Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I can add the following:
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-2) I just tested the copy of the small files using the ICY DOCK
-MB981U3S-1S connected to my ReadyNAS 102 *on a 3.11.7 kernel*
-and it completed successfully. 
+and applied to my tree.
 
-2) on current 3.13.0-rc7 kernel (w/ Bj?rn patch applied just in case), I
-just transferred 40GB through a Logitec LAN-GT JU3H3 (it is based on an
-ASIX AX88179) connected to my ReadyNAS Duo v2 (NEC XHCI controller) at
-an average rate of 82MB/s. Bottom line: no issue. When I try to do the
-same on my ReadyNAS 102, I immediately get complaints:
+> ---
+> V2:
+>   - Split in 2 sets of 3 pin groups
+> 
+>  drivers/pinctrl/sh-pfc/pfc-r8a7791.c |   63
+> ++++++++++++++++++++++++++++++++++ 1 file changed, 63 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a7791.c index 654bef369ab8..0ac8264440df
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
+> @@ -2135,6 +2135,53 @@ static const unsigned int msiof2_tx_pins[] = {
+>  static const unsigned int msiof2_tx_mux[] = {
+>  	MSIOF2_TXD_MARK,
+>  };
+> +/* - QSPI
+> ------------------------------------------------------------------- */
+> +static const unsigned int qspi_ctrl_pins[] = {
+> +	/* SPCLK, SSL */
+> +	RCAR_GP_PIN(1, 4), RCAR_GP_PIN(1, 9),
+> +};
+> +static const unsigned int qspi_ctrl_mux[] = {
+> +	SPCLK_MARK, SSL_MARK,
+> +};
+> +static const unsigned int qspi_data2_pins[] = {
+> +	/* MOSI_IO0, MISO_IO1 */
+> +	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6),
+> +};
+> +static const unsigned int qspi_data2_mux[] = {
+> +	MOSI_IO0_MARK, MISO_IO1_MARK,
+> +};
+> +static const unsigned int qspi_data4_pins[] = {
+> +	/* MOSI_IO0, MISO_IO1, IO2, IO3 */
+> +	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6), RCAR_GP_PIN(1, 7),
+> +	RCAR_GP_PIN(1, 8),
+> +};
+> +static const unsigned int qspi_data4_mux[] = {
+> +	MOSI_IO0_MARK, MISO_IO1_MARK, IO2_MARK, IO3_MARK,
+> +};
+> +
+> +static const unsigned int qspi_ctrl_b_pins[] = {
+> +	/* SPCLK, SSL */
+> +	RCAR_GP_PIN(6, 0), RCAR_GP_PIN(6, 5),
+> +};
+> +static const unsigned int qspi_ctrl_b_mux[] = {
+> +	SPCLK_B_MARK, SSL_B_MARK,
+> +};
+> +static const unsigned int qspi_data2_b_pins[] = {
+> +	/* MOSI_IO0, MISO_IO1 */
+> +	RCAR_GP_PIN(6, 1), RCAR_GP_PIN(6, 2),
+> +};
+> +static const unsigned int qspi_data2_b_mux[] = {
+> +	MOSI_IO0_B_MARK, MISO_IO1_B_MARK,
+> +};
+> +static const unsigned int qspi_data4_b_pins[] = {
+> +	/* MOSI_IO0, MISO_IO1, IO2, IO3 */
+> +	RCAR_GP_PIN(6, 1), RCAR_GP_PIN(6, 2), RCAR_GP_PIN(6, 3),
+> +	RCAR_GP_PIN(6, 4),
+> +};
+> +static const unsigned int qspi_data4_b_mux[] = {
+> +	SPCLK_B_MARK, MOSI_IO0_B_MARK, MISO_IO1_B_MARK,
+> +	IO2_B_MARK, IO3_B_MARK, SSL_B_MARK,
+> +};
+>  /* - SCIF0
+> ------------------------------------------------------------------ */
+> static const unsigned int scif0_data_pins[] = {
+>  	/* RX, TX */
+> @@ -2877,6 +2924,12 @@ static const struct sh_pfc_pin_group pinmux_groups[]
+> = { SH_PFC_PIN_GROUP(msiof2_ss2),
+>  	SH_PFC_PIN_GROUP(msiof2_rx),
+>  	SH_PFC_PIN_GROUP(msiof2_tx),
+> +	SH_PFC_PIN_GROUP(qspi_ctrl),
+> +	SH_PFC_PIN_GROUP(qspi_data2),
+> +	SH_PFC_PIN_GROUP(qspi_data4),
+> +	SH_PFC_PIN_GROUP(qspi_ctrl_b),
+> +	SH_PFC_PIN_GROUP(qspi_data2_b),
+> +	SH_PFC_PIN_GROUP(qspi_data4_b),
+>  	SH_PFC_PIN_GROUP(scif0_data),
+>  	SH_PFC_PIN_GROUP(scif0_data_b),
+>  	SH_PFC_PIN_GROUP(scif0_data_c),
+> @@ -3074,6 +3127,15 @@ static const char * const msiof2_groups[] = {
+>  	"msiof2_tx",
+>  };
+> 
+> +static const char * const qspi_groups[] = {
+> +	"qspi_ctrl",
+> +	"qspi_data2",
+> +	"qspi_data4",
+> +	"qspi_ctrl_b",
+> +	"qspi_data2_b",
+> +	"qspi_data4_b",
+> +};
+> +
+>  static const char * const scif0_groups[] = {
+>  	"scif0_data",
+>  	"scif0_data_b",
+> @@ -3230,6 +3292,7 @@ static const struct sh_pfc_function pinmux_functions[]
+> = { SH_PFC_FUNCTION(msiof0),
+>  	SH_PFC_FUNCTION(msiof1),
+>  	SH_PFC_FUNCTION(msiof2),
+> +	SH_PFC_FUNCTION(qspi),
+>  	SH_PFC_FUNCTION(scif0),
+>  	SH_PFC_FUNCTION(scif1),
+>  	SH_PFC_FUNCTION(scif2),
+-- 
+Regards,
 
-[  383.280429] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  383.280892] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  411.620073] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
-[  411.620750] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  411.621727] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.066651] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
-[  412.067233] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.068196] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.242708] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
-[  412.243333] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.244246] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.417956] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
-[  412.418516] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.419473] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
-[  412.545330] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
-
-If someone has a system w/ a Fresco Logic FL1009, I would be interested
-by some feedback on how it behaves w/ current kernel.
-
-Cheers,
-
-a+
+Laurent Pinchart
