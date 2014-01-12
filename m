@@ -1,7 +1,7 @@
 From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
-Date: Sat, 11 Jan 2014 10:03:58 +1000
-Subject: [PATCH] ARM: Fix incorrect FDT initrd parameter override
-Message-ID: <0a923e$51mtvt@icp-osb-irony-out9.iinet.net.au>
+Date: Sun, 12 Jan 2014 10:20:00 +1000
+Subject: [PATCH REPOST] ARM: Fix incorrect FDT initrd parameter override
+Message-ID: <deeb5f$5527t1@icp-osb-irony-out2.iinet.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
