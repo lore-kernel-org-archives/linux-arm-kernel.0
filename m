@@ -1,73 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 12 Jan 2014 13:16:49 +0100
-Subject: [PATCH RFC 01/10] ARM: s3c64xx: pm: Use name field of
- generic_pm_domain
-In-Reply-To: <20140112114717.GA31318@amd.pavel.ucw.cz>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-2-git-send-email-tomasz.figa@gmail.com>
- <20140112114717.GA31318@amd.pavel.ucw.cz>
-Message-ID: <52D287B1.3090106@gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 12 Jan 2014 13:23:21 +0100
+Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
+ register setting
+In-Reply-To: <20140111183648.GH15937@n2100.arm.linux.org.uk>
+References: <20140109120607.6a33bee5@armhf>
+ <20140111183648.GH15937@n2100.arm.linux.org.uk>
+Message-ID: <20140112132321.757f3fa7@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Sat, 11 Jan 2014 18:36:48 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-On 12.01.2014 12:47, Pavel Machek wrote:
-> On Sat 2014-01-11 20:42:43, Tomasz Figa wrote:
->> This patch removes name field from private s3c64xx_pm_domain struct and
->> moves domain name to dedicated field of generic_pm_domain struct.
->>
->> When at it, beautify the names a bit, since they are used by genpd core
->> as message prefixes.
->>
->> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
->> ---
->>   arch/arm/mach-s3c64xx/pm.c | 19 +++++++++----------
->>   1 file changed, 9 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
->> index 8cdb824..5238d66 100644
->> --- a/arch/arm/mach-s3c64xx/pm.c
->> +++ b/arch/arm/mach-s3c64xx/pm.c
->> @@ -35,7 +35,6 @@
->>   #include "regs-syscon-power.h"
->>
->>   struct s3c64xx_pm_domain {
->> -	char *const name;
->>   	u32 ena;
->>   	u32 pwr_stat;
->>   	struct generic_pm_domain pd;
->> @@ -76,7 +75,7 @@ static int s3c64xx_pd_on(struct generic_pm_domain *domain)
->>   		} while (retry--);
->>
->>   		if (!retry) {
->> -			pr_err("Failed to start domain %s\n", pd->name);
->> +			pr_err("Failed to start domain %s\n", pd->pd.name);
->>   			return -EBUSY;
->>   		}
->
->
-> So you changed text "failed to start domain I" to "failed to start
-> domain domain_i". Not sure that's an improvement...?
+> On Thu, Jan 09, 2014 at 12:06:07PM +0100, Jean-Francois Moine wrote:
+> > According to the comment, the TBG_CNTRL_0 register must be set at the
+> > end of the mode change sequence.
+> 
+> So you believe comments without understanding the history, and you move
+> code around due to those.
+> 
+> No, this is again wrong.  That write to REG_TBG_CNTRL_0 in the sequence
+> writing the video information to the chip.  This doesn't encompass the
+> HDMI/DVI mode setting nor the audio configuration - the audio configuration
+> can change independently of the video setting, and does not require this
+> register to be written.
+> 
+> This also brings up a bug in one of your previous patches which I now
+> must go back and comment upon.
 
-Right. I apparently missed this, since this error should never happen 
-unless there is something wrong with your hardware (SoC or PMIC).
+Well, I have not the full spec of the TDA998x's, and I don't know what
+is important or not. I was hoping that Rob had a better knowledge than I.
 
-Still, the generic code in drivers/base/power/domain.c does not add the 
-"domain" prefix to the message. Without this patch it was printing 
-messages like
+So, in my patch 9, I was writing the REG_TBG_CNTRL_1 after writing
+REG_TBG_CNTRL_0, and you refused it. Here, I write REG_TBG_CNTRL_0
+after the write of REG_TBG_CNTRL_1 in the HDMI sequence, and you still
+don't agree.
 
-I: Power-on latency exceeded, new value 1000 ns
+What is the right way?
 
-I'd say that what's need adjustment are the messages in 
-mach-s3c64xx/pm.c to print "%s: Failed to start\n" and keep things 
-consistent with higher level code.
-
->
-> Could we get some more descriptive names for the domains?
-
-They are listed like this in user's manual, e.g. DOMAIN_F, DOMAIN_I, 
-DOMAIN_G, etc.
-
-Best regards,
-Tomasz
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
