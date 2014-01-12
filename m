@@ -1,88 +1,75 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:50 +0200
-Subject: [PATCH 07/12] ARM: dts: cm-t3x30: add HS USB Host support
-In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-8-git-send-email-lifshitz@compulab.co.il>
+Date: Sun, 12 Jan 2014 15:22:43 +0200
+Subject: [PATCH 00/11] ARM: dts: sbc-t3x: add support for more boards
+Message-ID: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HS USB Host support along with USB PHYs and power supply regulators
+Add support for CompuLab SBC-T3530 and SBC-T3517 boards:
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
- arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   38 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi |    8 +++++++
- 2 files changed, 46 insertions(+), 0 deletions(-)
+https://compulab.co.il/products/sbcs/sbc-t3530/
+https://compulab.co.il/products/sbcs/sbc-t3517/
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index abda493..c671a22 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -19,6 +19,36 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	/* HS USB Port 1 Power */
-+	hsusb1_power: hsusb1_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb1_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 1 */
-+	hsusb1_phy: hsusb1_phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&hsusb1_power>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&hsusb2_power>;
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -70,3 +100,11 @@
- &i2c3 {
- 	clock-frequency = <400000>;
- };
-+&usbhshost {
-+	port1-mode = "ehci-phy";
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <&hsusb1_phy &hsusb2_phy>;
-+};
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-index a56d082..cb43929 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-@@ -93,3 +93,11 @@
- 	/* pullups: BIT(0) */
- 	ti,pullups = <0x000001>;
- };
-+
-+&hsusb1_phy {
-+	reset-gpios = <&twl_gpio 6 GPIO_ACTIVE_LOW>;
-+};
-+
-+&hsusb2_phy {
-+	reset-gpios = <&twl_gpio 7 GPIO_ACTIVE_LOW>;
-+};
+along with respective CoMs - CM-T3530 and CM-T3517:
+
+https://compulab.co.il/products/computer-on-modules/cm-t3530/
+https://compulab.co.il/products/computer-on-modules/cm-t3517/
+
+The device tree files have the following structure:
+
+omap3-cm-t3x.dtsi
+ |
+ |<-- omap3-cm-t3x30.dtsi
+ |     |
+ |     |
+ |     |     -----                  -------          ------------
+ |     |    | CoM |                | Board |        | Base board |
+ |     |     -----                  -------          ------------
+ |     |                                            omap3-sb-t35.dtsi
+ |     |                                                  |
+ |     |<-- omap3-cm-t3730.dts <-- omap3-sbc-t3730.dts -->|
+ |     |                                                  |
+ |     |<-- omap3-cm-t3530.dts <-- omap3-sbc-t3530.dts -->|
+ |                                                        |
+ |<-------- omap3-cm-t3517.dts <-- omap3-sbc-t3517.dts -->|
+
+
+where omap3-cm-t3730.dts, omap3-cm-t3530.dts, omap3-cm-t3517.dts
+contain CoMs specific data, while omap3-sbc-t3730.dts, omap3-sbc-t3530.dts,
+omap3-sbc-t3517.dts represent eval boards with respective core modules.
+
+This series is based on Tony's omap-for-v3.14/dt branch
+
+Dmitry Lifshitz (11):
+  ARM: dts: sbc-t3x: refactor DT support
+  ARM: dts: sbc-t3x: disable mmc3
+  ARM: dts: sb-t35: fix Ethernet power supply
+  ARM: dts: cm-t3x: add gpio-led pinmux
+  ARM: dts: cm-t3x30: add twl4030 gpio pullups
+  ARM: dts: cm-t3x30: add HS USB Host support
+  ARM: dts: sbc-t3730: add pinmux for usb hub reset
+  ARM: dts: cm-t3x30: add USB OTG support
+  ARM: dts: sbc-t3530: add support for sbc-t3530
+  ARM: dts: sbc-t3517: add support for sbc-t3517
+  ARM: OMAP2+: make reset pulse for sbc-t3x usb hubs
+
+ arch/arm/boot/dts/Makefile            |    4 +
+ arch/arm/boot/dts/omap3-cm-t3517.dts  |  137 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3530.dts  |   13 +++
+ arch/arm/boot/dts/omap3-cm-t3730.dts  |   40 ----------
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi   |  112 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   74 +++++++++++++-----
+ arch/arm/boot/dts/omap3-sb-t35.dtsi   |   30 +++++++-
+ arch/arm/boot/dts/omap3-sbc-t3517.dts |   44 +++++++++++
+ arch/arm/boot/dts/omap3-sbc-t3530.dts |   37 +++++++++
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |   24 +++---
+ arch/arm/mach-omap2/pdata-quirks.c    |   67 ++++++++++++++++-
+ 11 files changed, 506 insertions(+), 76 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3517.dts
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3x.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-sbc-t3517.dts
+ create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
+
 -- 
 1.7.5.4
