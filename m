@@ -1,72 +1,57 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 12:13:42 +0100
-Subject: [PATCH 9/9] ARM: shmobile: koelsch: Add QSPI nodes
+Date: Sun, 12 Jan 2014 12:13:35 +0100
+Subject: [PATCH 2/9] spi: rspi: Convert to clk_prepare_enable/disable_unprepare
 In-Reply-To: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
 References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389525222-3482-10-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389525222-3482-3-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Add pinctrl and SPI devices for QSPI on Koelsch.
-Add Spansion s25fl512s SPI FLASH and MTD partitions.
+Get the driver ready for the migration to the common clock framework by
+calling clk_prepare_enable() and clk_disable_unprepare().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts |   36 +++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/spi/spi-rspi.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index d5e42b396ef7..885b61e09638 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -123,6 +123,11 @@
- 		renesas,groups = "scif1_data_d";
- 		renesas,function = "scif1";
- 	};
-+
-+	qspi_pins: spi {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
- };
+diff --git a/drivers/spi/spi-rspi.c b/drivers/spi/spi-rspi.c
+index 5ce2127b2b43..b6439c9505ac 100644
+--- a/drivers/spi/spi-rspi.c
++++ b/drivers/spi/spi-rspi.c
+@@ -1066,7 +1066,7 @@ static int rspi_remove(struct platform_device *pdev)
+ 	struct rspi_data *rspi = platform_get_drvdata(pdev);
  
- &scif0 {
-@@ -138,3 +143,34 @@
+ 	rspi_release_dma(rspi);
+-	clk_disable(rspi->clk);
++	clk_disable_unprepare(rspi->clk);
  
- 	status = "okay";
- };
+ 	return 0;
+ }
+@@ -1115,7 +1115,12 @@ static int rspi_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(rspi->clk);
+ 		goto error1;
+ 	}
+-	clk_enable(rspi->clk);
 +
-+&spi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl512s";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		m25p,fast-read;
-+
-+		partition at 0 {
-+			label = "loader";
-+			reg = <0x00000000 0x00080000>;
-+			read-only;
-+		};
-+		partition at 80000 {
-+			label = "bootenv";
-+			reg = <0x00080000 0x00080000>;
-+			read-only;
-+		};
-+		partition at 100000 {
-+			label = "data";
-+			reg = <0x00100000 0x03f00000>;
-+		};
-+	};
-+};
++	ret = clk_prepare_enable(rspi->clk);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "unable to prepare/enable clock\n");
++		goto error1;
++	}
+ 
+ 	INIT_LIST_HEAD(&rspi->queue);
+ 	spin_lock_init(&rspi->lock);
+@@ -1177,7 +1182,7 @@ static int rspi_probe(struct platform_device *pdev)
+ error3:
+ 	rspi_release_dma(rspi);
+ error2:
+-	clk_disable(rspi->clk);
++	clk_disable_unprepare(rspi->clk);
+ error1:
+ 	spi_master_put(master);
+ 
 -- 
 1.7.9.5
