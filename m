@@ -1,122 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 12:00:30 +0100
-Subject: [PATCH V2 1/4] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
-In-Reply-To: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
-References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1389524433-2823-2-git-send-email-geert@linux-m68k.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 12 Jan 2014 11:09:16 +0000
+Subject: mainline build: 11 warnings 0 failures (mainline/v3.13-rc8)
+In-Reply-To: <52d274b2.aa13450a.77fb.ffffe540@mx.google.com>
+References: <52d274b2.aa13450a.77fb.ffffe540@mx.google.com>
+Message-ID: <20140112110916.GR15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On Sun, Jan 12, 2014 at 02:55:46AM -0800, Olof's autobuilder wrote:
+> Warnings:
+>       1 drivers/leds/leds-pwm.c:88:22: warning: unused variable 'node' [-Wunused-variable]
+>       1 drivers/net/ethernet/ti/cpsw.c:2140:2: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'resource_size_t' [-Wformat=]
+>       1 drivers/net/ethernet/ti/davinci_cpdma.c:182:3: warning: passing argument 3 of 'dma_alloc_attrs' from incompatible pointer type [enabled by default]
+>       1 drivers/net/ethernet/ti/davinci_cpdma.c:222:25: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+>       1 drivers/net/ethernet/ti/davinci_cpdma.c:223:8: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+>       1 drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'resource_size_t' [-Wformat=]
+>       1 drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'resource_size_t' [-Wformat=]
+>       2 drivers/mtd/nand/gpmi-nand/gpmi-nand.c:123:13: warning: 'set_geometry_by_ecc_info' defined but not used [-Wunused-function]
+>       2 net/netfilter/ipvs/ip_vs_sync.c:1640:8: warning: unused variable 'ret' [-Wunused-variable]
 
-A QSPI function set consists of 3 groups:
-  - qspi_ctrl (2 control wires)
-  - qspi_data2 (2 data wires, for Single/Dual SPI)
-  - qspi_data4 (4 data wires, for Quad SPI)
+Every time I look at these build reports, I see these same old warnings
+time and time again, which no one is addressing.  Some warnings are more
+serious than others.  In this case:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Cc: Cc: Linus Walleij <linus.walleij@linaro.org>
----
-V2:
-  - Split in 2 sets of 3 pin groups
+warning: format 'XX' expects argument of type 'unsigned int', but argument X has type 'resource_size_t' [-Wformat=]
 
- drivers/pinctrl/sh-pfc/pfc-r8a7791.c |   63 ++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+is a serious warning that's a real bug and really needs fixing.  Why?
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7791.c b/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
-index 654bef369ab8..0ac8264440df 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7791.c
-@@ -2135,6 +2135,53 @@ static const unsigned int msiof2_tx_pins[] = {
- static const unsigned int msiof2_tx_mux[] = {
- 	MSIOF2_TXD_MARK,
- };
-+/* - QSPI ------------------------------------------------------------------- */
-+static const unsigned int qspi_ctrl_pins[] = {
-+	/* SPCLK, SSL */
-+	RCAR_GP_PIN(1, 4), RCAR_GP_PIN(1, 9),
-+};
-+static const unsigned int qspi_ctrl_mux[] = {
-+	SPCLK_MARK, SSL_MARK,
-+};
-+static const unsigned int qspi_data2_pins[] = {
-+	/* MOSI_IO0, MISO_IO1 */
-+	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6),
-+};
-+static const unsigned int qspi_data2_mux[] = {
-+	MOSI_IO0_MARK, MISO_IO1_MARK,
-+};
-+static const unsigned int qspi_data4_pins[] = {
-+	/* MOSI_IO0, MISO_IO1, IO2, IO3 */
-+	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6), RCAR_GP_PIN(1, 7),
-+	RCAR_GP_PIN(1, 8),
-+};
-+static const unsigned int qspi_data4_mux[] = {
-+	MOSI_IO0_MARK, MISO_IO1_MARK, IO2_MARK, IO3_MARK,
-+};
-+
-+static const unsigned int qspi_ctrl_b_pins[] = {
-+	/* SPCLK, SSL */
-+	RCAR_GP_PIN(6, 0), RCAR_GP_PIN(6, 5),
-+};
-+static const unsigned int qspi_ctrl_b_mux[] = {
-+	SPCLK_B_MARK, SSL_B_MARK,
-+};
-+static const unsigned int qspi_data2_b_pins[] = {
-+	/* MOSI_IO0, MISO_IO1 */
-+	RCAR_GP_PIN(6, 1), RCAR_GP_PIN(6, 2),
-+};
-+static const unsigned int qspi_data2_b_mux[] = {
-+	MOSI_IO0_B_MARK, MISO_IO1_B_MARK,
-+};
-+static const unsigned int qspi_data4_b_pins[] = {
-+	/* MOSI_IO0, MISO_IO1, IO2, IO3 */
-+	RCAR_GP_PIN(6, 1), RCAR_GP_PIN(6, 2), RCAR_GP_PIN(6, 3),
-+	RCAR_GP_PIN(6, 4),
-+};
-+static const unsigned int qspi_data4_b_mux[] = {
-+	SPCLK_B_MARK, MOSI_IO0_B_MARK, MISO_IO1_B_MARK,
-+	IO2_B_MARK, IO3_B_MARK, SSL_B_MARK,
-+};
- /* - SCIF0 ------------------------------------------------------------------ */
- static const unsigned int scif0_data_pins[] = {
- 	/* RX, TX */
-@@ -2877,6 +2924,12 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(msiof2_ss2),
- 	SH_PFC_PIN_GROUP(msiof2_rx),
- 	SH_PFC_PIN_GROUP(msiof2_tx),
-+	SH_PFC_PIN_GROUP(qspi_ctrl),
-+	SH_PFC_PIN_GROUP(qspi_data2),
-+	SH_PFC_PIN_GROUP(qspi_data4),
-+	SH_PFC_PIN_GROUP(qspi_ctrl_b),
-+	SH_PFC_PIN_GROUP(qspi_data2_b),
-+	SH_PFC_PIN_GROUP(qspi_data4_b),
- 	SH_PFC_PIN_GROUP(scif0_data),
- 	SH_PFC_PIN_GROUP(scif0_data_b),
- 	SH_PFC_PIN_GROUP(scif0_data_c),
-@@ -3074,6 +3127,15 @@ static const char * const msiof2_groups[] = {
- 	"msiof2_tx",
- };
- 
-+static const char * const qspi_groups[] = {
-+	"qspi_ctrl",
-+	"qspi_data2",
-+	"qspi_data4",
-+	"qspi_ctrl_b",
-+	"qspi_data2_b",
-+	"qspi_data4_b",
-+};
-+
- static const char * const scif0_groups[] = {
- 	"scif0_data",
- 	"scif0_data_b",
-@@ -3230,6 +3292,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(msiof0),
- 	SH_PFC_FUNCTION(msiof1),
- 	SH_PFC_FUNCTION(msiof2),
-+	SH_PFC_FUNCTION(qspi),
- 	SH_PFC_FUNCTION(scif0),
- 	SH_PFC_FUNCTION(scif1),
- 	SH_PFC_FUNCTION(scif2),
+It means that format expects to see a 32-bit argument, but has been passed
+a potential 64-bit argument instead.
+
+Firstly, remember that on EABI, 64-bit arguments need natural alignment in
+memory and in registers.  So, if the 32-bit argument would've been in r1,
+it actually gets passed in r2/r3 and r1 is unused.  The result will be
+that we will print r1.
+
+Secondly, any following arguments are not correctly accessed.  If any of
+the following arguments are a pointer which we're going to dereference (eg,
+due to a %s format or one of these new fangled %p formats), we will not
+dereference the pointer that we think we should be - taking the above
+example, the next argument will be r2, rather than the first stacked
+argument.
+
+All these resource_size_t warnings need to be fixed, and stay fixed.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
