@@ -1,71 +1,45 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 12 Jan 2014 14:20:00 +0100
-Subject: [PATCH v2 20/28] drm/i2c: tda998x: move the TBG_CNTRL_0
- register setting
-In-Reply-To: <20140112123159.GS15937@n2100.arm.linux.org.uk>
-References: <20140109120607.6a33bee5@armhf>
- <20140111183648.GH15937@n2100.arm.linux.org.uk>
- <20140112132321.757f3fa7@armhf>
- <20140112123159.GS15937@n2100.arm.linux.org.uk>
-Message-ID: <20140112142000.1f3e5ab5@armhf>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Sun, 12 Jan 2014 15:22:48 +0200
+Subject: [PATCH 05/12] ARM: dts: cm-t3x: add gpio-led pinmux
+In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
+References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-6-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Jan 2014 12:31:59 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+GPIO186 is used for the heartbeat led.
+Setup the pinmux for the GPIO186.
 
-> > So, in my patch 9, I was writing the REG_TBG_CNTRL_1 after writing
-> > REG_TBG_CNTRL_0, and you refused it. Here, I write REG_TBG_CNTRL_0
-> > after the write of REG_TBG_CNTRL_1 in the HDMI sequence, and you still
-> > don't agree.
-> > 
-> > What is the right way?  
-> 
-> No, both NAKS are for the exact same issue.
-> 
-> Patch 9 inserted the write to REG_TBG_CNTRL_1 after REG_TBG_CNTRL_0.
-> Then in this patch you move REG_TBG_CNTRL_0 after all writes.
-> 
-> Had you appropriately placed the write to REG_TBG_CNTRL_1 in patch 9
-> in the first place, _this_ patch (patch 20) would not be required to
-> then move REG_TBG_CNTRL_0 after it.  So, fixing patch 9 removes the
-> need for patch 20.
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+---
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Fixing the patch 9 gives:
-
-	/*
-	 * Always generate sync polarity relative to input sync and
-	 * revert input stage toggled sync at output stage
-	 */
-	reg = TBG_CNTRL_1_DWIN_DIS | TBG_CNTRL_1_TGL_EN;
-	if (adj_mode->flags & DRM_MODE_FLAG_NHSYNC)
-		reg |= TBG_CNTRL_1_H_TGL;
-	if (adj_mode->flags & DRM_MODE_FLAG_NVSYNC)
-		reg |= TBG_CNTRL_1_V_TGL;
-	reg_write(priv, REG_TBG_CNTRL_1, reg);
-
-	/* must be last register set: */
-	reg_clear(priv, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
-
-	/* Only setup the info frames if the sink is HDMI */
-	if (priv->is_hdmi_sink) {
-		/* We need to turn HDMI HDCP stuff on to get audio through */
-		reg &= ~TBG_CNTRL_1_DWIN_DIS;
-		reg_write(priv, REG_TBG_CNTRL_1, reg);
-		reg_write(priv, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(1));
-		reg_set(priv, REG_TX33, TX33_HDMI);
-
-		tda998x_write_avi(priv, adj_mode);
-
-		if (priv->params.audio_cfg)
-			tda998x_configure_audio(priv, adj_mode, &priv->params);
-	}
-
-and REG_TBG_CNTRL_1 is set in the HDMI branch (with REG_ENC_CNTRL and
-REG_TX33).
-
-Is this OK?
-
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index 842201c..abda493 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -11,6 +11,8 @@
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&green_led_pins>;
+ 		ledb {
+ 			label = "cm-t3x:green";
+ 			gpios = <&gpio6 26 GPIO_ACTIVE_HIGH>;  /* gpio186 */
+@@ -38,6 +40,12 @@
+ 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3.sdmmc1_dat3 */
+ 		>;
+ 	};
++
++	green_led_pins: pinmux_green_led_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x21e2, PIN_OUTPUT | MUX_MODE4)	/* sys_clkout2.gpio_186 */
++		>;
++	};
+ };
+ 
+ &uart3 {
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.5.4
