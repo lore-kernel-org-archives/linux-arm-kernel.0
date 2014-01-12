@@ -1,44 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 12 Jan 2014 21:21:19 +0100
-Subject: DT include files
-In-Reply-To: <20140112032516.GA23525@S2101-09.ap.freescale.net>
-References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <201401111415.29395.arnd@arndb.de>
- <20140112032516.GA23525@S2101-09.ap.freescale.net>
-Message-ID: <201401122121.20084.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 12 Jan 2014 21:34:29 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove unneeded s3c24xx_init_cpu()
+Message-ID: <3865198.Kyn1P03kbU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 12 January 2014, Shawn Guo wrote:
-> Let's say the mux option SPDIF_OUT of pin GPIO_17 is used on a few board
-> designs, hummingboard, nitrogen6x and wandboard.  If we do not use
-> macro, every author of these board dts files need to look into reference
-> manual to find out the following numbers
-> 
->  - The mux register offset of pin GPIO_17
->  - The select input register offset of pin GPIO_17
->  - The config register offset of pin GPIO_17
->  - The value of SPDIF_OUT mux option for GPIO_17
->  - The select input value of SPDIF_OUT mux option for GPIO_17
-> 
-> , and then code these numbers in their <board>.dts by hand.  It's
-> boring and error prone.  As a comparison, we generate these numbers
-> from reference manual database using a tool and define a macro
-> MX6QDL_PAD_GPIO_17__SPDIF_OUT for these numbers.  The authors only need
-> to find out this macro from imx6q-pinfunc.dtsi and fill it into his dts.
-> Isn't the macro use here helping to ease everyone's life and make the
-> coding less error prone, since the macro is generated from database?
+The function is nearly empty and samsung_cpu_rev is static so already 0
+making the function obsolete, therefore remove it.
 
-I was under the impression that the generic pinctrl binding was designed
-in a way to let you assign labels to each possible (reasonable)
-configuration so you didn't have get to this level of detail at the
-driver. I'm also surprised that you have to know multiple constants
-(mux register, input register, config register offsets) to select a
-particular pin. I would have expected that you could have one constant
-from which the driver is able to compute the other ones.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/common.c           |    1 -
+ arch/arm/plat-samsung/cpu.c              |    7 -------
+ arch/arm/plat-samsung/include/plat/cpu.h |    1 -
+ 3 files changed, 9 deletions(-)
 
-If you actually need the complexity that you describe in the board files,
-the macros don't seem worse than the alternative, I would just be happier
-if the pinctrl driver binding could do without them.
-
-	Arnd
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index bf57d4c..97edd4d 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -232,7 +232,6 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ 	} else {
+ 		samsung_cpu_id = s3c24xx_read_idcode_v4();
+ 	}
+-	s3c24xx_init_cpu();
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ 
+diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
+index 46b426e..364963a 100644
+--- a/arch/arm/plat-samsung/cpu.c
++++ b/arch/arm/plat-samsung/cpu.c
+@@ -28,13 +28,6 @@ unsigned int samsung_rev(void)
+ }
+ EXPORT_SYMBOL(samsung_rev);
+ 
+-void __init s3c24xx_init_cpu(void)
+-{
+-	/* nothing here yet */
+-
+-	samsung_cpu_rev = 0;
+-}
+-
+ void __init s3c64xx_init_cpu(void)
+ {
+ 	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 8f09488..262ef86 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -207,7 +207,6 @@ extern void s5p_init_irq(u32 *vic, u32 num_vic);
+ 
+ extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
+ 
+-extern void s3c24xx_init_cpu(void);
+ extern void s3c64xx_init_cpu(void);
+ extern void s5p_init_cpu(void __iomem *cpuid_addr);
+ 
+-- 
+1.7.10.4
