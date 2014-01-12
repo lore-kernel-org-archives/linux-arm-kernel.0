@@ -1,62 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 12 Jan 2014 03:26:51 +0100
-Subject: [PATCH 0/6] cpufreq: use cpufreq-cpu0 driver for exynos4210 based
- platforms
-In-Reply-To: <CAJuA9ahCc7b=209Tmh-O_cx2aEhPY+s_TjHHnjGk1x3duE-P1g@mail.gmail.com>
-References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <20140110113240.797381e6@amdc2363>
- <CAJuA9ahCc7b=209Tmh-O_cx2aEhPY+s_TjHHnjGk1x3duE-P1g@mail.gmail.com>
-Message-ID: <52D1FD6B.9050503@gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 12 Jan 2014 16:04:43 +1300
+Subject: [PATCH v4 0/2] ohci and ehci-platform clks, phy and dt support
+In-Reply-To: <Pine.LNX.4.44L0.1401111728150.16586-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1401111728150.16586-100000@netrider.rowland.org>
+Message-ID: <52D2064B.3010103@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.01.2014 12:59, Thomas Abraham wrote:
-> Hi Lukasz,
+On 12/01/14 11:30, Alan Stern wrote:
+> On Fri, 10 Jan 2014, Hans de Goede wrote:
 >
-> On Fri, Jan 10, 2014 at 4:02 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
->> Hi Thomas,
+>> Hi,
 >>
->> I've investigated the topic for a while, so if you don't mind I will
->> share my thoughts :-)
->
-> Sure. Thanks for having a look at this patch series.
->
->>
->>> The patch series removes the use of Exynos4210 specific cpufreq driver
->>> and enables to use the cpufreq-cpu0 driver for Exynos4210 based
->>> platforms. This is being done for few reasons.
+>> On 01/11/2014 12:50 AM, Sergei Shtylyov wrote:
+>>> Hello.
 >>>
->>> (a) The Exynos4210 cpufreq driver reads/writes clock controller
->>> registers bypassing the Exynos4 CCF driver which is sort of
->>> problematic.
->>
->> Also other, already supported devices suffer from it. Namely -
->> Exynos4x12 and Exynos5250.
->>
+>>> On 01/11/2014 01:46 AM, Hans de Goede wrote:
+>>>
+>>>> Here is v4 of my ohci and ehci-platform clks, phy and dt support patch-set,
+>>>> this version should be 100% ready for merging upstream.
+>>>      I see you've decided to completely ignore my opinion. NAK, FWIW.
+>> I'm sorry but the whole prefix thing has become a thing of -ETOOMUCHBIKESHEDDING,
+>> everyone except you seems to be fine with mmio and and one point in time we
+>> need to make a decision and move forward.
+> If this isn't beating a dead horse...  Maybe everyone can agree on a
+> name like ohci-generic or generic-ohci.  That seems like a pretty good
+> description of the hardware that the platform driver can handle.
 >
-> Right, I did check the cpufreq driver of these SoCs.
->
->> That's why the solution shall be as generic as possible to also work
->> with those two SoCs.
->
-> The approach taken here is to encapsulate the source of the CPU domain
-> clock in a single logical clock. The implementation of this logical
-> clock can vary for different Exynos SoCs but the interface to register
-> and use this clock is common for all Exynos SoCs. If the changes in
-> the cpufreq-cpu0 driver are accepted, the combination of cpufreq-cpu0
-> and the logical clock representing the CPU clock is sufficient to
-> provide a generic solution for Exynos4x12 and Exynos5250 SoCs.
+> Alan Stern
+I prefer the -generic option, although generic- is equally fine - Having 
+said that, I don't really care if it's called mmio either (although this 
+does seem less 'descriptive').
 
-Well, looking at Exynos SoCs, the structure of core block is very 
-similar on all of them. You have a single mux to select between MPLL and 
-APLL and then a number of dividers that need to be configured 
-quasi-atomically when CPU frequency is to be changed or, looking at 
-higher level, a set of registers, which values need to be changed 
-(possibly masked).
-
-I'd say it wouldn't require much more effort to make this common at 
-least for all currently supported Exynos SoCs (except 5440, which has 
-completely different clock logic).
-
-Best regards,
-Tomasz
+Regards
+Tony Prisk
