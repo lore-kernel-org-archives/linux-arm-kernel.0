@@ -1,41 +1,43 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 11 Jan 2014 15:47:31 -0800
-Subject: [PATCH 0/4] mtd: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
-In-Reply-To: <1387555350-989-1-git-send-email-shijie8@gmail.com>
+Date: Sat, 11 Jan 2014 16:04:14 -0800
+Subject: [PATCH 3/4] mtd: nand: kill the the
+ NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE for nand_buffers{}
+In-Reply-To: <20140111234353.GO15937@n2100.arm.linux.org.uk>
 References: <1387555350-989-1-git-send-email-shijie8@gmail.com>
-Message-ID: <20140111234731.GG1992@norris-Latitude-E6410>
+ <1387555350-989-4-git-send-email-shijie8@gmail.com>
+ <20140111233937.GF1992@norris-Latitude-E6410>
+ <20140111234353.GO15937@n2100.arm.linux.org.uk>
+Message-ID: <20140112000414.GH1992@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 21, 2013 at 12:02:26AM +0800, Huang Shijie wrote:
-> [1] Why kill them?
->     As time goes on, the NAND's page size and oob size become larger and larger.
->     So we have changes these two macros frequently in order to support the new
->     NAND.
+On Sat, Jan 11, 2014 at 11:43:53PM +0000, Russell King - ARM Linux wrote:
+> On Sat, Jan 11, 2014 at 03:39:37PM -0800, Brian Norris wrote:
+> > When you move this after nand_scan_ident(), you forgot to move all the code
+> > that uses dmabuf and dmabuf:
+> > 
+> >         /* Set up DMA address */
+> >         cafe_writel(cafe, cafe->dmaaddr & 0xffffffff, NAND_DMA_ADDR0);
+> >         if (sizeof(cafe->dmaaddr) > 4)
+> >                 /* Shift in two parts to shut the compiler up */
+> >                 cafe_writel(cafe, (cafe->dmaaddr >> 16) >> 16, NAND_DMA_ADDR1);
+> >         else
+> >                 cafe_writel(cafe, 0, NAND_DMA_ADDR1);
+> > 
+> >         cafe_dev_dbg(&cafe->pdev->dev, "Set DMA address to %x (virt %p)\n",
+> >                 cafe_readl(cafe, NAND_DMA_ADDR0), cafe->dmabuf);
+> > 
+> > This code needs to stay after the point where you actually allocate the buffer.
 > 
-> [2] How does this patch set do?
->     There are three drivers which uses these two macros, the mxc-nand, denali,
->     and the cafe-nand.
+> You may wish to evaluate generated code differences between the above and
+> implementing it like this:
 > 
->     This patch will allocate a temporary buffer for the nand_scan_ident, and 
->     after it have getten the right page size and oob size, it will re-allocate
->     the buffer again.
+> 	u64 dmaaddr = cafe->dmaaddr;
 > 
-> [3] I do not have the boards which have the relative NAND controller.
-> 
->     I hope someone can test this patch set.
-> 
->     thanks.
-> 
-> 
-> Huang Shijie (4):
->   mtd: mxc-nand: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
->   mtd: denali: kill the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
->   mtd: nand: kill the the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE for
->     nand_buffers{}
->   mtd: nand: remove the NAND_MAX_PAGESIZE/NAND_MAX_OOBSIZE
+> 	cafe_writel(cafe, dmaaddr, NAND_DMA_ADDR0);
+> 	cafe_writel(cafe, dmaaddr >> 32, NAMD_DMA_ADDR1);
 
-Pushed only the first 2 patches. Patch 3 still has some issues.
+Well, that's not the primary concern of this patch, but that looks good.
+Thanks for the idea. I'll take a look sometime.
 
-Thanks,
 Brian
