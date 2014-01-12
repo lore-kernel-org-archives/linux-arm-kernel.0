@@ -1,454 +1,116 @@
-From: l.majewski@majess.pl (Lukasz Majewski)
-Date: Sun, 12 Jan 2014 09:23:30 +0100
-Subject: [PATCH 3/6] clk: samsung: register cpu clock provider for
- exynos4210 SoC
-In-Reply-To: <52D1FB94.1030006@gmail.com>
-References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
- <1389283165-17708-4-git-send-email-thomas.ab@samsung.com>
- <20140110130424.6aa78438@amdc2363>
- <CAJuA9aidWvkPPXFfOysqQCQ4d7q_y51zbYxHCK9d-E8+ojfN_w@mail.gmail.com>
- <20140110151812.5104cc92@amdc2363>
- <CAJuA9aj3ca9VNsQ9cadVH8pUpyYeaht3DufT3DW4jXuEN5BudA@mail.gmail.com>
- <52D1FB94.1030006@gmail.com>
-Message-ID: <20140112092330.4baa2c77@jawa>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 12 Jan 2014 10:17:19 +0100
+Subject: [PATCH v4 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52D102D4.4090302@prisktech.co.nz>
+References: <1389393980-21183-1-git-send-email-hdegoede@redhat.com>
+ <1389393980-21183-2-git-send-email-hdegoede@redhat.com>
+ <52D102D4.4090302@prisktech.co.nz>
+Message-ID: <52D25D9F.9020104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+Hi,
 
-> On 11.01.2014 06:25, Thomas Abraham wrote:
-> > On Fri, Jan 10, 2014 at 7:48 PM, Lukasz Majewski
-> > <l.majewski@samsung.com> wrote:
-> >> Hi Thomas,
-> >>
-> >>> Hi Lukasz,
-> >>>
-> >>> On Fri, Jan 10, 2014 at 5:34 PM, Lukasz Majewski
-> >>> <l.majewski@samsung.com> wrote:
-> >>>> Hi Thomas,
-> >>>>
-> >>>>> Add a new clock provider for ARM clock domain. This clock
-> >>>>> provider is composed of multiple components which include
-> >>>>> mux_core, div_core, div_core2, div_corem0, div_corem1,
-> >>>>> div_periph, div_atb, div_pclk_dbg, div_copy and div_hpm. This
-> >>>>> composition of mutiple components into a single clock provider
-> >>>>> helps with faster completion of CPU clock speed switching
-> >>>>> during DVFS operations.
-> >>>>>
-> >>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>> ---
-> >>>>>   drivers/clk/samsung/clk-exynos4.c |   96
-> >>>>> ++++++++++++++++++++++++++++++++++++- 1 files changed, 95
-> >>>>> insertions(+), 1 deletions(-)
-> >>>>>
-> >>>>> diff --git a/drivers/clk/samsung/clk-exynos4.c
-> >>>>> b/drivers/clk/samsung/clk-exynos4.c index d967571..4bf2f93
-> >>>>> 100644 --- a/drivers/clk/samsung/clk-exynos4.c
-> >>>>> +++ b/drivers/clk/samsung/clk-exynos4.c
-> >>>>> @@ -108,8 +108,11 @@
-> >>>>>   #define APLL_CON0            0x14100
-> >>>>>   #define E4210_MPLL_CON0              0x14108
-> >>>>>   #define SRC_CPU                      0x14200
-> >>>>> +#define STAT_CPU             0x14400
-> >>>>>   #define DIV_CPU0             0x14500
-> >>>>>   #define DIV_CPU1             0x14504
-> >>>>> +#define DIV_STAT_CPU0                0x14600
-> >>>>> +#define DIV_STAT_CPU1                0x14604
-> >>>>>   #define GATE_SCLK_CPU                0x14800
-> >>>>>   #define GATE_IP_CPU          0x14900
-> >>>>>   #define E4X12_DIV_ISP0               0x18300
-> >>>>> @@ -289,7 +292,7 @@ static unsigned long exynos4_clk_regs[]
-> >>>>> __initdata = { };
-> >>>>>
-> >>>>>   /* list of all parent clock list */
-> >>>>> -PNAME(mout_apll_p)   = { "fin_pll", "fout_apll", };
-> >>>>> +PNAME(mout_apll_p)   = { "fin_pll", "fout_apll1", };
-> >>>>>   PNAME(mout_mpll_p)   = { "fin_pll", "fout_mpll", };
-> >>>>>   PNAME(mout_epll_p)   = { "fin_pll", "fout_epll", };
-> >>>>>   PNAME(mout_vpllsrc_p)        = { "fin_pll", "sclk_hdmi24m", };
-> >>>>> @@ -306,6 +309,7 @@ PNAME(mout_onenand_p)  = {"aclk133",
-> >>>>> "aclk160", }; PNAME(mout_onenand1_p) = {"mout_onenand",
-> >>>>> "sclk_vpll", };
-> >>>>>
-> >>>>>   /* Exynos 4210-specific parent groups */
-> >>>>> +PNAME(armclk_p) = { "fout_apll", };
-> >>>>
-> >>>> Here you only give no parent clock, but at
-> >>>> samsung_coreclk_register() it is expected to provide list of
-> >>>> parents.
-> >>>
-> >>> Here only one parent is listed, but the core clock type does not
-> >>> limit the number of parents that can be specified. A specific
-> >>> implementation can define and use multiple parents.
-> >>
-> >> I only pointed out that the definition of the:
-> >>
-> >> samsung_coreclk_register("armclk", armclk_p,
-> >>                      ARRAY_SIZE(armclk_p), "fout_apll",
-> >>                      &exynos4210_armclk_clk_ops, arm_clk,
-> >>                      &exyno4210_armclk_table);
-> >>
-> >> Could only use parent, especially when you plan to change mux clock
-> >> (apll vs. mpll) by writing directly to registers (which I think is
-> >> bad).
-> >
-> > This definition is not limited to be used only on Exynos4210. This
-> > is a generic core clock registration helper function intended to be
-> > reusable across multiple Samsung SoCs.
-> >
-> 
-> I think Lukasz meant that you should rather use parent list to pass
-> any input clocks of the core clock block, instead of hardcoded clock
-> look-up inside clock ops.
+Thanks for the review. Note I did my best to ensure my patches
+would not break vt8500 support, but if you could run some tests
+with them that would be great.
 
-Yes, that was my point.
+On 01/11/2014 09:37 AM, Tony Prisk wrote:
+> On 11/01/14 11:46, Hans de Goede wrote:
+>> Add support for ohci-platform instantiation from devicetree, including
+>> optionally getting clks and a phy from devicetree, and enabling / disabling
+>> those on power_on / off.
+>>
+>> This should allow using ohci-platform from devicetree in various cases.
+>> Specifically after this commit it can be used for the ohci controller found
+>> on Allwinner sunxi SoCs.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   .../devicetree/bindings/usb/mmio-ohci.txt          |  22 +++
+>>   drivers/usb/host/ohci-platform.c                   | 164 ++++++++++++++++++---
+>>   2 files changed, 162 insertions(+), 24 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/mmio-ohci.txt b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>> new file mode 100644
+>> index 0000000..9c776ed
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/mmio-ohci.txt
+>> @@ -0,0 +1,22 @@
+>> +Generic MMIO OHCI controller
+>> +
+>> +Required properties:
+>> +- compatible : "mmio-ohci"
+>> +- reg : ohci controller register range (address and length)
+>> +- interrupts : ohci controller interrupt
+>> +
+>> +Optional properties:
+>> +- clocks : a list of phandle + clock specifier pairs
+>> +- phys : phandle + phy specifier pair
+>> +- phy-names : "usb"
+>> +
+>> +Example:
+>> +
+>> +    ohci0: ohci at 0x01c14400 {
+>> +        compatible = "mmio-ohci";
+>> +        reg = <0x01c14400 0x100>;
+>> +        interrupts = <64>;
+>> +        clocks = <&usb_clk 6>, <&ahb_gates 2>;
+>> +        phys = <&usbphy 1>;
+>> +        phy-names = "usb";
+>> +    };
+>>
+>> ... <snip> ....
+>>
+>> @@ -83,17 +156,40 @@ static int ohci_platform_probe(struct platform_device *dev)
+>>           return -ENXIO;
+>>       }
+>> +    hcd = usb_create_hcd(&ohci_platform_hc_driver, &dev->dev,
+>> +            dev_name(&dev->dev));
+>> +    if (!hcd)
+>> +        return -ENOMEM;
+>> +
+>> +    platform_set_drvdata(dev, hcd);
+>> +    dev->dev.platform_data = pdata;
+>> +    priv = hcd_to_ohci_priv(hcd);
+>> +
+>> +    if (pdata == &ohci_platform_defaults && dev->dev.of_node) {
+>> +        priv->phy = devm_phy_get(&dev->dev, "usb");
+>> +        if (IS_ERR(priv->phy)) {
+>> +            err = PTR_ERR(priv->phy);
+>> +            if (err == -EPROBE_DEFER)
+>> +                goto err_put_hcd;
+>> +            priv->phy = NULL;
+>> +        }
+>> +
+>> +        for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
+>> +            priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
+>> +            if (IS_ERR(priv->clks[clk])) {
+>> +                err = PTR_ERR(priv->clks[clk]);
+>> +                if (err == -EPROBE_DEFER)
+>> +                    goto err_put_clks;
+>> +                priv->clks[clk] = NULL;
+>> +                break;
+>> +            }
+>> +        }
+>> +    }
+>>
+>
+> Given that you have limited the clock parsing to OHCI_MAX_CLKS, there should be some kind of warning/error message if the DT contains more than OHCI_MAX_CLKS - otherwise you have silent failures when the clocks aren't configured.
 
-> 
-> >>
-> >>>
-> >>>>
-> >>>>>   PNAME(sclk_vpll_p4210)       = { "mout_vpllsrc",
-> >>>>> "fout_vpll", }; PNAME(mout_core_p4210)       = { "mout_apll",
-> >>>>> "sclk_mpll", }; PNAME(sclk_ampll_p4210)      = { "sclk_mpll",
-> >>>>> "sclk_apll", }; @@ -1089,6 +1093,92 @@ static struct
-> >>>>> samsung_pll_clock exynos4x12_plls[nr_plls] __initdata =
-> >>>>> { VPLL_LOCK, VPLL_CON0, NULL), };
-> >>>>>
-> >>>>> +#define EXYNOS4210_DIV_CPU0(apll, pclk_dbg, atb, periph,
-> >>>>> corem1, corem0) \
-> >>>>> +             ((apll << 24) | (pclk_dbg << 20) | (atb << 16) | \
-> >>>>> +             (periph << 12) | (corem1 << 8) | (corem0 << 4))
-> >>>>> +#define EXYNOS4210_DIV_CPU1(hpm, copy)       \
-> >>>>> +             ((hpm << 4) | (copy << 0))
-> >>>>> +static const unsigned long exynos4210_armclk_data[][2] = {
-> >>>>> +     { EXYNOS4210_DIV_CPU0(7, 1, 4, 3, 7, 3),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 5), },
-> >>>>> +     { EXYNOS4210_DIV_CPU0(7, 1, 4, 3, 7, 3),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 4), },
-> >>>>> +     { EXYNOS4210_DIV_CPU0(7, 1, 3, 3, 7, 3),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 3), },
-> >>>>> +     { EXYNOS4210_DIV_CPU0(7, 1, 3, 3, 7, 3),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 3), },
-> >>>>> +     { EXYNOS4210_DIV_CPU0(7, 1, 3, 3, 7, 3),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 3), },
-> >>>>> +     { EXYNOS4210_DIV_CPU0(0, 1, 3, 1, 3, 1),
-> >>>>> EXYNOS4210_DIV_CPU1(0, 3), }, +};
-> >>>>> +
-> >>>>
-> >>>> What do you think about adding those parameters (like CPU
-> >>>> dividers) as an attribute to /cpus/cpu at 0 node?
-> >>>
-> >>> Not in CPU node but may be in clock controller node since these
-> >>> values are actually used by the clock controller.
-> >>
-> >> /cpus/cpu at 0 seems like a good place for them (since those DIVs are
-> >> related to core)
-> >
-> > DIVs belong to the clock controller, not the CPU, and are addressed
-> > from the clock controller address space.
-> 
-> I also think that the contents of cpu at 0 node should be limited only
-> to CPU specific data. Personally I don't even like the idea of having 
-> operating points there - I would rather see frequency limits there,
-> i.e. maximum frequency allowed at given voltage; specific frequency
-> values could be inferred from available APLL/core clock
-> configurations.
-> 
-> >
-> >> .
-> >> However, we can choose any better DT node to add it.
-> >>
-> >>> But since these values are
-> >>> Exynos4210 specific and not generic enough to be reused across
-> >>> multiple Exynos SoCs, there is little benefit in defining
-> >>> bindings and parsing code for these values. It would be simpler
-> >>> enough to just embed them in the code.
-> >>
-> >> It would be less to code, but isn't it the same ugly code, which we
-> >> have now at exynos4xxx-cpufreq.c?
-> >>
-> >> With those values parsed from DT we can write generic code for the
-> >> "arm_clk" clock. One clock implementation for cpufreq-cpu0.c (and
-> >> maybe for arm_big_little.c) reused by Exynos4/5.
-> >
-> > As replied in the 2/3 patch, if these values would change across
-> > multiple platforms based on the same SoC, it makes sense to put them
-> > into DT. Any data that is purely SoC specific and not going to
-> > change across platforms can be embedded into the code itself.
-> 
-> Well, they do change. If not on per board basis, then at least with
-> SoC revisions.
+Adding such a test would be non trivial, and is just not worth it IMHO. There is one special case of a controller with 3 clocks,
+all others have 0-2 clocks, there are 0 known controllers with > 3 clocks. And if one shows up then the person writing the
+dts will figure this out quickly enough, and using old kernels with newer dts files has never been a supported scenario.
 
-I've added a real life example at my reply to patch 2/6
+> There is also no note in the binding to indicate this limitation and you shouldn't expect people writing DT files to go digging through the source to check for this.
 
-> 
-> Anyway, the biggest problem is that the same data needs to be
-> duplicated (well, triplicated) for each driver that needs them. If
-> you can find a reasonable way to avoid redundancy, without having DT
-> involved, I will probably be fine with it.
-> 
-> >>>
-> >>> These are frequencies supported by the core clock. But the cpufreq
-> >>> table can use all or subset of the supported frequencies.
-> >>
-> >> I see your point, but I find this distinction here a bit
-> >> superfluous.
-> >
-> > Replied to similar comment in 2/3 patch.
-> >
-> >>
-> >>> The core
-> >>> clock should be usable with the clock api independently and not
-> >>> tied to be used only by cpufreq driver.
-> >>
-> >> But then still for Exynos it will use PLL's M P S coefficients
-> >> which only corresponds to values defined at cpufreq's frequency
-> >> table.
-> >
-> > The PLL clocks are now separated out as PLL clock types in
-> > samsung/clk-pll.c file. The P,M,S values of the PLLs are now handled
-> > over there. So now the PLL is independent of the cpufreq driver and
-> > can support any number of clock speeds not limited to the ones
-> > needed by cpufreq.
-> 
-> Don't forget about opposite side of this relation. The APLL needs to 
-> support at least those that are required by cpufreq.
-> 
-> >
-> >>
-> >> The set of frequencies for PLL, cpufreq and this clock is the
-> >> same, so I think that we shall not define them in three different
-> >> places.
-> >>
-> >> Could you give any example supporting your point of view?
-> >
-> > A PLL is a hardware component that can be reused in multiple SoCs. A
-> > PLL can generate and support 'x' number of clock speeds but a SoC
-> > using that PLL might use only 'y' (a subset of 'x')  number of clock
-> > speeds of the PLL due to certain hardware limitations. Then there
-> > are platforms using a SoC which might use only 'z' (a subset of
-> > 'y') clock speeds due to the power/performance requirements of the
-> > platform.
-> >
-> 
-> As observed with our platforms, 'x' is usually SoC or SoC-revision 
-> specific and equal to 'y' and 'z' on respective platforms.
-> 
-> >>
-> >>>
-> >>>>
-> >>>>> +
-> >>>>> +static const struct samsung_core_clock_freq_table
-> >>>>> exyno4210_armclk_table = {
-> >>>>> +     .freq           = exynos4210_armclk_freqs,
-> >>>>> +     .freq_count     = ARRAY_SIZE(exynos4210_armclk_freqs),
-> >>>>> +     .data           = (void *)exynos4210_armclk_data,
-> >>>>> +};
-> >>>>> +
-> >>>>> +static int exynos4210_armclk_set_rate(struct clk_hw *hw,
-> >>>>> unsigned long drate,
-> >>>>> +                                     unsigned long prate)
-> >>>>> +{
-> >>>>> +     struct samsung_core_clock *armclk;
-> >>>>> +     const struct samsung_core_clock_freq_table *freq_tbl;
-> >>>>> +     unsigned long *freq_data;
-> >>>>> +     unsigned long mux_reg, idx;
-> >>>>> +     void __iomem *base;
-> >>>>> +
-> >>>>> +     if (drate == prate)
-> >>>>> +             return 0;
-> >>>>> +
-> >>>>> +     armclk = container_of(hw, struct samsung_core_clock, hw);
-> >>>>> +     freq_tbl = armclk->freq_table;
-> >>>>> +     freq_data = (unsigned long *)freq_tbl->data;
-> >>>>> +     base = armclk->ctrl_base;
-> >>>>> +
-> >>>>> +     for (idx = 0; idx < freq_tbl->freq_count; idx++, freq_data
-> >>>>> += 2)
-> >>>>> +             if ((freq_tbl->freq[idx] * 1000) == drate)
-> >>>>> +                     break;
-> >>>>> +
-> >>>>> +     if (!armclk->fout_pll)
-> >>>>> +             armclk->fout_pll = __clk_lookup("fout_apll");\
-> >>>>                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[*]
-> >>>>
-> >>>> I'm a bit confused here for two reasons. Please correct me if I'm
-> >>>> wrong.
-> >>>>
-> >>>> 1. You go into this ->set_rate() because of calling clk_set_rate
-> >>>> at "arm_clk" clock (numbered as 12 at clk-exynos4.c) at
-> >>>> cpufreq-cpu0.c
-> >>>>
-> >>>> In a Exynos4210 we have:
-> >>>> XXTI-> APLL -> fout_apll -> mout_apll -> mout_core -> div_core
-> >>>> -> div_core2 -> arm_clk
-> >>>>
-> >>>> In the code you call directly the fout_apll which changes
-> >>>> frequency. Then the change shall be propagated to all registered
-> >>>> clocks.
-> >>>> I think, that DIV and DIV1 shall be reduced before PLL change
-> >>>> [*], to reflect the changes at CCF.
-> >>>
-> >>> The core clock implementation encapsulates multiple clock blocks
-> >>> (such as dividers and muxes) which are in between the output of
-> >>> the APLL and the point that actually is the cpu domain clock
-> >>> output.
-> >>
-> >> No problem with that. I mostly agree...
-> >>
-> >>> When a clock
-> >>> frequency change has to be made, all these clock blocks
-> >>> encapsulated within the core clock are programmed by
-> >>> pre-determined values.
-> >>
-> >> And what about the situation with already defined clocks (like
-> >> "div_core" and "div_core2"). Those will not be updated when you
-> >> first call clk_set_rate() and change by hand DIV and DIV1.
-> >>
-> >> What if you would like to have the PCLK_DBG clock used in the
-> >> future? You would add it to CCF and the change will not propagate.
-> >
-> > I did intend to remove individual clock blocks which are now
-> > encapsulated within the core clock type from the clock driver file.
-> > I missed doing that in this patch series.
-> 
-> Yes, they should be removed, since they are encapsulated inside the
-> core clock now.
+I've been told by several people that dt-binding documentation should never contain implementation details, since it
+is supposed to be platform agnostic, etc. So people writing dts files who need to know implementation details, are
+actually expected to look into the implementation. And in my experience with re-using some existing drivers for
+other SoC's, that is exactly what one always ends up doing.
 
-This was not my point here. 
+Regards,
 
-You are creating an opaque clock for cpu (like
-"samsung_clock_cpu" [*]) , which encapsulates many other clocks
-(mostly DIVs and MUXes to be more precise).
-
-I don't think, that those clocks shall be removed from CCF. 
-
-I do believe, that they shall be passed as the argument to [*] and
-recalculated.
-
-Why the advent of [*] clock forbids me from creating and using clocks
-based on "div_core", "div_core2" and PCLK_DBG?
-
-What if I would like to see output of those particular clocks
-at /sys/kernel/debug/ or use them at a custom driver?
-
-> 
-> >
-> >>
-> >>> This
-> >>> approach allows very fast clock speed switching, instead of
-> >>> traversing the entire CCF clock tree searching for individual
-> >>> clock blocks to be programmed.
-> >>
-> >> Those are mostly DIV and MUXes. Recalculation shouldn't be time
-> >> consuming.
-> >
-> > I was mainly referring to the time taken to search the clock tree
-> > for these individual clock blocks.
-> 
-> Hmm, why couldn't you simply look-up all the needed clock at 
-> initialization and keep references to them?
-
-+1
-
-> 
-> Still, I think it is fine to directly program registers of
-> encapsulated clocks, 
-
-And then recalculate values of relevant clocks build on top of those
-registers.
-
-> since they are not visible outside anymore and
-> there is no need for them to be visible.
-
-Why do you assume, that those clocks won't be needed anymore? For me
-clocks like [*] are valid clocks from CCF/user point of view.
-
-> 
-> >
-> >>
-> >>>
-> >>>>
-> >>>>
-> >>>>> +
-> >>>>> +     if (drate < prate) {
-> >>>>> +             mux_reg = readl(base + SRC_CPU);
-> >>>>> +             writel(mux_reg | (1 << 16), base + SRC_CPU);
-> >>>>> +             while (((readl(base + STAT_CPU) >> 16) & 0x7) !=
-> >>>>> 2)
-> >>>>> +                     ;
-> >>>>                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ [**]
-> >>>>
-> >>>> 2. I think, the above shall be done in a following way:
-> >>>>
-> >>>>          clk_set_parent(mout_core, mout_mpll);
-> >>>>          clk_set_rate(armclk->fout_pll, drate);
-> >>>>          clk_set_parent(mout_core, mout_apll);
-> >>>>
-> >>>> The direct write to registers [**] doesn't look compliant to CCF.
-> >>>>
-> >>>
-> >>> As mentioned above, the clock block encapsulates these clock
-> >>> blocks into a single clock and only this single encapsulated
-> >>> clock is registered with CCF. The internal implementation of how
-> >>> the different clock blocks are managed within this clock is
-> >>> independent of the CCF.
-> >>
-> >> I agree, that the CPU_DIV and CPU_DIV1 shall be changed atomically
-> >> (without CCF).
-> >>
-> >> But on the situation [**] the MUX can be changed by
-> >> clk_set_parent() as it is now done at exynosXXXX-cpufreq.c code.
-> >
-> > The mux is also encapsulated into a larger clock type and this new
-> > clock type know how the mux has to be configured.
-> 
-> IMHO it's fine to encapsulate the mux as well. There are no users of
-> it other than the core clock.
-
-In spite of the above comment, it looks far more better to change clocks
-with CCF API (like clk_set_parent), not by writing directly to
-registers.
-
-> 
-> >
-> >>
-> >>
-> >>>
-> >>>>
-> >>>> I'd rather thought about using "mout_core" instead of "arm_clk".
-> >>>> Then we would get access to the parent directly:
-> >>>>
-> >>>>          struct clk *parent = clk_get_parent(hw->clk);
-> >>>>
-> >>>> so we set the parents explicitly (at clk registration) and call
-> >>>> ->recalc_rate for clocks which are lower in the tree (like
-> >>>> "div_core", "div_core2").
-> >>>
-> >>> That was not the intention as mentioned above.
-> >>
-> >> This is just another possible solution to the problem.
-> 
-> Those clocks should not be dealt with separately and this was the 
-> intention of this composite clock. I agree with Thomas here.
-
-I cannot agree here, as stated at the above comment.
-
-> 
-> Best regards,
-> Tomasz
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-Best regards,
-Lukasz Majewski
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140112/52724837/attachment.sig>
+Hans
