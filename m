@@ -1,47 +1,49 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 12 Jan 2014 11:52:07 -0300
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20140102145835.GA6883@localhost>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140102113057.GI16456@n2100.arm.linux.org.uk>
- <20140102144724.GF19878@titan.lakedaemon.net>
- <20140102145835.GA6883@localhost>
-Message-ID: <20140112145206.GD6099@localhost>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 12 Jan 2014 10:42:00 -0500
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+In-Reply-To: <20140112105958.GA9791@n2100.arm.linux.org.uk>
+References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
+ <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
+ <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
+ <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
+ <20140112105958.GA9791@n2100.arm.linux.org.uk>
+Message-ID: <52D2B7C8.4060103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 02, 2014 at 11:58:35AM -0300, Ezequiel Garcia wrote:
-> On Thu, Jan 02, 2014 at 09:47:24AM -0500, Jason Cooper wrote:
-> > On Thu, Jan 02, 2014 at 11:30:57AM +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Dec 10, 2013 at 11:41:35AM -0300, Ezequiel Garcia wrote:
-> > > > Some SoC have MMIO regions that are shared across orthogonal
-> > > > subsystems. This commit implements a possible solution for the
-> > > > thread-safe access of such regions through a spinlock-protected API.
-> > > > 
-> > > > Concurrent access is protected with a single spinlock for the
-> > > > entire MMIO address space. While this protects shared-registers,
-> > > > it also serializes access to unrelated/unshared registers.
-> > > > 
-> > > > We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
-> > > > respectively. The rationale for this is that some users may not require
-> > > > register write completion but only thread-safe access to a register.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > 
-> > > Okay, so this patch has been submitted to the patch system, but it
-> > > contains no other tags other than Ezequiel's sign-off.  Clearly
-> > > other people *have* reviewed it.
-> > > 
-> > > Can we please have some acks etc for it please?
-> > 
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > 
+On Sunday 12 January 2014 05:59 AM, Russell King - ARM Linux wrote:
+> On Mon, Dec 09, 2013 at 08:02:30PM -0500, Santosh Shilimkar wrote:
+>> On Monday 09 December 2013 07:54 PM, Russell King - ARM Linux wrote:
+>>> The underlying reason is that - as I've already explained - ARM's __ffs()
+>>> differs from other architectures in that it ends up being an int, whereas
+>>> almost everyone else is unsigned long.
+>>>
+>>> The fix is to fix ARMs __ffs() to conform to other architectures.
+>>>
+>> I was just about to cross-post your reply here. Obviously I didn't think
+>> this far when I made  $subject fix.
+>>
+>> So lets ignore the $subject patch which is not correct. Sorry for noise
+> 
+> Well, here we are, a month on, and this still remains unfixed despite
+> my comments pointing to what the problem is.  So, here's a patch to fix
+> this problem the correct way.  I took the time to add some comments to
+> these functions as I find that I wonder about their return values, and
+> these comments make the patch a little larger than it otherwise would be.
+> 
+The $subject warning fix [1] is already picked by Andrew with your ack
+and its in his queue [2]
 
-Catalin, Will: Can you ack as well, so Russell can take this?
+> This patch makes their types match exactly with x86's definitions of
+> the same, which is the basic problem: on ARM, they all took "int" values
+> and returned "int"s, which leads to min() in nobootmem.c complaining.
+> 
+Not sure if you missed the thread but the right fix was picked. Ofcourse
+you do have additional clz optimisation in updated patch and some comments
+on those functions.
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+Santosh
+
+[1] https://lkml.org/lkml/2013/12/9/811
+[2] http://ozlabs.org/~akpm/mmotm/broken-out/mm-arm-fix-arms-__ffs-to-conform-to-avoid-warning-with-no_bootmem.patch
