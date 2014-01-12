@@ -1,36 +1,72 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Jan 2014 12:13:33 +0100
-Subject: [PATCH 0/9] Renesas RSPI/QSPI DT support
-Message-ID: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
+Date: Sun, 12 Jan 2014 12:13:42 +0100
+Subject: [PATCH 9/9] ARM: shmobile: koelsch: Add QSPI nodes
+In-Reply-To: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
+References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389525222-3482-10-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches series adds DT support to the Renesas RSPI/QSPI driver, and
-to the r7s72100/genmai and r8a7791/koelsch development boards:
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-    [1/9] spi: rspi: Add missing clk_disable() calls in error and cleanup paths
-    [2/9] spi: rspi: Convert to clk_prepare_enable/disable_unprepare
-    [3/9] spi: rspi: Use NULL as the clock ID
-    [4/9][V3] spi: rspi: Add DT support
-    [5/9] ARM: shmobile: r7s72100: Add RSPI clocks for DT
-    [6/9][V3] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-    [7/9][V3] ARM: shmobile: genmai reference: Add RSPI nodes
-    [8/9] ARM: shmobile: r8a7791 dtsi: Add QSPI node
-    [9/9] ARM: shmobile: koelsch: Add QSPI nodes
+Add pinctrl and SPI devices for QSPI on Koelsch.
+Add Spansion s25fl512s SPI FLASH and MTD partitions.
 
-[4/9], [6/9], and [7/9] have been sent before in the series "[PATCH v2 0/8]
-SoC and board integration for RSPI on RZ/A1H".
-[4/9] received some updates, cfr. its changelog.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts |   36 +++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index d5e42b396ef7..885b61e09638 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -123,6 +123,11 @@
+ 		renesas,groups = "scif1_data_d";
+ 		renesas,function = "scif1";
+ 	};
++
++	qspi_pins: spi {
++		renesas,groups = "qspi_ctrl", "qspi_data4";
++		renesas,function = "qspi";
++	};
+ };
+ 
+ &scif0 {
+@@ -138,3 +143,34 @@
+ 
+ 	status = "okay";
+ };
++
++&spi {
++	pinctrl-0 = <&qspi_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	flash: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl512s";
++		reg = <0>;
++		spi-max-frequency = <30000000>;
++		m25p,fast-read;
++
++		partition at 0 {
++			label = "loader";
++			reg = <0x00000000 0x00080000>;
++			read-only;
++		};
++		partition at 80000 {
++			label = "bootenv";
++			reg = <0x00080000 0x00080000>;
++			read-only;
++		};
++		partition at 100000 {
++			label = "data";
++			reg = <0x00100000 0x03f00000>;
++		};
++	};
++};
+-- 
+1.7.9.5
