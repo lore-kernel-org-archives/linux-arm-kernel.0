@@ -1,29 +1,41 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Sun, 12 Jan 2014 15:22:49 +0200
-Subject: [PATCH 06/12] ARM: dts: cm-t3x30: add twl4030 gpio pullups
+Date: Sun, 12 Jan 2014 15:22:51 +0200
+Subject: [PATCH 08/12] ARM: dts: sbc-t3730: add pinmux for usb hub reset
 In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
 References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1389532975-28281-7-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1389532975-28281-9-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pullup for twl4030 GPIO_0 used as MMC1 card detect signal.
+GPIO167 is used as SB-T35 baseboard USB Hub reset.
+Add GPIO167 pinmux.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-index 4bcc639..a56d082 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-@@ -90,4 +90,6 @@
- 
- &twl_gpio {
- 	ti,use-leds;
-+	/* pullups: BIT(0) */
-+	ti,pullups = <0x000001>;
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+index 565099c..08e4a70 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+@@ -10,6 +10,17 @@
+ 	compatible = "compulab,omap3-sbc-t3730", "compulab,omap3-cm-t3730", "ti,omap36xx", "ti,omap3";
  };
+ 
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sb_t35_usb_hub_pins>;
++
++	sb_t35_usb_hub_pins: pinmux_sb_t35_usb_hub_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2130, PIN_OUTPUT | MUX_MODE4) /* ccdc_wen.gpio_167 - SB-T35 USB HUB RST */
++		>;
++	};
++};
++
+ &gpmc {
+ 	ranges = <5 0 0x2c000000 0x01000000>,
+ 		 <4 0 0x2d000000 0x01000000>;
 -- 
 1.7.5.4
