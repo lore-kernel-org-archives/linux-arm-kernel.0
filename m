@@ -1,139 +1,68 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 12 Jan 2014 22:46:40 +0100
-Subject: [PATCH V2 3/4] ARM: shmobile: koelsch: Add QSPI support
-In-Reply-To: <1389524433-2823-4-git-send-email-geert@linux-m68k.org>
-References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
- <1389524433-2823-4-git-send-email-geert@linux-m68k.org>
-Message-ID: <30881023.1VWPBCH6CR@avalon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jan 2014 00:16:10 +0100
+Subject: DT include files
+In-Reply-To: <201401122121.20084.arnd@arndb.de>
+References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <201401111415.29395.arnd@arndb.de>
+ <20140112032516.GA23525@S2101-09.ap.freescale.net>
+ <201401122121.20084.arnd@arndb.de>
+Message-ID: <CACRpkdYPrso7KSfWPhZC6chA4z=+YSjKb_SCLx4B-aMmYZYb4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Sun, Jan 12, 2014 at 9:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 12 January 2014, Shawn Guo wrote:
 
-Thank you for the patch.
+>> , and then code these numbers in their <board>.dts by hand.  It's
+>> boring and error prone.  As a comparison, we generate these numbers
+>> from reference manual database using a tool and define a macro
+>> MX6QDL_PAD_GPIO_17__SPDIF_OUT for these numbers.  The authors only need
+>> to find out this macro from imx6q-pinfunc.dtsi and fill it into his dts.
+>> Isn't the macro use here helping to ease everyone's life and make the
+>> coding less error prone, since the macro is generated from database?
+>
+> I was under the impression that the generic pinctrl binding was designed
+> in a way to let you assign labels to each possible (reasonable)
+> configuration so you didn't have get to this level of detail at the
+> driver.
 
-On Sunday 12 January 2014 12:00:32 Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> Enable support for the Spansion s25fl512s SPI FLASH on the Koelsch board:
->   - Add QSPI platform device, resources, platform data, and pinmux,
->   - Add FLASH data and MTD partitions.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+There is a binding for handles and states tied to a device.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+There is no generic pinctrl binding for the definition of groups
+and functions and how they map, i.e. muxing.
 
-> ---
-> V2:
->   - Split in 2 groups (qspi_ctrl/qspi_data4)
-> 
->  arch/arm/mach-shmobile/board-koelsch.c |   64
-> ++++++++++++++++++++++++++++++++ 1 file changed, 64 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-koelsch.c
-> b/arch/arm/mach-shmobile/board-koelsch.c index de7cc64b1f37..37e4a6fd36b3
-> 100644
-> --- a/arch/arm/mach-shmobile/board-koelsch.c
-> +++ b/arch/arm/mach-shmobile/board-koelsch.c
-> @@ -25,12 +25,17 @@
->  #include <linux/input.h>
->  #include <linux/kernel.h>
->  #include <linux/leds.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/partitions.h>
->  #include <linux/phy.h>
->  #include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/gpio-rcar.h>
->  #include <linux/platform_data/rcar-du.h>
->  #include <linux/platform_device.h>
->  #include <linux/sh_eth.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/rspi.h>
-> +#include <linux/spi/spi.h>
->  #include <mach/common.h>
->  #include <mach/irqs.h>
->  #include <mach/r8a7791.h>
-> @@ -148,6 +153,55 @@ static const struct gpio_keys_platform_data
-> koelsch_keys_pdata __initconst = { .nbuttons	= ARRAY_SIZE(gpio_buttons),
->  };
-> 
-> +/* QSPI */
-> +static const struct resource qspi_resources[] __initconst = {
-> +	DEFINE_RES_MEM(0xe6b10000, 0x1000),
-> +	DEFINE_RES_IRQ(gic_spi(184)),
-> +};
-> +
-> +static const struct rspi_plat_data qspi_pdata __initconst = {
-> +	.num_chipselect = 1,
-> +};
-> +
-> +/* SPI Flash memory (Spansion S25FL512SAGMFIG11 64 MiB) */
-> +static struct mtd_partition spi_flash_part[] = {
-> +	{
-> +		.name		= "loader",
-> +		.offset		= 0x00000000,
-> +		.size		= 512 * 1024,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	},
-> +	{
-> +		.name		= "bootenv",
-> +		.offset		= MTDPART_OFS_APPEND,
-> +		.size		= 512 * 1024,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	},
-> +	{
-> +		.name		= "data",
-> +		.offset		= MTDPART_OFS_APPEND,
-> +		.size		= MTDPART_SIZ_FULL,
-> +	},
-> +};
-> +
-> +static const struct flash_platform_data spi_flash_data = {
-> +	.name		= "m25p80",
-> +	.parts		= spi_flash_part,
-> +	.nr_parts	= ARRAY_SIZE(spi_flash_part),
-> +	.type		= "s25fl512s",
-> +};
-> +
-> +static const struct spi_board_info spi_info[] __initconst = {
-> +	{
-> +		.modalias	= "m25p80",
-> +		.platform_data	= &spi_flash_data,
-> +		.mode		= SPI_MODE_0,
-> +		.max_speed_hz	= 30000000,
-> +		.bus_num	= 0,
-> +		.chip_select	= 0,
-> +	},
-> +};
-> +
->  static const struct pinctrl_map koelsch_pinctrl_map[] = {
->  	/* DU */
->  	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-> @@ -165,6 +219,11 @@ static const struct pinctrl_map koelsch_pinctrl_map[] =
-> { "eth_rmii", "eth"),
->  	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
->  				  "intc_irq0", "intc"),
-> +	/* QSPI */
-> +	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
-> +				  "qspi_ctrl", "qspi"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
-> +				  "qspi_data4", "qspi"),
->  	/* SCIF0 (CN19: DEBUG SERIAL0) */
->  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
->  				  "scif0_data_d", "scif0"),
-> @@ -190,6 +249,11 @@ static void __init koelsch_add_standard_devices(void)
->  	platform_device_register_data(&platform_bus, "gpio-keys", -1,
->  				      &koelsch_keys_pdata,
->  				      sizeof(koelsch_keys_pdata));
-> +	platform_device_register_resndata(&platform_bus, "qspi", 0,
-> +					  qspi_resources,
-> +					  ARRAY_SIZE(qspi_resources),
-> +					  &qspi_pdata, sizeof(qspi_pdata));
-> +	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
-> 
->  	koelsch_add_du_device();
->  }
--- 
-Regards,
+The discussion around this ended up with everyone disagreeing
+and eventually everybody started writing their own bindings and
+have them merged.
 
-Laurent Pinchart
+There is a generic pin config binding, not everyone uses it,
+as they defined their bindings before I got that in place. It
+is mostly a requirement for newer drivers.
+
+This Freescale driver does not use the generic binding but
+instead it's homebrew thing. The reason being that there was
+no generic binding around when it was defined and written.
+
+It is possible to migrate it to generic pinconf, which would
+be nice.
+
+> I'm also surprised that you have to know multiple constants
+> (mux register, input register, config register offsets) to select a
+> particular pin. I would have expected that you could have one constant
+> from which the driver is able to compute the other ones.
+
+I might have merged this but I was younger then :-/
+
+Now I don't like the looks of this. I think the DT typically shall not
+store register offsets and bitfield information. I think doing
+so is taking away the responsibility of the driver knowing the
+hardware and moving too close to Open Firmware.
+
+pinctrl-single does store such things, the reason being that
+the OMAP people did not even have a datasheet for these regs,
+all they get is datafiles from the ASIC engineers, so there is
+nothing sensible to encode in the driver in C. But I'm reluctant
+also about this driver.
+
+Yours,
+Linus Walleij
