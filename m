@@ -1,85 +1,103 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Jan 2014 12:50:30 +0800
-Subject: [PATCH] ARM: dts: i.MX51: Switch to use standard definitions for
- input subsystem
-In-Reply-To: <1389423259-28870-1-git-send-email-shc_work@mail.ru>
-References: <1389423259-28870-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140113045028.GN23525@S2101-09.ap.freescale.net>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Sun, 12 Jan 2014 20:54:18 -0800
+Subject: [PATCH v4 1/2] ARM: imx: add select on ARCH_MXC for cpufreq
+ support
+In-Reply-To: <20140113032043.GF23525@S2101-09.ap.freescale.net>
+References: <1389321592-33220-1-git-send-email-john.tobias.ph@gmail.com>
+ <20140113032043.GF23525@S2101-09.ap.freescale.net>
+Message-ID: <CACUGKYMx_o6TLsvMxK3Gb+cmOUCX3Toj+6MeJmo=ahfyc=vXCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 11, 2014 at 10:54:19AM +0400, Alexander Shiyan wrote:
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+I tested leaving the HAVE_IMX_ANATOP under SOC_IMX6Q and SOC_IMX6SL.
+The iMX6Q cpufreq driver won't show up in menu config / gconfig and
+that's the reason why I added it.
 
-Applied, thanks.
+Regards,
 
-Shawn
+john
 
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts | 34 ++++++++++++++++++----------------
->  arch/arm/boot/dts/imx51.dtsi        |  3 ++-
->  2 files changed, 20 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 483178a..587ee58 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -388,21 +388,23 @@
->  &kpp {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_kpp>;
-> -	linux,keymap = <0x00000067	/* KEY_UP */
-> -			0x0001006c	/* KEY_DOWN */
-> -			0x00020072	/* KEY_VOLUMEDOWN */
-> -			0x00030066	/* KEY_HOME */
-> -			0x0100006a	/* KEY_RIGHT */
-> -			0x01010069	/* KEY_LEFT */
-> -			0x0102001c	/* KEY_ENTER */
-> -			0x01030073	/* KEY_VOLUMEUP */
-> -			0x02000040	/* KEY_F6 */
-> -			0x02010042	/* KEY_F8 */
-> -			0x02020043	/* KEY_F9 */
-> -			0x02030044	/* KEY_F10 */
-> -			0x0300003b	/* KEY_F1 */
-> -			0x0301003c	/* KEY_F2 */
-> -			0x0302003d	/* KEY_F3 */
-> -			0x03030074>;	/* KEY_POWER */
-> +	linux,keymap = <
-> +		MATRIX_KEY(0, 0, KEY_UP)
-> +		MATRIX_KEY(0, 1, KEY_DOWN)
-> +		MATRIX_KEY(0, 2, KEY_VOLUMEDOWN)
-> +		MATRIX_KEY(0, 3, KEY_HOME)
-> +		MATRIX_KEY(1, 0, KEY_RIGHT)
-> +		MATRIX_KEY(1, 1, KEY_LEFT)
-> +		MATRIX_KEY(1, 2, KEY_ENTER)
-> +		MATRIX_KEY(1, 3, KEY_VOLUMEUP)
-> +		MATRIX_KEY(2, 0, KEY_F6)
-> +		MATRIX_KEY(2, 1, KEY_F8)
-> +		MATRIX_KEY(2, 2, KEY_F9)
-> +		MATRIX_KEY(2, 3, KEY_F10)
-> +		MATRIX_KEY(3, 0, KEY_F1)
-> +		MATRIX_KEY(3, 1, KEY_F2)
-> +		MATRIX_KEY(3, 2, KEY_F3)
-> +		MATRIX_KEY(3, 3, KEY_POWER)
-> +		>;
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 61a2552..bced7bc 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -12,9 +12,10 @@
->  
->  #include "skeleton.dtsi"
->  #include "imx51-pingrp.h"
-> -#include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/clock/imx5-clock.h>
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
->  
->  / {
->  	aliases {
-> -- 
-> 1.8.3.2
-> 
+On Sun, Jan 12, 2014 at 7:20 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Jan 09, 2014 at 06:39:51PM -0800, John Tobias wrote:
+>> Moved ARCH_HAS_CPUFREQ, HAVE_IMX_ANATOP and PM_OPP on ARCH_MXC so that
+>> the user can enable the cpufreq support for iMX6Q and/or iMX6SL.
+>
+> All I was asking is to move the following:
+>
+>         select ARCH_HAS_CPUFREQ
+>         select ARCH_HAS_OPP
+>         select PM_OPP if PM
+>
+> So leave HAVE_IMX_ANATOP out there, and only move the above ones please.
+>
+> Shawn
+>
+>>
+>> Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+>> ---
+>>  arch/arm/mach-imx/Kconfig | 13 ++++++-------
+>>  1 file changed, 6 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index 7a6e6f7..d6aa34d 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -1,5 +1,6 @@
+>>  config ARCH_MXC
+>>       bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+>> +     select ARCH_HAS_CPUFREQ
+>>       select ARCH_REQUIRE_GPIOLIB
+>>       select ARM_CPU_SUSPEND if PM
+>>       select ARM_PATCH_PHYS_VIRT
+>> @@ -9,8 +10,10 @@ config ARCH_MXC
+>>       select GENERIC_ALLOCATOR
+>>       select GENERIC_CLOCKEVENTS
+>>       select GENERIC_IRQ_CHIP
+>> +     select HAVE_IMX_ANATOP if SOC_IMX6Q || SOC_IMX6SL
+>>       select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+>>       select MULTI_IRQ_HANDLER
+>> +     select PM_OPP if PM
+>>       select SOC_BUS
+>>       select SPARSE_IRQ
+>>       select USE_OF
+>> @@ -779,16 +782,14 @@ config  SOC_IMX53
+>>
+>>  config SOC_IMX6Q
+>>       bool "i.MX6 Quad/DualLite support"
+>> -     select ARCH_HAS_CPUFREQ
+>> -     select ARCH_HAS_OPP
+>> +     select ARCH_HAS_OPP
+>>       select ARM_ERRATA_754322
+>>       select ARM_ERRATA_764369 if SMP
+>>       select ARM_ERRATA_775420
+>>       select ARM_GIC
+>>       select CPU_V7
+>>       select HAVE_ARM_SCU if SMP
+>> -     select HAVE_ARM_TWD if SMP
+>> -     select HAVE_IMX_ANATOP
+>> +     select HAVE_ARM_TWD if SMP
+>>       select HAVE_IMX_GPC
+>>       select HAVE_IMX_MMDC
+>>       select HAVE_IMX_SRC
+>> @@ -800,8 +801,7 @@ config SOC_IMX6Q
+>>       select PINCTRL_IMX6Q
+>>       select PL310_ERRATA_588369 if CACHE_PL310
+>>       select PL310_ERRATA_727915 if CACHE_PL310
+>> -     select PL310_ERRATA_769419 if CACHE_PL310
+>> -     select PM_OPP if PM
+>> +     select PL310_ERRATA_769419 if CACHE_PL310
+>>
+>>       help
+>>         This enables support for Freescale i.MX6 Quad processor.
+>> @@ -812,7 +812,6 @@ config SOC_IMX6SL
+>>       select ARM_ERRATA_775420
+>>       select ARM_GIC
+>>       select CPU_V7
+>> -     select HAVE_IMX_ANATOP
+>>       select HAVE_IMX_GPC
+>>       select HAVE_IMX_MMDC
+>>       select HAVE_IMX_SRC
+>> --
+>> 1.8.3.2
+>>
+>
