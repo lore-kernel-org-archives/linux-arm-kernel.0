@@ -1,1230 +1,213 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Mon, 13 Jan 2014 10:31:01 +0000
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-Message-ID: <1389609060.1871.312.camel@smile>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 13 Jan 2014 18:32:33 +0800
+Subject: [PATCH 1/1] mmc: sdhci: fix lockdep error on tunning routine
+In-Reply-To: <CAA+hA=TRQP7hS3+iXyHg3FuNQKA=chJi7Ne47Ew_4RJcQ6yong@mail.gmail.com>
+References: <1387797184-18958-1-git-send-email-b29396@freescale.com>
+ <CAA+hA=TRQP7hS3+iXyHg3FuNQKA=chJi7Ne47Ew_4RJcQ6yong@mail.gmail.com>
+Message-ID: <CAA+hA=Sk_YK=FT7RJcGuSJWqd5fOfDzH7f60hfEvkJLf=Sy0Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-01-10 at 13:07 -0600, Andy Gross wrote:
-> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> found in the MSM 8x74 platforms.
-> 
-> Each BAM DMA device is associated with a specific on-chip peripheral.  Each
-> channel provides a uni-directional data transfer engine that is capable of
-> transferring data between the peripheral and system memory (System mode), or
-> between two peripherals (BAM2BAM).
-> 
-> The initial release of this driver only supports slave transfers between
-> peripherals and system memory.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  drivers/dma/Kconfig        |   9 +
->  drivers/dma/Makefile       |   1 +
->  drivers/dma/qcom_bam_dma.c | 843 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/dma/qcom_bam_dma.h | 268 ++++++++++++++
->  4 files changed, 1121 insertions(+)
->  create mode 100644 drivers/dma/qcom_bam_dma.c
->  create mode 100644 drivers/dma/qcom_bam_dma.h
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index c823daa..e58e6d2 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -384,4 +384,13 @@ config DMATEST
->  config DMA_ENGINE_RAID
->  	bool
->  
-> +config QCOM_BAM_DMA
-> +	tristate "QCOM BAM DMA support"
-> +	depends on ARCH_MSM || COMPILE_TEST
-> +	select DMA_ENGINE
-> +	select DMA_VIRTUAL_CHANNELS
-> +	---help---
-> +	  Enable support for the QCOM BAM DMA controller.  This controller
-> +	  provides DMA capabilities for a variety of on-chip devices.
-> +
->  endif
-> diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-> index 0ce2da9..7ef950a 100644
-> --- a/drivers/dma/Makefile
-> +++ b/drivers/dma/Makefile
-> @@ -42,3 +42,4 @@ obj-$(CONFIG_MMP_PDMA) += mmp_pdma.o
->  obj-$(CONFIG_DMA_JZ4740) += dma-jz4740.o
->  obj-$(CONFIG_TI_CPPI41) += cppi41.o
->  obj-$(CONFIG_K3_DMA) += k3dma.o
-> +obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
-> diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-> new file mode 100644
-> index 0000000..7a84b02
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.c
-> @@ -0,0 +1,843 @@
-> +/*
-> + * QCOM BAM DMA engine driver
-> + *
-> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + *
-> + * QCOM BAM DMA blocks are distributed amongst a number of the on-chip
-> + * peripherals on the MSM 8x74.  The configuration of the channels are dependent
-> + * on the way they are hard wired to that specific peripheral.  The peripheral
-> + * device tree entries specify the configuration of each channel.
-> + *
-> + * The DMA controller requires the use of external memory for storage of the
-> + * hardware descriptors for each channel.  The descriptor FIFO is accessed as a
-> + * circular buffer and operations are managed according to the offset within the
-> + * FIFO.  After pipe/channel reset, all of the pipe registers and internal state
-> + * are back to defaults.
-> + *
-> + * During DMA operations, we write descriptors to the FIFO, being careful to
-> + * handle wrapping and then write the last FIFO offset to that channel's
-> + * P_EVNT_REG register to kick off the transaction.  The P_SW_OFSTS register
-> + * indicates the current FIFO offset that is being processed, so there is some
-> + * indication of where the hardware is currently working.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/init.h>
-> +#include <linux/slab.h>
-> +#include <linux/module.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/scatterlist.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_dma.h>
-> +#include <linux/clk.h>
-> +
-> +#include "dmaengine.h"
-> +#include "qcom_bam_dma.h"
-> +
-> +
-> +/**
-> + * bam_reset_channel - Reset individual BAM DMA channel
-> + * @bdev: bam device
-> + * @channel: channel id
-> + */
-> +static void bam_reset_channel(struct bam_device *bdev, u32 channel)
-> +{
-> +	/* reset channel */
-> +	writel_relaxed(1, bdev->regs + BAM_P_RST(channel));
-> +	writel_relaxed(0, bdev->regs + BAM_P_RST(channel));
-> +}
-> +
-> +/**
-> + * bam_alloc_chan - Allocate channel resources for DMA channel.
-> + * @chan: specified channel
-> + *
-> + * This function allocates the FIFO descriptor memory and resets the channel
-> + */
-> +static int bam_alloc_chan(struct dma_chan *chan)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	u32 val;
-> +
-> +	/* allocate FIFO descriptor space, but only if necessary */
-> +	if (!bchan->fifo_virt) {
-> +		bchan->fifo_virt = dma_alloc_coherent(bdev->dev,
-> +					BAM_DESC_FIFO_SIZE, &bchan->fifo_phys,
-> +					GFP_KERNEL);
-> +
-> +		if (!bchan->fifo_virt) {
-> +			dev_err(bdev->dev, "Failed to allocate desc fifo\n");
-> +			return -ENOMEM;
-> +		}
-> +	}
-> +
-> +	/* Go ahead and initialize the pipe/channel hardware here
-> +	   - Reset the channel to clear internal state of the FIFO
-> +	   - Program in the FIFO address
-> +	   - Configure the irq based on the EE passed in from the DT entry
-> +	   - Set mode, direction and enable channel
-> +
-> +	   We do this here because the channel can only be enabled once and
-> +	   can only be disabled via a reset.  If done here, we don't have to
-> +	   manage additional state to figure out when to do this
-> +	*/
-> +
-> +	bam_reset_channel(bdev, bchan->id);
-> +
-> +	/* write out 8 byte aligned address.  We have enough space for this
-> +	   because we allocated 1 more descriptor (8 bytes) than we can use */
-> +	writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
-> +			bdev->regs + BAM_P_DESC_FIFO_ADDR(bchan->id));
-> +	writel_relaxed(BAM_DESC_FIFO_SIZE, bdev->regs +
-> +			BAM_P_FIFO_SIZES(bchan->id));
-> +
-> +	/* unmask and enable interrupts for defined EE, bam and error irqs */
-> +	writel_relaxed(BAM_IRQ_MSK, bdev->regs + BAM_IRQ_SRCS_EE(bchan->ee));
-> +
-> +	/* enable the per pipe interrupts, enable EOT, ERR, and INT irqs */
-> +	writel_relaxed(P_DEFAULT_IRQS_EN, bdev->regs + BAM_P_IRQ_EN(bchan->id));
-> +
-> +	/* unmask the specific pipe and EE combo */
-> +	val = readl_relaxed(bdev->regs + BAM_IRQ_SRCS_MSK_EE(bchan->ee));
-> +	val |= BIT(bchan->id);
-> +	writel_relaxed(val, bdev->regs + BAM_IRQ_SRCS_MSK_EE(bchan->ee));
-> +
-> +	/* set fixed direction and mode, then enable channel */
-> +	val = P_EN | P_SYS_MODE;
-> +	if (bchan->slave.direction == DMA_DEV_TO_MEM)
-> +		val |= P_DIRECTION;
-> +
-> +	/* make sure the other stores occur before enabling channel */
-> +	wmb();
-> +	writel_relaxed(val, bdev->regs + BAM_P_CTRL(bchan->id));
-> +
-> +	/* do bookkeeping for tracking used EEs, used during IRQ handling */
-> +	set_bit(bchan->ee, &bdev->enabled_ees);
-> +
-> +	bchan->head = 0;
-> +	bchan->tail = 0;
-> +
-> +	return BAM_DESC_FIFO_SIZE;
-> +}
-> +
-> +/**
-> + * bam_free_chan - Frees dma resources associated with specific channel
-> + * @chan: specified channel
-> + *
-> + * Free the allocated fifo descriptor memory and channel resources
-> + *
-> + */
-> +static void bam_free_chan(struct dma_chan *chan)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	u32 val;
-> +
-> +	vchan_free_chan_resources(to_virt_chan(chan));
-> +
-> +	if (bchan->curr_txd) {
-> +		dev_err(bchan->bdev->dev, "Cannot free busy channel\n");
-> +		return;
-> +	}
-> +
-> +	bam_reset_channel(bdev, bchan->id);
-> +
-> +	dma_free_coherent(bdev->dev, BAM_DESC_FIFO_SIZE, bchan->fifo_virt,
-> +				bchan->fifo_phys);
-> +	bchan->fifo_virt = NULL;
-> +
-> +	/* mask irq for pipe/channel */
-> +	val = readl_relaxed(bdev->regs + BAM_IRQ_SRCS_MSK_EE(bchan->ee));
-> +	val &= ~BIT(bchan->id);
-> +	writel_relaxed(val, bdev->regs + BAM_IRQ_SRCS_MSK_EE(bchan->ee));
-> +
-> +	/* disable irq */
-> +	writel_relaxed(0, bdev->regs + BAM_P_IRQ_EN(bchan->id));
-> +
-> +	clear_bit(bchan->ee, &bdev->enabled_ees);
-> +}
-> +
-> +/**
-> + * bam_slave_config - set slave configuration for channel
-> + * @chan: dma channel
-> + * @cfg: slave configuration
-> + *
-> + * Sets slave configuration for channel
-> + * Only allow setting direction once.  BAM channels are unidirectional
-> + * and the direction is set in hardware.
-> + *
-> + */
-> +static void bam_slave_config(struct bam_chan *bchan,
-> +		struct dma_slave_config *cfg)
-> +{
-> +	struct bam_device *bdev = bchan->bdev;
-> +	u32 maxburst;
-> +
-> +	if (bchan->slave.direction == DMA_DEV_TO_MEM)
-> +		maxburst = bchan->slave.src_maxburst = cfg->src_maxburst;
-> +	else
-> +		maxburst = bchan->slave.dst_maxburst = cfg->dst_maxburst;
-> +
-> +	/* set desc threshold */
-> +	writel_relaxed(maxburst, bdev->regs + BAM_DESC_CNT_TRSHLD);
-> +}
-> +
-> +/**
-> + * bam_prep_slave_sg - Prep slave sg transaction
-> + *
-> + * @chan: dma channel
-> + * @sgl: scatter gather list
-> + * @sg_len: length of sg
-> + * @direction: DMA transfer direction
-> + * @flags: DMA flags
-> + * @context: transfer context (unused)
-> + */
-> +static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
-> +	struct scatterlist *sgl, unsigned int sg_len,
-> +	enum dma_transfer_direction direction, unsigned long flags,
-> +	void *context)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	struct bam_async_desc *async_desc;
-> +	struct scatterlist *sg;
-> +	u32 i;
-> +	struct bam_desc_hw *desc;
-> +
-> +
-> +	if (!is_slave_direction(direction)) {
-> +		dev_err(bdev->dev, "invalid dma direction\n");
-> +		return NULL;
-> +	}
-> +
-> +	/* direction has to match pipe configuration from the slave config */
-> +	if (direction != bchan->slave.direction) {
-> +		dev_err(bdev->dev,
-> +				"direction does not match configuration\n");
-> +		return NULL;
-> +	}
-> +
-> +	/* allocate enough room to accomodate the number of entries */
-> +	async_desc = kzalloc(sizeof(*async_desc) +
-> +			(sg_len * sizeof(struct bam_desc_hw)), GFP_NOWAIT);
-> +
-> +	if (!async_desc) {
-> +		dev_err(bdev->dev, "failed to allocate async descriptor\n");
-> +		goto err_out;
-> +	}
-> +
-> +	async_desc->num_desc = sg_len;
-> +	async_desc->curr_desc = async_desc->desc;
-> +	async_desc->dir = (direction == DMA_DEV_TO_MEM) ? BAM_PIPE_PRODUCER :
-> +				BAM_PIPE_CONSUMER;
-> +
-> +	/* fill in descriptors, align hw descriptor to 8 bytes */
-> +	desc = async_desc->desc;
-> +	for_each_sg(sgl, sg, sg_len, i) {
-> +		if (sg_dma_len(sg) > BAM_MAX_DATA_SIZE) {
-> +			dev_err(bdev->dev, "segment exceeds max size\n");
-> +			goto err_out;
-> +		}
-> +
-> +		desc->addr = sg_dma_address(sg);
-> +		desc->size = sg_dma_len(sg);
-> +		async_desc->length += sg_dma_len(sg);
-> +		desc++;
-> +	}
-> +
-> +	return vchan_tx_prep(&bchan->vc, &async_desc->vd, flags);
-> +
-> +err_out:
-> +	kfree(async_desc);
-> +	return NULL;
-> +}
-> +
-> +/**
-> + * bam_dma_terminate_all - terminate all transactions
-> + * @chan: dma channel
-> + *
-> + * Idles channel and dequeues and frees all transactions
-> + * No callbacks are done
-> + *
-> +*/
-> +static void bam_dma_terminate_all(struct dma_chan *chan)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +
-> +	bam_reset_channel(bdev, bchan->id);
-> +
-> +	vchan_free_chan_resources(&bchan->vc);
-> +}
-> +
-> +/**
-> + * bam_control - DMA device control
-> + * @chan: dma channel
-> + * @cmd: control cmd
-> + * @arg: cmd argument
-> + *
-> + * Perform DMA control command
-> + *
-> +*/
-> +static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> +	unsigned long arg)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	int ret = 0;
-> +	unsigned long flag;
-> +
-> +	switch (cmd) {
-> +	case DMA_PAUSE:
-> +		spin_lock_irqsave(&bchan->vc.lock, flag);
-> +		writel_relaxed(1, bdev->regs + BAM_P_HALT(bchan->id));
-> +		bchan->paused = 1;
-> +		spin_unlock_irqrestore(&bchan->vc.lock, flag);
-> +		break;
-> +	case DMA_RESUME:
-> +		spin_lock_irqsave(&bchan->vc.lock, flag);
-> +		writel_relaxed(0, bdev->regs + BAM_P_HALT(bchan->id));
-> +		bchan->paused = 0;
-> +		spin_unlock_irqrestore(&bchan->vc.lock, flag);
-> +		break;
-> +	case DMA_TERMINATE_ALL:
-> +		spin_lock_irqsave(&bchan->vc.lock, flag);
-> +		bam_dma_terminate_all(chan);
-> +		spin_unlock_irqrestore(&bchan->vc.lock, flag);
-> +		break;
-> +	case DMA_SLAVE_CONFIG:
-> +		bam_slave_config(bchan, (struct dma_slave_config *)arg);
-> +		break;
-> +	default:
-> +		ret = -ENXIO;
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * process_irqs_per_ee - processes the interrupts for a specific ee
-> + * @bdev: bam controller
-> + * @ee: execution environment
-> + *
-> + * This function processes the interrupts for a given execution environment
-> + *
-> + */
-> +static u32 process_irqs_per_ee(struct bam_device *bdev, u32 ee)
-> +{
-> +	u32 i, srcs, pipe_stts;
-> +	unsigned long flags;
-> +	struct bam_async_desc *async_desc;
-> +
-> +
-> +	srcs = readl_relaxed(bdev->regs + BAM_IRQ_SRCS_EE(ee));
-> +
-> +	/* return early if no pipe/channel interrupts are present */
-> +	if (!(srcs & P_IRQ))
-> +		return srcs;
-> +
-> +	for (i = 0; i < bdev->num_channels; i++) {
-> +		struct bam_chan *bchan = &bdev->channels[i];
-> +		if (srcs & BIT(i)) {
-> +			/* clear pipe irq */
-> +			pipe_stts = readl_relaxed(bdev->regs +
-> +				BAM_P_IRQ_STTS(i));
-> +
-> +			writel_relaxed(pipe_stts, bdev->regs +
-> +					BAM_P_IRQ_CLR(i));
-> +
-> +			spin_lock_irqsave(&bchan->vc.lock, flags);
-> +			async_desc = bchan->curr_txd;
-> +
-> +			if (async_desc) {
-> +				async_desc->num_desc -= async_desc->xfer_len;
-> +				async_desc->curr_desc += async_desc->xfer_len;
-> +				bchan->curr_txd = NULL;
-> +
-> +				/* manage FIFO */
-> +				bchan->head += async_desc->xfer_len;
-> +				bchan->head %= MAX_DESCRIPTORS;
-> +
-> +				/* if complete, process cookie.  Otherwise
-> +				   push back to front of desc_issued so that
-> +				   it gets restarted by the tasklet */
-> +				if (!async_desc->num_desc)
-> +					vchan_cookie_complete(&async_desc->vd);
-> +				else
-> +					list_add(&async_desc->vd.node,
-> +						&bchan->vc.desc_issued);
-> +			}
-> +
-> +			spin_unlock_irqrestore(&bchan->vc.lock, flags);
-> +		}
-> +	}
-> +
-> +	return srcs;
-> +}
-> +
-> +/**
-> + * bam_dma_irq - irq handler for bam controller
-> + * @irq: IRQ of interrupt
-> + * @data: callback data
-> + *
-> + * IRQ handler for the bam controller
-> + */
-> +static irqreturn_t bam_dma_irq(int irq, void *data)
-> +{
-> +	struct bam_device *bdev = (struct bam_device *)data;
-> +	u32 clr_mask = 0, srcs = 0;
-> +	u32 i;
-> +
-> +
-> +	for (i = 0; i < bdev->num_ees; i++)
-> +		if (test_bit(i, &bdev->enabled_ees))
-> +			srcs |= process_irqs_per_ee(bdev, i);
-> +
-> +	/* kick off tasklet to start next dma transfer */
-> +	if (srcs & P_IRQ)
-> +		tasklet_schedule(&bdev->task);
-> +
-> +	if (srcs & BAM_IRQ)
-> +		clr_mask = readl_relaxed(bdev->regs + BAM_IRQ_STTS);
-> +
-> +	/* don't allow reorder of the various accesses to the BAM registers */
-> +	mb();
-> +
-> +	writel_relaxed(clr_mask, bdev->regs + BAM_IRQ_CLR);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +/**
-> + * bam_tx_status - returns status of transaction
-> + * @chan: dma channel
-> + * @cookie: transaction cookie
-> + * @txstate: DMA transaction state
-> + *
-> + * Return status of dma transaction
-> + */
-> +static enum dma_status bam_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> +		struct dma_tx_state *txstate)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct virt_dma_desc *vd;
-> +	int ret;
-> +	size_t residue = 0;
-> +	unsigned int i;
-> +	unsigned long flags;
-> +
-> +	ret = dma_cookie_status(chan, cookie, txstate);
-> +
+Ping....
 
-Redundant empty line.
-
-> +	if (ret == DMA_COMPLETE)
-> +		return ret;
-> +
-> +	if (!txstate)
-> +		return bchan->paused ? DMA_PAUSED : ret;
-> +
-> +	spin_lock_irqsave(&bchan->vc.lock, flags);
-> +	vd = vchan_find_desc(&bchan->vc, cookie);
-> +	if (vd)
-> +		residue = container_of(vd, struct bam_async_desc, vd)->length;
-> +	else if (bchan->curr_txd && bchan->curr_txd->vd.tx.cookie == cookie)
-> +		for (i = 0; i < bchan->curr_txd->num_desc; i++)
-> +			residue += bchan->curr_txd->curr_desc[i].size;
-> +
-> +	dma_set_residue(txstate, residue);
-
-I'm pretty sure you could do this outside of spin lock.
-
-> +
-> +	spin_unlock_irqrestore(&bchan->vc.lock, flags);
-> +
-> +	if (ret == DMA_IN_PROGRESS && bchan->paused)
-> +		ret = DMA_PAUSED;
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * bam_start_dma - start next transaction
-> + * @bchan - bam dma channel
-> + *
-> + * Note: must hold bam dma channel vc.lock
-> + */
-> +static void bam_start_dma(struct bam_chan *bchan)
-> +{
-> +	struct virt_dma_desc *vd = vchan_next_desc(&bchan->vc);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	struct bam_async_desc *async_desc;
-> +	struct bam_desc_hw *desc;
-> +	struct bam_desc_hw *fifo = PTR_ALIGN(bchan->fifo_virt,
-> +				sizeof(struct bam_desc_hw));
-
-> +
-> +	if (!vd)
-> +		return;
-> +
-> +	list_del(&vd->node);
-> +
-> +	async_desc = container_of(vd, struct bam_async_desc, vd);
-> +	bchan->curr_txd = async_desc;
-> +
-> +	desc = bchan->curr_txd->curr_desc;
-> +
-> +	if (async_desc->num_desc > MAX_DESCRIPTORS)
-> +		async_desc->xfer_len = MAX_DESCRIPTORS;
-> +	else
-> +		async_desc->xfer_len = async_desc->num_desc;
-> +
-> +	/* set INT on last descriptor */
-> +	desc[async_desc->xfer_len - 1].flags |= DESC_FLAG_INT;
-> +
-> +	if (bchan->tail + async_desc->xfer_len > MAX_DESCRIPTORS) {
-> +		u32 partial = MAX_DESCRIPTORS - bchan->tail;
-> +
-> +		memcpy(&fifo[bchan->tail], desc,
-> +				partial * sizeof(struct bam_desc_hw));
-> +		memcpy(fifo, &desc[partial], (async_desc->xfer_len - partial) *
-> +				sizeof(struct bam_desc_hw));
-
-I'm just curious if you could avoid memcpys at all somehow.
-
-> +	} else
-
-Keep style
-
-} else {
-...
-}
-
-Have you run checkpatch.pl?
-
-> +		memcpy(&fifo[bchan->tail], desc,
-> +			async_desc->xfer_len * sizeof(struct bam_desc_hw));
-> +
-> +	bchan->tail += async_desc->xfer_len;
-> +	bchan->tail %= MAX_DESCRIPTORS;
-> +
-> +	/* ensure descriptor writes and dma start not reordered */
-> +	wmb();
-> +	writel_relaxed(bchan->tail * sizeof(struct bam_desc_hw),
-> +			bdev->regs + BAM_P_EVNT_REG(bchan->id));
-> +}
-> +
-> +/**
-> + * dma_tasklet - DMA IRQ tasklet
-> + * @data: tasklet argument (bam controller structure)
-> + *
-> + * Sets up next DMA operation and then processes all completed transactions
-> + */
-> +static void dma_tasklet(unsigned long data)
-> +{
-> +	struct bam_device *bdev = (struct bam_device *)data;
-> +	struct bam_chan *bchan;
-> +	unsigned long flags;
-> +	unsigned int i;
-> +
-> +	/* go through the channels and kick off transactions */
-> +	for (i = 0; i < bdev->num_channels; i++) {
-> +		bchan = &bdev->channels[i];
-> +		spin_lock_irqsave(&bchan->vc.lock, flags);
-> +
-> +		if (!list_empty(&bchan->vc.desc_issued) && !bchan->curr_txd)
-> +			bam_start_dma(bchan);
-> +		spin_unlock_irqrestore(&bchan->vc.lock, flags);
-> +	}
-> +}
-> +
-> +/**
-> + * bam_issue_pending - starts pending transactions
-> + * @chan: dma channel
-> + *
-> + * Calls tasklet directly which in turn starts any pending transactions
-> + */
-> +static void bam_issue_pending(struct dma_chan *chan)
-> +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&bchan->vc.lock, flags);
-> +
-> +	/* if work pending and idle, start a transaction */
-> +	if (vchan_issue_pending(&bchan->vc) && !bchan->curr_txd)
-> +		bam_start_dma(bchan);
-> +
-> +	spin_unlock_irqrestore(&bchan->vc.lock, flags);
-> +}
-> +
-> +/**
-> + * bam_dma_free_desc - free descriptor memory
-> + * @vd: virtual descriptor
-> + *
-> + */
-> +static void bam_dma_free_desc(struct virt_dma_desc *vd)
-> +{
-> +	struct bam_async_desc *async_desc = container_of(vd,
-> +			struct bam_async_desc, vd);
-> +
-> +	kfree(async_desc);
-> +}
-> +
-> +struct bam_filter_args {
-> +	struct dma_device *dev;
-> +	u32 id;
-> +	u32 ee;
-> +	u32 dir;
-> +};
-> +
-> +static bool bam_dma_filter(struct dma_chan *chan, void *data)
-> +{
-> +	struct bam_filter_args *args = data;
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +
-> +	if (args->dev == chan->device &&
-> +		args->id == bchan->id) {
-> +
-> +		/* we found the channel, so lets set the EE and dir */
-> +		bchan->ee = args->ee;
-> +		bchan->slave.direction = args->dir ?
-> +				DMA_DEV_TO_MEM : DMA_MEM_TO_DEV;
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
-> +static struct dma_chan *bam_dma_xlate(struct of_phandle_args *dma_spec,
-> +		struct of_dma *of)
-> +{
-> +	struct bam_filter_args args;
-> +	dma_cap_mask_t cap;
-> +
-> +	if (dma_spec->args_count != 3)
-> +		return NULL;
-> +
-> +	args.dev = of->of_dma_data;
-> +	args.id = dma_spec->args[0];
-> +	args.ee = dma_spec->args[1];
-> +	args.dir = dma_spec->args[2];
-> +
-> +	dma_cap_zero(cap);
-> +	dma_cap_set(DMA_SLAVE, cap);
-> +
-> +	return dma_request_channel(cap, bam_dma_filter, &args);
-> +}
-> +
-> +/**
-> + * bam_init
-> + * @bdev: bam device
-> + *
-> + * Initialization helper for global bam registers
-> + */
-> +static void bam_init(struct bam_device *bdev)
-> +{
-> +	u32 val;
-> +
-> +	/* read versioning information */
-> +	val = readl_relaxed(bdev->regs + BAM_REVISION);
-> +	bdev->num_ees = val & NUM_EES_MASK;
-> +
-> +	val = readl_relaxed(bdev->regs + BAM_NUM_PIPES);
-> +	bdev->num_channels = val & BAM_NUM_PIPES_MASK;
-> +
-> +	/* s/w reset bam */
-> +	/* after reset all pipes are disabled and idle */
-> +	val = readl_relaxed(bdev->regs + BAM_CTRL);
-> +	val |= BAM_SW_RST;
-> +	writel_relaxed(val, bdev->regs + BAM_CTRL);
-> +	val &= ~BAM_SW_RST;
-> +	writel_relaxed(val, bdev->regs + BAM_CTRL);
-> +
-> +	/* make sure previous stores are visible before enabling BAM */
-> +	wmb();
-> +
-> +	/* enable bam */
-> +	val |= BAM_EN;
-> +	writel_relaxed(val, bdev->regs + BAM_CTRL);
-> +
-> +	/* set descriptor threshhold, start with 4 bytes */
-> +	writel_relaxed(DEFAULT_CNT_THRSHLD, bdev->regs + BAM_DESC_CNT_TRSHLD);
-> +
-> +	/* Enable default set of h/w workarounds, ie all except BAM_FULL_PIPE */
-> +	writel_relaxed(BAM_CNFG_BITS_DEFAULT, bdev->regs + BAM_CNFG_BITS);
-> +
-> +	/* enable irqs for errors */
-> +	writel_relaxed(BAM_ERROR_EN | BAM_HRESP_ERR_EN,
-> +				bdev->regs + BAM_IRQ_EN);
-> +}
-> +
-> +static void bam_channel_init(struct bam_device *bdev, struct bam_chan *bchan,
-> +	u32 index)
-> +{
-> +	bchan->id = index;
-> +	bchan->bdev = bdev;
-> +
-> +	vchan_init(&bchan->vc, &bdev->common);
-> +	bchan->vc.desc_free = bam_dma_free_desc;
-> +
-> +	bam_reset_channel(bdev, bchan->id);
-> +}
-> +
-> +static int bam_dma_probe(struct platform_device *pdev)
-> +{
-> +	struct bam_device *bdev;
-> +	struct resource *iores, *irq_res;
-> +	int ret, i;
-> +
-> +	bdev = devm_kzalloc(&pdev->dev, sizeof(*bdev), GFP_KERNEL);
-> +	if (!bdev)
-> +		return -ENOMEM;
-> +
-> +	bdev->dev = &pdev->dev;
-> +
-> +	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!iores) {
-> +		dev_err(bdev->dev, "register resource is missing\n");
-> +		return -EINVAL;
-> +	}
-
-Useless check and messaging, devm_ioremap_resource will do this for you.
-
-> +
-> +	bdev->regs = devm_ioremap_resource(&pdev->dev, iores);
-> +	if (IS_ERR(bdev->regs))
-> +		return PTR_ERR(bdev->regs);
-> +
-> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (!irq_res) {
-> +		dev_err(bdev->dev, "irq resource is missing\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	bdev->bamclk = devm_clk_get(bdev->dev, "bam_clk");
-> +	if (IS_ERR(bdev->bamclk))
-> +		return PTR_ERR(bdev->bamclk);
-> +
-> +	ret = clk_prepare_enable(bdev->bamclk);
-> +	if (ret) {
-> +		dev_err(bdev->dev, "failed to prepare/enable clock");
-> +		return ret;
-> +	}
-> +
-> +	bam_init(bdev);
-> +
-> +	tasklet_init(&bdev->task, dma_tasklet, (unsigned long)bdev);
-> +
-> +	bdev->channels = devm_kzalloc(bdev->dev,
-
-devm_kcalloc.
-
-> +				sizeof(*bdev->channels) * bdev->num_channels,
-> +				GFP_KERNEL);
-> +
-> +	if (!bdev->channels) {
-> +		ret = -ENOMEM;
-> +		goto err_disable_clk;
-> +	}
-> +
-> +	/* allocate and initialize channels */
-> +	INIT_LIST_HEAD(&bdev->common.channels);
-> +
-> +	for (i = 0; i < bdev->num_channels; i++)
-> +		bam_channel_init(bdev, &bdev->channels[i], i);
-> +
-> +	ret = devm_request_irq(bdev->dev, irq_res->start, bam_dma_irq,
-> +			IRQF_TRIGGER_HIGH, "bam_dma", bdev);
-> +	if (ret) {
-> +		dev_err(bdev->dev, "cannot register IRQ\n");
-> +		goto err_disable_clk;
-> +	}
-> +
-> +	/* set max dma segment size */
-> +	bdev->common.dev = bdev->dev;
-> +	bdev->common.dev->dma_parms = &bdev->dma_parms;
-> +	ret = dma_set_max_seg_size(bdev->common.dev, BAM_MAX_DATA_SIZE);
-> +	if (ret) {
-> +		dev_err(bdev->dev, "cannot set maximum segment size\n");
-> +		goto err_disable_clk;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, bdev);
-> +
-> +	/* set capabilities */
-> +	dma_cap_zero(bdev->common.cap_mask);
-> +	dma_cap_set(DMA_SLAVE, bdev->common.cap_mask);
-> +
-> +	/* initialize dmaengine apis */
-> +	bdev->common.device_alloc_chan_resources = bam_alloc_chan;
-> +	bdev->common.device_free_chan_resources = bam_free_chan;
-> +	bdev->common.device_prep_slave_sg = bam_prep_slave_sg;
-> +	bdev->common.device_control = bam_control;
-> +	bdev->common.device_issue_pending = bam_issue_pending;
-> +	bdev->common.device_tx_status = bam_tx_status;
-> +	bdev->common.dev = bdev->dev;
-> +
-> +	ret = dma_async_device_register(&bdev->common);
-> +	if (ret) {
-> +		dev_err(bdev->dev, "failed to register dma async device\n");
-> +		goto err_disable_clk;
-> +	}
-> +
-> +	if (pdev->dev.of_node) {
-> +		ret = of_dma_controller_register(pdev->dev.of_node,
-> +				bam_dma_xlate, &bdev->common);
-> +
-> +		if (ret) {
-> +			dev_err(bdev->dev, "failed to register of_dma\n");
-> +			goto err_unregister_dma;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +err_unregister_dma:
-> +	dma_async_device_unregister(&bdev->common);
-> +err_disable_clk:
-> +	clk_disable_unprepare(bdev->bamclk);
-
-
-
-> +	return ret;
-> +}
-> +
-> +static int bam_dma_remove(struct platform_device *pdev)
-> +{
-> +	struct bam_device *bdev = platform_get_drvdata(pdev);
-> +
-> +	dma_async_device_unregister(&bdev->common);
-> +
-> +	if (pdev->dev.of_node)
-> +		of_dma_controller_free(pdev->dev.of_node);
-> +
-> +	clk_disable_unprepare(bdev->bamclk);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id bam_of_match[] = {
-> +	{ .compatible = "qcom,bam-v1.4.0", },
-> +	{ .compatible = "qcom,bam-v1.4.1", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, bam_of_match);
-> +#endif
-> +
-> +static struct platform_driver bam_dma_driver = {
-> +	.probe = bam_dma_probe,
-> +	.remove = bam_dma_remove,
-> +	.driver = {
-> +		.name = "bam-dma-engine",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(bam_of_match),
-> +	},
-> +};
-> +
-> +static int __init bam_dma_init(void)
-> +{
-> +	return platform_driver_register(&bam_dma_driver);
-> +}
-> +
-> +static void __exit bam_dma_exit(void)
-> +{
-> +	return platform_driver_unregister(&bam_dma_driver);
-> +}
-> +
-> +module_init(bam_dma_init);
-> +module_exit(bam_dma_exit);
-
-module_platform_driver() ?
-
-> +
-> +MODULE_AUTHOR("Andy Gross <agross@codeaurora.org>");
-> +MODULE_DESCRIPTION("QCOM BAM DMA engine driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
-> new file mode 100644
-> index 0000000..2cb3b5f
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.h
-> @@ -0,0 +1,268 @@
-> +/*
-> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-
-2014 ?
-
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#ifndef __QCOM_BAM_DMA_H__
-> +#define __QCOM_BAM_DMA_H__
-> +
-> +#include <linux/dmaengine.h>
-> +#include "virt-dma.h"
-> +
-> +enum bam_channel_dir {
-> +	BAM_PIPE_CONSUMER = 0,	/* channel reads from data-fifo or memory */
-> +	BAM_PIPE_PRODUCER,	/* channel writes to data-fifo or memory */
-> +};
-> +
-> +struct bam_desc_hw {
-> +	u32 addr;		/* Buffer physical address */
-> +	u16 size;		/* Buffer size in bytes */
-> +	u16 flags;
-> +} __packed;
-> +
-> +#define DESC_FLAG_INT	BIT(15)
-> +#define DESC_FLAG_EOT	BIT(14)
-> +#define DESC_FLAG_EOB	BIT(13)
-> +
-> +struct bam_async_desc {
-> +	struct virt_dma_desc vd;
-> +
-> +	u32 num_desc;
-> +	u32 xfer_len;
-> +	struct bam_desc_hw *curr_desc;
-> +
-> +	enum bam_channel_dir dir;
-> +	size_t length;
-> +	struct bam_desc_hw desc[0];
-> +};
-> +
-> +#define BAM_CTRL			0x0000
-> +#define BAM_REVISION			0x0004
-> +#define BAM_SW_REVISION			0x0080
-> +#define BAM_NUM_PIPES			0x003C
-> +#define BAM_TIMER			0x0040
-> +#define BAM_TIMER_CTRL			0x0044
-> +#define BAM_DESC_CNT_TRSHLD		0x0008
-> +#define BAM_IRQ_SRCS			0x000C
-> +#define BAM_IRQ_SRCS_MSK		0x0010
-> +#define BAM_IRQ_SRCS_UNMASKED		0x0030
-> +#define BAM_IRQ_STTS			0x0014
-> +#define BAM_IRQ_CLR			0x0018
-> +#define BAM_IRQ_EN			0x001C
-> +#define BAM_CNFG_BITS			0x007C
-> +#define BAM_IRQ_SRCS_EE(pipe)		(0x0800 + ((pipe) * 0x80))
-> +#define BAM_IRQ_SRCS_MSK_EE(pipe)	(0x0804 + ((pipe) * 0x80))
-> +#define BAM_P_CTRL(pipe)		(0x1000 + ((pipe) * 0x1000))
-> +#define BAM_P_RST(pipe)			(0x1004 + ((pipe) * 0x1000))
-> +#define BAM_P_HALT(pipe)		(0x1008 + ((pipe) * 0x1000))
-> +#define BAM_P_IRQ_STTS(pipe)		(0x1010 + ((pipe) * 0x1000))
-> +#define BAM_P_IRQ_CLR(pipe)		(0x1014 + ((pipe) * 0x1000))
-> +#define BAM_P_IRQ_EN(pipe)		(0x1018 + ((pipe) * 0x1000))
-> +#define BAM_P_EVNT_DEST_ADDR(pipe)	(0x182C + ((pipe) * 0x1000))
-> +#define BAM_P_EVNT_REG(pipe)		(0x1818 + ((pipe) * 0x1000))
-> +#define BAM_P_SW_OFSTS(pipe)		(0x1800 + ((pipe) * 0x1000))
-> +#define BAM_P_DATA_FIFO_ADDR(pipe)	(0x1824 + ((pipe) * 0x1000))
-> +#define BAM_P_DESC_FIFO_ADDR(pipe)	(0x181C + ((pipe) * 0x1000))
-> +#define BAM_P_EVNT_TRSHLD(pipe)		(0x1828 + ((pipe) * 0x1000))
-> +#define BAM_P_FIFO_SIZES(pipe)		(0x1820 + ((pipe) * 0x1000))
-> +
-> +/* BAM CTRL */
-> +#define BAM_SW_RST			BIT(0)
-> +#define BAM_EN				BIT(1)
-> +#define BAM_EN_ACCUM			BIT(4)
-> +#define BAM_TESTBUS_SEL_SHIFT		5
-> +#define BAM_TESTBUS_SEL_MASK		0x3F
-> +#define BAM_DESC_CACHE_SEL_SHIFT	13
-> +#define BAM_DESC_CACHE_SEL_MASK		0x3
-> +#define BAM_CACHED_DESC_STORE		BIT(15)
-> +#define IBC_DISABLE			BIT(16)
-> +
-> +/* BAM REVISION */
-> +#define REVISION_SHIFT		0
-> +#define REVISION_MASK		0xFF
-> +#define NUM_EES_SHIFT		8
-> +#define NUM_EES_MASK		0xF
-> +#define CE_BUFFER_SIZE		BIT(13)
-> +#define AXI_ACTIVE		BIT(14)
-> +#define USE_VMIDMT		BIT(15)
-> +#define SECURED			BIT(16)
-> +#define BAM_HAS_NO_BYPASS	BIT(17)
-> +#define HIGH_FREQUENCY_BAM	BIT(18)
-> +#define INACTIV_TMRS_EXST	BIT(19)
-> +#define NUM_INACTIV_TMRS	BIT(20)
-> +#define DESC_CACHE_DEPTH_SHIFT	21
-> +#define DESC_CACHE_DEPTH_1	(0 << DESC_CACHE_DEPTH_SHIFT)
-> +#define DESC_CACHE_DEPTH_2	(1 << DESC_CACHE_DEPTH_SHIFT)
-> +#define DESC_CACHE_DEPTH_3	(2 << DESC_CACHE_DEPTH_SHIFT)
-> +#define DESC_CACHE_DEPTH_4	(3 << DESC_CACHE_DEPTH_SHIFT)
-> +#define CMD_DESC_EN		BIT(23)
-> +#define INACTIV_TMR_BASE_SHIFT	24
-> +#define INACTIV_TMR_BASE_MASK	0xFF
-> +
-> +/* BAM NUM PIPES */
-> +#define BAM_NUM_PIPES_SHIFT		0
-> +#define BAM_NUM_PIPES_MASK		0xFF
-> +#define PERIPH_NON_PIPE_GRP_SHIFT	16
-> +#define PERIPH_NON_PIP_GRP_MASK		0xFF
-> +#define BAM_NON_PIPE_GRP_SHIFT		24
-> +#define BAM_NON_PIPE_GRP_MASK		0xFF
-> +
-> +/* BAM CNFG BITS */
-> +#define BAM_PIPE_CNFG		BIT(2)
-> +#define BAM_FULL_PIPE		BIT(11)
-> +#define BAM_NO_EXT_P_RST	BIT(12)
-> +#define BAM_IBC_DISABLE		BIT(13)
-> +#define BAM_SB_CLK_REQ		BIT(14)
-> +#define BAM_PSM_CSW_REQ		BIT(15)
-> +#define BAM_PSM_P_RES		BIT(16)
-> +#define BAM_AU_P_RES		BIT(17)
-> +#define BAM_SI_P_RES		BIT(18)
-> +#define BAM_WB_P_RES		BIT(19)
-> +#define BAM_WB_BLK_CSW		BIT(20)
-> +#define BAM_WB_CSW_ACK_IDL	BIT(21)
-> +#define BAM_WB_RETR_SVPNT	BIT(22)
-> +#define BAM_WB_DSC_AVL_P_RST	BIT(23)
-> +#define BAM_REG_P_EN		BIT(24)
-> +#define BAM_PSM_P_HD_DATA	BIT(25)
-> +#define BAM_AU_ACCUMED		BIT(26)
-> +#define BAM_CMD_ENABLE		BIT(27)
-> +
-> +#define BAM_CNFG_BITS_DEFAULT	(BAM_PIPE_CNFG |	\
-> +			BAM_NO_EXT_P_RST |		\
-> +			BAM_IBC_DISABLE |		\
-> +			BAM_SB_CLK_REQ |		\
-> +			BAM_PSM_CSW_REQ |		\
-> +			BAM_PSM_P_RES |			\
-> +			BAM_AU_P_RES |			\
-> +			BAM_SI_P_RES |			\
-> +			BAM_WB_P_RES |			\
-> +			BAM_WB_BLK_CSW |		\
-> +			BAM_WB_CSW_ACK_IDL |		\
-> +			BAM_WB_RETR_SVPNT |		\
-> +			BAM_WB_DSC_AVL_P_RST |		\
-> +			BAM_REG_P_EN |			\
-> +			BAM_PSM_P_HD_DATA |		\
-> +			BAM_AU_ACCUMED |		\
-> +			BAM_CMD_ENABLE)
-> +
-> +/* PIPE CTRL */
-> +#define	P_EN			BIT(1)
-> +#define P_DIRECTION		BIT(3)
-> +#define P_SYS_STRM		BIT(4)
-> +#define P_SYS_MODE		BIT(5)
-> +#define P_AUTO_EOB		BIT(6)
-> +#define P_AUTO_EOB_SEL_SHIFT	7
-> +#define P_AUTO_EOB_SEL_512	(0 << P_AUTO_EOB_SEL_SHIFT)
-> +#define P_AUTO_EOB_SEL_256	(1 << P_AUTO_EOB_SEL_SHIFT)
-> +#define P_AUTO_EOB_SEL_128	(2 << P_AUTO_EOB_SEL_SHIFT)
-> +#define P_AUTO_EOB_SEL_64	(3 << P_AUTO_EOB_SEL_SHIFT)
-> +#define P_PREFETCH_LIMIT_SHIFT	9
-> +#define P_PREFETCH_LIMIT_32	(0 << P_PREFETCH_LIMIT_SHIFT)
-> +#define P_PREFETCH_LIMIT_16	(1 << P_PREFETCH_LIMIT_SHIFT)
-> +#define P_PREFETCH_LIMIT_4	(2 << P_PREFETCH_LIMIT_SHIFT)
-> +#define P_WRITE_NWD		BIT(11)
-> +#define P_LOCK_GROUP_SHIFT	16
-> +#define P_LOCK_GROUP_MASK	0x1F
-> +
-> +/* BAM_DESC_CNT_TRSHLD */
-> +#define CNT_TRSHLD		0xffff
-> +#define DEFAULT_CNT_THRSHLD	0x4
-> +
-> +/* BAM_IRQ_SRCS */
-> +#define BAM_IRQ			BIT(31)
-> +#define P_IRQ			0x7fffffff
-> +
-> +/* BAM_IRQ_SRCS_MSK */
-> +#define BAM_IRQ_MSK		BAM_IRQ
-> +#define P_IRQ_MSK		P_IRQ
-> +
-> +/* BAM_IRQ_STTS */
-> +#define BAM_TIMER_IRQ		BIT(4)
-> +#define BAM_EMPTY_IRQ		BIT(3)
-> +#define BAM_ERROR_IRQ		BIT(2)
-> +#define BAM_HRESP_ERR_IRQ	BIT(1)
-> +
-> +/* BAM_IRQ_CLR */
-> +#define BAM_TIMER_CLR		BIT(4)
-> +#define BAM_EMPTY_CLR		BIT(3)
-> +#define BAM_ERROR_CLR		BIT(2)
-> +#define BAM_HRESP_ERR_CLR	BIT(1)
-> +
-> +/* BAM_IRQ_EN */
-> +#define BAM_TIMER_EN		BIT(4)
-> +#define BAM_EMPTY_EN		BIT(3)
-> +#define BAM_ERROR_EN		BIT(2)
-> +#define BAM_HRESP_ERR_EN	BIT(1)
-> +
-> +/* BAM_P_IRQ_EN */
-> +#define P_PRCSD_DESC_EN		BIT(0)
-> +#define P_TIMER_EN		BIT(1)
-> +#define P_WAKE_EN		BIT(2)
-> +#define P_OUT_OF_DESC_EN	BIT(3)
-> +#define P_ERR_EN		BIT(4)
-> +#define P_TRNSFR_END_EN		BIT(5)
-> +#define P_DEFAULT_IRQS_EN	(P_PRCSD_DESC_EN | P_ERR_EN | P_TRNSFR_END_EN)
-> +
-> +/* BAM_P_SW_OFSTS */
-> +#define P_SW_OFSTS_MASK		0xffff
-> +
-> +#define BAM_DESC_FIFO_SIZE	SZ_32K
-> +#define MAX_DESCRIPTORS (BAM_DESC_FIFO_SIZE / sizeof(struct bam_desc_hw) - 1)
-> +#define BAM_MAX_DATA_SIZE	(SZ_32K - 8)
-> +
-> +struct bam_chan {
-> +	struct virt_dma_chan vc;
-> +
-> +	struct bam_device *bdev;
-> +
-> +	/* configuration from device tree */
-> +	u32 id;
-> +	u32 ee;
-> +
-> +	struct bam_async_desc *curr_txd;	/* current running dma */
-> +
-> +	/* runtime configuration */
-> +	struct dma_slave_config slave;
-> +
-> +	/* fifo storage */
-> +	struct bam_desc_hw *fifo_virt;
-> +	dma_addr_t fifo_phys;
-> +
-> +	/* fifo markers */
-> +	unsigned short head;		/* start of active descriptor entries */
-> +	unsigned short tail;		/* end of active descriptor entries */
-> +
-> +	unsigned int paused;		/* is the channel paused? */
-> +
-> +	struct list_head node;
-> +};
-> +
-> +static inline struct bam_chan *to_bam_chan(struct dma_chan *common)
-> +{
-> +	return container_of(common, struct bam_chan, vc.chan);
-> +}
-> +
-> +struct bam_device {
-> +	void __iomem *regs;
-> +	struct device *dev;
-> +	struct dma_device common;
-> +	struct device_dma_parameters dma_parms;
-> +	struct bam_chan *channels;
-> +	u32 num_channels;
-> +	u32 num_ees;
-> +	unsigned long enabled_ees;
-> +	int irq;
-> +	struct clk *bamclk;
-> +
-> +	/* dma start transaction tasklet */
-> +	struct tasklet_struct task;
-> +};
-> +
-> +#endif /* __QCOM_BAM_DMA_H__ */
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+On Thu, Dec 26, 2013 at 3:58 PM, Dong Aisheng <dongas86@gmail.com> wrote:
+> Hi Peter,
+>
+> On Mon, Dec 23, 2013 at 7:13 PM, Dong Aisheng <b29396@freescale.com> wrote:
+>> The sdhci_execute_tuning routine gets lock separately by
+>> disable_irq(host->irq);
+>> spin_lock(&host->lock);
+>> It will cause the following lockdep error message since the &host->lock
+>> could also be got in irq context.
+>> Use spin_lock_irqsave/spin_unlock_restore instead to get rid of
+>> this error message.
+>>
+>> [ INFO: inconsistent lock state ]
+>> 3.13.0-rc1+ #287 Not tainted
+>> ---------------------------------
+>> inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
+>> kworker/u2:1/33 [HC0[0]:SC0[0]:HE1:SE1] takes:
+>>  (&(&host->lock)->rlock){?.-...}, at: [<8045f7f4>] sdhci_execute_tuning+0x4c/0x710
+>> {IN-HARDIRQ-W} state was registered at:
+>>   [<8005f030>] mark_lock+0x140/0x6ac
+>>   [<80060760>] __lock_acquire+0xb30/0x1cbc
+>>   [<800620d0>] lock_acquire+0x70/0x84
+>>   [<8061d1c8>] _raw_spin_lock+0x30/0x40
+>>   [<804605cc>] sdhci_irq+0x24/0xa68
+>>   [<8006b1d4>] handle_irq_event_percpu+0x54/0x18c
+>>   [<8006b350>] handle_irq_event+0x44/0x64
+>>   [<8006e50c>] handle_fasteoi_irq+0xa0/0x170
+>>   [<8006a8f0>] generic_handle_irq+0x30/0x44
+>>   [<8000f238>] handle_IRQ+0x54/0xbc
+>>   [<8000864c>] gic_handle_irq+0x30/0x64
+>>   [<80013024>] __irq_svc+0x44/0x5c
+>>   [<80329bf4>] dev_vprintk_emit+0x50/0x58
+>>   [<80329c24>] dev_printk_emit+0x28/0x30
+>>   [<80329fec>] __dev_printk+0x4c/0x90
+>>   [<8032a180>] dev_err+0x3c/0x48
+>>   [<802dd4f0>] _regulator_get+0x158/0x1cc
+>>   [<802dd5b4>] regulator_get_optional+0x18/0x1c
+>>   [<80461df4>] sdhci_add_host+0x42c/0xbd8
+>>   [<80464820>] sdhci_esdhc_imx_probe+0x378/0x67c
+>>   [<8032ee88>] platform_drv_probe+0x20/0x50
+>>   [<8032d48c>] driver_probe_device+0x118/0x234
+>>   [<8032d690>] __driver_attach+0x9c/0xa0
+>>   [<8032b89c>] bus_for_each_dev+0x68/0x9c
+>>   [<8032cf44>] driver_attach+0x20/0x28
+>>   [<8032cbc8>] bus_add_driver+0x148/0x1f4
+>>   [<8032dce0>] driver_register+0x80/0x100
+>>   [<8032ee54>] __platform_driver_register+0x50/0x64
+>>   [<8084b094>] sdhci_esdhc_imx_driver_init+0x18/0x20
+>>   [<80008980>] do_one_initcall+0x108/0x16c
+>>   [<8081cca4>] kernel_init_freeable+0x10c/0x1d0
+>>   [<80611b28>] kernel_init+0x10/0x120
+>>   [<8000e9c8>] ret_from_fork+0x14/0x2c
+>> irq event stamp: 805
+>> hardirqs last  enabled at (805): [<8061d43c>] _raw_spin_unlock_irqrestore+0x38/0x4c
+>> hardirqs last disabled at (804): [<8061d2c8>] _raw_spin_lock_irqsave+0x24/0x54
+>> softirqs last  enabled at (570): [<8002b824>] __do_softirq+0x1c4/0x290
+>> softirqs last disabled at (561): [<8002bcf4>] irq_exit+0xb4/0x10c
+>>
+>> other info that might help us debug this:
+>>  Possible unsafe locking scenario:
+>>
+>>        CPU0
+>>        ----
+>>   lock(&(&host->lock)->rlock);
+>>   <Interrupt>
+>>     lock(&(&host->lock)->rlock);
+>>
+>>  *** DEADLOCK ***
+>>
+>> 2 locks held by kworker/u2:1/33:
+>>  #0:  (kmmcd){.+.+..}, at: [<8003db18>] process_one_work+0x128/0x468
+>>  #1:  ((&(&host->detect)->work)){+.+...}, at: [<8003db18>] process_one_work+0x128/0x468
+>>
+>> stack backtrace:
+>> CPU: 0 PID: 33 Comm: kworker/u2:1 Not tainted 3.13.0-rc1+ #287
+>> Workqueue: kmmcd mmc_rescan
+>> Backtrace:
+>> [<80012160>] (dump_backtrace+0x0/0x10c) from [<80012438>] (show_stack+0x18/0x1c)
+>>  r6:bfad0900 r5:00000000 r4:8088ecc8 r3:bfad0900
+>> [<80012420>] (show_stack+0x0/0x1c) from [<806169ec>] (dump_stack+0x84/0x9c)
+>> [<80616968>] (dump_stack+0x0/0x9c) from [<806147b4>] (print_usage_bug+0x260/0x2d0)
+>>  r5:8076ba88 r4:80977410
+>> [<80614554>] (print_usage_bug+0x0/0x2d0) from [<8005f0d0>] (mark_lock+0x1e0/0x6ac)
+>>  r9:8005e678 r8:00000000 r7:bfad0900 r6:00001015 r5:bfad0cd0
+>> r4:00000002
+>> [<8005eef0>] (mark_lock+0x0/0x6ac) from [<80060234>] (__lock_acquire+0x604/0x1cbc)
+>> [<8005fc30>] (__lock_acquire+0x0/0x1cbc) from [<800620d0>] (lock_acquire+0x70/0x84)
+>> [<80062060>] (lock_acquire+0x0/0x84) from [<8061d1c8>] (_raw_spin_lock+0x30/0x40)
+>>  r7:00000000 r6:bfb63000 r5:00000000 r4:bfb60568
+>> [<8061d198>] (_raw_spin_lock+0x0/0x40) from [<8045f7f4>] (sdhci_execute_tuning+0x4c/0x710)
+>>  r4:bfb60000
+>> [<8045f7a8>] (sdhci_execute_tuning+0x0/0x710) from [<80453454>] (mmc_sd_init_card+0x5f8/0x660)
+>> [<80452e5c>] (mmc_sd_init_card+0x0/0x660) from [<80453748>] (mmc_attach_sd+0xb4/0x180)
+>>  r9:bf92d400 r8:8065f364 r7:00061a80 r6:bfb60000 r5:8065f358
+>> r4:bfb60000
+>> [<80453694>] (mmc_attach_sd+0x0/0x180) from [<8044d9f8>] (mmc_rescan+0x284/0x2f0)
+>>  r5:8065f358 r4:bfb602f8
+>> [<8044d774>] (mmc_rescan+0x0/0x2f0) from [<8003db94>] (process_one_work+0x1a4/0x468)
+>>  r8:00000000 r7:bfb55eb0 r6:bf80dc00 r5:bfb602f8 r4:bfb35980
+>> r3:8044d774
+>> [<8003d9f0>] (process_one_work+0x0/0x468) from [<8003e850>] (worker_thread+0x118/0x3e0)
+>> [<8003e738>] (worker_thread+0x0/0x3e0) from [<80044de0>] (kthread+0xd4/0xf0)
+>> [<80044d0c>] (kthread+0x0/0xf0) from [<8000e9c8>] (ret_from_fork+0x14/0x2c)
+>>  r7:00000000 r6:00000000 r5:80044d0c r4:bfb37b40
+>>
+>> Cc: Peter Zijlstra <peterz@infradead.org>
+>> Cc: Chris Ball <cjb@laptop.org>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>>
+>> ---
+>> It's strange that this issue did not happen on kernel 3.10.17 with the same
+>> code. And looking at the code, before call spin_lock we already disable the mmc
+>> controller irq, per on my understanding, the deadlock given by lockdep may not
+>> be able to happen(pls fix me if wrong).
+>> May the lockdep not track the specific irq disable?
+>> Copy lockdep guy to comment.
+>
+> Any comments for it?
+>
+> Regards
+> Dong Aisheng
+>
+>> ---
+>>  drivers/mmc/host/sdhci.c |   20 +++++++-------------
+>>  1 files changed, 7 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index a104bb1..c5d5f53 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -1876,12 +1876,12 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>>         unsigned long timeout;
+>>         int err = 0;
+>>         bool requires_tuning_nonuhs = false;
+>> +       unsigned long flags;
+>>
+>>         host = mmc_priv(mmc);
+>>
+>>         sdhci_runtime_pm_get(host);
+>> -       disable_irq(host->irq);
+>> -       spin_lock(&host->lock);
+>> +       spin_lock_irqsave(&host->lock, flags);
+>>
+>>         ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+>>
+>> @@ -1901,15 +1901,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>>             requires_tuning_nonuhs)
+>>                 ctrl |= SDHCI_CTRL_EXEC_TUNING;
+>>         else {
+>> -               spin_unlock(&host->lock);
+>> -               enable_irq(host->irq);
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>>                 sdhci_runtime_pm_put(host);
+>>                 return 0;
+>>         }
+>>
+>>         if (host->ops->platform_execute_tuning) {
+>> -               spin_unlock(&host->lock);
+>> -               enable_irq(host->irq);
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>>                 err = host->ops->platform_execute_tuning(host, opcode);
+>>                 sdhci_runtime_pm_put(host);
+>>                 return err;
+>> @@ -1982,15 +1980,12 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>>                 host->cmd = NULL;
+>>                 host->mrq = NULL;
+>>
+>> -               spin_unlock(&host->lock);
+>> -               enable_irq(host->irq);
+>> -
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>>                 /* Wait for Buffer Read Ready interrupt */
+>>                 wait_event_interruptible_timeout(host->buf_ready_int,
+>>                                         (host->tuning_done == 1),
+>>                                         msecs_to_jiffies(50));
+>> -               disable_irq(host->irq);
+>> -               spin_lock(&host->lock);
+>> +               spin_lock_irqsave(&host->lock, flags);
+>>
+>>                 if (!host->tuning_done) {
+>>                         pr_info(DRIVER_NAME ": Timeout waiting for "
+>> @@ -2065,8 +2060,7 @@ out:
+>>                 err = 0;
+>>
+>>         sdhci_clear_set_irqs(host, SDHCI_INT_DATA_AVAIL, ier);
+>> -       spin_unlock(&host->lock);
+>> -       enable_irq(host->irq);
+>> +       spin_unlock_irqrestore(&host->lock, flags);
+>>         sdhci_runtime_pm_put(host);
+>>
+>>         return err;
+>> --
+>> 1.7.2.rc3
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
