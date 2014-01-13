@@ -1,33 +1,21 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 13 Jan 2014 02:00:25 +0100
-Subject: [patch] fix omap compile with randconfig
-Message-ID: <20140113010025.GA14431@amd.pavel.ucw.cz>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Mon, 13 Jan 2014 09:00:32 +0800
+Subject: [PATCH v7 0/3] mmc: dw_mmc: add dw_mmc-k3
+In-Reply-To: <86iotpdupe.fsf@void.printf.net>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
+ <86iotpdupe.fsf@void.printf.net>
+Message-ID: <CAMj5BkjfQ2gfMgUNLMpgpU159+NcUDUAUm=g8kk0oEW-Ym4p-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 13, 2014 at 12:35 AM, Chris Ball <chris@printf.net> wrote:
+> Hi,
+>
+> I've pushed patches 1 and 2 to mmc-next for 3.14, with Arnd and
+> Jaehoon's ACK -- since patch 3 depends on files that aren't in my
+> tree, please can you push that one through arm-soc?
 
-This fixes:
+Great, thanks Chris.
+The 3rd patch may need go to Mike's tree, will search Mike's help.
 
-arch/arm/mach-omap2/built-in.o: In function `omap_reserve':
-/data/l/linux-n900/arch/arm/mach-omap2/common.c:36: undefined
-  reference to `omap_fb_reserve_memblock'
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 9beecde..857907f 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -33,5 +33,7 @@ void __init omap_reserve(void)
- 	omap_dsp_reserve_sdram_memblock();
- 	omap_secure_ram_reserve_memblock();
- 	omap_barrier_reserve_memblock();
-+#ifdef CONFIG_OMAP2_VRFB
- 	omap_fb_reserve_memblock();
-+#endif
- }
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks.
