@@ -1,50 +1,55 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Mon, 13 Jan 2014 11:09:24 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52CFFFDA.8050108@linaro.org>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
- <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
- <52CFFFDA.8050108@linaro.org>
-Message-ID: <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Jan 2014 10:19:14 +0800
+Subject: DT include files
+In-Reply-To: <201401122121.20084.arnd@arndb.de>
+References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <201401111415.29395.arnd@arndb.de>
+ <20140112032516.GA23525@S2101-09.ap.freescale.net>
+ <201401122121.20084.arnd@arndb.de>
+Message-ID: <20140113021912.GB23525@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, January 10, 2014, Zhangfei Gao wrote:
-> On 01/10/2014 09:39 PM, Seungwon Jeon wrote:
-> >> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-> >> +{
-> >> +	struct dw_mci_k3_priv_data *priv = host->priv;
-> >> +	u32 rate = priv->clk_table[ios->timing];
-> >
-> > First, sorry for quick review even though your effort.
-> > But I still worry about this change.
-> > Currently k3 host's clock table depends on value number of SD/MMC mode value.
-> > It seems close to identifier for eachg mode. I think it's not good way to use as table's index.
-> > Can you modify to mmc_clk_determine_rate() in your another patch-set?
-> > I guess required actual target rate could be determined depending on ios->clock.
-> >
-> 
-> No, it can not get input clock source rate simply from ios->clock, also
-> requied info like which controller, which mode etc.
-> Here is setting clock source rate, not the working clock rate.
-> 
-> For example, emmc init clock source rate is 13M, while sd init clock
-> source is 25M, it can not simply get such info from ios->clock.
-> And for HS200, emmc may have to set clock source rate to 104M since the
-> controller limitation and can not work stable as 208M.
+On Sun, Jan 12, 2014 at 09:21:19PM +0100, Arnd Bergmann wrote:
+> I was under the impression that the generic pinctrl binding was designed
+> in a way to let you assign labels to each possible (reasonable)
+> configuration so you didn't have get to this level of detail at the
+> driver.
 
-Yes, clock table is source clock rate, not actual working clock rate.
-I was not saying that 'ios->clock' would be used for source clock directly.
-I meant that you can adjust the source clock rate depending on 'ios->clock'.
-You've already done with clock table similarly in mmc_clk_determine_rate().
+The generic part of pinctrl binding only covers the procedure how a
+client device get its pinctrl state configuration from a pin controller
+node.  That's what we defined in bindings/pinctrl/pinctrl-bindings.txt
+and implemented in pinctrl core.  But the details of how a pinctrl state
+configuration should be interpreted for a particular pin controller is
+defined by individual pin controller binding like fsl,imx-pinctrl.txt,
+and implemented in the pin controller driver like
+drivers/pinctrl/pinctrl-imx.c.
 
-For example, in case of HS200, 'ios->clock' will be passed with 200MHz.
-And then, mmc_clk_determine_rate() can set the 'rate & best' to 100000000 and 720000000 respectively.
-Also, 'ios->clock' with 400KHz or less may be passed for init clock.
-If clock id is HI3620_SD_CIUCLK, 'rate & best' can be selected with 13000000 and 26000000.
-If not and it's case of MMC,  'rate & best' can be selected with 25000000 and 180000000.
-If it should be considered with other conditions, please let me know.
+> I'm also surprised that you have to know multiple constants
+> (mux register, input register, config register offsets) to select a
+> particular pin. I would have expected that you could have one constant
+> from which the driver is able to compute the other ones.
 
-Thanks,
-Seungwon Jeon
+That's what we do before.  We define a constant in the binding and have
+the driver to maintain these data and look up the data using the
+constant.  See commit below for imx6q example.
+
+  d8fe357 pinctrl: pinctrl-imx: add imx6q pinctrl driver
+
+The biggest problem with that approach is we have huge data to maintain
+in the driver because of the complexity and flexibility of IMX pin
+controller design.  And these data can not be init data.  Check that big
+array of struct imx_pin_reg in commit above for what I'm talking about.
+So when we build a v7 kernel image for IMX, we will have such big array
+for each of these SoCs, imx50, imx51, imx53, imx6sl, imx6dl, imx6q, and
+more to come.
+
+That's why we went through the pain of breaking DT compatibility to move
+all these data into device tree one year ago with the commit below.
+
+  e164153 pinctrl: imx: move hard-coding data into device tree
+
+Now kernel gets released from the floating and we do not even need to
+touch kernel to add these data when new SoC support is added.
+
+Shawn
