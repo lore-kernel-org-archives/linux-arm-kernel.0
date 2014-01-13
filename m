@@ -1,55 +1,91 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 13 Jan 2014 14:14:33 +0100
-Subject: [PATCH v3 3/3] arm: dts: keystone: add keystone timer entry
-In-Reply-To: <52D3CDD5.9060104@ti.com>
-References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387974724-31138-4-git-send-email-ivan.khoronzhuk@ti.com>
- <52BC6F28.1020009@ti.com> <52BF2164.6040501@linaro.org>
- <52D3CDD5.9060104@ti.com>
-Message-ID: <52D3E6B9.40502@linaro.org>
+From: wigyori@uid0.hu (Zoltan HERPAI)
+Date: Mon, 13 Jan 2014 14:15:01 +0100 (CET)
+Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for LinkSprite
+ pcDuino
+Message-ID: <alpine.DEB.2.02.1401131406230.17739@trabant.deployis.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2014 12:28 PM, ivan.khoronzhuk wrote:
-> On 12/28/2013 09:07 PM, Daniel Lezcano wrote:
->> On 12/26/2013 07:02 PM, Santosh Shilimkar wrote:
->>> $subject
->>> s/arm/ARM,
->>>
->>> On Wednesday 25 December 2013 07:32 AM, Ivan Khoronzhuk wrote:
->>>> Add keystone timer entry to keystone device tree.
->>>> This 64-bit timer is used as backup clock event device.
->>>>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>> No need to repost. I will fix it up while applying based
->>> on state of PATCH 1/3 and 2/3.
->>
->> I assume you will take the patchset in your tree.
->>
->> I am back from vacations, give me a couple of days to review the
->> patchset before applying it please.
->>
->> Thanks
->>    -- Daniel
->>
->
-> Hi, Daniel
->
-> Do you have any comments on this patch series?
-> Can we expect it in k3.14
+>From b2cd1681fe988584028d280ca79249f4ebcb271c Mon Sep 17 00:00:00 2001
+From: Zoltan HERPAI <wigyori@uid0.hu>
+Date: Mon, 13 Jan 2014 14:00:12 +0100
+Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for LinkSprite pcDuino
 
-I have applied the patch 1/3 and 2/3 in my tree but I was expecting the 
-DT folks to give their acked-by for the patch 2/3.
+This patch will add a basic board support DT for the
+LinkSprite pcDuino board.
 
-It is a bit late for 3.14 but if the patch 3/3 is in Santosh's tree, the 
-patch 2/3 gets its acked-by and you absolutely need the driver for this 
-version, I may consider to send another PR to the upstream maintainers. 
-That will be up to them to accept to pull it or not.
+Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+---
+  arch/arm/boot/dts/Makefile              |    1 +
+  arch/arm/boot/dts/sun4i-a10-pcduino.dts |   48 +++++++++++++++++++++++++++++++
+  2 files changed, 49 insertions(+), 0 deletions(-)
+  create mode 100644 arch/arm/boot/dts/sun4i-a10-pcduino.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b663ed7..a2e3620 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -253,6 +253,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+  	sun4i-a10-cubieboard.dtb \
+  	sun4i-a10-mini-xplus.dtb \
+  	sun4i-a10-hackberry.dtb \
++	sun4i-a10-pcduino.dtb \
+  	sun5i-a10s-olinuxino-micro.dtb \
+  	sun5i-a13-olinuxino.dtb \
+  	sun5i-a13-olinuxino-micro.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+new file mode 100644
+index 0000000..f5692a3
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+@@ -0,0 +1,48 @@
++/*
++ * Copyright 2014 Zoltan HERPAI
++ * Zoltan HERPAI <wigyori@uid0.hu>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun4i-a10.dtsi"
++
++/ {
++	model = "LinkSprite pcDuino";
++	compatible = "linksprite,a10-pcduino", "allwinner,sun4i-a10";
++
++	soc at 01c00000 {
++		emac: ethernet at 01c0b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy1>;
++			status = "okay";
++		};
++
++		mdio at 01c0b080 {
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++	};
++};
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.0.4
