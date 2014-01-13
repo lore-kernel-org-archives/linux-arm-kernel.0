@@ -1,37 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jan 2014 14:36:15 +0100
-Subject: [GIT PULL] get rid of <mach/timex.h>
-In-Reply-To: <52CBE3DE.5010706@atmel.com>
-References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
- <87bo0clved.fsf@linaro.org> <20131219221758.GS14866@pengutronix.de>
- <20131220184715.GT14866@pengutronix.de>
- <52CBE3DE.5010706@atmel.com>
-Message-ID: <CACRpkdboVtY2nBxGeWj_ReHJ5J8WuyuPHCwHM=yELBdePkX7Vw@mail.gmail.com>
+Date: Mon, 13 Jan 2014 14:39:07 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 12:24 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 20/12/2013 19:47, Uwe Kleine-K?nig :
+On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
->> Please pull
->>
->>       git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
->>
->> which points to 79f08d9ed217318b4f325b7fcf8f26dcd0e41689 now provided
->> you are happy with Linus W.'s series, too.
+> This passes the errata fix using a GPIO to control the RTS pin
+> on one of the AT91 chips to use gpiolib instead of the
+> AT91-specific interfaces. Also remove the reliance on
+> compile-time #defines and the cpu_* check and rely on the
+> platform passing down the proper GPIO pin through platform
+> data.
 >
-> Hi all,
+> This is a prerequisite for getting rid of the local GPIO
+> implementation in the AT91 platform and move toward
+> multiplatform.
 >
-> Is this pull-request is foreseen to be integrated in arm-soc for 3.14? I
-> may have some material for Linus W. that I would like to queue that
-> depend on these patches.
+> The patch also adds device tree support for getting the
+> RTS GPIO pin from the device tree on DT boot paths.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v3->v4:
 
-I'd like to know the status here. If the <timex.h> material is not
-going into v3.14 I'd very much like my single patch to the serial
-driver to go in, and the removal of AT91's <mach/gpio.h>.
-
-In that case I'm requesting an ACK on the ARM portions from the
-ARM SoC folks, so I can take it through the GPIO tree.
+ARM SoC folks, if you're not taking this in through the <timex.h> removal
+series then please ACK this patch so I can take it through the GPIO
+tree instead (unless you want to apply this single patch, which would
+be even better, you have Greg's ACK in this thread).
 
 Yours,
 Linus Walleij
