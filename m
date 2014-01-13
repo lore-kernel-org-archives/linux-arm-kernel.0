@@ -1,48 +1,39 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 13 Jan 2014 13:13:52 +0100
-Subject: [PATCH RFC 06/10] ARM: s3c64xx: pm: Add device tree based power
- domain instantiation
-In-Reply-To: <20140113110935.GB29039@sirena.org.uk>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-7-git-send-email-tomasz.figa@gmail.com>
- <20140112192910.GW29039@sirena.org.uk> <52D2EE32.5060709@gmail.com>
- <20140113110935.GB29039@sirena.org.uk>
-Message-ID: <52D3D880.2090300@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 13 Jan 2014 13:17:18 +0100
+Subject: [PATCH 1/9] spi: rspi: Add missing clk_disable() calls in error
+ and cleanup paths
+In-Reply-To: <20140113115947.GL29039@sirena.org.uk>
+References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
+ <1389525222-3482-2-git-send-email-geert@linux-m68k.org>
+ <20140113115947.GL29039@sirena.org.uk>
+Message-ID: <CAMuHMdVjkWD0nP-9f579kUOqG4EVsy9Yp+vwNsM_=LxNU=Bdzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.01.2014 12:09, Mark Brown wrote:
-> On Sun, Jan 12, 2014 at 08:34:10PM +0100, Tomasz Figa wrote:
->> On 12.01.2014 20:29, Mark Brown wrote:
->>> On Sat, Jan 11, 2014 at 08:42:48PM +0100, Tomasz Figa wrote:
->
->>>> This patch adds support for registering power domains of S3C64xx SoCs
->>>> and binding devices to them using device tree.
->
->>>> +#ifdef CONFIG_OF
->>>> +static struct of_device_id s3c64xx_pd_matches[] = {
->>>> +	{ .compatible = "samsung,s3c6400-clock", },
->>>> +	{ .compatible = "samsung,s3c6410-clock", },
->>>> +	{ },
->>>>   };
->
->>> Looks like a rebasing issue?  Otherwise this looks nice.
->
->> Hmm, what's the problem here? Maybe I'm just blind, but I fail to
->> see anything wrong (except that the array should be const...).
->
->> Thanks for reviewing this.
->
-> I wasn't expecting to see references to clocks come up in power domain
-> code.
->
+Hi Mark,
 
-Power domain control registers are part of the system controller block, 
-which uses the "samsung,s3c64*-clock" compatible string. I know this is 
-a bit unfortunate, but all registers of this IP block are mapped at the 
-same page and some clock registers are at the other end of this area 
-than others, so there is even no good way to split them into separate 
-mappings.
+On Mon, Jan 13, 2014 at 12:59 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Sun, Jan 12, 2014 at 12:13:34PM +0100, Geert Uytterhoeven wrote:
+>> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>
+> This doesn't seem to apply to current code, please check and resend.
+> The fact that there's multiple patch serieses in flight from you for
+> this driver plus development work (again mostly from you) in git is
+> probably not helping here...
 
-Best regards,
-Tomasz
+This depends on the series:
+
+[PATCH V2 0/8] spi: rspi: Add support for RZ/A1H
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
