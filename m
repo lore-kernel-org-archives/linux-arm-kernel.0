@@ -1,36 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jan 2014 16:35:01 +0000
-Subject: [PATCH v2 15/28] drm/i2c: tda998x: use the tda998x video
- format when cea mode
-In-Reply-To: <20140113172220.521917ce@armhf>
-References: <20140109120448.24d89eba@armhf>
- <20140111181832.GD15937@n2100.arm.linux.org.uk>
- <20140113170707.10b908dc@armhf>
- <20140113161333.GA15937@n2100.arm.linux.org.uk>
- <20140113172220.521917ce@armhf>
-Message-ID: <20140113163501.GB15937@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 13 Jan 2014 16:40:21 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <1389554441-27335-4-git-send-email-broonie@kernel.org>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+ <1389554441-27335-4-git-send-email-broonie@kernel.org>
+Message-ID: <20140113164021.GA6934@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 05:22:20PM +0100, Jean-Francois Moine wrote:
-> On Mon, 13 Jan 2014 16:13:34 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > Sorry, I don't see what bearing your response to my reply has.
-> 
-> Simply that NXP people better like to use the cea mode.
+On Sun, Jan 12, 2014 at 07:20:40PM +0000, Mark Brown wrote:
 
-Ah, I see.  It's a thread about your DRM driver, and about the lack of
-audio on 1080 resolutions.  Taking it in context, the reported issue
-appears to be lack of video when 1080p is selected, but the display
-doesn't support 1080p.  That's hardly surprising.
+[...]
 
-Then rabeeh posts his message about lack of audio at 1920x1080.
+> @@ -89,7 +113,7 @@ static void __init parse_cluster(struct device_node *cluster, int depth)
+>  	bool leaf = true;
+>  	bool has_cores = false;
+>  	struct device_node *c;
+> -	static int cluster_id = 0;
+> +	static int cluster_id;
 
-Well, I can say that with the tda998x as it stands, the 1080* modes
-work with audio with armada-drm, so there's no need to change this.
+It has to be __initdata, and the line change above does not belong in
+this patch but patch 1.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+[...]
+
+>  static void __init parse_dt_topology(void)
+>  {
+> +	const struct cpu_efficiency *cpu_eff;
+>  	struct device_node *cn;
+> +	unsigned long min_capacity = ULONG_MAX;
+> +	unsigned long max_capacity = 0;
+> +	unsigned long capacity = 0;
+> +	int cpu;
+> +
+> +	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
+> +				 GFP_NOWAIT);
+>  
+>  	cn = of_find_node_by_path("/cpus");
+>  	if (!cn) {
+> @@ -155,10 +219,84 @@ static void __init parse_dt_topology(void)
+>  	if (!cn)
+>  		return;
+>  	parse_cluster(cn, 0);
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		const u32 *rate;
+> +		int len;
+> +
+> +		/* Too early to use cpu->of_node */
+> +		cn = of_get_cpu_node(cpu, NULL);
+> +		if (!cn) {
+> +			pr_err("Missing device node for CPU %d\n", cpu);
+> +			continue;
+> +		}
+> +
+> +		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
+> +			if (of_device_is_compatible(cn, cpu_eff->compatible))
+> +				break;
+> +
+> +		if (cpu_eff->compatible == NULL) {
+> +			pr_warn("%s: Unknown CPU type\n", cn->full_name);
+> +			continue;
+> +		}
+> +
+> +		rate = of_get_property(cn, "clock-frequency", &len);
+> +		if (!rate || len != 4) {
+> +			pr_err("%s: Missing clock-frequency property\n",
+> +				cn->full_name);
+> +			continue;
+> +		}
+
+I am wondering why we spit an error for a property that in practice is
+optional. Either we make it required, or we drop the error output.
+
+Actually this is not defined anywhere apart from the ePAPR, which
+defines this property as required, but following your attempt to
+standardize it for ARM, I gather it should be considered optional.
+
+If it is optional, should we really print an error ? (I know it is the
+same on arm32, I am questioning that code too).
+
+Lorenzo
