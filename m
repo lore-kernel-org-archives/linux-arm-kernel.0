@@ -1,70 +1,32 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 13 Jan 2014 18:57:15 +0000
-Subject: [PATCH v4 5/5] init: efi: arm: enable (U)EFI runtime services on
- arm
-In-Reply-To: <201401131929.07236.arnd@arndb.de>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-6-git-send-email-leif.lindholm@linaro.org>
- <201401131929.07236.arnd@arndb.de>
-Message-ID: <20140113185714.GE30907@bivouac.eciton.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jan 2014 18:59:43 +0000
+Subject: [BUILD BUG] msm: mdp4_drv_encoder.c
+In-Reply-To: <CAF6AEGssWPvFkKrqZwsN+WPr=Hkgs-DXZYO7Ywdu5MSeknHGaQ@mail.gmail.com>
+References: <20140113184324.GE15937@n2100.arm.linux.org.uk>
+ <CAF6AEGssWPvFkKrqZwsN+WPr=Hkgs-DXZYO7Ywdu5MSeknHGaQ@mail.gmail.com>
+Message-ID: <20140113185943.GF15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 07:29:06PM +0100, Arnd Bergmann wrote:
-> On Saturday 11 January 2014, Leif Lindholm wrote:
-> > diff --git a/init/main.c b/init/main.c
-> > index febc511..1331829 100644
-> > --- a/init/main.c
-> > +++ b/init/main.c
-> > @@ -905,6 +905,10 @@ static noinline void __init kernel_init_freeable(void)
-> >         smp_prepare_cpus(setup_max_cpus);
-> >  
-> >         do_pre_smp_initcalls();
-> > +
-> > +       if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
-> > +               efi_enter_virtual_mode();
+On Mon, Jan 13, 2014 at 01:56:27PM -0500, Rob Clark wrote:
+> On Mon, Jan 13, 2014 at 1:43 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Referencing mach/*.h from drivers does not work in multi-platform
+> > kernels, and leads to errors such as this:
+> >
+> > drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c:18:22: fatal error: mach/clk.h: No such file or directory
+> >
+> > which were found via my allmodconfig build.
 > 
-> What is the dependency on CONFIG_ARM here? Wouldn't most other
-> architectures need the same?
-
-Most 64-bit architectures could get away from it.
-x86 does it where its particular init environment forces it to.
-
-For arm, the strict ordering requirement is for efi_enter_virtual_mode
-to be called after init_static_idmap.
-
-If ordering between early_initcalls was possible in a sane way, I could
-do that instead, but I don't think a patch that swapped order of kernel/
-and mm/ in arch/arm/Makefile would be accepted :)
-
-> I'd rather not see this turn into
-> a long list of CONFIG_$(ARCH) checks if other architectures
-> enable it in the same place.
+> dropping this #include is already in my 3.14-rc1 pull req..
 > 
-> I also wonder why the three architectures implementing it all
-> call this from wildly different places during init/main.c, namely
-> (very early) setup_arch() on ia64,
+> do we need this in 3.13 too?
 
-Likewise arm64.
+That depends how it's ending up in my build tree of Linus' tip, plus
+my tip, plus arm-soc tip.  I guess it's a result of MSM switching to
+use the multiplatform support, which is in arm-soc rather than 3.13.
 
-> (relatively early) start_kernel
-> on x86 and (relatively late) kernel_init_freeable on arm.
-
-As I said - the pure 64-bit archs have less of an issue, since they
-can have their kernel somewhere that won't clash with the 1:1 mapping
-of RAM required by UEFI SetVirtualAddressMap.
-
-> In general, I'd be happy with adding this as late in the startup
-> code as possible, but it may be better to use the same place as
-> x86 in order to avoid surprises with unexpected dependencies.
-
-I _really_ don't want to call SetVirtualAddressMap after smp_init.
-
-> One such dependency that may cause problems is the fact that
-> we (try to) call efi_late_init() before efi_enter_virtual_mode()
-> now.
-
-Well, efi_late_init() is an inline {} on everything !x86.
-
-/
-    Leif
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
