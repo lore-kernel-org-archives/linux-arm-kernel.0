@@ -1,84 +1,42 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Mon, 13 Jan 2014 12:05:37 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <52D3C166.5050908@overkiz.com>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com>
-Message-ID: <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Jan 2014 11:09:35 +0000
+Subject: [PATCH RFC 06/10] ARM: s3c64xx: pm: Add device tree based power
+ domain instantiation
+In-Reply-To: <52D2EE32.5060709@gmail.com>
+References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+ <1389469372-17199-7-git-send-email-tomasz.figa@gmail.com>
+ <20140112192910.GW29039@sirena.org.uk> <52D2EE32.5060709@gmail.com>
+Message-ID: <20140113110935.GB29039@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Sun, Jan 12, 2014 at 08:34:10PM +0100, Tomasz Figa wrote:
+> On 12.01.2014 20:29, Mark Brown wrote:
+> >On Sat, Jan 11, 2014 at 08:42:48PM +0100, Tomasz Figa wrote:
 
-2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
-> On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
->>
->> Hello Nicolas, Jean-Christophe,
->>
->> As I was trying to enable the touchscreen on the at91sam9261ek with
->> device-tree support, I ran into an issue. The touchscreen driver needs
->> to know the state of the pendown gpio and also needs it as an
->> interrupt source.
->>
->> The problem is that when a gpio is used as an interrupt, it's
->> requested by the pinctrl driver during the xlate stage, marking it
->> unavaliable for the other driver.
->> It looks like the at91 pinctrl driver is the only one to use
->> gpio_request() in the xlate stage. Maybe we should remove this:
->
->
-> You should only request it as a GPIO and then use gpio_to_irq to get the
-> related IRQ.
-> Because what is done here, is to solve the case where only the irq
-> is request, and in this specific case we need to request the pin as a
-> GPIO.
->
+> >>This patch adds support for registering power domains of S3C64xx SoCs
+> >>and binding devices to them using device tree.
 
-That's what I did first, and was about to submit the patch for the
-touchscreen driver.
-However it doesn't feel right. Being able to get the state of a gpio
-that is also an interrupt seems very useful to me, not only for a
-touchscreen controller.
+> >>+#ifdef CONFIG_OF
+> >>+static struct of_device_id s3c64xx_pd_matches[] = {
+> >>+	{ .compatible = "samsung,s3c6400-clock", },
+> >>+	{ .compatible = "samsung,s3c6410-clock", },
+> >>+	{ },
+> >>  };
 
-I understand why it's being done here. It's a matter of being sure
-that the GPIO is an input and that it'll not be configured otherwise
-latter.
-But:
-1) I'm wondering why the atmel pinctrl is the only one to do that.
-2) I believe that configuration of the direction can be done by
-describing the GPIO in the DT. (pinctrl-at91.c line 592).
-3) If all the GPIOs are described in the DT with a proper pinmux
-description, i believe the exclusion is also handled. It's probably
-not the case today though.
+> >Looks like a rebasing issue?  Otherwise this looks nice.
 
->
-> Best Regards,
->
-> Boris
->
->>
->> diff --git a/drivers/pinctrl/pinctrl-at91.c
->> b/drivers/pinctrl/pinctrl-at91.c
->> index a7549c4..cf91a35 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
->> irq_domain *d,
->>          *out_hwirq = intspec[0];
->>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
->>
->> -       ret = gpio_request(pin, ctrlr->full_name);
->> -       if (ret)
->> -               return ret;
->> -
->> -       ret = gpio_direction_input(pin);
->> -       if (ret)
->> -               return ret;
->> -
->>          return 0;
->>   }
->>
->> Jean-Jacques
->
->
+> Hmm, what's the problem here? Maybe I'm just blind, but I fail to
+> see anything wrong (except that the array should be const...).
+
+> Thanks for reviewing this.
+
+I wasn't expecting to see references to clocks come up in power domain
+code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/a4c4f762/attachment.sig>
