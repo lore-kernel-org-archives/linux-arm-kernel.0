@@ -1,26 +1,74 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 13 Jan 2014 12:43:57 +0100
-Subject: [PATCH] imx-drm: parallel-display: honor 'native-mode' property
- when selecting video mode from DT
-In-Reply-To: <1389608673-10565-1-git-send-email-LW@KARO-electronics.de>
-References: <1389608673-10565-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <201401131243.57573.marex@denx.de>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 13 Jan 2014 12:47:42 +0100
+Subject: build_skb() and data corruption
+Message-ID: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 13, 2014 at 11:24:33 AM, Lothar Wa?mann wrote:
-> This patch allows to select a specific video mode from a list of modes
-> defined in DT by setting the 'native-mode' property appropriately.
-> 
-> Since all current users of this driver have only one mode defined in
-> their .dts files, the patch does not change the behaviour of this
-> driver on the affected platforms.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+Please help,
 
-Looks OK to me, thanks.
+I think I see memory corruption with a driver recently added to linux-next.
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+The following error occur downloading a large file with wget (or
+ncftp): "read error: Bad address"
+wget exits and leaves the file unfinished.
 
-Best regards,
-Marek Vasut
+The error goes away when build_skb() is patched out, in this case by
+allocating pages directly in RX loop.
+
+I currently have two branches with code placed under ifdef USE_BUILD_SKB:
+https://bitbucket.org/Kasreyn/linux-next/src/faa7c408a655fdfd7c383f79259031da5a05d61e/drivers/net/ethernet/moxa/moxart_ether.c#cl-472
+
+If build_skb() is the cause, is there something the driver can do about it?
+
+A quick search on "build_skb memory corruption" reveals the following
+commit, "igb: Revert support for build_skb in igb"
+f9d40f6a9921cc7d9385f64362314054e22152bd:
+
+"The reason for reverting this patch is that it can lead to data corruption.
+The following flow was pointed out by Ben Hutchings:
+1. skb is forwarded to another device
+2. Packet headers are modified and it's put into a queue
+3. Second packet is received into the other half of this page
+4. Page cannot be reused, so is DMA-unmapped
+5. The DMA mapping was non-coherent, so unmap copies or invalidates
+cache
+The headers added in step 2 get trashed in step 5."
+
+
+This is extra interesting, errors only happen on a locally mounted
+ext3 filesystem, never on tmpfs e.g.:
+
+# mount
+/dev/mmcblk0p1 on / type ext3
+(rw,relatime,errors=continue,barrier=1,data=ordered)
+tmpfs on /dev/shm type tmpfs (rw,relatime,mode=777)
+tmpfs on /tmp type tmpfs (rw,relatime)
+
+#cd /tmp
+# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
+Connecting to 149.20.4.69 (149.20.4.69:21)
+linux-2.6.11.11.tar.  25% |*******                        | 11374k
+0:01:36 ETAwget: short write
+[  153.560000] wget (383) used greatest stack depth: 4776 bytes left
+# rm linux-2.6.11.11.tar.gz
+# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
+Connecting to 149.20.4.69 (149.20.4.69:21)
+linux-2.6.11.11.tar.  25% |*******                        | 11315k
+0:01:34 ETAwget: short write
+# rm linux-2.6.11.11.tar.gz
+# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
+Connecting to 149.20.4.69 (149.20.4.69:21)
+linux-2.6.11.11.tar.  25% |*******                        | 11473k
+0:01:38 ETAwget: short write
+[  237.300000] wget (387) used greatest stack depth: 4752 bytes left
+
+# cd /root/
+# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
+Connecting to 149.20.4.69 (149.20.4.69:21)
+linux-2.6.11.11.tar.   3% |*                              |  1647k  0:03:02 ETA
+wget: read error: Bad address
+
+
+Regards,
+Jonas
