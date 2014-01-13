@@ -1,40 +1,75 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Mon, 13 Jan 2014 13:58:37 +0800
-Subject: [PATCH V3 4/5] ARM: dts: imx6sl: add compatible name for i.mx6q
-In-Reply-To: <1389592718-9999-1-git-send-email-b20788@freescale.com>
-References: <1389592718-9999-1-git-send-email-b20788@freescale.com>
-Message-ID: <1389592718-9999-4-git-send-email-b20788@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Jan 2014 14:01:04 +0800
+Subject: [PATCH v4 1/2] ARM: imx: add select on ARCH_MXC for cpufreq
+ support
+In-Reply-To: <CACUGKYMx_o6TLsvMxK3Gb+cmOUCX3Toj+6MeJmo=ahfyc=vXCA@mail.gmail.com>
+References: <1389321592-33220-1-git-send-email-john.tobias.ph@gmail.com>
+ <20140113032043.GF23525@S2101-09.ap.freescale.net>
+ <CACUGKYMx_o6TLsvMxK3Gb+cmOUCX3Toj+6MeJmo=ahfyc=vXCA@mail.gmail.com>
+Message-ID: <20140113060102.GO23525@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible name of i.mx6q for those reuse modules.
+On Sun, Jan 12, 2014 at 08:54:18PM -0800, John Tobias wrote:
+> I tested leaving the HAVE_IMX_ANATOP under SOC_IMX6Q and SOC_IMX6SL.
+> The iMX6Q cpufreq driver won't show up in menu config / gconfig and
+> that's the reason why I added it.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/boot/dts/imx6sl.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I tested the following changes against my for-next branch, and I can see
+iMX6Q cpufreq driver in menuconfig.  Note, the
+drivers/cpufreq/Kconfig.arm change is on cpufreq tree, so I have to make
+the change locally for the testing.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index a5ef3c3..5fbf42d 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -564,7 +564,7 @@
- 			};
- 
- 			src: src at 020d8000 {
--				compatible = "fsl,imx6sl-src", "fsl,imx51-src";
-+				compatible = "fsl,imx6sl-src", "fsl,imx6q-src", "fsl,imx51-src";
- 				reg = <0x020d8000 0x4000>;
- 				interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 96 IRQ_TYPE_LEVEL_HIGH>;
-@@ -584,7 +584,7 @@
- 			};
- 
- 			iomuxc: iomuxc at 020e0000 {
--				compatible = "fsl,imx6sl-iomuxc";
-+				compatible = "fsl,imx6sl-iomuxc", "fsl,imx6q-iomuxc";
- 				reg = <0x020e0000 0x4000>;
- 			};
- 
--- 
-1.7.9.5
+Shawn
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 1e70150..7071468 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,5 +1,7 @@
+ config ARCH_MXC
+        bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 ||
+ARCH_MULTI_V6_V7
++       select ARCH_HAS_CPUFREQ
++       select ARCH_HAS_OPP
+        select ARCH_REQUIRE_GPIOLIB
+        select ARM_CPU_SUSPEND if PM
+        select ARM_PATCH_PHYS_VIRT
+@@ -12,6 +14,7 @@ config ARCH_MXC
+        select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+        select MULTI_IRQ_HANDLER
+        select PINCTRL
++       select PM_OPP if PM
+        select SOC_BUS
+        select SPARSE_IRQ
+        select USE_OF
+@@ -787,8 +790,6 @@ config      SOC_IMX53
+
+ config SOC_IMX6Q
+        bool "i.MX6 Quad/DualLite support"
+-       select ARCH_HAS_CPUFREQ
+-       select ARCH_HAS_OPP
+        select ARM_ERRATA_754322
+        select ARM_ERRATA_764369 if SMP
+        select ARM_ERRATA_775420
+@@ -808,7 +809,6 @@ config SOC_IMX6Q
+        select PL310_ERRATA_588369 if CACHE_PL310
+        select PL310_ERRATA_727915 if CACHE_PL310
+        select PL310_ERRATA_769419 if CACHE_PL310
+-       select PM_OPP if PM
+
+        help
+          This enables support for Freescale i.MX6 Quad processor.
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index ce52ed9..21e069e 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -80,7 +80,7 @@ config ARM_HIGHBANK_CPUFREQ
+
+ config ARM_IMX6Q_CPUFREQ
+        tristate "Freescale i.MX6Q cpufreq support"
+-       depends on SOC_IMX6Q
++       depends on ARCH_MXC
+        depends on REGULATOR_ANATOP
+        help
+          This adds cpufreq driver support for Freescale i.MX6Q SOC.
