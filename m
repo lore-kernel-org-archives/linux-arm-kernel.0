@@ -1,67 +1,164 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 13 Jan 2014 16:20:12 +0100
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <20140113134813.GX15937@n2100.arm.linux.org.uk>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
- <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
- <3792319.Wf518ByjFs@wuerfel>
- <20140113115208.GA22313@ulmo.nvidia.com>
- <20140113134813.GX15937@n2100.arm.linux.org.uk>
-Message-ID: <20140113152011.GA15107@ulmo.nvidia.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 13 Jan 2014 09:23:10 -0600
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <52D404DE.2020806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 01:48:13PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 13, 2014 at 12:52:10PM +0100, Thierry Reding wrote:
-> > On Wed, Jan 08, 2014 at 09:20:10AM +0100, Arnd Bergmann wrote:
-> > > --- a/arch/arm/mach-imx/Kconfig
-> > > +++ b/arch/arm/mach-imx/Kconfig
-> > > @@ -3,7 +3,7 @@ config ARCH_MXC
-> > >         select ARCH_REQUIRE_GPIOLIB
-> > >         select ARM_CPU_SUSPEND if PM
-> > >         select ARM_PATCH_PHYS_VIRT
-> > > -       select AUTO_ZRELADDR if !ZBOOT_ROM
-> > > +       select AUTO_ZRELADDR
-> > >         select CLKSRC_MMIO
-> > >         select COMMON_CLK
-> > >         select GENERIC_ALLOCATOR
-> > 
-> > Hi Arnd,
-> > 
-> > I haven't seen this go into linux-next yet. Do you plan on sending a
-> > patch for this?
+On 01/13/2014 09:03 AM, Taras Kondratiuk wrote:
+> From: Victor Kamensky <victor.kamensky@linaro.org>
 > 
-> Maybe someone should respond to this comment from Arnd:
+> Assembler functions defined in sleep44xx.S need to byteswap values
+> after read / before write from h/w register if code compiled in big
+> endian mode. Simple change to do 'rev x, x' before str instruction
+> and after ldr instruction that deals with h/w registers.
 > 
-> | On second thought, we should just remove the 'select AUTO_ZRELADDR' from
-> | ARCH_MXC and everything that is multiplatform enabled, since it's already
-> | selected by ARCH_MULTIPLATFORM.
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> ---
+> This is a part of RFC series [1].
+> Based on v3.13-rc8.
 > 
-> which I think is the right way to go here.  The ARCH_MXC option is
-> hidden when multiplatform is not enabled.  When it is enabled,
-> AUTO_ZRELADDR is selected by the multiplatform option.  So having a
-> "select AUTO_ZRELADDR" of any kind under ARCH_MXC is entirely
-> redundant.
+> [1] http://www.spinics.net/lists/linux-omap/msg99927.html
+> 
+>  arch/arm/mach-omap2/sleep44xx.S |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
 
-It looks like ARCH_MXC is the only one that matches Arnd's requirements.
-All other platforms that select AUTO_ZRELADDR seem to not support multi-
-platform.
+OMAP4 is LE, and if there is a gcc flag for the same, is'nt it cleaner
+to deal with it in Makefile rather than trying to make an assembly
+meant only for LE by force building it for BE?
 
-Below is a patch to remove the line completely. Shall I post that to the
-patch tracker?
+> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
+> index 9086ce0..8017016 100644
+> --- a/arch/arm/mach-omap2/sleep44xx.S
+> +++ b/arch/arm/mach-omap2/sleep44xx.S
+> @@ -12,6 +12,7 @@
+>  #include <linux/linkage.h>
+>  #include <asm/smp_scu.h>
+>  #include <asm/memory.h>
+> +#include <asm/assembler.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  
+>  #include "omap-secure.h"
+> @@ -74,6 +75,7 @@ ENTRY(omap4_finish_suspend)
+>  	 */
+>  	bl	omap4_get_sar_ram_base
+>  	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
+> +ARM_BE8(rev	r9, r9)
+>  	cmp	r9, #0x1			@ Check for HS device
+>  	bne	skip_secure_l1_clean
+>  	mov	r0, #SCU_PM_NORMAL
+> @@ -113,12 +115,14 @@ skip_secure_l1_clean:
+>  	bl	omap4_get_sar_ram_base
+>  	mov	r8, r0
+>  	ldr	r9, [r8, #OMAP_TYPE_OFFSET]
+> +ARM_BE8(rev	r9, r9)
+>  	cmp	r9, #0x1			@ Check for HS device
+>  	bne	scu_gp_set
+>  	mrc	p15, 0, r0, c0, c0, 5		@ Read MPIDR
+>  	ands	r0, r0, #0x0f
+>  	ldreq	r0, [r8, #SCU_OFFSET0]
+>  	ldrne	r0, [r8, #SCU_OFFSET1]
+> +ARM_BE8(rev	r0, r0)
+>  	mov	r1, #0x00
+>  	stmfd   r13!, {r4-r12, r14}
+>  	ldr	r12, =OMAP4_MON_SCU_PWR_INDEX
+> @@ -130,6 +134,7 @@ scu_gp_set:
+>  	ands	r0, r0, #0x0f
+>  	ldreq	r1, [r8, #SCU_OFFSET0]
+>  	ldrne	r1, [r8, #SCU_OFFSET1]
+> +ARM_BE8(rev	r1, r1)
+>  	bl	omap4_get_scu_base
+>  	bl	scu_power_mode
+>  skip_scu_gp_set:
+> @@ -157,6 +162,7 @@ skip_scu_gp_set:
+>  	ands	r5, r5, #0x0f
+>  	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]	@ Retrieve L2 state from SAR
+>  	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]	@ memory.
+> +ARM_BE8(rev	r0, r0)
+>  	cmp	r0, #3
+>  	bne	do_WFI
+>  #ifdef CONFIG_PL310_ERRATA_727915
+> @@ -167,9 +173,11 @@ skip_scu_gp_set:
+>  	bl	omap4_get_l2cache_base
+>  	mov	r2, r0
+>  	ldr	r0, =0xffff
+> +ARM_BE8(rev	r0, r0)
+>  	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
+>  wait:
+>  	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
+> +ARM_BE8(rev	r0, r0)
+>  	ldr	r1, =0xffff
+>  	ands	r0, r0, r1
+>  	bne	wait
+> @@ -182,9 +190,11 @@ l2x_sync:
+>  	bl	omap4_get_l2cache_base
+>  	mov	r2, r0
+>  	mov	r0, #0x0
+> +ARM_BE8(rev	r0, r0)
+>  	str	r0, [r2, #L2X0_CACHE_SYNC]
+>  sync:
+>  	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+> +ARM_BE8(rev	r0, r0)
+>  	ands	r0, r0, #0x1
+>  	bne	sync
+>  #endif
+> @@ -216,6 +226,7 @@ do_WFI:
+>  	bl	omap4_get_sar_ram_base
+>  	mov	r8, r0
+>  	ldr	r9, [r8, #OMAP_TYPE_OFFSET]
+> +ARM_BE8(rev	r9, r9)
+>  	cmp	r9, #0x1			@ Check for HS device
+>  	bne	scu_gp_clear
+>  	mov	r0, #SCU_PM_NORMAL
+> @@ -258,6 +269,7 @@ ENTRY(omap4_cpu_resume)
+>  	 */
+>  	ldr	r8, =OMAP44XX_SAR_RAM_BASE
+>  	ldr	r9, [r8, #OMAP_TYPE_OFFSET]
+> +ARM_BE8(rev	r9, r9)
+>  	cmp	r9, #0x1			@ Skip if GP device
+>  	bne	skip_ns_smp_enable
+>  	mrc     p15, 0, r0, c0, c0, 5
+> @@ -292,16 +304,19 @@ skip_ns_smp_enable:
+>  	 */
+>  	ldr	r2, =OMAP44XX_L2CACHE_BASE
+>  	ldr	r0, [r2, #L2X0_CTRL]
+> +ARM_BE8(rev	r0, r0)
+>  	and	r0, #0x0f
+>  	cmp	r0, #1
+>  	beq	skip_l2en			@ Skip if already enabled
+>  	ldr	r3, =OMAP44XX_SAR_RAM_BASE
+>  	ldr	r1, [r3, #OMAP_TYPE_OFFSET]
+> +ARM_BE8(rev	r1, r1)
+>  	cmp	r1, #0x1			@ Check for HS device
+>  	bne     set_gp_por
+>  	ldr     r0, =OMAP4_PPA_L2_POR_INDEX
+>  	ldr     r1, =OMAP44XX_SAR_RAM_BASE
+>  	ldr     r4, [r1, #L2X0_PREFETCH_CTRL_OFFSET]
+> +ARM_BE8(rev	r4, r4)
+>  	adr     r3, ppa_por_params
+>  	str     r4, [r3, #0x04]
+>  	mov	r1, #0x0			@ Process ID
+> @@ -313,11 +328,13 @@ skip_ns_smp_enable:
+>  set_gp_por:
+>  	ldr     r1, =OMAP44XX_SAR_RAM_BASE
+>  	ldr     r0, [r1, #L2X0_PREFETCH_CTRL_OFFSET]
+> +ARM_BE8(rev	r0, r0)
+>  	ldr	r12, =OMAP4_MON_L2X0_PREFETCH_INDEX	@ Setup L2 PREFETCH
+>  	DO_SMC
+>  set_aux_ctrl:
+>  	ldr     r1, =OMAP44XX_SAR_RAM_BASE
+>  	ldr	r0, [r1, #L2X0_AUXCTRL_OFFSET]
+> +ARM_BE8(rev	r0, r0)
+>  	ldr	r12, =OMAP4_MON_L2X0_AUXCTRL_INDEX	@ Setup L2 AUXCTRL
+>  	DO_SMC
+>  	mov	r0, #0x1
+> 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-Remove-redundant-select-AUTO_ZRELADDR.patch
-Type: text/x-diff
-Size: 1302 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/82d5820b/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/82d5820b/attachment-0001.sig>
+
+-- 
+Regards,
+Nishanth Menon
