@@ -1,45 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Jan 2014 11:34:48 +0100
-Subject: [PATCH v2 0/5] ARM: sun6i: Add support for the A31 I2C controller
-Message-ID: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 13 Jan 2014 18:52:54 +0800
+Subject: [PATCH V2 1/2] mmc: sdhci-esdhc-imx: fix access hardirq-unsafe
+ lock in atomic context
+In-Reply-To: <20131231052436.GA22122@S2101-09.ap.freescale.net>
+References: <1388042634-17281-1-git-send-email-b29396@freescale.com>
+ <20131231052436.GA22122@S2101-09.ap.freescale.net>
+Message-ID: <CAA+hA=TFx4KpBpyUs0T6AJmLbZR36sxQNAA5yTANseQTrgxgbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Hi Chris,
 
-This patchset adds support the A31 i2c controller. This is mostly the
-same controller as the one found in the other Allwinner SoCs, except
-for the interrupts acking.
+On Tue, Dec 31, 2013 at 1:24 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Dec 26, 2013 at 03:23:53PM +0800, Dong Aisheng wrote:
+>> Sometimes we may meet the following lockdep issue.
+>> The root cause is .set_clock callback is executed with spin_lock_irqsave
+>> in sdhci_do_set_ios. However, the IMX set_clock callback will try to access
+>> clk_get_rate which is using a mutex lock.
+>>
+>> The fix avoids access mutex in .set_clock callback by initializing the
+>> pltfm_host->clock at probe time and use it later instead of calling
+>> clk_get_rate again in atomic context.
+>
+> <snip>
+>
+>> Cc: Chris Ball <cjb@laptop.org>
+>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>
+> For both,
+>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>
+>> Fixes: 0ddf03c mmc: esdhc-imx: parse max-frequency from devicetree
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>
+>
 
-On the other SoCs using this driver, the interrupts are acked by
-clearing the INT_FLAG bit in the control register, while on the A31,
-the interrupt is acked by writing that bit into the control register.
+Can we make patch 1 go into 3.13 final since the issue exists
+since 3.13 rc1.
 
-The other difference is that the I2C IP is maintained in reset by a
-reset controller, so we're adding optionnal support for the reset
-framework in the driver to deassert the device from reset.
+Patch 2 in that series is the fix for sdhci-esdhc-imx runtime pm which is
+newly added in chris/mmc-next and seems target for 3.14.
 
-Thanks!
-Maxime
+BTW, pls add:
+Tested-by: Philippe De Muyter <phdm@macqel.be>
 
-Changes from v1:
-  - Handle EPROBE_DEFER from the reset framework
-  - Put the device back in reset at remove/failed probe
-  - Document the newly introduced compatible string
+See:
+https://lkml.org/lkml/2014/1/13/77
 
-Maxime Ripard (5):
-  i2c: mv64xxx: Add reset deassert call
-  i2c: mv64xxx: Add support for the Allwinner A31 I2C driver
-  ARM: sun6i: Enable the I2C controllers
-  ARM: sun6i: Enable the I2C muxing options
-  ARM: sun6i: colombus: Enable the I2C controllers
+Regards
+Dong Aisheng
 
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |  8 ++-
- arch/arm/boot/dts/sun6i-a31-colombus.dts           | 18 +++++++
- arch/arm/boot/dts/sun6i-a31.dtsi                   | 61 ++++++++++++++++++++++
- drivers/i2c/busses/Kconfig                         |  1 +
- drivers/i2c/busses/i2c-mv64xxx.c                   | 31 ++++++++++-
- 5 files changed, 115 insertions(+), 4 deletions(-)
-
--- 
-1.8.4.2
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
