@@ -1,78 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 13 Jan 2014 09:34:52 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <20140111114004.GJ15937@n2100.arm.linux.org.uk>
-References: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
- <20140103031055.GB28751@kroah.com>
- <20140110145444.GE15937@n2100.arm.linux.org.uk>
- <20140110150702.GA22533@kroah.com>
- <20140110151123.GG15937@n2100.arm.linux.org.uk>
- <20140110153530.GA770@kroah.com> <20140110183021.GZ2400@pengutronix.de>
- <20140110204259.GC10235@kroah.com>
- <20140110232336.GI15937@n2100.arm.linux.org.uk>
- <20140111113119.GC2400@pengutronix.de>
- <20140111114004.GJ15937@n2100.arm.linux.org.uk>
-Message-ID: <1389602092.6318.7.camel@pizza.hi.pengutronix.de>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Mon, 13 Jan 2014 16:30:51 +0800
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
+ <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
+ <52CFFFDA.8050108@linaro.org>
+ <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
+ <52D3515B.7040008@linaro.org>
+ <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
+Message-ID: <52D3A43B.4030909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 11.01.2014, 11:40 +0000 schrieb Russell King - ARM
-Linux:
-> On Sat, Jan 11, 2014 at 12:31:19PM +0100, Robert Schwebel wrote:
-> > On Fri, Jan 10, 2014 at 11:23:37PM +0000, Russell King - ARM Linux wrote:
-> > > We do this in DT by providing a "superdevice" node which specifies
-> > > the components, eg:
-> > > 
-> > > 	imx-drm {
-> > > 		compatible = "fsl,drm";
-> > > 		crtcs = <&ipu1>;
-> > > 		connectors = <&hdmi>;
-> > > 	};
-> > 
-> > Saschas comment from 20140109074030.GN6750 at pengutronix.de isn't
-> > addressed yet:
+Dear Seungwon
+
+On 01/13/2014 01:32 PM, Seungwon Jeon wrote:
+>>>>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>>> +{
+>>>>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
+>>>>>> +	u32 rate = priv->clk_table[ios->timing];
+>>>>>
+
+>>
+>> The function mmc_clk_determine_rate() will need the info which
+>> controller it is, what's the init clock rate, what's the max clock rate,
+>> and what's the limitation, which may be different as different soc, and
+>> can not be hardcoded.
+>> The limitation may in HS200 and SDR104 mode.
+>>
+>> The plan is only input init rate and max rate instead of the table,
+>> while others directly use ios->clock, only if the the limitation resolved.
 > 
-> This is not a comment against _this_ patch.  It was a question for Sean
-> Paul.  You can tell this by the contents of the To: and Cc: headers on
-> Sascha's email.  If that's not what was intended, then the email headers
-> are misleading.
+> Handling mmc clock for hi3620 is in drivers/clk/hisilicon/clk-hi3620.c, right?
+> Currently only hi3620 has been introduced.
+> If hi3620's host has a limitation, clk-hi3620.c can handle clock range(init, max) for source clock enough.
+> I feel like clock table is redundant.
+> Ok. It's just my suggestion.  But I still point dependency of mode index number.
+> K3's clock table refers and depends mode definition value from include/linux/mmc/host.h
+> If new mode is added or modified, it should be considered and also may make complicated.
 > 
-> > Sascha Hauer wrote:
-> > > Can we have an example with a different number of
-> > > encoders/connectors/crtcs, like:
-> > > 
-> > > exynos-drm {
-> > >         compatible = "exynos,drm";
-> > >         crtcs = <&fimd1>;
-> > >         encoders = <&dp1>, <&hdmi1>, <&lvds1>;
-> > >         connectors = <&ptn3460>, <&hdmi1>;
-> > > };
-> > > 
-> > > Otherwise I get the impression that there is some topology of the
-> > > components or at least relationship between the components encoded
-> > > into the binding.
-> > 
-> > If I remember correctly, Sascha+Philipp+Lucas still had issues with the
-> > bindings, but I'm not sure if they have been already addressed.
-> 
-> The bindings are not part of this patch.  This patch doesn't even care
-> about DT one bit - that's part of the design goal of it.  It doesn't
-> care about platform devices either.
 
-Yes, I think the device tree bindings are in need of discussion, but
-this is a separate issue. I'd be happy to hear your opinion on the
-"imx-drm dt bindings" patches.
+Looks like you dislike the clk_table very much :)
 
-> All it cares about is maintaining lists of struct device pointers,
-> asking the master device(s) whether they have all their components, and
-> binding/unbinding the components at the appropriate moment.  It's
-> completely up to the master device operations to decide how to make
-> these decisions, and how those decisions are made, whether it be by
-> looking up in DT, or ACPI, or whatever.
+Double checked with the silicon guy, currently it is said the limitation
+in HS200 and SDR104 can be replaced by the max_rate, so clk_table can be
+replaced with ios->clock directly, though they have concern it is not so
+convinent when removing clk_table in case limitation rate is not equal
+to max_rate again in future.
 
-I'm very much in favor of this particular patch being merged as soon as
-sensible.
+Will update accordingly, thanks for the suggestion.
 
-regards
-Philipp
+Thanks
