@@ -1,58 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 Jan 2014 12:08:44 +0000
-Subject: [PATCH V3 4/9] spi: rspi: Add DT support
-In-Reply-To: <1389525222-3482-5-git-send-email-geert@linux-m68k.org>
-References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
- <1389525222-3482-5-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140113120844.GM29039@sirena.org.uk>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Mon, 13 Jan 2014 14:09:40 +0200
+Subject: [GIT PULL] ARM: kprobes: big-endian support
+Message-ID: <52D3D784.2000600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 12:13:37PM +0100, Geert Uytterhoeven wrote:
+Hi Russell,
 
-> +Required properties:
-> +- compatible       : For Renesas Serial Peripheral Interface on SH:
-> +                     "renesas,rspi-<soctype>", "renesas,rspi-sh" as fallback.
-> +		     For Renesas Serial Peripheral Interface on ARM:
-> +                     "renesas,rspi-<soctype>", "renesas,rspi-rz" as fallback.
-> +		     For Quad Serial Peripheral Interface:
-> +		     "renesas,qspi-<soctype>", "renesas,qspi" as fallback.
+Please pull fixes for ARM Kprobes big-endian support.
 
-This should specify what <soctype> is and ideally list the valid values
-or at least the convention for writing them; perhaps a list of SoCs in
-some common place would be useful for sharing between all the IPs.
+It is reworked initial Ben's series for big endian support [1].
+Dropped patches that are not directly related to kprobes.
+Current set of patches is enough to have functional BE kprobes.
 
-> +- interrupts       : Up to 3 interrupts for RSPI (SPEI, SPRI, SPTI),
-> +		     1 interrupt for QSPI
+One ARM kprobe test fails on Cortex-A15 boards (TC2 and Keystone2 EVM),
+while it passes on Pandaboard. The issue is not related to this series
+and already present in v3.13-rc7.
 
-For multiple interrupts you need to say how they are identified - if
-they're not named the order must be specified.
+[1] http://www.spinics.net/lists/arm-kernel/msg285210.html
 
-> +Pinctrl properties might be needed, too. See there.
+-- 
+Taras Kondratiuk
 
-Where?
+--->8
 
-> +static const struct of_device_id rspi_of_match[] = {
-> +	/* RSPI on legacy SH */
-> +	{ .compatible = "renesas,rspi-sh7757", .data = &rspi_sh_of_data },
-> +	{ .compatible = "renesas,rspi-sh", .data = &rspi_sh_of_data },
-> +	/* RSPI on RZ */
-> +	{ .compatible = "renesas,rspi-r7s72100", .data = &rspi_rz_of_data },
-> +	{ .compatible = "renesas,rspi-rz", .data = &rspi_rz_of_data },
-> +	/* QSPI on R-Car Gen2 */
-> +	{ .compatible = "renesas,qspi-r8a7790", .data = &qspi_of_data },
-> +	{ .compatible = "renesas,qspi-r8a7791", .data = &qspi_of_data },
-> +	{ .compatible = "renesas,qspi", .data = &qspi_of_data },
-> +	{ /* sentinel */ }
-> +};
+The following changes since commit 7e22e91102c6b9df7c4ae2168910e19d2bb14cd6:
 
-No need to actually list the specific SoCs given that the fallback is
-mandatory and the resulting data is identical, if you are going to do
-that then I'd have the compatible set num_cs too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/22e31170/attachment.sig>
+  Linux 3.13-rc8 (2014-01-12 17:04:18 +0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/taras.kondratiuk/linux.git tags/for_russell/arm-be-kprobes
+
+for you to fetch changes up to 1c2d814c019b63bf0778fc2d2fd54c6e44f1ab5d:
+
+  ARM: kprobes-test: Workaround GAS .align bug (2014-01-13 13:58:52 +0200)
+
+----------------------------------------------------------------
+Ben Dooks (4):
+      ARM: kprobes: fix instruction fetch order with <asm/opcodes.h>
+      ARM: kprobes-test: use <asm/opcodes.h> for instruction accesses
+      ARM: kprobes-test: use <asm/opcodes.h> for ARM instruction building
+      ARM: kprobes-test: use <asm/opcodes.h> for Thumb instruction building
+
+Taras Kondratiuk (1):
+      ARM: kprobes-test: Workaround GAS .align bug
+
+ arch/arm/kernel/kprobes-common.c     |   19 +-
+ arch/arm/kernel/kprobes-test-arm.c   |  603 +++++++++++++++++-----------------
+ arch/arm/kernel/kprobes-test-thumb.c |  447 ++++++++++++-------------
+ arch/arm/kernel/kprobes-test.c       |   13 +-
+ arch/arm/kernel/kprobes-test.h       |    2 +-
+ arch/arm/kernel/kprobes-thumb.c      |   20 +-
+ arch/arm/kernel/kprobes.c            |    9 +-
+ 7 files changed, 562 insertions(+), 551 deletions(-)
