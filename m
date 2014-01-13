@@ -1,70 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jan 2014 09:37:45 -0800
-Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
-In-Reply-To: <20140113141811.GD27282@n2100.arm.linux.org.uk>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <20140108012110.GL5074@atomide.com>
- <20140109152437.GB27282@n2100.arm.linux.org.uk>
- <20140113141811.GD27282@n2100.arm.linux.org.uk>
-Message-ID: <20140113173744.GA7746@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 13 Jan 2014 17:44:21 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140113163045.GB29039@sirena.org.uk>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+ <1389554441-27335-2-git-send-email-broonie@kernel.org>
+ <20140113161059.GA32720@e102568-lin.cambridge.arm.com>
+ <20140113163045.GB29039@sirena.org.uk>
+Message-ID: <20140113174420.GC6934@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [140113 08:48]:
-> On Thu, Jan 09, 2014 at 03:24:37PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 07, 2014 at 05:21:11PM -0800, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140102 07:11]:
-> > > > The following patch series moves code to setup the DMA hardware and
-> > > > service interrupts from the hardware to the DMA engine driver.  This
-> > > > reduces the dependency on the legacy DMA implementation.
-> > > > 
-> > > > This series does not remove the channel allocation/freeing hooks which
-> > > > are used to manage the allocation of physical channels - this is the
-> > > > next step in the evolution.
-> > > > 
-> > > > The patches which move the interrupt handling are currently less than
-> > > > perfect since they're writing to ENABLE_L0 under a different spinlock,
-> > > > and hence RFC only at the moment.
-> > > 
-> > > Nice to see this happening. These seem to work for me based on a quick
-> > > try on omap2+, but on omap1 the build fails:
-> > > 
-> > > arch/arm/mach-omap1/dma.c: In function ?dma_write?:
-> > > arch/arm/mach-omap1/dma.c:186: error: ?const struct omap_dma_reg? has no member named ?size?
-> > 
-> > Right, needs this incremental patch:
-> > 
-> > diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-> > index 3afde9628839..404f89e3eeb8 100644
-> > --- a/arch/arm/mach-omap1/dma.c
-> > +++ b/arch/arm/mach-omap1/dma.c
-> > @@ -183,7 +183,7 @@ static inline void dma_write(u32 val, int reg, int lch)
-> >  	addr += reg_map[reg].stride * lch;
-> >  
-> >  	__raw_writew(val, addr);
-> > -	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
-> > +	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
-> >  		__raw_writew(val >> 16, addr + 2);
-> >  }
-> >  
-> > @@ -196,7 +196,7 @@ static inline u32 dma_read(int reg, int lch)
-> >  	addr += reg_map[reg].stride * lch;
-> >  
-> >  	val = __raw_readw(addr);
-> > -	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
-> > +	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
-> >  		val |= __raw_readw(addr + 2) << 16;
-> >  
-> >  	return val;
-> > 
+On Mon, Jan 13, 2014 at 04:30:45PM +0000, Mark Brown wrote:
+> On Mon, Jan 13, 2014 at 04:10:59PM +0000, Lorenzo Pieralisi wrote:
+> > On Sun, Jan 12, 2014 at 07:20:38PM +0000, Mark Brown wrote:
 > 
-> Any news on this?
+> > > +struct cpu_topology {
+> > > +	int thread_id;
+> > > +	int core_id;
+> > > +	int socket_id;
+> 
+> > Is there any reason why we can't rename socket_id to cluster_id ? It won't
+> > change our lives but at least we kind of know what it means in ARM world.
+> 
+> I really don't care, whatever you guys want.
 
-Sorry for the delay, now getting this:
+s/socket_id/cluster_id
 
-arch/arm/mach-omap1/dma.c: In function ?omap1_system_dma_init?:
-arch/arm/mach-omap1/dma.c:368: error: ?struct omap_dma_dev_attr? has no member named ?chan?
+unless we have a compelling reason to keep the socket_id naming, I do
+not see it, given that cpu_topology is arch specific anyway.
 
-Regards,
+socket_id means really nothing in ARM world.
 
-Tony
+Again, Vincent if you see a compelling reason to keep socket_id as in arm32
+that I am missing please shout.
+
+> 
+> > > +#define mc_capable()	(cpu_topology[0].socket_id != -1)
+> > > +#define smt_capable()	(cpu_topology[0].thread_id != -1)
+> 
+> > Are the two macros above still required in the kernel ? I can't see any
+> > usage at present.
+> > 
+> > Vincent, do you know why they were not removed in commit:
+> > 
+> > 8e7fbcbc22c12414bcc9dfdd683637f58fb32759
+> > 
+> > I am certainly missing something.
+> 
+> They're defined by a bunch of other architectures (including x86).  If I
+> had to guess I'd say the architectures are still providing the
+> information so we don't need to go round adding it again if someone
+> comes up with a use for it in the core.
+
+Yes, let's keep the macros, just wanted to make sure I got it right.
+
+Lorenzo
