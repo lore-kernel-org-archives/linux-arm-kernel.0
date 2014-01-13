@@ -1,50 +1,78 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 13 Jan 2014 09:20:04 -0500
-Subject: [PATCH v3 3/3] arm: dts: keystone: add keystone timer entry
-In-Reply-To: <52D3E6B9.40502@linaro.org>
-References: <1387974724-31138-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1387974724-31138-4-git-send-email-ivan.khoronzhuk@ti.com>
- <52BC6F28.1020009@ti.com> <52BF2164.6040501@linaro.org>
- <52D3CDD5.9060104@ti.com> <52D3E6B9.40502@linaro.org>
-Message-ID: <52D3F614.3090608@ti.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Mon, 13 Jan 2014 19:51:25 +0530
+Subject: [PATCH 1/6] cpufreq: cpufreq-cpu0: allow optional safe voltage
+ during frequency transitions
+In-Reply-To: <20140113031457.GD23525@S2101-09.ap.freescale.net>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+ <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
+ <20140113031457.GD23525@S2101-09.ap.freescale.net>
+Message-ID: <CAJuA9ajop9C+vq9LJy48yX8-+RFN+5eqXHYSqiEaXbw3ntPQQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 January 2014 08:14 AM, Daniel Lezcano wrote:
-> On 01/13/2014 12:28 PM, ivan.khoronzhuk wrote:
->> On 12/28/2013 09:07 PM, Daniel Lezcano wrote:
->>> On 12/26/2013 07:02 PM, Santosh Shilimkar wrote:
->>>> $subject
->>>> s/arm/ARM,
->>>>
->>>> On Wednesday 25 December 2013 07:32 AM, Ivan Khoronzhuk wrote:
->>>>> Add keystone timer entry to keystone device tree.
->>>>> This 64-bit timer is used as backup clock event device.
->>>>>
->>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>> ---
->>>> No need to repost. I will fix it up while applying based
->>>> on state of PATCH 1/3 and 2/3.
->>>
->>> I assume you will take the patchset in your tree.
->>>
->>> I am back from vacations, give me a couple of days to review the
->>> patchset before applying it please.
->>>
->>> Thanks
->>>    -- Daniel
->>>
->>
->> Hi, Daniel
->>
->> Do you have any comments on this patch series?
->> Can we expect it in k3.14
-> 
-> I have applied the patch 1/3 and 2/3 in my tree but I was expecting the DT folks to give their acked-by for the patch 2/3.
-> 
-> It is a bit late for 3.14 but if the patch 3/3 is in Santosh's tree, the patch 2/3 gets its acked-by and you absolutely need the driver for this version, I may consider to send another PR to the upstream maintainers. That will be up to them to accept to pull it or not.
-> 
-They can wait for next merge window (3.15).
+Hi Shawn,
 
-Regards,
-Santosh
+On Mon, Jan 13, 2014 at 8:44 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Hi Thomas,
+>
+> On Thu, Jan 09, 2014 at 09:29:20PM +0530, Thomas Abraham wrote:
+>> @@ -19,6 +19,10 @@ Optional properties:
+>>  - cooling-min-level:
+>>  - cooling-max-level:
+>>       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
+>> +- safe-opp-index: Certain platforms require that during a opp transition,
+>> +  a system should not go below a particular opp level. For such systems,
+>> +  this property specifies the minimum opp to be maintained during the
+>> +  opp transitions.
+>
+> <snip>
+>
+>> @@ -165,13 +196,27 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>>               goto out_put_node;
+>>       }
+>>
+>> +     if (!of_property_read_u32(np, "safe-opp-index", &safe_opp_index)) {
+>> +             rcu_read_lock();
+>> +             opp = dev_pm_opp_find_freq_exact(cpu_dev,
+>> +                     freq_table[safe_opp_index].frequency * 1000, true);
+>
+> The property safe_opp_index is directly used to index freq_table here.
+> It only works when the opp table in device tree is defined in increasing
+> order.  But we have nothing in opp binding bindings/power/opp.txt to
+> enforce it.  That said, opp table in device tree could be in arbitrary
+> order, and thus safe_opp_index gives you nothing reliable.
+
+Yes, true. Thanks for pointing out. Instead of using index, will using
+a tuple of for safe frequency and safe voltage be fine ?
+
+Thanks,
+Thomas.
+
+>
+> Shawn
+>
+>> +             if (IS_ERR(opp)) {
+>> +                     rcu_read_unlock();
+>> +                     pr_err("safe opp index %d is invalid\n",
+>> +                                                     safe_opp_index);
+>> +                     goto out_free_table;
+>> +             }
+>> +             safe_voltage = dev_pm_opp_get_voltage(opp);
+>> +             safe_frequency = freq_table[safe_opp_index].frequency;
+>> +             rcu_read_unlock();
+>> +     }
+>> +
+>>       of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
+>>
+>>       if (of_property_read_u32(np, "clock-latency", &transition_latency))
+>>               transition_latency = CPUFREQ_ETERNAL;
+>>
+>>       if (!IS_ERR(cpu_reg)) {
+>> -             struct dev_pm_opp *opp;
+>>               unsigned long min_uV, max_uV;
+>>               int i;
+>>
+>> --
+>> 1.6.6.rc2
+>>
+>
