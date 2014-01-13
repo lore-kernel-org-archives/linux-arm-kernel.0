@@ -1,324 +1,294 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Jan 2014 22:22:51 +0800
-Subject: [PATCH V4 1/6] ARM: dts: imx6q: add common compatible name for
- reused modules
-In-Reply-To: <20140113121016.GJ16215@pengutronix.de>
-References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
- <20140113121016.GJ16215@pengutronix.de>
-Message-ID: <20140113142249.GW23525@S2101-09.ap.freescale.net>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 13 Jan 2014 15:22:05 +0100
+Subject: [PATCHv11] ARM: dts: Add support for the cpuimx35 board from Eukrea
+ and its baseboard.
+Message-ID: <1389622925-21628-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 01:10:16PM +0100, Sascha Hauer wrote:
-> > @@ -840,7 +840,7 @@
-> >  			};
-> >  
-> >  			mmdc0: mmdc at 021b0000 { /* MMDC0 */
-> > -				compatible = "fsl,imx6q-mmdc";
-> > +				compatible = "fsl,imx6q-mmdc", "fsl,mmdc";
-> 
-> This is not nice. Here you introduce a fsl,mmdc compatible claiming all
-> mmdc are compatible to each other and in the driver code you have:
-> 
-> static const u32 imx6q_mmdc_io_dsm_offset[]
-> static const u32 imx6dl_mmdc_io_dsm_offset[]
-> 
-> which proves they are *not* compatible.
-> 
-> You do this just to share a
-> 
-> imx6_pm_get_base(&pm_info->mmdc_base, "fsl,mmdc");
-> 
-> across the different i.MX6 SoCs.
-> 
-> You can sanitize this by introducing a SoC struct which you populate
-> differently for the SoCs
-> 
-> static pm_soc_data imx6q_data {
-> 	.mmdc_compat = "fsl,imx6q-mmdc",
-> };
-> 
-> And by putting cpu_type, mmdc_io_num and others in this struct you can
-> also remove the if(cpu_is_x()) else if (cpu_is_y()) else...
+The following devices/functionalities were added:
+ * Main and secondary UARTs.
+ * i2c and the pcf8563 device.
+ * Ethernet.
+ * NAND.
+ * The BP1 button.
+ * The LED.
+ * Watchdog
+ * SD.
 
-Good point.
+Cc: Eric B?nard <eric@eukrea.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ChangeLog v10->v11:
+- The other patches in this serie have already been applied in the for-next branch
+  in Shawn Guo's tree at git://git.linaro.org/people/shawnguo/linux-2.6.git :
+    4449d01 ARM i.MX35: build in pinctrl support.
+    cd01fd4 ARM: imx_v6_v7_defconfig: Enable some drivers used on the cpuimx35.
+- Reordered the Cc list and dropped the Cc to the devicetree binding maintainers.
+- Moved the pins of the hoggrp inside their respective node, the bp1 and led1 nodes
+  were updated accordingly.
+- The esdhc1's gpio was fixed: the card detect code will never uses the gpio "active"
+  high/low setting, instead it uses that GPIO as an IRQ.
+- Cosmetic fixes in the uart pinctrl nodes.
 
-Anson, the change below is a demonstration of Sascha's suggestion.
-Sascha, correct me if I misunderstood your comment.
+ChangeLog v9->v10:
+- Added Fabio Estevam To the Cc list
 
-Shawn
+ChangeLog v8->v9:
+- Added the dtb target into arch/arm/boot/dts/Makefile.
+- Added a blank line before the pcf8563 node in the i2c1 node.
+- Whitespace cleanups as requested by Shawn Guo.
+- _' was used in label, it's now fixed (it has been replaced with '-').
+- The recently introduced defines for input and gpios are now used.
+- The uarts had the fsl,uart-has-rtscts property set, but they didn't use 
+  any rts and cts pins in the uart pinctrl nodes.
 
----8<-----------
+ChangeLog v7->v8:
+- The commit message was improved.
+- The board specific iomuxc pins group configuration that were in imx35.dtsi were moved here.
+- The rest of the patch was updated accordingly.
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7087d1a..4dd932a 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -146,13 +146,17 @@ void imx_cpu_die(unsigned int cpu);
- int imx_cpu_kill(unsigned int cpu);
- 
- #ifdef CONFIG_PM
--void imx6_suspend(void);
-+void imx6_suspend(void __iomem *ocram_vbase);
- void imx6q_pm_init(void);
-+void imx6dl_pm_init(void);
-+void imx6sl_pm_init(void);
- void imx6q_pm_set_ccm_base(void __iomem *base);
- void imx5_pm_init(void);
- #else
--static inline void imx6_suspend(void) {}
-+static inline void imx6_suspend(void __iomem *ocram_vbase) {}
- static inline void imx6q_pm_init(void) {}
-+static inline void imx6dl_pm_init(void) {}
-+static inline void imx6sl_pm_init(void) {}
- static inline void imx6q_pm_set_ccm_base(void __iomem *base) {}
- static inline void imx5_pm_init(void) {}
- #endif
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e51e3da..3f7b4e3 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -212,7 +212,7 @@ static void __init imx6q_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
- 
- 	imx_anatop_init();
--	imx6q_pm_init();
-+	cpu_is_imx6dl() ?  imx6dl_pm_init() : imx6q_pm_init();
- 	imx6q_1588_init();
- }
- 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index a26fdb2..ad32338 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -58,8 +58,7 @@ static void __init imx6sl_init_machine(void)
- 
- 	imx6sl_fec_init();
- 	imx_anatop_init();
--	/* Reuse imx6q pm code */
--	imx6q_pm_init();
-+	imx6sl_pm_init();
- }
- 
- static void __init imx6sl_init_irq(void)
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 175b229..ce058db 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -66,7 +66,7 @@
- 
- static void __iomem *ccm_base;
- static void __iomem *suspend_ocram_base;
--static int (*imx6_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
-+static void (*imx6_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
- 
- /*
-  * suspend ocram space layout:
-@@ -88,36 +88,66 @@ struct imx6_pm_base {
- 	void __iomem *vbase;
- };
- 
--static const u32 imx6q_mmdc_io_dsm_offset[] __initconst = {
--	0x5ac, 0x5b4, 0x528, 0x520, /* DQM0 ~ DQM3 */
--	0x514, 0x510, 0x5bc, 0x5c4, /* DQM4 ~ DQM7 */
--	0x56c, 0x578, 0x588, 0x594, /* CAS, RAS, SDCLK_0, SDCLK_1 */
--	0x5a8, 0x5b0, 0x524, 0x51c, /* SDQS0 ~ SDQS3 */
--	0x518, 0x50c, 0x5b8, 0x5c0, /* SDQS4 ~ SDQS7 */
--	0x784, 0x788, 0x794, 0x79c, /* GPR_B0DS ~ GPR_B3DS */
--	0x7a0, 0x7a4, 0x7a8, 0x748, /* GPR_B4DS ~ GPR_B7DS */
--	0x59c, 0x5a0, 0x750, 0x774, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
--	0x74c			    /* GPR_ADDS */
-+struct imx6_pm_socdata {
-+	u32 cpu_type;
-+	const char *mmdc_compat;
-+	const char *src_compat;
-+	const char *iomuxc_compat;
-+	const char *gpc_compat;
-+	const u32 mmdc_io_offset[MX6_MAX_MMDC_IO_NUM];
+ChangeLog v6->v7:
+- Added Grant Likely in the Cc list.
+- Shortened the license.
+- The tsc2007 pads were moved in another patch.
+
+ChangeLog v5->v6:
+- Shawn Guo was added in the Cc.
+---
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |   59 +++++++++
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  137 ++++++++++++++++++++
+ 3 files changed, 197 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 059d280..d41edc7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -143,6 +143,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-phytec-phycard-s-som.dtb \
+ 	imx27-phytec-phycard-s-rdk.dtb \
+ 	imx31-bug.dtb \
++	imx35-eukrea-mbimxsd35-baseboard.dtb \
+ 	imx50-evk.dtb \
+ 	imx51-apf51.dtb \
+ 	imx51-apf51dev.dtb \
+diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+new file mode 100644
+index 0000000..303f789
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+@@ -0,0 +1,59 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "imx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,cpuimx35", "fsl,imx35";
++
++	memory {
++		reg = <0x80000000 0x8000000>; /* 128M */
++	};
 +};
 +
-+static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6Q,
-+	.mmdc_compat = "fsl,imx6q-mmdc",
-+	.src_compat = "fsl,imx6q-src",
-+	.iomuxc_compat = "fsl,imx6q-iomuxc",
-+	.gpc_compat = "fsl,imx6q-gpc",
-+	.mmdc_io_offset = {
-+		0x5ac, 0x5b4, 0x528, 0x520, /* DQM0 ~ DQM3 */
-+		0x514, 0x510, 0x5bc, 0x5c4, /* DQM4 ~ DQM7 */
-+		0x56c, 0x578, 0x588, 0x594, /* CAS, RAS, SDCLK_0, SDCLK_1 */
-+		0x5a8, 0x5b0, 0x524, 0x51c, /* SDQS0 ~ SDQS3 */
-+		0x518, 0x50c, 0x5b8, 0x5c0, /* SDQS4 ~ SDQS7 */
-+		0x784, 0x788, 0x794, 0x79c, /* GPR_B0DS ~ GPR_B3DS */
-+		0x7a0, 0x7a4, 0x7a8, 0x748, /* GPR_B4DS ~ GPR_B7DS */
-+		0x59c, 0x5a0, 0x750, 0x774, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
-+		0x74c,			    /* GPR_ADDS */
-+	},
- };
- 
--static const u32 imx6dl_mmdc_io_dsm_offset[] __initconst = {
--	0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
--	0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
--	0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
--	0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
--	0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
--	0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
--	0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
--	0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
--	0x74c			    /* GPR_ADDS */
-+static const struct imx6_pm_socdata imx6dl_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6DL,
-+	.mmdc_compat = "fsl,imx6dl-mmdc",
-+	.src_compat = "fsl,imx6dl-src",
-+	.iomuxc_compat = "fsl,imx6dl-iomuxc",
-+	.gpc_compat = "fsl,imx6dl-gpc",
-+	.mmdc_io_offset = {
-+		0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
-+		0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
-+		0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
-+		0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
-+		0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
-+		0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
-+		0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
-+		0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
-+		0x74c,			    /* GPR_ADDS */
-+	},
- };
- 
--static const u32 imx6sl_mmdc_io_dsm_offset[] __initconst = {
--	0x30c, 0x310, 0x314, 0x318, /* DQM0 ~ DQM3 */
--	0x5c4, 0x5cc, 0x5d4, 0x5d8, /* GPR_B0DS ~ GPR_B3DS */
--	0x300, 0x31c, 0x338, 0x5ac, /* CAS, RAS, SDCLK_0, GPR_ADDS */
--	0x33c, 0x340, 0x5b0, 0x5c0, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
--	0x330, 0x334, 0x320,	    /* SDCKE0, SDCKE1, RESET */
-+static const struct imx6_pm_socdata imx6sl_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6SL,
-+	.mmdc_compat = "fsl,imx6sl-mmdc",
-+	.src_compat = "fsl,imx6sl-src",
-+	.iomuxc_compat = "fsl,imx6sl-iomuxc",
-+	.gpc_compat = "fsl,imx6sl-gpc",
-+	.mmdc_io_offset = {
-+		0x30c, 0x310, 0x314, 0x318, /* DQM0 ~ DQM3 */
-+		0x5c4, 0x5cc, 0x5d4, 0x5d8, /* GPR_B0DS ~ GPR_B3DS */
-+		0x300, 0x31c, 0x338, 0x5ac, /* CAS, RAS, SDCLK_0, GPR_ADDS */
-+		0x33c, 0x340, 0x5b0, 0x5c0, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
-+		0x330, 0x334, 0x320,	    /* SDCKE0, SDCKE1, RESET */
-+	},
- };
- 
- /*
-@@ -343,7 +373,7 @@ out:
- 	return ret;
- }
- 
--static int __init imx6q_ocram_suspend_init(void)
-+static int __init imx6_ocram_suspend_init(const struct imx6_pm_socdata *socdata)
- {
- 	phys_addr_t ocram_pbase;
- 	struct device_node *node;
-@@ -398,25 +428,25 @@ static int __init imx6q_ocram_suspend_init(void)
- 	 */
- 	pm_info->ccm_base.vbase = ccm_base;
- 
--	ret = imx6_pm_get_base(&pm_info->mmdc_base, "fsl,mmdc");
-+	ret = imx6_pm_get_base(&pm_info->mmdc_base, socdata->mmdc_compat);
- 	if (ret) {
- 		pr_warn("%s: failed to get mmdc base %d!\n", __func__, ret);
- 		goto put_node;
- 	}
- 
--	ret = imx6_pm_get_base(&pm_info->src_base, "fsl,src");
-+	ret = imx6_pm_get_base(&pm_info->src_base, socdata->src_compat);
- 	if (ret) {
- 		pr_warn("%s: failed to get src base %d!\n", __func__, ret);
- 		goto src_map_failed;
- 	}
- 
--	ret = imx6_pm_get_base(&pm_info->iomuxc_base, "fsl,iomuxc");
-+	ret = imx6_pm_get_base(&pm_info->iomuxc_base, socdata->iomuxc_compat);
- 	if (ret) {
- 		pr_warn("%s: failed to get iomuxc base %d!\n", __func__, ret);
- 		goto iomuxc_map_failed;
- 	}
- 
--	ret = imx6_pm_get_base(&pm_info->gpc_base, "fsl,gpc");
-+	ret = imx6_pm_get_base(&pm_info->gpc_base, socdata->gpc_compat);
- 	if (ret) {
- 		pr_warn("%s: failed to get gpc base %d!\n", __func__, ret);
- 		goto gpc_map_failed;
-@@ -429,34 +459,19 @@ static int __init imx6q_ocram_suspend_init(void)
- 		goto pl310_cache_map_failed;
- 	}
- 
--	if (cpu_is_imx6q()) {
--		pm_info->cpu_type = MXC_CPU_IMX6Q;
--		pm_info->mmdc_io_num = ARRAY_SIZE(imx6q_mmdc_io_dsm_offset);
--		mmdc_offset_array = imx6q_mmdc_io_dsm_offset;
--	} else if (cpu_is_imx6dl()) {
--		pm_info->cpu_type = MXC_CPU_IMX6DL;
--		pm_info->mmdc_io_num = ARRAY_SIZE(imx6dl_mmdc_io_dsm_offset);
--		mmdc_offset_array = imx6dl_mmdc_io_dsm_offset;
--	} else if (cpu_is_imx6sl()) {
--		pm_info->cpu_type = MXC_CPU_IMX6SL;
--		pm_info->mmdc_io_num = ARRAY_SIZE(imx6sl_mmdc_io_dsm_offset);
--		mmdc_offset_array = imx6sl_mmdc_io_dsm_offset;
--	}
--
--	if (!mmdc_offset_array) {
--		pr_warn("%s: unsupported platform!\n", __func__);
--		goto pl310_cache_map_failed;
--	}
-+	pm_info->cpu_type = socdata->cpu_type;
-+	pm_info->mmdc_io_num = ARRAY_SIZE(socdata->mmdc_io_offset);
-+	mmdc_offset_array = socdata->mmdc_io_offset;
- 
- 	for (i = 0; i < pm_info->mmdc_io_num; i++) {
- 		pm_info->mmdc_io_val[i][0] =
- 			mmdc_offset_array[i];
- 		pm_info->mmdc_io_val[i][1] =
--			readl_relaxed(*(&pm_info->iomuxc_base.vbase) +
-+			readl_relaxed(pm_info->iomuxc_base.vbase +
- 			mmdc_offset_array[i]);
- 	}
- 
--	imx6_suspend_in_ocram_fn = (void *)fncpy(
-+	imx6_suspend_in_ocram_fn = fncpy(
- 		suspend_ocram_base + sizeof(*pm_info),
- 		&imx6_suspend,
- 		MX6Q_SUSPEND_OCRAM_SIZE - sizeof(*pm_info));
-@@ -477,14 +492,14 @@ put_node:
- 	return ret;
- }
- 
--void __init imx6q_pm_init(void)
-+static void __init imx6_pm_common_init(const struct imx6_pm_socdata *socdata)
- {
- 	struct regmap *gpr;
- 	int ret;
- 
- 	WARN_ON(!ccm_base);
- 
--	ret = imx6q_ocram_suspend_init();
-+	ret = imx6_ocram_suspend_init(socdata);
- 	if (ret)
- 		pr_warn("%s: failed to initialize ocram suspend %d!\n",
- 			__func__, ret);
-@@ -506,3 +521,18 @@ void __init imx6q_pm_init(void)
- 
- 	suspend_set_ops(&imx6q_pm_ops);
- }
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec>;
++	status = "okay";
++};
 +
-+void __init imx6q_pm_init(void)
-+{
-+	imx6_pm_common_init(&imx6q_pm_data);
-+}
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
 +
-+void __init imx6dl_pm_init(void)
-+{
-+	imx6_pm_common_init(&imx6dl_pm_data);
-+}
++	pcf8563 at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
 +
-+void __init imx6sl_pm_init(void)
-+{
-+	imx6_pm_common_init(&imx6sl_pm_data);
-+}
++&iomuxc {
++	imx35-eukrea {
++		pinctrl_fec: fecgrp {
++			fsl,pins = <MX35_FEC_PINGRP1>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX35_I2C1_PINGRP1>;
++		};
++	};
++};
++
++&nfc {
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	nand-on-flash-bbt;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+new file mode 100644
+index 0000000..833bd1f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -0,0 +1,137 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "imx35-eukrea-cpuimx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		bp1 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_bp1>;
++			label = "BP1";
++			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
++			linux,code = <BTN_MISC>;
++			gpio-key,wakeup;
++			linux,input-type = <1>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led1 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_led1>;
++			label = "led1";
++			gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	cd-gpios = <&gpio3 24>;
++	status = "okay";
++};
++
++&i2c1 {
++	tlv320aic23: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++	};
++};
++
++&iomuxc {
++	imx35-eukrea {
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <MX35_AUDMUX_PINGRP1>;
++		};
++
++		pinctrl_bp1: bp1grp {
++			fsl,pins = <MX35_PAD_LD19__GPIO3_25  0x80000000>;
++		};
++
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,pins = <
++				  MX35_ESDHC1_PINGRP1
++				  MX35_PAD_LD18__GPIO3_24  0x80000000 /* CD */
++			>;
++		};
++
++		pinctrl_fec: fecgrp {
++			fsl,pins = <MX35_FEC_PINGRP1>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX35_I2C1_PINGRP1>;
++		};
++
++		pinctrl_led1: led1grp {
++			fsl,pins = <MX35_PAD_LD23__GPIO3_29  0x80000000>;
++		};
++
++		pinctrl_reg_lcd_3v3: reg-lcd-3v3 {
++			fsl,pins = <MX35_PAD_D3_CLS__GPIO1_4 0x80000000>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX35_UART1_PINGRP1
++				MX35_UART1_RTSCTS_PINGRP1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX35_UART2_PINGRP1
++				MX35_UART2_RTSCTS_PINGRP1
++			>;
++		};
++	};
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
+-- 
+1.7.9.5
