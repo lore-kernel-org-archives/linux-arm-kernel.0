@@ -1,60 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 13 Jan 2014 09:27:44 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-In-Reply-To: <20140113123733.GU15937@n2100.arm.linux.org.uk>
-References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
- <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
- <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
- <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
- <20140112105958.GA9791@n2100.arm.linux.org.uk> <52D2B7C8.4060103@ti.com>
- <20140113123733.GU15937@n2100.arm.linux.org.uk>
-Message-ID: <52D3F7E0.3030206@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Jan 2014 09:36:51 -0500
+Subject: [PATCH] ata: sata_mv: setting PHY speed according to SControl
+ speed
+In-Reply-To: <20140111075557.353478fa@skate>
+References: <1387800455-30629-1-git-send-email-simon.guinot@sequanux.org>
+ <20131231121214.GB3985@htj.dyndns.org>
+ <20131231170515.GG32537@lunn.ch>
+ <EE71107DF0D1F24FA2D95041E64AB9E801C034BF2AD1@IL-MB01.marvell.com>
+ <20140110174412.GJ19878@titan.lakedaemon.net>
+ <20140111075557.353478fa@skate>
+Message-ID: <20140113143651.GD19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 January 2014 07:37 AM, Russell King - ARM Linux wrote:
-> On Sun, Jan 12, 2014 at 10:42:00AM -0500, Santosh Shilimkar wrote:
->> On Sunday 12 January 2014 05:59 AM, Russell King - ARM Linux wrote:
->>> On Mon, Dec 09, 2013 at 08:02:30PM -0500, Santosh Shilimkar wrote:
->>>> On Monday 09 December 2013 07:54 PM, Russell King - ARM Linux wrote:
->>>>> The underlying reason is that - as I've already explained - ARM's __ffs()
->>>>> differs from other architectures in that it ends up being an int, whereas
->>>>> almost everyone else is unsigned long.
->>>>>
->>>>> The fix is to fix ARMs __ffs() to conform to other architectures.
->>>>>
->>>> I was just about to cross-post your reply here. Obviously I didn't think
->>>> this far when I made  $subject fix.
->>>>
->>>> So lets ignore the $subject patch which is not correct. Sorry for noise
->>>
->>> Well, here we are, a month on, and this still remains unfixed despite
->>> my comments pointing to what the problem is.  So, here's a patch to fix
->>> this problem the correct way.  I took the time to add some comments to
->>> these functions as I find that I wonder about their return values, and
->>> these comments make the patch a little larger than it otherwise would be.
->>>
->> The $subject warning fix [1] is already picked by Andrew with your ack
->> and its in his queue [2]
->>
->>> This patch makes their types match exactly with x86's definitions of
->>> the same, which is the basic problem: on ARM, they all took "int" values
->>> and returned "int"s, which leads to min() in nobootmem.c complaining.
->>>
->> Not sure if you missed the thread but the right fix was picked. Ofcourse
->> you do have additional clz optimisation in updated patch and some comments
->> on those functions.
+On Sat, Jan 11, 2014 at 07:55:57AM +0800, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> The problem here is that the patch fixing this is going via akpm's tree
-> (why?) yet you want the code which introduces the warning to be merged
-> via my tree.
->
-> It seems to me to be absolutely silly to have code introduce a warning
-> yet push the fix for the warning via a completely different tree...
+> On Fri, 10 Jan 2014 12:44:12 -0500, Jason Cooper wrote:
 > 
-I mixed it up. Sorry. Some how I thought there was some other build
-configuration thrown the same warning with memblock series and hence
-suggested the patch to go via Andrew's tree.
+> > Lior, thanks for the clarification.  Simon, care to respin this with a
+> > check for "marvell,armada-370-xp" root compatible string?  It should be
+> > safe to say that if there is no DT, don't write the register.
+> 
+> Why check a root compatible string? If we do this, then we will have to
+> change the SATA driver for each and every new Marvell SoC that has this
+> PHY speed control register (and these new SOCs will not use the
+> "marvell,armada-370-xp" root compatible string, since they are clearly
+> not Armada 370/XP).
+> 
+> Instead, we should introduce an additional compatible string for the
+> SATA driver itself.
 
-Regards,
-Santosh
+Agreed.  
+
+> > Alternatively, we could do as Lior suggests, and create a new sata
+> > compatible string.  But I think that is overkill.
+> 
+> No, this is the right thing to do, IMO.
+> 
+> > Also, I'm growing more leery creating compatible strings for IP blocks
+> > which are tied to the SoC revision.  If the IP block doesn't get issued
+> > it's own version number/codename, we should just use the root compatible
+> > strings to determine which SoC we are on.  I'll expand on this though as
+> > I get caught up with Gregory's series's. 
+> 
+> I really disagree. It means that whenever a new root compatible string
+> is created for a new SOC, we will have to edit gazillions of drivers.
+> It's not because two SOCs have the same SATA IP that they are globally
+> compatible, and can therefore share the same root compatible strings.
+
+Yes, you're right.  I really went off the deep end on that one.  Simon,
+please do as Lior and Thomas suggested.
+
+thx,
+
+Jason.
