@@ -1,29 +1,94 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 13 Jan 2014 11:54:59 -0800 (PST)
-Subject: [PATCH 1/1] drivers: net: silence compiler warning in smc91x.c
-In-Reply-To: <52D05B41.7000601@cogentembedded.com>
-References: <1389323046-4521-1-git-send-email-pankaj.dubey@samsung.com>
- <52D05B41.7000601@cogentembedded.com>
-Message-ID: <20140113.115459.326248442934302460.davem@davemloft.net>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 13 Jan 2014 20:01:35 +0000
+Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
+In-Reply-To: <201401131943.10352.arnd@arndb.de>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-5-git-send-email-leif.lindholm@linaro.org>
+ <201401131943.10352.arnd@arndb.de>
+Message-ID: <20140113200135.GF30907@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Date: Fri, 10 Jan 2014 23:42:41 +0300
+On Mon, Jan 13, 2014 at 07:43:09PM +0100, Arnd Bergmann wrote:
+> > This patch implements basic support for UEFI runtime services in the
+> > ARM architecture - a requirement for using efibootmgr to read and update
+> > the system boot configuration.
+> > 
+> > It uses the generic configuration table scanning to populate ACPI and
+> > SMBIOS pointers.
+> 
+> As far as I'm concerned there are no plans to have ACPI support on ARM32,
+> so I wonder what the code to populate the ACPI tables is about. Can
+> you clarify this?
 
-> Hello.
-> 
-> On 01/10/2014 06:04 AM, Pankaj Dubey wrote:
-> 
->> If used 64 bit compiler GCC warns that:
-> 
->> drivers/net/ethernet/smsc/smc91x.c:1897:7:
->> warning: cast from pointer to integer of different
->> size [-Wpointer-to-int-cast]
-> 
->> This patch fixes this by changing typecase from "unsigned int" to
->> "unsigned long"
-> 
->    Only "typecast".
+Are you suggesting that I should #ifndef ARM in common code, or that I
+should neglect to document what the common code will do with data it is
+given by UEFI?
 
-Applied with this typo fixed, thanks.
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 78a79a6a..1ab24cc 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
+> >  	  the same virtual memory range as kmap so all early mappings must
+> >  	  be unapped before paging_init() is called.
+> >  
+> > +config EFI
+> > +	bool "UEFI runtime service support"
+> > +	depends on OF && !CPU_BIG_ENDIAN
+> 
+> What is the dependency on !CPU_BIG_ENDIAN?
+
+Mainly on code not being implemented to byte-reverse UCS strings.
+
+> We try hard to have
+> all kernel code support both big-endian and little-endian, and
+> I'm guessing there is a significant overlap between the people
+> that want UEFI support and those that want big-endian kernels.
+
+Not really. There might be some. Also, it is not necessarily the case
+that those people want to run the big-endian kernel at EL2.
+
+If a need is seen, this support can be added at a later date.
+
+> > +struct efi_memory_map memmap;
+> 
+> "memmap" is not a good name for a global identifier, particularly because
+> it's easily confused with the well-known "mem_map" array. This
+> wants namespace prefix like you other variable, or a "static" tag,
+> preferably both.
+
+It is defined by include/linux/efi.h.
+
+> > +/*
+> > + * This function switches the UEFI runtime services to virtual mode.
+> > + * This operation must be performed only once in the system's lifetime,
+> > + * including any kecec calls.
+> 
+>                    kexec
+
+Ok.
+
+> > diff --git a/include/linux/efi.h b/include/linux/efi.h
+> > index fa7d950..afaeb85 100644
+> > --- a/include/linux/efi.h
+> > +++ b/include/linux/efi.h
+> > @@ -664,7 +664,7 @@ extern int __init efi_setup_pcdp_console(char *);
+> >  #define EFI_64BIT		5	/* Is the firmware 64-bit? */
+> >  
+> >  #ifdef CONFIG_EFI
+> > -# ifdef CONFIG_X86
+> > +# if defined(CONFIG_X86) || defined(CONFIG_ARM)
+> >  extern int efi_enabled(int facility);
+> >  # else
+> >  static inline int efi_enabled(int facility)
+> 
+> Maybe better #ifndef CONFIG_IA64? It seems that is the odd one out and
+> all possible future architectures would be like x86 and ARM.
+
+This was pointed out by Matt Fleming earlier, so it will change.
+Mark Salter suggested introducing something like ARCH_USES_EFI_FACILITY
+would be a bit cleaner.
+
+/
+    Leif
