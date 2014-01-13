@@ -1,54 +1,46 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 13 Jan 2014 16:30:51 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
- <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
- <52CFFFDA.8050108@linaro.org>
- <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
- <52D3515B.7040008@linaro.org>
- <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
-Message-ID: <52D3A43B.4030909@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jan 2014 09:45:52 +0100
+Subject: [PATCH 2/2] serial: fsl_lpuart: add eDMA support
+In-Reply-To: <1d437762499348b6aeca3621b151d770@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1389236681-30372-1-git-send-email-yao.yuan@freescale.com>
+ <201401090956.38789.arnd@arndb.de>
+ <1d437762499348b6aeca3621b151d770@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <201401130945.53447.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Seungwon
-
-On 01/13/2014 01:32 PM, Seungwon Jeon wrote:
->>>>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>>>>> +{
->>>>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
->>>>>> +	u32 rate = priv->clk_table[ios->timing];
->>>>>
-
->>
->> The function mmc_clk_determine_rate() will need the info which
->> controller it is, what's the init clock rate, what's the max clock rate,
->> and what's the limitation, which may be different as different soc, and
->> can not be hardcoded.
->> The limitation may in HS200 and SDR104 mode.
->>
->> The plan is only input init rate and max rate instead of the table,
->> while others directly use ios->clock, only if the the limitation resolved.
+On Monday 13 January 2014, Yao Yuan wrote:
+> I need the functions like this:
+> Static A()
+> {
+>         if(condition) 
+>                 B();
+> }
+> Static B()
+> {
+>         callback:C();
+> }
+> Static C()
+> {
+>         if(condition)
+>                 A();
+> }
 > 
-> Handling mmc clock for hi3620 is in drivers/clk/hisilicon/clk-hi3620.c, right?
-> Currently only hi3620 has been introduced.
-> If hi3620's host has a limitation, clk-hi3620.c can handle clock range(init, max) for source clock enough.
-> I feel like clock table is redundant.
-> Ok. It's just my suggestion.  But I still point dependency of mode index number.
-> K3's clock table refers and depends mode definition value from include/linux/mmc/host.h
-> If new mode is added or modified, it should be considered and also may make complicated.
-> 
+> So, it's hard to avoid forward declarations for "static" functions.
+> I'm very glad for a better way.
 
-Looks like you dislike the clk_table very much :)
 
-Double checked with the silicon guy, currently it is said the limitation
-in HS200 and SDR104 can be replaced by the max_rate, so clk_table can be
-replaced with ios->clock directly, though they have concern it is not so
-convinent when removing clk_table in case limitation rate is not equal
-to max_rate again in future.
+Ok, that makes sense. It is an unusual pattern from the dmaengine API,
+most drivers can more easily do without forward declarations. I think
+you'd be able to avoid the lpuart_prepare_tx() forward declation, but
+that wouldn't actually improve readability in this case. Just add a
+comment above the declarations describing that they are needed for the
+callbacks and that no recursion is possible. The important problem
+to avoid really is having unbounded recursion between multple
+functions, because that could blow the kernel stack size limit.
 
-Will update accordingly, thanks for the suggestion.
+A small improvement that you can try is to have forward declarations
+for the completion functions rather than the dma start functions, but
+it won't be a big difference in the end. Your choice.
 
-Thanks
+	Arnd
