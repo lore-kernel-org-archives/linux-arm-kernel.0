@@ -1,43 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 13 Jan 2014 17:33:20 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <CAKfTPtBKXgX7P+pAYv0h=amScM2zQydVkYd7XDOwaQxEDT0Fdw@mail.gmail.com>
-References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
- <1389554441-27335-2-git-send-email-broonie@kernel.org>
- <20140113161059.GA32720@e102568-lin.cambridge.arm.com>
- <CAKfTPtBKXgX7P+pAYv0h=amScM2zQydVkYd7XDOwaQxEDT0Fdw@mail.gmail.com>
-Message-ID: <20140113173320.GB6934@e102568-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jan 2014 09:37:45 -0800
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+In-Reply-To: <20140113141811.GD27282@n2100.arm.linux.org.uk>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+ <20140108012110.GL5074@atomide.com>
+ <20140109152437.GB27282@n2100.arm.linux.org.uk>
+ <20140113141811.GD27282@n2100.arm.linux.org.uk>
+Message-ID: <20140113173744.GA7746@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 04:44:06PM +0000, Vincent Guittot wrote:
-
-[...]
-
-> >> +extern struct cpu_topology cpu_topology[NR_CPUS];
-> >> +
-> >> +#define topology_physical_package_id(cpu)    (cpu_topology[cpu].socket_id)
-> >> +#define topology_core_id(cpu)                (cpu_topology[cpu].core_id)
-> >> +#define topology_core_cpumask(cpu)   (&cpu_topology[cpu].core_sibling)
-> >> +#define topology_thread_cpumask(cpu) (&cpu_topology[cpu].thread_sibling)
-> >> +
-> >> +#define mc_capable() (cpu_topology[0].socket_id != -1)
-> >> +#define smt_capable()        (cpu_topology[0].thread_id != -1)
-> >
-> > Are the two macros above still required in the kernel ? I can't see any
-> > usage at present.
-> >
-> > Vincent, do you know why they were not removed in commit:
-> >
-> > 8e7fbcbc22c12414bcc9dfdd683637f58fb32759
-> >
-> > I am certainly missing something.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140113 08:48]:
+> On Thu, Jan 09, 2014 at 03:24:37PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 07, 2014 at 05:21:11PM -0800, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140102 07:11]:
+> > > > The following patch series moves code to setup the DMA hardware and
+> > > > service interrupts from the hardware to the DMA engine driver.  This
+> > > > reduces the dependency on the legacy DMA implementation.
+> > > > 
+> > > > This series does not remove the channel allocation/freeing hooks which
+> > > > are used to manage the allocation of physical channels - this is the
+> > > > next step in the evolution.
+> > > > 
+> > > > The patches which move the interrupt handling are currently less than
+> > > > perfect since they're writing to ENABLE_L0 under a different spinlock,
+> > > > and hence RFC only at the moment.
+> > > 
+> > > Nice to see this happening. These seem to work for me based on a quick
+> > > try on omap2+, but on omap1 the build fails:
+> > > 
+> > > arch/arm/mach-omap1/dma.c: In function ?dma_write?:
+> > > arch/arm/mach-omap1/dma.c:186: error: ?const struct omap_dma_reg? has no member named ?size?
+> > 
+> > Right, needs this incremental patch:
+> > 
+> > diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+> > index 3afde9628839..404f89e3eeb8 100644
+> > --- a/arch/arm/mach-omap1/dma.c
+> > +++ b/arch/arm/mach-omap1/dma.c
+> > @@ -183,7 +183,7 @@ static inline void dma_write(u32 val, int reg, int lch)
+> >  	addr += reg_map[reg].stride * lch;
+> >  
+> >  	__raw_writew(val, addr);
+> > -	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
+> > +	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
+> >  		__raw_writew(val >> 16, addr + 2);
+> >  }
+> >  
+> > @@ -196,7 +196,7 @@ static inline u32 dma_read(int reg, int lch)
+> >  	addr += reg_map[reg].stride * lch;
+> >  
+> >  	val = __raw_readw(addr);
+> > -	if (reg_map[reg].size == OMAP_DMA_REG_2X16BIT)
+> > +	if (reg_map[reg].type == OMAP_DMA_REG_2X16BIT)
+> >  		val |= __raw_readw(addr + 2) << 16;
+> >  
+> >  	return val;
+> > 
 > 
-> I think it was not planned to be used only by the scheduler but since
-> 8e7fbcbc22c12414bcc9dfdd683637f58fb32759, we have reach a situation
-> where nobody use them for the moment.
+> Any news on this?
 
-Ok, we can add the macros and eventually remove all of them in a later
-patch if we think they must go then.
+Sorry for the delay, now getting this:
 
-Lorenzo
+arch/arm/mach-omap1/dma.c: In function ?omap1_system_dma_init?:
+arch/arm/mach-omap1/dma.c:368: error: ?struct omap_dma_dev_attr? has no member named ?chan?
+
+Regards,
+
+Tony
