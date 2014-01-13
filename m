@@ -1,94 +1,60 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 13 Jan 2014 20:01:35 +0000
-Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
-In-Reply-To: <201401131943.10352.arnd@arndb.de>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-5-git-send-email-leif.lindholm@linaro.org>
- <201401131943.10352.arnd@arndb.de>
-Message-ID: <20140113200135.GF30907@bivouac.eciton.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jan 2014 20:34:04 +0000
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+In-Reply-To: <20140113192630.GB7746@atomide.com>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+ <20140108012110.GL5074@atomide.com>
+ <20140109152437.GB27282@n2100.arm.linux.org.uk>
+ <20140113141811.GD27282@n2100.arm.linux.org.uk>
+ <20140113173744.GA7746@atomide.com>
+ <20140113185503.GE27282@n2100.arm.linux.org.uk>
+ <20140113192630.GB7746@atomide.com>
+Message-ID: <20140113203404.GF27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 07:43:09PM +0100, Arnd Bergmann wrote:
-> > This patch implements basic support for UEFI runtime services in the
-> > ARM architecture - a requirement for using efibootmgr to read and update
-> > the system boot configuration.
+On Mon, Jan 13, 2014 at 11:26:31AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140113 10:57]:
+> > On Mon, Jan 13, 2014 at 09:37:45AM -0800, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140113 08:48]:
+> > > > Any news on this?
+> > > 
+> > > Sorry for the delay, now getting this:
+> > > 
+> > > arch/arm/mach-omap1/dma.c: In function ?omap1_system_dma_init?:
+> > > arch/arm/mach-omap1/dma.c:368: error: ?struct omap_dma_dev_attr? has no member named ?chan?
 > > 
-> > It uses the generic configuration table scanning to populate ACPI and
-> > SMBIOS pointers.
+> > Gah.  Next incremental patch:
 > 
-> As far as I'm concerned there are no plans to have ACPI support on ARM32,
-> so I wonder what the code to populate the ACPI tables is about. Can
-> you clarify this?
-
-Are you suggesting that I should #ifndef ARM in common code, or that I
-should neglect to document what the common code will do with data it is
-given by UEFI?
-
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 78a79a6a..1ab24cc 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
-> >  	  the same virtual memory range as kmap so all early mappings must
-> >  	  be unapped before paging_init() is called.
-> >  
-> > +config EFI
-> > +	bool "UEFI runtime service support"
-> > +	depends on OF && !CPU_BIG_ENDIAN
+> Thanks, now getting this on omap1:
 > 
-> What is the dependency on !CPU_BIG_ENDIAN?
+> # dmesg | grep -i dma
+> DMA: preallocated 256 KiB pool for atomic coherent allocations
+> OMAP DMA hardware version 1
+> DMA capabilities: 0000000c:00000000:01ff:003f:007f
+> omap-dma-engine omap-dma-engine: invalid resource
+> omap-dma-engine: probe of omap-dma-engine failed with error -22
+> mmci-omap mmci-omap.1: unable to obtain TX DMA engine channel 54
+> mmci-omap mmci-omap.1: unable to obtain RX DMA engine channel 55
 
-Mainly on code not being implemented to byte-reverse UCS strings.
+Sigh... let's give it the iomem resource then:
 
-> We try hard to have
-> all kernel code support both big-endian and little-endian, and
-> I'm guessing there is a significant overlap between the people
-> that want UEFI support and those that want big-endian kernels.
+diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+index 1b1b64647def..4be601b638d7 100644
+--- a/arch/arm/mach-omap1/dma.c
++++ b/arch/arm/mach-omap1/dma.c
+@@ -261,6 +261,8 @@ static const struct platform_device_info omap_dma_dev_info = {
+ 	.name = "omap-dma-engine",
+ 	.id = -1,
+ 	.dma_mask = DMA_BIT_MASK(32),
++	.res = res,
++	.num_res = 1,
+ };
+ 
+ static struct omap_system_dma_plat_info dma_plat_info __initdata = {
 
-Not really. There might be some. Also, it is not necessarily the case
-that those people want to run the big-endian kernel at EL2.
 
-If a need is seen, this support can be added at a later date.
-
-> > +struct efi_memory_map memmap;
-> 
-> "memmap" is not a good name for a global identifier, particularly because
-> it's easily confused with the well-known "mem_map" array. This
-> wants namespace prefix like you other variable, or a "static" tag,
-> preferably both.
-
-It is defined by include/linux/efi.h.
-
-> > +/*
-> > + * This function switches the UEFI runtime services to virtual mode.
-> > + * This operation must be performed only once in the system's lifetime,
-> > + * including any kecec calls.
-> 
->                    kexec
-
-Ok.
-
-> > diff --git a/include/linux/efi.h b/include/linux/efi.h
-> > index fa7d950..afaeb85 100644
-> > --- a/include/linux/efi.h
-> > +++ b/include/linux/efi.h
-> > @@ -664,7 +664,7 @@ extern int __init efi_setup_pcdp_console(char *);
-> >  #define EFI_64BIT		5	/* Is the firmware 64-bit? */
-> >  
-> >  #ifdef CONFIG_EFI
-> > -# ifdef CONFIG_X86
-> > +# if defined(CONFIG_X86) || defined(CONFIG_ARM)
-> >  extern int efi_enabled(int facility);
-> >  # else
-> >  static inline int efi_enabled(int facility)
-> 
-> Maybe better #ifndef CONFIG_IA64? It seems that is the odd one out and
-> all possible future architectures would be like x86 and ARM.
-
-This was pointed out by Matt Fleming earlier, so it will change.
-Mark Salter suggested introducing something like ARCH_USES_EFI_FACILITY
-would be a bit cleaner.
-
-/
-    Leif
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
