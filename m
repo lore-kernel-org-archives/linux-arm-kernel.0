@@ -1,44 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 13 Jan 2014 09:38:12 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
-In-Reply-To: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
-References: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140113003811.GI15296@verge.net.au>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 13 Jan 2014 02:00:25 +0100
+Subject: [patch] fix omap compile with randconfig
+Message-ID: <20140113010025.GA14431@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 12:15:49PM +0100, Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> Without this, a Debian jessie nfsroot hangs early in the boot process.
 
-If this is really necessary for Jessie to boot then I think
-we should enabled it in all shmobile defconfigs.
+This fixes:
 
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> ---
->  arch/arm/configs/koelsch_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-> index 8f283f725a12..7c06fbac21a7 100644
-> --- a/arch/arm/configs/koelsch_defconfig
-> +++ b/arch/arm/configs/koelsch_defconfig
-> @@ -36,6 +36,8 @@ CONFIG_UNIX=y
->  CONFIG_INET=y
->  CONFIG_IP_PNP=y
->  CONFIG_IP_PNP_DHCP=y
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_MTD=y
->  CONFIG_MTD_M25P80=y
->  CONFIG_NETDEVICES=y
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+arch/arm/mach-omap2/built-in.o: In function `omap_reserve':
+/data/l/linux-n900/arch/arm/mach-omap2/common.c:36: undefined
+  reference to `omap_fb_reserve_memblock'
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+index 9beecde..857907f 100644
+--- a/arch/arm/mach-omap2/common.c
++++ b/arch/arm/mach-omap2/common.c
+@@ -33,5 +33,7 @@ void __init omap_reserve(void)
+ 	omap_dsp_reserve_sdram_memblock();
+ 	omap_secure_ram_reserve_memblock();
+ 	omap_barrier_reserve_memblock();
++#ifdef CONFIG_OMAP2_VRFB
+ 	omap_fb_reserve_memblock();
++#endif
+ }
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
