@@ -1,35 +1,69 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 Jan 2014 18:38:00 +0400
-Subject: [PATCH v2 1/3] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <5805022.go1dlAzuQx@wuerfel>
-References: <1387454336-1347-1-git-send-email-shc_work@mail.ru>
- <3585542.v49U0LMMmk@wuerfel>
- <20140109162035.a23fac6b35297b63d67163e0@mail.ru>
- <5805022.go1dlAzuQx@wuerfel>
-Message-ID: <20140113183800.6f63b40328a659cabfd566f1@mail.ru>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Mon, 13 Jan 2014 14:44:29 +0000
+Subject: [3.11.y.z extended stable] Patch "clk: clk-divider: fix divisor > 255
+ bug" has been added to staging queue
+Message-ID: <1389624269-24899-1-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This is a note to let you know that I have just added a patch titled
 
-On Thu, 09 Jan 2014 13:26:41 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+    clk: clk-divider: fix divisor > 255 bug
 
-> On Thursday 09 January 2014 16:20:35 Alexander Shiyan wrote:
-> > So, irq_domain_add_simple() do not work for me.
-> > Current driver uses 1:1 mapping between hwirq and virq. Since DT is not
-> > supported by all CLPS711X drivers, I am initialize some devices in
-> > init_machine call, so these devices uses 0-based IRQs (i.e. old scheme).
-> > Using irq_domain_add_simple() means all our IRQs will be dynamic and its
-> > numbers starts from NR_IRQS, so usage irq_domain_add_simple() at this stage
-> > is not possible. Once all boards will be ported to DT, I'll review this
-> > code, but cannot do it now.
-> 
-> Ok, makes sense. I didn't know you were mixing static devices
-> with DT-probed ones. Your driver looks good then.
+to the linux-3.11.y-queue branch of the 3.11.y.z extended stable tree 
+which can be found at:
 
-So, I still hope for the chance to put this into 3.14-rc.
+ http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.11.y-queue
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.11.y.z tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
 Thanks.
+-Luis
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+------
+
+>From 1477f9ed805dc66b61993b7d4051ebbf12f61222 Mon Sep 17 00:00:00 2001
+From: James Hogan <james.hogan@imgtec.com>
+Date: Mon, 16 Dec 2013 10:41:38 +0000
+Subject: clk: clk-divider: fix divisor > 255 bug
+
+commit 778037e1ccb75609846deca9e419449c1dc137fa upstream.
+
+Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
+merged in v3.6 added the _get_val function to convert a divisor value to
+a register field value depending on the flags. However it used the type
+u8 for the div field, causing divisors larger than 255 to be masked
+and the resultant clock rate to be too high.
+
+E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
+to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
+was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
+
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
+---
+ drivers/clk/clk-divider.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d55eb2..ae76b0f 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -87,7 +87,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
+ 	return 0;
+ }
+
+-static unsigned int _get_val(struct clk_divider *divider, u8 div)
++static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
+ {
+ 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
+ 		return div;
+--
+1.8.3.2
