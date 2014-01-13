@@ -1,56 +1,94 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Mon, 13 Jan 2014 14:09:40 +0200
-Subject: [GIT PULL] ARM: kprobes: big-endian support
-Message-ID: <52D3D784.2000600@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Jan 2014 13:10:16 +0100
+Subject: [PATCH V4 1/6] ARM: dts: imx6q: add common compatible name for
+ reused modules
+In-Reply-To: <1389614031-7253-1-git-send-email-b20788@freescale.com>
+References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140113121016.GJ16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Jan 13, 2014 at 07:53:46PM +0800, Anson Huang wrote:
+> As some modules are common for all i.MX6 SOCs, to avoid
+> checking cpu type for drivers that needs them, just add a
+> new compatible name for them.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi   |    2 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi |    6 +++---
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 021e0cb..5bc79c7 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -91,7 +91,7 @@
+>  			};
+>  
+>  			iomuxc: iomuxc at 020e0000 {
+> -				compatible = "fsl,imx6q-iomuxc";
+> +				compatible = "fsl,imx6q-iomuxc", "fsl,iomuxc";
+>  
+>  				ipu2 {
+>  					pinctrl_ipu2_1: ipu2grp-1 {
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 8a86502..cb9129b 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -622,7 +622,7 @@
+>  			};
+>  
+>  			src: src at 020d8000 {
+> -				compatible = "fsl,imx6q-src", "fsl,imx51-src";
+> +				compatible = "fsl,imx6q-src", "fsl,imx51-src", "fsl,src";
+>  				reg = <0x020d8000 0x4000>;
+>  				interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <0 96 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -630,7 +630,7 @@
+>  			};
+>  
+>  			gpc: gpc at 020dc000 {
+> -				compatible = "fsl,imx6q-gpc";
+> +				compatible = "fsl,imx6q-gpc", "fsl,gpc";
+>  				reg = <0x020dc000 0x4000>;
+>  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -840,7 +840,7 @@
+>  			};
+>  
+>  			mmdc0: mmdc at 021b0000 { /* MMDC0 */
+> -				compatible = "fsl,imx6q-mmdc";
+> +				compatible = "fsl,imx6q-mmdc", "fsl,mmdc";
 
-Please pull fixes for ARM Kprobes big-endian support.
+This is not nice. Here you introduce a fsl,mmdc compatible claiming all
+mmdc are compatible to each other and in the driver code you have:
 
-It is reworked initial Ben's series for big endian support [1].
-Dropped patches that are not directly related to kprobes.
-Current set of patches is enough to have functional BE kprobes.
+static const u32 imx6q_mmdc_io_dsm_offset[]
+static const u32 imx6dl_mmdc_io_dsm_offset[]
 
-One ARM kprobe test fails on Cortex-A15 boards (TC2 and Keystone2 EVM),
-while it passes on Pandaboard. The issue is not related to this series
-and already present in v3.13-rc7.
+which proves they are *not* compatible.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg285210.html
+You do this just to share a
+
+imx6_pm_get_base(&pm_info->mmdc_base, "fsl,mmdc");
+
+across the different i.MX6 SoCs.
+
+You can sanitize this by introducing a SoC struct which you populate
+differently for the SoCs
+
+static pm_soc_data imx6q_data {
+	.mmdc_compat = "fsl,imx6q-mmdc",
+};
+
+And by putting cpu_type, mmdc_io_num and others in this struct you can
+also remove the if(cpu_is_x()) else if (cpu_is_y()) else...
+
+Sascha
 
 -- 
-Taras Kondratiuk
-
---->8
-
-The following changes since commit 7e22e91102c6b9df7c4ae2168910e19d2bb14cd6:
-
-  Linux 3.13-rc8 (2014-01-12 17:04:18 +0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/taras.kondratiuk/linux.git tags/for_russell/arm-be-kprobes
-
-for you to fetch changes up to 1c2d814c019b63bf0778fc2d2fd54c6e44f1ab5d:
-
-  ARM: kprobes-test: Workaround GAS .align bug (2014-01-13 13:58:52 +0200)
-
-----------------------------------------------------------------
-Ben Dooks (4):
-      ARM: kprobes: fix instruction fetch order with <asm/opcodes.h>
-      ARM: kprobes-test: use <asm/opcodes.h> for instruction accesses
-      ARM: kprobes-test: use <asm/opcodes.h> for ARM instruction building
-      ARM: kprobes-test: use <asm/opcodes.h> for Thumb instruction building
-
-Taras Kondratiuk (1):
-      ARM: kprobes-test: Workaround GAS .align bug
-
- arch/arm/kernel/kprobes-common.c     |   19 +-
- arch/arm/kernel/kprobes-test-arm.c   |  603 +++++++++++++++++-----------------
- arch/arm/kernel/kprobes-test-thumb.c |  447 ++++++++++++-------------
- arch/arm/kernel/kprobes-test.c       |   13 +-
- arch/arm/kernel/kprobes-test.h       |    2 +-
- arch/arm/kernel/kprobes-thumb.c      |   20 +-
- arch/arm/kernel/kprobes.c            |    9 +-
- 7 files changed, 562 insertions(+), 551 deletions(-)
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
