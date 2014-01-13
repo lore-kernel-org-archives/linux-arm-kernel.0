@@ -1,37 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 13 Jan 2014 18:24:55 +0100
-Subject: [PATCH v2 15/28] drm/i2c: tda998x: use the tda998x video format
- when cea mode
-In-Reply-To: <20140113163501.GB15937@n2100.arm.linux.org.uk>
-References: <20140109120448.24d89eba@armhf>
- <20140111181832.GD15937@n2100.arm.linux.org.uk>
- <20140113170707.10b908dc@armhf>
- <20140113161333.GA15937@n2100.arm.linux.org.uk>
- <20140113172220.521917ce@armhf>
- <20140113163501.GB15937@n2100.arm.linux.org.uk>
-Message-ID: <20140113182455.1f8c3f40@armhf>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 13 Jan 2014 17:33:20 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <CAKfTPtBKXgX7P+pAYv0h=amScM2zQydVkYd7XDOwaQxEDT0Fdw@mail.gmail.com>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+ <1389554441-27335-2-git-send-email-broonie@kernel.org>
+ <20140113161059.GA32720@e102568-lin.cambridge.arm.com>
+ <CAKfTPtBKXgX7P+pAYv0h=amScM2zQydVkYd7XDOwaQxEDT0Fdw@mail.gmail.com>
+Message-ID: <20140113173320.GB6934@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jan 2014 16:35:01 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, Jan 13, 2014 at 04:44:06PM +0000, Vincent Guittot wrote:
 
-> Ah, I see.  It's a thread about your DRM driver, and about the lack of
-> audio on 1080 resolutions.  Taking it in context, the reported issue
-> appears to be lack of video when 1080p is selected, but the display
-> doesn't support 1080p.  That's hardly surprising.
+[...]
+
+> >> +extern struct cpu_topology cpu_topology[NR_CPUS];
+> >> +
+> >> +#define topology_physical_package_id(cpu)    (cpu_topology[cpu].socket_id)
+> >> +#define topology_core_id(cpu)                (cpu_topology[cpu].core_id)
+> >> +#define topology_core_cpumask(cpu)   (&cpu_topology[cpu].core_sibling)
+> >> +#define topology_thread_cpumask(cpu) (&cpu_topology[cpu].thread_sibling)
+> >> +
+> >> +#define mc_capable() (cpu_topology[0].socket_id != -1)
+> >> +#define smt_capable()        (cpu_topology[0].thread_id != -1)
+> >
+> > Are the two macros above still required in the kernel ? I can't see any
+> > usage at present.
+> >
+> > Vincent, do you know why they were not removed in commit:
+> >
+> > 8e7fbcbc22c12414bcc9dfdd683637f58fb32759
+> >
+> > I am certainly missing something.
 > 
-> Then rabeeh posts his message about lack of audio at 1920x1080.
-> 
-> Well, I can say that with the tda998x as it stands, the 1080* modes
-> work with audio with armada-drm, so there's no need to change this.
+> I think it was not planned to be used only by the scheduler but since
+> 8e7fbcbc22c12414bcc9dfdd683637f58fb32759, we have reach a situation
+> where nobody use them for the moment.
 
-My DRM driver also has audio with and without the cea mode for all
-resolutions. At the time of Rabeeh's message, I just had forgot to
-switch the audio pins...
+Ok, we can add the macros and eventually remove all of them in a later
+patch if we think they must go then.
 
-So, TDA998x CEA mode or not?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Lorenzo
