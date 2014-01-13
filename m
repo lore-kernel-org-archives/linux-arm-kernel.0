@@ -1,23 +1,36 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 13 Jan 2014 17:22:20 +0100
-Subject: [PATCH v2 15/28] drm/i2c: tda998x: use the tda998x video format
- when cea mode
-In-Reply-To: <20140113161333.GA15937@n2100.arm.linux.org.uk>
-References: <20140109120448.24d89eba@armhf>
- <20140111181832.GD15937@n2100.arm.linux.org.uk>
- <20140113170707.10b908dc@armhf>
- <20140113161333.GA15937@n2100.arm.linux.org.uk>
-Message-ID: <20140113172220.521917ce@armhf>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 13 Jan 2014 10:24:37 -0600
+Subject: [PATCH 0/2] ARM: DRA7XX/AM43XX build fixes
+In-Reply-To: <1389347850-22435-1-git-send-email-t-kristo@ti.com>
+References: <1389347850-22435-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20140113162412.GF26950@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jan 2014 16:13:34 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Fri, Jan 10, 2014 at 11:57:28AM +0200, Tero Kristo wrote:
+> The move of clock code from mach-omap2 to drivers/clk/ti introduces
+> a couple of new build errors with AM43XX/DRA7XX only builds. The
+> following patches address these issues by modifying the Kconfig + Makefile
+> under mach-omap2.
+> 
+> Also, it seems DRA7XX only build is not possible at the moment, added
+> patch #2 to fix this.
 
-> Sorry, I don't see what bearing your response to my reply has.
+looks like we still need some extra patches since OMAP2-only builds
+still fail :-(
 
-Simply that NXP people better like to use the cea mode.
+Also omap1_defconfig fails miserably :-(
+
+hoping this can still get fixed in time for 3.14 :-s
+
+cheers
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/2e974c57/attachment.sig>
