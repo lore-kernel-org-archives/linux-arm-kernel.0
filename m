@@ -1,51 +1,42 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 13 Jan 2014 14:52:26 +0530
-Subject: [PATCH 0/2] Fix SSI audio function regression when using ROM
- firmware
-In-Reply-To: <1389170756-22351-1-git-send-email-Guangyu.Chen@freescale.com>
-References: <1389170756-22351-1-git-send-email-Guangyu.Chen@freescale.com>
-Message-ID: <20140113092226.GE25466@intel.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 13 Jan 2014 11:29:09 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+Message-ID: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 04:45:54PM +0800, Nicolin Chen wrote:
-> Previously we added dual-fifo script support for SSI and SDMA, meanwhile, we
-> switched the default script in DT to this new script. However, there're still
-> quite a few people using the old version or even ROM firmware which means they
-> don't provide any firmware to SDMA driver. In these cases, the SDMA driver'd
-> fail to load essential script then the audio function broken.
-> 
-> This series of patches mainly fix this issue by assigning a default script
-> number for ROM firmware case and reverting the default script in DT so that
-> all kinds of users would continue to run it with or without firmware.
-> 
-> We might later need to figure out a better solution to ensure both SDMA driver
-> and SSI driver could adaptively switch the new script to the old one when V2
-> firmware isn't provided.
+Hello Nicolas, Jean-Christophe,
 
-Applied both,
+As I was trying to enable the touchscreen on the at91sam9261ek with
+device-tree support, I ran into an issue. The touchscreen driver needs
+to know the state of the pendown gpio and also needs it as an
+interrupt source.
 
-Thanks
+The problem is that when a gpio is used as an interrupt, it's
+requested by the pinctrl driver during the xlate stage, marking it
+unavaliable for the other driver.
+It looks like the at91 pinctrl driver is the only one to use
+gpio_request() in the xlate stage. Maybe we should remove this:
 
---
-~Vinod
-> 
-> This series of patches are based on Vinod's repository.
-> 
-> Nicolin Chen (2):
->   Revert "ARM: dts: imx: use dual-fifo sdma script for ssi"
->   dma: imx-sdma: Assign a default script number for ROM firmware cases
-> 
->  arch/arm/boot/dts/imx51.dtsi   |  4 ++--
->  arch/arm/boot/dts/imx53.dtsi   |  4 ++--
->  arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
->  arch/arm/boot/dts/imx6sl.dtsi  | 12 ++++++------
->  drivers/dma/imx-sdma.c         |  4 ++++
->  5 files changed, 20 insertions(+), 16 deletions(-)
-> 
-> -- 
-> 1.8.4
-> 
-> 
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index a7549c4..cf91a35 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
+irq_domain *d,
+        *out_hwirq = intspec[0];
+        *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
 
--- 
+-       ret = gpio_request(pin, ctrlr->full_name);
+-       if (ret)
+-               return ret;
+-
+-       ret = gpio_direction_input(pin);
+-       if (ret)
+-               return ret;
+-
+        return 0;
+ }
+
+Jean-Jacques
