@@ -1,64 +1,69 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 13 Jan 2014 12:52:10 +0100
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <3792319.Wf518ByjFs@wuerfel>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
- <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
- <3792319.Wf518ByjFs@wuerfel>
-Message-ID: <20140113115208.GA22313@ulmo.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jan 2014 11:52:13 +0000
+Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
+In-Reply-To: <20140110193657.GG14405@codeaurora.org>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
+ <20140109104943.GB17838@mudshark.cambridge.arm.com>
+ <52CEF5C9.1010701@codeaurora.org>
+ <20140110105813.GB10455@mudshark.cambridge.arm.com>
+ <20140110193657.GG14405@codeaurora.org>
+Message-ID: <20140113115213.GE1189@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 08, 2014 at 09:20:10AM +0100, Arnd Bergmann wrote:
-> On Wednesday 08 January 2014 13:32:35 Viresh Kumar wrote:
-> > On Thu, Jan 2, 2014 at 9:53 PM, Russell King
-> > <rmk+kernel@arm.linux.org.uk> wrote:
-> > > warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
-> > >  SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
-> > >  has unmet direct dependencies (!ZBOOT_ROM)
-> > >
-> > > This is because it's possible to have ZBOOT_ROM enabled, but at the
-> > > same time have another option enabled which selects AUTO_ZRELADDR
-> > > overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
-> > > dependencies between ZBOOT_ROM and the options which depend on
-> > > !ZBOOT_ROM.
-> > >
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
+On Fri, Jan 10, 2014 at 07:36:57PM +0000, Stephen Boyd wrote:
+> On 01/10, Will Deacon wrote:
+> > On Thu, Jan 09, 2014 at 07:17:29PM +0000, Stephen Boyd wrote:
 > > 
-> > After this patch I see these warnings with exynos_defconfig
+> > > We can avoid the hacky cast of the per-cpu dev token by using the
+> > > cpu_pmu pointer directly, but we'll still need to pass something to the
+> > > percpu interrupt handler otherwise the genirq layer doesn't allow us to
+> > > request the PPI. I can pass hw_events I guess. Is that what you're
+> > > thinking? Or were you thinking that we could just use
+> > > cpu_pmu->handle_irq as the handler argument in request_percpu_irq()? I
+> > > can't figure out how that is supposed to work.
 > > 
-> > arch/arm/Kconfig:1963:error: recursive dependency detected!
-> > arch/arm/Kconfig:1963: symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-> > arch/arm/Kconfig:2151: symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
+> > Actually, I was thinking you could remove cpu_pmu_dispatch_irq completely
+> > and just pass the actual handler straight through to request_percpu_irq. On
+> > arm64 we pass the hw_events as the pcpu token, so I'd be inclined to do the
+> > same here unless there's a good reason not to.
 > > 
-> > I am not really sure why this happened as I don't see AUTO_ZRELADDR
-> > selected by ZBOOT_ROM in Kconfig :)
 > 
-> It's a weird dependency. You need this hunk:
+> Passing the hw_events as the pcpu token here is kind of hacky.
+> The reason is because the token is dereferenced into cpu_pmu in
+> armv7pmu_handle_irq() like so:
 > 
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -3,7 +3,7 @@ config ARCH_MXC
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_CPU_SUSPEND if PM
->         select ARM_PATCH_PHYS_VIRT
-> -       select AUTO_ZRELADDR if !ZBOOT_ROM
-> +       select AUTO_ZRELADDR
->         select CLKSRC_MMIO
->         select COMMON_CLK
->         select GENERIC_ALLOCATOR
+> 	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
+> 
+> It would be great if we could pass cpu_pmu directly to the
+> request call like so:
+> 
+> 	request_percpu_irq(irq, cpu_pmu->handle_irq, "arm-pmu", &cpu_pmu);
+> 
+> but no. request_percpu_irq() wants a percpu pointer so this won't
+> work. If cpu_pmu was declared as DEFINE_PER_CPU, this would work
+> out just fine.
 
-Hi Arnd,
+That feels really broken though, since we rely on the cpu_pmu being a
+container for the struct pmu that was registered with perf core.
 
-I haven't seen this go into linux-next yet. Do you plan on sending a
-patch for this?
+> Should the cpu_pmu become a per-cpu variable? That sounds rather
+> invasive.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/0a36b637/attachment.sig>
+I also don't think that's the right solution, based on the above. It's
+actually pretty hard to work out what's the right thing to do here...
+
+We *could* have a per-cpu pointer to the cpu_pmu_pointer, but then we'd
+need to update the IRQ handlers, including things like the CCI PMU which
+really doesn't care about per-cpu stuff. So after all this, the shim we have
+around the IRQ handler for the U8500 SPI workarounds might be the right
+thing after all -- it allows us to consolidate the conversion of a pcpu
+pointer into the relevant instance (actually any instance, since they'd all
+point at the same thing) for the current CPU.
+
+What do you think to having that shim throw away the second level pcpu
+pointer in the case of a PPI? (probably means we need to revisit that
+renaming again).
+
+Will
