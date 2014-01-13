@@ -1,151 +1,74 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 13 Jan 2014 16:06:30 +1100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-Message-ID: <20140113160630.cf720268510f5e0931c24284@canb.auug.org.au>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Mon, 13 Jan 2014 14:32:46 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52D3515B.7040008@linaro.org>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
+ <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
+ <52CFFFDA.8050108@linaro.org>
+ <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
+ <52D3515B.7040008@linaro.org>
+Message-ID: <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Mon, January 13, 2014, zhangfei wrote:
+> On 01/13/2014 10:09 AM, Seungwon Jeon wrote:
+> > On Fri, January 10, 2014, Zhangfei Gao wrote:
+> >> On 01/10/2014 09:39 PM, Seungwon Jeon wrote:
+> >>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+> >>>> +{
+> >>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
+> >>>> +	u32 rate = priv->clk_table[ios->timing];
+> >>>
+> >>> First, sorry for quick review even though your effort.
+> >>> But I still worry about this change.
+> >>> Currently k3 host's clock table depends on value number of SD/MMC mode value.
+> >>> It seems close to identifier for eachg mode. I think it's not good way to use as table's index.
+> >>> Can you modify to mmc_clk_determine_rate() in your another patch-set?
+> >>> I guess required actual target rate could be determined depending on ios->clock.
+> >>>
+> >>
+> >> No, it can not get input clock source rate simply from ios->clock, also
+> >> requied info like which controller, which mode etc.
+> >> Here is setting clock source rate, not the working clock rate.
+> >>
+> >> For example, emmc init clock source rate is 13M, while sd init clock
+> >> source is 25M, it can not simply get such info from ios->clock.
+> >> And for HS200, emmc may have to set clock source rate to 104M since the
+> >> controller limitation and can not work stable as 208M.
+> >
+> > Yes, clock table is source clock rate, not actual working clock rate.
+> > I was not saying that 'ios->clock' would be used for source clock directly.
+> > I meant that you can adjust the source clock rate depending on 'ios->clock'.
+> > You've already done with clock table similarly in mmc_clk_determine_rate().
+> >
+> > For example, in case of HS200, 'ios->clock' will be passed with 200MHz.
+> > And then, mmc_clk_determine_rate() can set the 'rate & best' to 100000000 and 720000000 respectively.
+> > Also, 'ios->clock' with 400KHz or less may be passed for init clock.
+> > If clock id is HI3620_SD_CIUCLK, 'rate & best' can be selected with 13000000 and 26000000.
+> > If not and it's case of MMC,  'rate & best' can be selected with 25000000 and 180000000.
+> > If it should be considered with other conditions, please let me know.
+> 
+> However, I am afraid this will make things complicated rather than
+> simplified.
+> 
+> The function mmc_clk_determine_rate() will need the info which
+> controller it is, what's the init clock rate, what's the max clock rate,
+> and what's the limitation, which may be different as different soc, and
+> can not be hardcoded.
+> The limitation may in HS200 and SDR104 mode.
+> 
+> The plan is only input init rate and max rate instead of the table,
+> while others directly use ios->clock, only if the the limitation resolved.
 
-Today's linux-next merge of the clk tree got a conflict in
-drivers/clk/samsung/clk-exynos4.c between commit 86576fbe201b ("clk:
-samsung: exynos4: Fix definition of div_mmc_pre4 divider") from the
-arm-soc tree and commit 2d7382375054 ("clk: exynos4: replace clock ID
-private enums with IDs from DT header") from the clk tree.
+Handling mmc clock for hi3620 is in drivers/clk/hisilicon/clk-hi3620.c, right?
+Currently only hi3620 has been introduced.
+If hi3620's host has a limitation, clk-hi3620.c can handle clock range(init, max) for source clock enough.
+I feel like clock table is redundant.
+Ok. It's just my suggestion.  But I still point dependency of mode index number.
+K3's clock table refers and depends mode definition value from include/linux/mmc/host.h
+If new mode is added or modified, it should be considered and also may make complicated.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/clk/samsung/clk-exynos4.c
-index 3852e44db0f8,2f7e440aebf8..000000000000
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@@ -498,64 -437,63 +437,64 @@@ static struct samsung_mux_clock exynos4
-  
-  /* list of divider clocks supported in all exynos4 soc's */
-  static struct samsung_div_clock exynos4_div_clks[] __initdata = {
-- 	DIV(none, "div_core", "mout_core", DIV_CPU0, 0, 3),
-- 	DIV(none, "div_core2", "div_core", DIV_CPU0, 28, 3),
-- 	DIV(none, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
-- 	DIV(none, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
-- 	DIV(none, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-- 	DIV(none, "div_fimc3", "mout_fimc3", DIV_CAM, 12, 4),
-- 	DIV(none, "div_cam0", "mout_cam0", DIV_CAM, 16, 4),
-- 	DIV(none, "div_cam1", "mout_cam1", DIV_CAM, 20, 4),
-- 	DIV(none, "div_csis0", "mout_csis0", DIV_CAM, 24, 4),
-- 	DIV(none, "div_csis1", "mout_csis1", DIV_CAM, 28, 4),
-- 	DIV(sclk_mfc, "sclk_mfc", "mout_mfc", DIV_MFC, 0, 4),
-- 	DIV_F(none, "div_g3d", "mout_g3d", DIV_G3D, 0, 4,
-+ 	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
-+ 	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
-+ 	DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
-+ 	DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
-+ 	DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-+ 	DIV(0, "div_fimc3", "mout_fimc3", DIV_CAM, 12, 4),
-+ 	DIV(0, "div_cam0", "mout_cam0", DIV_CAM, 16, 4),
-+ 	DIV(0, "div_cam1", "mout_cam1", DIV_CAM, 20, 4),
-+ 	DIV(0, "div_csis0", "mout_csis0", DIV_CAM, 24, 4),
-+ 	DIV(0, "div_csis1", "mout_csis1", DIV_CAM, 28, 4),
-+ 	DIV(CLK_SCLK_MFC, "sclk_mfc", "mout_mfc", DIV_MFC, 0, 4),
-+ 	DIV_F(0, "div_g3d", "mout_g3d", DIV_G3D, 0, 4,
-  			CLK_SET_RATE_PARENT, 0),
-- 	DIV(none, "div_fimd0", "mout_fimd0", DIV_LCD0, 0, 4),
-- 	DIV(none, "div_mipi0", "mout_mipi0", DIV_LCD0, 16, 4),
-- 	DIV(none, "div_audio0", "mout_audio0", DIV_MAUDIO, 0, 4),
-- 	DIV(sclk_pcm0, "sclk_pcm0", "sclk_audio0", DIV_MAUDIO, 4, 8),
-- 	DIV(none, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
-- 	DIV(none, "div_mmc1", "mout_mmc1", DIV_FSYS1, 16, 4),
-- 	DIV(none, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
-- 	DIV(none, "div_mmc3", "mout_mmc3", DIV_FSYS2, 16, 4),
-- 	DIV(sclk_pixel, "sclk_pixel", "sclk_vpll", DIV_TV, 0, 4),
-- 	DIV(aclk100, "aclk100", "mout_aclk100", DIV_TOP, 4, 4),
-- 	DIV(aclk160, "aclk160", "mout_aclk160", DIV_TOP, 8, 3),
-- 	DIV(aclk133, "aclk133", "mout_aclk133", DIV_TOP, 12, 3),
-- 	DIV(none, "div_onenand", "mout_onenand1", DIV_TOP, 16, 3),
-- 	DIV(sclk_slimbus, "sclk_slimbus", "sclk_epll", DIV_PERIL3, 4, 4),
-- 	DIV(sclk_pcm1, "sclk_pcm1", "sclk_audio1", DIV_PERIL4, 4, 8),
-- 	DIV(sclk_pcm2, "sclk_pcm2", "sclk_audio2", DIV_PERIL4, 20, 8),
-- 	DIV(sclk_i2s1, "sclk_i2s1", "sclk_audio1", DIV_PERIL5, 0, 6),
-- 	DIV(sclk_i2s2, "sclk_i2s2", "sclk_audio2", DIV_PERIL5, 8, 6),
-- 	DIV(none, "div_mmc4", "mout_mmc4", DIV_FSYS3, 0, 4),
-- 	DIV_F(none, "div_mmc_pre4", "div_mmc4", DIV_FSYS3, 8, 8,
-+ 	DIV(0, "div_fimd0", "mout_fimd0", DIV_LCD0, 0, 4),
-+ 	DIV(0, "div_mipi0", "mout_mipi0", DIV_LCD0, 16, 4),
-+ 	DIV(0, "div_audio0", "mout_audio0", DIV_MAUDIO, 0, 4),
-+ 	DIV(CLK_SCLK_PCM0, "sclk_pcm0", "sclk_audio0", DIV_MAUDIO, 4, 8),
-+ 	DIV(0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
-+ 	DIV(0, "div_mmc1", "mout_mmc1", DIV_FSYS1, 16, 4),
-+ 	DIV(0, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
-+ 	DIV(0, "div_mmc3", "mout_mmc3", DIV_FSYS2, 16, 4),
-+ 	DIV(CLK_SCLK_PIXEL, "sclk_pixel", "sclk_vpll", DIV_TV, 0, 4),
-+ 	DIV(CLK_ACLK100, "aclk100", "mout_aclk100", DIV_TOP, 4, 4),
-+ 	DIV(CLK_ACLK160, "aclk160", "mout_aclk160", DIV_TOP, 8, 3),
-+ 	DIV(CLK_ACLK133, "aclk133", "mout_aclk133", DIV_TOP, 12, 3),
-+ 	DIV(0, "div_onenand", "mout_onenand1", DIV_TOP, 16, 3),
-+ 	DIV(CLK_SCLK_SLIMBUS, "sclk_slimbus", "sclk_epll", DIV_PERIL3, 4, 4),
-+ 	DIV(CLK_SCLK_PCM1, "sclk_pcm1", "sclk_audio1", DIV_PERIL4, 4, 8),
-+ 	DIV(CLK_SCLK_PCM2, "sclk_pcm2", "sclk_audio2", DIV_PERIL4, 20, 8),
-+ 	DIV(CLK_SCLK_I2S1, "sclk_i2s1", "sclk_audio1", DIV_PERIL5, 0, 6),
-+ 	DIV(CLK_SCLK_I2S2, "sclk_i2s2", "sclk_audio2", DIV_PERIL5, 8, 6),
-+ 	DIV(0, "div_mmc4", "mout_mmc4", DIV_FSYS3, 0, 4),
- -	DIV(0, "div_mmc_pre4", "div_mmc4", DIV_FSYS3, 8, 8),
-++	DIV_F(0, "div_mmc_pre4", "div_mmc4", DIV_FSYS3, 8, 8,
- +			CLK_SET_RATE_PARENT, 0),
-- 	DIV(none, "div_uart0", "mout_uart0", DIV_PERIL0, 0, 4),
-- 	DIV(none, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
-- 	DIV(none, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
-- 	DIV(none, "div_uart3", "mout_uart3", DIV_PERIL0, 12, 4),
-- 	DIV(none, "div_uart4", "mout_uart4", DIV_PERIL0, 16, 4),
-- 	DIV(none, "div_spi0", "mout_spi0", DIV_PERIL1, 0, 4),
-- 	DIV(none, "div_spi_pre0", "div_spi0", DIV_PERIL1, 8, 8),
-- 	DIV(none, "div_spi1", "mout_spi1", DIV_PERIL1, 16, 4),
-- 	DIV(none, "div_spi_pre1", "div_spi1", DIV_PERIL1, 24, 8),
-- 	DIV(none, "div_spi2", "mout_spi2", DIV_PERIL2, 0, 4),
-- 	DIV(none, "div_spi_pre2", "div_spi2", DIV_PERIL2, 8, 8),
-- 	DIV(none, "div_audio1", "mout_audio1", DIV_PERIL4, 0, 4),
-- 	DIV(none, "div_audio2", "mout_audio2", DIV_PERIL4, 16, 4),
-- 	DIV(arm_clk, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
-- 	DIV(sclk_apll, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
-- 	DIV_F(none, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
-+ 	DIV(0, "div_uart0", "mout_uart0", DIV_PERIL0, 0, 4),
-+ 	DIV(0, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
-+ 	DIV(0, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
-+ 	DIV(0, "div_uart3", "mout_uart3", DIV_PERIL0, 12, 4),
-+ 	DIV(0, "div_uart4", "mout_uart4", DIV_PERIL0, 16, 4),
-+ 	DIV(0, "div_spi0", "mout_spi0", DIV_PERIL1, 0, 4),
-+ 	DIV(0, "div_spi_pre0", "div_spi0", DIV_PERIL1, 8, 8),
-+ 	DIV(0, "div_spi1", "mout_spi1", DIV_PERIL1, 16, 4),
-+ 	DIV(0, "div_spi_pre1", "div_spi1", DIV_PERIL1, 24, 8),
-+ 	DIV(0, "div_spi2", "mout_spi2", DIV_PERIL2, 0, 4),
-+ 	DIV(0, "div_spi_pre2", "div_spi2", DIV_PERIL2, 8, 8),
-+ 	DIV(0, "div_audio1", "mout_audio1", DIV_PERIL4, 0, 4),
-+ 	DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4, 16, 4),
-+ 	DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
-+ 	DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
-+ 	DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
-  			CLK_SET_RATE_PARENT, 0),
-- 	DIV_F(none, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
-+ 	DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
-  			CLK_SET_RATE_PARENT, 0),
-- 	DIV_F(none, "div_mmc_pre1", "div_mmc1", DIV_FSYS1, 24, 8,
-+ 	DIV_F(0, "div_mmc_pre1", "div_mmc1", DIV_FSYS1, 24, 8,
-  			CLK_SET_RATE_PARENT, 0),
-- 	DIV_F(none, "div_mmc_pre2", "div_mmc2", DIV_FSYS2, 8, 8,
-+ 	DIV_F(0, "div_mmc_pre2", "div_mmc2", DIV_FSYS2, 8, 8,
-  			CLK_SET_RATE_PARENT, 0),
-- 	DIV_F(none, "div_mmc_pre3", "div_mmc3", DIV_FSYS2, 24, 8,
-+ 	DIV_F(0, "div_mmc_pre3", "div_mmc3", DIV_FSYS2, 24, 8,
-  			CLK_SET_RATE_PARENT, 0),
-  };
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/425aeedf/attachment.sig>
+Thanks,
+Seungwon Jeon
