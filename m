@@ -1,46 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jan 2014 13:48:13 +0000
-Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
-In-Reply-To: <20140113115208.GA22313@ulmo.nvidia.com>
-References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
- <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
- <3792319.Wf518ByjFs@wuerfel> <20140113115208.GA22313@ulmo.nvidia.com>
-Message-ID: <20140113134813.GX15937@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 13 Jan 2014 14:53:08 +0100
+Subject: [RFC] dma-mapping: Provide write-combine allocations
+Message-ID: <1389621188-3094-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 12:52:10PM +0100, Thierry Reding wrote:
-> On Wed, Jan 08, 2014 at 09:20:10AM +0100, Arnd Bergmann wrote:
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -3,7 +3,7 @@ config ARCH_MXC
-> >         select ARCH_REQUIRE_GPIOLIB
-> >         select ARM_CPU_SUSPEND if PM
-> >         select ARM_PATCH_PHYS_VIRT
-> > -       select AUTO_ZRELADDR if !ZBOOT_ROM
-> > +       select AUTO_ZRELADDR
-> >         select CLKSRC_MMIO
-> >         select COMMON_CLK
-> >         select GENERIC_ALLOCATOR
-> 
-> Hi Arnd,
-> 
-> I haven't seen this go into linux-next yet. Do you plan on sending a
-> patch for this?
+Provide an implementation for dma_{alloc,free}_writecombine() when the
+architecture supports DMA attributes.
 
-Maybe someone should respond to this comment from Arnd:
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm/include/asm/dma-mapping.h | 16 ----------------
+ include/linux/dma-mapping.h        | 16 ++++++++++++++++
+ 2 files changed, 16 insertions(+), 16 deletions(-)
 
-| On second thought, we should just remove the 'select AUTO_ZRELADDR' from
-| ARCH_MXC and everything that is multiplatform enabled, since it's already
-| selected by ARCH_MULTIPLATFORM.
-
-which I think is the right way to go here.  The ARCH_MXC option is
-hidden when multiplatform is not enabled.  When it is enabled,
-AUTO_ZRELADDR is selected by the multiplatform option.  So having a
-"select AUTO_ZRELADDR" of any kind under ARCH_MXC is entirely
-redundant.
-
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index e701a4d9aa59..96b7634a7edc 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -242,22 +242,6 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+ 			struct dma_attrs *attrs);
+ 
+-static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
+-				       dma_addr_t *dma_handle, gfp_t flag)
+-{
+-	DEFINE_DMA_ATTRS(attrs);
+-	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
+-	return dma_alloc_attrs(dev, size, dma_handle, flag, &attrs);
+-}
+-
+-static inline void dma_free_writecombine(struct device *dev, size_t size,
+-				     void *cpu_addr, dma_addr_t dma_handle)
+-{
+-	DEFINE_DMA_ATTRS(attrs);
+-	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
+-	return dma_free_attrs(dev, size, cpu_addr, dma_handle, &attrs);
+-}
+-
+ /*
+  * This can be called during early boot to increase the size of the atomic
+  * coherent DMA pool above the default value of 256KiB. It must be called
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index fd4aee29ad10..8475e02b4bd1 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -249,6 +249,22 @@ struct dma_attrs;
+ #define dma_unmap_sg_attrs(dev, sgl, nents, dir, attrs) \
+ 	dma_unmap_sg(dev, sgl, nents, dir)
+ 
++#else
++static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
++					   dma_addr_t *dma_addr, gfp_t gfp)
++{
++	DEFINE_DMA_ATTRS(attrs);
++	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
++	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
++}
++
++static inline void dma_free_writecombine(struct device *dev, size_t size,
++					 void *cpu_addr, dma_addr_t dma_addr)
++{
++	DEFINE_DMA_ATTRS(attrs);
++	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
++	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
++}
+ #endif /* CONFIG_HAVE_DMA_ATTRS */
+ 
+ #ifdef CONFIG_NEED_DMA_MAP_STATE
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.4.2
