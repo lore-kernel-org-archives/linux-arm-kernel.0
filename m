@@ -1,51 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 13 Jan 2014 09:48:43 -0700
-Subject: DT include files
-In-Reply-To: <20140110170319.GC20094@book.gsilab.sittig.org>
-References: <20140102202108.GF19720@quad.lixom.net>
- <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
- <20140103030455.GB25079@S2101-09.ap.freescale.net>
- <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
- <20140104011056.GA3282@S2101-09.ap.freescale.net>
- <20140110024124.GA6844@S2101-09.ap.freescale.net>
- <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
- <52CFF57D.8060808@samsung.com>
- <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
- <20140110170319.GC20094@book.gsilab.sittig.org>
-Message-ID: <52D418EB.1040605@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Jan 2014 17:01:56 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
+ relative power of cores
+In-Reply-To: <20140113164021.GA6934@e102568-lin.cambridge.arm.com>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+ <1389554441-27335-4-git-send-email-broonie@kernel.org>
+ <20140113164021.GA6934@e102568-lin.cambridge.arm.com>
+Message-ID: <20140113170156.GC29039@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 10:03 AM, Gerhard Sittig wrote:
-> On Fri, Jan 10, 2014 at 09:30 -0600, Rob Herring wrote:
->>
->> As for *.h vs. *.dtsi naming, if the include is only pre-processor
->> defines, then I think using .h is the right way. Otherwise, if there
->> is any dts syntax, then .dtsi is the right name. It looks to me like
->> this style has been followed in both the imx and s3c64xx cases.
->>
->> On a side note, I'm not really a fan of this pattern:
->>
->> #define FOO1 1 2 3
->>
->> #define BAR FOO1 FOO2 FOO3
->>
->> While it definitely simplifies the dts files, it would never be used
->> in C and obfuscates what the actual property size is. Reading a dts
->> file, I would naturally assume the define was a single value while in
->> fact it could expand to a very large property size.
-> 
-> For more complex yet tedious repetitive cases like GPIO banks and
-> pins I've seen #define directives which introduce "functions"
-> (macros with parameters).  They appear to be rather useful, can
-> reflect very well the essence of the information, don't
-> necessarily pretend to be single values, but still may hide how
-> many cells they expand to.  For example:
-> 
->   arch/arm/boot/dts/tegra30-cardhu.dtsi:
->     interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+On Mon, Jan 13, 2014 at 04:40:21PM +0000, Lorenzo Pieralisi wrote:
+> On Sun, Jan 12, 2014 at 07:20:40PM +0000, Mark Brown wrote:
 
-I'm not sure I entirely understand your point, but for the record, both
-TEGRA_GPIO() and IRQ_TYPE_LEVEL_HIGH expand to a single cell, as I would
-expect (almost?) any DT macro to do.
+> > @@ -89,7 +113,7 @@ static void __init parse_cluster(struct device_node *cluster, int depth)
+> >  	bool leaf = true;
+> >  	bool has_cores = false;
+> >  	struct device_node *c;
+> > -	static int cluster_id = 0;
+> > +	static int cluster_id;
+
+> It has to be __initdata, and the line change above does not belong in
+> this patch but patch 1.
+
+I would really have expected static data from a function marked init to
+end up marked appropriately, but whatever.
+
+> > +		rate = of_get_property(cn, "clock-frequency", &len);
+> > +		if (!rate || len != 4) {
+> > +			pr_err("%s: Missing clock-frequency property\n",
+> > +				cn->full_name);
+> > +			continue;
+> > +		}
+
+> I am wondering why we spit an error for a property that in practice is
+> optional. Either we make it required, or we drop the error output.
+
+> Actually this is not defined anywhere apart from the ePAPR, which
+> defines this property as required, but following your attempt to
+> standardize it for ARM, I gather it should be considered optional.
+
+It's already standard in the spec we claim to be following...
+
+> If it is optional, should we really print an error ? (I know it is the
+> same on arm32, I am questioning that code too).
+
+For big.LITTLE systems with the current implementation this information
+is required in order to scale the relative performances of the cores -
+such a system the maximum frequencies of the cores may vary as well as
+their type (or indeed theoretically even only their maximum frequency).
+We could at some future time end up evolving the code so that this
+information is acquired from cpufreq or somewhere but that's something
+that should probably happen kernel wide as part of the scheduler work
+rather than going off and doing something custom.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/27886b75/attachment.sig>
