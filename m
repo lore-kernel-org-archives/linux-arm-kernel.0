@@ -1,74 +1,56 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 13 Jan 2014 15:46:58 -0700
-Subject: [PATCH v6 4/6] ACPI: in HW reduced mode, using FADT PM information
- is not allowed.
-In-Reply-To: <4248842.kTIlfoGImy@vostro.rjw.lan>
-References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
- <1389394340-2680-5-git-send-email-al.stone@linaro.org>
- <4248842.kTIlfoGImy@vostro.rjw.lan>
-Message-ID: <52D46CE2.8020300@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 13 Jan 2014 23:49:13 +0100
+Subject: [patch] fix omap compile with randconfig
+In-Reply-To: <CAOesGMjG37FprRX7U-+S3nFCuv=RVAOUv7wb8K-Tcqr26ETevw@mail.gmail.com>
+References: <20140113010025.GA14431@amd.pavel.ucw.cz>
+ <CAOesGMjG37FprRX7U-+S3nFCuv=RVAOUv7wb8K-Tcqr26ETevw@mail.gmail.com>
+Message-ID: <20140113224913.GA16235@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 04:31 PM, Rafael J. Wysocki wrote:
-> On Friday, January 10, 2014 03:52:18 PM al.stone at linaro.org wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> Per the ACPI 5.0 specification, section 5.2.9, none of the power
->> management fields in the FADT are to be used.  Short-circuit using
->> any of those fields in acpi_processor_get_power_info_fadt().
->
-> So the spec says that we're supposed to ignore the information in
-> certain FADT fields if the HW_REDUCED_ACPI flag is set.
->
-> However, what about systems in which that information is actually
-> valid even though HW_REDUCED_ACPI is set?
->
-> Does it break things if we attempt to use that information?
+On Mon 2014-01-13 10:02:58, Olof Johansson wrote:
+> On Sun, Jan 12, 2014 at 5:00 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >
+> > This fixes:
+> >
+> > arch/arm/mach-omap2/built-in.o: In function `omap_reserve':
+> > /data/l/linux-n900/arch/arm/mach-omap2/common.c:36: undefined
+> >   reference to `omap_fb_reserve_memblock'
+> >
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> >
+> > diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+> > index 9beecde..857907f 100644
+> > --- a/arch/arm/mach-omap2/common.c
+> > +++ b/arch/arm/mach-omap2/common.c
+> > @@ -33,5 +33,7 @@ void __init omap_reserve(void)
+> >         omap_dsp_reserve_sdram_memblock();
+> >         omap_secure_ram_reserve_memblock();
+> >         omap_barrier_reserve_memblock();
+> > +#ifdef CONFIG_OMAP2_VRFB
+> >         omap_fb_reserve_memblock();
+> > +#endif
+> >  }
+> 
+> What is this patch against? omap_fb_reserve_memblock() doesn't exist
+> in v3.13-rc8, nor in -next.
 
-The way I see it in the spec, we just don't use that info _if_ we wish
-to remain compliant with the spec.  If we insist on using it anyway, we
-can't say we're implementing hardware reduced mode correctly.  That
-being said, from my read of the code it appears things would operate
-the same as they did before if this part of the spec was ignored _and_
-the info in the tables was still valid (same control register addresses
-and content and so on).
+It is actually against -n900 tree, sorry about that. But this means
+that this regression likely will not hit -next :-).
 
->>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> ---
->>   drivers/acpi/processor_idle.c | 8 ++++++++
->>   1 file changed, 8 insertions(+)
->>
->> diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
->> index eac984a..89f0a0f 100644
->> --- a/drivers/acpi/processor_idle.c
->> +++ b/drivers/acpi/processor_idle.c
->> @@ -270,6 +270,14 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
->>   	if (!pr->pblk)
->>   		return -ENODEV;
->>
->> +	/*
->> +	 * Using power management information from the FADT is not
->> +	 * allowed when in HW reduced mode.  See ACPI 5.0, section
->> +	 * 5.2.9.
->> +	 */
->> +	if (acpi_gbl_reduced_hardware)
->> +		return -ENODEV;
->> +
->>   	/* if info is obtained from pblk/fadt, type equals state */
->>   	pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
->>   	pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
->>
->
+> Adding an ifdef here is likely the wrong thing anyway, there should be
+> a stub provided for !CONFIG_OMAP2_VRFB in the header file instead.
 
+Agreed.
 
+I found few more compile problems, but those are neither easy nor I
+expect them to happen commonly. In particular BIG_ENDIAN=y breaks
+flexcan, MMU=n break some core code, and CONFIG_ARM_KPROBES_TEST=y
+just does not work with my compiler here. Probably not worth trying to
+reproduce on vanilla tree?
+
+Thanks,
+									Pavel
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
