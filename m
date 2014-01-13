@@ -1,55 +1,61 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Mon, 13 Jan 2014 19:53:49 +0800
-Subject: [PATCH V4 4/6] ARM: imx: add suspend in ocram support on i.mx6dl
+Date: Mon, 13 Jan 2014 19:53:50 +0800
+Subject: [PATCH V4 5/6] ARM: dts: imx6sl: add common compatible name for
+ reused modules
 In-Reply-To: <1389614031-7253-1-git-send-email-b20788@freescale.com>
 References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
-Message-ID: <1389614031-7253-4-git-send-email-b20788@freescale.com>
+Message-ID: <1389614031-7253-5-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6DL's suspend in ocram function is derived from i.MX6Q,
-the only difference is the offset of DDR IO pins. It can
-lower the DDR IO power from ~26mA at 1.5V to ~15mA at 1.5V,
-measured on i.MX6Q/DL SabreSD board, R25.
+As some modules are common for all i.MX6 SOCs, to avoid
+checking cpu type for drivers that needs them, just add a
+new compatible name for them.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/pm-imx6q.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/imx6sl.dtsi |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 42ac301..826bf8a 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -100,6 +100,18 @@ static const u32 imx6q_mmdc_io_dsm_offset[] __initconst = {
- 	0x74c			    /* GPR_ADDS */
- };
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index a5ef3c3..01f65a2 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -564,7 +564,7 @@
+ 			};
  
-+static const u32 imx6dl_mmdc_io_dsm_offset[] __initconst = {
-+	0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
-+	0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
-+	0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
-+	0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
-+	0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
-+	0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
-+	0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
-+	0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, DDRMODE_CTL, DDRMODE */
-+	0x74c			    /* GPR_ADDS */
-+};
-+
- /*
-  * This structure is for passing necessary data for low level ocram
-  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
-@@ -413,6 +425,10 @@ static int __init imx6q_ocram_suspend_init(void)
- 		pm_info->cpu_type = MXC_CPU_IMX6Q;
- 		pm_info->mmdc_io_num = ARRAY_SIZE(imx6q_mmdc_io_dsm_offset);
- 		mmdc_offset_array = imx6q_mmdc_io_dsm_offset;
-+	} else if (cpu_is_imx6dl()) {
-+		pm_info->cpu_type = MXC_CPU_IMX6DL;
-+		pm_info->mmdc_io_num = ARRAY_SIZE(imx6dl_mmdc_io_dsm_offset);
-+		mmdc_offset_array = imx6dl_mmdc_io_dsm_offset;
- 	}
+ 			src: src at 020d8000 {
+-				compatible = "fsl,imx6sl-src", "fsl,imx51-src";
++				compatible = "fsl,imx6sl-src", "fsl,imx51-src", "fsl,src";
+ 				reg = <0x020d8000 0x4000>;
+ 				interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 96 IRQ_TYPE_LEVEL_HIGH>;
+@@ -572,7 +572,7 @@
+ 			};
  
- 	if (!mmdc_offset_array) {
+ 			gpc: gpc at 020dc000 {
+-				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
++				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc", "fsl,gpc";
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+@@ -584,7 +584,7 @@
+ 			};
+ 
+ 			iomuxc: iomuxc at 020e0000 {
+-				compatible = "fsl,imx6sl-iomuxc";
++				compatible = "fsl,imx6sl-iomuxc", "fsl,iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 			};
+ 
+@@ -763,7 +763,7 @@
+ 			};
+ 
+ 			mmdc: mmdc at 021b0000 {
+-				compatible = "fsl,imx6sl-mmdc", "fsl,imx6q-mmdc";
++				compatible = "fsl,imx6sl-mmdc", "fsl,imx6q-mmdc", "fsl,mmdc";
+ 				reg = <0x021b0000 0x4000>;
+ 			};
+ 
 -- 
 1.7.9.5
