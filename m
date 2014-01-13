@@ -1,62 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 13 Jan 2014 09:33:02 +0900
-Subject: [PATCH V3 0/5] SoC and board integration for RSPI on
- r7s72100/genmai
-In-Reply-To: <2996587.8yFdzmUGOy@avalon>
-References: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
- <2996587.8yFdzmUGOy@avalon>
-Message-ID: <20140113003301.GH15296@verge.net.au>
+Date: Mon, 13 Jan 2014 09:38:12 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
+In-Reply-To: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
+References: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140113003811.GI15296@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 10:32:27PM +0100, Laurent Pinchart wrote:
-> Hi Geert,
+On Sun, Jan 12, 2014 at 12:15:49PM +0100, Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 > 
-> Thank you for the patches.
-> 
-> On Sunday 12 January 2014 11:48:38 Geert Uytterhoeven wrote:
-> > This patch series integrates Renesas RSPI on the RZ/A1H aka R7S72100 SoC,
-> > and the Genmai development board.
-> > 
-> > The series is based on renesas-devel-v3.13-rc7-20140109v2, with Magnus'
-> > pinctrl, Wolfram's riic, and Simon's sh_eth work applied on top.
-> > [Simon: I don't know in which order you will merge these. If you want me
-> >  to rebase my patches, just ask! Thanks!]
-> > 
-> > It was tested on the Genmai development board (genmai-reference), using
-> > an in-kernel version of Documentation/spi/spidev_test.c, exercising
-> > loopback mode on rspi1, with the same outcome as the SDK reference code.
-> > 
-> > It will not yet work with the non-reference version of genmai, due to
-> > missing pinmux configuration in setup-r7s72100.c.
-> 
-> The whole series looks good to me. The first patch depends on r7s72100 pinmux 
-> support, for which I'm still waiting a new version from Magnus. The rest could 
-> already be applied as far as I'm concerned.
+> Without this, a Debian jessie nfsroot hangs early in the boot process.
 
-Thanks, that sounds reasonable to me.
-But I would like to hear from Magnus.
+If this is really necessary for Jessie to boot then I think
+we should enabled it in all shmobile defconfigs.
 
 > 
-> >     [1/5] pinctrl: sh-pfc: r7s72100: Add RSPI support
-> >     [2/5] ARM: shmobile: r7s72100: Add RSPI clocks
-> >     [3/5] ARM: shmobile: genmai: Add RSPI support
-> >     [4/5] [RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux
-> >     [5/5] ARM: shmobile: genmai: Enable RSPI in defconfig
-> > 
-> > Changes in V2:
-> >   - Add "ARM: shmobile: genmai: Add RSPI children"
-> >   - Add "[RFC] ARM: shmobile: genmai: Add preliminary RSPI pinmux"
-> > 
-> > Changes in V3:
-> >   - Implement review comments
-> >   - Add defconfig update
-> >   - Remove DT support patches, they will be sent in a separate series
-> >   - Merge "ARM: shmobile: r7s72100: Add RSPI platform devices" and
-> >     "ARM: shmobile: genmai: Add RSPI children"
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> ---
+>  arch/arm/configs/koelsch_defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
+> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+> index 8f283f725a12..7c06fbac21a7 100644
+> --- a/arch/arm/configs/koelsch_defconfig
+> +++ b/arch/arm/configs/koelsch_defconfig
+> @@ -36,6 +36,8 @@ CONFIG_UNIX=y
+>  CONFIG_INET=y
+>  CONFIG_IP_PNP=y
+>  CONFIG_IP_PNP_DHCP=y
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_NETDEVICES=y
 > -- 
-> Regards,
+> 1.7.9.5
 > 
-> Laurent Pinchart
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
