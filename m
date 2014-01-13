@@ -1,30 +1,59 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Mon, 13 Jan 2014 16:57:56 +0800
-Subject: [PATCH] arm64: fix typo in entry.S
-Message-ID: <1389603476-10494-1-git-send-email-zhangwm@marvell.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 13 Jan 2014 10:00:46 +0100
+Subject: ARM: mvebu: dt: add missing alias 'eth3' on Armada XP mv78260
+In-Reply-To: <20140112120924.GA1916@1wt.eu>
+References: <20140112120924.GA1916@1wt.eu>
+Message-ID: <52D3AB3E.2000305@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 64681787 (arm64: let the core code deal with preempt_count)
-changed the code, but left the comments unchanged, fix it.
+Hi Willy,
+On 12/01/2014 13:09, Willy Tarreau wrote:
+> It was correctly set on mv78460 but not on mv78260, resulting in my
+> OpenBlocks AX3-4 retrieving only 3 of its 4 MAC addresses from the
+> boot loader.
+> 
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm64/kernel/entry.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 4d2c6f3..ffce55e 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -314,7 +314,7 @@ el1_irq:
- 
- #ifdef CONFIG_PREEMPT
- 	get_thread_info tsk
--	ldr	w24, [tsk, #TI_PREEMPT]		// restore preempt count
-+	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
- 	cbnz	w24, 1f				// preempt count != 0
- 	ldr	x0, [tsk, #TI_FLAGS]		// get flags
- 	tbz	x0, #TIF_NEED_RESCHED, 1f	// needs rescheduling?
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> index 6660968..9480cf8 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> @@ -23,6 +23,7 @@
+>  		gpio0 = &gpio0;
+>  		gpio1 = &gpio1;
+>  		gpio2 = &gpio2;
+> +		eth3 = &eth3;
+>  	};
+>  
+>  	cpus {
+> @@ -291,7 +292,7 @@
+>  				interrupts = <91>;
+>  			};
+>  
+> -			ethernet at 34000 {
+> +			eth3: ethernet at 34000 {
+>  				compatible = "marvell,armada-370-neta";
+>  				reg = <0x34000 0x4000>;
+>  				interrupts = <14>;
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
