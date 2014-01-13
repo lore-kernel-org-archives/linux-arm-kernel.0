@@ -1,44 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Jan 2014 15:50:04 +0000
-Subject: [PATCH v10 1/4] arm64: topology: Implement basic CPU topology
- support
-In-Reply-To: <20140110182705.GR29039@sirena.org.uk>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
- <1389287106-29979-2-git-send-email-broonie@kernel.org>
- <20140110174558.GI925@arm.com>
- <20140110182705.GR29039@sirena.org.uk>
-Message-ID: <20140113155004.GF11805@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 13 Jan 2014 16:54:42 +0100
+Subject: [PATCH v4 0/2] ohci and ehci-platform clks, phy and dt support
+In-Reply-To: <52D292DA.8010709@gmail.com>
+References: <Pine.LNX.4.44L0.1401111728150.16586-100000@netrider.rowland.org>
+ <52D2064B.3010103@prisktech.co.nz> <52D292DA.8010709@gmail.com>
+Message-ID: <52D40C42.2050408@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 06:27:05PM +0000, Mark Brown wrote:
-> On Fri, Jan 10, 2014 at 05:45:59PM +0000, Catalin Marinas wrote:
-> > The patches seem fine otherwise, apart from the last one which I
-> > won't merge until we get some real numbers.
-> 
-> As I previously said I am really concerned about diverging from what
-> arm32 has done here
+Hi,
 
-There is no diverging, these are new processors with possibly different
-values for these parameters.
+On 01/12/2014 02:04 PM, Tomasz Figa wrote:
+> Hi,
+>
+> [Cc'ing DT maintainers directly]
+>
 
-> and the numbers don't seem any less real than the
-> ones we're using there (they were generated in an identical fashion).
+<snip>
 
-Were the numbers in this patch generated in any way or simply copied
-from arch/arm?
+>>> Alan Stern Wrote:
+>> I prefer the -generic option, although generic- is equally fine - Having
+>> said that, I don't really care if it's called mmio either (although this
+>> does seem less 'descriptive').
 
-> Given the hardware availability for arm64 in general is limited and
-> likely to be even more so for big.LITTLE systems it seems like asking
-> for problems down the line to do something different.
+I can do a v5 changing the compatible string to generix-Xhci, if that will
+put an end to all this discussion, then again, there may be a better way, see
+below.
 
-I'm not saying we do something different, only that we can add the
-numbers once we get hold of some real hardware.
+>
+> Grepping over existing dts files, I can find several occurrences of "usb-ehci" compatible string:
+>
+> at91sam9g45.dtsi:                       compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> at91sam9x5.dtsi:                        compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> omap3.dtsi:                             compatible = "ti,ehci-omap", "usb-ehci";
+> omap4.dtsi:                             compatible = "ti,ehci-omap", "usb-ehci";
+> omap5.dtsi:                             compatible = "ti,ehci-omap", "usb-ehci";
+> sama5d3.dtsi:                   compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> spear13xx.dtsi:                 compatible = "st,spear600-ehci", "usb-ehci";
+> spear13xx.dtsi:                 compatible = "st,spear600-ehci", "usb-ehci";
+> spear3xx.dtsi:                  compatible = "st,spear600-ehci", "usb-ehci";
+> spear600.dtsi:                  compatible = "st,spear600-ehci", "usb-ehci";
+> spear600.dtsi:                  compatible = "st,spear600-ehci", "usb-ehci";
+> tegra114.dtsi:          compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> tegra114.dtsi:          compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> tegra20.dtsi:           compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> tegra20.dtsi:           compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> tegra20.dtsi:           compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> tegra30.dtsi:           compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> tegra30.dtsi:           compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> tegra30.dtsi:           compatible = "nvidia,tegra30-ehci", "usb-ehci";
+>
+> Same for "usb-ohci":
+>
+> arch/arm/boot/dts/at91rm9200.dtsi:                      compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/at91sam9260.dtsi:                     compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/at91sam9263.dtsi:                     compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/at91sam9g45.dtsi:                     compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/at91sam9n12.dtsi:                     compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/at91sam9x5.dtsi:                      compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/lpc32xx.dtsi:                 compatible = "nxp,ohci-nxp", "usb-ohci";
+> arch/arm/boot/dts/omap3.dtsi:                           compatible = "ti,ohci-omap3", "usb-ohci";
+> arch/arm/boot/dts/omap4.dtsi:                           compatible = "ti,ohci-omap3", "usb-ohci";
+> arch/arm/boot/dts/omap5.dtsi:                           compatible = "ti,ohci-omap3", "usb-ohci";
+> arch/arm/boot/dts/sama5d3.dtsi:                 compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear3xx.dtsi:                        compatible = "st,spear600-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear3xx.dtsi:                        compatible = "st,spear600-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ohci", "usb-ohci";
+> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ohci", "usb-ohci";
+>
+> For "usb-ehci" there is even a documentation file [1], while "usb-ohci" seems to be undocumented.
+>
+> [1] Documentation/devicetree/bindings/usb/usb-ehci.txt
+>
+> Aren't they both something that should be accounted for in this series?
 
-> Honestly I'm not sure there will ever be more real numbers that aren't
-> benchmarked at runtime.
+I agree that usb-Xhci would be the best compatible strings to use.
 
-This could be a later addition.
+The problem with usb-ehci is that there already is a ppc specific driver binding to that
+compatible string, doing various ppc specific controller initialization.
 
--- 
-Catalin
+Thinking more about this, there is one possible solution though, the ehci-ppc-of.c is
+guarded in Kconfig with:
+
+         depends on PPC_OF
+
+If we add an inverted check to the Kconfig option for platform-ehci.c, ie:
+
+config USB_EHCI_HCD_PLATFORM
+         tristate "Generic EHCI driver for a platform device"
+	depends on !PPC_OF
+
+Then we can be certain that we don't end up with 2 drivers claiming the
+usb-ehci compatible on ppc platforms. I've done some quick research
+and it seems that ehci-platform.c is only used on arm and mips devices, so
+excluding its use on ppc should not be an issue.
+
+Then later on someone, who has the actual hardware to test, can merge the
+ppc specific quirk handling into ehci-platform,c and ehci-ppc-of.c can go
+away entirely.
+
+Alan, if you agree this is the best way forward, I'll do a v5 with the proposed
+changes.
+
+Regards,
+
+Hans
