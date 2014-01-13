@@ -1,43 +1,56 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon, 13 Jan 2014 11:24:33 +0100
-Subject: [PATCH] imx-drm: parallel-display: honor 'native-mode' property when
- selecting video mode from DT
-Message-ID: <1389608673-10565-1-git-send-email-LW@KARO-electronics.de>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 13 Jan 2014 11:35:18 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a
+ gpio used as an interrupt source.
+In-Reply-To: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+Message-ID: <52D3C166.5050908@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows to select a specific video mode from a list of modes
-defined in DT by setting the 'native-mode' property appropriately.
+On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+> Hello Nicolas, Jean-Christophe,
+>
+> As I was trying to enable the touchscreen on the at91sam9261ek with
+> device-tree support, I ran into an issue. The touchscreen driver needs
+> to know the state of the pendown gpio and also needs it as an
+> interrupt source.
+>
+> The problem is that when a gpio is used as an interrupt, it's
+> requested by the pinctrl driver during the xlate stage, marking it
+> unavaliable for the other driver.
+> It looks like the at91 pinctrl driver is the only one to use
+> gpio_request() in the xlate stage. Maybe we should remove this:
 
-Since all current users of this driver have only one mode defined in
-their .dts files, the patch does not change the behaviour of this
-driver on the affected platforms.
+You should only request it as a GPIO and then use gpio_to_irq to get the
+related IRQ.
+Because what is done here, is to solve the case where only the irq
+is request, and in this specific case we need to request the pin as a
+GPIO.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/staging/imx-drm/parallel-display.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 24aa9be..351d61d 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -23,6 +23,7 @@
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_crtc_helper.h>
- #include <linux/videodev2.h>
-+#include <video/of_display_timing.h>
- 
- #include "imx-drm.h"
- 
-@@ -74,7 +75,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
- 
- 	if (np) {
- 		struct drm_display_mode *mode = drm_mode_create(connector->dev);
--		of_get_drm_display_mode(np, &imxpd->mode, 0);
-+		of_get_drm_display_mode(np, &imxpd->mode, OF_USE_NATIVE_MODE);
- 		drm_mode_copy(mode, &imxpd->mode);
- 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
- 		drm_mode_probed_add(connector, mode);
--- 
-1.7.2.5
+Best Regards,
+
+Boris
+>
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index a7549c4..cf91a35 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
+> irq_domain *d,
+>          *out_hwirq = intspec[0];
+>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>
+> -       ret = gpio_request(pin, ctrlr->full_name);
+> -       if (ret)
+> -               return ret;
+> -
+> -       ret = gpio_direction_input(pin);
+> -       if (ret)
+> -               return ret;
+> -
+>          return 0;
+>   }
+>
+> Jean-Jacques
