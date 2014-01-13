@@ -1,39 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jan 2014 14:03:04 -0800
-Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
-In-Reply-To: <20140113212815.GH27282@n2100.arm.linux.org.uk>
-References: <20140109152437.GB27282@n2100.arm.linux.org.uk>
- <20140113141811.GD27282@n2100.arm.linux.org.uk>
- <20140113173744.GA7746@atomide.com>
- <20140113185503.GE27282@n2100.arm.linux.org.uk>
- <20140113192630.GB7746@atomide.com>
- <20140113203404.GF27282@n2100.arm.linux.org.uk>
- <20140113210242.GA7993@atomide.com>
- <20140113211130.GG27282@n2100.arm.linux.org.uk>
- <20140113212117.GB7993@atomide.com>
- <20140113212815.GH27282@n2100.arm.linux.org.uk>
-Message-ID: <20140113220304.GC7993@atomide.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Mon, 13 Jan 2014 16:10:25 -0600
+Subject: AArch64 kernel image decompression
+In-Reply-To: <20140113111733.GD1189@mudshark.cambridge.arm.com>
+References: <20140110170436.GS8153@joshc.qualcomm.com>
+ <20140113111733.GD1189@mudshark.cambridge.arm.com>
+Message-ID: <20140113221025.GU8153@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [140113 13:30]:
-> On Mon, Jan 13, 2014 at 01:21:18PM -0800, Tony Lindgren wrote:
-> > Yes that's correct, here are all the DMA related lines:
-> > 
-> > DMA: preallocated 256 KiB pool for atomic coherent allocations
-> > OMAP DMA hardware version 1
-> > DMA capabilities: 0000000c:00000000:01ff:003f:007f
-> > omap-dma-engine omap-dma-engine: failed to get L1 IRQ: -6
-> > omap-dma-engine omap-dma-engine: OMAP DMA engine driver
-> > omap-dma-engine omap-dma-engine: allocating channel 0 for 54
-> > omap-dma-engine omap-dma-engine: allocating channel 1 for 55
-> > DMA timeout with device 55
+On Mon, Jan 13, 2014 at 11:17:33AM +0000, Will Deacon wrote:
+> On Fri, Jan 10, 2014 at 05:04:36PM +0000, Josh Cartwright wrote:
+> > Hey Will-
+>
+> Hi Josh,
+>
+> > Scanning the Documentation/arm64/booting.txt document, I came across
+> > this, listing an optional step a bootloader might take:
+> >
+> > "The AArch64 kernel does not currently provide a decompressor and
+> > therefore requires decompression (gzip, etc.) to be performed by the
+> > boot loader if a compressed Image target (e.g. Image.gz) is used."
+> >
+> > Do you envision that, if a decompressor is desired, it will always be
+> > the responsibility of a bootloader to implement it?
+>
+> That's certainly our current stance, yes. It also simplifies the booting
+> code and things like EFI stub, so I'd be reluctant to consider adding a
+> decompressor to the arm64 kernel without a compelling use-case.
+
+Okay, thanks for the clarification.
+
+> > In other words, would you accept patches adding support for building
+> > zImages (and others) for AArch64?
 > 
-> Hmm, that's annoying, and will be annoying to debug remotely.  Would
-> you like a new set of patches to try bisecting to find the culpret?
+> Are these patches actually needed, or are you trying to find a project
+> involving the arm64 kernel?
 
-Sure that would help.
+Really, I'm just trying to get a better handle on the difference in
+booting requirements for 32-bit and 64-bit ARM kernels.  I haven't yet
+determined whether compression is even necessary for our usecase.
 
-Regards,
+If we did find it necessary and you had said "yes, we'd like in-kernel
+decompression, but we haven't gotten around to it yet", then we'd likely
+go down the path of implementing it.  Anyway, I'm probably getting too
+far ahead of myself. :)
 
-Tony
+Thanks,
+   Josh
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
