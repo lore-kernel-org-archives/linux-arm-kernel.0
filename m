@@ -1,38 +1,119 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jan 2014 14:39:07 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Mon, 13 Jan 2014 13:42:19 +0000
+Subject: build_skb() and data corruption
+In-Reply-To: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
+References: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
+Message-ID: <1389620539.3720.157.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Mon, 2014-01-13 at 12:47 +0100, Jonas Jensen wrote:
+> Please help,
+> 
+> I think I see memory corruption with a driver recently added to linux-next.
+> 
+> The following error occur downloading a large file with wget (or
+> ncftp): "read error: Bad address"
+> wget exits and leaves the file unfinished.
+> 
+> The error goes away when build_skb() is patched out, in this case by
+> allocating pages directly in RX loop.
 
-> This passes the errata fix using a GPIO to control the RTS pin
-> on one of the AT91 chips to use gpiolib instead of the
-> AT91-specific interfaces. Also remove the reliance on
-> compile-time #defines and the cpu_* check and rely on the
-> platform passing down the proper GPIO pin through platform
-> data.
->
-> This is a prerequisite for getting rid of the local GPIO
-> implementation in the AT91 platform and move toward
-> multiplatform.
->
-> The patch also adds device tree support for getting the
-> RTS GPIO pin from the device tree on DT boot paths.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v3->v4:
+The problem is you're assuming build_skb() does rather more than it
+does.
 
-ARM SoC folks, if you're not taking this in through the <timex.h> removal
-series then please ACK this patch so I can take it through the GPIO
-tree instead (unless you want to apply this single patch, which would
-be even better, you have Greg's ACK in this thread).
+> I currently have two branches with code placed under ifdef USE_BUILD_SKB:
+> https://bitbucket.org/Kasreyn/linux-next/src/faa7c408a655fdfd7c383f79259031da5a05d61e/drivers/net/ethernet/moxa/moxart_ether.c#cl-472
 
-Yours,
-Linus Walleij
+Quoting from there:
+
+> #define USE_BUILD_SKB
+> #ifdef USE_BUILD_SKB
+> 
+> 
+> 	skb = build_skb(page_address(priv->rx_pages[priv->rx_head]), priv->rx_buf_size);
+> 
+> 
+> 	if (unlikely(!skb)) {
+> 		net_info_ratelimited("RX build_skb failed\n");
+
+Don't log; increment the rx_dropped counter.
+
+> 		moxart_rx_drop_packet(ndev, desc0);
+> 		return true;
+> 	}
+>
+> 
+> 	if (likely(skb))
+
+Redundant condition.
+
+> 		get_page(priv->rx_pages[priv->rx_head]);
+> 
+> 
+> 	skb_put(skb, len);
+> 
+> 
+> #else
+> 
+> 
+> 	dma_unmap_page(&ndev->dev, priv->rx_buf_phys[priv->rx_head], RX_BUF_SIZE, DMA_FROM_DEVICE);
+
+dma_unmap_page() is always needed, so move this above the #ifdef
+USE_BUILD_SKB.
+
+> 
+> 	skb = netdev_alloc_skb_ip_align(ndev, 128);
+
+Missing check for NULL.
+
+> 	skb_fill_page_desc(skb, 0, priv->rx_pages[priv->rx_head], 0, len);
+> 	skb->len += len;
+> 	skb->data_len += len;
+> 
+> 
+> 	if (len > 128) {
+> 		skb->truesize += PAGE_SIZE;
+> 		__pskb_pull_tail(skb, ETH_HLEN);
+> 	} else {
+> 		__pskb_pull_tail(skb, len);
+> 	}
+> 
+> 
+> 	p = priv->rx_pages[priv->rx_head];
+
+Missing check for NULL.
+
+> 	moxart_alloc_rx_page(ndev, priv->rx_head);
+
+New buffer is always required, so move this under the #endif... well,
+except that if moxart_alloc_rx_page() fails then things go horribly
+wrong as you have.
+
+Best practice is to try allocating the next buffer before passing up the
+current one; if that fails then you recycle the current buffer and
+increment rx_dropped.
+
+> 
+> 
+> #endif
+[end quoted code]
+
+> If build_skb() is the cause, is there something the driver can do about it?
+> 
+> A quick search on "build_skb memory corruption" reveals the following
+> commit, "igb: Revert support for build_skb in igb"
+> f9d40f6a9921cc7d9385f64362314054e22152bd:
+[...]
+
+The problem I identified in igb occurs only when splitting a page into
+multiple buffers (or when recycling DMA-mapped pages).  build_skb() is
+fine to use whenever each RX buffer is a single page (except that that's
+memory-inefficient) that's unmapped on completion.
+
+Ben.
+
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
