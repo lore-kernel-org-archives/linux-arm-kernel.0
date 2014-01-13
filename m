@@ -1,60 +1,87 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Jan 2014 15:40:40 +0000
-Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
-In-Reply-To: <1389445524-30623-5-git-send-email-leif.lindholm@linaro.org>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-5-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140113154040.GH3256@console-pimps.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 13 Jan 2014 17:49:19 +0200
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <CAGhQ9Vz8i2EEG+GgFwXFj3vgeV_Eg0dDfRvKn-XRRVBjwJkDXQ@mail.gmail.com>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+ <CAGhQ9Vz8i2EEG+GgFwXFj3vgeV_Eg0dDfRvKn-XRRVBjwJkDXQ@mail.gmail.com>
+Message-ID: <52D40AFF.9000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jan, at 01:05:23PM, Leif Lindholm wrote:
-> This patch implements basic support for UEFI runtime services in the
-> ARM architecture - a requirement for using efibootmgr to read and update
-> the system boot configuration.
-> 
-> It uses the generic configuration table scanning to populate ACPI and
-> SMBIOS pointers.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/Kconfig            |   16 ++
->  arch/arm/include/asm/uefi.h |   28 +++
->  arch/arm/kernel/Makefile    |    2 +
->  arch/arm/kernel/setup.c     |    4 +
->  arch/arm/kernel/uefi.c      |  418 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/uefi_phys.S |   67 +++++++
->  include/linux/efi.h         |    2 +-
->  7 files changed, 536 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/include/asm/uefi.h
->  create mode 100644 arch/arm/kernel/uefi.c
->  create mode 100644 arch/arm/kernel/uefi_phys.S
+On 01/11/2014 06:35 PM, Joachim Eastwood wrote:
+> On 9 January 2014 15:00, Tero Kristo <t-kristo@ti.com> wrote:
+>> Hi,
+>>
+>> So, bad luck number release for this, as v12 wasn't sufficient still.
+>>
+>> Changes compared to previous version:
+>> - Dropped any changes to generic clock drivers, as it seems impossible
+>>    to agree anything in short term, this means the patch set shrank in
+>>    size from 49 patches to 40 (first 9 patches were dropped).
+>> - Copy pasted implementation for clk-divider and clk-mux from drivers/clk
+>>    to drivers/clk/ti, and made the modifications needed to the TI version
+>>    of the clock drivers only (based on discussions with Mike, this is fine)
+>> - Changed name of clk_ll_ops to ti_clk_ll_ops so that this doesn't conflict
+>>    with any generic implementation we might have at some point, migrating
+>>    this to the generic version should be easy enough also.
+>> - Fixed trace_clk_div_div_ck for omap4, this node was broken in previous
+>>    versions and resulted into an orphan clock node
+>> - Fixed compile problem for omap5 only build reported by Felipe
+>> - Fixed a couple of sparse warnings
+>> - changed the mach-omap2/clock.c to use readl_relaxed / writel_relaxed
+>>    instead of __raw_readl / __raw_writel
+>>
+>> Testing done:
+>> - omap3-beagle: boot / suspend-resume (RET) / suspend-resume (OFF)
+>> - omap4-panda-es: boot / suspend-resume (RET)
+>> - omap5-uevm: boot
+>> - am335x-bone: boot
+>> - dra7-evm: boot
+>>
+>> Maintainer friendly branches also available:
+>>
+>> tree: https://github.com/t-kristo/linux-pm.git
+>>
+>> clk driver only (Mike): clk-next-dt-clks-v13
+>> DTS data only (Benoit): dts_for_3.14-dt-clks-v13
+>> full-branch (Tony/Paul): 3.13-rc7-dt-clks-v13
+>
+> I tested 3.13-rc7-dt-clks-v13 on top of a next branch I am working on
+> with a OMAP4460 and it's working fine.
+>
+> A couple of things I noticed in the boot log:
+> [ 0.000000] ti_dt_clocks_register: failed to lookup clock node bandgap_fclk
+> [ 0.000000] smp_twd: clock not found -2
+>
+> I am get the bandgap_fclk clock lookup fail since it doesn't exist on
+> 4460 and I guess the bandgap_ts_fclk clock will fail the same way on
+> 4430. So maybe you need to differentiate between 4460 and 4430 in
+> clk-44xx.c to get rid of this warning.
 
-[...]
+Yeah thats true. I was kind of lazy with the omap4 clk file (these are 
+supposed to be temporary anyway until we can get rid of the clock 
+aliases through proper driver DT mappings), and didn't separate omap4430 
+vs omap4460 there. If this print needs to go away, we need to do this 
+similarly to what was done with different omap3 versions (the clock data 
+delta is much more larger there), but the additional code needed for 
+this was rather large for the minimal impact... we would need separate 
+board files, separate io.c setups, and logic within the clk-44xx.c file 
+itself.
 
-> @@ -664,7 +664,7 @@ extern int __init efi_setup_pcdp_console(char *);
->  #define EFI_64BIT		5	/* Is the firmware 64-bit? */
->  
->  #ifdef CONFIG_EFI
-> -# ifdef CONFIG_X86
-> +# if defined(CONFIG_X86) || defined(CONFIG_ARM)
->  extern int efi_enabled(int facility);
->  # else
->  static inline int efi_enabled(int facility)
+Just to re-phrase it, this doesn't impact functionality, the resultant 
+clock nodes etc. are exactly the same before-and-after this set, the 
+kernel just tries to register one additional clock alias which it can't 
+find and prints the single line out.
 
-This looks like it's going to conflict with Mark's "[PATCH 6/6] arm64:
-add EFI runtime services".
+-Tero
 
-Guys, what's going on here? Srsly. The dependency chain is so nuts that
-I'm struggling to even review these patches. Good luck to the maintainer
-that wants to merge this stuff.
-
-Can't you guys work together a bit more closely so that all of your
-patches feel like one logical progression of work?
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+>
+> As for the smp_twd clock I assume we can add "clocks =
+> <&mpu_periphclk>" to local-timer at 48240600 in omap4.dtsi to get rid of
+> the warning. I can cook up a patch here if it is the right thing to
+> do.
+> I think the smp_twd warning existed before I applied this patch set.
+>
+> regards
+> Joachim Eastwood
+>
