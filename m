@@ -1,60 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Jan 2014 16:16:23 +0100
-Subject: [PATCH V4 1/6] ARM: dts: imx6q: add common compatible name for
- reused modules
-In-Reply-To: <20140113142249.GW23525@S2101-09.ap.freescale.net>
-References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
- <20140113121016.GJ16215@pengutronix.de>
- <20140113142249.GW23525@S2101-09.ap.freescale.net>
-Message-ID: <20140113151623.GL16215@pengutronix.de>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 13 Jan 2014 15:17:59 +0000
+Subject: [PATCH 1/6] efi: create memory map iteration helper
+In-Reply-To: <1389392950-22457-2-git-send-email-msalter@redhat.com>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+ <1389392950-22457-2-git-send-email-msalter@redhat.com>
+Message-ID: <20140113151759.GG3256@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 10:22:51PM +0800, Shawn Guo wrote:
-> On Mon, Jan 13, 2014 at 01:10:16PM +0100, Sascha Hauer wrote:
-> > > @@ -840,7 +840,7 @@
-> > >  			};
-> > >  
-> > >  			mmdc0: mmdc at 021b0000 { /* MMDC0 */
-> > > -				compatible = "fsl,imx6q-mmdc";
-> > > +				compatible = "fsl,imx6q-mmdc", "fsl,mmdc";
-> > 
-> > This is not nice. Here you introduce a fsl,mmdc compatible claiming all
-> > mmdc are compatible to each other and in the driver code you have:
-> > 
-> > static const u32 imx6q_mmdc_io_dsm_offset[]
-> > static const u32 imx6dl_mmdc_io_dsm_offset[]
-> > 
-> > which proves they are *not* compatible.
-> > 
-> > You do this just to share a
-> > 
-> > imx6_pm_get_base(&pm_info->mmdc_base, "fsl,mmdc");
-> > 
-> > across the different i.MX6 SoCs.
-> > 
-> > You can sanitize this by introducing a SoC struct which you populate
-> > differently for the SoCs
-> > 
-> > static pm_soc_data imx6q_data {
-> > 	.mmdc_compat = "fsl,imx6q-mmdc",
-> > };
-> > 
-> > And by putting cpu_type, mmdc_io_num and others in this struct you can
-> > also remove the if(cpu_is_x()) else if (cpu_is_y()) else...
+On Fri, 10 Jan, at 05:29:05PM, Mark Salter wrote:
+> There are a lot of places in the kernel which iterate through an
+> EFI memory map. Most of these places use essentially the same
+> for-loop code. This patch adds a for_each_efi_memory_desc()
+> helper to clean up all of the existing duplicate code and avoid
+> more in the future.
 > 
-> Good point.
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  include/linux/efi.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> Anson, the change below is a demonstration of Sascha's suggestion.
-> Sascha, correct me if I misunderstood your comment.
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index 11ce678..9dc5b05 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -618,6 +618,12 @@ extern int efi_set_rtc_mmss(const struct timespec *now);
+>  extern void efi_reserve_boot_services(void);
+>  extern struct efi_memory_map memmap;
+>  
+> +/* Iterate through an efi_memory_map */
+> +#define for_each_efi_memory_desc(m, md)					   \
+> +	for ((md) = (m)->map;						   \
+> +	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
+> +	     (md) = (void *)(md) + (m)->desc_size)
+> +
 
-Looks good. That's exactly what I meant. Maybe the cpu_type field can
-even be removed the way you did it.
+Err, what? I just picked up your previous patch ("x86/efi: Create memory
+map iteration helper") which adds this chunk, and I didn't see a follow
+up email telling me not to pick it up.
 
-Sascha
+What's the plan?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Matt Fleming, Intel Open Source Technology Center
