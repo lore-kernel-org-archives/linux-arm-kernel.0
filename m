@@ -1,101 +1,73 @@
-From: rapatel@apm.com (Ravi Patel)
-Date: Mon, 13 Jan 2014 14:18:08 -0800
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <201401122219.11593.arnd@arndb.de>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <CAN1v_PsaAeDiLaiP7FfTHFbNRG=UHuom6-2L6NMwzyOOyB+5cA@mail.gmail.com>
- <CAN1v_PuySRzi6r9aT_SJrQRMBh9gj-5yXOOY1QpyZ6V4wXyZCA@mail.gmail.com>
- <201401122219.11593.arnd@arndb.de>
-Message-ID: <CAN1v_Pt9rOGn8zmf+u7MR6-GJPDPswBbuhXu6i=MJVa2mwqNtw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jan 2014 14:18:30 -0800
+Subject: [PATCH RFC 05/26] dmaengine: omap-dma: control start/stop directly
+In-Reply-To: <E1Vyju0-0005EE-6a@rmk-PC.arm.linux.org.uk>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+ <E1Vyju0-0005EE-6a@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140113221830.GE7993@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 1:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 10 January 2014, Ravi Patel wrote:
->
->> Do you want any further clarification or document related to QMTM.
->> We want to make sure everyone is on same page, understand and
->> conclude upon that QMTM is a device and and not a bus or a dma
->> engine.
->
-> I have a much better understanding now, but there are still a few open
-> questions from my side. Let me try to explain in my own words what I
-> think is the relevant information (part of this is still guessing).
-> It took me a while to figure out what it does from your description,
-> and then some more time to see what it's actually good for (as
-> opposed to adding complexity).
->
-> Please confirm or correct the individual statements in this
-> description:
->
-> The QMTM serves as a relay for short (a few bytes) messages between
-> the OS software and various slave hardware blocks on the SoC.
-> The messages are typically but not always DMA descriptors used by the
-> slave device used for starting bus master transactions by the slave,
-> or for notifying sofware about the competion of a DMA transaction.
->
-> The message format is specific to the slave device and the QMTM
-> only understands the common header of the message.
->
-> OS software sees the messages in cache-coherent memory and does
-> not require any cache flushes or MMIO access for inbound messages
-> and only a single posted MMIO write for outbound messages.
->
-> The queues are likely designed to be per-thread and don't require
-> software-side locking.
->
-> For outbound messages, the QMTM is the bus master of a device-to-device
-> DMA transaction that gets started once a message is queued and the
-> device has signaled that it is ready for receiving it. The QMTM needs
-> to know the bus address of the device as well as a slave ID for
-> the signal pin.
-> For inbound messages, the QMTM slave initiates a busmaster transaction
-> and needs to know the bus address of its QMTM port, while the QMTM
-> needs to know only the slave ID that is associated with the queue.
->
-> In addition to those hardware properties, the QMTM driver needs to
-> set up a memory buffer for the message queue as seen by the CPU,
-> and needs tell the QMTM the location as well as some other
-> properties such as the message length.
+* Russell King <rmk+kernel@arm.linux.org.uk> [140102 07:14]:
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -570,20 +695,27 @@ static int omap_dma_terminate_all(struct omap_chan *c)
+>  
+>  	/*
+>  	 * Stop DMA activity: we assume the callback will not be called
+> -	 * after omap_stop_dma() returns (even if it does, it will see
+> +	 * after omap_dma_stop() returns (even if it does, it will see
+>  	 * c->desc is NULL and exit.)
+>  	 */
+>  	if (c->desc) {
+>  		c->desc = NULL;
+>  		/* Avoid stopping the dma twice */
+>  		if (!c->paused)
+> -			omap_stop_dma(c->dma_ch);
+> +			omap_dma_stop(c);
+>  	}
+>  
+>  	if (c->cyclic) {
+>  		c->cyclic = false;
+>  		c->paused = false;
+> -		omap_dma_unlink_lch(c->dma_ch, c->dma_ch);
+> +
+> +		if (__dma_omap15xx(od->plat->dma_attr)) {
+> +			uint32_t val;
+> +
+> +			val = c->plat->dma_read(CCR, c->dma_ch);
+> +			val &= ~(3 << 8);
+> +			c->plat->dma_write(val, CCR, c->dma_ch);
+> +		}
+>  	}
+>  
+>  	vchan_get_all_descriptors(&c->vc, &head);
 
-Your description is correct upto this point.
+This won't build for omap1 as od is just d in this function. Something
+like the following needs to be folded in.
 
-> For inbound messages, the QMTM serves a similar purpose as an MSI
-> controller, ensuring that inbound DMA data has arrived in RAM
-> before an interrupt is delivered to the CPU and thereby avoiding
-> the need for an expensive MMIO read to serialize the DMA.
+Tony
 
-For inbound messages, slave device generates message on a completion
-of a inbound DMA operation or any relevant operation targeted to the
-CPU. The QMTM's role is to just trigger an interrupt to CPU when there
-is a new message arrived from a slave device. QMTM doesn't know what
-the message was for. It is upto the upper layer drivers to decide how
-to process this message.
-
-> The resources managed by the QMTM are both SoC-global (e.g. bus
-> bandwidth) and slave specific (e.g. ethernet bandwith or buffer space).
-> Global resource management is performed to prevent one slave
-> device from monopolizing the system or preventing other slaves
-> from making forward progress.
-> Examples for local resource management (I had to think about this
-> a long time, but probably some of these are wrong) would be
-> * balancing between multiple non-busmaster devices connected to
->   a dma-engine
-> * distributing incoming ethernet data to the available CPUs based on
->   a flow classifier in the MAC, e.g. by IOV MAC address, VLAN tag
->   or even individual TCP connection depending on the NIC's capabilities.
-> * 802.1p flow control for incoming ethernet data based on the amount
->   of data queued up between the MAC and the driver
-> * interrupt mitigation for both inbound data and outbound completion,
->   by delaying the IRQ to the OS until multiple messages have arrived
->   or a queue specific amount of time has passed.
-> * controlling the amount of outbound buffer space per flow to minimize
->   buffer-bloat between an ethernet driver and the NIC hardware.
-> * reordering data from outbound flows based on priority.
->
-> This is basically my current interpretation, I hope I got at least
-> some of it right this time ;-)
-
-You have got them right. Although we have taken Ethernet examples here,
-most of the local resource management apply to other slave devices also.
+8< -----------------------
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -682,16 +682,16 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
+ 
+ static int omap_dma_terminate_all(struct omap_chan *c)
+ {
+-	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
++	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
+ 	unsigned long flags;
+ 	LIST_HEAD(head);
+ 
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 
+ 	/* Prevent this channel being scheduled */
+-	spin_lock(&d->lock);
++	spin_lock(&od->lock);
+ 	list_del_init(&c->node);
+-	spin_unlock(&d->lock);
++	spin_unlock(&od->lock);
+ 
+ 	/*
+ 	 * Stop DMA activity: we assume the callback will not be called
