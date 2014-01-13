@@ -1,39 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jan 2014 14:29:37 +0100
-Subject: build_skb() and data corruption
-In-Reply-To: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
-References: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
-Message-ID: <201401131429.38218.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jan 2014 14:36:15 +0100
+Subject: [GIT PULL] get rid of <mach/timex.h>
+In-Reply-To: <52CBE3DE.5010706@atmel.com>
+References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+ <87bo0clved.fsf@linaro.org> <20131219221758.GS14866@pengutronix.de>
+ <20131220184715.GT14866@pengutronix.de>
+ <52CBE3DE.5010706@atmel.com>
+Message-ID: <CACRpkdboVtY2nBxGeWj_ReHJ5J8WuyuPHCwHM=yELBdePkX7Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 January 2014, Jonas Jensen wrote:
-> Please help,
-> 
-> I think I see memory corruption with a driver recently added to linux-next.
-> 
-> The following error occur downloading a large file with wget (or
-> ncftp): "read error: Bad address"
-> wget exits and leaves the file unfinished.
-> 
-> The error goes away when build_skb() is patched out, in this case by
-> allocating pages directly in RX loop.
-> 
-> I currently have two branches with code placed under ifdef USE_BUILD_SKB:
-> https://bitbucket.org/Kasreyn/linux-next/src/faa7c408a655fdfd7c383f79259031da5a05d61e/drivers/net/ethernet/moxa/moxart_ether.c#cl-472
-> 
+On Tue, Jan 7, 2014 at 12:24 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 20/12/2013 19:47, Uwe Kleine-K?nig :
 
-The problem appears to be incorrect coherency management of the
-dma buffers. You are using the streaming DMA mapping API on a
-platform that is not cache coherent, and you are reusing buffers.
+>> Please pull
+>>
+>>       git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
+>>
+>> which points to 79f08d9ed217318b4f325b7fcf8f26dcd0e41689 now provided
+>> you are happy with Linus W.'s series, too.
+>
+> Hi all,
+>
+> Is this pull-request is foreseen to be integrated in arm-soc for 3.14? I
+> may have some material for Linus W. that I would like to queue that
+> depend on these patches.
 
-The solution to this problem is to add the appropriate
-dma_sync_single_for_device() and dma_sync_single_for_cpu()
-calls at the point where buffer ownership changes between the
-dma master and the CPU. This will flush the caches after the
-filling them on the tx path and invalidate caches when the
-dma master fills them on rx.
+I'd like to know the status here. If the <timex.h> material is not
+going into v3.14 I'd very much like my single patch to the serial
+driver to go in, and the removal of AT91's <mach/gpio.h>.
 
-See Documentation/DMA-API-HOWTO.txt for details.
+In that case I'm requesting an ACK on the ARM portions from the
+ARM SoC folks, so I can take it through the GPIO tree.
 
-	Arnd
+Yours,
+Linus Walleij
