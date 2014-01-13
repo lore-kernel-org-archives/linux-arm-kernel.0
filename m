@@ -1,119 +1,46 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Mon, 13 Jan 2014 13:42:19 +0000
-Subject: build_skb() and data corruption
-In-Reply-To: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
-References: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
-Message-ID: <1389620539.3720.157.camel@deadeye.wl.decadent.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jan 2014 13:48:13 +0000
+Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
+In-Reply-To: <20140113115208.GA22313@ulmo.nvidia.com>
+References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
+ <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
+ <3792319.Wf518ByjFs@wuerfel> <20140113115208.GA22313@ulmo.nvidia.com>
+Message-ID: <20140113134813.GX15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-01-13 at 12:47 +0100, Jonas Jensen wrote:
-> Please help,
+On Mon, Jan 13, 2014 at 12:52:10PM +0100, Thierry Reding wrote:
+> On Wed, Jan 08, 2014 at 09:20:10AM +0100, Arnd Bergmann wrote:
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -3,7 +3,7 @@ config ARCH_MXC
+> >         select ARCH_REQUIRE_GPIOLIB
+> >         select ARM_CPU_SUSPEND if PM
+> >         select ARM_PATCH_PHYS_VIRT
+> > -       select AUTO_ZRELADDR if !ZBOOT_ROM
+> > +       select AUTO_ZRELADDR
+> >         select CLKSRC_MMIO
+> >         select COMMON_CLK
+> >         select GENERIC_ALLOCATOR
 > 
-> I think I see memory corruption with a driver recently added to linux-next.
+> Hi Arnd,
 > 
-> The following error occur downloading a large file with wget (or
-> ncftp): "read error: Bad address"
-> wget exits and leaves the file unfinished.
-> 
-> The error goes away when build_skb() is patched out, in this case by
-> allocating pages directly in RX loop.
+> I haven't seen this go into linux-next yet. Do you plan on sending a
+> patch for this?
 
-The problem is you're assuming build_skb() does rather more than it
-does.
+Maybe someone should respond to this comment from Arnd:
 
-> I currently have two branches with code placed under ifdef USE_BUILD_SKB:
-> https://bitbucket.org/Kasreyn/linux-next/src/faa7c408a655fdfd7c383f79259031da5a05d61e/drivers/net/ethernet/moxa/moxart_ether.c#cl-472
+| On second thought, we should just remove the 'select AUTO_ZRELADDR' from
+| ARCH_MXC and everything that is multiplatform enabled, since it's already
+| selected by ARCH_MULTIPLATFORM.
 
-Quoting from there:
-
-> #define USE_BUILD_SKB
-> #ifdef USE_BUILD_SKB
-> 
-> 
-> 	skb = build_skb(page_address(priv->rx_pages[priv->rx_head]), priv->rx_buf_size);
-> 
-> 
-> 	if (unlikely(!skb)) {
-> 		net_info_ratelimited("RX build_skb failed\n");
-
-Don't log; increment the rx_dropped counter.
-
-> 		moxart_rx_drop_packet(ndev, desc0);
-> 		return true;
-> 	}
->
-> 
-> 	if (likely(skb))
-
-Redundant condition.
-
-> 		get_page(priv->rx_pages[priv->rx_head]);
-> 
-> 
-> 	skb_put(skb, len);
-> 
-> 
-> #else
-> 
-> 
-> 	dma_unmap_page(&ndev->dev, priv->rx_buf_phys[priv->rx_head], RX_BUF_SIZE, DMA_FROM_DEVICE);
-
-dma_unmap_page() is always needed, so move this above the #ifdef
-USE_BUILD_SKB.
-
-> 
-> 	skb = netdev_alloc_skb_ip_align(ndev, 128);
-
-Missing check for NULL.
-
-> 	skb_fill_page_desc(skb, 0, priv->rx_pages[priv->rx_head], 0, len);
-> 	skb->len += len;
-> 	skb->data_len += len;
-> 
-> 
-> 	if (len > 128) {
-> 		skb->truesize += PAGE_SIZE;
-> 		__pskb_pull_tail(skb, ETH_HLEN);
-> 	} else {
-> 		__pskb_pull_tail(skb, len);
-> 	}
-> 
-> 
-> 	p = priv->rx_pages[priv->rx_head];
-
-Missing check for NULL.
-
-> 	moxart_alloc_rx_page(ndev, priv->rx_head);
-
-New buffer is always required, so move this under the #endif... well,
-except that if moxart_alloc_rx_page() fails then things go horribly
-wrong as you have.
-
-Best practice is to try allocating the next buffer before passing up the
-current one; if that fails then you recycle the current buffer and
-increment rx_dropped.
-
-> 
-> 
-> #endif
-[end quoted code]
-
-> If build_skb() is the cause, is there something the driver can do about it?
-> 
-> A quick search on "build_skb memory corruption" reveals the following
-> commit, "igb: Revert support for build_skb in igb"
-> f9d40f6a9921cc7d9385f64362314054e22152bd:
-[...]
-
-The problem I identified in igb occurs only when splitting a page into
-multiple buffers (or when recycling DMA-mapped pages).  build_skb() is
-fine to use whenever each RX buffer is a single page (except that that's
-memory-inefficient) that's unmapped on completion.
-
-Ben.
+which I think is the right way to go here.  The ARCH_MXC option is
+hidden when multiplatform is not enabled.  When it is enabled,
+AUTO_ZRELADDR is selected by the multiplatform option.  So having a
+"select AUTO_ZRELADDR" of any kind under ARCH_MXC is entirely
+redundant.
 
 -- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
