@@ -1,31 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 13 Jan 2014 17:49:20 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
-In-Reply-To: <CAMuHMdWu80dtY_uKtd-t4eYQw3c4Vu=AqbTZ1CnDtc6yeyXiYQ@mail.gmail.com>
-References: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
- <20140113003811.GI15296@verge.net.au>
- <CAMuHMdWu80dtY_uKtd-t4eYQw3c4Vu=AqbTZ1CnDtc6yeyXiYQ@mail.gmail.com>
-Message-ID: <20140113084920.GE29308@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 13 Jan 2014 09:57:08 +0100
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
+ <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
+Message-ID: <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 09:02:07AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Jan 13, 2014 at 1:38 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Sun, Jan 12, 2014 at 12:15:49PM +0100, Geert Uytterhoeven wrote:
-> >> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> >>
-> >> Without this, a Debian jessie nfsroot hangs early in the boot process.
-> >
-> > If this is really necessary for Jessie to boot then I think
-> 
-> I think it's needed for udev. Looking in the git history for similar changes
-> to other defconfigs confirmed that.
+Hi Morimoto-san,
 
-Ok, thanks.
+On Wed, Jan 8, 2014 at 11:23 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Wed, Jan 8, 2014 at 2:08 AM, Kuninori Morimoto
+> <kuninori.morimoto.gx@gmail.com> wrote:
+>>> +     common->clk = devm_clk_get(&pdev->dev, NULL);
+>>> +     if (IS_ERR(common->clk)) {
+>>> +             dev_err(&pdev->dev, "cannot get clock\n");
+>>> +             return PTR_ERR(common->clk);
+>>> +     }
+>>> +
+>>> +     ret = clk_prepare(common->clk);
+>>> +     if (ret < 0) {
+>>> +             dev_err(&pdev->dev, "unable to prepare clock\n");
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +     clk_enable(common->clk);
+>>> +
+>>>       pm_runtime_enable(dev);
+>>>       pm_runtime_get_sync(dev);
+>>
+>> And this patch seems strange for me.
+>> pm_runtime_xxx() is doing same things.
+>> If it didn't work, wrong place is not driver, clock side ?
+>
+> That's an interesting observation...
 
-> > we should enabled it in all shmobile defconfigs.
-> 
-> Sure. Do you want me to send patches for that, or will you take care yourself?
+You were right. After applying both of "ARM: shmobile: compile drivers/sh
+for CONFIG_ARCH_SHMOBILE_MULTI" and "power: clock_ops.c: fixup clk
+prepare/unprepare count" from Ben Dooks the issue went away.
 
-If you have time to prepare patches that would be great.
-Else I can do it myself.
+So my patch can be dropped.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
