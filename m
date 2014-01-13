@@ -1,36 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Jan 2014 15:28:30 +0000
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20140113140215.GZ15937@n2100.arm.linux.org.uk>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140102113057.GI16456@n2100.arm.linux.org.uk>
- <20140102144724.GF19878@titan.lakedaemon.net>
- <20140102145835.GA6883@localhost> <20140112145206.GD6099@localhost>
- <20140113135858.GE11805@arm.com>
- <20140113140215.GZ15937@n2100.arm.linux.org.uk>
-Message-ID: <20140113152830.GB29921@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Jan 2014 10:28:51 -0500
+Subject: [PATCH] ARM: Fix incorrect FDT initrd parameter override
+In-Reply-To: <0a923e$51mtvt@icp-osb-irony-out9.iinet.net.au>
+References: <0a923e$51mtvt@icp-osb-irony-out9.iinet.net.au>
+Message-ID: <20140113152851.GF19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 02:02:15PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 13, 2014 at 01:58:58PM +0000, Catalin Marinas wrote:
-> > On Sun, Jan 12, 2014 at 02:52:07PM +0000, Ezequiel Garcia wrote:
-> > > Catalin, Will: Can you ack as well, so Russell can take this?
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > (with the condition that Will promises to sort out the generic relaxed
-> > IO accessors and move this to generic code ;))
+Ben,
+
+Thanks for the patch.  A few comments below.
+
+On Sat, Jan 11, 2014 at 10:03:58AM +1000, klightspeed at killerwolves.net wrote:
+> Commit 65939301acdb (arm: set initrd_start/initrd_end for fdt scan)
+
+Thanks for including this.  We have a new tag we are using now to
+incorporate this information to be included after your SoB.  I've added
+it below.
+
+> caused the FDT initrd_start and initrd_end to override the
+> phys_initrd_start and phys_initrd_size set by the initrd= kernel
+> parameter.  With this patch initrd_start and initrd_end will be
+> overridden if phys_initrd_start and phys_initrd_size are set by the
+> kernel initrd= parameter.
 > 
-> I think that's an impossibility, as there's no such thing as a "generic
-> relaxed IO accessor" and agreement on what that should be is very hard
-> to come by.
+> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+Fixes: 65939301acdb (arm: set initrd_start/initrd_end for fdt scan)
 
-We'll see... I managed to get agreement with powerpc, and I think most other
-people (esp. x86) don't really care. I'll post an RFC when I've written
-something up. It will likely involve use of things like mmiowb for truly
-portable code, so how many drivers will actually be portable even after the
-generic definition of the relaxed accessors remains to be seen.
+This commit was only introduced in v3.13-rc1 so we shouldn't need the
+stable tag.  Unless v3.13 drops before Russell gets a chance to merge
+it.
 
-Will
+> ---
+>  arch/arm/mm/init.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 1f7b19a..819c539 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -345,10 +345,11 @@ void __init arm_memblock_init(struct meminfo *mi,
+>  #endif
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>  	/* FDT scan will populate initrd_start */
+> -	if (initrd_start) {
+> +	if (initrd_start && !phys_initrd_size) {
+>  		phys_initrd_start = __virt_to_phys(initrd_start);
+>  		phys_initrd_size = initrd_end - initrd_start;
+>  	}
+> +	initrd_start = initrd_end = 0;
+
+This line shouldn't be necessary.  Both are reset in the following hunk
+below your change:
+
+if (phys_initrd_size) {
+	memblock_reserve(phys_initrd_start, phys_initrd_size);
+
+	/* Now convert initrd to virtual addresses */
+	initrd_start = __phys_to_virt(phys_initrd_start);
+	initrd_end = initrd_start + phys_initrd_size;
+}
+
+With the above line removed,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+Please add this patch to Russell's patch tracker found at
+
+http://www.arm.linux.org.uk/developer/patches/
+
+thx,
+
+Jason.
