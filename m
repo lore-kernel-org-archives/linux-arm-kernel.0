@@ -1,47 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jan 2014 12:13:58 +0100
-Subject: [PATCH 2/2] pwm: imx: support polarity inversion
-In-Reply-To: <1389608988-10981-3-git-send-email-LW@KARO-electronics.de>
-References: <1389608988-10981-1-git-send-email-LW@KARO-electronics.de>
- <1389608988-10981-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <11504930.fjG2AZiQ4e@wuerfel>
+From: florian.meier@koalo.de (Florian Meier)
+Date: Mon, 13 Jan 2014 12:16:40 +0100
+Subject: [PATCH 2/2] BCM2835: Add I2S driver to device tree
+In-Reply-To: <52D3CA6E.1010803@koalo.de>
+References: <52D3CA6E.1010803@koalo.de>
+Message-ID: <52D3CB18.8040608@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 January 2014 11:29:48 Lothar Wa?mann wrote:
+This adds the definitions for the BCM2835 I2S driver
+to the device tree. Some GPIO settings are needed for
+the correct pin functions.
 
-> diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-> index 01c0499..e3647a8 100644
-> --- a/arch/arm/boot/dts/imx50.dtsi
-> +++ b/arch/arm/boot/dts/imx50.dtsi
-> @@ -273,7 +273,7 @@
->  			};
->  
->  			pwm1: pwm at 53fb4000 {
-> -				#pwm-cells = <2>;
-> +				#pwm-cells = <3>;
->  				compatible = "fsl,imx50-pwm", "fsl,imx27-pwm";
->  				reg = <0x53fb4000 0x4000>;
->  				clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
-...
-> @@ -271,6 +293,13 @@ static int imx_pwm_probe(struct platform_device *pdev)
->  		return PTR_ERR(imx->mmio_base);
->  
->  	data = of_id->data;
-> +	if (data->output_polarity) {
-> +		dev_info(&pdev->dev, "PWM supports inversion\n");
-> +		imx_pwm_ops.set_polarity = imx_pwm_set_polarity;
-> +		imx->chip.of_xlate = of_pwm_xlate_with_flags;
-> +		imx->chip.of_pwm_n_cells = 3;
-> +	}
-> +
->  	imx->config = data->config;
->  	imx->set_enable = data->set_enable;
+Signed-off-by: Florian Meier <florian.meier@koalo.de>
+---
 
-This looks like you are breaking compatibility with the binding,
-which requires #pwm-cells to be <2>. You can extend the binding
-to allow both <2> and <3>, but then you have to not only document
-that change in the binding, but also ensure that the pwm driver
-is able to use either variant.
+Sorry, I forgot to disable word-wrap again....
 
-	Arnd
+ arch/arm/boot/dts/bcm2835-rpi-b.dts | 12 +++++++++++-
+ arch/arm/boot/dts/bcm2835.dtsi      | 10 ++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 2a3b1c1..e83ed2f 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -23,7 +23,7 @@
+ 
+ &gpio {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&gpioout &alt0 &alt3>;
++	pinctrl-0 = <&gpioout &alt0 &alt2 &alt3>;
+ 
+ 	gpioout: gpioout {
+ 		brcm,pins = <6>;
+@@ -39,6 +39,16 @@
+ 		brcm,pins = <48 49 50 51 52 53>;
+ 		brcm,function = <7>; /* alt3 */
+ 	};
++
++	/* I2S interface */
++	alt2: alt2 {
++		brcm,pins = <28 29 30 31>;
++		brcm,function = <6>; /* alt2 */
++	};
++};
++
++&bcm2835_i2s {
++	status = "okay";
+ };
+ 
+ &i2c0 {
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 1da6b36..ca2259c 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -134,6 +134,16 @@
+ 			#dma-cells = <1>;
+ 			brcm,dma-channel-mask = <0x7f35>;
+ 		};
++
++		bcm2835_i2s: i2s at 7e203000 {
++			compatible = "brcm,bcm2835-i2s";
++			reg = <0x7e203000 0x20>,
++			      <0x7e101098 0x02>;
++
++			dmas = <&dma 2>,
++			       <&dma 3>;
++			dma-names = "tx", "rx";
++		};
+ 	};
+ 
+ 	clocks {
+-- 
+1.8.3.2
