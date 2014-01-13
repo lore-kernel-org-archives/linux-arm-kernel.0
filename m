@@ -1,11 +1,45 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Mon, 13 Jan 2014 11:32:36 +0100
-Subject: No subject
-Message-ID: <1389609158-11179-1-git-send-email-LW@KARO-electronics.de>
+Date: Mon, 13 Jan 2014 11:32:37 +0100
+Subject: [PATCH 1/2] ARM: dts: imx53: add another pingroup for NAND pads
+In-Reply-To: <1389609158-11179-1-git-send-email-LW@KARO-electronics.de>
+References: <1389609158-11179-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1389609158-11179-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the Ka-Ro electronics i.MX53 based
-modules.
-The first patch adds a new pingroup for NAND pads that is used by the
-modules.
+
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx53-pingrp.h |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx53-pingrp.h b/arch/arm/boot/dts/imx53-pingrp.h
+index ac8e73d..f8d7d9c 100644
+--- a/arch/arm/boot/dts/imx53-pingrp.h
++++ b/arch/arm/boot/dts/imx53-pingrp.h
+@@ -300,6 +300,23 @@
+ 	MX53_PAD_PATA_DATA6__EMI_NANDF_D_6		0xa4 \
+ 	MX53_PAD_PATA_DATA7__EMI_NANDF_D_7		0xa4
+ 
++#define MX53_NAND_PINGRP2 \
++	MX53_PAD_NANDF_WE_B__EMI_NANDF_WE_B		0x4 \
++	MX53_PAD_NANDF_RE_B__EMI_NANDF_RE_B		0x4 \
++	MX53_PAD_NANDF_CLE__EMI_NANDF_CLE		0x4 \
++	MX53_PAD_NANDF_ALE__EMI_NANDF_ALE		0x4 \
++	MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B		0xe0 \
++	MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0		0xe0 \
++	MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0		0x4 \
++	MX53_PAD_EIM_DA0__EMI_NAND_WEIM_DA_0		0xa4 \
++	MX53_PAD_EIM_DA1__EMI_NAND_WEIM_DA_1		0xa4 \
++	MX53_PAD_EIM_DA2__EMI_NAND_WEIM_DA_2		0xa4 \
++	MX53_PAD_EIM_DA3__EMI_NAND_WEIM_DA_3		0xa4 \
++	MX53_PAD_EIM_DA4__EMI_NAND_WEIM_DA_4		0xa4 \
++	MX53_PAD_EIM_DA5__EMI_NAND_WEIM_DA_5		0xa4 \
++	MX53_PAD_EIM_DA6__EMI_NAND_WEIM_DA_6		0xa4 \
++	MX53_PAD_EIM_DA7__EMI_NAND_WEIM_DA_7		0xa4
++
+ #define MX53_OWIRE_PINGRP1 \
+ 	MX53_PAD_GPIO_18__OWIRE_LINE			0x80000000
+ 
+-- 
+1.7.2.5
