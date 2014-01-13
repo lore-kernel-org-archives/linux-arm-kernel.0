@@ -1,74 +1,64 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 13 Jan 2014 12:47:42 +0100
-Subject: build_skb() and data corruption
-Message-ID: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 13 Jan 2014 12:52:10 +0100
+Subject: [PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM
+In-Reply-To: <3792319.Wf518ByjFs@wuerfel>
+References: <E1Vyl3Q-0005Lt-Lo@rmk-PC.arm.linux.org.uk>
+ <CAOh2x==c+O9SwaeCOOSDkFUgSYnY=1Y-7C=Ti_5ceiyUUiQw1Q@mail.gmail.com>
+ <3792319.Wf518ByjFs@wuerfel>
+Message-ID: <20140113115208.GA22313@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please help,
+On Wed, Jan 08, 2014 at 09:20:10AM +0100, Arnd Bergmann wrote:
+> On Wednesday 08 January 2014 13:32:35 Viresh Kumar wrote:
+> > On Thu, Jan 2, 2014 at 9:53 PM, Russell King
+> > <rmk+kernel@arm.linux.org.uk> wrote:
+> > > warning: (ARCH_MULTIPLATFORM && ARCH_CLPS711X && ARCH_PXA &&
+> > >  SOC_EXYNOS5440 && ARCH_EMEV2) selects AUTO_ZRELADDR which
+> > >  has unmet direct dependencies (!ZBOOT_ROM)
+> > >
+> > > This is because it's possible to have ZBOOT_ROM enabled, but at the
+> > > same time have another option enabled which selects AUTO_ZRELADDR
+> > > overriding the !ZBOOT_ROM dependency.  Fix this by reversing the
+> > > dependencies between ZBOOT_ROM and the options which depend on
+> > > !ZBOOT_ROM.
+> > >
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > 
+> > After this patch I see these warnings with exynos_defconfig
+> > 
+> > arch/arm/Kconfig:1963:error: recursive dependency detected!
+> > arch/arm/Kconfig:1963: symbol ZBOOT_ROM depends on AUTO_ZRELADDR
+> > arch/arm/Kconfig:2151: symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
+> > 
+> > I am not really sure why this happened as I don't see AUTO_ZRELADDR
+> > selected by ZBOOT_ROM in Kconfig :)
+> 
+> It's a weird dependency. You need this hunk:
+> 
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -3,7 +3,7 @@ config ARCH_MXC
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_CPU_SUSPEND if PM
+>         select ARM_PATCH_PHYS_VIRT
+> -       select AUTO_ZRELADDR if !ZBOOT_ROM
+> +       select AUTO_ZRELADDR
+>         select CLKSRC_MMIO
+>         select COMMON_CLK
+>         select GENERIC_ALLOCATOR
 
-I think I see memory corruption with a driver recently added to linux-next.
+Hi Arnd,
 
-The following error occur downloading a large file with wget (or
-ncftp): "read error: Bad address"
-wget exits and leaves the file unfinished.
+I haven't seen this go into linux-next yet. Do you plan on sending a
+patch for this?
 
-The error goes away when build_skb() is patched out, in this case by
-allocating pages directly in RX loop.
-
-I currently have two branches with code placed under ifdef USE_BUILD_SKB:
-https://bitbucket.org/Kasreyn/linux-next/src/faa7c408a655fdfd7c383f79259031da5a05d61e/drivers/net/ethernet/moxa/moxart_ether.c#cl-472
-
-If build_skb() is the cause, is there something the driver can do about it?
-
-A quick search on "build_skb memory corruption" reveals the following
-commit, "igb: Revert support for build_skb in igb"
-f9d40f6a9921cc7d9385f64362314054e22152bd:
-
-"The reason for reverting this patch is that it can lead to data corruption.
-The following flow was pointed out by Ben Hutchings:
-1. skb is forwarded to another device
-2. Packet headers are modified and it's put into a queue
-3. Second packet is received into the other half of this page
-4. Page cannot be reused, so is DMA-unmapped
-5. The DMA mapping was non-coherent, so unmap copies or invalidates
-cache
-The headers added in step 2 get trashed in step 5."
-
-
-This is extra interesting, errors only happen on a locally mounted
-ext3 filesystem, never on tmpfs e.g.:
-
-# mount
-/dev/mmcblk0p1 on / type ext3
-(rw,relatime,errors=continue,barrier=1,data=ordered)
-tmpfs on /dev/shm type tmpfs (rw,relatime,mode=777)
-tmpfs on /tmp type tmpfs (rw,relatime)
-
-#cd /tmp
-# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
-Connecting to 149.20.4.69 (149.20.4.69:21)
-linux-2.6.11.11.tar.  25% |*******                        | 11374k
-0:01:36 ETAwget: short write
-[  153.560000] wget (383) used greatest stack depth: 4776 bytes left
-# rm linux-2.6.11.11.tar.gz
-# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
-Connecting to 149.20.4.69 (149.20.4.69:21)
-linux-2.6.11.11.tar.  25% |*******                        | 11315k
-0:01:34 ETAwget: short write
-# rm linux-2.6.11.11.tar.gz
-# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
-Connecting to 149.20.4.69 (149.20.4.69:21)
-linux-2.6.11.11.tar.  25% |*******                        | 11473k
-0:01:38 ETAwget: short write
-[  237.300000] wget (387) used greatest stack depth: 4752 bytes left
-
-# cd /root/
-# wget -c ftp://149.20.4.69/pub/linux/kernel/v2.6/linux-2.6.11.11.tar.gz
-Connecting to 149.20.4.69 (149.20.4.69:21)
-linux-2.6.11.11.tar.   3% |*                              |  1647k  0:03:02 ETA
-wget: read error: Bad address
-
-
-Regards,
-Jonas
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/0a36b637/attachment.sig>
