@@ -1,67 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 13 Jan 2014 13:43:59 +0100
-Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
-In-Reply-To: <52D37DE7.1000407@samsung.com>
-References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
- <1704043.sYrCOYas4N@phil> <52D37DE7.1000407@samsung.com>
-Message-ID: <52D3DF8F.4000109@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jan 2014 12:44:45 +0000
+Subject: [PATCH V4 2/6] ARM: imx: add suspend in ocram support on i.mx6q
+In-Reply-To: <1389614031-7253-2-git-send-email-b20788@freescale.com>
+References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
+ <1389614031-7253-2-git-send-email-b20788@freescale.com>
+Message-ID: <20140113124445.GV15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon, Heiko,
+On Mon, Jan 13, 2014 at 07:53:47PM +0800, Anson Huang wrote:
+>  #ifdef CONFIG_PM
+> +void imx6_suspend(void);
 
-On 13.01.2014 06:47, Jaehoon Chung wrote:
-> Hi, All.
->
-> On 01/13/2014 06:18 AM, Heiko St?bner wrote:
->> Am Samstag, 11. Januar 2014, 22:39:00 schrieb Tomasz Figa:
->>> Tested on S3C6410-based Mini6410 board, with following performance
->>> figures:
->>>
->>> * Before this series (133 MHz HCLK always selected, leading to at most
->>>    33 MHz card clock):
->>>
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
->>
->> # hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads: 44 MB in  3.12 seconds =  14.11 MB/sec
->
-> /dev/mmcblk0:
->   Timing buffered disk reads:  38 MB in  3.14 seconds =  12.12 MB/sec
->>
->>
->>> * After this series (48 MHz EPLL clock selected, leading to 48 MHz card
->>>    clock):
->>>
->>> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>>
->>> /dev/mmcblk0:
->>>   Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
->>
->> # hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads: 48 MB in  3.01 seconds =  15.94 MB/sec
->
->   /dev/mmcblk0:
->   Timing buffered disk reads:  56 MB in  3.05 seconds =  18.35 MB/sec
->>
->>
->> So on a s3c2416:
->> Tested-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->
-> Tested with exynos4 board.
->
-> Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Acked-by; Jaehoon Chung <jh80.chung@samsung.com>
+So, imx6_suspend() takes no arguments.
 
-Thank you both for testing and acking.
+> +static int (*imx6_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
 
-Best regards,
-Tomasz
+Oh, it takes one argument.
+
+> +		/*
+> +		 * call low level suspend function in ocram,
+> +		 * as we need to float DDR IO.
+> +		 */
+> +		local_flush_tlb_all();
+> +		imx6_suspend_in_ocram_fn(suspend_ocram_base);
+
+Yes, definitely takes one argument...
+
+> +	imx6_suspend_in_ocram_fn = (void *)fncpy(
+> +		suspend_ocram_base + sizeof(*pm_info),
+> +		&imx6_suspend,
+> +		MX6Q_SUSPEND_OCRAM_SIZE - sizeof(*pm_info));
+
+This cast here is needed to work around the above confusion.
+
+> +ENTRY(imx6_suspend)
+> +	ldr	r1, [r0, #PM_INFO_PBASE_OFFSET]
+> +	ldr	r2, [r0, #PM_INFO_RESUME_ADDR_OFFSET]
+> +	ldr	r3, [r0, #PM_INFO_CPU_TYPE_OFFSET]
+> +	ldr	r4, [r0, #PM_INFO_PM_INFO_SIZE_OFFSET]
+
+Yes, definitely takes one argument.
+
+If you fix the prototype for imx6_suspend, you don't need to cast the
+result of fncpy().  Casts should always be avoided where possible.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
