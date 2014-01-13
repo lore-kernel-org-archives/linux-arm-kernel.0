@@ -1,61 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 Jan 2014 16:28:34 -0500
-Subject: [PATCH] ARM: Fix incorrect FDT initrd parameter override
-In-Reply-To: <52D455CE.6090306@killerwolves.net>
-References: <0a923e$51mtvt@icp-osb-irony-out9.iinet.net.au>
- <20140113152851.GF19878@titan.lakedaemon.net>
- <52D455CE.6090306@killerwolves.net>
-Message-ID: <20140113212834.GG19878@titan.lakedaemon.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 13 Jan 2014 22:31:46 +0100
+Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for
+ i.MX27/i.MX31 CPUs
+In-Reply-To: <1389448908.753471404@f40.i.mail.ru>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <1384153756.15403316@f304.i.mail.ru>
+ <20140111125505.GA24479@pengutronix.de>
+ <1389448908.753471404@f40.i.mail.ru>
+Message-ID: <20140113213146.GM29475@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+On Sat, Jan 11, 2014 at 06:01:48PM +0400, Alexander Shiyan wrote:
+> ???????, 11 ?????? 2014, 13:55 +01:00 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > On Mon, Nov 11, 2013 at 11:09:16AM +0400, Alexander Shiyan wrote:
+> > > Hello.
+> > > 
+> > > > >>>> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
+> > > > >>>>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+> > > > >>>>>
+> > > > >>>>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
+> > > > >>>>> ---
+> > > > >>>>>     drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+> > > > >>>>>     1 file changed, 42 insertions(+)
+> > > ...
+> > > > At this point might be good to patch the imx27.dtsi with the usb defines.
+> > > ...
+> > > 
+> > > I have a working configuration for i.MX27 USB, but I prefer to make a few more
+> > > tests before the addition of definitions in DTS. This will be a next step.
+> > > Thanks.
+> > Any news here?
+> 
+> Not ready yet.
+Are you still working at it? Would you mind sharing more details, like
+your current tree/patch stack and what works/doesn't work for you?
 
-On Tue, Jan 14, 2014 at 07:08:30AM +1000, Ben Peddell wrote:
-> Patch submitted with requested changes.
-> 
-> On Mon, 13 Jan 2014 at 10:28:51 AM -0500, Jason Cooper wrote:
-> >> +	initrd_start = initrd_end = 0;
-> > 
-> > This line shouldn't be necessary.  Both are reset in the following hunk
-> > below your change:
-> > 
-> 
-> if (phys_initrd_size &&
->     !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
-> 	pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-> 	       (u64)phys_initrd_start, phys_initrd_size);
-> 	phys_initrd_start = phys_initrd_size = 0;
-> }
-> if (phys_initrd_size &&
->     memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
-> 	pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
-> 	       (u64)phys_initrd_start, phys_initrd_size);
-> 	phys_initrd_start = phys_initrd_size = 0;
-> }
-> 
-> > if (phys_initrd_size) {
-> > 	memblock_reserve(phys_initrd_start, phys_initrd_size);
-> > 
-> > 	/* Now convert initrd to virtual addresses */
-> > 	initrd_start = __phys_to_virt(phys_initrd_start);
-> > 	initrd_end = initrd_start + phys_initrd_size;
-> > }
-> 
-> Please note that above this a check is made to ensure that
-> phys_initrd_start and phys_initrd_size are valid, and they are zeroed
-> if they are not valid.  Therefore if phys_initrd_start or 
-> phys_initrd_size are invalid, then initrd_start and initrd_end are not
-> reset.
-> 
-> This means that if the initrd= address is not present or is invalid
-> then the FDT address will be used anyway as initrd_start and 
-> initrd_end will not have been zeroed, and if that is invalid the
-> kernel will OOPS in unpack_to_rootfs():
+Thanks
+Uwe
 
-Ahhh, ok.  Thanks for the clarification.  You kept that line in the
-version you submitted to Russell's patch tracker?
-
-thx,
-
-Jason.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
