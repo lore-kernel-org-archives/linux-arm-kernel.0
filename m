@@ -1,35 +1,60 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Jan 2014 15:07:35 +0000
-Subject: [PATCH V6 0/8] Add ARM EFI stub
-In-Reply-To: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
-References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
-Message-ID: <20140113150735.GF3256@console-pimps.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Jan 2014 16:16:23 +0100
+Subject: [PATCH V4 1/6] ARM: dts: imx6q: add common compatible name for
+ reused modules
+In-Reply-To: <20140113142249.GW23525@S2101-09.ap.freescale.net>
+References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
+ <20140113121016.GJ16215@pengutronix.de>
+ <20140113142249.GW23525@S2101-09.ap.freescale.net>
+Message-ID: <20140113151623.GL16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jan, at 08:30:09AM, Roy Franz wrote:
-> This patch series adds EFI stub support for the ARM architecture.  The 
-> stub for ARM is implemented in a similar manner to x86 in that it is a 
-> shim layer between EFI and the normal zImage/bzImage boot process, and 
-> that an image with the stub configured is bootable as both a zImage and 
-> EFI application.  This patchset adds common code that is shared with
-> the ARM64 EFI stub.
+On Mon, Jan 13, 2014 at 10:22:51PM +0800, Shawn Guo wrote:
+> On Mon, Jan 13, 2014 at 01:10:16PM +0100, Sascha Hauer wrote:
+> > > @@ -840,7 +840,7 @@
+> > >  			};
+> > >  
+> > >  			mmdc0: mmdc at 021b0000 { /* MMDC0 */
+> > > -				compatible = "fsl,imx6q-mmdc";
+> > > +				compatible = "fsl,imx6q-mmdc", "fsl,mmdc";
+> > 
+> > This is not nice. Here you introduce a fsl,mmdc compatible claiming all
+> > mmdc are compatible to each other and in the driver code you have:
+> > 
+> > static const u32 imx6q_mmdc_io_dsm_offset[]
+> > static const u32 imx6dl_mmdc_io_dsm_offset[]
+> > 
+> > which proves they are *not* compatible.
+> > 
+> > You do this just to share a
+> > 
+> > imx6_pm_get_base(&pm_info->mmdc_base, "fsl,mmdc");
+> > 
+> > across the different i.MX6 SoCs.
+> > 
+> > You can sanitize this by introducing a SoC struct which you populate
+> > differently for the SoCs
+> > 
+> > static pm_soc_data imx6q_data {
+> > 	.mmdc_compat = "fsl,imx6q-mmdc",
+> > };
+> > 
+> > And by putting cpu_type, mmdc_io_num and others in this struct you can
+> > also remove the if(cpu_is_x()) else if (cpu_is_y()) else...
 > 
-> This patch depends on Leif Lindholm's ARM v7 runtime services patchset, which 
-> in turn depends on Mark Salter's early_io_remap() patchset.  This EFI stub 
-> patchset can be tested without those by simply modifying the Kconfig for 
-> EFI_STUB to not depend on EFI.  The kernel will boot using the stub, 
-> however no EFI support will be available in the kernel.
+> Good point.
 > 
-> I have addressed all the feedback I have recieved to date, and I am hoping 
-> that this patchset is acceptable for merging into 3.14.  It has been 
-> functionally stable for some time, and provides useful functionality.  
-> Further consolidation of the ARM/ARM64 stubs planned as part of the 
-> ongoing development of the stubs and supporting tools for both 
-> architectures (getting the FDT from a UEFI configuration table, using UEFI 
-> memory map instead of FDT for memory description.) 
+> Anson, the change below is a demonstration of Sascha's suggestion.
+> Sascha, correct me if I misunderstood your comment.
 
-Is this going to Linus via one of the ARM maintainer trees?
+Looks good. That's exactly what I meant. Maybe the cpu_type field can
+even be removed the way you did it.
+
+Sascha
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
