@@ -1,56 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jan 2014 17:46:31 +0000
-Subject: [PATCH v2 15/28] drm/i2c: tda998x: use the tda998x video
- format when cea mode
-In-Reply-To: <20140113182455.1f8c3f40@armhf>
-References: <20140109120448.24d89eba@armhf>
- <20140111181832.GD15937@n2100.arm.linux.org.uk>
- <20140113170707.10b908dc@armhf>
- <20140113161333.GA15937@n2100.arm.linux.org.uk>
- <20140113172220.521917ce@armhf>
- <20140113163501.GB15937@n2100.arm.linux.org.uk>
- <20140113182455.1f8c3f40@armhf>
-Message-ID: <20140113174631.GC15937@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 13 Jan 2014 12:53:01 -0500
+Subject: [PATCH 1/6] efi: create memory map iteration helper
+In-Reply-To: <20140113151759.GG3256@console-pimps.org>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+ <1389392950-22457-2-git-send-email-msalter@redhat.com>
+ <20140113151759.GG3256@console-pimps.org>
+Message-ID: <1389635581.26822.2.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 06:24:55PM +0100, Jean-Francois Moine wrote:
-> On Mon, 13 Jan 2014 16:35:01 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > Ah, I see.  It's a thread about your DRM driver, and about the lack of
-> > audio on 1080 resolutions.  Taking it in context, the reported issue
-> > appears to be lack of video when 1080p is selected, but the display
-> > doesn't support 1080p.  That's hardly surprising.
+On Mon, 2014-01-13 at 15:17 +0000, Matt Fleming wrote:
+> On Fri, 10 Jan, at 05:29:05PM, Mark Salter wrote:
+> > There are a lot of places in the kernel which iterate through an
+> > EFI memory map. Most of these places use essentially the same
+> > for-loop code. This patch adds a for_each_efi_memory_desc()
+> > helper to clean up all of the existing duplicate code and avoid
+> > more in the future.
 > > 
-> > Then rabeeh posts his message about lack of audio at 1920x1080.
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  include/linux/efi.h | 6 ++++++
+> >  1 file changed, 6 insertions(+)
 > > 
-> > Well, I can say that with the tda998x as it stands, the 1080* modes
-> > work with audio with armada-drm, so there's no need to change this.
+> > diff --git a/include/linux/efi.h b/include/linux/efi.h
+> > index 11ce678..9dc5b05 100644
+> > --- a/include/linux/efi.h
+> > +++ b/include/linux/efi.h
+> > @@ -618,6 +618,12 @@ extern int efi_set_rtc_mmss(const struct timespec *now);
+> >  extern void efi_reserve_boot_services(void);
+> >  extern struct efi_memory_map memmap;
+> >  
+> > +/* Iterate through an efi_memory_map */
+> > +#define for_each_efi_memory_desc(m, md)					   \
+> > +	for ((md) = (m)->map;						   \
+> > +	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
+> > +	     (md) = (void *)(md) + (m)->desc_size)
+> > +
 > 
-> My DRM driver also has audio with and without the cea mode for all
-> resolutions. At the time of Rabeeh's message, I just had forgot to
-> switch the audio pins...
+> Err, what? I just picked up your previous patch ("x86/efi: Create memory
+> map iteration helper") which adds this chunk, and I didn't see a follow
+> up email telling me not to pick it up.
 > 
-> So, TDA998x CEA mode or not?
+> What's the plan?
+> 
+Sorry, I meant to drop this one from this series. The one you picked
+up is the one I wanted picked up.
 
-Firstly, why change something which isn't broken?
-
-Secondly, you need to justify this change by explaining why it is
-beneficial to use the internally programmed modes rather than programming
-the timings to match the adjusted settings from DRM.
-
-Thirdly, one of your previous patches changed the programming to use the
-adjusted mode settings, which may be the CEA mode with slight tweaks.
-Have you considered the implication of the hardware generating the video
-being programmed with those tweaks vs the encoder using a fixed set of
-unadjusted timings?
-
-I'm not convinced that we need this patch at the present time, and I'm
-not convinced that we need to introduce a load of tables for no
-measurable gain.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+--Mark
