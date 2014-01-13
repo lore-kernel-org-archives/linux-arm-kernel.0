@@ -1,65 +1,66 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Mon, 13 Jan 2014 10:37:15 +0800
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
- <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
- <52CFFFDA.8050108@linaro.org>
- <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
-Message-ID: <52D3515B.7040008@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Jan 2014 11:14:59 +0800
+Subject: [PATCH 1/6] cpufreq: cpufreq-cpu0: allow optional safe voltage
+ during frequency transitions
+In-Reply-To: <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
+References: <1389283165-17708-1-git-send-email-thomas.ab@samsung.com>
+ <1389283165-17708-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20140113031457.GD23525@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
+On Thu, Jan 09, 2014 at 09:29:20PM +0530, Thomas Abraham wrote:
+> @@ -19,6 +19,10 @@ Optional properties:
+>  - cooling-min-level:
+>  - cooling-max-level:
+>       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
+> +- safe-opp-index: Certain platforms require that during a opp transition,
+> +  a system should not go below a particular opp level. For such systems,
+> +  this property specifies the minimum opp to be maintained during the
+> +  opp transitions.
 
-On 01/13/2014 10:09 AM, Seungwon Jeon wrote:
-> On Fri, January 10, 2014, Zhangfei Gao wrote:
->> On 01/10/2014 09:39 PM, Seungwon Jeon wrote:
->>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>>> +{
->>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
->>>> +	u32 rate = priv->clk_table[ios->timing];
->>>
->>> First, sorry for quick review even though your effort.
->>> But I still worry about this change.
->>> Currently k3 host's clock table depends on value number of SD/MMC mode value.
->>> It seems close to identifier for eachg mode. I think it's not good way to use as table's index.
->>> Can you modify to mmc_clk_determine_rate() in your another patch-set?
->>> I guess required actual target rate could be determined depending on ios->clock.
->>>
->>
->> No, it can not get input clock source rate simply from ios->clock, also
->> requied info like which controller, which mode etc.
->> Here is setting clock source rate, not the working clock rate.
->>
->> For example, emmc init clock source rate is 13M, while sd init clock
->> source is 25M, it can not simply get such info from ios->clock.
->> And for HS200, emmc may have to set clock source rate to 104M since the
->> controller limitation and can not work stable as 208M.
+<snip>
+
+> @@ -165,13 +196,27 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>  		goto out_put_node;
+>  	}
+>  
+> +	if (!of_property_read_u32(np, "safe-opp-index", &safe_opp_index)) {
+> +		rcu_read_lock();
+> +		opp = dev_pm_opp_find_freq_exact(cpu_dev,
+> +			freq_table[safe_opp_index].frequency * 1000, true);
+
+The property safe_opp_index is directly used to index freq_table here.
+It only works when the opp table in device tree is defined in increasing
+order.  But we have nothing in opp binding bindings/power/opp.txt to
+enforce it.  That said, opp table in device tree could be in arbitrary
+order, and thus safe_opp_index gives you nothing reliable.
+
+Shawn
+
+> +		if (IS_ERR(opp)) {
+> +			rcu_read_unlock();
+> +			pr_err("safe opp index %d is invalid\n",
+> +							safe_opp_index);
+> +			goto out_free_table;
+> +		}
+> +		safe_voltage = dev_pm_opp_get_voltage(opp);
+> +		safe_frequency = freq_table[safe_opp_index].frequency;
+> +		rcu_read_unlock();
+> +	}
+> +
+>  	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
+>  
+>  	if (of_property_read_u32(np, "clock-latency", &transition_latency))
+>  		transition_latency = CPUFREQ_ETERNAL;
+>  
+>  	if (!IS_ERR(cpu_reg)) {
+> -		struct dev_pm_opp *opp;
+>  		unsigned long min_uV, max_uV;
+>  		int i;
+>  
+> -- 
+> 1.6.6.rc2
 > 
-> Yes, clock table is source clock rate, not actual working clock rate.
-> I was not saying that 'ios->clock' would be used for source clock directly.
-> I meant that you can adjust the source clock rate depending on 'ios->clock'.
-> You've already done with clock table similarly in mmc_clk_determine_rate().
-> 
-> For example, in case of HS200, 'ios->clock' will be passed with 200MHz.
-> And then, mmc_clk_determine_rate() can set the 'rate & best' to 100000000 and 720000000 respectively.
-> Also, 'ios->clock' with 400KHz or less may be passed for init clock.
-> If clock id is HI3620_SD_CIUCLK, 'rate & best' can be selected with 13000000 and 26000000.
-> If not and it's case of MMC,  'rate & best' can be selected with 25000000 and 180000000.
-> If it should be considered with other conditions, please let me know.
-
-However, I am afraid this will make things complicated rather than
-simplified.
-
-The function mmc_clk_determine_rate() will need the info which
-controller it is, what's the init clock rate, what's the max clock rate,
-and what's the limitation, which may be different as different soc, and
-can not be hardcoded.
-The limitation may in HS200 and SDR104 mode.
-
-The plan is only input init rate and max rate instead of the table,
-while others directly use ios->clock, only if the the limitation resolved.
-
-Thanks
