@@ -1,80 +1,69 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 13 Jan 2014 19:10:17 +0100
-Subject: DT include files
-In-Reply-To: <52D418EB.1040605@wwwdotorg.org>
-References: <CAOesGMheei8YgzfRp9pmQ0rT9zhJ2_hF56j5Y+jLSy5TadPZ-g@mail.gmail.com>
- <20140103030455.GB25079@S2101-09.ap.freescale.net>
- <CAOesGMihX-pLva-aBCHJ6TYfsN57MzRWiYFTnfKCXOKeja0uUg@mail.gmail.com>
- <20140104011056.GA3282@S2101-09.ap.freescale.net>
- <20140110024124.GA6844@S2101-09.ap.freescale.net>
- <CAOesGMh3HBCYut2hfub3svrJT5JJzoWq8mU=VU0grZbg-JqqbA@mail.gmail.com>
- <52CFF57D.8060808@samsung.com>
- <CAL_JsqKHr6v+6kNXrAdnzH0gpoFCPAjPSnX8iBDgRSMh9JgxvA@mail.gmail.com>
- <20140110170319.GC20094@book.gsilab.sittig.org>
- <52D418EB.1040605@wwwdotorg.org>
-Message-ID: <20140113181017.GI20094@book.gsilab.sittig.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 13 Jan 2014 10:26:10 -0800
+Subject: [GIT PULL] get rid of <mach/timex.h>
+In-Reply-To: <CACRpkdboVtY2nBxGeWj_ReHJ5J8WuyuPHCwHM=yELBdePkX7Vw@mail.gmail.com>
+References: <20131213221651.GA10344@perseus.defre.xn--kleine-knig-yfb.de>
+ <87bo0clved.fsf@linaro.org> <20131219221758.GS14866@pengutronix.de>
+ <20131220184715.GT14866@pengutronix.de>
+ <52CBE3DE.5010706@atmel.com>
+ <CACRpkdboVtY2nBxGeWj_ReHJ5J8WuyuPHCwHM=yELBdePkX7Vw@mail.gmail.com>
+Message-ID: <CAOesGMgLuR_HSHZjHLGcgQrnaoYHCqGOXE-Tab=DNC5qc2YfGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 09:48 -0700, Stephen Warren wrote:
-> 
-> On 01/10/2014 10:03 AM, Gerhard Sittig wrote:
-> > On Fri, Jan 10, 2014 at 09:30 -0600, Rob Herring wrote:
-> >>
-> >> As for *.h vs. *.dtsi naming, if the include is only pre-processor
-> >> defines, then I think using .h is the right way. Otherwise, if there
-> >> is any dts syntax, then .dtsi is the right name. It looks to me like
-> >> this style has been followed in both the imx and s3c64xx cases.
-> >>
-> >> On a side note, I'm not really a fan of this pattern:
-> >>
-> >> #define FOO1 1 2 3
-> >>
-> >> #define BAR FOO1 FOO2 FOO3
-> >>
-> >> While it definitely simplifies the dts files, it would never be used
-> >> in C and obfuscates what the actual property size is. Reading a dts
-> >> file, I would naturally assume the define was a single value while in
-> >> fact it could expand to a very large property size.
-> > 
-> > For more complex yet tedious repetitive cases like GPIO banks and
-> > pins I've seen #define directives which introduce "functions"
-> > (macros with parameters).  They appear to be rather useful, can
-> > reflect very well the essence of the information, don't
-> > necessarily pretend to be single values, but still may hide how
-> > many cells they expand to.  For example:
-> > 
-> >   arch/arm/boot/dts/tegra30-cardhu.dtsi:
-> >     interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
-> 
-> I'm not sure I entirely understand your point, but for the record, both
-> TEGRA_GPIO() and IRQ_TYPE_LEVEL_HIGH expand to a single cell, as I would
-> expect (almost?) any DT macro to do.
+On Mon, Jan 13, 2014 at 5:36 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jan 7, 2014 at 12:24 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> On 20/12/2013 19:47, Uwe Kleine-K?nig :
+>
+>>> Please pull
+>>>
+>>>       git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh
+>>>
+>>> which points to 79f08d9ed217318b4f325b7fcf8f26dcd0e41689 now provided
+>>> you are happy with Linus W.'s series, too.
+>>
+>> Hi all,
+>>
+>> Is this pull-request is foreseen to be integrated in arm-soc for 3.14? I
+>> may have some material for Linus W. that I would like to queue that
+>> depend on these patches.
+>
+> I'd like to know the status here. If the <timex.h> material is not
+> going into v3.14 I'd very much like my single patch to the serial
+> driver to go in, and the removal of AT91's <mach/gpio.h>.
 
-It turns out I slightly misunderstood Rob's concern.  The issue
-is not that the use of the C language preprocessor is discouraged
-or frouned upon, but instead that obfuscating invariant data or
-spilling random parts of the information across the place in
-unneeded ways is unwanted.  While there is agreement that the use
-of symbolic identifiers can help readability and maintainability
-in certain situations.
+Uwe made it a pain to review these patches, so it's taking a while.
+Instead of removing the header contents in the same commit, he just
+adds to the non-include-file code so I have to manually go find the
+right include file, check the value, and then move to the next one.
+Since he removes the headers in the last change that means checking
+out a different tree back and forth.
 
-Regarding your specific reply:  I haven't noticed before that all
-of the macros I cited do expand to a single cell.  Before that I
-saw the potential to generate more cells when required for a
-single value (like "wide" addresses, or multi cell pins or
-channels or whatever).  Can't tell how much of a concern there is
-against such an approach, don't have strong feelings about it.
+> In that case I'm requesting an ACK on the ARM portions from the
+> ARM SoC folks, so I can take it through the GPIO tree.
 
-Actually I wasn't picking at those specific macros above, quite
-the contrary.  Those were the first I came across searching for
-demonstration of useful preprocessor use. :)  I just did not
-bother to cite several hundred other useful phrases as well.
+Most of the series looks OK, but the IXP4xx change looks fishy. This
+is exactly why I wanted to get the header touched at the same time. It
+says:
 
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+/*
+ * We use IXP425 General purpose timer for our timer needs, it runs at
+ * 66.66... MHz. We do a convulted calculation of CLOCK_TICK_RATE b/c the
+ * timer register ignores the bottom 2 bits of the LATCH value.
+ */
+#define IXP4XX_TIMER_FREQ 66666000
+#define CLOCK_TICK_RATE \
+        (((IXP4XX_TIMER_FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
+
+
+
+But all he does in the C file now is:
+
++#define IXP4XX_TIMER_FREQ 66666000
++#define IXP4XX_LATCH DIV_ROUND_CLOSEST(IXP4XX_TIMER_FREQ, HZ)
+
+So it seems that this code is now broken. Uwe?
+
+
+-Olof
