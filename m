@@ -1,18 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jan 2014 18:43:24 +0000
-Subject: [BUILD BUG] msm: mdp4_drv_encoder.c
-Message-ID: <20140113184324.GE15937@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jan 2014 19:49:38 +0100
+Subject: [PATCH 4/6] arm64: add EFI stub
+In-Reply-To: <1389392950-22457-5-git-send-email-msalter@redhat.com>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+ <1389392950-22457-5-git-send-email-msalter@redhat.com>
+Message-ID: <201401131949.39358.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Referencing mach/*.h from drivers does not work in multi-platform
-kernels, and leads to errors such as this:
+On Friday 10 January 2014, Mark Salter wrote:
+> This patch adds PE/COFF header fields to the start of the Image
+> so that it appears as an EFI application to EFI firmware. An EFI
+> stub is included to allow direct booting of the kernel Image. Due
+> to EFI firmware limitations, only little endian kernels with 4K
+> page sizes are supported at this time. Support in the COFF header
+> for signed images was provided by Ard Biesheuvel.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-drivers/gpu/drm/msm/mdp4/mdp4_dtv_encoder.c:18:22: fatal error: mach/clk.h: No such file or directory
+You got the ordering of the S-o-b lines wrong. Since you send the
+patch, your name should come last.
 
-which were found via my allmodconfig build.
+> +config EFI_STUB
+> +	bool "EFI stub support"
+> +	depends on !ARM64_64K_PAGES && OF
+> +	select LIBFDT
+> +	default y
+> +	help
+> +	  This kernel feature allows an Image to be loaded directly
+> +	  by EFI firmware without the use of a bootloader.
+> +	  See Documentation/efi-stub.txt for more information.
+> +
+>  endmenu
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Why not ARM64_64K_PAGES? I thought that it was going to be the
+default for a lot of distros that would need to run on UEFI systems.
+
+>  menu "Userspace binary formats"
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 5ba2fd4..1c52b84 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -4,6 +4,8 @@
+>  
+>  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> +CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET) \
+> +			   -I$(src)/../../../scripts/dtc/libfdt
+
+Hmm, this is pretty ugly. I notice the same has been done on MIPS
+as well, but I'd hope we can find a proper way to do it.
+
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> new file mode 100644
+> index 0000000..10d02bf
+> --- /dev/null
+> +++ b/arch/arm64/kernel/efi-stub.c
+> +
+> +/* Include shared EFI stub code */
+> +#include "../../../drivers/firmware/efi/efi-stub-helper.c"
+> +#include "../../../drivers/firmware/efi/fdt.c"
+
+It gets worse here.
+
+	Arnd
