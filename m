@@ -1,15 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Jan 2014 11:40:08 +0800
-Subject: [PATCH 0/2] ARM: i.MX53: add support for MCIMX53-START-R
-In-Reply-To: <1389358379-26196-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1389358379-26196-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20140113034006.GH23525@S2101-09.ap.freescale.net>
+From: lho@apm.com (Loc Ho)
+Date: Sun, 12 Jan 2014 20:01:59 -0800
+Subject: [PATCH v8 3/4] ata: Add APM X-Gene SoC SATA host controller driver
+In-Reply-To: <20140112114958.GA8509@mtj.dyndns.org>
+References: <1389031922-4309-1-git-send-email-lho@apm.com>
+ <1389031922-4309-2-git-send-email-lho@apm.com>
+ <1389031922-4309-3-git-send-email-lho@apm.com>
+ <1389031922-4309-4-git-send-email-lho@apm.com>
+ <52D052F9.8050703@redhat.com>
+ <20140111193104.GD3257@mtj.dyndns.org>
+ <6EB44142-06DA-4C9D-8999-CFA9EE30E03D@apm.com>
+ <20140112114958.GA8509@mtj.dyndns.org>
+Message-ID: <CAPw-ZTmfKfPY3DRfJT6FQP78ULwfcjGG76cNfr9yk7UMdrO4wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 01:52:57PM +0100, Steffen Trumtrar wrote:
-> Steffen Trumtrar (2):
->   ARM: i.MX53: dts: move common QSB nodes to new file
->   ARM: i.MX53: dts: add support for MCIMX53-START-R
+Hi,
 
-Applied both, thanks.
+> On Sat, Jan 11, 2014 at 07:58:04PM -0800, Loc Ho wrote:
+>> The flush has to occurred immediately after reading the CI
+>> register. It can not wrap around the isr routine and issue the flush
+>> after or before the library ahci isr routine.
+>
+> I see.  So, you're saying that if PMP support is disabled for the
+> controller, the driver would need to reimplement only the interrupt
+> handler?
+>
+
+Yes but Let me summary what overrides are required for this X-Gene
+SATA controller driver:
+
+1. For Query ID, these two functions - ahci_read_id and ahci_qc_issue
+requires override.
+2. For PMP support, these two functions - ahci_qc_prep and
+ahci_qc_fill_rtf requires override.
+3. For softreset, softreset requires override to add additional flags
+in call to ahci_exec_polled_cmd.
+4. For IRQ and ensure data consistent for read operation, function
+ahci_interrupt and ahci_port_intr requires override. But it only
+requires an flush call right after reading from the CI register.
+5. For hardreset, no need to explain this one as all SATA drivers
+require its only method.
+
+-Loc
