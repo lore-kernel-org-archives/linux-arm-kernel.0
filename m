@@ -1,56 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 13 Jan 2014 23:49:13 +0100
-Subject: [patch] fix omap compile with randconfig
-In-Reply-To: <CAOesGMjG37FprRX7U-+S3nFCuv=RVAOUv7wb8K-Tcqr26ETevw@mail.gmail.com>
-References: <20140113010025.GA14431@amd.pavel.ucw.cz>
- <CAOesGMjG37FprRX7U-+S3nFCuv=RVAOUv7wb8K-Tcqr26ETevw@mail.gmail.com>
-Message-ID: <20140113224913.GA16235@amd.pavel.ucw.cz>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 13 Jan 2014 16:07:19 -0700
+Subject: [PATCH v6 5/6] ACPI: do not map/unmap memory regions for FADT
+ entries in reduced HW mode
+In-Reply-To: <3512616.qUD2F1beoi@vostro.rjw.lan>
+References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
+ <1389394340-2680-6-git-send-email-al.stone@linaro.org>
+ <3512616.qUD2F1beoi@vostro.rjw.lan>
+Message-ID: <52D471A7.9090907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-01-13 10:02:58, Olof Johansson wrote:
-> On Sun, Jan 12, 2014 at 5:00 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> >
-> > This fixes:
-> >
-> > arch/arm/mach-omap2/built-in.o: In function `omap_reserve':
-> > /data/l/linux-n900/arch/arm/mach-omap2/common.c:36: undefined
-> >   reference to `omap_fb_reserve_memblock'
-> >
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> >
-> > diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-> > index 9beecde..857907f 100644
-> > --- a/arch/arm/mach-omap2/common.c
-> > +++ b/arch/arm/mach-omap2/common.c
-> > @@ -33,5 +33,7 @@ void __init omap_reserve(void)
-> >         omap_dsp_reserve_sdram_memblock();
-> >         omap_secure_ram_reserve_memblock();
-> >         omap_barrier_reserve_memblock();
-> > +#ifdef CONFIG_OMAP2_VRFB
-> >         omap_fb_reserve_memblock();
-> > +#endif
-> >  }
-> 
-> What is this patch against? omap_fb_reserve_memblock() doesn't exist
-> in v3.13-rc8, nor in -next.
+On 01/10/2014 04:32 PM, Rafael J. Wysocki wrote:
+> On Friday, January 10, 2014 03:52:19 PM al.stone at linaro.org wrote:
+>> From: Al Stone <al.stone@linaro.org>
+>>
+>> Several of the FADT fields are normally kept in specific memory
+>> regions.  Since these fields are to be ignored in hardware reduced
+>> ACPI mode, do not map those addresses when in that mode, and of
+>> course do not release the mappings that have not been made.
+>>
+>> The function acpi_os_initialize() could become a stub in the header
+>> file but is left here in case it can be of further use.
+>
+> Why exactly is this change necessary?
 
-It is actually against -n900 tree, sorry about that. But this means
-that this regression likely will not hit -next :-).
+Two reasons: (1) why do work we do not have to do?  and (2) it
+seemed to make sense to me to have the code reflect the spec
+accurately.
 
-> Adding an ifdef here is likely the wrong thing anyway, there should be
-> a stub provided for !CONFIG_OMAP2_VRFB in the header file instead.
+> Will things work incorrectly on HW-reduced ACPI systems if we don't make it?
 
-Agreed.
+If the ACPI tables have all of these fields properly set to zero
+in hardware reduced, this change does not need to be made.  If a
+vendor provides broken ACPI tables where these values are valid,
+but still sets hardware reduced in the FADT, these fields could
+then be used as before -- but allowing them to be used would mean
+we can no longer claim we are implementing hardware reduced correctly.
+So things would work, but the system would by definition be in some
+sort of undefined hybrid ACPI mode.
 
-I found few more compile problems, but those are neither easy nor I
-expect them to happen commonly. In particular BIG_ENDIAN=y breaks
-flexcan, MMU=n break some core code, and CONFIG_ARM_KPROBES_TEST=y
-just does not work with my compiler here. Probably not worth trying to
-reproduce on vanilla tree?
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> ---
+>>   drivers/acpi/osl.c | 20 ++++++++++++--------
+>>   1 file changed, 12 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+>> index c946a3a..7822821 100644
+>> --- a/drivers/acpi/osl.c
+>> +++ b/drivers/acpi/osl.c
+>> @@ -1778,10 +1778,12 @@ __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
+>>
+>>   acpi_status __init acpi_os_initialize(void)
+>>   {
+>> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+>> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+>> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+>> -	acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
+>> +	if (!acpi_gbl_reduced_hardware) {
+>> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+>> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+>> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe0_block);
+>> +		acpi_os_map_generic_address(&acpi_gbl_FADT.xgpe1_block);
+>> +	}
+>>
+>>   	return AE_OK;
+>>   }
+>> @@ -1806,10 +1808,12 @@ acpi_status acpi_os_terminate(void)
+>>   						 acpi_irq_handler);
+>>   	}
+>>
+>> -	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
+>> -	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
+>> -	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+>> -	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+>> +	if (!acpi_gbl_reduced_hardware) {
+>> +		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
+>> +		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
+>> +		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+>> +		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+>> +	}
+>>
+>>   	destroy_workqueue(kacpid_wq);
+>>   	destroy_workqueue(kacpi_notify_wq);
+>>
+>
 
-Thanks,
-									Pavel
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
