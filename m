@@ -1,39 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 13 Jan 2014 13:17:18 +0100
-Subject: [PATCH 1/9] spi: rspi: Add missing clk_disable() calls in error
- and cleanup paths
-In-Reply-To: <20140113115947.GL29039@sirena.org.uk>
-References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
- <1389525222-3482-2-git-send-email-geert@linux-m68k.org>
- <20140113115947.GL29039@sirena.org.uk>
-Message-ID: <CAMuHMdVjkWD0nP-9f579kUOqG4EVsy9Yp+vwNsM_=LxNU=Bdzg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Jan 2014 12:17:26 +0000
+Subject: [PATCH RFC 06/10] ARM: s3c64xx: pm: Add device tree based power
+ domain instantiation
+In-Reply-To: <52D3D880.2090300@samsung.com>
+References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+ <1389469372-17199-7-git-send-email-tomasz.figa@gmail.com>
+ <20140112192910.GW29039@sirena.org.uk> <52D2EE32.5060709@gmail.com>
+ <20140113110935.GB29039@sirena.org.uk>
+ <52D3D880.2090300@samsung.com>
+Message-ID: <20140113121726.GQ29039@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Jan 13, 2014 at 01:13:52PM +0100, Tomasz Figa wrote:
 
-On Mon, Jan 13, 2014 at 12:59 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Sun, Jan 12, 2014 at 12:13:34PM +0100, Geert Uytterhoeven wrote:
->> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->
-> This doesn't seem to apply to current code, please check and resend.
-> The fact that there's multiple patch serieses in flight from you for
-> this driver plus development work (again mostly from you) in git is
-> probably not helping here...
+> Power domain control registers are part of the system controller
+> block, which uses the "samsung,s3c64*-clock" compatible string. I
+> know this is a bit unfortunate, but all registers of this IP block
+> are mapped at the same page and some clock registers are at the
+> other end of this area than others, so there is even no good way to
+> split them into separate mappings.
 
-This depends on the series:
-
-[PATCH V2 0/8] spi: rspi: Add support for RZ/A1H
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I see - probably would've been neater to give it a different name but
+too late now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/6d85f176/attachment.sig>
