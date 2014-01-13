@@ -1,31 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jan 2014 14:02:15 +0000
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20140113135858.GE11805@arm.com>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140102113057.GI16456@n2100.arm.linux.org.uk>
- <20140102144724.GF19878@titan.lakedaemon.net>
- <20140102145835.GA6883@localhost> <20140112145206.GD6099@localhost>
- <20140113135858.GE11805@arm.com>
-Message-ID: <20140113140215.GZ15937@n2100.arm.linux.org.uk>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 13 Jan 2014 16:06:20 +0200
+Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
+ clk_disable_unprepare()
+In-Reply-To: <CAKohponJ5n6Vr56nFJT7nXX5ByOCFHDET7-E_=xsfGK80X3jag@mail.gmail.com>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpomA=vSGuKfD-_zwiSnXGkqAQjtiVqxT2Po=D-LDA_FESg@mail.gmail.com>
+ <20121216115756.GO14363@n2100.arm.linux.org.uk>
+ <20121217054240.GA13300@core.coreip.homeip.net>
+ <CAKohponJ5n6Vr56nFJT7nXX5ByOCFHDET7-E_=xsfGK80X3jag@mail.gmail.com>
+Message-ID: <CAHp75Ve=G1reCgdgWcor3ChGKk=kFnMxOsfL-U82cWyit7ipgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 01:58:58PM +0000, Catalin Marinas wrote:
-> On Sun, Jan 12, 2014 at 02:52:07PM +0000, Ezequiel Garcia wrote:
-> > Catalin, Will: Can you ack as well, so Russell can take this?
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> (with the condition that Will promises to sort out the generic relaxed
-> IO accessors and move this to generic code ;))
+Dmitry, what is the status of this patchseries? Are you continue to
+make it upstream?
 
-I think that's an impossibility, as there's no such thing as a "generic
-relaxed IO accessor" and agreement on what that should be is very hard
-to come by.
+On Mon, Apr 8, 2013 at 1:19 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 17 December 2012 11:12, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+>> They do not _have_ to be non-inline, I think we should simply drop the
+>> first 2 patches and I will refresh and ressend the 3rd one.
+>
+> I haven't seen this patch since a long time? Any updates?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
+
+
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+With Best Regards,
+Andy Shevchenko
