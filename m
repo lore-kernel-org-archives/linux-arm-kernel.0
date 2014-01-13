@@ -1,76 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 Jan 2014 19:21:11 +0000
-Subject: [PATCH v10 1/4] arm64: topology: Implement basic CPU topology
- support
-In-Reply-To: <20140113155004.GF11805@arm.com>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
- <1389287106-29979-2-git-send-email-broonie@kernel.org>
- <20140110174558.GI925@arm.com>
- <20140110182705.GR29039@sirena.org.uk>
- <20140113155004.GF11805@arm.com>
-Message-ID: <20140113192111.GJ29039@sirena.org.uk>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 13 Jan 2014 11:25:39 -0800
+Subject: [PATCH V2 1/6] Documentation: add dts binding for X-Gene reboot
+ dts node.
+In-Reply-To: <201401131619.35030.arnd@arndb.de>
+References: <1389135041-16062-1-git-send-email-fkan@apm.com>
+ <6073715.cGydpIHKD1@wuerfel>
+ <CAL85gmA5Ob+kp-+5seO-wcB8tx4jyiOeFMyCsZWFBLdX09nZDg@mail.gmail.com>
+ <201401131619.35030.arnd@arndb.de>
+Message-ID: <CAL85gmCTsxng3jCaAcCjePE6Pxu7Jg98TDUqQrDFzsfW2GQwEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 03:50:04PM +0000, Catalin Marinas wrote:
-> On Fri, Jan 10, 2014 at 06:27:05PM +0000, Mark Brown wrote:
-> > On Fri, Jan 10, 2014 at 05:45:59PM +0000, Catalin Marinas wrote:
-> > > The patches seem fine otherwise, apart from the last one which I
-> > > won't merge until we get some real numbers.
+> That is not what I was asking about.
+>
+> The problem with your binding is that it doesn't seem to describe
+> the hardware structure at all, but rather try to invent devices
+> because of how it's convenient for how you write the Linux drivers.
+>
+> This is never a good idea and it will become a problem once you
+> try to port a different operating system, or when the structure
+> of the Linux drivers changes. Remember that in Linux we can freely
+> reorganize our code as requirements change, but the bindings have
+> to remain stable to allow running new kernels with an older device
+> tree that may be shipped with the firmware.
+>
+> (Side note: if you end up doing an ACPI driver for this after all,
+> the problem is even worse because it's basically impossible to update
+> the ACPI tables in field, while with DT you can at least override
+> them in the firmware if something goes really wrong.)
+>
+> On most SoCs I've seen, the system reset registers are part of
+> some on-chip device, most likely one of
+> - A SoC-specific system control register set containing various
+>   global registers that may be of interest to other parts of the
+>   kernel.
+FKAN: our system block in your reference would be the system clock unit (SCU).
+It handles number of things (JTAG, clock control, power control not
+touched by OS).
+The register that is relevant to the system reset is this lone
+register. I reduce the
+range of the dts aperture due to this fact.
 
-> > As I previously said I am really concerned about diverging from what
-> > arm32 has done here
 
-> There is no diverging, these are new processors with possibly different
-> values for these parameters.
-
-I would argue that not providing the numbers at all is a divergence,
-we can be reasonably confident that the A53 and A57 do differ.  We're
-giving the scheduler a ballpark figure here, it's not an exact science.
-
-> > and the numbers don't seem any less real than the
-> > ones we're using there (they were generated in an identical fashion).
-
-> Were the numbers in this patch generated in any way or simply copied
-> from arch/arm?
-
-Both IIRC - I did initially cut'n'paste but then went to try to find
-numbers for the A53 and A57, came up with the idea of using the DMIPS
-numbers to do that independently and then realised that the numbers I
-was getting when I tried to do the maths were the same.  I only found
-out Vincent had done the same thing in one of the earlier reviews for
-the patches.
-
-> > Given the hardware availability for arm64 in general is limited and
-> > likely to be even more so for big.LITTLE systems it seems like asking
-> > for problems down the line to do something different.
-
-> I'm not saying we do something different, only that we can add the
-> numbers once we get hold of some real hardware.
-
-I'm saying we can tune them later on if we need to but that the finger
-in the air saying there is expected to be a performance difference is
-likely to be helpful.  The scheduler shouldn't be *that* fragile and I
-expect you'll find that even with silicon it will be possible to have
-endless debates about precisely which benchmarks to use.  In reality
-good enough is probably fine, even with real hardware I'm not sure we
-know exactly what to measure.
-
-Hopefully people will be able to take released kernels and get them
-doing useful stuff right off the bat and unless the information turns
-out to be way off the mark I don't think people are going to be that
-worried.  The more stress that gets put on picking the numbers the
-harder it will be.
-
-I think Nico was right in an earlier version of this discussion when he
-said that we're likely to end up with the scheduler doing runtime tuning.
-Long term if these remain I'd expect they'll be providing a hint to make
-sure it starts off in roughly the right place and in the meantime the
-scheduler does need some help here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140113/65092db9/attachment.sig>
+> - A watchdog timer device that will reset the system after a crash,
+>   or when explicit requested by the OS
+> - A dedicated reset controller that has registers for individually
+>   resetting a number of subsystems of the SoC, or all at once in
+>   case of system reboot.
+> - an interface to an external or integrated power management IC
+>   that controls voltages and/or clock frequencies provided to
+>   the SoC and other parts of the system.
+>
+> In each of those cases, we already have a subsystem that is supposed
+> to handle the entire register set and provide a system reset method
+> as one of the things it does. Given that your register is at offset
+> 0x14 from the start of a larger MMIO range, I strongly suspect
+> that the same is true here.
+FKAN: I could remove this dts node and create another dts node that
+describe the range of registers on the SCU and use that node in this driver.
+I am not sure which subsystem I can use to handle this case, I do see a reset
+subsystem in the kernel but more used for ip resets. Please kindly let
+me know. Thanks for the great feedback.
+>
+>         Arnd
