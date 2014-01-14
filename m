@@ -1,86 +1,63 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 14 Jan 2014 09:35:38 -0800
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <52D55CE5.1060902@ti.com>
-References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
- <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
-Message-ID: <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 14 Jan 2014 10:43:58 -0700
+Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
+ SoC file
+In-Reply-To: <52D4D314.3000208@nvidia.com>
+References: <20131219122857.3226.42830.stgit@tamien>
+ <20131219123719.3226.44864.stgit@tamien> <52B389CD.8010004@wwwdotorg.org>
+ <52D4D314.3000208@nvidia.com>
+Message-ID: <52D5775E.9080209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On 01/13/2014 11:03 PM, Paul Walmsley wrote:
+> On 12/19/2013 04:05 PM, Stephen Warren wrote:
+>> On 12/19/2013 05:49 AM, Paul Walmsley wrote:
+>>> Add basic DT bindings for the DFLL IP block for the NVIDIA Tegra114 SoC.
+>>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
 
-On 14 January 2014 07:51, Nishanth Menon <nm@ti.com> wrote:
-> On 01/14/2014 05:14 AM, Taras Kondratiuk wrote:
->> On 13 January 2014 17:23, Nishanth Menon <nm@ti.com> wrote:
->>> On 01/13/2014 09:03 AM, Taras Kondratiuk wrote:
->>>> From: Victor Kamensky <victor.kamensky@linaro.org>
->>>>
->>>> Assembler functions defined in sleep44xx.S need to byteswap values
->>>> after read / before write from h/w register if code compiled in big
->>>> endian mode. Simple change to do 'rev x, x' before str instruction
->>>> and after ldr instruction that deals with h/w registers.
->>>>
->>>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->>>> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
->>>> ---
->>>> This is a part of RFC series [1].
->>>> Based on v3.13-rc8.
->>>>
->>>> [1] http://www.spinics.net/lists/linux-omap/msg99927.html
->>>>
->>>>  arch/arm/mach-omap2/sleep44xx.S |   17 +++++++++++++++++
->>>>  1 file changed, 17 insertions(+)
->>>>
->>>
->>> OMAP4 is LE, and if there is a gcc flag for the same, is'nt it cleaner
->>> to deal with it in Makefile rather than trying to make an assembly
->>> meant only for LE by force building it for BE?
->>
->> Hi Nishanth
->> I'm not sure I got your point.
->> Do you propose to build this file as LE while the rest of kernel is BE?
->>
-> I dont see why I should deal with the BE macro for every code change
-> we have in omap4,am335x assembly. The hardware is LE and wont change
-> just coz you are building it for BE. So I dont get the rationale for
-> changing the assembly here - yes, if the assembly can be maintained as
-> LE only mode and the build handling be adequately handled in Makefile
-> (similar to SMC handling), that would be the best.
+>>> +- clock-names : Must contain an array of strings, one per 'clocks'
+>>> +                two-cell array.  The position in the array of these
+>> clock-names defines the set of entries in clocks, not the other way around.
+> 
+> Hmm.  If one refers to the DT clock binding documentation, it lists the
+> 'clock-names' property as optional, and the 'clocks' property as mandatory:
+> 
+> -----
+> 
+> |==Clock consumers==
+> 
+> Required properties:
+> clocks:		List of phandle and clock specifier pairs, one pair
+> 		for each clock input to the device.  Note: if the
+> 		clock provider specifies '0' for #clock-cells, then
+> 		only the phandle portion of the pair will appear.
+> 
+> Optional properties:
+> clock-names:	List of clock input name strings sorted in the same
+> 		order as the clocks property.  Consumers drivers
+> 		will use clock-names to match clock input names
+> 		with clocks specifiers.
+> 
+> -----
+> |
+> 
+> 
+>  https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/clock-bindings.txt#n47
+> 
+> Considering that of_clk_get() doesn't require names, it certainly
+> appears to be the way that the original patch described it (modulo the
+> bit about 'cells'; which has been fixed.)
 
-ARM core is capable of running in LE or BE modes. Yes, OMAP
-memory mapped periphery gives data in LE form. When core runs
-in BE mode after reading h/w register it will byteswap it, also before
-writing h/w register it byteswap it. In such way BE kernel can work
-with LE periphery.
+If the binding defines that clock must exist at certain indices in the
+clock property, and clock-names isn't used, then the clocks property
+defines which clocks must exist.
 
-When it comes to C code that works with LE periphery, if correct
-access functions are used like readl_relaxed and writel_relaxed
-(vs __raw_readl and __raw_writel), the functions will take care of
-the swaps. In case of asm files there is no other way than to insert
-those byteswaps manually and conditionally - they will be enabled only
-if kernel compiled in BE mode. The reason why it could be done only
-manually is that load/store opcodes behavior changes when core
-runs in BE mode (E bit set) in these case ldr/str treat memory as
-big endian. So when LE periphery register is read/stored additional
-byteswaps that compensate for it should be inserted.
+However, if the binding is defining clock names, then the clock-names
+property is the master that defines which clocks exist. In this case,
+the index of entries in the clocks property is undefined by the binding;
+it must simply match the clock-names property, which can be arbitrarily
+ordered by the user.
 
-When BE kernel is built Makefile does take of compiling code in BE
-mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
-
-> is the idea of BE build meant to deal with having a single BE kernel
-> build work for all platforms (including LE ones)?
-
-Sort of. The idea here to run BE image on OMAP4 chip, with
-kernel that would deals with LE periphery correctly, but ARM
-core run in BE with special kernel that compiled for BE case (i.e
-CONFIG_CPU_BIG_ENDIAN is set).
-
-Thanks,
-Victor
-
-> --
-> Regards,
-> Nishanth Menon
+Since this is a new binding, we should use the clock-names style to
+ensure easy future backwards-compatible changes.
