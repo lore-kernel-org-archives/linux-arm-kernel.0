@@ -1,116 +1,120 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 14 Jan 2014 16:42:58 +0800
-Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk
- board.
-In-Reply-To: <20140114082948.GC1896@S2101-09.ap.freescale.net>
-References: <1389685029-17323-1-git-send-email-b20788@freescale.com>
- <20140114082948.GC1896@S2101-09.ap.freescale.net>
-Message-ID: <20140114084258.GA18299@ubuntu>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 14 Jan 2014 09:44:47 +0100
+Subject: [linux-sunxi] Re: [PATCH v5 2/2] ehci-platform: Add support for
+ clks and phy passed through devicetree
+In-Reply-To: <52D4B933.9080505@prisktech.co.nz>
+References: <1389653115-11028-1-git-send-email-hdegoede@redhat.com>
+ <1389653115-11028-3-git-send-email-hdegoede@redhat.com>
+ <52D4B933.9080505@prisktech.co.nz>
+Message-ID: <52D4F8FF.1050105@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 04:29:50PM +0800, Shawn Guo wrote:
-> On Tue, Jan 14, 2014 at 03:37:09PM +0800, Anson Huang wrote:
-> > i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
-> > enable them, the keymap is as below:
-> > 
-> > SW6:  0x00000067    /* KEY_UP */
-> > SW7:  0x0001006c    /* KEY_DOWN */
-> > SW8:  0x0002001c    /* KEY_ENTER */
-> > SW9:  0x01000066    /* KEY_HOME */
-> > SW10: 0x0101006a    /* KEY_RIGHT */
-> > SW11: 0x01020069    /* KEY_LEFT */
-> > SW12: 0x02000072    /* KEY_VOLUMEDOWN */
-> > SW13: 0x02010073    /* KEY_VOLUMEUP */
-> > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
-> >  2 files changed, 29 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-> > index f5e4513..8d49a10 100644
-> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> > @@ -93,6 +93,17 @@
-> >  			fsl,pins = <MX6SL_FEC_PINGRP1>;
-> >  		};
-> >  
-> > +		pinctrl_kpp: kppgrp {
-> > +			fsl,pins = <
-> > +				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-> > +				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
-> > +				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
-> > +				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
-> > +				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
-> > +				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
-> 
-> Rather than using whatever the config register gives us, why don't we
-> put a proper pad confg value for COLs just like ROWs?
+Hi,
 
-right, actually I think we should never use 0x80000000, as we might need to add multiple
-pin state, so all those pins using 0x80000000, should be configurated, will do it in V2.
+On 01/14/2014 05:12 AM, Tony Prisk wrote:
+> On 14/01/14 11:45, Hans de Goede wrote:
+>> Currently ehci-platform is only used in combination with devicetree when used
+>> with some Via socs. By extending it to (optionally) get clks and a phy from
+>> devicetree, and enabling / disabling those on power_on / off, it can be used
+>> more generically. Specifically after this commit it can be used for the
+>> ehci controller on Allwinner sunxi SoCs.
+>>
+>> Since ehci-platform is intended to handle any generic enough non pci ehci
+>> device, add a "usb-ehci" compatibility string.
+>>
+>> There already is a usb-ehci device-tree bindings document, update this
+>> with clks and phy bindings info.
+>>
+>> Although actually quite generic so far the via,vt8500 compatibilty string
+>> had its own bindings document. Somehow we even ended up with 2 of them. Since
+>> these provide no extra information over the generic usb-ehci documentation,
+>> this patch removes them.
+>>
+>> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
+>> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
+>> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
+>> 2 drivers claiming the same compatibility string getting build on ppc.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  25 +++-
+>>   .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
+>>   .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
+>>   drivers/usb/host/Kconfig                           |   1 +
+>>   drivers/usb/host/ehci-platform.c                   | 149 +++++++++++++++++----
+>>   5 files changed, 142 insertions(+), 60 deletions(-)
+>>   delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>>   delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index fa18612..fad10f3 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -7,13 +7,14 @@ Required properties:
+>>       (debug-port or other) can be also specified here, but only after
+>>       definition of standard EHCI registers.
+>>     - interrupts : one EHCI interrupt should be described here.
+>> -If device registers are implemented in big endian mode, the device
+>> -node should have "big-endian-regs" property.
+>> -If controller implementation operates with big endian descriptors,
+>> -"big-endian-desc" property should be specified.
+>> -If both big endian registers and descriptors are used by the controller
+>> -implementation, "big-endian" property can be specified instead of having
+>> -both "big-endian-regs" and "big-endian-desc".
+>> +
+>> +Optional properties:
+>> + - big-endian-regs : boolean, set this for hcds with big-endian registers
+>> + - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+>> + - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
+>> + - clocks : a list of phandle + clock specifier pairs
+>> + - phys : phandle + phy specifier pair
+>> + - phy-names : "usb"
+>>   Example (Sequoia 440EPx):
+>>       ehci at e0000300 {
+>> @@ -23,3 +24,13 @@ Example (Sequoia 440EPx):
+>>          reg = <0 e0000300 90 0 e0000390 70>;
+>>          big-endian;
+>>      };
+>> +
+>> +Example (Allwinner sun4i A10 SoC):
+>> +   ehci0: ehci at 0x01c14000 {
+>> +       compatible = "allwinner,sun4i-a10-ehci", "usb-ehci";
+>> +       reg = <0x01c14000 0x100>;
+>> +       interrupts = <39>;
+>> +       clocks = <&ahb_gates 1>;
+>> +       phys = <&usbphy 1>;
+>> +       phy-names = "usb";
+>> +   };
 
-> 
-> > +			>;
-> > +		};
-> > +
-> >  		pinctrl_uart1: uart1grp {
-> >  			fsl,pins = <MX6SL_UART1_PINGRP1>;
-> >  		};
-> > @@ -139,6 +150,22 @@
-> >  	};
-> >  };
-> >  
-> > +&kpp {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_kpp>;
-> > +	linux,keymap = <
-> > +			0x00000067    /* KEY_UP */
-> > +			0x0001006c    /* KEY_DOWN */
-> > +			0x0002001c    /* KEY_ENTER */
-> > +			0x01000066    /* KEY_HOME */
-> > +			0x0101006a    /* KEY_RIGHT */
-> > +			0x01020069    /* KEY_LEFT */
-> > +			0x02000072    /* KEY_VOLUMEDOWN */
-> > +			0x02010073    /* KEY_VOLUMEUP */
-> 
-> You can use the macros defined in include/dt-bindings/input/input.h to
-> make them more readable.
+<snip>
 
-I thought about this, but what we used here is keymap, which contain info other
-than key-code, the keymap is (row << 24 | column << 16 | key-code), so should we
-use "row << 24 | column << 16 | key-code" format here is using macro define? Does
-DTS support it?
+> You have removed the documentation for the via,vt8500-ehci and wm,prizm-ehci bindings (which in itself isn't really an issue), and left them in the driver (again, not an issue)
 
-> 
-> Shawn
-> 
-> > +		>;
-> > +	status = "okay";
-> > +};
-> > +
-> >  &uart1 {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&pinctrl_uart1>;
-> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> > index a5ef3c3..a449c4f 100644
-> > --- a/arch/arm/boot/dts/imx6sl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> > @@ -393,8 +393,10 @@
-> >  			};
-> >  
-> >  			kpp: kpp at 020b8000 {
-> > +				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
-> >  				reg = <0x020b8000 0x4000>;
-> >  				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +				clocks = <&clks IMX6SL_CLK_DUMMY>;
-> >  			};
-> >  
-> >  			wdog1: wdog at 020bc000 {
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> 
+Correct.
+
+> - except now we have two bindings without any binding documentation?!?
+
+My reasoning behind is that the driver is really a generic usb-ehci driver, and the only reason
+the 2 compatibility strings are left in there is for backwards compatibility. I don't think
+compatibility strings only kept in the driver for backwards compatibility should be documented,
+because documented suggests people can rely on them and then they may end up getting used for new things.
+
+> I'm not sure where the 'wm,prizm-ehci' string came from (presumably me some time ago), but it isn't used and could be dropped.
+> All WonderMedia SoCs use the 'via,vt8500-ehci' - Doing a quick grep of arch/arm/boot/dts shows no usage of 'wm,prizm-ehci'.
+>
+> Arguably, the dtsi files for the WonderMedia SoCs could be updated to include 'usb-ehci' as a second compatible string
+
+Right, I think this would be a good thing to do regardless, also see all the existing dts files for other
+boards already doing this (which is why we ended up using usb-ehci in the first place).
+
+> and the 'via,vt8500-ehci' could be dropped from the driver - but it does mean that old dts files won't work with the current kernel (and I think that's a no-no).
+
+Right, which is exactly why I did not remove them from the driver. But since as you indicate yourself
+if we were to do things from scratch we would likely not put them in the driver it seems best to
+leave them undocumented. Alternatively, if you see this as a problem I can add a note to usb-ehci.txt listing
+these 2 compatibility strings as legacy compatiblity strings, which should not be used for new dts files.
+
+Regards,
+
+Hans
