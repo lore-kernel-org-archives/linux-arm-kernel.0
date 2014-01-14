@@ -1,45 +1,39 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 14 Jan 2014 15:25:23 +0000
-Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
-In-Reply-To: <201401141426.16497.arnd@arndb.de>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <201401140752.33257.arnd@arndb.de>
- <20140114114419.GH30907@bivouac.eciton.net>
- <201401141426.16497.arnd@arndb.de>
-Message-ID: <CAF7UmSwGgQ9u505s3fhd5MmGLHHy1A=rJLZBshycKr+rTniH1A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Jan 2014 15:28:45 +0000
+Subject: [PATCH v2 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
+In-Reply-To: <20140114151404.GN19878@titan.lakedaemon.net>
+References: <1389711007-7239-1-git-send-email-simon.guinot@sequanux.org>
+ <20140114151404.GN19878@titan.lakedaemon.net>
+Message-ID: <20140114152845.GI15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2014 13:26, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > Are you suggesting that I should #ifndef ARM in common code, or that I
->> > > should neglect to document what the common code will do with data it is
->> > > given by UEFI?
->> >
->> > It would probably be good to document the fact that it won't work,
->> > possibly even having a BUG_ON statement in the code for this case.
->>
->> Why?
->>
->> You'll only touch that pointer if you enable CONFIG_ACPI, and if you
->> do you probably want that address. Sounds a bit hostile to throw a BUG
->> in the face of someone who's (for example) just succeeded to get Linux
->> running on a Windows RT device.
->
-> But we know that it can't work unless a lot of other things get changed
-> in the kernel.
+On Tue, Jan 14, 2014 at 10:14:04AM -0500, Jason Cooper wrote:
+> Simon,
+> 
+> On Tue, Jan 14, 2014 at 03:50:04PM +0100, Simon Guinot wrote:
+> > Hello,
+> > 
+> > This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
+> > SoCs: once a disk is removed from a SATA port, then the re-plug events
+> > are not detected by the sata_mv driver.
+> > 
+> > This should be applied to the -stable kernels 3.10 and onwards. 
+> 
+> Please add a 'Fixes: <commit-hash> (oneline)' tag below the Cc: stable
+> tags.  It looks like the sata_mv binding and the Armada 370 DT booting
+> were both introduced in v3.6, so I would probably use:
+> 
+> Fixes: 9ae6f740b49f (arm: mach-mvebu: add support for Armada 370 and Armada XP with DT)
 
-We know using ACPI cannot work without updates to the kernel.
-That doesn't mean we need to throw a BUG just because the
-firmware tells us a table exists.
+Correction - it's format is:
 
->> Although no other architectures supported by UEFI support big-endian,
->> so to be honest, I don't want to have to be the first one to validate
->> that in order to get the basic support into the kernel.
->
-> I think there was a project to run UEFI on PowerPC on some stage, though
-> I can't find any code now.
+Fixes: <commit-hash> ("oneline")
 
-That does sound familiar, but there is nothing in the specification.
+Double-quotes inside the parens.  (Don't ask me why, that's just how it
+was decided.)
 
-/
-    Leif
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
