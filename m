@@ -1,33 +1,19 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 08:04:40 -0800
-Subject: [PATCH] ARM: tegra: fix tegra_powergate_sequence_power_up() inline
-In-Reply-To: <20140114134225.GC10936@ulmo.nvidia.com> (Thierry Reding's
- message of "Tue, 14 Jan 2014 14:42:26 +0100")
-References: <1389650502-30017-1-git-send-email-swarren@wwwdotorg.org>
- <20140114134225.GC10936@ulmo.nvidia.com>
-Message-ID: <87k3e28s87.fsf@linaro.org>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Tue, 14 Jan 2014 16:07:55 +0000
+Subject: [PATCH V2 0/6] Enable X-Gene platform reboot driver.
+In-Reply-To: <1389135041-16062-1-git-send-email-fkan@apm.com>
+References: <1389135041-16062-1-git-send-email-fkan@apm.com>
+Message-ID: <20140114160755.GC4307@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+On Tue, Jan 07, 2014 at 02:50:35PM -0800, Feng Kan wrote:
+> Enable X-Gene platform driver for the X-Gene platform. Remove the
+> use of the mask attribute from the reboot dts node. Add support
+> for using the ACPI and DTS resource for the reboot driver.
 
-> On Mon, Jan 13, 2014 at 03:01:42PM -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->> 
->> Remove an invalid semicolon from the inline dummy, thus solving:
->> In file included from drivers/gpu/drm/tegra/gr3d.c:15:0:
->> include/linux/tegra-powergate.h:119:1: error: expected identifier or '(' before '{' token
->> 
->> Fixes: 80b28791ff04 ("ARM: tegra: pass reset to tegra_powergate_sequence_power_up()")
->> Reported-by: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  include/linux/tegra-powergate.h | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
+Why can't you just use the standard ACPI reboot register values in the 
+FADT?
 
-Applied to next/soc (where the offending patch was merged), merged into
-for-next, and pushed out.
-
-Kevin
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
