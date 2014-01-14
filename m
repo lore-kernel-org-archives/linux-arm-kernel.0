@@ -1,52 +1,66 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Tue, 14 Jan 2014 16:30:12 +0100
-Subject: imx6dl/imx6q fec rmii mode with external ref_clk
-Message-ID: <20140114153012.GA22550@frolo.macqel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Jan 2014 10:41:41 -0500
+Subject: [GIT PULL] ARM: mvebu: stable fix for v3.13
+Message-ID: <20140114154141.GO19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+arm-soc folks,
 
-On the custom board we are developping (imx6q and imx6dl), we have connected
-the fec to a switch chip using rmii mode, and we let the switch provide the
-reference clock to gpio_16.
+Sorry for the lateness in the window on this one.  I'd like to see it
+get into v3.13 if possible, but if it doesn't get there till v3.13.1, I
+understand.
 
-I work currently with 3.13-rc8 and
+This fixes a boot hang experienced on some Openblocks AX3-4 boards.
+Once i2c transaction support was added, it was discovered that the A0
+revision of the Armada XP had broken offload support which causes the
+kernel to hang at boot.  The only way to detect this situation is to
+read the PCI config register to get the SoC revision, then disable
+offload if we are on an A0 SoC.
 
-- I do not have ethernet access working (tx timeout)
-- I do not find in the dtb files a description of the pad settings for the
-RMII mode
-- when searching about the setting for bit 21 ing GPR1, which seems to
-be important for my setting to work, I found the following mail:
-	http://www.spinics.net/lists/devicetree/msg06450.html
+Unfortunately, this makes for a rather large patch series against
+stable.  Doing the fix in a smaller patch would create a runtime
+dependency between i2c and PCI which we prefer to avoid.
 
-saying "So far, we haven't got any user with that setup (external phy or
-oscillator generates clock to pad GPIO_16).  When we do, we can add a
-device tree property for telling that."
+I'm Cc'ing Greg and linux-stable as a heads-up, and so they can comment
+or ask questions.
 
-Is there any progress for that configuration since that mail ?
+thx,
 
-Best regards
+Jason.
 
-Philippe
+The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 
--- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
 
-P.S.: here is my attempt for a dts entry for RMII mode :
+are available in the git repository at:
 
-pinctrl_enet_4: enetgrp-4 {
-			fsl,pins = <
-				MX6QDL_PAD_ENET_MDC__ENET_MDC           0x1b0b0
-				MX6QDL_PAD_ENET_MDIO__ENET_MDIO         0x1b0b0
-				MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x1b0b0
-				MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0     0x1b0b0
-				MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1     0x1b0b0
-				MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN      0x1b0b0
-				MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER       0x1b0b0
-				MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0     0x1b0b0
-				MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1     0x1b0b0
-				MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN       0x1b0b0
-				MX6QDL_PAD_GPIO_19__ENET_TX_ER          0x1b0b0
-			>;
-		};
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.13
+
+for you to fetch changes up to f8b94beb7e6a374cb0de531b72377c49857b35ca:
+
+  i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible (2014-01-14 02:09:17 +0000)
+
+----------------------------------------------------------------
+mvebu late fixes for v3.13
+
+ - mvebu
+    - fix boot hang on Armada XP due to broken i2c offloading in A0 SoC revision
+	(specifically experienced on some early OpenBlocks AX3-4 boards)
+
+----------------------------------------------------------------
+Gregory CLEMENT (4):
+      ARM: mvebu: Add support to get the ID and the revision of a SoC
+      ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
+      i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
+      i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
+
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   6 +-
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |  32 ++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.c                 | 119 +++++++++++++++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h                 |  32 ++++++
+ drivers/i2c/busses/i2c-mv64xxx.c                   |   5 +
+ 6 files changed, 194 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
