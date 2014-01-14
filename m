@@ -1,70 +1,46 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 15 Jan 2014 00:45:49 +0100
-Subject: [PATCH net-next 1/2] net: mvneta: mvneta_tx_done_gbe() cleanups
-In-Reply-To: <cover.1389742334.git.arno@natisbad.org>
-References: <cover.1389742334.git.arno@natisbad.org>
-Message-ID: <5880b38afc5884f5ed57c26824cc37666bd60b99.1389742334.git.arno@natisbad.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 14 Jan 2014 15:46:33 -0800
+Subject: [GIT PULL] at91: cleanup for 3.14 #2
+In-Reply-To: <1389190989-8261-1-git-send-email-nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Wed, 8 Jan 2014 15:23:09 +0100")
+References: <1389190989-8261-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <877ga25dpi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-mvneta_tx_done_gbe() return value and third parameter are no more
-used. This patch changes the function prototype and removes a useless
-variable where the function is called.
+> Arnd, Olof, Kevin,
+>
+> A little "cleanup" pull-request for 3.14 that goes on top of the previous
+> AT91 cleanup material.
+> The thing to note from this pull-request is the beginning of board file removal
+> thank to the conversion to DT. We are still waiting for more feedback from
+> board maintainer to intensify the effort.
+>
+> Thanks, best regards,
+>
+> The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
+>
+>   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-cleanup2
+>
+> for you to fetch changes up to e91a5555df5883bbc204b0e1f8e0489d3f7f3f2e:
+>
+>   ARM: at91: switch Calao QIL-A9260 board to DT (2013-12-19 17:27:30 +0100)
+>
+> ----------------------------------------------------------------
+> Second cleanup pull-request for 3.14:
+> - a tiny fix for the recent AT91 CCF implementation
+> - the switch of one platform to DT with board file removal
+>
+> ----------------------------------------------------------------
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- drivers/net/ethernet/marvell/mvneta.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+Pulled into next/cleanup.
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index f5fc7a249880..8c5150124b5e 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1704,30 +1704,23 @@ static void mvneta_txq_done_force(struct mvneta_port *pp,
- /* Handle tx done - called in softirq context. The <cause_tx_done> argument
-  * must be a valid cause according to MVNETA_TXQ_INTR_MASK_ALL.
-  */
--static u32 mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done,
--			      int *tx_todo)
-+static void mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done)
- {
- 	struct mvneta_tx_queue *txq;
--	u32 tx_done = 0;
- 	struct netdev_queue *nq;
- 
--	*tx_todo = 0;
- 	while (cause_tx_done) {
- 		txq = mvneta_tx_done_policy(pp, cause_tx_done);
- 
- 		nq = netdev_get_tx_queue(pp->dev, txq->id);
- 		__netif_tx_lock(nq, smp_processor_id());
- 
--		if (txq->count) {
--			tx_done += mvneta_txq_done(pp, txq);
--			*tx_todo += txq->count;
--		}
-+		if (txq->count)
-+			mvneta_txq_done(pp, txq);
- 
- 		__netif_tx_unlock(nq);
- 		cause_tx_done &= ~((1 << txq->id));
- 	}
--
--	return tx_done;
- }
- 
- /* Compute crc8 of the specified address, using a unique algorithm ,
-@@ -1961,9 +1954,7 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
- 
- 	/* Release Tx descriptors */
- 	if (cause_rx_tx & MVNETA_TX_INTR_MASK_ALL) {
--		int tx_todo = 0;
--
--		mvneta_tx_done_gbe(pp, (cause_rx_tx & MVNETA_TX_INTR_MASK_ALL), &tx_todo);
-+		mvneta_tx_done_gbe(pp, (cause_rx_tx & MVNETA_TX_INTR_MASK_ALL));
- 		cause_rx_tx &= ~MVNETA_TX_INTR_MASK_ALL;
- 	}
- 
--- 
-1.8.5.2
+Thanks,
+
+Kevin
