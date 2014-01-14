@@ -1,86 +1,98 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Jan 2014 12:57:53 -0800
-Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
-In-Reply-To: <20140113115213.GE1189@mudshark.cambridge.arm.com>
-References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
- <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
- <20140109104943.GB17838@mudshark.cambridge.arm.com>
- <52CEF5C9.1010701@codeaurora.org>
- <20140110105813.GB10455@mudshark.cambridge.arm.com>
- <20140110193657.GG14405@codeaurora.org>
- <20140113115213.GE1189@mudshark.cambridge.arm.com>
-Message-ID: <52D5A4D1.9030403@codeaurora.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 14 Jan 2014 16:03:08 -0500
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+ <52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+ <52D55CE5.1060902@ti.com>
+ <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+ <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
+ <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+ <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
+Message-ID: <52D5A60C.7080800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/14 03:52, Will Deacon wrote:
-> On Fri, Jan 10, 2014 at 07:36:57PM +0000, Stephen Boyd wrote:
+On Tuesday 14 January 2014 03:56 PM, Nishanth Menon wrote:
+> On Tue, Jan 14, 2014 at 2:20 PM, Victor Kamensky
+> <victor.kamensky@linaro.org> wrote:
+>> On 14 January 2014 09:56, Nishanth Menon <nm@ti.com> wrote:
+>>> On Tue, Jan 14, 2014 at 11:35 AM, Victor Kamensky
+>>> <victor.kamensky@linaro.org> wrote:
+>>>>
+>>>> When BE kernel is built Makefile does take of compiling code in BE
+>>>> mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
+>>>
+>>> Agreed, and I assume you cannot instead switch to LE mode when
+>>> entering assembly assuming LE?
 >>
->> Passing the hw_events as the pcpu token here is kind of hacky.
->> The reason is because the token is dereferenced into cpu_pmu in
->> armv7pmu_handle_irq() like so:
+>> Yes. Note that this asm interacts with other data in kernel that would
+>> be in BE form. And after all linker will not allow to put together files
+>> that were compiled in different endianity.
 >>
->> 	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
+>>> The reason I ask this is - most of our development is NOT in BE mode.
+>>> we will continue to manipulate and add assembly - AM335x, DRA7/OMAP5
+>>> etc.. and obviously not every code change will indulge in ensuring
+>>> right markers will be in place.
+>>>
+>>> by ensuring readl_relaxed handles the variations, you have ensured
+>>> that I dont need to care about drivers other than to ensure they use
+>>> _relaxed variants. in the case of assembly, this does not seem long
+>>> term manageable.
 >>
->> It would be great if we could pass cpu_pmu directly to the
->> request call like so:
+>> Yes, I agree if it is outside of main use case it will get broken if not
+>> attended to. Definitely universe entropy increases :) - if left without
+>> attention things will decay. Note we admit that even with ARM CPU
+>> core BE changes similar decay can happen eventually ...that is
+>> what LNG BE group trying to prevent. I think
+>> the deal here is that next user of it can/need to fix things if they
+>> decayed.
 >>
->> 	request_percpu_irq(irq, cpu_pmu->handle_irq, "arm-pmu", &cpu_pmu);
+> 
+> Personally, I have no idea what "LNG BE" stands for.. I see the
+> approach we are attempting here is to do any interaction external to
+> ARM boundary to go through the ARM_BE8 macro.
+> 
+> If we want to make this something we can live with, then the platforms
+> will have to ensure memory operations external to ARM must be operated
+> upon by these macros. Instead, an approach that may be used is to
+> introduce accessors macros that will provide right instruction based
+> on BE/LE build and BE/LE SoC peripheral behavior.
+> 
+>>>>
+>>>>> is the idea of BE build meant to deal with having a single BE kernel
+>>>>> build work for all platforms (including LE ones)?
+>>>>
+>>>> Sort of. The idea here to run BE image on OMAP4 chip, with
+>>>> kernel that would deals with LE periphery correctly, but ARM
+>>>> core run in BE with special kernel that compiled for BE case (i.e
+>>>> CONFIG_CPU_BIG_ENDIAN is set).
+>>>
+>>> I still dont get the usecase - other than "hey, we do this coz we can
+>>> do it!".. I mean, yep, it sounds great and all.. but 4 years down the
+>>> line, is this still going to work? is this going to be interesting
+>>> careabout? or we are just maintaining additional code for a passing
+>>> fancy or proof-of-concept?
 >>
->> but no. request_percpu_irq() wants a percpu pointer so this won't
->> work. If cpu_pmu was declared as DEFINE_PER_CPU, this would work
->> out just fine.
-> That feels really broken though, since we rely on the cpu_pmu being a
-> container for the struct pmu that was registered with perf core.
->
->> Should the cpu_pmu become a per-cpu variable? That sounds rather
->> invasive.
-> I also don't think that's the right solution, based on the above. It's
-> actually pretty hard to work out what's the right thing to do here...
+>> Valid concern. From LNG BE group point of view it is not "we can do
+>> it". It is more like we've done it. We have Pandaboard ES running BE
+>> kernel for a while. It is in LNG BE tree. We used it as development
+>> and testing vehicle for BE work for a while. We are very grateful to
+>> the platform for that - it is affordable and easily available! Given,
+>> beyond ongoing BE testing on Pandaboard in LNG there may not be valid
+>> use case for further things on OMAP4 BE. We had discussion
+>> with Santosh Shilimkar from TI during last Linaro connect what to
+>> do with LNG BE Pandaboard series. Santosh suggested and we
+>> agreed that we would try to contribute them back to community. And
+>> that is what Taras is doing. IMHO even though there may not be real
+> 
+> ok.. some sort of Linaro thing about which I have no background about
+> - but dont really care in this context.
+> 
+Nothing related Linaro. Its just that platforms are supporting ARM BE
+mode and Linaro folks had working patches for Panda. So I suggested
+to get them on the lists.
 
-Yes it doesn't seem like the right solution.
-
->
-> We *could* have a per-cpu pointer to the cpu_pmu_pointer, but then we'd
-> need to update the IRQ handlers, including things like the CCI PMU which
-> really doesn't care about per-cpu stuff. So after all this, the shim we have
-> around the IRQ handler for the U8500 SPI workarounds might be the right
-> thing after all -- it allows us to consolidate the conversion of a pcpu
-> pointer into the relevant instance (actually any instance, since they'd all
-> point at the same thing) for the current CPU.
->
-> What do you think to having that shim throw away the second level pcpu
-> pointer in the case of a PPI? (probably means we need to revisit that
-> renaming again).
-
-Ok I think I understand what you're getting at. We pass a per-cpu
-pointer to the cpu_pmu pointer as the dev_id argument to the PPI irq
-handler, and then we check to see if the irq is per-cpu inside the
-armpmu_dispatch_irq() function and throw away the second level of
-pointer, i.e.
-
-static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
-{
-        struct arm_pmu *armpmu;
-        struct platform_device *plat_device;
-        struct arm_pmu_platdata *plat;
-
-        if (irq_is_percpu(irq))
-                dev = *(struct arm_pmu_cpu **)dev;
-        armpmu = dev;
-        plat_device = armpmu->plat_device;
-        plat = dev_get_platdata(&plat_device->dev);
-
-        if (plat && plat->handle_irq)
-                return plat->handle_irq(irq, dev, armpmu->handle_irq);
-        else
-                return armpmu->handle_irq(irq, dev);
-}
-
-
-We still need to make a per-cpu variable to hold the pointer, and assign
-it during cpu_pmu_init like this patch does. Hopefully that is ok.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Santosh
