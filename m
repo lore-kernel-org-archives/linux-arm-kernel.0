@@ -1,62 +1,53 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 14 Jan 2014 20:04:39 +0100
-Subject: [PATCH v3 1/3] ata: sata_mv: introduce compatible string "marvell,
- armada-370-sata"
-In-Reply-To: <1389726281-8731-1-git-send-email-simon.guinot@sequanux.org>
-References: <1389726281-8731-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1389726281-8731-2-git-send-email-simon.guinot@sequanux.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 14 Jan 2014 14:08:56 -0500 (EST)
+Subject: [PATCH v5 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1389653115-11028-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1401141404420.1310-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sata_mv driver supports the SATA IP found in several Marvell SoCs.
-As some new SATA registers have been introduced with the Armada 370/XP
-SoCs, a way to identify them is needed.
+On Mon, 13 Jan 2014, Hans de Goede wrote:
 
-This patch introduces a new compatible string for the SATA IP found in
-Armada 370/XP SoCs.
+> Add support for ohci-platform instantiation from devicetree, including
+> optionally getting clks and a phy from devicetree, and enabling / disabling
+> those on power_on / off.
+> 
+> This should allow using ohci-platform from devicetree in various cases.
+> Specifically after this commit it can be used for the ohci controller found
+> on Allwinner sunxi SoCs.
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: stable at vger.kernel.org # v3.6+
-Acked-by: Jason Cooper <jason@lakedaemon.net>
----
-Changes since v2:
-- Use compatible string "marvell,armada-370-sata" instead of
-  "marvell,armada-370-xp-sata".
+This is fine as far as I am concerned, except for one thing.
 
- Documentation/devicetree/bindings/ata/marvell.txt | 2 +-
- drivers/ata/sata_mv.c                             | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+> @@ -60,17 +127,23 @@ static int ohci_platform_probe(struct platform_device *dev)
+>  	struct usb_hcd *hcd;
+>  	struct resource *res_mem;
+>  	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
+> -	int irq;
+> -	int err = -ENOMEM;
+> -
+> -	if (!pdata) {
+> -		WARN_ON(1);
+> -		return -ENODEV;
+> -	}
+> +	struct ohci_platform_priv *priv;
+> +	int clk, irq, err;
 
-diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
-index b5cdd20cde9c..1c8351604d38 100644
---- a/Documentation/devicetree/bindings/ata/marvell.txt
-+++ b/Documentation/devicetree/bindings/ata/marvell.txt
-@@ -1,7 +1,7 @@
- * Marvell Orion SATA
- 
- Required Properties:
--- compatibility : "marvell,orion-sata"
-+- compatibility : "marvell,orion-sata" or "marvell,armada-370-sata"
- - reg           : Address range of controller
- - interrupts    : Interrupt controller is using
- - nr-ports      : Number of SATA ports in use.
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index 56be31819897..4ec5368c10f7 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -4209,6 +4209,7 @@ static int mv_platform_resume(struct platform_device *pdev)
- 
- #ifdef CONFIG_OF
- static struct of_device_id mv_sata_dt_ids[] = {
-+	{ .compatible = "marvell,armada-370-sata", },
- 	{ .compatible = "marvell,orion-sata", },
- 	{},
- };
--- 
-1.8.5.2
+clk isn't initialized to anything...
+
+> -err_put_hcd:
+> -	usb_put_hcd(hcd);
+>  err_power:
+>  	if (pdata->power_off)
+>  		pdata->power_off(dev);
+> +err_put_clks:
+> +	while (--clk >= 0)
+> +		clk_put(priv->clks[clk]);
+
+... but it gets used here.  The compiler should have warned about this.
+
+After fixing that, you can add
+
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+
+Alan Stern
