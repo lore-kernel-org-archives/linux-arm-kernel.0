@@ -1,82 +1,75 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 13 Jan 2014 16:46:13 -0700
-Subject: [PATCH v6 6/6] ACPI: make sure ECs do not use the ACPI global lock
-In-Reply-To: <1826710.CJqGCqohkh@vostro.rjw.lan>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 14 Jan 2014 01:06:14 +0100
+Subject: [PATCH v6 4/6] ACPI: in HW reduced mode,
+ using FADT PM information is not allowed.
+In-Reply-To: <52D46CE2.8020300@linaro.org>
 References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
- <1389394340-2680-7-git-send-email-al.stone@linaro.org>
- <1826710.CJqGCqohkh@vostro.rjw.lan>
-Message-ID: <52D47AC5.7080508@linaro.org>
+ <4248842.kTIlfoGImy@vostro.rjw.lan> <52D46CE2.8020300@linaro.org>
+Message-ID: <15980172.euCUnnaQYR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 04:33 PM, Rafael J. Wysocki wrote:
-> On Friday, January 10, 2014 03:52:20 PM al.stone at linaro.org wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> ACPI ECs (Embedded Controllers) are allowed to use the ACPI global
->> lock in legacy mode.  Since there is no global lock in hardware
->> reduced mode, make sure that ECs cannot inadvertently use it with
->> older ACPI tables that may have defined an _GLK method for the
->> EC device.  Since an individual lock can and should be defined for
->> each EC, access to each EC should still be properly controlled.
->>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> ---
->>   drivers/acpi/ec.c | 12 ++++++++++--
->>   1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/ec.c b/drivers/acpi/ec.c
->> index ba5b56d..3f15110 100644
->> --- a/drivers/acpi/ec.c
->> +++ b/drivers/acpi/ec.c
->> @@ -745,9 +745,17 @@ ec_parse_device(acpi_handle handle, u32 Level, void *context, void **retval)
->>   	if (ACPI_FAILURE(status))
->>   		return status;
->>   	ec->gpe = tmp;
->> -	/* Use the global lock for all EC transactions? */
->> +	/*
->> +	 * Use the global lock for all EC transactions?
->> +	 *
->> +	 * If ACPI is in hardware reduced mode, there is no global lock.
->> +	 * If a _GLK method is defined, it needs to be ignored, just
->> +	 * in case it returns "true", which could happen if the ASL is
->> +	 * written incorrectly.
->
-> What is going to happen if it is defined and works correctly in turn?
+On Monday, January 13, 2014 03:46:58 PM Al Stone wrote:
+> On 01/10/2014 04:31 PM, Rafael J. Wysocki wrote:
+> > On Friday, January 10, 2014 03:52:18 PM al.stone at linaro.org wrote:
+> >> From: Al Stone <al.stone@linaro.org>
+> >>
+> >> Per the ACPI 5.0 specification, section 5.2.9, none of the power
+> >> management fields in the FADT are to be used.  Short-circuit using
+> >> any of those fields in acpi_processor_get_power_info_fadt().
+> >
+> > So the spec says that we're supposed to ignore the information in
+> > certain FADT fields if the HW_REDUCED_ACPI flag is set.
+> >
+> > However, what about systems in which that information is actually
+> > valid even though HW_REDUCED_ACPI is set?
+> >
+> > Does it break things if we attempt to use that information?
+> 
+> The way I see it in the spec, we just don't use that info _if_ we wish
+> to remain compliant with the spec.  If we insist on using it anyway, we
+> can't say we're implementing hardware reduced mode correctly.  That
+> being said, from my read of the code it appears things would operate
+> the same as they did before if this part of the spec was ignored _and_
+> the info in the tables was still valid (same control register addresses
+> and content and so on).
 
-If for any reason the ec->global_lock field is non-zero, then every
-time an EC transaction is being run (acpi_ec_transaction()), there will
-be an attempt to acquire the ACPI global lock in violation of the
-definition of hardware reduced mode -- the spec says that there is
-no ACPI global lock in this mode.
+Yes.
 
-Since the ACPICA code acpi_acquire_global_lock() doesn't check if it
-is in hardware reduced or not, it will go ahead and make the attempt.
-And again, things will work, but we will not be in hardware reduced
-mode by definition.
+And we are at the point where we've already been violating the spec
+(formally) by not ignoring that information for quite a while, so we risk
+regressions if we suddenly try to become "exactly compliant".  That's
+my main concern here.
 
-If the ACPICA code is compiled for hardware reduced only, then
-acpi_acquire_global_lock() is properly stubbed out and we would
-stay in compliance with the spec's definition of hardware reduced.
+> >> Signed-off-by: Al Stone <al.stone@linaro.org>
+> >> ---
+> >>   drivers/acpi/processor_idle.c | 8 ++++++++
+> >>   1 file changed, 8 insertions(+)
+> >>
+> >> diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
+> >> index eac984a..89f0a0f 100644
+> >> --- a/drivers/acpi/processor_idle.c
+> >> +++ b/drivers/acpi/processor_idle.c
+> >> @@ -270,6 +270,14 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
+> >>   	if (!pr->pblk)
+> >>   		return -ENODEV;
+> >>
+> >> +	/*
+> >> +	 * Using power management information from the FADT is not
+> >> +	 * allowed when in HW reduced mode.  See ACPI 5.0, section
+> >> +	 * 5.2.9.
+> >> +	 */
+> >> +	if (acpi_gbl_reduced_hardware)
+> >> +		return -ENODEV;
+> >> +
+> >>   	/* if info is obtained from pblk/fadt, type equals state */
+> >>   	pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
+> >>   	pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
+> >>
+> >
 
->> +	 */
->>   	tmp = 0;
->> -	acpi_evaluate_integer(handle, "_GLK", NULL, &tmp);
->> +	if (!acpi_gbl_reduced_hardware)
->> +		acpi_evaluate_integer(handle, "_GLK", NULL, &tmp);
->>   	ec->global_lock = tmp;
->>   	ec->handle = handle;
->>   	return AE_CTRL_TERMINATE;
->>
->
-
+Thanks!
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
