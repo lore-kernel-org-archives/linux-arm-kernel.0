@@ -1,37 +1,52 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 13 Jan 2014 17:16:41 -0800
-Subject: [PATCH v10 4/4] arm64: topology: Provide relative power numbers
- for cores
-In-Reply-To: <1389287106-29979-5-git-send-email-broonie@kernel.org>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
- <1389287106-29979-5-git-send-email-broonie@kernel.org>
-Message-ID: <52D48FF9.1070501@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Jan 2014 10:27:05 +0900
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
+ <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
+ <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
+Message-ID: <20140114012705.GA11259@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Jan 13, 2014 at 09:57:08AM +0100, Geert Uytterhoeven wrote:
+> Hi Morimoto-san,
+> 
+> On Wed, Jan 8, 2014 at 11:23 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Wed, Jan 8, 2014 at 2:08 AM, Kuninori Morimoto
+> > <kuninori.morimoto.gx@gmail.com> wrote:
+> >>> +     common->clk = devm_clk_get(&pdev->dev, NULL);
+> >>> +     if (IS_ERR(common->clk)) {
+> >>> +             dev_err(&pdev->dev, "cannot get clock\n");
+> >>> +             return PTR_ERR(common->clk);
+> >>> +     }
+> >>> +
+> >>> +     ret = clk_prepare(common->clk);
+> >>> +     if (ret < 0) {
+> >>> +             dev_err(&pdev->dev, "unable to prepare clock\n");
+> >>> +             return ret;
+> >>> +     }
+> >>> +
+> >>> +     clk_enable(common->clk);
+> >>> +
+> >>>       pm_runtime_enable(dev);
+> >>>       pm_runtime_get_sync(dev);
+> >>
+> >> And this patch seems strange for me.
+> >> pm_runtime_xxx() is doing same things.
+> >> If it didn't work, wrong place is not driver, clock side ?
+> >
+> > That's an interesting observation...
+> 
+> You were right. After applying both of "ARM: shmobile: compile drivers/sh
+> for CONFIG_ARCH_SHMOBILE_MULTI" and "power: clock_ops.c: fixup clk
+> prepare/unprepare count" from Ben Dooks the issue went away.
 
-On 01/09/2014 09:05 AM, Mark Brown wrote:
-> The power numbers are the same as for ARMv7 since it seems that the
-> expected differential between the big and little cores is very similar on
-> both ARMv7 and ARMv8. These numbers are just an initial and basic
-> approximation for use with the current scheduler, it is likely that both
-> experience with silicon and ongoing work on improving the scheduler will
-> lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
-> based on the published DMIPS numbers.
+There seems to be some lively discussion around Ben's patch.
 
-Just to chime in on this.
+> So my patch can be dropped.
 
-As I think someone else proposed, ideally both arch/arm32 and arch/arm64 
-should be determining these metrics dynamically, and allowing the 
-metrics to be overridden from DT data.  These metrics can vary 
-significantly based on variables other than just the core type.
-
-For example, for some ARMv7 CPUs, we know that different revision levels 
-of the same core type can result in significant performance 
-differences.  Also CPU bug workarounds applied early by the bootloader, 
-or different integrator hardware core configurations, can impact these 
-metrics.
-
-
-- Paul
+I have marked this patch as Rejected accordingly.
