@@ -1,49 +1,35 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Tue, 14 Jan 2014 13:38:16 +0000
-Subject: AArch64 kernel image decompression
-In-Reply-To: <201401141351.18988.marex@denx.de>
-References: <20140110170436.GS8153@joshc.qualcomm.com>
- <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
- <4250104.UfkPP3heXI@wuerfel> <201401141351.18988.marex@denx.de>
-Message-ID: <819346bb83b04348a266643afd5bd6f6@BN1PR03MB220.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Jan 2014 13:39:50 +0000
+Subject: [PATCH RFC 08/26] dmaengine: omap-dma: consolidate setup of CCR
+In-Reply-To: <20140113231227.GI27282@n2100.arm.linux.org.uk>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+ <E1VyjuU-0005EQ-H5@rmk-PC.arm.linux.org.uk>
+ <20140113221425.GD7993@atomide.com>
+ <20140113231227.GI27282@n2100.arm.linux.org.uk>
+Message-ID: <20140114133949.GJ27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marek Vasut [mailto:marex at denx.de]
-> Sent: Tuesday, January 14, 2014 6:21 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Arnd Bergmann; Sharma Bhupesh-B45370; 'Catalin Marinas'; 'Josh
-> Cartwright'; 'Will Deacon'; Wolfgang Denk
-> Subject: Re: AArch64 kernel image decompression
+On Mon, Jan 13, 2014 at 11:12:27PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 13, 2014 at 02:14:26PM -0800, Tony Lindgren wrote:
+> > * Russell King <rmk+kernel@arm.linux.org.uk> [140102 07:17]:
+> > > Consolidate the setup of the channel control register.  Prepare the
+> > > basic value in the preparation of the DMA descriptor, and write it into
+> > > the register upon descriptor execution.
+> > 
+> > FYI, this patch seems to be the one that causes the
+> > "DMA timeout with device 55" error for omap1.
 > 
-> On Monday, January 13, 2014 at 12:42:41 PM, Arnd Bergmann wrote:
-> > On Monday 13 January 2014 11:29:20 bhupesh.sharma at freescale.com wrote:
-> > > With the u-boot bootloader also having AArch64 support now (see
-> > > [1]), it would make sense to add the uImage and decompressor support
-> > > to the
-> > > AArch64 Makefile in Linux kernel as well, so that u-boot can also
-> > > boot uImages for AArch64 systems out-off-box.
-> > >
-> > > [1].
-> > > http://git.denx.de/?p=u-boot/u-boot-arm.git;a=shortlog;h=refs/heads/
-> > > aarc
-> > > h64
-> >
-> > u-boot should never have to use a uImage on arm64, since it already
-> > supports booting a vmlinux file.
-> 
-> Just a side-note. The benefit of uImage (resp. please use fitImage, as
-> it's more
-> modern) is that it is protected by checksum against possible corruption.
-> Besides, U-Boot can do the decompression of uImage payload, so there's no
-> need to have decompressor in arm64 kernel.
-> 
+> Okay, looks like I've missed some bit of muxing for DMA signals or
+> something.  I've yet to find any information on this in the OMAP5912
+> docs, so I guess I'm going to have to do this not only blind, but also
+> without hardware.  GAH.
 
-I agree with Marek. Usually for non-cryptographic-secure (key based cryptography) boot
-method the CRC protection is usually the best possible protection against Image
-corruption. CRC check is usually used in a number of field-deployed solutions to ensure
-linux image sanity. 
+Do you know which of the OMAP1 variants your device is?  Is it OMAP15xx
+or OMAP16xx?  It looks like OMAP15xx is easy to fix for this as it hasn't
+got the additional multiplexer on the DMA request signals.
 
-Regards,
-Bhupesh
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
