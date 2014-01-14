@@ -1,40 +1,37 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 14:30:30 -0800
-Subject: [GIT PULL 2/4] omap device tree fixes for v3.14 merge window
-In-Reply-To: <20140109012053.GJ31323@atomide.com> (Tony Lindgren's message of
- "Wed, 8 Jan 2014 17:20:54 -0800")
+Date: Tue, 14 Jan 2014 14:31:52 -0800
+Subject: [GIT PULL 3/4] trivial omap big endian changes for v3.14 merge
+ window
+In-Reply-To: <20140109012139.GK31323@atomide.com> (Tony Lindgren's message of
+ "Wed, 8 Jan 2014 17:21:40 -0800")
 References: <20140109011940.GI31323@atomide.com>
- <20140109012053.GJ31323@atomide.com>
-Message-ID: <877ga26vsp.fsf@linaro.org>
+ <20140109012139.GK31323@atomide.com>
+Message-ID: <871u0a6vqf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tony Lindgren <tony@atomide.com> writes:
 
-> The following changes since commit adfe9361b236154215d4b0fc8b6d79995394b15c:
+> The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
 >
->   ARM: dts: Add basic devices on am3517-evm (2013-12-08 14:15:46 -0800)
+>   Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/dt-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/be-signed
 >
-> for you to fetch changes up to e37e1cb0ee231ffdc9b5ef1da63a0c7e1077c603:
+> for you to fetch changes up to fc6ca98c81bf0ea8b46064915b5947b971594101:
 >
->   ARM: dts: OMAP2: fix interrupt number for rng (2014-01-08 10:24:44 -0800)
+>   ARM: OMAP: debug-leds: raw read and write endian fix (2014-01-07 16:09:45 -0800)
 >
 > ----------------------------------------------------------------
-> Split omap3 core padconf area into two as some of the registers in
-> the padconf area are not accessible and used for other devices.
-> Also fix the interrupt number for omap2 RNG, and add basic support
-> for sbc-3xxx with cm-t3730.
->
-> Note that the minor merge conflicts for omap_hwmod_2xxx_ipblock_data.c
-> can be solved by just dropping the legacy hwmod data for interrupts
-> for v3.14.
+> Trivial search and replace of read and write functions to allow
+> further patches to make omaps work also in big endian mode.
 >
 > ----------------------------------------------------------------
 
-Applying to next/fixes-non-critical.
+I think this one should wait for v3.15.  While a trivial rename, it's a
+pretty broad change and risks having conflicts and fallouts with other
+changes (thinking especially of ongoing clock changes.)
 
 Kevin
