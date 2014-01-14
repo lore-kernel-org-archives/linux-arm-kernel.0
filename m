@@ -1,49 +1,29 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 14 Jan 2014 11:56:17 -0600
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
-References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
- <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
- <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
-Message-ID: <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
+From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
+Date: Tue, 14 Jan 2014 19:11:49 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <20140114170719.GA12126@xanatos> (Sarah Sharp's message of "Tue,
+ 14 Jan 2014 09:07:19 -0800")
+References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
+ <20140114170719.GA12126@xanatos>
+Message-ID: <87r48a77ru.fsf@nemi.mork.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:35 AM, Victor Kamensky
-<victor.kamensky@linaro.org> wrote:
+Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
+> On Sun, Jan 12, 2014 at 10:36:56PM +0100, Arnaud Ebalard wrote:
 >
-> When BE kernel is built Makefile does take of compiling code in BE
-> mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
-
-Agreed, and I assume you cannot instead switch to LE mode when
-entering assembly assuming LE?
-
-The reason I ask this is - most of our development is NOT in BE mode.
-we will continue to manipulate and add assembly - AM335x, DRA7/OMAP5
-etc.. and obviously not every code change will indulge in ensuring
-right markers will be in place.
-
-by ensuring readl_relaxed handles the variations, you have ensured
-that I dont need to care about drivers other than to ensure they use
-_relaxed variants. in the case of assembly, this does not seem long
-term manageable.
-
+>> arno at natisbad.org (Arnaud Ebalard) writes:
+>> 
+>> 2) on current 3.13.0-rc7 kernel (w/ Bj?rn patch applied just in case), I
 >
->> is the idea of BE build meant to deal with having a single BE kernel
->> build work for all platforms (including LE ones)?
->
-> Sort of. The idea here to run BE image on OMAP4 chip, with
-> kernel that would deals with LE periphery correctly, but ARM
-> core run in BE with special kernel that compiled for BE case (i.e
-> CONFIG_CPU_BIG_ENDIAN is set).
+> Which patch are you referring to?
 
-I still dont get the usecase - other than "hey, we do this coz we can
-do it!".. I mean, yep, it sounds great and all.. but 4 years down the
-line, is this still going to work? is this going to be interesting
-careabout? or we are just maintaining additional code for a passing
-fancy or proof-of-concept?
+I wondered about that too at first :-)
 
-Regards,
-Nishanth Menon
+But luckily I don't work that much, and the reference to the ASIX
+AX88179 made it clearer.  I believe it must have been this patch:
+
+ https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=fdc3452cd2c7b2bfe0f378f92123f4f9a98fa2bd
+
+
+Bj?rn
