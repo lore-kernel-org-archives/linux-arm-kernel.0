@@ -1,20 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 14 Jan 2014 22:39:14 +0100
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <20140114060254.GB1914@S2101-09.ap.freescale.net>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <20140114060254.GB1914@S2101-09.ap.freescale.net>
-Message-ID: <201401142239.14531.marex@denx.de>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 14 Jan 2014 22:48:50 +0100
+Subject: [PATCH v5 0/4] Krait L1/L2 EDAC driver
+In-Reply-To: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
+References: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140114214850.GQ29865@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 14, 2014 at 07:02:58 AM, Shawn Guo wrote:
-> The list linux-spi at vger.kernel.org should be copied.
+On Tue, Jan 14, 2014 at 01:30:30PM -0800, Stephen Boyd wrote:
+> This patchset adds support for the Krait L1/L2 cache error detection
+> hardware. The first patch adds the Krait l2 indirection
+> register code. This patch is in need of an ACK from ARM folks.
+> The next two patches add the driver and the binding and 
+> the final patch hooks it all up by adding the device tree node.
 > 
-> I also added Marek who has great experience of play DMA on SPI.
+> I think Boris will pick up the first and third patches since they depend
+> on each other. The final dts change could go through arm-soc via davidb's tree
+> and the Documentation patch could go through the devicetree tree. Or patches 1
+> through 3 can go through Boris' tree.
+> 
+> Changes since v4:
+>  * Prefixed l2 accessors functions with krait_
+>  * Dropped first two patches as Boris says he picked them up
 
-I'm flattered, thanks ;-)
+Hey Stephen,
 
-Best regards,
-Marek Vasut
+I'm going to send upstream only
+
+[PATCH v4 1/6] edac: Don't try to cancel workqueue when it's never setup
+
+as it is a clear bugfix.
+
+The second one
+
+[PATCH v4 2/6] genirq: export percpu irq functions for module usage
+
+will have to wait for when the driver goes in. But the driver depends on
+"ARM: Add Krait L2 register accessor functions" which still waits for
+ACKs, right?
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
