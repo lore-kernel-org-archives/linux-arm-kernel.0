@@ -1,52 +1,41 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Jan 2014 22:50:21 +0800
-Subject: [PATCH] pinctrl: sunxi: Honor GPIO output initial vaules
-Message-ID: <1389711021-16430-1-git-send-email-wens@csie.org>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Tue, 14 Jan 2014 14:52:05 +0000
+Subject: [PATCH v1 1/5] pinctrl: st: Fix a typo in probe
+In-Reply-To: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1389711125-21007-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIO users, such as fixed-regulator, request GPIO output with
-initial value of 1. This was ignored by sunxi driver.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Probe function had commas instead of semi-colons on some of the lines.
+This patch just fixes those lines. No functional chagnes done in this
+patch.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- drivers/pinctrl/pinctrl-sunxi.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ drivers/pinctrl/pinctrl-st.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 119d2dd..fc72d10 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -469,12 +469,6 @@ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	return val;
- }
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 9cadc68..320c273 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1370,10 +1370,10 @@ static int st_pctl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
--static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
--					unsigned offset, int value)
--{
--	return pinctrl_gpio_direction_output(chip->base + offset);
--}
--
- static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
- 				unsigned offset, int value)
- {
-@@ -498,6 +492,17 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
- 	spin_unlock_irqrestore(&pctl->lock, flags);
- }
+-	pctl_desc->owner	= THIS_MODULE,
+-	pctl_desc->pctlops	= &st_pctlops,
+-	pctl_desc->pmxops	= &st_pmxops,
+-	pctl_desc->confops	= &st_confops,
++	pctl_desc->owner	= THIS_MODULE;
++	pctl_desc->pctlops	= &st_pctlops;
++	pctl_desc->pmxops	= &st_pmxops;
++	pctl_desc->confops	= &st_confops;
+ 	pctl_desc->name		= dev_name(&pdev->dev);
  
-+static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
-+					unsigned offset, int value)
-+{
-+	int ret = pinctrl_gpio_direction_output(chip->base + offset);
-+
-+	if (ret == 0)
-+		sunxi_pinctrl_gpio_set(chip, offset, value);
-+
-+	return ret;
-+}
-+
- static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
- 				const struct of_phandle_args *gpiospec,
- 				u32 *flags)
+ 	info->pctl = pinctrl_register(pctl_desc, &pdev->dev, info);
 -- 
-1.8.5.2
+1.7.6.5
