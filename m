@@ -1,45 +1,90 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 Jan 2014 09:53:13 +0900
-Subject: [PATCH 0/9] Renesas RSPI/QSPI DT support
-In-Reply-To: <CAMuHMdWmFa-XsderYDp4jMw6r7fnwpm5XgQGfz8gEbCryXEkHg@mail.gmail.com>
-References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdWmFa-XsderYDp4jMw6r7fnwpm5XgQGfz8gEbCryXEkHg@mail.gmail.com>
-Message-ID: <20140114005312.GF18217@verge.net.au>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 13 Jan 2014 17:59:25 -0700
+Subject: [PATCH v6 5/6] ACPI: do not map/unmap memory regions for FADT
+ entries in reduced HW mode
+In-Reply-To: <11986900.5FYeBqExXg@vostro.rjw.lan>
+References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
+ <3512616.qUD2F1beoi@vostro.rjw.lan> <52D471A7.9090907@linaro.org>
+ <11986900.5FYeBqExXg@vostro.rjw.lan>
+Message-ID: <52D48BED.4060505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 01:55:19PM +0100, Geert Uytterhoeven wrote:
-> On Sun, Jan 12, 2014 at 12:13 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
+On 01/13/2014 05:02 PM, Rafael J. Wysocki wrote:
+> On Monday, January 13, 2014 04:07:19 PM Al Stone wrote:
+>> On 01/10/2014 04:32 PM, Rafael J. Wysocki wrote:
+>>> On Friday, January 10, 2014 03:52:19 PM al.stone at linaro.org wrote:
+>>>> From: Al Stone <al.stone@linaro.org>
+>>>>
+>>>> Several of the FADT fields are normally kept in specific memory
+>>>> regions.  Since these fields are to be ignored in hardware reduced
+>>>> ACPI mode, do not map those addresses when in that mode, and of
+>>>> course do not release the mappings that have not been made.
+>>>>
+>>>> The function acpi_os_initialize() could become a stub in the header
+>>>> file but is left here in case it can be of further use.
+>>>
+>>> Why exactly is this change necessary?
+>>
+>> Two reasons: (1) why do work we do not have to do?  and (2) it
+>> seemed to make sense to me to have the code reflect the spec
+>> accurately.
+>>
+>>> Will things work incorrectly on HW-reduced ACPI systems if we don't make it?
+>>
+>> If the ACPI tables have all of these fields properly set to zero
+>> in hardware reduced, this change does not need to be made.  If a
+>> vendor provides broken ACPI tables where these values are valid,
+>> but still sets hardware reduced in the FADT, these fields could
+>> then be used as before -- but allowing them to be used would mean
+>> we can no longer claim we are implementing hardware reduced correctly.
+>> So things would work, but the system would by definition be in some
+>> sort of undefined hybrid ACPI mode.
+>
+> So this is how it goes.  I'm being told that there are systems in existence
+> where the HW-reduced bit is set for Windows RT compatibility, but otherwise
+> the ACPI HW is fully functional on them.  Apparently, people are able to
+> install and run Linux on those systems today.
+>
+> Question is, are they still going to be able to run Linux on them after the
+> changes in this set?
 
-        [1/9] spi: rspi: Add missing clk_disable() calls in error and cleanup paths
-        [2/9] spi: rspi: Convert to clk_prepare_enable/disable_unprepare           
-        [3/9] spi: rspi: Use NULL as the clock ID
-        [4/9][V3] spi: rspi: Add DT support
+Hrm.  This would have been incredibly useful to know earlier.  I
+might have taken a completely different approach.  Or perhaps not
+even have bothered.
 
-> >     [5/9] ARM: shmobile: r7s72100: Add RSPI clocks for DT
-> >     [6/9][V3] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-> >     [7/9][V3] ARM: shmobile: genmai reference: Add RSPI nodes
-> >     [8/9] ARM: shmobile: r8a7791 dtsi: Add QSPI node
-> >     [9/9] ARM: shmobile: koelsch: Add QSPI nodes
-> 
-> Forgot to mention:
-> 
-> The ARM/shmobile part is based on renesas-devel-v3.13-rc7-20140109v2, with
-> Magnus' pinctrl, Wolfram's riic, Simon's sh_eth, Valentine's i2c pinctrl
-> and Laurent's SCIF DT work applied on top.
-> [Simon: I don't know in which order you will merge these. If you want me
->  to rebase my patches, just ask! Thanks!]
+I'm not naive enough to think all vendors will fully or rigorously
+comply with standards.  Down that path madness lies.  But at face
+value, it sounds like they didn't even try.
 
-Firstly, I would like an Ack from Magnus on the shmobile patches.
+Without access to the ACPI tables and the hardware itself, there is
+no way to know if Linux will run; I have yet to see any such system.
+The phrase "...the ACPI HW is fully functional..." could mean way too
+many things -- it could mean anything from strict compliance with
+hardware reduced mode to completely compliant with legacy mode but all
+we did was toggle the hardware reduced flag so we could use GPIOs 
+instead of an SCI.
 
-With regards to merge order, my preference is to merge patches
-in parallel once their dependencies will no longer change.
+As far as I can tell, that makes the question undecidable.  I can't
+prove a negative -- I can't prove these patches won't break an unknown
+set of systems that have implemented an unknown hybrid of legacy and
+hardware reduced modes.
 
-So for this series it lools like.
+If someone can tell me that these mongrel ACPI systems continue
+to run correctly when they run a Linux built with the
+ACPI_REDUCED_HARDWARE flag set in the ACPICA code, I might at least
+have a clue as to where the boundaries of compliance are.
 
-5/9: Can be merged independently of other patches in the series.
-     But there isn't much point in merging it until the rest of the
-     series is acked and tested.
-6-9/9: Needs to wait until 4/9 has at least been acked by Mark
-       Also, is 1/9 a run-time dependency of these changes?
+Or, if such hardware is commercially available, where does one get it?
+
+Otherwise, the only safe patch is 1/6, the Kconfig changes.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
