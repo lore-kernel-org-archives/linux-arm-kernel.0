@@ -1,63 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 14 Jan 2014 10:43:58 -0700
-Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
- SoC file
-In-Reply-To: <52D4D314.3000208@nvidia.com>
-References: <20131219122857.3226.42830.stgit@tamien>
- <20131219123719.3226.44864.stgit@tamien> <52B389CD.8010004@wwwdotorg.org>
- <52D4D314.3000208@nvidia.com>
-Message-ID: <52D5775E.9080209@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 14 Jan 2014 11:56:17 -0600
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+ <52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+ <52D55CE5.1060902@ti.com>
+ <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+Message-ID: <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2014 11:03 PM, Paul Walmsley wrote:
-> On 12/19/2013 04:05 PM, Stephen Warren wrote:
->> On 12/19/2013 05:49 AM, Paul Walmsley wrote:
->>> Add basic DT bindings for the DFLL IP block for the NVIDIA Tegra114 SoC.
->>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
+On Tue, Jan 14, 2014 at 11:35 AM, Victor Kamensky
+<victor.kamensky@linaro.org> wrote:
+>
+> When BE kernel is built Makefile does take of compiling code in BE
+> mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
 
->>> +- clock-names : Must contain an array of strings, one per 'clocks'
->>> +                two-cell array.  The position in the array of these
->> clock-names defines the set of entries in clocks, not the other way around.
-> 
-> Hmm.  If one refers to the DT clock binding documentation, it lists the
-> 'clock-names' property as optional, and the 'clocks' property as mandatory:
-> 
-> -----
-> 
-> |==Clock consumers==
-> 
-> Required properties:
-> clocks:		List of phandle and clock specifier pairs, one pair
-> 		for each clock input to the device.  Note: if the
-> 		clock provider specifies '0' for #clock-cells, then
-> 		only the phandle portion of the pair will appear.
-> 
-> Optional properties:
-> clock-names:	List of clock input name strings sorted in the same
-> 		order as the clocks property.  Consumers drivers
-> 		will use clock-names to match clock input names
-> 		with clocks specifiers.
-> 
-> -----
-> |
-> 
-> 
->  https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/clock-bindings.txt#n47
-> 
-> Considering that of_clk_get() doesn't require names, it certainly
-> appears to be the way that the original patch described it (modulo the
-> bit about 'cells'; which has been fixed.)
+Agreed, and I assume you cannot instead switch to LE mode when
+entering assembly assuming LE?
 
-If the binding defines that clock must exist at certain indices in the
-clock property, and clock-names isn't used, then the clocks property
-defines which clocks must exist.
+The reason I ask this is - most of our development is NOT in BE mode.
+we will continue to manipulate and add assembly - AM335x, DRA7/OMAP5
+etc.. and obviously not every code change will indulge in ensuring
+right markers will be in place.
 
-However, if the binding is defining clock names, then the clock-names
-property is the master that defines which clocks exist. In this case,
-the index of entries in the clocks property is undefined by the binding;
-it must simply match the clock-names property, which can be arbitrarily
-ordered by the user.
+by ensuring readl_relaxed handles the variations, you have ensured
+that I dont need to care about drivers other than to ensure they use
+_relaxed variants. in the case of assembly, this does not seem long
+term manageable.
 
-Since this is a new binding, we should use the clock-names style to
-ensure easy future backwards-compatible changes.
+>
+>> is the idea of BE build meant to deal with having a single BE kernel
+>> build work for all platforms (including LE ones)?
+>
+> Sort of. The idea here to run BE image on OMAP4 chip, with
+> kernel that would deals with LE periphery correctly, but ARM
+> core run in BE with special kernel that compiled for BE case (i.e
+> CONFIG_CPU_BIG_ENDIAN is set).
+
+I still dont get the usecase - other than "hey, we do this coz we can
+do it!".. I mean, yep, it sounds great and all.. but 4 years down the
+line, is this still going to work? is this going to be interesting
+careabout? or we are just maintaining additional code for a passing
+fancy or proof-of-concept?
+
+Regards,
+Nishanth Menon
