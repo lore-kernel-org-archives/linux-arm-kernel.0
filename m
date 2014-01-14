@@ -1,48 +1,45 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Tue, 14 Jan 2014 18:20:21 +0800
-Subject: LSK merge linux-stable review
-In-Reply-To: <20140114094555.GA1088@arm.com>
-References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
- <20140110105615.GD925@arm.com> <52D01234.5040402@linaro.org>
- <20140110163239.GF925@arm.com> <52D09FF8.8060308@linaro.org>
- <20140113155525.GG11805@arm.com> <52D48586.5030801@linaro.org>
- <20140114094555.GA1088@arm.com>
-Message-ID: <52D50F65.1030202@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Jan 2014 11:30:50 +0100
+Subject: [RFC 03/18] GPIO: gpio-generic: Add label to platform data
+In-Reply-To: <1389196639.23721.16.camel@hornet>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-4-git-send-email-pawel.moll@arm.com>
+ <CACRpkdb4w26vuOtR1bAhQ6k=1uQx=np4WwoabvH8pOq8HK54=w@mail.gmail.com>
+ <1389196639.23721.16.camel@hornet>
+Message-ID: <CACRpkdb4X+=Tpe_+U0ixyQTA3BbtX17wk=y=63CVkQsdLo60iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2014 05:45 PM, Catalin Marinas wrote:
-> On Tue, Jan 14, 2014 at 12:32:06AM +0000, Alex Shi wrote:
->> On 01/13/2014 11:55 PM, Catalin Marinas wrote:
->>> On Sat, Jan 11, 2014 at 01:35:52AM +0000, Alex Shi wrote:
->>>>>> the first column '-/+' means contents was removed/added from file
->>>>>> 5e9d274. the 2nd column '-/+' means contents was removed/added from file
->>>>>> 9c93e12.
->>>>>>
->>>>>> Yes, The notify_cpu_starting kept in final file later.
->>>>>
->>>>> Just make sure it is in line with commit 7ade67b5984d0a (arm64: move
->>>>> enabling of GIC before CPUs are set online)
->>>>
->>>> Give you the part of modified smp.c file here :)
->>>
->>> As I said, you may want to cherry pick 7ade67b5984d0a. It comes in handy
->>> with GICv3 support (if you later plan to back-port it to this version of
->>> LSK).
+On Wed, Jan 8, 2014 at 4:57 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Mon, 2013-12-23 at 17:26 +0000, Linus Walleij wrote:
+
+>> Good point. But what about also adding device tree support for
+>> naming the chips while you're at it?
 >>
->> Sorry for not make it clear.
->> We had picked up 7ade67b5984d0a as I showed the contents of function
->> secondary_start_kernel().
-> 
-> I don't think you picked it since this commit moves
-> notify_cpu_starting() before set_cpu_online() which is not the case for
-> the code you pasted.
-> 
+>> I imagine a generic gpiochip property in
+>> Documentation/devicetree/bindings/gpio/gpio.txt
+>
+> Well, this has been discussed almost to death already (as you may
+> remember ;-) in the thread:
+>
+> http://www.spinics.net/lists/devicetree/msg00072.html
+>
+> (only portions survived)
+>
+> Although I was in favour of the generic binding (as were you if I
+> remember correctly), the final non-conclusion was not to open the
+> "generic door". Fair enough with me, I went the defined-in-code way
+> here...
 
-Ops, my stupid mistaken. Just cherry-picked this patch into lsk.
+OK I buy this. I am willing to apply this patch. Just a problem:
 
-Thanks again!
+Content-Type: text/plain; charset=WINDOWS-1252
+Content-Transfer-Encoding: quoted-printable
 
--- 
-Thanks
-    Alex
+I can't apply this patch :-)
+
+Please consult your fellow upstream developers on how to get
+the mail out of the ARM offices in a form that I can apply...
+
+Yours,
+Linus Walleij
