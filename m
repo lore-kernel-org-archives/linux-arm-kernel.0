@@ -1,39 +1,54 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 13 Jan 2014 16:42:46 -0800
-Subject: [PATCH V2 1/6] Documentation: add dts binding for X-Gene reboot
- dts node.
-In-Reply-To: <201401132043.52491.arnd@arndb.de>
-References: <1389135041-16062-1-git-send-email-fkan@apm.com>
- <201401131619.35030.arnd@arndb.de>
- <CAL85gmCTsxng3jCaAcCjePE6Pxu7Jg98TDUqQrDFzsfW2GQwEg@mail.gmail.com>
- <201401132043.52491.arnd@arndb.de>
-Message-ID: <CAL85gmCA4kBsRUMC_ENjGfCq5jM11iY5Jx_+A3V9XQDU0b7E0A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Jan 2014 09:46:38 +0900
+Subject: [PATCH V2 0/3] SoC and board integration for QSPI on
+ r8a7791/koelsch
+In-Reply-To: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140114004638.GE18217@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> Is this related to the standard ARM SCU that manages multiprocessor
-> systems, or a different unit that uses the same name?
+On Sun, Jan 12, 2014 at 12:00:29PM +0100, Geert Uytterhoeven wrote:
+> This series adds support for the Spansion s25fl512s SPI FLASH on the
+> r8a7791-based Koelsch board. It is based on
+> renesas-devel-v3.13-rc7-20140109v2, with Valentine's i2c pinctrl and
+> Laurent's SCIF DT work applied on top.
+> [Simon: I don't know in which order you will merge these. If you want me
+>  to rebase my patches, just ask! Thanks!]
 
-FKAN: You mean the snoop control unit in ARM. This is different from
-that, the main function of this unit is clk control.
+I see that Laruent has taken patch 1/4.
 
->
-> Since this is a global register range with a variety of things in it,
-> the best candidate IMHO would be to use the "syscon" driver. You can
-> mark the device node as 'compatible="apm,xgene-scu","syscon"' to let
-> it get picked up by the drivers/mfd/syscon driver, which creates
-> a "regmap" structure for it.
->
-> The reset driver then uses a DT reference with a phandle to the
-> SCU node and calls syscon_regmap_lookup_by_phandle() to get the
-> regmap. It can get the register number inside the regmap from DT
-> as well and use the regmap API to perform the reset.
+Is it possible for me to merge patches 2-4/4 independently of that patch?
+That is, can I apply them and still produce a kernel that boots. If so,
+that is my preferred option. If not I will talk to Laurent about a branch
+to base things on.
 
-Thanks, will do.
->
->         Arnd
+Also, I would like to get an Ack from Magnus.
+
+> 
+> This applies to non-multiplatform Koelsch only.  Multi-platform Koelsch
+> support will be added in a separate series.
+> 
+>     [1/4] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
+>     [2/4] ARM: shmobile: r8a7791: add QSPI clocks
+>     [3/4] ARM: shmobile: koelsch: Add QSPI support
+>     [4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80 in
+> 
+> Changes in V2:
+>   - Split QSPI pins in 2 sets of 3 pin groups
+>   - Add "[PATCH V2 4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80
+>     in defconfig"
+> 
+> Thanks!
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
