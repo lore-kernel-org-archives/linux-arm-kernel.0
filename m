@@ -1,29 +1,35 @@
-From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
-Date: Tue, 14 Jan 2014 19:11:49 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <20140114170719.GA12126@xanatos> (Sarah Sharp's message of "Tue,
- 14 Jan 2014 09:07:19 -0800")
-References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
- <20140114170719.GA12126@xanatos>
-Message-ID: <87r48a77ru.fsf@nemi.mork.no>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 14 Jan 2014 10:34:38 -0800
+Subject: [PATCH] ARM: at91: smc: bug fix in sam9_smc_cs_read()
+In-Reply-To: <1389279714-30873-1-git-send-email-nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Thu, 9 Jan 2014 16:01:54 +0100")
+References: <1389279714-30873-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <87fvoq8la9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
-> On Sun, Jan 12, 2014 at 10:36:56PM +0100, Arnaud Ebalard wrote:
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+
+> From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 >
->> arno at natisbad.org (Arnaud Ebalard) writes:
->> 
->> 2) on current 3.13.0-rc7 kernel (w/ Bj?rn patch applied just in case), I
+> There was a copy/paste error when reading the nwe_pulse value.
 >
-> Which patch are you referring to?
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Cc: stable <stable@vger.kernel.org> # 3.3
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Arnd, Olof, Kevin,
+>
+> This is a little fix that I have just received. As the "fixes" colletion is
+> certainly closed for 3.13, I would like to include this one in the
+> "fixes-non-critical" topic for 3.14.
+>
+> For the time being, I only have this one, so It can be convenient if you take
+> this fix as a patch instead of a pull-request.
 
-I wondered about that too at first :-)
+Applied to fixes-non-critical, and merged into for-next.
 
-But luckily I don't work that much, and the reference to the ASIX
-AX88179 made it clearer.  I believe it must have been this patch:
+Thanks,
 
- https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=fdc3452cd2c7b2bfe0f378f92123f4f9a98fa2bd
-
-
-Bj?rn
+Kevin
