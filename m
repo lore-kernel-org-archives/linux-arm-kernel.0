@@ -1,38 +1,30 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 13 Jan 2014 18:19:24 -0600
-Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx,
- AM43xx & DRA7xx
-In-Reply-To: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-Message-ID: <1389658764-39199-8-git-send-email-s-anna@ti.com>
+From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
+Date: Mon, 13 Jan 2014 16:20:30 -0800 (PST)
+Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
+In-Reply-To: <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
+ <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
+ <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
+ <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
+Message-ID: <87d2jvh0s5.wl%kuninori.morimoto.gx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
-device families as well. The IPs are identical to that of
-OMAP4/OMAP5, except for the number of locks.
 
-Add a depends on to the above family of SoCs to enable the
-build support for OMAP hwspinlock driver for any of the above
-SoC configs.
+Hi Geert
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+> >> And this patch seems strange for me.
+> >> pm_runtime_xxx() is doing same things.
+> >> If it didn't work, wrong place is not driver, clock side ?
+(snipO
+> You were right. After applying both of "ARM: shmobile: compile drivers/sh
+> for CONFIG_ARCH_SHMOBILE_MULTI" and "power: clock_ops.c: fixup clk
+> prepare/unprepare count" from Ben Dooks the issue went away.
+
+Nice !
+Thank you for your help :)
+
+Best regards
 ---
- drivers/hwspinlock/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
-index 70637d2..3612cb5 100644
---- a/drivers/hwspinlock/Kconfig
-+++ b/drivers/hwspinlock/Kconfig
-@@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
- 
- config HWSPINLOCK_OMAP
- 	tristate "OMAP Hardware Spinlock device"
--	depends on ARCH_OMAP4 || SOC_OMAP5
-+	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
- 	select HWSPINLOCK
- 	help
- 	  Say y here to support the OMAP Hardware Spinlock device (firstly
--- 
-1.8.4.3
+Kuninori Morimoto
