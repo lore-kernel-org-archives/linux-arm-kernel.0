@@ -1,89 +1,53 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 14 Jan 2014 16:48:34 +0100
-Subject: [PATCH v2 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
-In-Reply-To: <20140114151404.GN19878@titan.lakedaemon.net>
-References: <1389711007-7239-1-git-send-email-simon.guinot@sequanux.org>
- <20140114151404.GN19878@titan.lakedaemon.net>
-Message-ID: <20140114154834.GD32507@kw.sim.vm.gnt>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 14 Jan 2014 09:51:01 -0600
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>	<52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+Message-ID: <52D55CE5.1060902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 10:14:04AM -0500, Jason Cooper wrote:
-> Simon,
+On 01/14/2014 05:14 AM, Taras Kondratiuk wrote:
+> On 13 January 2014 17:23, Nishanth Menon <nm@ti.com> wrote:
+>> On 01/13/2014 09:03 AM, Taras Kondratiuk wrote:
+>>> From: Victor Kamensky <victor.kamensky@linaro.org>
+>>>
+>>> Assembler functions defined in sleep44xx.S need to byteswap values
+>>> after read / before write from h/w register if code compiled in big
+>>> endian mode. Simple change to do 'rev x, x' before str instruction
+>>> and after ldr instruction that deals with h/w registers.
+>>>
+>>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>>> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+>>> ---
+>>> This is a part of RFC series [1].
+>>> Based on v3.13-rc8.
+>>>
+>>> [1] http://www.spinics.net/lists/linux-omap/msg99927.html
+>>>
+>>>  arch/arm/mach-omap2/sleep44xx.S |   17 +++++++++++++++++
+>>>  1 file changed, 17 insertions(+)
+>>>
+>>
+>> OMAP4 is LE, and if there is a gcc flag for the same, is'nt it cleaner
+>> to deal with it in Makefile rather than trying to make an assembly
+>> meant only for LE by force building it for BE?
 > 
-> On Tue, Jan 14, 2014 at 03:50:04PM +0100, Simon Guinot wrote:
-> > Hello,
-> > 
-> > This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
-> > SoCs: once a disk is removed from a SATA port, then the re-plug events
-> > are not detected by the sata_mv driver.
-> > 
-> > This should be applied to the -stable kernels 3.10 and onwards. 
+> Hi Nishanth
+> I'm not sure I got your point.
+> Do you propose to build this file as LE while the rest of kernel is BE?
 > 
-> Please add a 'Fixes: <commit-hash> (oneline)' tag below the Cc: stable
-> tags.  It looks like the sata_mv binding and the Armada 370 DT booting
-> were both introduced in v3.6, so I would probably use:
-> 
-> Fixes: 9ae6f740b49f (arm: mach-mvebu: add support for Armada 370 and Armada XP with DT)
+I dont see why I should deal with the BE macro for every code change
+we have in omap4,am335x assembly. The hardware is LE and wont change
+just coz you are building it for BE. So I dont get the rationale for
+changing the assembly here - yes, if the assembly can be maintained as
+LE only mode and the build handling be adequately handled in Makefile
+(similar to SMC handling), that would be the best.
 
-Hi Jason,
+is the idea of BE build meant to deal with having a single BE kernel
+build work for all platforms (including LE ones)?
 
-I am not comfortable with this "Fixes: commit_id" notation. It states
-that the patch fixes a regression introduced by a given commit. This
-hardly makes sense to me because obviously the hotplug issue has not
-been introduced by:
-
-"arm: mach-mvebu: add support for Armada 370 and Armada XP with DT".
-
-I know that the purpose is purely administrative, but it is kind of
-weird...
-
-> 
-> Is there a specific reason you say v3.10?
-
-I could have said nothing as well.
-
-As stable kernel older than 3.10 are no longer maintained, I think
-we don't need to point out a specific commit as a -stable target.
-Simply Cc'ing -stable without any extra informations should be good
-enough.
-
-> 
-> Once you've incorporated Gregory's comments,
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-OK.
-
-Thanks,
-
-Simon
-
-> 
-> > Lior Amsalem (1):
-> >   ata: sata_mv: fix disk hotplug for Armada 370/XP SoCs
-> > 
-> > Simon Guinot (2):
-> >   ata: sata_mv: introduce compatible string "marvell,armada-370-xp-sata"
-> >   ARM: mvebu: update the SATA compatible string for Armada 370/XP
-> > 
-> >  Documentation/devicetree/bindings/ata/marvell.txt |  2 +-
-> >  arch/arm/boot/dts/armada-370-xp.dtsi              |  2 +-
-> >  drivers/ata/sata_mv.c                             | 25 +++++++++++++++++++++++
-> >  3 files changed, 27 insertions(+), 2 deletions(-)
-> 
-> Tejun,
-> 
-> I see no point to breaking up this series only to have both pieces end
-> up in stable.  Are you ok with taking the whole thing?
-> 
-> thx,
-> 
-> Jason.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/e6b03fc5/attachment.sig>
+-- 
+Regards,
+Nishanth Menon
