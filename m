@@ -1,37 +1,45 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 14 Jan 2014 15:50:08 +0200
-Subject: [PATCH] spi: davinci: fix build warning when printing resource_size_t
- vars
-In-Reply-To: <20140112110916.GR15937@n2100.arm.linux.org.uk>
-References: <20140112110916.GR15937@n2100.arm.linux.org.uk>
-Message-ID: <1389707408-24785-1-git-send-email-grygorii.strashko@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Jan 2014 08:00:31 -0500
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <20140114091543.GC334@lunn.ch>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <20140114004833.GI19878@titan.lakedaemon.net>
+ <20140114091543.GC334@lunn.ch>
+Message-ID: <20140114130031.GM19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use %pa format specifier when printing variables of resource_size_t type
-to fix build warnings:
-drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'resource_size_t'
-drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'resource_size_t'
+On Tue, Jan 14, 2014 at 10:15:43AM +0100, Andrew Lunn wrote:
+> On Mon, Jan 13, 2014 at 07:48:33PM -0500, Jason Cooper wrote:
+> > On Mon, Jan 06, 2014 at 11:49:17PM +0100, Andrew Lunn wrote:
+> > > Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
+> > > 
+> > > As with the QNAP 119, there are two variants, depending on which SoC
+> > > has been used. They differ on Ethernet PHY addresses and number of
+> > > PCIe busses.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > >  arch/arm/boot/dts/Makefile                |    4 +-
+> > >  arch/arm/boot/dts/kirkwood-ts419-6281.dts |   20 ++++++++
+> > >  arch/arm/boot/dts/kirkwood-ts419-6282.dts |   32 ++++++++++++
+> > >  arch/arm/boot/dts/kirkwood-ts419.dtsi     |   75 +++++++++++++++++++++++++++++
+> > >  4 files changed, 130 insertions(+), 1 deletion(-)
+> > >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
+> > >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
+> > >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
+> > 
+> > Applied to mvebu/dt with Ian's Tested-by
+> 
+> Hi Jason
+> 
+> Thanks, but please could you hold onto it for a while. I would like to
+> see how the discussion about unstable /dev/input/by-path discussion
+> plays out. That is if anybody actually replies to my question...
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/spi/spi-davinci.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Ok, this and the Bubba board are probably for next cycle at this point
+anyhow.  I'll send pulls for the fixes sometime today.
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 50b2d88..d3f6386 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -963,8 +963,8 @@ static int davinci_spi_probe(struct platform_device *pdev)
- 			goto free_clk;
- 
- 		dev_info(&pdev->dev, "DMA: supported\n");
--		dev_info(&pdev->dev, "DMA: RX channel: %d, TX channel: %d, "
--				"event queue: %d\n", dma_rx_chan, dma_tx_chan,
-+		dev_info(&pdev->dev, "DMA: RX channel: %pa, TX channel: %pa, "
-+				"event queue: %d\n", &dma_rx_chan, &dma_tx_chan,
- 				pdata->dma_event_q);
- 	}
- 
--- 
-1.7.9.5
+thx,
+
+Jason.
