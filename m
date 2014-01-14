@@ -1,213 +1,100 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 14 Jan 2014 01:21:56 +0100
-Subject: [PATCH v6 3/6] ACPI: HW reduced mode does not allow use of the
- FADT sci_interrupt field
-In-Reply-To: <52D468A5.90609@redhat.com>
-References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
- <13769273.zu9PcWNH5N@vostro.rjw.lan> <52D468A5.90609@redhat.com>
-Message-ID: <7770549.oezqyo8gaq@vostro.rjw.lan>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 13 Jan 2014 18:19:17 -0600
+Subject: [PATCHv4 0/7] omap hwspinlock dt support
+Message-ID: <1389658764-39199-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 13, 2014 03:28:53 PM Al Stone wrote:
-> On 01/10/2014 04:20 PM, Rafael J. Wysocki wrote:
-> > On Friday, January 10, 2014 03:52:17 PM al.stone at linaro.org wrote:
-> >> From: Al Stone <al.stone@linaro.org>
-> >>
-> >> In HW reduced mode, the use of the SCI interrupt is not allowed.  In
-> >> all those places that use the FADT sci_interrupt field, make sure we
-> >> do not execute that path when in HW reduced mode.
-> >>
-> >> In the case of acpi_os_install_interrupt_handler() in osl.c, this allows
-> >> us to open up the routine to installing interrupt handlers other than
-> >> acpi_gbl_FADT.sci_interrupt regardless of whether we are in ACPI legacy
-> >> mode or reduced HW mode; acpi_os_remove_interrupt_handler() changes to
-> >> maintain symmetry.
-> >>
-> >> Signed-off-by: Al Stone <al.stone@linaro.org>
-> >> ---
-> >>   drivers/acpi/bus.c      | 30 ++++++++++++++++--------------
-> >>   drivers/acpi/osl.c      | 18 +++++++-----------
-> >>   drivers/acpi/pci_link.c |  2 ++
-> >>   3 files changed, 25 insertions(+), 25 deletions(-)
-> >>
-> >> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> >> index 0710004..d871859 100644
-> >> --- a/drivers/acpi/bus.c
-> >> +++ b/drivers/acpi/bus.c
-> >> @@ -552,21 +552,23 @@ void __init acpi_early_init(void)
-> >>   	}
-> >>
-> >>   #ifdef CONFIG_X86
-> >> -	if (!acpi_ioapic) {
-> >> -		/* compatible (0) means level (3) */
-> >> -		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
-> >> -			acpi_sci_flags &= ~ACPI_MADT_TRIGGER_MASK;
-> >> -			acpi_sci_flags |= ACPI_MADT_TRIGGER_LEVEL;
-> >
-> > I wonder why exactly you want to make this change.  It surely doesn't matter
-> > for ARM and do you have any HW-reduced x86 hardware to test it?
-> 
-> The point of this exercise was not to make hardware reduced work for
-> just ARM; the point was to ensure hardware reduced is working correctly
-> for any architecture using ACPI.
-> 
-> No, I do not have hardware reduced x86 hardware to test with.  Nor can
-> I predict if or when Intel will make such a thing.  If you would rather
-> wait until they do, so be it.  My intent was to avoid problems before
-> they occur, rather than waiting until they actually break.
-> 
-> I chose to make this change because (a) it seemed silly to me to
-> execute code you don't have to, (b) since the kernel code does end
-> up acting as documentation for how ACPI is implemented and how it
-> is compliant with the spec, it made sense to me to ensure all usage
-> was compliant with the spec, and (c) if the machine has an IOAPIC
-> and acpi_sci=n (n is non-zero) is supplied on the command line, the
-> FADT SCI interrupt will end being initialized and used which is not
-> allowed in hardware reduced mode.
-> 
-> >> +	if (!acpi_gbl_reduced_hardware) {
-> >> +		if (!acpi_ioapic) {
-> >> +			/* compatible (0) means level (3) */
-> >> +			if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
-> >> +				acpi_sci_flags &= ~ACPI_MADT_TRIGGER_MASK;
-> >> +				acpi_sci_flags |= ACPI_MADT_TRIGGER_LEVEL;
-> >> +			}
-> >> +			/* Set PIC-mode SCI trigger type */
-> >> +			acpi_pic_sci_set_trigger(acpi_gbl_FADT.sci_interrupt,
-> >> +				(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK) >> 2);
-> >> +		} else {
-> >> +			/*
-> >> +			 * now that acpi_gbl_FADT is initialized,
-> >> +			 * update it with result from INT_SRC_OVR parsing
-> >> +			 */
-> >> +			acpi_gbl_FADT.sci_interrupt = acpi_sci_override_gsi;
-> >>   		}
-> >> -		/* Set PIC-mode SCI trigger type */
-> >> -		acpi_pic_sci_set_trigger(acpi_gbl_FADT.sci_interrupt,
-> >> -					 (acpi_sci_flags & ACPI_MADT_TRIGGER_MASK) >> 2);
-> >> -	} else {
-> >> -		/*
-> >> -		 * now that acpi_gbl_FADT is initialized,
-> >> -		 * update it with result from INT_SRC_OVR parsing
-> >> -		 */
-> >> -		acpi_gbl_FADT.sci_interrupt = acpi_sci_override_gsi;
-> >>   	}
-> >>   #endif
-> >>
-> >> diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-> >> index 44c07eb..c946a3a 100644
-> >> --- a/drivers/acpi/osl.c
-> >> +++ b/drivers/acpi/osl.c
-> >> @@ -84,6 +84,7 @@ static int (*__acpi_os_prepare_extended_sleep)(u8 sleep_state, u32 val_a,
-> >>
-> >>   static acpi_osd_handler acpi_irq_handler;
-> >>   static void *acpi_irq_context;
-> >> +static u32 acpi_irq_number;
-> >>   static struct workqueue_struct *kacpid_wq;
-> >>   static struct workqueue_struct *kacpi_notify_wq;
-> >>   static struct workqueue_struct *kacpi_hotplug_wq;
-> >> @@ -178,6 +179,10 @@ static void __init acpi_request_region (struct acpi_generic_address *gas,
-> >>
-> >>   static int __init acpi_reserve_resources(void)
-> >>   {
-> >> +	/* Handle hardware reduced mode: i.e., do nothing. */
-> >> +	if (acpi_gbl_reduced_hardware)
-> >> +		return 0;
-> >
-> > Does it actually break things if we do that?
-> 
-> Not that I can see anywhere.  All of the code I have looked at appears
-> to behave correctly if the ignored fields in the FADT are set to zero
-> -- in this case, not using or checking bits in the xpm1a_event_blocks
-> if the FADT field is zero.
-> 
-> >> +
-> >>   	acpi_request_region(&acpi_gbl_FADT.xpm1a_event_block, acpi_gbl_FADT.pm1_event_length,
-> >>   		"ACPI PM1a_EVT_BLK");
-> >>
-> >> @@ -795,13 +800,6 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
-> >>
-> >>   	acpi_irq_stats_init();
-> >>
-> >> -	/*
-> >> -	 * ACPI interrupts different from the SCI in our copy of the FADT are
-> >> -	 * not supported.
-> >> -	 */
-> >> -	if (gsi != acpi_gbl_FADT.sci_interrupt)
-> >> -		return AE_BAD_PARAMETER;
-> >> -
-> >>   	if (acpi_irq_handler)
-> >>   		return AE_ALREADY_ACQUIRED;
-> >>
-> >> @@ -818,15 +816,13 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
-> >>   		acpi_irq_handler = NULL;
-> >>   		return AE_NOT_ACQUIRED;
-> >>   	}
-> >> +	acpi_irq_number = irq;
-> >>
-> >>   	return AE_OK;
-> >>   }
-> >>
-> >>   acpi_status acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
-> >>   {
-> >> -	if (irq != acpi_gbl_FADT.sci_interrupt)
-> >> -		return AE_BAD_PARAMETER;
-> >> -
-> >>   	free_irq(irq, acpi_irq);
-> >>   	acpi_irq_handler = NULL;
-> >>
-> >> @@ -1806,7 +1802,7 @@ acpi_status __init acpi_os_initialize1(void)
-> >>   acpi_status acpi_os_terminate(void)
-> >>   {
-> >>   	if (acpi_irq_handler) {
-> >> -		acpi_os_remove_interrupt_handler(acpi_gbl_FADT.sci_interrupt,
-> >> +		acpi_os_remove_interrupt_handler(acpi_irq_number,
-> >>   						 acpi_irq_handler);
-> >>   	}
-> >>
-> >> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> >> index 2652a61..d5c155e 100644
-> >> --- a/drivers/acpi/pci_link.c
-> >> +++ b/drivers/acpi/pci_link.c
-> >> @@ -505,6 +505,8 @@ int __init acpi_irq_penalty_init(void)
-> >>   		}
-> >>   	}
-> >>   	/* Add a penalty for the SCI */
-> >> +	if (acpi_gbl_reduced_hardware)
-> >> +		return 0;
-> >>   	acpi_irq_penalty[acpi_gbl_FADT.sci_interrupt] += PIRQ_PENALTY_PCI_USING;
-> >>   	return 0;
-> >>   }
-> >
-> > Is ARM really going to use the code in pci_link.c?  If so, then how exactly?
-> 
-> I have no idea; I wasn't thinking strictly ARM in the first place.
-> Just the same, why execute code if it is irrelevant?
+Hi,
 
-Becase we don't know if it really is irrelevant.  Had I known for a fact that
-it had been irrelevant, I wouldn't have had any concerns here.
+This is an updated series mainly addressing Mark Rutland's comments
+about hwlock specifier being always one-cell. The series adds the
+support for #hwlock-cells property and adds a simple default OF
+translate function.
 
-> Further, if hardware reduced ACPI tables have the SCI interrupt field set to
-> zero as they should, IRQ 0 gets a hefty penalty assessed; or, if the
-> hardware reduced tables were made by taking a shortcut and just toggling
-> the hardware reduced flag while leaving the SCI interrupt field alone,
-> some other IRQ gets a penalty assessed, neither of which seemed to me
-> to be correct either.
+The DTS patches from previous series have already been merged, and
+needs this property to be added. This is handled in a separate series
+that only deals with OMAP hwspinlock DTS patches.
 
-That is a good point.  I think it will be safe to avoid using the SCI if
-the HW reduced bit is set and the SCI interrupt field is 0 at the same time.
+The series, along with the DTS patches, is tested on top of v3.13-rc8
+plus Tero's v13 clock DT series and Tony's 3.14 staged branches. The
+validation on OMAP5, DRA7, AM437 requires Tero's series with couple of
+additional base patches for AM43xx. AM43xx functionality needs a hwmod
+fix [1] for creating the associated omap_device as well.
 
-So in my opinion it generally is better to avoid interpreting the spec
-literally in this particular respect and to treat the ACPI HW features as
-optional if the the HW reduced bit is set.  I think it is OK to check if they
-are present (arguably, we should be doing that anyway, because there may be
-broken BIOSes that don't set HW-reduced and still don't implement those features
-although they should in that case), but changing the code to always ignore them
-altogether may be going a bit too far.
+The validation logs on all the applicable OMAP SoCs are at:
+  OMAP4 - http://paste2.org/YJ7ZwG80
+  OMAP5 - http://paste2.org/c6vO96b9
+  DRA7  - http://paste2.org/tHvxN439
+  AM33x - http://paste2.org/AjCv0U4t
+  AM43x - http://paste2.org/2AKIPa55
 
-Thanks!
+The kernel with the test patches plus the various pulled in branches
+is here for reference (not for merging)
+https://github.com/sumananna/omap-kernel/commits/hwspinlock/3.13-rc8-v4-test
+
+[1] http://marc.info/?l=linux-omap&m=138939747524820&w=2
+
+Changes new in v4:
+- The DT bindings are split into separate patches, and updated to
+  add comments about #hwlock-cells (Patches 1 & 2)
+- Fixed a registration issue with repeated module installation and
+  removal. (Patch 3)
+- Added a new OF helper to support #hwlock-cells in addition to the
+  previous OF functions (Patch 4). The OMAP adaptation patch is
+  updated to use the default translate function (Patch 5)
+- Updated hwspinlock documentation to adjust for the structure
+  changes and the new api additions. (Patches 3, 4)
+- Added build support for AM335x, AM43xx and DRA7xx (Patch 7)
+- The AM335/AM43x fix patch is unchanged (Patch 6)
+
+v3:
+- Removed the DT property hwlock-base-id and associated OF helper
+- Added changes in core to support requesting a specific hwlock using
+  phandle + args approach
+- Revised both the common and OMAP DT bindings document
+http://marc.info/?l=linux-omap&m=138143992932197&w=2
+
+v2:
+- Added a new common DT binding documentation and OF helpers.
+- Revised OMAP DT parse support to use the new OF helper (Patch2)
+- OMAP5 hwspinlock support including the hwmod entry and DT node
+- Add AM335x support to OMAP hwspinlock driver, including a fix
+  needed in driver given that AM335 spinlock module requires s/w wakeup
+- AM335 DT node for spinlock, and a hwmod change to enable smart-idle
+  for AM335.
+- OMAP4 DT node patch is unchanged
+http://marc.info/?l=linux-omap&m=137944644112727&w=2
+
+v1:
+- Add DT parse support to OMAP hwspinlock driver
+- Add OMAP4 DT node and bindings information
+http://marc.info/?l=linux-omap&m=137823082308009&w=2
+
+Suman Anna (7):
+  Documentation: dt: add common bindings for hwspinlock
+  Documentation: dt: add the omap hwspinlock bindings document
+  hwspinlock/core: maintain a list of registered hwspinlock banks
+  hwspinlock/core: add common OF helpers
+  hwspinlock/omap: add support for dt nodes
+  hwspinlock/omap: enable module before reading SYSSTATUS register
+  hwspinlock/omap: enable build for AM33xx, AM43xx & DRA7xx
+
+ .../devicetree/bindings/hwlock/hwlock.txt          |  52 +++++++
+ .../devicetree/bindings/hwlock/omap-hwspinlock.txt |  24 ++++
+ Documentation/hwspinlock.txt                       |  36 ++++-
+ MAINTAINERS                                        |   1 -
+ arch/arm/mach-omap2/Makefile                       |   3 -
+ arch/arm/mach-omap2/hwspinlock.c                   |  60 --------
+ drivers/hwspinlock/Kconfig                         |   2 +-
+ drivers/hwspinlock/hwspinlock_core.c               | 159 ++++++++++++++++++++-
+ drivers/hwspinlock/hwspinlock_internal.h           |   6 +
+ drivers/hwspinlock/omap_hwspinlock.c               |  39 +++--
+ include/linux/hwspinlock.h                         |  20 ++-
+ 11 files changed, 321 insertions(+), 81 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+ create mode 100644 Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+ delete mode 100644 arch/arm/mach-omap2/hwspinlock.c
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.4.3
