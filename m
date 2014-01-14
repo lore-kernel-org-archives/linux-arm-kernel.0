@@ -1,34 +1,35 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 13 Jan 2014 17:58:24 -0800
-Subject: [PATCH] ARM: pm: remove outdated comment
-Message-ID: <1389664704-22350-1-git-send-email-computersforpeace@gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 14 Jan 2014 10:05:42 +0800
+Subject: [PATCH -next] clk: exynos-audss: remove redundant dev_err call in
+ exynos_audss_clk_probe()
+Message-ID: <CAPgLHd9A8QjVk8ThLbP8vv8wMmJ-DovvR+=uadTXWyTFJok_JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit abda1bd5f4e04054ce083c298fcd68a743e9df03 __cpu_suspend()
-takes only 2 arguments, and those arguments are passed by the platform
-code. This comment thus makes no sense, as cpu_suspend() is not actually
-hiding any arguments.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/kernel/suspend.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/clk/samsung/clk-exynos-audss.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 2835d35234ca..9a2f882a0a2d 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -14,10 +14,6 @@ extern int __cpu_suspend(unsigned long, int (*)(unsigned long), u32 cpuid);
- extern void cpu_resume_mmu(void);
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 884187f..01ef381 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -94,10 +94,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
  
- #ifdef CONFIG_MMU
--/*
-- * Hide the first two arguments to __cpu_suspend - these are an implementation
-- * detail which platform code shouldn't have to know about.
-- */
- int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- {
- 	struct mm_struct *mm = current->active_mm;
--- 
-1.8.3.2
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	reg_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(reg_base)) {
+-		dev_err(&pdev->dev, "failed to map audss registers\n");
++	if (IS_ERR(reg_base))
+ 		return PTR_ERR(reg_base);
+-	}
+ 
+ 	clk_table = devm_kzalloc(&pdev->dev,
+ 				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
