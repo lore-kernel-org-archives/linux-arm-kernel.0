@@ -1,27 +1,81 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 14 Jan 2014 09:41:48 -0500
-Subject: [PATCH] spi: davinci: fix build warning when printing
- resource_size_t vars
-In-Reply-To: <20140114143945.GP15567@sirena.org.uk>
-References: <20140112110916.GR15937@n2100.arm.linux.org.uk>
- <1389707408-24785-1-git-send-email-grygorii.strashko@ti.com>
- <20140114143945.GP15567@sirena.org.uk>
-Message-ID: <52D54CAC.1050005@ti.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 14 Jan 2014 09:44:00 -0500
+Subject: [PATCH 4/6] arm64: add EFI stub
+In-Reply-To: <201401131949.39358.arnd@arndb.de>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+ <1389392950-22457-5-git-send-email-msalter@redhat.com>
+ <201401131949.39358.arnd@arndb.de>
+Message-ID: <1389710640.26822.10.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 January 2014 09:39 AM, Mark Brown wrote:
-> On Tue, Jan 14, 2014 at 03:50:08PM +0200, Grygorii Strashko wrote:
->> Use %pa format specifier when printing variables of resource_size_t type
->> to fix build warnings:
->> drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'resource_size_t'
->> drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'resource_size_t'
+On Mon, 2014-01-13 at 19:49 +0100, Arnd Bergmann wrote:
+> On Friday 10 January 2014, Mark Salter wrote:
+> > This patch adds PE/COFF header fields to the start of the Image
+> > so that it appears as an EFI application to EFI firmware. An EFI
+> > stub is included to allow direct booting of the kernel Image. Due
+> > to EFI firmware limitations, only little endian kernels with 4K
+> > page sizes are supported at this time. Support in the COFF header
+> > for signed images was provided by Ard Biesheuvel.
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> This doesn't apply against current code, it seems the same patch has
-> already been applied.
-> 
-Yeah. I did send same patch last merge window time-frame which has been
-applied by you.
+> You got the ordering of the S-o-b lines wrong. Since you send the
+> patch, your name should come last.
 
-Regards,
-Santosh
+Yes.
+
+> 
+> > +config EFI_STUB
+> > +     bool "EFI stub support"
+> > +     depends on !ARM64_64K_PAGES && OF
+> > +     select LIBFDT
+> > +     default y
+> > +     help
+> > +       This kernel feature allows an Image to be loaded directly
+> > +       by EFI firmware without the use of a bootloader.
+> > +       See Documentation/efi-stub.txt for more information.
+> > +
+> >  endmenu
+> 
+> Why not ARM64_64K_PAGES? I thought that it was going to be the
+> default for a lot of distros that would need to run on UEFI systems.
+
+The UEFI spec currently mandates 4k page size. We may be able to work
+around that or get the spec changed, but for now it is just 4k pages.
+
+> 
+> >  menu "Userspace binary formats"
+> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > index 5ba2fd4..1c52b84 100644
+> > --- a/arch/arm64/kernel/Makefile
+> > +++ b/arch/arm64/kernel/Makefile
+> > @@ -4,6 +4,8 @@
+> >  
+> >  CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
+> >  AFLAGS_head.o                := -DTEXT_OFFSET=$(TEXT_OFFSET)
+> > +CFLAGS_efi-stub.o    := -DTEXT_OFFSET=$(TEXT_OFFSET) \
+> > +                        -I$(src)/../../../scripts/dtc/libfdt
+> 
+> Hmm, this is pretty ugly. I notice the same has been done on MIPS
+> as well, but I'd hope we can find a proper way to do it.
+
+Yes, I just copied that from mips. I can look into some more.
+
+> 
+> > diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> > new file mode 100644
+> > index 0000000..10d02bf
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/efi-stub.c
+> > +
+> > +/* Include shared EFI stub code */
+> > +#include "../../../drivers/firmware/efi/efi-stub-helper.c"
+> > +#include "../../../drivers/firmware/efi/fdt.c"
+> 
+> It gets worse here.
+
+Well, I'm open to suggestions here. The shared code has to work with
+stubs which are built into kernel (arm64) and which are part of the
+compressed image wrapper.
