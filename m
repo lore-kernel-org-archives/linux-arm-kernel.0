@@ -1,39 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 14 Jan 2014 12:58:55 +0100
-Subject: [PATCH 4/7] drivers/pci/host: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1389700739-3696-1-git-send-email-wsa@the-dreams.de>
-References: <1389700739-3696-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1389700739-3696-4-git-send-email-wsa@the-dreams.de>
+From: albert.u.boot@aribaud.net (Albert ARIBAUD)
+Date: Tue, 14 Jan 2014 13:08:01 +0100
+Subject: [PATCH v1 0/24] Zynq DT changes
+In-Reply-To: <cover.1388743861.git.michal.simek@xilinx.com>
+References: <cover.1388743861.git.michal.simek@xilinx.com>
+Message-ID: <20140114130801.0f4ea12b@lilith>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource does sanity checks on the given resource. No need to
-duplicate this in the driver.
+Hi Michal,
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
+On Fri,  3 Jan 2014 11:10:45 +0100, Michal Simek
+<michal.simek@xilinx.com> wrote:
 
-Should go via subsystem tree
+> Hi,
+> 
+> this is respin of Jagan v3 series sent here
+> http://lists.denx.de/pipermail/u-boot/2013-December/169617.html
+> + 2 patches v4
+> http://lists.denx.de/pipermail/u-boot/2013-December/169753.html
+> http://lists.denx.de/pipermail/u-boot/2013-December/169752.html
+> 
+> The purpose of this series was to synchronized configuration
+> which we are using with mainline version with adding features
+> which we are using.
+> 
+> The major change, which I have done, is adding DT support for
+> all zynq boards instead of board specification configurations.
+> I have changed serial, gem, emaclite, mmc.
+> i2c, spi already support bus selection.
+> 
+> For more information please look at patches.
+> 
+> All series are available here for easier testing.
+> http://git.denx.de/?p=u-boot/u-boot-microblaze.git;a=shortlog;h=refs/heads/zynq
+> 
+> Thanks,
+> Michal
 
- drivers/pci/host/pci-imx6.c | 5 -----
- 1 file changed, 5 deletions(-)
+As Jagan's series has been pulled in, can you resubmit a v2 based on
+current ARM ToT?
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index bd70af8..5002e23 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -426,11 +426,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		"imprecise external abort");
- 
- 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!dbi_base) {
--		dev_err(&pdev->dev, "dbi_base memory resource not found\n");
--		return -ENODEV;
--	}
--
- 	pp->dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
- 	if (IS_ERR(pp->dbi_base)) {
- 		ret = PTR_ERR(pp->dbi_base);
+Amicalement,
 -- 
-1.8.5.1
+Albert.
