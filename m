@@ -1,45 +1,61 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 14 Jan 2014 09:30:39 +0100
-Subject: [PATCH] ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
-In-Reply-To: <20140114003627.GB18217@verge.net.au>
-References: <1389525349-3722-1-git-send-email-geert@linux-m68k.org>
- <20140113003811.GI15296@verge.net.au>
- <CAMuHMdWu80dtY_uKtd-t4eYQw3c4Vu=AqbTZ1CnDtc6yeyXiYQ@mail.gmail.com>
- <20140113084920.GE29308@verge.net.au>
- <20140114003627.GB18217@verge.net.au>
-Message-ID: <CAMuHMdXksaGazq2e9hNw49SsKf3u4K5VLt5eY-PX6P=VPBEhRg@mail.gmail.com>
+Date: Tue, 14 Jan 2014 09:40:34 +0100
+Subject: [PATCH 0/9] Renesas RSPI/QSPI DT support
+In-Reply-To: <20140114005312.GF18217@verge.net.au>
+References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdWmFa-XsderYDp4jMw6r7fnwpm5XgQGfz8gEbCryXEkHg@mail.gmail.com>
+ <20140114005312.GF18217@verge.net.au>
+Message-ID: <CAMuHMdWMZE23JkEr7Weq6MWgPK5w-Gy_kus5HxvcLBdgPn5Daw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 1:36 AM, Simon Horman <horms@verge.net.au> wrote:
-> In the mean time I will queue this up. In doing so I had to resolve
-> a minor conflict. The result is as follows. Please check it.
+On Tue, Jan 14, 2014 at 1:53 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Sun, Jan 12, 2014 at 01:55:19PM +0100, Geert Uytterhoeven wrote:
+>> On Sun, Jan 12, 2014 at 12:13 PM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
 >
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>         [1/9] spi: rspi: Add missing clk_disable() calls in error and cleanup paths
+>         [2/9] spi: rspi: Convert to clk_prepare_enable/disable_unprepare
+>         [3/9] spi: rspi: Use NULL as the clock ID
+>         [4/9][V3] spi: rspi: Add DT support
 >
-> ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
+>> >     [5/9] ARM: shmobile: r7s72100: Add RSPI clocks for DT
+>> >     [6/9][V3] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
+>> >     [7/9][V3] ARM: shmobile: genmai reference: Add RSPI nodes
+>> >     [8/9] ARM: shmobile: r8a7791 dtsi: Add QSPI node
+>> >     [9/9] ARM: shmobile: koelsch: Add QSPI nodes
+>>
+>> Forgot to mention:
+>>
+>> The ARM/shmobile part is based on renesas-devel-v3.13-rc7-20140109v2, with
+>> Magnus' pinctrl, Wolfram's riic, Simon's sh_eth, Valentine's i2c pinctrl
+>> and Laurent's SCIF DT work applied on top.
+>> [Simon: I don't know in which order you will merge these. If you want me
+>>  to rebase my patches, just ask! Thanks!]
 >
-> Without this, a Debian jessie nfsroot hangs early in the boot process.
+> Firstly, I would like an Ack from Magnus on the shmobile patches.
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> [horms+renesas at verge.net.au: resolved trivial conflict]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> With regards to merge order, my preference is to merge patches
+> in parallel once their dependencies will no longer change.
 >
-> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-> index 4071e61..3015797 100644
-> --- a/arch/arm/configs/koelsch_defconfig
-> +++ b/arch/arm/configs/koelsch_defconfig
-> @@ -34,6 +34,8 @@ CONFIG_UNIX=y
->  CONFIG_INET=y
->  CONFIG_IP_PNP=y
->  CONFIG_IP_PNP_DHCP=y
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_BLK_DEV_SD=y
->  CONFIG_ATA=y
+> So for this series it lools like.
+>
+> 5/9: Can be merged independently of other patches in the series.
+>      But there isn't much point in merging it until the rest of the
+>      series is acked and tested.
 
-Looks OK, thanks!
+OK.
+
+> 6-9/9: Needs to wait until 4/9 has at least been acked by Mark
+
+OK. Based on Mark's comments, there will be a V4.
+
+>        Also, is 1/9 a run-time dependency of these changes?
+
+1/9 is a bugfix. I'll send a rebased version to Mark, as he wanted to
+get that one in first.
+
+2-3/9 are run-time dependencies, but 2/9 won't apply without 1/9.
 
 Gr{oetje,eeting}s,
 
