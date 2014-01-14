@@ -1,44 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jan 2014 21:49:10 +0000
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <CAHrpEqS-_EBa2z+StMjk9upeyLWLff_p=bS+14TVMDQjoEHv+g@mail.gmail.com>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <CAHrpEqS-_EBa2z+StMjk9upeyLWLff_p=bS+14TVMDQjoEHv+g@mail.gmail.com>
-Message-ID: <20140114214910.GC15567@sirena.org.uk>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Tue, 14 Jan 2014 06:36:47 -0800
+Subject: [PATCH v5] ARM: imx: add select on ARCH_MXC for cpufreq support
+Message-ID: <1389710207-19761-1-git-send-email-john.tobias.ph@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 04:56:02PM -0600, Frank Li wrote:
+Move ARCH_HAS_CPUFREQ, ARCH_HAS_OPP and PM_OPP on ARCH_MXC so that
+the user can enable the cpufreq support for iMX6Q and/or iMX6SL.
 
-> > Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: John Tobias <john.tobias.ph@gmail.com>
+---
+ arch/arm/mach-imx/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> ping!
-
-Don't send contentless pings, either your mail has been lost (in which
-case it'll need resending anyway) or this is just yet another mail to
-read.  You should also, as covered in SubmittingPatches, CC any patches
-to both the maintainers (remembering to use the address in MAINTAINERS)
-and the relevant mailing list.  For SPI that's:
-
-SPI SUBSYSTEM
-M:      Mark Brown <broonie@kernel.org>
-L:      linux-spi at vger.kernel.org
-T:      git git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
-Q:      http://patchwork.kernel.org/project/spi-devel-general/list/
-S:      Maintained
-F:      Documentation/spi/
-F:      drivers/spi/
-F:      include/linux/spi/
-F:      include/uapi/linux/spi/
-
-It's OK to send to other places as well but don't rely on them, for
-example my linux-arm-kernel folder currently has 1405 unread messages in
-it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/0446376b/attachment.sig>
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 7a6e6f7..4a500a4 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,5 +1,7 @@
+ config ARCH_MXC
+ 	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_PATCH_PHYS_VIRT
+@@ -11,6 +13,7 @@ config ARCH_MXC
+ 	select GENERIC_IRQ_CHIP
+ 	select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
+ 	select MULTI_IRQ_HANDLER
++	select PM_OPP if PM
+ 	select SOC_BUS
+ 	select SPARSE_IRQ
+ 	select USE_OF
+@@ -779,8 +782,6 @@ config	SOC_IMX53
+ 
+ config SOC_IMX6Q
+ 	bool "i.MX6 Quad/DualLite support"
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_OPP
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+ 	select ARM_ERRATA_775420
+@@ -801,7 +802,6 @@ config SOC_IMX6Q
+ 	select PL310_ERRATA_588369 if CACHE_PL310
+ 	select PL310_ERRATA_727915 if CACHE_PL310
+ 	select PL310_ERRATA_769419 if CACHE_PL310
+-	select PM_OPP if PM
+ 
+ 	help
+ 	  This enables support for Freescale i.MX6 Quad processor.
+-- 
+1.8.3.2
