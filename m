@@ -1,31 +1,25 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 Jan 2014 19:48:33 -0500
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140114004833.GI19878@titan.lakedaemon.net>
+Date: Mon, 13 Jan 2014 19:53:00 -0500
+Subject: ARM: mvebu: dt: add missing alias 'eth3' on Armada XP mv78260
+In-Reply-To: <20140112120924.GA1916@1wt.eu>
+References: <20140112120924.GA1916@1wt.eu>
+Message-ID: <20140114005300.GJ19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 06, 2014 at 11:49:17PM +0100, Andrew Lunn wrote:
-> Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
+On Sun, Jan 12, 2014 at 01:09:24PM +0100, Willy Tarreau wrote:
+> It was correctly set on mv78460 but not on mv78260, resulting in my
+> OpenBlocks AX3-4 retrieving only 3 of its 4 MAC addresses from the
+> boot loader.
 > 
-> As with the QNAP 119, there are two variants, depending on which SoC
-> has been used. They differ on Ethernet PHY addresses and number of
-> PCIe busses.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
 > ---
->  arch/arm/boot/dts/Makefile                |    4 +-
->  arch/arm/boot/dts/kirkwood-ts419-6281.dts |   20 ++++++++
->  arch/arm/boot/dts/kirkwood-ts419-6282.dts |   32 ++++++++++++
->  arch/arm/boot/dts/kirkwood-ts419.dtsi     |   75 +++++++++++++++++++++++++++++
->  4 files changed, 130 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Applied to mvebu/dt with Ian's Tested-by
+Applied to mvebu/dt-fixes
 
 thx,
 
