@@ -1,19 +1,31 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 13 Jan 2014 22:32:36 -0800
-Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
- SoC file
-In-Reply-To: <alpine.DEB.2.02.1401132219150.11672@tamien>
-References: <20131219122857.3226.42830.stgit@tamien>
- <20131219123719.3226.44864.stgit@tamien> <52B389CD.8010004@wwwdotorg.org>
- <alpine.DEB.2.02.1401132219150.11672@tamien>
-Message-ID: <52D4DA04.4040201@nvidia.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 14 Jan 2014 14:34:44 +0800
+Subject: [PATCH] ARM: at91: enable USB host on at91sam9n12ek board
+Message-ID: <1389681284-28833-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable USB host on at91sam9n12ek board.
 
-On 01/13/2014 10:27 PM, Paul Walmsley wrote:
-> The format is <&clock-provider-phandle clock-id>.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9n12ek.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Ah, one other change: the above string has been dropped.  Pesky examples ;-)
-
-- Paul
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index e9487f6..924a6a6 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -124,6 +124,10 @@
+ 			nand-on-flash-bbt;
+ 			status = "okay";
+ 		};
++
++		usb0: ohci at 00500000 {
++			status = "okay";
++		};
+ 	};
+ 
+ 	leds {
+-- 
+1.8.5.2
