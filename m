@@ -1,105 +1,105 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 Jan 2014 12:41:46 -0800
-Subject: [RFC PATCH] clk: composite: support determine_rate using
- rate_ops->round_rate + mux_ops->set_parent
-In-Reply-To: <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
-References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
- <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20140114204146.4167.2654@quantum>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Jan 2014 12:47:34 -0800
+Subject: [PATCH v2 02/10] genirq: Add devm_request_any_context_irq()
+In-Reply-To: <52CB2D29.3050107@codeaurora.org>
+References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
+ <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
+ <52CB2D29.3050107@codeaurora.org>
+Message-ID: <52D5A266.5000504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-01-07 09:03:52)
-> In case the rate_hw does not implement determine_rate, but only round_rate
-> we fallback to best_parent selection if mux_hw is present and support
-> reparenting.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On 01/06/14 14:24, Stephen Boyd wrote:
+> On 01/02/14 16:37, Stephen Boyd wrote:
+>> Some drivers use request_any_context_irq() but there isn't a
+>> devm_* function for it. Add one so that these drivers don't need
+>> to explicitly free the irq on driver detach.
+>>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Thomas, can you please review this patch?
 
-Hi Boris,
+ping?
 
-Since this change affects users of the composite clock type I will hold
-off reviewing/applying this patch until after the merge window.
+>> ---
+>>  include/linux/interrupt.h |  5 +++++
+>>  kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 50 insertions(+)
+>>
+>> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+>> index 0053adde0ed9..a2678d35b5a2 100644
+>> --- a/include/linux/interrupt.h
+>> +++ b/include/linux/interrupt.h
+>> @@ -158,6 +158,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
+>>  					 devname, dev_id);
+>>  }
+>>  
+>> +extern int __must_check
+>> +devm_request_any_context_irq(struct device *dev, unsigned int irq,
+>> +		 irq_handler_t handler, unsigned long irqflags,
+>> +		 const char *devname, void *dev_id);
+>> +
+>>  extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+>>  
+>>  /*
+>> diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
+>> index bd8e788d71e0..1ef0606797c9 100644
+>> --- a/kernel/irq/devres.c
+>> +++ b/kernel/irq/devres.c
+>> @@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
+>>  EXPORT_SYMBOL(devm_request_threaded_irq);
+>>  
+>>  /**
+>> + *	devm_request_any_context_irq - allocate an interrupt line for a managed device
+>> + *	@dev: device to request interrupt for
+>> + *	@irq: Interrupt line to allocate
+>> + *	@handler: Function to be called when the IRQ occurs
+>> + *	@thread_fn: function to be called in a threaded interrupt context. NULL
+>> + *		    for devices which handle everything in @handler
+>> + *	@irqflags: Interrupt type flags
+>> + *	@devname: An ascii name for the claiming device
+>> + *	@dev_id: A cookie passed back to the handler function
+>> + *
+>> + *	Except for the extra @dev argument, this function takes the
+>> + *	same arguments and performs the same function as
+>> + *	request_any_context_irq().  IRQs requested with this function will be
+>> + *	automatically freed on driver detach.
+>> + *
+>> + *	If an IRQ allocated with this function needs to be freed
+>> + *	separately, devm_free_irq() must be used.
+>> + */
+>> +int devm_request_any_context_irq(struct device *dev, unsigned int irq,
+>> +			      irq_handler_t handler, unsigned long irqflags,
+>> +			      const char *devname, void *dev_id)
+>> +{
+>> +	struct irq_devres *dr;
+>> +	int rc;
+>> +
+>> +	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
+>> +			  GFP_KERNEL);
+>> +	if (!dr)
+>> +		return -ENOMEM;
+>> +
+>> +	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
+>> +	if (rc) {
+>> +		devres_free(dr);
+>> +		return rc;
+>> +	}
+>> +
+>> +	dr->irq = irq;
+>> +	dr->dev_id = dev_id;
+>> +	devres_add(dev, dr);
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL(devm_request_any_context_irq);
+>> +
+>> +/**
+>>   *	devm_free_irq - free an interrupt
+>>   *	@dev: device to free interrupt for
+>>   *	@irq: Interrupt line to free
 
-Thanks,
-Mike
 
-> ---
->  drivers/clk/clk-composite.c |   49 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 48 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> index 753d0b7..d3cf49a 100644
-> --- a/drivers/clk/clk-composite.c
-> +++ b/drivers/clk/clk-composite.c
-> @@ -64,11 +64,57 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
->         const struct clk_ops *mux_ops = composite->mux_ops;
->         struct clk_hw *rate_hw = composite->rate_hw;
->         struct clk_hw *mux_hw = composite->mux_hw;
-> +       struct clk *parent;
-> +       unsigned long parent_rate;
-> +       long tmp_rate;
-> +       unsigned long rate_diff;
-> +       unsigned long best_rate_diff = ULONG_MAX;
-> +       int i;
->  
->         if (rate_hw && rate_ops && rate_ops->determine_rate) {
->                 rate_hw->clk = hw->clk;
->                 return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
->                                                 best_parent_p);
-> +       } else if (rate_hw && rate_ops && rate_ops->round_rate &&
-> +                  mux_hw && mux_ops && mux_ops->set_parent) {
-> +               *best_parent_p = NULL;
-> +
-> +               if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
-> +                       *best_parent_p = clk_get_parent(mux_hw->clk);
-> +                       *best_parent_rate = __clk_get_rate(*best_parent_p);
-> +
-> +                       return rate_ops->round_rate(rate_hw, rate,
-> +                                                   best_parent_rate);
-> +               }
-> +
-> +               for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
-> +                       parent = clk_get_parent_by_index(mux_hw->clk, i);
-> +                       if (!parent)
-> +                               continue;
-> +
-> +                       parent_rate = __clk_get_rate(parent);
-> +
-> +                       tmp_rate = rate_ops->round_rate(rate_hw, rate,
-> +                                                       &parent_rate);
-> +                       if (tmp_rate < 0)
-> +                               continue;
-> +
-> +                       if (tmp_rate < rate)
-> +                               rate_diff = rate - tmp_rate;
-> +                       else
-> +                               rate_diff = tmp_rate - rate;
-> +
-> +                       if (!rate_diff || !*best_parent_p || best_rate_diff > rate_diff) {
-> +                               *best_parent_p = parent;
-> +                               *best_parent_rate = parent_rate;
-> +                               best_rate_diff = rate_diff;
-> +                       }
-> +
-> +                       if (!rate_diff)
-> +                               return rate;
-> +               }
-> +
-> +               return best_rate_diff;
->         } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
->                 mux_hw->clk = hw->clk;
->                 return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
-> @@ -196,7 +242,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
->                 composite->rate_hw = rate_hw;
->                 composite->rate_ops = rate_ops;
->                 clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
-> -               if (rate_ops->determine_rate)
-> +               if (rate_ops->determine_rate ||
-> +                   (rate_ops->round_rate && clk_composite_ops->set_parent))
->                         clk_composite_ops->determine_rate = clk_composite_determine_rate;
->         }
->  
-> -- 
-> 1.7.9.5
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
