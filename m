@@ -1,34 +1,59 @@
-From: js07.lee@samsung.com (=?ks_c_5601-1987?B?wMzBpL3C?=)
-Date: Tue, 14 Jan 2014 22:42:35 +0900
-Subject: Question on flush_pfn_alias function.
-Message-ID: <001f01cf112e$7bb98f80$732cae80$@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jan 2014 13:43:10 +0000
+Subject: [PATCH v10 4/4] arm64: topology: Provide relative power numbers
+ for cores
+In-Reply-To: <52D48FF9.1070501@nvidia.com>
+References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+ <1389287106-29979-5-git-send-email-broonie@kernel.org>
+ <52D48FF9.1070501@nvidia.com>
+Message-ID: <20140114134310.GF15567@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin,
+On Mon, Jan 13, 2014 at 05:16:41PM -0800, Paul Walmsley wrote:
 
-I found below function and that clean and invalidate data cache range with
-"mcrr"
-The end address is end of page - L1_CACHE_BYTES (e.g. 32 , 64)
+> As I think someone else proposed, ideally both arch/arm32 and
+> arch/arm64 should be determining these metrics dynamically, and
+> allowing the metrics to be overridden from DT data.  These metrics
+> can vary significantly based on variables other than just the core
+> type.
 
-+static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
-+{
-+	unsigned long to = ALIAS_FLUSH_START + (CACHE_COLOUR(vaddr) <<
-PAGE_SHIFT);
-+
-+	set_pte(TOP_PTE(to), pfn_pte(pfn, PAGE_KERNEL));
-+	flush_tlb_kernel_page(to);
-+
-+	asm(	"mcrr	p15, 0, %1, %0, c14\n"
-+	"	mcrr	p15, 0, %1, %0, c5\n"
-+	    :
-+	    : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES)
-+	    : "cc");
-+}
+> For example, for some ARMv7 CPUs, we know that different revision
+> levels of the same core type can result in significant performance
+> differences.  Also CPU bug workarounds applied early by the
+> bootloader, or different integrator hardware core configurations,
+> can impact these metrics.
 
-However, follow the mail and current setting in vanilla kernel, 
-L1_CACHE_BYTES of Cortex A9 will be 64 not 32.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/183316.html
-I think that could be problem.
+So, determining any numbers dynamically is obviously the ideal (and
+shouldn't really be an architecture thing - there is nothing obviously
+architecture specific about that) and we ought to take things like core
+revision differences into account.
 
-What is your opinion?
+However doing this by putting specific tunable numbers into the DT isn't
+good practice since the implementation that interprets those numbers is
+subject to change.  The numbers are basically just benchmark numbers
+with all the specificness and so on that this entails, saying "this is
+core with rating X" isn't robust for the long term since it's not really
+objective information and is heavily tied to the the specific software
+doing the parsing (and most likely also some particular application
+stack that was being tuned).
+
+The best practice is therefore for any relevant information that needs
+to be factored in and can't be read from the silicon at runtime to be
+put in the DT in a way that describes something objective like the core
+revisions.  This lets the system take account of these factors in a way
+that makes sense within the implementation rather than having to try to
+interpret numbers which may not apply well to the current implementation
+and may hide information which would help the implementation tune itself.
+
+The other option here is runtime tunables via sysfs or whatever which
+avoids baking numbers into the DT in the same way, though that is partly
+just a punt of the same problem to userspace.  That's probably also more
+helpful to people doing the tuning since it can be tweaked dynamically.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/aab2d266/attachment.sig>
