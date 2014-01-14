@@ -1,60 +1,81 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 14 Jan 2014 14:35:14 +0800
-Subject: [PATCH V5 2/3] ARM: imx: add suspend in ocram support for i.mx6dl
-In-Reply-To: <1389681315-10231-1-git-send-email-b20788@freescale.com>
-References: <1389681315-10231-1-git-send-email-b20788@freescale.com>
-Message-ID: <1389681315-10231-2-git-send-email-b20788@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jan 2014 07:52:32 +0100
+Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
+In-Reply-To: <20140113200135.GF30907@bivouac.eciton.net>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <201401131943.10352.arnd@arndb.de>
+ <20140113200135.GF30907@bivouac.eciton.net>
+Message-ID: <201401140752.33257.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6DL's suspend in ocram function is derived from i.MX6Q,
-it can lower the DDR IO power from ~26mA at 1.5V to ~15mA at 1.5V,
-measured on i.MX6DL SabreSD board, R25.
+On Monday 13 January 2014, Leif Lindholm wrote:
+> On Mon, Jan 13, 2014 at 07:43:09PM +0100, Arnd Bergmann wrote:
+> > > This patch implements basic support for UEFI runtime services in the
+> > > ARM architecture - a requirement for using efibootmgr to read and update
+> > > the system boot configuration.
+> > > 
+> > > It uses the generic configuration table scanning to populate ACPI and
+> > > SMBIOS pointers.
+> > 
+> > As far as I'm concerned there are no plans to have ACPI support on ARM32,
+> > so I wonder what the code to populate the ACPI tables is about. Can
+> > you clarify this?
+> 
+> Are you suggesting that I should #ifndef ARM in common code, or that I
+> should neglect to document what the common code will do with data it is
+> given by UEFI?
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/pm-imx6q.c |   22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+It would probably be good to document the fact that it won't work,
+possibly even having a BUG_ON statement in the code for this case.
 
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index fb18de7..daf177d 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -118,6 +118,26 @@ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
- 	},
- };
- 
-+static const struct imx6_pm_socdata imx6dl_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6DL,
-+	.mmdc_compat = "fsl,imx6q-mmdc",
-+	.src_compat = "fsl,imx6q-src",
-+	.iomuxc_compat = "fsl,imx6dl-iomuxc",
-+	.gpc_compat = "fsl,imx6q-gpc",
-+	.mmdc_io_num = 33,
-+	.mmdc_io_offset = {
-+		0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
-+		0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
-+		0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
-+		0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
-+		0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
-+		0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
-+		0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
-+		0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, MODE_CTL, MODE */
-+		0x74c,			    /* GPR_ADDS */
-+	},
-+};
-+
- /*
-  * This structure is for passing necessary data for low level ocram
-  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
-@@ -504,7 +524,7 @@ void __init imx6q_pm_init(void)
- 
- void __init imx6dl_pm_init(void)
- {
--	imx6_pm_common_init(NULL);
-+	imx6_pm_common_init(&imx6dl_pm_data);
- }
- 
- void __init imx6sl_pm_init(void)
--- 
-1.7.9.5
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 78a79a6a..1ab24cc 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
+> > >  	  the same virtual memory range as kmap so all early mappings must
+> > >  	  be unapped before paging_init() is called.
+> > >  
+> > > +config EFI
+> > > +	bool "UEFI runtime service support"
+> > > +	depends on OF && !CPU_BIG_ENDIAN
+> > 
+> > What is the dependency on !CPU_BIG_ENDIAN?
+> 
+> Mainly on code not being implemented to byte-reverse UCS strings.
+
+Why would you byte-reverse /strings/? They normally just come in
+order of the characters, and UTF-16 strings are already defined
+as being big-endian or marked by the BOM character.
+
+> > We try hard to have
+> > all kernel code support both big-endian and little-endian, and
+> > I'm guessing there is a significant overlap between the people
+> > that want UEFI support and those that want big-endian kernels.
+> 
+> Not really. There might be some. Also, it is not necessarily the case
+> that those people want to run the big-endian kernel at EL2.
+> 
+> If a need is seen, this support can be added at a later date.
+
+Ok.
+
+> > > +struct efi_memory_map memmap;
+> > 
+> > "memmap" is not a good name for a global identifier, particularly because
+> > it's easily confused with the well-known "mem_map" array. This
+> > wants namespace prefix like you other variable, or a "static" tag,
+> > preferably both.
+> 
+> It is defined by include/linux/efi.h.
+
+This seems to be a mistake: there is no user of this variable outside
+of arch/x86/platform/efi/efi.c and arch/x86/platform/efi/efi_64.c.
+I think it should just be moved into an x86 specific header file,
+or preferably be renamed in the process. There is also efi->memmap,
+which seems to be the same pointer.
+
+Note that a number of drivers have local memmap variables.
+
+	Arnd
