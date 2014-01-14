@@ -1,40 +1,39 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Jan 2014 07:12:08 -0600
-Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx, AM43xx &
- DRA7xx
-In-Reply-To: <1389658764-39199-8-git-send-email-s-anna@ti.com>
+Date: Tue, 14 Jan 2014 07:12:23 -0600
+Subject: [PATCHv4 0/7] omap hwspinlock dt support
+In-Reply-To: <1389658764-39199-1-git-send-email-s-anna@ti.com>
 References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-8-git-send-email-s-anna@ti.com>
-Message-ID: <20140114131207.GB10818@saruman.home>
+Message-ID: <20140114131223.GC10818@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 06:19:24PM -0600, Suman Anna wrote:
-> HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
-> device families as well. The IPs are identical to that of
-> OMAP4/OMAP5, except for the number of locks.
+On Mon, Jan 13, 2014 at 06:19:17PM -0600, Suman Anna wrote:
+> This is an updated series mainly addressing Mark Rutland's comments
+> about hwlock specifier being always one-cell. The series adds the
+> support for #hwlock-cells property and adds a simple default OF
+> translate function.
 > 
-> Add a depends on to the above family of SoCs to enable the
-> build support for OMAP hwspinlock driver for any of the above
-> SoC configs.
+> The DTS patches from previous series have already been merged, and
+> needs this property to be added. This is handled in a separate series
+> that only deals with OMAP hwspinlock DTS patches.
 > 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  drivers/hwspinlock/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> The series, along with the DTS patches, is tested on top of v3.13-rc8
+> plus Tero's v13 clock DT series and Tony's 3.14 staged branches. The
+> validation on OMAP5, DRA7, AM437 requires Tero's series with couple of
+> additional base patches for AM43xx. AM43xx functionality needs a hwmod
+> fix [1] for creating the associated omap_device as well.
 > 
-> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
-> index 70637d2..3612cb5 100644
-> --- a/drivers/hwspinlock/Kconfig
-> +++ b/drivers/hwspinlock/Kconfig
-> @@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
->  
->  config HWSPINLOCK_OMAP
->  	tristate "OMAP Hardware Spinlock device"
-> -	depends on ARCH_OMAP4 || SOC_OMAP5
-> +	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
+> The validation logs on all the applicable OMAP SoCs are at:
+>   OMAP4 - http://paste2.org/YJ7ZwG80
+>   OMAP5 - http://paste2.org/c6vO96b9
+>   DRA7  - http://paste2.org/tHvxN439
+>   AM33x - http://paste2.org/AjCv0U4t
+>   AM43x - http://paste2.org/2AKIPa55
 
-how about just using ARCH_OMAP2PLUS ?
+I build tested your 3.13-rc8-v4 branch with the same script I used to
+build CCF series and hspinlock built without any problems ;-)
+
+Acked-by: Felipe Balbi <balbi@ti.com>
 
 -- 
 balbi
@@ -44,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/30d1200c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/77e31aff/attachment.sig>
