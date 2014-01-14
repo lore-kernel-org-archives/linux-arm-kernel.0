@@ -1,83 +1,247 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 14 Jan 2014 12:20:17 -0800
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
-References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
- <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
- <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
- <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
-Message-ID: <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Jan 2014 12:34:55 -0800
+Subject: [PATCH] msm_serial: Add support for poll_{get,put}_char()
+Message-ID: <1389731695-28265-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2014 09:56, Nishanth Menon <nm@ti.com> wrote:
-> On Tue, Jan 14, 2014 at 11:35 AM, Victor Kamensky
-> <victor.kamensky@linaro.org> wrote:
->>
->> When BE kernel is built Makefile does take of compiling code in BE
->> mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
->
-> Agreed, and I assume you cannot instead switch to LE mode when
-> entering assembly assuming LE?
+Implement the polling functionality for the MSM serial driver.
+This allows us to use KGDB on this hardware.
 
-Yes. Note that this asm interacts with other data in kernel that would
-be in BE form. And after all linker will not allow to put together files
-that were compiled in different endianity.
+Cc: David Brown <davidb@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/tty/serial/msm_serial.c | 140 +++++++++++++++++++++++++++++++++++++++-
+ drivers/tty/serial/msm_serial.h |   9 +++
+ 2 files changed, 146 insertions(+), 3 deletions(-)
 
-> The reason I ask this is - most of our development is NOT in BE mode.
-> we will continue to manipulate and add assembly - AM335x, DRA7/OMAP5
-> etc.. and obviously not every code change will indulge in ensuring
-> right markers will be in place.
->
-> by ensuring readl_relaxed handles the variations, you have ensured
-> that I dont need to care about drivers other than to ensure they use
-> _relaxed variants. in the case of assembly, this does not seem long
-> term manageable.
-
-Yes, I agree if it is outside of main use case it will get broken if not
-attended to. Definitely universe entropy increases :) - if left without
-attention things will decay. Note we admit that even with ARM CPU
-core BE changes similar decay can happen eventually ...that is
-what LNG BE group trying to prevent. I think
-the deal here is that next user of it can/need to fix things if they
-decayed.
-
->>
->>> is the idea of BE build meant to deal with having a single BE kernel
->>> build work for all platforms (including LE ones)?
->>
->> Sort of. The idea here to run BE image on OMAP4 chip, with
->> kernel that would deals with LE periphery correctly, but ARM
->> core run in BE with special kernel that compiled for BE case (i.e
->> CONFIG_CPU_BIG_ENDIAN is set).
->
-> I still dont get the usecase - other than "hey, we do this coz we can
-> do it!".. I mean, yep, it sounds great and all.. but 4 years down the
-> line, is this still going to work? is this going to be interesting
-> careabout? or we are just maintaining additional code for a passing
-> fancy or proof-of-concept?
-
-Valid concern. From LNG BE group point of view it is not "we can do
-it". It is more like we've done it. We have Pandaboard ES running BE
-kernel for a while. It is in LNG BE tree. We used it as development
-and testing vehicle for BE work for a while. We are very grateful to
-the platform for that - it is affordable and easily available! Given,
-beyond ongoing BE testing on Pandaboard in LNG there may not be valid
-use case for further things on OMAP4 BE. We had discussion
-with Santosh Shilimkar from TI during last Linaro connect what to
-do with LNG BE Pandaboard series. Santosh suggested and we
-agreed that we would try to contribute them back to community. And
-that is what Taras is doing. IMHO even though there may not be real
-product use case for BE OMAP4, it could serve in kernel source as good
-example that shows how to work with LE periphery from BE kernel. After
-all, these changes are noop for LE case and they don't introduce
-a lot of clutter: all BE asm rev and rev16 instructions wrapped around
-with ARM_BE8 macro.
-
-Thanks,
-Victor
-
-> Regards,
-> Nishanth Menon
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index b5d779cd3c2b..053b98eb46c8 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -39,6 +39,13 @@
+ 
+ #include "msm_serial.h"
+ 
++enum {
++	UARTDM_1P1 = 1,
++	UARTDM_1P2,
++	UARTDM_1P3,
++	UARTDM_1P4,
++};
++
+ struct msm_port {
+ 	struct uart_port	uart;
+ 	char			name[16];
+@@ -309,6 +316,8 @@ static unsigned int msm_get_mctrl(struct uart_port *port)
+ 
+ static void msm_reset(struct uart_port *port)
+ {
++	struct msm_port *msm_port = UART_TO_MSM(port);
++
+ 	/* reset everything */
+ 	msm_write(port, UART_CR_CMD_RESET_RX, UART_CR);
+ 	msm_write(port, UART_CR_CMD_RESET_TX, UART_CR);
+@@ -316,6 +325,10 @@ static void msm_reset(struct uart_port *port)
+ 	msm_write(port, UART_CR_CMD_RESET_BREAK_INT, UART_CR);
+ 	msm_write(port, UART_CR_CMD_RESET_CTS, UART_CR);
+ 	msm_write(port, UART_CR_CMD_SET_RFR, UART_CR);
++
++	/* Disable DM modes */
++	if (msm_port->is_uartdm)
++		msm_write(port, 0, UARTDM_DMEN);
+ }
+ 
+ static void msm_set_mctrl(struct uart_port *port, unsigned int mctrl)
+@@ -711,6 +724,117 @@ static void msm_power(struct uart_port *port, unsigned int state,
+ 	}
+ }
+ 
++#ifdef CONFIG_CONSOLE_POLL
++static int msm_poll_init(struct uart_port *port)
++{
++	struct msm_port *msm_port = UART_TO_MSM(port);
++
++	/* Enable single character mode on RX FIFO */
++	if (msm_port->is_uartdm >= UARTDM_1P4)
++		msm_write(port, UARTDM_DMEN_RX_SC_ENABLE, UARTDM_DMEN);
++
++	return 0;
++}
++
++static int msm_poll_get_char_single(struct uart_port *port)
++{
++	struct msm_port *msm_port = UART_TO_MSM(port);
++	unsigned int rf_reg = msm_port->is_uartdm ? UARTDM_RF : UART_RF;
++
++	if (!(msm_read(port, UART_SR) & UART_SR_RX_READY))
++		return NO_POLL_CHAR;
++	else
++		return msm_read(port, rf_reg) & 0xff;
++}
++
++static int msm_poll_get_char_dm_1p3(struct uart_port *port)
++{
++	int c;
++	static u32 slop;
++	static int count;
++	unsigned char *sp = (unsigned char *)&slop;
++
++	/* Check if a previous read had more than one char */
++	if (count) {
++		c = sp[sizeof(slop) - count];
++		count--;
++	/* Or if FIFO is empty */
++	} else if (!(msm_read(port, UART_SR) & UART_SR_RX_READY)) {
++		/*
++		 * If RX packing buffer has less than a word, force stale to
++		 * push contents into RX FIFO
++		 */
++		count = msm_read(port, UARTDM_RXFS);
++		count = (count >> UARTDM_RXFS_BUF_SHIFT) & UARTDM_RXFS_BUF_MASK;
++		if (count) {
++			msm_write(port, UART_CR_CMD_FORCE_STALE, UART_CR);
++			slop = msm_read(port, UARTDM_RF);
++			c = sp[0];
++			count--;
++		} else {
++			c = NO_POLL_CHAR;
++		}
++	/* FIFO has a word */
++	} else {
++		slop = msm_read(port, UARTDM_RF);
++		c = sp[0];
++		count = sizeof(slop) - 1;
++	}
++
++	return c;
++}
++
++static int msm_poll_get_char(struct uart_port *port)
++{
++	u32 imr;
++	int c;
++	struct msm_port *msm_port = UART_TO_MSM(port);
++
++	/* Disable all interrupts */
++	imr = msm_read(port, UART_IMR);
++	msm_write(port, 0, UART_IMR);
++
++	if (msm_port->is_uartdm == UARTDM_1P3)
++		c = msm_poll_get_char_dm_1p3(port);
++	else
++		c = msm_poll_get_char_single(port);
++
++	/* Enable interrupts */
++	msm_write(port, imr, UART_IMR);
++
++	return c;
++}
++
++static void msm_poll_put_char(struct uart_port *port, unsigned char c)
++{
++	u32 imr;
++	struct msm_port *msm_port = UART_TO_MSM(port);
++
++	/* Disable all interrupts */
++	imr = msm_read(port, UART_IMR);
++	msm_write(port, 0, UART_IMR);
++
++	if (msm_port->is_uartdm)
++		reset_dm_count(port, 1);
++
++	/* Wait until FIFO is empty */
++	while (!(msm_read(port, UART_SR) & UART_SR_TX_READY))
++		cpu_relax();
++
++	/* Write a character */
++	msm_write(port, c, msm_port->is_uartdm ? UARTDM_TF : UART_TF);
++
++	/* Wait until FIFO is empty */
++	while (!(msm_read(port, UART_SR) & UART_SR_TX_READY))
++		cpu_relax();
++
++	/* Enable interrupts */
++	msm_write(port, imr, UART_IMR);
++
++	return;
++}
++#endif
++
+ static struct uart_ops msm_uart_pops = {
+ 	.tx_empty = msm_tx_empty,
+ 	.set_mctrl = msm_set_mctrl,
+@@ -729,6 +853,11 @@ static struct uart_ops msm_uart_pops = {
+ 	.config_port = msm_config_port,
+ 	.verify_port = msm_verify_port,
+ 	.pm = msm_power,
++#ifdef CONFIG_CONSOLE_POLL
++	.poll_init = msm_poll_init,
++	.poll_get_char	= msm_poll_get_char,
++	.poll_put_char	= msm_poll_put_char,
++#endif
+ };
+ 
+ static struct msm_port msm_uart_ports[] = {
+@@ -900,7 +1029,10 @@ static struct uart_driver msm_uart_driver = {
+ static atomic_t msm_uart_next_id = ATOMIC_INIT(0);
+ 
+ static const struct of_device_id msm_uartdm_table[] = {
+-	{ .compatible = "qcom,msm-uartdm" },
++	{ .compatible = "qcom,msm-uartdm-v1.1", .data = (void *)UARTDM_1P1 },
++	{ .compatible = "qcom,msm-uartdm-v1.2", .data = (void *)UARTDM_1P2 },
++	{ .compatible = "qcom,msm-uartdm-v1.3", .data = (void *)UARTDM_1P3 },
++	{ .compatible = "qcom,msm-uartdm-v1.4", .data = (void *)UARTDM_1P4 },
+ 	{ }
+ };
+ 
+@@ -909,6 +1041,7 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	struct msm_port *msm_port;
+ 	struct resource *resource;
+ 	struct uart_port *port;
++	const struct of_device_id *id;
+ 	int irq;
+ 
+ 	if (pdev->id == -1)
+@@ -923,8 +1056,9 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	port->dev = &pdev->dev;
+ 	msm_port = UART_TO_MSM(port);
+ 
+-	if (of_match_device(msm_uartdm_table, &pdev->dev))
+-		msm_port->is_uartdm = 1;
++	id = of_match_device(msm_uartdm_table, &pdev->dev);
++	if (id)
++		msm_port->is_uartdm = (unsigned long)id->data;
+ 	else
+ 		msm_port->is_uartdm = 0;
+ 
+diff --git a/drivers/tty/serial/msm_serial.h b/drivers/tty/serial/msm_serial.h
+index 469fda50ac63..1e9b68b6f9eb 100644
+--- a/drivers/tty/serial/msm_serial.h
++++ b/drivers/tty/serial/msm_serial.h
+@@ -59,6 +59,7 @@
+ #define UART_CR_CMD_RESET_RFR		(14 << 4)
+ #define UART_CR_CMD_PROTECTION_EN	(16 << 4)
+ #define UART_CR_CMD_STALE_EVENT_ENABLE	(80 << 4)
++#define UART_CR_CMD_FORCE_STALE		(4 << 8)
+ #define UART_CR_CMD_RESET_TX_READY	(3 << 8)
+ #define UART_CR_TX_DISABLE		(1 << 3)
+ #define UART_CR_TX_ENABLE		(1 << 2)
+@@ -113,6 +114,14 @@
+ #define GSBI_PROTOCOL_UART	0x40
+ #define GSBI_PROTOCOL_IDLE	0x0
+ 
++#define UARTDM_RXFS		0x50
++#define UARTDM_RXFS_BUF_SHIFT	0x7
++#define UARTDM_RXFS_BUF_MASK	0x7
++
++#define UARTDM_DMEN		0x3C
++#define UARTDM_DMEN_RX_SC_ENABLE BIT(5)
++#define UARTDM_DMEN_TX_SC_ENABLE BIT(4)
++
+ #define UARTDM_DMRX		0x34
+ #define UARTDM_NCF_TX		0x40
+ #define UARTDM_RX_TOTAL_SNAP	0x38
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
