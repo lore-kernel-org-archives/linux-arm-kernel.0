@@ -1,99 +1,105 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Jan 2014 14:36:13 -0600
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <52D53084.1070105@ti.com>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
- <52CF12FB.6000602@ti.com> <20140109231513.GA11648@saruman.home>
- <52CFC2F1.706@ti.com> <20140110161352.GG6665@saruman.home>
- <52D02037.3090705@ti.com> <20140110185110.GM31323@atomide.com>
- <52D53084.1070105@ti.com>
-Message-ID: <20140114203613.GA604@saruman.home>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 14 Jan 2014 12:41:46 -0800
+Subject: [RFC PATCH] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
+References: <1387769564-12894-2-git-send-email-emilio@elopez.com.ar>
+ <1389114233-11162-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20140114204146.4167.2654@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 02:41:40PM +0200, Tero Kristo wrote:
-> On 01/10/2014 08:51 PM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [140110 08:32]:
-> >>On 01/10/2014 06:13 PM, Felipe Balbi wrote:
-> >>>On Fri, Jan 10, 2014 at 11:52:49AM +0200, Tero Kristo wrote:
-> >>>>On 01/10/2014 01:15 AM, Felipe Balbi wrote:
-> >>>>>On Thu, Jan 09, 2014 at 03:22:03PM -0600, Nishanth Menon wrote:
-> >>>>>>
-> >>>>>>conflicts with be changes on Tony's be branch.
-> >>>>>>commit 80f304dd2360cf5d50953c4eb4e902536f6a1263
-> >>>>>>     ARM: OMAP2+: raw read and write endian fix
-> >>>>>>
-> >>>>>>Conflict:
-> >>>>>>arch/arm/mach-omap2/clkt_clksel.c
-> >>>>>>arch/arm/mach-omap2/clkt_dpll.c
-> >>>>>>arch/arm/mach-omap2/clkt_iclk.c
-> >>>>>>arch/arm/mach-omap2/clock.c
-> >>>>>>arch/arm/mach-omap2/clock36xx.c
-> >>>>>>arch/arm/mach-omap2/dpll3xxx.c
-> >>>>>>arch/arm/mach-omap2/dpll44xx.c
-> >>>>>>
-> >>>>>>Both change raw_readls -> should now be just clk api instead which
-> >>>>>>already does readl_relaxed etc.. If Tony feels like, then we should
-> >>>>>>probably post a branch based on 'be' branch for easy merge.
-> >
-> >This should be a trivial merge conflict to handle, so let's not base
-> >things on the BE changes.
-> >
-> >>>>I think all of these fails are caused by the initially bugged
-> >>>>Makefile + Kconfig under mach-omap2. Seems like they can be fixed by
-> >>>>the patches I inlined at the end (will also post them as proper
-> >>>>patches to l-o list after this.) The question is, should Mike go
-> >>>>ahead and merge these along with the base clk patches or how should
-> >>>>we handle them? Patch 1 must be merged, patch 2 is a nice to have one
-> >>>>which allows DRA7 only builds (doing DRA7 only build currently seems
-> >>>>not possible.)
-> >>>
-> >>>If it's OK with Tony, I would suggest having a branch with both patches
-> >>>below which both Tony and Mike merge before merging CCF series. That way
-> >>>we avoid bisection problems.
-> >
-> >I can queue those two separately as fixes.
-> >
-> >>That reminds me, I think the baseline branch for the mach-omap2
-> >>patches is still somewhat unclear to me, what should be used for
-> >>this? And which patches should be put there (the mach-omap2 patches
-> >>depend on the drivers/clk/ti part basically, so I need to put at
-> >>least those there also.)
-> >
-> >I would keep the clock patches against some mainline -rc commit if
-> >possible, and if there are non trivial merge conflicts, the omap
-> >to use as the base is commit adfe9361b236154215d4b0fc8b6d79995394b15c.
-> >
-> >In any case, it's probably best that Mike merges this all via his
-> >clock tree unless there non-trivial merge conflicts.
-> >
+Quoting Boris BREZILLON (2014-01-07 09:03:52)
+> In case the rate_hw does not implement determine_rate, but only round_rate
+> we fallback to best_parent selection if mux_hw is present and support
+> reparenting.
 > 
-> I just pushed a branch against rc7 with makefile fixes in place to
-> fix omap1 and omap2 only builds for this stuff. Inlined the delta
-> here at the end. Do you want me to repost the series as v14 for this
-> or is the attached delta ok for review purposes? All the changes have
-> been squashed to existing patches (except the 2 patches I posted
-> separately for DRA7xx / AM43xx only builds.)
-> 
-> The test branch itself can be found here:
-> 
-> tree: https://github.com/t-kristo/linux-pm.git
-> branch: 3.13-rc7-dt-clks-v13-build-fixes
-> 
-> Felipe, care to run your randconfig magic for this?
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-This branch builds just fine so far, I still have omap5 multiplaform and
-uniplatform builds, but since that was working before i'm assuming it
-won't break.
+Hi Boris,
 
-cheers
+Since this change affects users of the composite clock type I will hold
+off reviewing/applying this patch until after the merge window.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/144666a9/attachment-0001.sig>
+Thanks,
+Mike
+
+> ---
+>  drivers/clk/clk-composite.c |   49 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 48 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index 753d0b7..d3cf49a 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -64,11 +64,57 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+>         const struct clk_ops *mux_ops = composite->mux_ops;
+>         struct clk_hw *rate_hw = composite->rate_hw;
+>         struct clk_hw *mux_hw = composite->mux_hw;
+> +       struct clk *parent;
+> +       unsigned long parent_rate;
+> +       long tmp_rate;
+> +       unsigned long rate_diff;
+> +       unsigned long best_rate_diff = ULONG_MAX;
+> +       int i;
+>  
+>         if (rate_hw && rate_ops && rate_ops->determine_rate) {
+>                 rate_hw->clk = hw->clk;
+>                 return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
+>                                                 best_parent_p);
+> +       } else if (rate_hw && rate_ops && rate_ops->round_rate &&
+> +                  mux_hw && mux_ops && mux_ops->set_parent) {
+> +               *best_parent_p = NULL;
+> +
+> +               if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
+> +                       *best_parent_p = clk_get_parent(mux_hw->clk);
+> +                       *best_parent_rate = __clk_get_rate(*best_parent_p);
+> +
+> +                       return rate_ops->round_rate(rate_hw, rate,
+> +                                                   best_parent_rate);
+> +               }
+> +
+> +               for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
+> +                       parent = clk_get_parent_by_index(mux_hw->clk, i);
+> +                       if (!parent)
+> +                               continue;
+> +
+> +                       parent_rate = __clk_get_rate(parent);
+> +
+> +                       tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> +                                                       &parent_rate);
+> +                       if (tmp_rate < 0)
+> +                               continue;
+> +
+> +                       if (tmp_rate < rate)
+> +                               rate_diff = rate - tmp_rate;
+> +                       else
+> +                               rate_diff = tmp_rate - rate;
+> +
+> +                       if (!rate_diff || !*best_parent_p || best_rate_diff > rate_diff) {
+> +                               *best_parent_p = parent;
+> +                               *best_parent_rate = parent_rate;
+> +                               best_rate_diff = rate_diff;
+> +                       }
+> +
+> +                       if (!rate_diff)
+> +                               return rate;
+> +               }
+> +
+> +               return best_rate_diff;
+>         } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+>                 mux_hw->clk = hw->clk;
+>                 return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
+> @@ -196,7 +242,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>                 composite->rate_hw = rate_hw;
+>                 composite->rate_ops = rate_ops;
+>                 clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+> -               if (rate_ops->determine_rate)
+> +               if (rate_ops->determine_rate ||
+> +                   (rate_ops->round_rate && clk_composite_ops->set_parent))
+>                         clk_composite_ops->determine_rate = clk_composite_determine_rate;
+>         }
+>  
+> -- 
+> 1.7.9.5
+> 
