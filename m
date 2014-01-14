@@ -1,50 +1,19 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 14 Jan 2014 11:18:38 +0900
-Subject: [PATCH -next] clk: exynos-audss: remove redundant dev_err call in
- exynos_audss_clk_probe()
-In-Reply-To: <CAPgLHd9A8QjVk8ThLbP8vv8wMmJ-DovvR+=uadTXWyTFJok_JQ@mail.gmail.com>
-References: <CAPgLHd9A8QjVk8ThLbP8vv8wMmJ-DovvR+=uadTXWyTFJok_JQ@mail.gmail.com>
-Message-ID: <000301cf10ce$efbe3080$cf3a9180$%han@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 Jan 2014 11:23:55 +0900
+Subject: Possible regression of Mackerel/ASoC Simple Card in next-20130107
+In-Reply-To: <20140108040017.GA11231@verge.net.au>
+References: <20140108040017.GA11231@verge.net.au>
+Message-ID: <20140114022353.GA7053@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 14, 2014 11:06 AM, Wei Yongjun wrote:
+On Wed, Jan 08, 2014 at 01:00:21PM +0900, Simon Horman wrote:
+> Hi Morimoto-san, Hi all,
 > 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> I noticed that next-20130107 does not boot on the Mackerel board does not
+> boot using its defconfig. The boot log is as follows.
 > 
-> There is a error message within devm_ioremap_resource
-> already, so remove the dev_err call to avoid redundant
-> error message.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> I have not investigated any further as typically when I investigate
+> problems in next they turn out to be known problems.
 
-It looks good. This error message is redundant; thus it
-should be removed.
-
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
-
-Best regards,
-Jingoo Han
-
-> ---
->  drivers/clk/samsung/clk-exynos-audss.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-> index 884187f..01ef381 100644
-> --- a/drivers/clk/samsung/clk-exynos-audss.c
-> +++ b/drivers/clk/samsung/clk-exynos-audss.c
-> @@ -94,10 +94,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
-> 
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	reg_base = devm_ioremap_resource(&pdev->dev, res);
-> -	if (IS_ERR(reg_base)) {
-> -		dev_err(&pdev->dev, "failed to map audss registers\n");
-> +	if (IS_ERR(reg_base))
->  		return PTR_ERR(reg_base);
-> -	}
-> 
->  	clk_table = devm_kzalloc(&pdev->dev,
->  				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
-> 
-> --
+This problem does not appear to be present any more in next-20140113.
