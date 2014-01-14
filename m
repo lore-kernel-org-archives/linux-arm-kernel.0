@@ -1,33 +1,53 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 14 Jan 2014 15:20:36 +0100
-Subject: [PATCH] ARM: s3c24xx: explicit dependency on <plat/gpio-cfg.h>
-In-Reply-To: <1389708788-18331-1-git-send-email-linus.walleij@linaro.org>
-References: <1389708788-18331-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <2340755.WhXRgu2emH@phil>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Tue, 14 Jan 2014 16:23:10 +0200
+Subject: [PATCH 2/5] phy: add support for indexed lookup
+In-Reply-To: <52CC03D4.50603@ti.com>
+References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1386601737-8735-3-git-send-email-heikki.krogerus@linux.intel.com>
+ <52AEDDE2.8060406@ti.com> <20131216143227.GA22944@xps8300>
+ <52CC03D4.50603@ti.com>
+Message-ID: <20140114142310.GA21169@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 14. Januar 2014, 15:13:08 schrieb Linus Walleij:
-> Previously the custom GPIO header for the S3C24xx would in turn
-> bring in the custom pin control implementation from
-> <plat/gpio-cfg.h>. This is not good as it mixes up two
-> subsystems and makes the dependencies hard to track. Make
-> the dependency explicit by explicitly including the pin
-> control header where needed.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Maintainers: this builds on top of the previous patch moving
-> headers back to <mach/*>. This will also boil in linux-next,
-> ACKs appreciated.
-> ---
+Hi Kishon,
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+And happy new year..
+
+On Tue, Jan 07, 2014 at 07:10:36PM +0530, Kishon Vijay Abraham I wrote:
+> >>>  /**
+> >>> - * phy_get() - lookup and obtain a reference to a phy.
+> >>> + * phy_get_index() - obtain a phy based on index
+> >>
+> >> NAK. It still takes a 'char' argument and the name is misleading.
+> >> Btw are you replacing phy_get() or adding a new API in addition to phy_get()?
+> > 
+> > Additional API. The phy_get() would in practice act as a wrapper after
+> 
+> In this patch it looks like you've replaced phy_get().
+> > this. It could actually be just a #define macro in the include file.
+> > The function naming I just copied straight from gpiolib.c. I did not
+> > have the imagination for anything fancier.
+> > 
+> > I would like to be able to use some function like phy_get_index() and
+> > be able to deliver it both the name and the index. With DT you guys
+> > will always be able to use the name (and the string will always
+> > supersede the index if we do it like this), but with ACPI, and possibly
+> > the platform lookup tables, the index can be used...
+> 
+> I think in that case, we should drop the 'string' from phy_get_index since we
+> have the other API to handle that? I don't know about ACPI, but is it not
+> possible to use strings with ACPI?
+
+No unfortunately. We just have what the ACPI tables provide. The PHYs
+would be "child" device entries under the controller and we can only
+get handle to them based on the index.
+
+I think I'll skip this patch from this set. Let's wait until we have
+an actual ACPI DSDT describing some PHYs.
+
+
+Thanks,
+
+-- 
+heikki
