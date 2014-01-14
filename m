@@ -1,50 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Jan 2014 23:40:19 +0000
-Subject: [Intel-gfx] [PATCH 1/2] drm: share drm_add_fake_info_node
-In-Reply-To: <20140114232510.GV4770@phenom.ffwll.local>
-References: <1389708847-25038-1-git-send-email-benjamin.widawsky@intel.com>
- <20140114232510.GV4770@phenom.ffwll.local>
-Message-ID: <20140114234018.GK15937@n2100.arm.linux.org.uk>
+From: courtney.cavin@sonymobile.com (Courtney Cavin)
+Date: Tue, 14 Jan 2014 15:44:03 -0800
+Subject: [PATCH v4 4/6] spmi: pmic_arb: add support for interrupt handling
+In-Reply-To: <0f3e257f098d5f1ec6e9f09ba4dbf055291f2d83.1389738151.git.joshc@codeaurora.org>
+References: <cover.1389738151.git.joshc@codeaurora.org>
+ <0f3e257f098d5f1ec6e9f09ba4dbf055291f2d83.1389738151.git.joshc@codeaurora.org>
+Message-ID: <20140114234402.GD23276@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 12:25:10AM +0100, Daniel Vetter wrote:
-> On Tue, Jan 14, 2014 at 06:14:06AM -0800, Ben Widawsky wrote:
-> > Both i915 and Armada had the exact same implementation. For an upcoming
-> > patch, I'd like to call this function from two different source files in
-> > i915, and having it available externally helps there too.
-> > 
-> > While moving, add 'debugfs_' to the name in order to match the other drm
-> > debugfs helper functions.
-> > 
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: intel-gfx at lists.freedesktop.org
-> > Signed-off-by: Ben Widawsky <ben@bwidawsk.net>
+On Tue, Jan 14, 2014 at 07:41:38PM +0100, Josh Cartwright wrote:
+> The Qualcomm PMIC Arbiter, in addition to being a basic SPMI controller,
+> also implements interrupt handling for slave devices.  Note, this is
+> outside the scope of SPMI, as SPMI leaves interrupt handling completely
+> unspecified.
 > 
-> drm_debugfs_create_files in drm_debugfs.c has the almost same code again.
-> Now the problem here is that the interface is a bit botched up, since all
-> the users in i915 and armada actaully faile to clean up teh debugfs dentry
-> if drm_add_fake_info_node.
+> Extend the driver to provide a irq_chip implementation and chained irq
+> handling which allows for these interrupts to be used.
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  drivers/spmi/spmi-pmic-arb.c | 393 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 391 insertions(+), 2 deletions(-)
+> 
 
-That's not correct - armada does clean up these, I think you need to
-take a closer look at the code.
+Yay! Good to see this series.
 
-We do this by setting node->info_ent to the file operations structure,
-which is a unique key to the file being registered.
+> diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
+> index 16083cd..32bed54 100644
+> --- a/drivers/spmi/spmi-pmic-arb.c
+> +++ b/drivers/spmi/spmi-pmic-arb.c
+> @@ -13,6 +13,9 @@
+>  #include <linux/err.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> +#include <linux/irqchip/chained_irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -103,6 +106,14 @@ enum pmic_arb_cmd_op_code {
+>   * @cnfg:              address of the PMIC Arbiter configuration registers.
+>   * @lock:              lock to synchronize accesses.
+>   * @channel:           which channel to use for accesses.
+> + * @irq:               PMIC ARB interrupt.
+> + * @ee:                        the current Execution Environment
+> + * @min_apid:          minimum APID (used for bounding IRQ search)
+> + * @max_apid:          maximum APID
+> + * @mapping_table:     in-memory copy of PPID -> APID mapping table.
+> + * @domain:            irq domain object for PMIC IRQ domain
+> + * @spmic:             SPMI controller object
+> + * @apid_to_ppid:      cached mapping from APID to PPID
+>   */
+>  struct spmi_pmic_arb_dev {
+>         void __iomem            *base;
+> @@ -110,6 +121,14 @@ struct spmi_pmic_arb_dev {
+>         void __iomem            *cnfg;
+>         spinlock_t              lock;
+>         u8                      channel;
+> +       unsigned int            irq;
+> +       u8                      ee;
+> +       u8                      min_apid;
+> +       u8                      max_apid;
+> +       u32                     mapping_table[SPMI_MAPPING_TABLE_LEN];
+> +       struct irq_domain       *domain;
+> +       struct spmi_controller  *spmic;
+> +       u16                     apid_to_ppid[256];
+>  };
+> 
+>  static inline u32 pmic_arb_base_read(struct spmi_pmic_arb_dev *dev, u32 offset)
+> @@ -314,12 +333,333 @@ static int pmic_arb_write_cmd(struct spmi_controller *ctrl, u8 opc, u8 sid,
+>         return rc;
+>  }
+> 
+> +enum qpnpint_regs {
+> +       QPNPINT_REG_RT_STS              = 0x10,
+> +       QPNPINT_REG_SET_TYPE            = 0x11,
+> +       QPNPINT_REG_POLARITY_HIGH       = 0x12,
+> +       QPNPINT_REG_POLARITY_LOW        = 0x13,
+> +       QPNPINT_REG_LATCHED_CLR         = 0x14,
+> +       QPNPINT_REG_EN_SET              = 0x15,
+> +       QPNPINT_REG_EN_CLR              = 0x16,
+> +       QPNPINT_REG_LATCHED_STS         = 0x18,
+> +};
+> +
+> +struct spmi_pmic_arb_qpnpint_type {
+> +       u8 type; /* 1 -> edge */
+> +       u8 polarity_high;
+> +       u8 polarity_low;
+> +} __packed;
+> +
 
-Upon failure to create the fake node, we appropriately call
-drm_debugfs_remove_files() with the first argument being a pointer to
-the file operations.  This causes drm_debugfs_remove_files() to match
-the fake entry, call debugfs_remove() on the dentry, and remove the
-node from the list, and free the node structure we allocated.
+While the rest of this driver uses 'pmic' or 'spmi_pmic', this patch
+adds 'qpnpint'.  Can we please just leave the software fabricated name
+'qpnp' out of any changes, as it isn't in any hardware spec?  Perhaps
+'pmic_int' or something along those lines?
 
-Upon driver teardown, we also call drm_debugfs_remove_files() but with
-each fops which should be registered, thus cleaning up each fake node
-which was created.
+> +/* Simplified accessor functions for irqchip callbacks */
+> +static void qpnpint_spmi_write(struct irq_data *d, u8 reg, void *buf,
+> +                              size_t len)
+[...]
 
-So, Armada does clean up these entries properly.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+-Courtney
