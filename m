@@ -1,30 +1,33 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 14 Jan 2014 23:25:40 +0100
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <20140114221315.GE15567@sirena.org.uk>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <201401142302.31434.marex@denx.de> <20140114221315.GE15567@sirena.org.uk>
-Message-ID: <201401142325.40943.marex@denx.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 14 Jan 2014 14:24:30 -0800
+Subject: [GIT PULL 1/4] non-urgent omap fixes for v3.14 merge window
+In-Reply-To: <52cde11d.a179420a.3652.ffffd40fSMTPIN_ADDED_BROKEN@mx.google.com>
+ (Tony Lindgren's message of "Wed, 8 Jan 2014 15:36:05 -0800")
+References: <52cde11d.a179420a.3652.ffffd40fSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <87eh4a6w2p.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 14, 2014 at 11:13:15 PM, Mark Brown wrote:
-> On Tue, Jan 14, 2014 at 11:02:31PM +0100, Marek Vasut wrote:
-> > On Tuesday, January 14, 2014 at 10:55:48 PM, Mark Brown wrote:
-> > > Or try to - the other trick here is getting 4MB of contiguous memory in
-> > > the first place (unless there's an IOMMU making everything pretty).
-> > 
-> > Oh, but what if I want to make a really looong transfer ? Say, read
-> > entire SPI NOR of 128MB in size ... Spansion has such big SPI NORs in
-> > their new portfolio.
-> 
-> Use scatter/gather - to the SPI controller and the outside world it
-> still looks like one big transfer (I'm missing a way to go from a
-> virtual address to a sg_list, that'd be handy).  It's an issue if the
-> DMA controller doesn't support it but but that's rare.
+Tony Lindgren <tony@atomide.com> writes:
 
-OK, yep, indeed.
+> The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
+>
+>   Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-not-urgent-signed
+>
+> for you to fetch changes up to bbc28cdbd003be5ceeaf644be3533e898c25da2b:
+>
+>   ARM: OMAP2+: gpmc: Move legacy GPMC width setting (2014-01-08 09:49:47 -0800)
+>
+> ----------------------------------------------------------------
+> Some non-urgent fixes to enable am335x features, update documentation,
+> and to remove unnecessary double initialization for the GPMC code.
+>
+> ----------------------------------------------------------------
 
-Best regards,
-Marek Vasut
+Thanks, adding to next/fixes-non-critical.
+
+Kevin
