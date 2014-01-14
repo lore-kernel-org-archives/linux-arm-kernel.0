@@ -1,55 +1,93 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Tue, 14 Jan 2014 03:52:39 +0000
-Subject: AArch64 kernel image decompression
-In-Reply-To: <4250104.UfkPP3heXI@wuerfel>
-References: <20140110170436.GS8153@joshc.qualcomm.com>
- <20140113111733.GD1189@mudshark.cambridge.arm.com>
- <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
- <4250104.UfkPP3heXI@wuerfel>
-Message-ID: <e79fa209ffc4485d8cae87bae3daa656@BN1PR03MB220.namprd03.prod.outlook.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 13 Jan 2014 19:54:42 -0800
+Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
+In-Reply-To: <20140109015158.7168.60274@quantum>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
+ <20140109015158.7168.60274@quantum>
+Message-ID: <52D4B502.3080409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 01/08/2014 05:51 PM, Mike Turquette wrote:
+> Quoting Stephen Boyd (2013-12-23 17:12:26)
+>> Add support to the clock core so that drivers can pass in a
+>> regmap. If no regmap is specified try to query the device that's
+>> registering the clock for its regmap. This should allow drivers
+>> to use the core regmap helpers. This is based on a similar design
+>> in the regulator framework.
+>>
+>> Cc: Mark Brown <broonie@kernel.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>   drivers/clk/clk.c            | 8 ++++++++
+>>   include/linux/clk-provider.h | 7 +++++++
+>>   2 files changed, 15 insertions(+)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 9ad7b71..5e71f5c 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -20,6 +20,7 @@
+>>   #include <linux/device.h>
+>>   #include <linux/init.h>
+>>   #include <linux/sched.h>
+>> +#include <linux/regmap.h>
+>>
+>>   static DEFINE_SPINLOCK(enable_lock);
+>>   static DEFINE_MUTEX(prepare_lock);
+>> @@ -1834,6 +1835,13 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+>>          clk->num_parents = hw->init->num_parents;
+>>          hw->clk = clk;
+>>
+>> +       if (hw->init->regmap)
+>> +               hw->regmap = hw->init->regmap;
+>
+> Hi Stephen,
+>
+> The whole series looks good to me except for the placement of the regmap
+> details inside struct clk_hw. That structure exists only to hide struct
+> clk from the hardware-specific clock structure and I'd not like to set
+> the precedent of shoving per-clock data into it.
+>
+> As an alternative, how about finding a way to put these per-clock regmap
+> details into the hardware-specific clock structure? I understand that
+> you want to make these ops available to others, which is why they are in
+> the public struct clk_hw. I'm just wondering if that is the right way to
+> do it...
+>
+> Patch #3 illustrates the sort of struct-member-creep that worries me.
+> What is to stop someone from putting "unsigned int divider_reg" or
+> "unsigned int mux_reg", and then the thing just keeps growing.
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, January 13, 2014 5:13 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Sharma Bhupesh-B45370; 'Will Deacon'; 'Josh Cartwright'; 'Catalin
-> Marinas'
-> Subject: Re: AArch64 kernel image decompression
-> 
-> On Monday 13 January 2014 11:29:20 bhupesh.sharma at freescale.com wrote:
-> >
-> > With the u-boot bootloader also having AArch64 support now (see [1]),
-> > it would make sense to add the uImage and decompressor support to the
-> > AArch64 Makefile in Linux kernel as well, so that u-boot can also boot
-> > uImages for AArch64 systems out-off-box.
-> >
-> > [1].
-> > http://git.denx.de/?p=u-boot/u-boot-arm.git;a=shortlog;h=refs/heads/aa
-> > rch64
-> 
-> u-boot should never have to use a uImage on arm64, since it already
-> supports booting a vmlinux file.
-> 
-> A more sensible thing to add would be vmlinux.gz support in u-boot, if
-> that doesn't exist already.
-> 
+I agree with Mike here. This definitely encourages struct field creep if 
+more people want to use it.
 
-AFAIK, u-boot requires a u-boot specific header (see [1]) on top of any image it wants to
-boot - whether it's a uncompressed vmlinux or a compressed vmlinux.gz
+I talked to Stephen is person and my recommendation is to not have any 
+new fields other than struct regmap in clk_hw and remove the above 2 
+lines of code.
 
-In the ARM32 code base we had the Makefile rule to generate a uImage automatically (see [2]), with ARM64
-now, I am forced to compress the vmlinux and put a u-boot header on top of it using 'mkimage' and then
-feed the 'uImage' thus generated to the u-boot.
+>> +       else if (dev && dev_get_regmap(dev, NULL))
+>> +               hw->regmap = dev_get_regmap(dev, NULL);
 
-So, it would be good if the ARM64 Makefile can mimic the ARM32 one in this aspect - now that we have
-a working u-boot capable of booting vanilla linux on an ARMv8 foundation model.
+Move "struct regmap *regmap" into struct clk_hw (since it's truly 
+reusable across clock types and is technically purely HW related) and 
+update it from the device's regmap like above.
 
-[1]. http://www.denx.de/wiki/DULG/UBootImages
-[2]. https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/Makefile?id=refs/tags/next-20140110#n330
+We can then provide __clk_regmap_enable(regmap, offset, enable_mask) 
+helper functions. Then clock specific functions can use the helper. We 
+can even a simple macro to generate these wrappers.
 
-Regards,
-Bhupesh
+#define DEFINE_REGMAP_EN_DIS(clktype) \
+
+int clk_type##_enable(clktype *c, ....) { }
+int clk_type##_disable(clktype *c, ....) { }
+
+
+That to me seems like a reasonable compromise.
+
+Thanks,
+Saravana
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
