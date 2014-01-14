@@ -1,66 +1,103 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 14 Jan 2014 09:17:41 +0100
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140113174420.GC6934@e102568-lin.cambridge.arm.com>
-References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
- <1389554441-27335-2-git-send-email-broonie@kernel.org>
- <20140113161059.GA32720@e102568-lin.cambridge.arm.com>
- <20140113163045.GB29039@sirena.org.uk>
- <20140113174420.GC6934@e102568-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtDHjytSWYBiqxECJ4TqDN6RL1uT+Vx5tCjzjdBL6N9+5g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 14 Jan 2014 16:29:50 +0800
+Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk
+ board.
+In-Reply-To: <1389685029-17323-1-git-send-email-b20788@freescale.com>
+References: <1389685029-17323-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140114082948.GC1896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2014 18:44, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Mon, Jan 13, 2014 at 04:30:45PM +0000, Mark Brown wrote:
->> On Mon, Jan 13, 2014 at 04:10:59PM +0000, Lorenzo Pieralisi wrote:
->> > On Sun, Jan 12, 2014 at 07:20:38PM +0000, Mark Brown wrote:
->>
->> > > +struct cpu_topology {
->> > > + int thread_id;
->> > > + int core_id;
->> > > + int socket_id;
->>
->> > Is there any reason why we can't rename socket_id to cluster_id ? It won't
->> > change our lives but at least we kind of know what it means in ARM world.
->>
->> I really don't care, whatever you guys want.
->
-> s/socket_id/cluster_id
->
-> unless we have a compelling reason to keep the socket_id naming, I do
-> not see it, given that cpu_topology is arch specific anyway.
->
-> socket_id means really nothing in ARM world.
->
-> Again, Vincent if you see a compelling reason to keep socket_id as in arm32
-> that I am missing please shout.
+On Tue, Jan 14, 2014 at 03:37:09PM +0800, Anson Huang wrote:
+> i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
+> enable them, the keymap is as below:
+> 
+> SW6:  0x00000067    /* KEY_UP */
+> SW7:  0x0001006c    /* KEY_DOWN */
+> SW8:  0x0002001c    /* KEY_ENTER */
+> SW9:  0x01000066    /* KEY_HOME */
+> SW10: 0x0101006a    /* KEY_RIGHT */
+> SW11: 0x01020069    /* KEY_LEFT */
+> SW12: 0x02000072    /* KEY_VOLUMEDOWN */
+> SW13: 0x02010073    /* KEY_VOLUMEUP */
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
+>  2 files changed, 29 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+> index f5e4513..8d49a10 100644
+> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> @@ -93,6 +93,17 @@
+>  			fsl,pins = <MX6SL_FEC_PINGRP1>;
+>  		};
+>  
+> +		pinctrl_kpp: kppgrp {
+> +			fsl,pins = <
+> +				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
+> +				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
+> +				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
+> +				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
+> +				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
+> +				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
 
-I don't have any compellingreason, i have just used the same name than
-other platform.
+Rather than using whatever the config register gives us, why don't we
+put a proper pad confg value for COLs just like ROWs?
 
-Vincent
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <MX6SL_UART1_PINGRP1>;
+>  		};
+> @@ -139,6 +150,22 @@
+>  	};
+>  };
+>  
+> +&kpp {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_kpp>;
+> +	linux,keymap = <
+> +			0x00000067    /* KEY_UP */
+> +			0x0001006c    /* KEY_DOWN */
+> +			0x0002001c    /* KEY_ENTER */
+> +			0x01000066    /* KEY_HOME */
+> +			0x0101006a    /* KEY_RIGHT */
+> +			0x01020069    /* KEY_LEFT */
+> +			0x02000072    /* KEY_VOLUMEDOWN */
+> +			0x02010073    /* KEY_VOLUMEUP */
 
->
->>
->> > > +#define mc_capable()     (cpu_topology[0].socket_id != -1)
->> > > +#define smt_capable()    (cpu_topology[0].thread_id != -1)
->>
->> > Are the two macros above still required in the kernel ? I can't see any
->> > usage at present.
->> >
->> > Vincent, do you know why they were not removed in commit:
->> >
->> > 8e7fbcbc22c12414bcc9dfdd683637f58fb32759
->> >
->> > I am certainly missing something.
->>
->> They're defined by a bunch of other architectures (including x86).  If I
->> had to guess I'd say the architectures are still providing the
->> information so we don't need to go round adding it again if someone
->> comes up with a use for it in the core.
->
-> Yes, let's keep the macros, just wanted to make sure I got it right.
->
-> Lorenzo
->
+You can use the macros defined in include/dt-bindings/input/input.h to
+make them more readable.
+
+Shawn
+
+> +		>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1>;
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index a5ef3c3..a449c4f 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -393,8 +393,10 @@
+>  			};
+>  
+>  			kpp: kpp at 020b8000 {
+> +				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
+>  				reg = <0x020b8000 0x4000>;
+>  				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6SL_CLK_DUMMY>;
+>  			};
+>  
+>  			wdog1: wdog at 020bc000 {
+> -- 
+> 1.7.9.5
+> 
+> 
