@@ -1,63 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 Jan 2014 13:23:19 +0000
-Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the
- relative power of cores
-In-Reply-To: <20140114121343.GA15567@sirena.org.uk>
-References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
- <1389554441-27335-4-git-send-email-broonie@kernel.org>
- <20140113164021.GA6934@e102568-lin.cambridge.arm.com>
- <20140113170156.GC29039@sirena.org.uk>
- <20140114101236.GA28912@e102568-lin.cambridge.arm.com>
- <20140114121343.GA15567@sirena.org.uk>
-Message-ID: <20140114132319.GC28912@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jan 2014 14:26:15 +0100
+Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
+In-Reply-To: <20140114114419.GH30907@bivouac.eciton.net>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <201401140752.33257.arnd@arndb.de>
+ <20140114114419.GH30907@bivouac.eciton.net>
+Message-ID: <201401141426.16497.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 12:13:43PM +0000, Mark Brown wrote:
-> On Tue, Jan 14, 2014 at 10:12:36AM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Jan 13, 2014 at 05:01:56PM +0000, Mark Brown wrote:
+On Tuesday 14 January 2014, Leif Lindholm wrote:
+> On Tue, Jan 14, 2014 at 07:52:32AM +0100, Arnd Bergmann wrote:
+> > > > > It uses the generic configuration table scanning to populate ACPI and
+> > > > > SMBIOS pointers.
+> > > > 
+> > > > As far as I'm concerned there are no plans to have ACPI support on ARM32,
+> > > > so I wonder what the code to populate the ACPI tables is about. Can
+> > > > you clarify this?
+> > > 
+> > > Are you suggesting that I should #ifndef ARM in common code, or that I
+> > > should neglect to document what the common code will do with data it is
+> > > given by UEFI?
+> > 
+> > It would probably be good to document the fact that it won't work,
+> > possibly even having a BUG_ON statement in the code for this case.
 > 
-> > > I would really have expected static data from a function marked init to
-> > > end up marked appropriately, but whatever.
+> Why?
 > 
-> > I would not expect that.
-> 
-> Really?  If something is local to a function marked init it seems like
-> the __init ought to carry over to it.
+> You'll only touch that pointer if you enable CONFIG_ACPI, and if you
+> do you probably want that address. Sounds a bit hostile to throw a BUG
+> in the face of someone who's (for example) just succeeded to get Linux
+> running on a Windows RT device.
 
-Yes, for the same reason as static variables declared in a function do
-not end up in the .text section. You want the variable to be in the
-.init.data section and the compiler initialize it to 0 for you. If it was not
-declared as __initdata it would be added to the .bss section and zeroed
-by the kernel.
+But we know that it can't work unless a lot of other things get changed
+in the kernel.
 
+> > > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > > index 78a79a6a..1ab24cc 100644
+> > > > > --- a/arch/arm/Kconfig
+> > > > > +++ b/arch/arm/Kconfig
+> > > > > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
+> > > > >  	  the same virtual memory range as kmap so all early mappings must
+> > > > >  	  be unapped before paging_init() is called.
+> > > > >  
+> > > > > +config EFI
+> > > > > +	bool "UEFI runtime service support"
+> > > > > +	depends on OF && !CPU_BIG_ENDIAN
+> > > > 
+> > > > What is the dependency on !CPU_BIG_ENDIAN?
+> > > 
+> > > Mainly on code not being implemented to byte-reverse UCS strings.
+> > 
+> > Why would you byte-reverse /strings/? They normally just come in
+> > order of the characters, and UTF-16 strings are already defined
+> > as being big-endian or marked by the BOM character.
 > 
-> > > > > +		rate = of_get_property(cn, "clock-frequency", &len);
+> Well, then that bit might just work[tm].
 > 
-> > > It's already standard in the spec we claim to be following...
-> 
-> > So is it required ?
-> 
-> That's what ePAPR says.  If that's good decision making on the part of
-> ePAPR or not is a separate question.
-> 
-> > I was just referring to this thread, whose outcome is unclear to me.
-> 
-> > http://archive.arm.linux.org.uk/lurker/message/20131206.115707.24b095f4.en.html
-> 
-> > I am not questioning why it is needed, I am just asking whether it is
-> > optional or not. If it is, getting error messages in the kernel log does not
-> > seem correct.
-> 
-> At present we don't really have a better way to get the information so
-> we're relying on it; until the scheduler is able to talk to cpufreq not
-> providing this information means we won't be able to provide a relative
-> performance estimate to the scheduler.  This means that we probably
-> ought to be telling the user if we couldn't figure out the top frequency
-> for the core.
+> Although no other architectures supported by UEFI support big-endian,
+> so to be honest, I don't want to have to be the first one to validate
+> that in order to get the basic support into the kernel.
 
-It is not the top frequency, it is the current frequency. Leaving the
-log is fine by me, but actually implies that the ePAPR must be followed,
-ie the property is "required".
+I think there was a project to run UEFI on PowerPC on some stage, though
+I can't find any code now.
 
-Lorenzo
+> Some of the data structures might need swizzling though...
+> Again - if there is demand, this can be dealt with at a later date.
+
+Ok.
+
+	Arnd
