@@ -1,54 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 Jan 2014 09:46:38 +0900
-Subject: [PATCH V2 0/3] SoC and board integration for QSPI on
- r8a7791/koelsch
-In-Reply-To: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
-References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140114004638.GE18217@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Jan 2014 19:48:33 -0500
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140114004833.GI19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 12:00:29PM +0100, Geert Uytterhoeven wrote:
-> This series adds support for the Spansion s25fl512s SPI FLASH on the
-> r8a7791-based Koelsch board. It is based on
-> renesas-devel-v3.13-rc7-20140109v2, with Valentine's i2c pinctrl and
-> Laurent's SCIF DT work applied on top.
-> [Simon: I don't know in which order you will merge these. If you want me
->  to rebase my patches, just ask! Thanks!]
+On Mon, Jan 06, 2014 at 11:49:17PM +0100, Andrew Lunn wrote:
+> Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
+> 
+> As with the QNAP 119, there are two variants, depending on which SoC
+> has been used. They differ on Ethernet PHY addresses and number of
+> PCIe busses.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/Makefile                |    4 +-
+>  arch/arm/boot/dts/kirkwood-ts419-6281.dts |   20 ++++++++
+>  arch/arm/boot/dts/kirkwood-ts419-6282.dts |   32 ++++++++++++
+>  arch/arm/boot/dts/kirkwood-ts419.dtsi     |   75 +++++++++++++++++++++++++++++
+>  4 files changed, 130 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
 
-I see that Laruent has taken patch 1/4.
+Applied to mvebu/dt with Ian's Tested-by
 
-Is it possible for me to merge patches 2-4/4 independently of that patch?
-That is, can I apply them and still produce a kernel that boots. If so,
-that is my preferred option. If not I will talk to Laurent about a branch
-to base things on.
+thx,
 
-Also, I would like to get an Ack from Magnus.
-
-> 
-> This applies to non-multiplatform Koelsch only.  Multi-platform Koelsch
-> support will be added in a separate series.
-> 
->     [1/4] pinctrl: sh-pfc: r8a7791: Add QSPI pin groups
->     [2/4] ARM: shmobile: r8a7791: add QSPI clocks
->     [3/4] ARM: shmobile: koelsch: Add QSPI support
->     [4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80 in
-> 
-> Changes in V2:
->   - Split QSPI pins in 2 sets of 3 pin groups
->   - Add "[PATCH V2 4/4] ARM: shmobile: koelsch: Enable RSPI and MTD_M25P80
->     in defconfig"
-> 
-> Thanks!
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+Jason.
