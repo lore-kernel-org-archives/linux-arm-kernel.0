@@ -1,39 +1,95 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 14 Jan 2014 10:15:43 +0100
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <20140114004833.GI19878@titan.lakedaemon.net>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <20140114004833.GI19878@titan.lakedaemon.net>
-Message-ID: <20140114091543.GC334@lunn.ch>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 14 Jan 2014 17:23:31 +0800
+Subject: [PATCH V2] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk board.
+Message-ID: <1389691411-25231-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 07:48:33PM -0500, Jason Cooper wrote:
-> On Mon, Jan 06, 2014 at 11:49:17PM +0100, Andrew Lunn wrote:
-> > Re-implement the Marvell Kirkwood ts41x-setup.c in DT.
-> > 
-> > As with the QNAP 119, there are two variants, depending on which SoC
-> > has been used. They differ on Ethernet PHY addresses and number of
-> > PCIe busses.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |    4 +-
-> >  arch/arm/boot/dts/kirkwood-ts419-6281.dts |   20 ++++++++
-> >  arch/arm/boot/dts/kirkwood-ts419-6282.dts |   32 ++++++++++++
-> >  arch/arm/boot/dts/kirkwood-ts419.dtsi     |   75 +++++++++++++++++++++++++++++
-> >  4 files changed, 130 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
-> 
-> Applied to mvebu/dt with Ian's Tested-by
+i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
+enable them, the keymap is as below:
 
-Hi Jason
+SW6:  MATRIX_KEY(0x0, 0x0, 0x67)  /* ROW0, COL0, KEY_UP */
+SW7:  MATRIX_KEY(0x0, 0x1, 0x6c)  /* ROW0, COL1, KEY_DOWN */
+SW8:  MATRIX_KEY(0x0, 0x2, 0x1c)  /* ROW0, COL2, KEY_ENTER */
+SW9:  MATRIX_KEY(0x1, 0x0, 0x66)  /* ROW1, COL0, KEY_HOME */
+SW10: MATRIX_KEY(0x1, 0x1, 0x6a)  /* ROW1, COL1, KEY_RIGHT */
+SW11: MATRIX_KEY(0x1, 0x2, 0x69)  /* ROW1, COL2, KEY_LEFT */
+SW12: MATRIX_KEY(0x2, 0x0, 0x72)  /* ROW2, COL0, KEY_VOLUMEDOWN */
+SW13: MATRIX_KEY(0x2, 0x1, 0x73)  /* ROW2, COL1, KEY_VOLUMEUP */
 
-Thanks, but please could you hold onto it for a while. I would like to
-see how the discussion about unstable /dev/input/by-path discussion
-plays out. That is if anybody actually replies to my question...
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |   28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
+ 2 files changed, 30 insertions(+)
 
-      Thanks
-	Andrew
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index f5e4513..a2a0399 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -8,6 +8,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/input/input.h>
+ #include "imx6sl.dtsi"
+ 
+ / {
+@@ -93,6 +94,17 @@
+ 			fsl,pins = <MX6SL_FEC_PINGRP1>;
+ 		};
+ 
++		pinctrl_kpp: kppgrp {
++			fsl,pins = <
++				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
++				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
++				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
++				MX6SL_PAD_KEY_COL0__KEY_COL0    0x110b0
++				MX6SL_PAD_KEY_COL1__KEY_COL1    0x110b0
++				MX6SL_PAD_KEY_COL2__KEY_COL2    0x110b0
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <MX6SL_UART1_PINGRP1>;
+ 		};
+@@ -139,6 +151,22 @@
+ 	};
+ };
+ 
++&kpp {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_kpp>;
++	linux,keymap = <
++			MATRIX_KEY(0x0, 0x0, 0x67)  /* ROW0, COL0, KEY_UP */
++			MATRIX_KEY(0x0, 0x1, 0x6c)  /* ROW0, COL1, KEY_DOWN */
++			MATRIX_KEY(0x0, 0x2, 0x1c)  /* ROW0, COL2, KEY_ENTER */
++			MATRIX_KEY(0x1, 0x0, 0x66)  /* ROW1, COL0, KEY_HOME */
++			MATRIX_KEY(0x1, 0x1, 0x6a)  /* ROW1, COL1, KEY_RIGHT */
++			MATRIX_KEY(0x1, 0x2, 0x69)  /* ROW1, COL2, KEY_LEFT */
++			MATRIX_KEY(0x2, 0x0, 0x72)  /* ROW2, COL0, KEY_VOLUMEDOWN */
++			MATRIX_KEY(0x2, 0x1, 0x73)  /* ROW2, COL1, KEY_VOLUMEUP */
++	>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index a5ef3c3..a449c4f 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -393,8 +393,10 @@
+ 			};
+ 
+ 			kpp: kpp at 020b8000 {
++				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
+ 				reg = <0x020b8000 0x4000>;
+ 				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SL_CLK_DUMMY>;
+ 			};
+ 
+ 			wdog1: wdog at 020bc000 {
+-- 
+1.7.9.5
