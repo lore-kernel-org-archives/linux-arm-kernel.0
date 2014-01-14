@@ -1,394 +1,246 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 14 Jan 2014 15:52:01 -0600
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <20140114060254.GB1914@S2101-09.ap.freescale.net>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <20140114060254.GB1914@S2101-09.ap.freescale.net>
-Message-ID: <CAHrpEqT+9P_rRqaEd8O-FjR21=juF-NSTE8_umVJ83-6riO2_w@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 14 Jan 2014 22:54:14 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
+ <20140114170719.GA12126@xanatos>
+Message-ID: <87bnzekz5l.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 12:02 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> The list linux-spi at vger.kernel.org should be copied.
->
-> I also added Marek who has great experience of play DMA on SPI.
->
-> On Sat, Jan 04, 2014 at 06:53:51AM +0800, Frank Li wrote:
->> After enable DMA
->>
->> spi-nor read speed is
->> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
->> 1+0 records in
->> 1+0 records out
->> 1048576 bytes (1.0 MB) copied, 0.720402 s, 1.5 MB/s
->>
->> spi-nor write speed is
->> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
->> 1+0 records in
->> 1+0 records out
->> 1048576 bytes (1.0 MB) copied, 3.56044 s, 295 kB/s
->>
->> Before enable DMA
->>
->> spi-nor read speed is
->> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
->> 1+0 records in
->> 1+0 records out
->> 1048576 bytes (1.0 MB) copied, 2.37717 s, 441 kB/s
->>
->> spi-nor write speed is
->>
->> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
->> 1+0 records in
->> 1+0 records out
->> 1048576 bytes (1.0 MB) copied, 4.83181 s, 217 kB/s
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->>  drivers/spi/spi-imx.c |  447 ++++++++++++++++++++++++++++++++++++++++++++++++-
->>  1 files changed, 441 insertions(+), 6 deletions(-)
->>
->> Change from v1.
->>       1. check if res is null at res = platform_get_resource(pdev, IORESOURCE_MEM, 0)
->>       2. fix failure transfer when len is not multiple watermark
->>
->> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
->> index b80f2f7..1a9099a 100644
->> --- a/drivers/spi/spi-imx.c
->> +++ b/drivers/spi/spi-imx.c
->> @@ -39,6 +39,10 @@
->>  #include <linux/of_gpio.h>
->>
->>  #include <linux/platform_data/spi-imx.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/platform_data/dma-imx.h>
->> +#include <linux/dmaengine.h>
->> +
->
-> Nit: we already have one blank in between.
->
->>
->>  #define DRIVER_NAME "spi_imx"
->>
->> @@ -52,6 +56,9 @@
->>  #define MXC_INT_RR   (1 << 0) /* Receive data ready interrupt */
->>  #define MXC_INT_TE   (1 << 1) /* Transmit FIFO empty interrupt */
->>
->> +/* The maximum  bytes that a sdma BD can transfer.*/
->> +#define MAX_SDMA_BD_BYTES  (1 << 15)
->> +
->>  struct spi_imx_config {
->>       unsigned int speed_hz;
->>       unsigned int bpw;
->> @@ -84,6 +91,7 @@ struct spi_imx_data {
->>
->>       struct completion xfer_done;
->>       void __iomem *base;
->> +     resource_size_t mapbase;
->
-> I think the following definition is more easy to understand.
->
->         phys_addr_t pbase;
->
->>       int irq;
->>       struct clk *clk_per;
->>       struct clk *clk_ipg;
->> @@ -92,6 +100,29 @@ struct spi_imx_data {
->>       unsigned int count;
->>       void (*tx)(struct spi_imx_data *);
->>       void (*rx)(struct spi_imx_data *);
->> +     int (*txrx_bufs)(struct spi_device *spi, struct spi_transfer *t);
->> +     struct dma_chan         *dma_chan_rx, *dma_chan_tx;
->
-> Having them on two line fits better to the style used here.
->
->> +     unsigned int            dma_is_inited;
->
-> All other lines use space in between.  Why these two use tabs?
->
->> +     struct device *dev;
->> +
->> +     struct completion dma_rx_completion;
->> +     struct completion dma_tx_completion;
->> +
->> +     u8 *dma_rx_tmpbuf;
->> +     unsigned int dma_rx_tmpbuf_size;
->> +     unsigned int dma_rx_tmpbuf_phy_addr;
->
-> Use type dma_addr_t for it?
->
->> +
->> +     u8 *dma_tx_tmpbuf;
->> +     unsigned int dma_tx_tmpbuf_size;
->> +     unsigned int dma_tx_tmpbuf_phy_addr;
->> +
->> +     unsigned int usedma;
->> +     unsigned int dma_finished;
->> +     /* SDMA wartermark */
->> +     u32 rx_wml;
->> +     u32 tx_wml;
->> +     u32 rxt_wml;
->> +
->>       void *rx_buf;
->>       const void *tx_buf;
->>       unsigned int txfifo; /* number of words pushed in tx FIFO */
->> @@ -185,6 +216,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->>  #define MX51_ECSPI_CTRL              0x08
->>  #define MX51_ECSPI_CTRL_ENABLE               (1 <<  0)
->>  #define MX51_ECSPI_CTRL_XCH          (1 <<  2)
->> +#define MX51_ECSPI_CTRL_SMC          (1 <<  3)
->
-> You do not have to follow the wrong pattern.  One space after '<<' is
-> good enough.
->
->>  #define MX51_ECSPI_CTRL_MODE_MASK    (0xf << 4)
->>  #define MX51_ECSPI_CTRL_POSTDIV_OFFSET       8
->>  #define MX51_ECSPI_CTRL_PREDIV_OFFSET        12
->> @@ -202,9 +234,22 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->>  #define MX51_ECSPI_INT_TEEN          (1 <<  0)
->>  #define MX51_ECSPI_INT_RREN          (1 <<  3)
->>
->> +#define MX51_ECSPI_DMA      0x14
->> +#define MX51_ECSPI_DMA_TX_WML_OFFSET 0
->> +#define MX51_ECSPI_DMA_TX_WML_MASK 0x3F
->
-> It seems that the common pattern for hex value in this file is to use
-> lowercase.
->
->> +#define MX51_ECSPI_DMA_RX_WML_OFFSET 16
->> +#define MX51_ECSPI_DMA_RX_WML_MASK (0x3F << 16)
->> +#define MX51_ECSPI_DMA_RXT_WML_OFFSET 24
->> +#define MX51_ECSPI_DMA_RXT_WML_MASK (0x3F << 16)
->
-> Shouldn't it be (0x3F << 24)?
->
->> +
->> +#define MX51_ECSPI_DMA_TEDEN_OFFSET 7
->> +#define MX51_ECSPI_DMA_RXDEN_OFFSET 23
->> +#define MX51_ECSPI_DMA_RXTDEN_OFFSET 31
->
-> Please use tabs to align these numbers in the same column.
->
->> +
->>  #define MX51_ECSPI_STAT              0x18
->>  #define MX51_ECSPI_STAT_RR           (1 <<  3)
->>
->> +#define MX51_ECSPI_TESTREG   0x20
->
-> It's used nowhere?
->
->>  /* MX51 eCSPI */
->>  static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi)
->>  {
->> @@ -255,16 +300,28 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
->>  {
->>       u32 reg;
->>
->> -     reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
->> -     reg |= MX51_ECSPI_CTRL_XCH;
->> -     writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->> +     if (!spi_imx->usedma) {
->
-> So the DMA support is added for imx51-ecspi type device only?  If that's
-> case, we should make it clear in commit log.
->
->> +             reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
->> +             reg |= MX51_ECSPI_CTRL_XCH;
->> +             writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->> +     } else {
->> +             if (!spi_imx->dma_finished) {
->> +                     reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
->> +                     reg |= MX51_ECSPI_CTRL_SMC;
->> +                     writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->> +             } else {
->> +                     reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
->> +                     reg &= (~MX51_ECSPI_CTRL_SMC);
->
-> Unnecessary parentheses.
->
->> +                     writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->> +             }
->
-> Wouldn't it make more sense to write it like below?
->
->                 reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
->                 if (!spi_imx->dma_finished)
->                         reg |= MX51_ECSPI_CTRL_SMC;
->                 else
->                         reg &= ~MX51_ECSPI_CTRL_SMC;
->                 writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->
->> +     }
->>  }
->>
->>  static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->>               struct spi_imx_config *config)
->>  {
->> -     u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
->> -
->> +     u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
->> +     u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
->>       /*
->>        * The hardware seems to have a race condition when changing modes. The
->>        * current assumption is that the selection of the channel arrives
->> @@ -297,6 +354,30 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->>       writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
->>       writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
->>
->> +     /*
->> +      * Configure the DMA register: setup the watermark
->> +      * and enable DMA request.
->> +      */
->> +     if (spi_imx->dma_is_inited) {
->> +             dma = readl(spi_imx->base + MX51_ECSPI_DMA);
->> +
->> +             spi_imx->tx_wml = spi_imx_get_fifosize(spi_imx) / 2;
->> +             spi_imx->rx_wml = spi_imx_get_fifosize(spi_imx) / 2;
->> +             spi_imx->rxt_wml = spi_imx_get_fifosize(spi_imx) / 2;
->> +             rx_wml_cfg = spi_imx->rx_wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
->> +             tx_wml_cfg = spi_imx->tx_wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
->> +             rxt_wml_cfg = spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
->> +             dma = (dma & (~MX51_ECSPI_DMA_TX_WML_MASK)
->> +                                & (~MX51_ECSPI_DMA_RX_WML_MASK)
->> +                                & (~MX51_ECSPI_DMA_RXT_WML_MASK))
->
-> Unnecessary parentheses.
->
->> +                                | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
->> +                                | (1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
->> +                                | (1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
->> +                                | (1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
->> +
->> +             writel(dma, spi_imx->base + MX51_ECSPI_DMA);
->> +     }
->> +
->>       return 0;
->>  }
->
-> ... skip the dma code, and hope Marek can help review it ...
->
->> @@ -729,6 +1088,27 @@ static int spi_imx_transfer(struct spi_device *spi,
->>       return transfer->len;
->>  }
->>
->> +static int spi_imx_transfer(struct spi_device *spi,
->> +                             struct spi_transfer *transfer)
->> +{
->> +     struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->> +
->> +     if (spi_imx->dma_chan_tx && spi_imx->dma_chan_rx) {
->> +             /*
->> +              * Don't use sdma when the size of data to be transfered is
->> +              * lower then SDMA wartermark.
->> +              */
->> +             if ((transfer->len >= spi_imx->rx_wml) &&
->> +                             (transfer->len > spi_imx->tx_wml)) {
->> +                     spi_imx->usedma = 1;
->> +                     return spi_imx_sdma_transfer(spi, transfer);
->> +             }
->> +     }
->> +
->> +     spi_imx->usedma = 0;
->> +     return spi_imx_pio_transfer(spi, transfer);
->> +}
->> +
->>  static int spi_imx_setup(struct spi_device *spi)
->>  {
->>       struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->> @@ -778,6 +1158,56 @@ spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
->>       return 0;
->>  }
->>
->> +static int spi_imx_sdma_init(struct spi_imx_data *spi_imx)
->> +{
->> +     struct dma_slave_config slave_config = {};
->> +     struct device *dev = spi_imx->dev;
->> +     int ret;
->> +
->> +
->> +     /* Prepare for TX : */
->> +     spi_imx->dma_chan_tx = dma_request_slave_channel(dev, "tx");
->> +     if (!spi_imx->dma_chan_tx) {
->> +             dev_err(dev, "cannot get the TX DMA channel!\n");
->
-> So we will see this error message for each type of imx spi device,
-> though the driver only supports DMA for imx51-ecspi.
->
-> Shawn
+Hi Sarah,
 
-How to handle this one? change to devinfo? Or check check if imx51-ecspi?
+Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
+
+>> I can add the following:
+>> 
+>> 2) I just tested the copy of the small files using the ICY DOCK
+>> MB981U3S-1S connected to my ReadyNAS 102 *on a 3.11.7 kernel*
+>> and it completed successfully. 
+>
+> Please try a 3.13-rc7 kernel after running `git revert 35773dac5f86`.
+
+I tried current 3.13.0-rc8 w/ 35773dac5f86 reverted and the result is
+the same:
+
+Powering the dock station:
+
+[   70.530128] usb 3-1: new SuperSpeed USB device number 2 using xhci_hcd
+[   70.550649] usb 3-1: New USB device found, idVendor=174c, idProduct=5106
+[   70.557368] usb 3-1: New USB device strings: Mfr=2, Product=3, SerialNumber=1
+[   70.564529] usb 3-1: Product: AS2105
+[   70.568112] usb 3-1: Manufacturer: ASMedia
+[   70.572222] usb 3-1: SerialNumber: 00000000000000000000
+[   70.579174] usb-storage 3-1:1.0: USB Mass Storage device detected
+[   70.586379] scsi4 : usb-storage 3-1:1.0
+[   71.590415] scsi 4:0:0:0: Direct-Access     ASMT     2105             0    PQ: 0 ANSI: 6
+[   71.601630] sd 4:0:0:0: Attached scsi generic sg2 type 0
+[   76.968663] sd 4:0:0:0: [sdc] 488281250 512-byte logical blocks: (250 GB/232 GiB)
+[   76.976800] sd 4:0:0:0: [sdc] Write Protect is off
+[   76.982190] sd 4:0:0:0: [sdc] Write cache: enabled, read cache: enabled, doesn't support DPO or FUA
+[   77.028598]  sdc: sdc1 sdc2
+[   77.035729] sd 4:0:0:0: [sdc] Attached SCSI disk
 
 
+Starting the copy after mounting the disk and creating test/:
+
+# cp -r /bin/ /lib /sbin /opt /etc /usr test/
+[  398.130048] xhci_hcd 0000:02:00.0: xHCI host not responding to stop endpoint command.
+[  398.137905] xhci_hcd 0000:02:00.0: Assuming host is dying, halting host.
+[  398.144650] xhci_hcd 0000:02:00.0: HC died; cleaning up
+[  398.150337] usb 3-1: USB disconnect, device number 2
+[  398.155472] sd 4:0:0:0: Device offlined - not ready after error recovery
+[  398.170111] sd 4:0:0:0: [sdc] Unhandled error code
+[  398.174923] sd 4:0:0:0: [sdc]  
+[  398.178076] sd 4:0:0:0: [sdc] CDB: 
+[  398.181606] end_request: I/O error, dev sdc, sector 235538432
+[  398.187367] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7347656 (offset 0 size 323584 starting block 29442334)
+[  398.200175] Buffer I/O error on device sdc1, logical block 29442048
+[  398.206457] Buffer I/O error on device sdc1, logical block 29442049
+[  398.212739] Buffer I/O error on device sdc1, logical block 29442050
+[  398.219016] Buffer I/O error on device sdc1, logical block 29442051
+[  398.225298] Buffer I/O error on device sdc1, logical block 29442052
+[  398.231579] Buffer I/O error on device sdc1, logical block 29442053
+[  398.237857] Buffer I/O error on device sdc1, logical block 29442054
+[  398.244137] Buffer I/O error on device sdc1, logical block 29442055
+[  398.250418] Buffer I/O error on device sdc1, logical block 29442056
+[  398.256696] Buffer I/O error on device sdc1, logical block 29442057
+[  398.264481] sd 4:0:0:0: [sdc] Unhandled error code
+[  398.269290] sd 4:0:0:0: [sdc]  
+[  398.272466] sd 4:0:0:0: [sdc] CDB: 
+[  398.275980] end_request: I/O error, dev sdc, sector 235538672
+[  398.281744] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7347656 (offset 0 size 323584 starting block 29442364)
+[  398.294606] EXT4-fs warning (device sdc1): ext4_end_bio:317: I/O error writing to inode 7347656 (offset 0 size 323584 starting block 29442383)
+
+>> 2) on current 3.13.0-rc7 kernel (w/ Bj?rn patch applied just in case), I
 >
->> +             ret = -EINVAL;
->> +             goto err;
->> +     }
->> +
->> +     slave_config.direction = DMA_MEM_TO_DEV;
->> +     slave_config.dst_addr = spi_imx->mapbase + MXC_CSPITXDATA;
->> +     slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
->> +     ret = dmaengine_slave_config(spi_imx->dma_chan_tx, &slave_config);
->> +     if (ret) {
->> +             dev_err(dev, "error in TX dma configuration.");
->> +             goto err;
->> +     }
->> +
->> +     /* Prepare for RX : */
->> +     spi_imx->dma_chan_rx = dma_request_slave_channel(dev, "rx");
->> +     if (!spi_imx->dma_chan_rx) {
->> +             dev_dbg(dev, "cannot get the DMA channel.\n");
->> +             ret = -EINVAL;
->> +             goto err;
->> +     }
->> +
->> +     slave_config.direction = DMA_DEV_TO_MEM;
->> +     slave_config.src_addr = spi_imx->mapbase + MXC_CSPIRXDATA;
->> +     slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     slave_config.src_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
->> +     ret = dmaengine_slave_config(spi_imx->dma_chan_rx, &slave_config);
->> +     if (ret) {
->> +             dev_err(dev, "error in RX dma configuration.\n");
->> +             goto err;
->> +     }
->> +     spi_imx->dma_is_inited = 1;
->> +
->> +     return 0;
->> +err:
->> +     spi_imx_sdma_exit(spi_imx);
->> +     return ret;
->> +}
->> +
->>  static int spi_imx_probe(struct platform_device *pdev)
->>  {
->>       struct device_node *np = pdev->dev.of_node;
->> @@ -849,6 +1279,8 @@ static int spi_imx_probe(struct platform_device *pdev)
->>               (struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
->>
->>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     if (res)
->> +             spi_imx->mapbase = res->start;
->>       spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
->>       if (IS_ERR(spi_imx->base)) {
->>               ret = PTR_ERR(spi_imx->base);
->> @@ -890,6 +1322,9 @@ static int spi_imx_probe(struct platform_device *pdev)
->>
->>       spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
->>
->> +     spi_imx->dev = &pdev->dev;
->> +     spi_imx_sdma_init(spi_imx);
->> +
->>       spi_imx->devtype_data->reset(spi_imx);
->>
->>       spi_imx->devtype_data->intctrl(spi_imx, 0);
->> --
->> 1.7.8
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Which patch are you referring to?
+
+This one:
+
+  Commit 60e453a940ac ("USBNET: fix handling padding packet")
+  added an extra SG entry in case padding is necessary, but
+  failed to update the initialisation of the list. This can
+  cause list traversal to fall off the end of the list,
+  resulting in an oops.
+  
+  Fixes: 60e453a940ac ("USBNET: fix handling padding packet")
+  Reported-by: Thomas Kear <thomas@kear.co.nz>
+  Cc: Ming Lei <ming.lei@canonical.com>
+  Signed-off-by: Bj?rn Mork <bjorn@mork.no>
+  
+
+>> just transferred 40GB through a Logitec LAN-GT JU3H3 (it is based on an
+>> ASIX AX88179) connected to my ReadyNAS Duo v2 (NEC XHCI controller) at
+>> an average rate of 82MB/s. Bottom line: no issue. When I try to do the
+>> same on my ReadyNAS 102, I immediately get complaints:
 >
+> Was the ReadyNAS 102 with the Fresco Logic host running 3.13.0-rc7 as
+> well?
+
+Yes. Summary is:
+
+ - RN102 w/ 3.11.7: OK
+ - RN102 w/ 3.13-rc7: KO
+ - Duo v2 w/ 3.13.0-rc7: OK
+
+>> [  383.280429] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  383.280892] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  411.620073] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
+>> [  411.620750] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  411.621727] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.066651] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
+>> [  412.067233] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.068196] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.242708] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
+>> [  412.243333] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.244246] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.417956] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
+>> [  412.418516] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.419473] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20400 bytes untransferred
+>> [  412.545330] xhci_hcd 0000:02:00.0: ep 0x82 - asked for 20480 bytes, 20352 bytes untransferred
+>
+> Those messages are normal.  It just means the device transferred less
+> data than the host asked for, which is part of normal USB operation.
+>
+> Does the dock work despite the messages?
+
+no
+
+> Please send me the output of `sudo lspci -vvv -n` for the ReadyNAS 102
+> Fresco Logic host.
+
+# lspci -vvv -n
+00:01.0 0604: 11ab:7846 (prog-if 00 [Normal decode])
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 00010000-00010fff
+        Memory behind bridge: e0000000-e00fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity- SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+
+00:02.0 0604: 11ab:7846 (prog-if 00 [Normal decode])
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Bus: primary=00, secondary=02, subordinate=02, sec-latency=0
+        I/O behind bridge: 0000f000-00000fff
+        Memory behind bridge: e0100000-e01fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity- SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+
+01:00.0 0106: 1b4b:9170 (rev 12) (prog-if 01 [AHCI 1.0])
+        Subsystem: 1b4b:9170
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx+
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 105
+        Region 0: I/O ports at 10010 [size=8]
+        Region 1: I/O ports at 10020 [size=4]
+        Region 2: I/O ports at 10018 [size=8]
+        Region 3: I/O ports at 10024 [size=4]
+        Region 4: I/O ports at 10000 [size=16]
+        Region 5: Memory at e0010000 (32-bit, non-prefetchable) [size=512]
+        Expansion ROM@e0000000 [disabled] [size=64K]
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot+,D3cold-)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [50] MSI: Enable+ Count=1/1 Maskable- 64bit-
+                Address: d0020a04  Data: 0f10
+        Capabilities: [70] Express (v2) Legacy Endpoint, MSI 00
+                DevCap: MaxPayload 512 bytes, PhantFunc 0, Latency L0s <1us, L1 <8us
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Latency L0 <512ns, L1 <64us
+                        ClockPM- Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                DevCap2: Completion Timeout: Not Supported, TimeoutDis+, LTR-, OBFF Not Supported
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled
+                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap- CGenEn- ChkCap- ChkEn-
+        Kernel driver in use: ahci
+
+02:00.0 0c03: 1b73:1009 (rev 02) (prog-if 30 [XHCI])
+        Subsystem: 1b73:0000
+        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx+
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 104
+        Region 0: Memory at e0100000 (64-bit, non-prefetchable) [size=64K]
+        Region 2: Memory at e0110000 (64-bit, non-prefetchable) [size=4K]
+        Region 4: Memory@e0111000 (64-bit, non-prefetchable) [size=4K]
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI- D1+ D2- AuxCurrent=375mA PME(D0+,D1+,D2-,D3hot+,D3cold+)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [50] MSI: Enable- Count=1/8 Maskable- 64bit+
+                Address: 0000000000000000  Data: 0000
+        Capabilities: [70] Express (v2) Endpoint, MSI 00
+                DevCap: MaxPayload 512 bytes, PhantFunc 0, Latency L0s unlimited, L1 unlimited
+                        ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr+ TransPend-
+                LnkCap: Port #0, Speed 5GT/s, Width x1, ASPM L0s L1, Latency L0 unlimited, L1 unlimited
+                        ClockPM- Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- Retrain- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                DevCap2: Completion Timeout: Not Supported, TimeoutDis+, LTR-, OBFF Not Supported
+                DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis-, LTR-, OBFF Disabled
+                LnkCtl2: Target Link Speed: 5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-, LinkEqualizationRequest-
+        Capabilities: [b0] MSI-X: Enable+ Count=8 Masked-
+                Vector table: BAR=2 offset=00000000
+                PBA: BAR=4 offset=00000000
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr+
+                AERCap: First Error Pointer: 00, GenCap+ CGenEn- ChkCap+ ChkEn-
+        Kernel driver in use: xhci_hcd
