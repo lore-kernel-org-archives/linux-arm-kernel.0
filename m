@@ -1,41 +1,71 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Jan 2014 08:04:40 -0600
-Subject: [PATCHv4 6/7] hwspinlock/omap: enable module before reading
- SYSSTATUS register
-In-Reply-To: <20140114131052.GA10818@saruman.home>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-7-git-send-email-s-anna@ti.com>
- <20140114131052.GA10818@saruman.home>
-Message-ID: <20140114140440.GA15785@saruman.home>
+From: dailemon.gl@gmail.com (Lemon Dai)
+Date: Tue, 14 Jan 2014 22:08:44 +0800
+Subject: Add .determine_rate to composite clk
+In-Reply-To: <CAJiWf8WJxf0S32bPiXGUu3Rwmh36xYdbd0VEpLTG-pwyvVnasg@mail.gmail.com>
+References: <CAJiWf8W6rCnnF9Tv+cpcqqshEb4ALD+J_RnYeLkaNVG-Rcd+QA@mail.gmail.com>
+ <20140111102843.GU2941@lukather>
+ <CAJiWf8WJxf0S32bPiXGUu3Rwmh36xYdbd0VEpLTG-pwyvVnasg@mail.gmail.com>
+Message-ID: <CAJiWf8Wvcu0pWBNd7xSm9ES7ApTNp27CXTHWBxbr4msfNd9xCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+Hi Maxime,
 
-On Tue, Jan 14, 2014 at 07:10:52AM -0600, Felipe Balbi wrote:
-> > diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
-> > index 9f56fb2..194886e 100644
-> > --- a/drivers/hwspinlock/omap_hwspinlock.c
-> > +++ b/drivers/hwspinlock/omap_hwspinlock.c
-> > @@ -101,10 +101,23 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
-> >  	if (!io_base)
-> >  		return -ENOMEM;
-> >  
-> > +	/*
-> > +	 * make sure the module is enabled and clocked before reading
-> > +	 * the module SYSSTATUS register
-> > +	 */
-> > +	pm_runtime_enable(&pdev->dev);
-> > +	pm_runtime_get_sync(&pdev->dev);
+The commit 107f3198 in Mike's clk-next branch shows that:
+(about line 72 in drivers/clk/clk-composite.c)
 
-another thing, you need to check return of pm_runtime_get_sync()
+        } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+                mux_hw->clk = hw->clk;
+                return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
+                                               best_parent_p);
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/6ca61f80/attachment.sig>
+
+ It should be fixed as follows, at least for reason that  NULL rate_hw
+may be used in the old code,
+
+        } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+                mux_hw->clk = hw->clk;
+ -              return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
+ +             return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
+                                               best_parent_p);
+
+--
+Best regards,
+Lemon Dai
+
+On Sun, Jan 12, 2014 at 11:56 AM, Lemon Dai <dailemon.gl@gmail.com> wrote:
+> Hi  Maxime,
+>
+> Thank you for your reply and suggestion.
+>  I am sorry for sending  a mail with such a lot of style issues before
+> reading Documentation/SubmittingPatches file.
+>
+> Best wishes,
+> Lemon
+>
+> On Sat, Jan 11, 2014 at 6:28 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Hi Lemon,
+>>
+>> On Sat, Jan 11, 2014 at 05:15:58PM +0800, Lemon Dai wrote:
+>>> Hi Mike,
+>>>
+>>> As .determine_rate was added to struct clk and clk_mux_ops, maybe we
+>>> should also copy determine_rate operation from mux_ops to
+>>> clk_composite_ops in clk_register_composite( ),
+>>> to make composite clk implementation more generic.
+>>
+>> A similar patch is on its way to 3.14 already (commit 107f3198 in
+>> Mike's clk-next branch).
+>>
+>> Also, for future contributions, I'd suggest to read the
+>> Documentation/SubmittingPatches file. Your patch had several style
+>> issues that are covered in this file.
+>>
+>> Thanks!
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
