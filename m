@@ -1,32 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jan 2014 19:16:46 +0000
-Subject: [PATCH v10 4/4] arm64: topology: Provide relative power numbers
- for cores
-In-Reply-To: <20140114134310.GF15567@sirena.org.uk>
-References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
- <1389287106-29979-5-git-send-email-broonie@kernel.org>
- <52D48FF9.1070501@nvidia.com>
- <20140114134310.GF15567@sirena.org.uk>
-Message-ID: <20140114191646.GV15567@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Jan 2014 14:17:11 -0500
+Subject: [GIT PULL] ARM: mvebu: stable fix for v3.13
+In-Reply-To: <87wqi274vp.fsf@linaro.org>
+References: <20140114154452.GP19878@titan.lakedaemon.net>
+ <87wqi274vp.fsf@linaro.org>
+Message-ID: <20140114191711.GS19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 01:43:10PM +0000, Mark Brown wrote:
+On Tue, Jan 14, 2014 at 11:14:18AM -0800, Kevin Hilman wrote:
+> Jason Cooper <jason@lakedaemon.net> writes:
+> 
+> > And... despite typing the stable ML address quite often, I still got it
+> > wrong.  Need more coffee.
+> >
+> > thx,
+> >
+> > Jason.
+> >
+> > arm-soc folks,
+> >
+> > Sorry for the lateness in the window on this one.  I'd like to see it
+> > get into v3.13 if possible, but if it doesn't get there till v3.13.1, I
+> > understand.
+> 
+> Since it touches arch/arm, drivers, and bindings I'm a little reluctant
+> to take it in to v3.13 at this point since we're already at -rc8.  
 
-> The other option here is runtime tunables via sysfs or whatever which
-> avoids baking numbers into the DT in the same way, though that is partly
-> just a punt of the same problem to userspace.  That's probably also more
-> helpful to people doing the tuning since it can be tweaked dynamically.
+ok, that was my thought as well, but I didn't want to assume one way or
+the other.
 
-One other thing on this which occurred to me later on: if we do want to
-make these values directly tunable we probably want to do that from the
-scheduler rather than individual architectures.  These are scheduler
-interfaces and the issues which make tuning desirable are essentially
-architecture neutral ones.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/ce351e7a/attachment.sig>
+> I've merged it into next/fixes-non-critical so it goes in right away for
+> v3.14, and your stable tags will get it into v3.12+
+
+Great!  Thanks.
+
+Jason.
