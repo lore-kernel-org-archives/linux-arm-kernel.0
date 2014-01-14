@@ -1,105 +1,119 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Jan 2014 12:47:34 -0800
-Subject: [PATCH v2 02/10] genirq: Add devm_request_any_context_irq()
-In-Reply-To: <52CB2D29.3050107@codeaurora.org>
-References: <1388709460-19222-1-git-send-email-sboyd@codeaurora.org>
- <1388709460-19222-3-git-send-email-sboyd@codeaurora.org>
- <52CB2D29.3050107@codeaurora.org>
-Message-ID: <52D5A266.5000504@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 14 Jan 2014 14:56:42 -0600
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+ <52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+ <52D55CE5.1060902@ti.com>
+ <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+ <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
+ <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+Message-ID: <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/14 14:24, Stephen Boyd wrote:
-> On 01/02/14 16:37, Stephen Boyd wrote:
->> Some drivers use request_any_context_irq() but there isn't a
->> devm_* function for it. Add one so that these drivers don't need
->> to explicitly free the irq on driver detach.
+On Tue, Jan 14, 2014 at 2:20 PM, Victor Kamensky
+<victor.kamensky@linaro.org> wrote:
+> On 14 January 2014 09:56, Nishanth Menon <nm@ti.com> wrote:
+>> On Tue, Jan 14, 2014 at 11:35 AM, Victor Kamensky
+>> <victor.kamensky@linaro.org> wrote:
+>>>
+>>> When BE kernel is built Makefile does take of compiling code in BE
+>>> mode. I.e all proper flags like -mbig-endian and -Wl,--be8 will be set.
 >>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Thomas, can you please review this patch?
-
-ping?
-
->> ---
->>  include/linux/interrupt.h |  5 +++++
->>  kernel/irq/devres.c       | 45 +++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 50 insertions(+)
+>> Agreed, and I assume you cannot instead switch to LE mode when
+>> entering assembly assuming LE?
+>
+> Yes. Note that this asm interacts with other data in kernel that would
+> be in BE form. And after all linker will not allow to put together files
+> that were compiled in different endianity.
+>
+>> The reason I ask this is - most of our development is NOT in BE mode.
+>> we will continue to manipulate and add assembly - AM335x, DRA7/OMAP5
+>> etc.. and obviously not every code change will indulge in ensuring
+>> right markers will be in place.
 >>
->> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
->> index 0053adde0ed9..a2678d35b5a2 100644
->> --- a/include/linux/interrupt.h
->> +++ b/include/linux/interrupt.h
->> @@ -158,6 +158,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
->>  					 devname, dev_id);
->>  }
->>  
->> +extern int __must_check
->> +devm_request_any_context_irq(struct device *dev, unsigned int irq,
->> +		 irq_handler_t handler, unsigned long irqflags,
->> +		 const char *devname, void *dev_id);
->> +
->>  extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
->>  
->>  /*
->> diff --git a/kernel/irq/devres.c b/kernel/irq/devres.c
->> index bd8e788d71e0..1ef0606797c9 100644
->> --- a/kernel/irq/devres.c
->> +++ b/kernel/irq/devres.c
->> @@ -73,6 +73,51 @@ int devm_request_threaded_irq(struct device *dev, unsigned int irq,
->>  EXPORT_SYMBOL(devm_request_threaded_irq);
->>  
->>  /**
->> + *	devm_request_any_context_irq - allocate an interrupt line for a managed device
->> + *	@dev: device to request interrupt for
->> + *	@irq: Interrupt line to allocate
->> + *	@handler: Function to be called when the IRQ occurs
->> + *	@thread_fn: function to be called in a threaded interrupt context. NULL
->> + *		    for devices which handle everything in @handler
->> + *	@irqflags: Interrupt type flags
->> + *	@devname: An ascii name for the claiming device
->> + *	@dev_id: A cookie passed back to the handler function
->> + *
->> + *	Except for the extra @dev argument, this function takes the
->> + *	same arguments and performs the same function as
->> + *	request_any_context_irq().  IRQs requested with this function will be
->> + *	automatically freed on driver detach.
->> + *
->> + *	If an IRQ allocated with this function needs to be freed
->> + *	separately, devm_free_irq() must be used.
->> + */
->> +int devm_request_any_context_irq(struct device *dev, unsigned int irq,
->> +			      irq_handler_t handler, unsigned long irqflags,
->> +			      const char *devname, void *dev_id)
->> +{
->> +	struct irq_devres *dr;
->> +	int rc;
->> +
->> +	dr = devres_alloc(devm_irq_release, sizeof(struct irq_devres),
->> +			  GFP_KERNEL);
->> +	if (!dr)
->> +		return -ENOMEM;
->> +
->> +	rc = request_any_context_irq(irq, handler, irqflags, devname, dev_id);
->> +	if (rc) {
->> +		devres_free(dr);
->> +		return rc;
->> +	}
->> +
->> +	dr->irq = irq;
->> +	dr->dev_id = dev_id;
->> +	devres_add(dev, dr);
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL(devm_request_any_context_irq);
->> +
->> +/**
->>   *	devm_free_irq - free an interrupt
->>   *	@dev: device to free interrupt for
->>   *	@irq: Interrupt line to free
+>> by ensuring readl_relaxed handles the variations, you have ensured
+>> that I dont need to care about drivers other than to ensure they use
+>> _relaxed variants. in the case of assembly, this does not seem long
+>> term manageable.
+>
+> Yes, I agree if it is outside of main use case it will get broken if not
+> attended to. Definitely universe entropy increases :) - if left without
+> attention things will decay. Note we admit that even with ARM CPU
+> core BE changes similar decay can happen eventually ...that is
+> what LNG BE group trying to prevent. I think
+> the deal here is that next user of it can/need to fix things if they
+> decayed.
+>
 
+Personally, I have no idea what "LNG BE" stands for.. I see the
+approach we are attempting here is to do any interaction external to
+ARM boundary to go through the ARM_BE8 macro.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+If we want to make this something we can live with, then the platforms
+will have to ensure memory operations external to ARM must be operated
+upon by these macros. Instead, an approach that may be used is to
+introduce accessors macros that will provide right instruction based
+on BE/LE build and BE/LE SoC peripheral behavior.
+
+>>>
+>>>> is the idea of BE build meant to deal with having a single BE kernel
+>>>> build work for all platforms (including LE ones)?
+>>>
+>>> Sort of. The idea here to run BE image on OMAP4 chip, with
+>>> kernel that would deals with LE periphery correctly, but ARM
+>>> core run in BE with special kernel that compiled for BE case (i.e
+>>> CONFIG_CPU_BIG_ENDIAN is set).
+>>
+>> I still dont get the usecase - other than "hey, we do this coz we can
+>> do it!".. I mean, yep, it sounds great and all.. but 4 years down the
+>> line, is this still going to work? is this going to be interesting
+>> careabout? or we are just maintaining additional code for a passing
+>> fancy or proof-of-concept?
+>
+> Valid concern. From LNG BE group point of view it is not "we can do
+> it". It is more like we've done it. We have Pandaboard ES running BE
+> kernel for a while. It is in LNG BE tree. We used it as development
+> and testing vehicle for BE work for a while. We are very grateful to
+> the platform for that - it is affordable and easily available! Given,
+> beyond ongoing BE testing on Pandaboard in LNG there may not be valid
+> use case for further things on OMAP4 BE. We had discussion
+> with Santosh Shilimkar from TI during last Linaro connect what to
+> do with LNG BE Pandaboard series. Santosh suggested and we
+> agreed that we would try to contribute them back to community. And
+> that is what Taras is doing. IMHO even though there may not be real
+
+ok.. some sort of Linaro thing about which I have no background about
+- but dont really care in this context.
+
+> product use case for BE OMAP4, it could serve in kernel source as good
+> example that shows how to work with LE periphery from BE kernel. After
+> all, these changes are noop for LE case and they don't introduce
+> a lot of clutter: all BE asm rev and rev16 instructions wrapped around
+> with ARM_BE8 macro.
+>
+
+So, why are we not doing this for *all* OMAP platforms? we try very
+hard not to regress on features introduced and wish to ensure all
+platforms are equivalent in terms of usage. it makes code sharing a
+little harder if we have to ensure that ARM_BE8 is supported in a mix
+of reusable codebases.
+
+Personally, here is what I might expect to see:
+a) if we are going to force usage of BE and LE build options - then we
+*must* be able to reuse code across platforms without having to worry
+about breaking platform x etc..
+b) this seems like - "take this code in" if something breaks, the guy
+who needs it later will come and fix - Shrug, I personally dont buy
+that. if something benefits many folks, lets all use it in upstream,
+if there is just an exception usage for a short duration which may
+impact code scalability and hard to maintain, keep it forked.
+c) considering this is non standard usage, some sort of regular test
+procedure and owner to ensure this feature is kept sane
+
+With out the above, we are just adding dead code IMHO.
+
+Regards,
+Nishanth Menon
