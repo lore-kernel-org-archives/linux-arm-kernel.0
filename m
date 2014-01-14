@@ -1,30 +1,33 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Mon, 13 Jan 2014 16:20:30 -0800 (PST)
-Subject: [PATCH 3/4] thermal: rcar: Add missing clock handling
-In-Reply-To: <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
-References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
- <1389121036-3555-4-git-send-email-geert@linux-m68k.org>
- <87ha9fxoua.wl%kuninori.morimoto.gx@gmail.com>
- <CAMuHMdW+1yP2PqvLTc0tjyrnhGssvn_iK8mCO6u-++pjGYR9KQ@mail.gmail.com>
- <CAMuHMdWVZhWKDS46GWo83z940B9+Z-yt1WrBKSuiS+zwYMqZQA@mail.gmail.com>
-Message-ID: <87d2jvh0s5.wl%kuninori.morimoto.gx@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 13 Jan 2014 18:26:44 -0600
+Subject: [PATCH 0/3] OMAP hwspinlock DT updates
+Message-ID: <1389659207-39445-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi Geert
+This series updates the existing OMAP hwspinlock DT nodes to have a
+#hwlock-cells property as suggested by Mark Rutland [1], and adds the
+hwspinlock nodes for two other newer SoCs - DRA7xx and AM43xx.
 
-> >> And this patch seems strange for me.
-> >> pm_runtime_xxx() is doing same things.
-> >> If it didn't work, wrong place is not driver, clock side ?
-(snipO
-> You were right. After applying both of "ARM: shmobile: compile drivers/sh
-> for CONFIG_ARCH_SHMOBILE_MULTI" and "power: clock_ops.c: fixup clk
-> prepare/unprepare count" from Ben Dooks the issue went away.
+Posting the series separately from the driver DT adapation changes [2]
+to avoid maintainer confusion.
 
-Nice !
-Thank you for your help :)
+[1] http://marc.info/?l=linux-omap&m=138433541420926&w=2
+[2] http://marc.info/?l=linux-omap&m=138965904015225&w=2 
 
-Best regards
----
-Kuninori Morimoto
+Suman Anna (3):
+  ARM: dts: OMAP: Add #hwlock-cells property to hwspinlock nodes
+  ARM: dts: DRA7: Add hwspinlock node
+  ARM: dts: AM4372: Add hwspinlock node
+
+ arch/arm/boot/dts/am33xx.dtsi | 1 +
+ arch/arm/boot/dts/am4372.dtsi | 7 +++++++
+ arch/arm/boot/dts/dra7.dtsi   | 7 +++++++
+ arch/arm/boot/dts/omap4.dtsi  | 1 +
+ arch/arm/boot/dts/omap5.dtsi  | 1 +
+ 5 files changed, 17 insertions(+)
+
+-- 
+1.8.4.3
