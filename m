@@ -1,153 +1,87 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 13 Jan 2014 22:27:33 -0800
-Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
- SoC file
-In-Reply-To: <52B389CD.8010004@wwwdotorg.org>
-References: <20131219122857.3226.42830.stgit@tamien>
- <20131219123719.3226.44864.stgit@tamien> <52B389CD.8010004@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1401132219150.11672@tamien>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 14 Jan 2014 15:37:09 +0800
+Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk board.
+Message-ID: <1389685029-17323-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
+enable them, the keymap is as below:
 
-(Resending, and revising - the original wasn't fully baked in several 
-regards..)
+SW6:  0x00000067    /* KEY_UP */
+SW7:  0x0001006c    /* KEY_DOWN */
+SW8:  0x0002001c    /* KEY_ENTER */
+SW9:  0x01000066    /* KEY_HOME */
+SW10: 0x0101006a    /* KEY_RIGHT */
+SW11: 0x01020069    /* KEY_LEFT */
+SW12: 0x02000072    /* KEY_VOLUMEDOWN */
+SW13: 0x02010073    /* KEY_VOLUMEUP */
 
-Hello Stephen,
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
+ 2 files changed, 29 insertions(+)
 
-thanks for your review.
-
-On Thu, 19 Dec 2013, Stephen Warren wrote:
-
-> On 12/19/2013 05:49 AM, Paul Walmsley wrote:
->> Add basic DT bindings for the DFLL IP block for the NVIDIA Tegra114 SoC.
->
->> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
->
->> +- clocks : Must contain an array of two-cell arrays, one per clock.
->> +           DFLL source clocks.  At minimum this should include the
->> +           reference clock source and the IP block's main clock
->> +           source.  Also it should contain the DFLL's I2C controller
->> +           clock source.  The format is <&clock-provider-phandle
->> +           clock-id>.
->
-> Entries in "clocks" aren't two cells, they're a phandle plus as many
-> cells as the node referenced by the phandle specifies.
-
-It's worth noting that the clock binding documentation itself refers to 
-pairs:
-
-----
-
-clocks:		List of phandle and clock specifier pairs, one pair
- 		for each clock input to the device.  Note: if the
- 		clock provider specifies '0' for #clock-cells, then
- 		only the phandle portion of the pair will appear.
-
-----
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/clock-bindings.txt#n50
-
-But given the ambiguity of that documentation, I basically agree, so have 
-changed it to:
-
-- clocks : Must contain an array of clock specifiers, one per clock.
-            DFLL source clocks.  At minimum this should include the
-            reference clock source and the IP block's main clock
-            source.  Also it should contain the DFLL's I2C controller
-            clock source.  The format is <&clock-provider-phandle
-            clock-id>.
-
->> +
->> +- clock-names : Must contain an array of strings, one per 'clocks'
->> +                two-cell array.  The position in the array of these
->
-> clock-names defines the set of entries in clocks, not the other way around.
-
-Hmm.  Referring to the DT clock binding documentation, it lists the 
-'clock-names' property as optional, and the 'clocks' property as 
-mandatory:
-
------
-
-==Clock consumers==
-
-Required properties:
-clocks:		List of phandle and clock specifier pairs, one pair
- 		for each clock input to the device.  Note: if the
- 		clock provider specifies '0' for #clock-cells, then
- 		only the phandle portion of the pair will appear.
-
-Optional properties:
-clock-names:	List of clock input name strings sorted in the same
- 		order as the clocks property.  Consumers drivers
- 		will use clock-names to match clock input names
- 		with clocks specifiers.
-
------
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/clock-bindings.txt#n47
-
-Considering that of_clk_get() doesn't require names, the situation appears 
-to be the way that the original patch described it (modulo the part about 
-"two cells.")
-
->> +                strings must correspond to the position in the 'clocks'
->> +                array (see above).  The DFLL driver currently requires
->> +                the "soc", "ref", and "i2c" clock names to be populated.
->
-> The standard wording used by all the Tegra clock client bindings is now:
->
-> - clocks : Must contain an entry for each entry in clock-names.
->  See clock-bindings.txt for details.
-> - clock-names : Must include the following entries:
->  - soc
->  - ref
->  - i2c
->
-> For consistency, it'd be nice to adopt the same style here.
-
-I've altered the 'clock-names' format along the lines of what you've 
-suggested, but have not changed the 'clocks' format, per the above 
-discussion:
-
------
-
-- clocks : Must contain an array of clock specifiers, one per clock.
-            DFLL source clocks.  At minimum this should include the
-            reference clock source and the IP block's main clock
-            source.  Also it should contain the DFLL's I2C controller
-            clock source.  The format is <&clock-provider-phandle
-            clock-id>.
-
-- clock-names : Must contain an array of strings, one per 'clocks'
-                 cell.  The position in the array of these strings must
-                 correspond to the position in the 'clocks' array (see
-                 above).
-   - soc
-   - ref
-   - i2c
-
------
-
-
->> +Optional properties:
->> +
->> +- status : device availability -- managed by the DT integration code, not
->> +           the DFLL driver.  Should be set to "disabled" in the SoC
->> +           DTS file.
->
-> That's such a core property that it's not worth documenting in every
-> single binding.
-
-That's fine.  Removed.
-
->
->> +
->
-> Blank line at EOF.
-
-
-Hehe.  Removed.
-
-- Paul
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index f5e4513..8d49a10 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -93,6 +93,17 @@
+ 			fsl,pins = <MX6SL_FEC_PINGRP1>;
+ 		};
+ 
++		pinctrl_kpp: kppgrp {
++			fsl,pins = <
++				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
++				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
++				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
++				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
++				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
++				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <MX6SL_UART1_PINGRP1>;
+ 		};
+@@ -139,6 +150,22 @@
+ 	};
+ };
+ 
++&kpp {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_kpp>;
++	linux,keymap = <
++			0x00000067    /* KEY_UP */
++			0x0001006c    /* KEY_DOWN */
++			0x0002001c    /* KEY_ENTER */
++			0x01000066    /* KEY_HOME */
++			0x0101006a    /* KEY_RIGHT */
++			0x01020069    /* KEY_LEFT */
++			0x02000072    /* KEY_VOLUMEDOWN */
++			0x02010073    /* KEY_VOLUMEUP */
++		>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index a5ef3c3..a449c4f 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -393,8 +393,10 @@
+ 			};
+ 
+ 			kpp: kpp at 020b8000 {
++				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
+ 				reg = <0x020b8000 0x4000>;
+ 				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SL_CLK_DUMMY>;
+ 			};
+ 
+ 			wdog1: wdog at 020bc000 {
+-- 
+1.7.9.5
