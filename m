@@ -1,51 +1,26 @@
-From: srinivas.kandagatla@st.com (Srinivas Kandagatla)
-Date: Tue, 14 Jan 2014 10:51:56 +0000
-Subject: [PATCH v1 6/6] ARM: STi: Add reset controller support to mach-sti
- Kconfig
-In-Reply-To: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1389696716-19944-1-git-send-email-srinivas.kandagatla@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Jan 2014 10:59:31 +0000
+Subject: AArch64 kernel image decompression
+In-Reply-To: <201401140714.52400.arnd@arndb.de>
+References: <20140110170436.GS8153@joshc.qualcomm.com>
+ <e79fa209ffc4485d8cae87bae3daa656@BN1PR03MB220.namprd03.prod.outlook.com>
+ <CAOesGMi_QY6z_3QSdAs-3JaEUufgymJg=kiqpb9D6RNNjZF5sA@mail.gmail.com>
+ <201401140714.52400.arnd@arndb.de>
+Message-ID: <20140114105930.GH15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Gallimore <stephen.gallimore@st.com>
+On Tue, Jan 14, 2014 at 07:14:51AM +0100, Arnd Bergmann wrote:
+> I thought we could already boot both zImage and vmlinux on arm32.
 
-This patch selects reset controller support for ARCH_STI and
-selects the reset controllers for STiH415 and STiH416 SoCs.
+We can now do with zImage, but it requires a u-boot which supports the
+bootz command.  All the platforms rigged up to my test system with the
+exception of the LDP3430 all support bootz, and use it, and I notice
+that new platforms such as the now released cubox-i and hummingboard
+support bootz right from the start, since it's the only sensible way
+to boot a multiplatform kernel with a dt blob.
 
-Signed-off-by: Stephen Gallimore <stephen.gallimore@st.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/mach-sti/Kconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index d71654b..2550620 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -7,6 +7,7 @@ menuconfig ARCH_STI
- 	select PINCTRL
- 	select PINCTRL_ST
- 	select MFD_SYSCON
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select HAVE_SMP
- 	select HAVE_ARM_SCU if SMP
-@@ -28,6 +29,7 @@ if ARCH_STI
- config SOC_STIH415
- 	bool "STiH415 STMicroelectronics Consumer Electronics family"
- 	default y
-+	select STIH415_RESET
- 	help
- 	  This enables support for STMicroelectronics Digital Consumer
- 	  Electronics family StiH415 parts, primarily targeted at set-top-box
-@@ -37,6 +39,7 @@ config SOC_STIH415
- config SOC_STIH416
- 	bool "STiH416 STMicroelectronics Consumer Electronics family"
- 	default y
-+	select STIH416_RESET
- 	help
- 	  This enables support for STMicroelectronics Digital Consumer
- 	  Electronics family StiH416 parts, primarily targeted at set-top-box
 -- 
-1.7.6.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
