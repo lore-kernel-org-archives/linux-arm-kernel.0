@@ -1,49 +1,31 @@
 From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Tue, 14 Jan 2014 15:48:49 -0800
-Subject: [PATCH v3 3/7] ARM: do CPU-specific init for Broadcom Brahma15 cores
+Date: Tue, 14 Jan 2014 15:48:50 -0800
+Subject: [PATCH v3 4/7] ARM: brcmstb: add CPU binding for Broadcom Brahma15
 In-Reply-To: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
 References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <1389743333-16741-4-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <1389743333-16741-5-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perform any CPU-specific initialization required on the
-Broadcom Brahma-15 core.
+Add the Broadcom Brahma B15 CPU to the DT CPU binding list.
 
 Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
 Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mm/proc-v7.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/arm/cpus.txt |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index bd17819..98ea423 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -193,6 +193,7 @@ __v7_cr7mp_setup:
- 	b	1f
- __v7_ca7mp_setup:
- __v7_ca15mp_setup:
-+__v7_b15mp_setup:
- 	mov	r10, #0
- 1:
- #ifdef CONFIG_SMP
-@@ -494,6 +495,16 @@ __v7_ca15mp_proc_info:
- 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
- 
- 	/*
-+	 * Broadcom Corporation Brahma-B15 processor.
-+	 */
-+	.type	__v7_b15mp_proc_info, #object
-+__v7_b15mp_proc_info:
-+	.long	0x420f00f0
-+	.long	0xff0ffff0
-+	__v7_proc __v7_b15mp_setup, hwcaps = HWCAP_IDIV
-+	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
-+
-+	/*
- 	 * Qualcomm Inc. Krait processors.
- 	 */
- 	.type	__krait_proc_info, #object
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 9130435..423b879 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -163,6 +163,7 @@ nodes to be present and contain the properties described below.
+ 			    "arm,cortex-r4"
+ 			    "arm,cortex-r5"
+ 			    "arm,cortex-r7"
++			    "brcm,brahma15"
+ 			    "faraday,fa526"
+ 			    "intel,sa110"
+ 			    "intel,sa1100"
 -- 
 1.7.1
