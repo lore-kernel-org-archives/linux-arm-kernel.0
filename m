@@ -1,90 +1,37 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 13 Jan 2014 17:59:25 -0700
-Subject: [PATCH v6 5/6] ACPI: do not map/unmap memory regions for FADT
- entries in reduced HW mode
-In-Reply-To: <11986900.5FYeBqExXg@vostro.rjw.lan>
-References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
- <3512616.qUD2F1beoi@vostro.rjw.lan> <52D471A7.9090907@linaro.org>
- <11986900.5FYeBqExXg@vostro.rjw.lan>
-Message-ID: <52D48BED.4060505@linaro.org>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 13 Jan 2014 17:16:41 -0800
+Subject: [PATCH v10 4/4] arm64: topology: Provide relative power numbers
+ for cores
+In-Reply-To: <1389287106-29979-5-git-send-email-broonie@kernel.org>
+References: <1389287106-29979-1-git-send-email-broonie@kernel.org>
+ <1389287106-29979-5-git-send-email-broonie@kernel.org>
+Message-ID: <52D48FF9.1070501@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2014 05:02 PM, Rafael J. Wysocki wrote:
-> On Monday, January 13, 2014 04:07:19 PM Al Stone wrote:
->> On 01/10/2014 04:32 PM, Rafael J. Wysocki wrote:
->>> On Friday, January 10, 2014 03:52:19 PM al.stone at linaro.org wrote:
->>>> From: Al Stone <al.stone@linaro.org>
->>>>
->>>> Several of the FADT fields are normally kept in specific memory
->>>> regions.  Since these fields are to be ignored in hardware reduced
->>>> ACPI mode, do not map those addresses when in that mode, and of
->>>> course do not release the mappings that have not been made.
->>>>
->>>> The function acpi_os_initialize() could become a stub in the header
->>>> file but is left here in case it can be of further use.
->>>
->>> Why exactly is this change necessary?
->>
->> Two reasons: (1) why do work we do not have to do?  and (2) it
->> seemed to make sense to me to have the code reflect the spec
->> accurately.
->>
->>> Will things work incorrectly on HW-reduced ACPI systems if we don't make it?
->>
->> If the ACPI tables have all of these fields properly set to zero
->> in hardware reduced, this change does not need to be made.  If a
->> vendor provides broken ACPI tables where these values are valid,
->> but still sets hardware reduced in the FADT, these fields could
->> then be used as before -- but allowing them to be used would mean
->> we can no longer claim we are implementing hardware reduced correctly.
->> So things would work, but the system would by definition be in some
->> sort of undefined hybrid ACPI mode.
->
-> So this is how it goes.  I'm being told that there are systems in existence
-> where the HW-reduced bit is set for Windows RT compatibility, but otherwise
-> the ACPI HW is fully functional on them.  Apparently, people are able to
-> install and run Linux on those systems today.
->
-> Question is, are they still going to be able to run Linux on them after the
-> changes in this set?
+Hi
 
-Hrm.  This would have been incredibly useful to know earlier.  I
-might have taken a completely different approach.  Or perhaps not
-even have bothered.
+On 01/09/2014 09:05 AM, Mark Brown wrote:
+> The power numbers are the same as for ARMv7 since it seems that the
+> expected differential between the big and little cores is very similar on
+> both ARMv7 and ARMv8. These numbers are just an initial and basic
+> approximation for use with the current scheduler, it is likely that both
+> experience with silicon and ongoing work on improving the scheduler will
+> lead to further tuning. In both ARMv7 and ARMv8 cases the numbers were
+> based on the published DMIPS numbers.
 
-I'm not naive enough to think all vendors will fully or rigorously
-comply with standards.  Down that path madness lies.  But at face
-value, it sounds like they didn't even try.
+Just to chime in on this.
 
-Without access to the ACPI tables and the hardware itself, there is
-no way to know if Linux will run; I have yet to see any such system.
-The phrase "...the ACPI HW is fully functional..." could mean way too
-many things -- it could mean anything from strict compliance with
-hardware reduced mode to completely compliant with legacy mode but all
-we did was toggle the hardware reduced flag so we could use GPIOs 
-instead of an SCI.
+As I think someone else proposed, ideally both arch/arm32 and arch/arm64 
+should be determining these metrics dynamically, and allowing the 
+metrics to be overridden from DT data.  These metrics can vary 
+significantly based on variables other than just the core type.
 
-As far as I can tell, that makes the question undecidable.  I can't
-prove a negative -- I can't prove these patches won't break an unknown
-set of systems that have implemented an unknown hybrid of legacy and
-hardware reduced modes.
+For example, for some ARMv7 CPUs, we know that different revision levels 
+of the same core type can result in significant performance 
+differences.  Also CPU bug workarounds applied early by the bootloader, 
+or different integrator hardware core configurations, can impact these 
+metrics.
 
-If someone can tell me that these mongrel ACPI systems continue
-to run correctly when they run a Linux built with the
-ACPI_REDUCED_HARDWARE flag set in the ACPICA code, I might at least
-have a clue as to where the boundaries of compliance are.
 
-Or, if such hardware is commercially available, where does one get it?
-
-Otherwise, the only safe patch is 1/6, the Kconfig changes.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+- Paul
