@@ -1,51 +1,56 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Tue, 14 Jan 2014 11:00:59 -0800
-Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
- SoCs
-In-Reply-To: <CACRpkdYyz+zrzt0y135Wcq-yUMhiHOb1ov15+SsnVOcZvad96g@mail.gmail.com>
-References: <1386787041-6035-1-git-send-email-syin@broadcom.com>	<1387592016-13740-1-git-send-email-syin@broadcom.com>	<1387592016-13740-3-git-send-email-syin@broadcom.com>	<CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>	<52CC6782.4060309@broadcom.com>
- <CACRpkdYyz+zrzt0y135Wcq-yUMhiHOb1ov15+SsnVOcZvad96g@mail.gmail.com>
-Message-ID: <52D5896B.6000209@broadcom.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 14 Jan 2014 20:04:38 +0100
+Subject: [PATCH v3 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
+Message-ID: <1389726281-8731-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-01-14 02:16 AM, Linus Walleij wrote:
-> On Tue, Jan 7, 2014 at 9:45 PM, Sherman Yin <syin@broadcom.com> wrote:
->> On 14-01-07 09:15 AM, Linus Walleij wrote:
->
->> Is that what you wanted to see in pinctrl-bindings.txt, or is there
->> something else you want to see added to that txt file?  I didn't want to add
->> the description of slew-rate arguments there because this is capri-specific.
->> I'm not quite sure what else to add.
-> (...)
->> That doc already says bias-pull-up is specified in Ohm, and the specific
->> values are chip-specific, so I don't think they should be mentioned there.
->
-> You're right, forget about this. I didn't realize the pinctrl bindings doc
-> was that good...
->
->>>> +Optional Properties (for HDMI pins):
->>>> +
->>>> +- function:                    String. Specifies the pin mux selection.
->>>> Values
->>>> +                               must be one of: "alt1", "alt2", "alt3",
->>>> "alt4"
->>>> +- slew-rate:                   Integer. Controls slew rate.
->>>> +                                       0: Standard(100kbps)&
->>>> Fast(400kbps) mode
->>>> +                                       1: Highspeed (3.4Mbps) mode
->>>
->>> Hmmmm slew rate is not specifiec in "bps" but rather in
->>> something like volts per second. But maybe it's best to keep
->>> this value driver-specific.
->>
->> Right, I think the slew-rates values are capri specific.
->
-> OK
->
+Hello,
 
-Great!  Is there anything else you would like to see changed before this 
-patchset can be accepted?
+This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
+SoCs: once a disk is removed from a SATA port, then the re-plug events
+are not detected by the sata_mv driver.
+
+As this hotplug issue have been emphasized by 9ae6f740b49f
+"arm: mach-mvebu: add support for Armada 370 and Armada XP with DT",
+then this patches should be applied to the -stable kernels 3.6 and
+onwards.
+
+Changes since v1:
+- Introduces a new compatible string for the SATA IP found in Armada
+  370/XP SoCs.
+- Only fix the LP_PHY_CTL register (0x58) if the compatible string
+  "marvell,armada-370-xp-sata" is found in the SATA DT node.
+- Update compatible string in DT SATA node for Armada 370/XP SoCs. 
+
+Changes since v2:
+- Use compatible string "marvell,armada-370-sata" instead of
+  "marvell,armada-370-xp-sata".
+- Provide more informations for -stable.
 
 Thanks,
-Sherman
+
+Simon
+
+Lior Amsalem (1):
+  ata: sata_mv: fix disk hotplug for Armada 370/XP SoCs
+
+Simon Guinot (2):
+  ata: sata_mv: introduce compatible string "marvell,armada-370-sata"
+  ARM: mvebu: update the SATA compatible string for Armada 370/XP
+
+ Documentation/devicetree/bindings/ata/marvell.txt |  2 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi              |  2 +-
+ drivers/ata/sata_mv.c                             | 25 +++++++++++++++++++++++
+ 3 files changed, 27 insertions(+), 2 deletions(-)
+
+-- 
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: stable at vger.kernel.org
+-- 
+1.8.5.2
