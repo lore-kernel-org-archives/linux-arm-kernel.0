@@ -1,20 +1,25 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 14 Jan 2014 19:42:19 +0900
-Subject: [PATCH 2/2] mmc: dw_mmc: k3: remove clk_table
-In-Reply-To: <1389604469-8064-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
- <1389604469-8064-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <002b01cf1115$4cdfe240$e69fa6c0$%jun@samsung.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 14 Jan 2014 10:44:47 +0000
+Subject: [RFC 03/18] GPIO: gpio-generic: Add label to platform data
+In-Reply-To: <CACRpkdb4X+=Tpe_+U0ixyQTA3BbtX17wk=y=63CVkQsdLo60iA@mail.gmail.com>
+References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com>
+ <1387815830-8794-4-git-send-email-pawel.moll@arm.com>
+ <CACRpkdb4w26vuOtR1bAhQ6k=1uQx=np4WwoabvH8pOq8HK54=w@mail.gmail.com>
+ <1389196639.23721.16.camel@hornet>
+ <CACRpkdb4X+=Tpe_+U0ixyQTA3BbtX17wk=y=63CVkQsdLo60iA@mail.gmail.com>
+Message-ID: <1389696287.3496.27.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 13, 2014, Zhangfei Gao wrote:
-> Remove clk_table and directly use ios->clock as clock source rate.
-> Abstract init clock rate and max clock limitation in clk.c
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Tue, 2014-01-14 at 10:30 +0000, Linus Walleij wrote:
+> Please consult your fellow upstream developers on how to get
+> the mail out of the ARM offices in a form that I can apply...
 
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+They were exactly in the same position :-)
 
-Thanks,
-Seungwon Jeon
+Fortunately we've got a Christmas gift of a normal SMTP server, so when
+I re-post the series, it should be already fine.
+
+Thanks!
+
+Pawe?
