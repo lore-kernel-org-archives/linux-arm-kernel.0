@@ -1,47 +1,48 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 15:33:07 -0800
-Subject: [GIT PULL] Allwinner DT changes for 3.14, take 2
-In-Reply-To: <20140107231033.GA18548@lukather> (Maxime Ripard's message of
- "Wed, 8 Jan 2014 00:10:33 +0100")
-References: <20140107231033.GA18548@lukather>
-Message-ID: <87ha965ebw.fsf@linaro.org>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Tue, 14 Jan 2014 15:34:14 -0800
+Subject: [RFC PATCH V2 0/4] APM X-Gene PCIe controller
+Message-ID: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+This patch adds support for AppliedMicro X-Gene PCIe host controller. The
+driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
+cards.
 
-> Hi Arnd, Kevin, Olof,
->
-> Please pull the following changes on top of the previous pull request.
->
-> Thanks!
-> Maxime
->
-> The following changes since commit 81ee429ffdd021626bf191bb8a3ae886dd94adcc:
->
->   ARM: sun6i: dt: Add IP needed to bring up the additional cores (2013-12-16 21:15:12 +0100)
->
-> are available in the git repository at:
->
->   https://github.com/mripard/linux.git tags/sunxi-dt-for-3.14-2
->
-> for you to fetch changes up to 6267355f0e513bed9a5009924abc7a1e7de22ab3:
->
->   arm: sun7i: cubietruck: Enable the i2c controllers (2014-01-07 23:39:19 +0100)
->
-> ----------------------------------------------------------------
-> Second round of DT additions for 3.14
->
-> Mostly:
->   - Addition of the missing PLLs and module clocks
->   - Addition of the external clocks
->   - Addition of the touchscreen controler
->   - I2C nodes of the Cubietruck
->
-> ----------------------------------------------------------------
+X-Gene PCIe controller driver has depedency on the pcie arch support for
+arm64. The arm64 pcie arch support is not yet part of mainline Linux kernel
+and approach for arch support is under discussion with arm64 maintainers.
+The reference patch can be found here --> https://lkml.org/lkml/2013/10/23/244
 
-Applied to next/dt.
+If someone wishes to test PCIe on X-Gene, arch support patch must be applied
+before the patches in this patch set.
 
-Thanks,
+changes since V1:
+1. added PCI domain support
+2. reading cpu and pci addresses from device tree to configure regions.
+3. got rid of unnecessary wrappers for readl and writel.
+4. got rid of endpoint configuration code.
+5. added 'dma-ranges' property support to read inbound region configuration.
+6. renamed host driver file to 'pci-xgene.c' from 'pcie-xgene.c'
+7. dropped 'clock-names' property from bindings
+8. added comments whereever requested.
 
-Kevin
+Tanmay Inamdar (4):
+  pci: APM X-Gene PCIe controller driver
+  arm64:dts: APM X-Gene PCIe device tree nodes
+  dt-bindings: pci: xgene pcie device tree bindings
+  MAINTAINERS: entry for APM X-Gene PCIe host driver
+
+ .../devicetree/bindings/pci/xgene-pcie.txt         |   45 +
+ MAINTAINERS                                        |    7 +
+ arch/arm64/boot/dts/apm-mustang.dts                |    4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  144 +++
+ drivers/pci/host/Kconfig                           |   10 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-xgene.c                       |  934 ++++++++++++++++++++
+ 7 files changed, 1145 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pcie.txt
+ create mode 100644 drivers/pci/host/pci-xgene.c
+
+-- 
+1.7.9.5
