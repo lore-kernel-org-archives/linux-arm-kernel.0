@@ -1,109 +1,99 @@
-From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Tue, 14 Jan 2014 13:37:02 -0700
-Subject: [PATCH] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to enforce
- this ACPI mode
-Message-ID: <1389731822-21336-1-git-send-email-al.stone@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 14 Jan 2014 14:36:13 -0600
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <52D53084.1070105@ti.com>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+ <52CF12FB.6000602@ti.com> <20140109231513.GA11648@saruman.home>
+ <52CFC2F1.706@ti.com> <20140110161352.GG6665@saruman.home>
+ <52D02037.3090705@ti.com> <20140110185110.GM31323@atomide.com>
+ <52D53084.1070105@ti.com>
+Message-ID: <20140114203613.GA604@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+On Tue, Jan 14, 2014 at 02:41:40PM +0200, Tero Kristo wrote:
+> On 01/10/2014 08:51 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [140110 08:32]:
+> >>On 01/10/2014 06:13 PM, Felipe Balbi wrote:
+> >>>On Fri, Jan 10, 2014 at 11:52:49AM +0200, Tero Kristo wrote:
+> >>>>On 01/10/2014 01:15 AM, Felipe Balbi wrote:
+> >>>>>On Thu, Jan 09, 2014 at 03:22:03PM -0600, Nishanth Menon wrote:
+> >>>>>>
+> >>>>>>conflicts with be changes on Tony's be branch.
+> >>>>>>commit 80f304dd2360cf5d50953c4eb4e902536f6a1263
+> >>>>>>     ARM: OMAP2+: raw read and write endian fix
+> >>>>>>
+> >>>>>>Conflict:
+> >>>>>>arch/arm/mach-omap2/clkt_clksel.c
+> >>>>>>arch/arm/mach-omap2/clkt_dpll.c
+> >>>>>>arch/arm/mach-omap2/clkt_iclk.c
+> >>>>>>arch/arm/mach-omap2/clock.c
+> >>>>>>arch/arm/mach-omap2/clock36xx.c
+> >>>>>>arch/arm/mach-omap2/dpll3xxx.c
+> >>>>>>arch/arm/mach-omap2/dpll44xx.c
+> >>>>>>
+> >>>>>>Both change raw_readls -> should now be just clk api instead which
+> >>>>>>already does readl_relaxed etc.. If Tony feels like, then we should
+> >>>>>>probably post a branch based on 'be' branch for easy merge.
+> >
+> >This should be a trivial merge conflict to handle, so let's not base
+> >things on the BE changes.
+> >
+> >>>>I think all of these fails are caused by the initially bugged
+> >>>>Makefile + Kconfig under mach-omap2. Seems like they can be fixed by
+> >>>>the patches I inlined at the end (will also post them as proper
+> >>>>patches to l-o list after this.) The question is, should Mike go
+> >>>>ahead and merge these along with the base clk patches or how should
+> >>>>we handle them? Patch 1 must be merged, patch 2 is a nice to have one
+> >>>>which allows DRA7 only builds (doing DRA7 only build currently seems
+> >>>>not possible.)
+> >>>
+> >>>If it's OK with Tony, I would suggest having a branch with both patches
+> >>>below which both Tony and Mike merge before merging CCF series. That way
+> >>>we avoid bisection problems.
+> >
+> >I can queue those two separately as fixes.
+> >
+> >>That reminds me, I think the baseline branch for the mach-omap2
+> >>patches is still somewhat unclear to me, what should be used for
+> >>this? And which patches should be put there (the mach-omap2 patches
+> >>depend on the drivers/clk/ti part basically, so I need to put at
+> >>least those there also.)
+> >
+> >I would keep the clock patches against some mainline -rc commit if
+> >possible, and if there are non trivial merge conflicts, the omap
+> >to use as the base is commit adfe9361b236154215d4b0fc8b6d79995394b15c.
+> >
+> >In any case, it's probably best that Mike merges this all via his
+> >clock tree unless there non-trivial merge conflicts.
+> >
+> 
+> I just pushed a branch against rc7 with makefile fixes in place to
+> fix omap1 and omap2 only builds for this stuff. Inlined the delta
+> here at the end. Do you want me to repost the series as v14 for this
+> or is the attached delta ok for review purposes? All the changes have
+> been squashed to existing patches (except the 2 patches I posted
+> separately for DRA7xx / AM43xx only builds.)
+> 
+> The test branch itself can be found here:
+> 
+> tree: https://github.com/t-kristo/linux-pm.git
+> branch: 3.13-rc7-dt-clks-v13-build-fixes
+> 
+> Felipe, care to run your randconfig magic for this?
 
-Hardware reduced mode, despite the name, exists primarily to allow
-newer platforms to use a much simpler form of ACPI that does not
-require supporting the legacy of previous versions of the specification.
-This mode was first introduced in the ACPI 5.0 specification, but because
-it is so much simpler and reduces the size of the object code needed to
-support ACPI, it is likely to be used more often in the near future.
+This branch builds just fine so far, I still have omap5 multiplaform and
+uniplatform builds, but since that was working before i'm assuming it
+won't break.
 
-To enable the hardware reduced mode of ACPI on some platforms (such as
-ARM), we need to modify the kernel code and set ACPI_REDUCED_HARDWARE
-to TRUE in the ACPICA source.  For ARM/ARM64, hardware reduced ACPI
-should be the only mode used; legacy mode would require modifications
-to SoCs in order to provide several x86-specific hardware features (e.g.,
-an NMI and SMI support).
+cheers
 
-We set ACPI_REDUCED_HARDWARE to TRUE in the ACPICA source by introducing
-a kernel config item to enable/disable ACPI_REDUCED_HARDWARE.  We can then
-change the kernel config instead of having to modify the kernel source
-directly to enable the reduced hardware mode of ACPI.
-
-Lv Zheng suggested that this configuration item does not belong in ACPICA,
-the upstream source for much of the ACPI internals, but rather to the
-Linux kernel itself.  Hence, we introduce this flag so that we can make
-ACPI_REDUCED_HARDWARE configurable.  For the details of the discussion,
-please refer to: http://www.spinics.net/lists/linux-acpi/msg46369.html
-
-Even though support for X86 in hardware reduced mode is possible, it
-is NOT enabled.  Extensive effort has gone into the Linux kernel so that
-there is a single kernel image than can run on all x86 hardware; the kernel
-changes run-time behavior to adapt to the hardware being used.  This is not
-currently possible with the existing ACPICA infrastructure but only presents
-a problem on achitectures supporting both hardware-reduced and legacy modes
-of ACPI -- i.e., on x86 only.
-
-The problem with the current ACPICA code base is that if one builds legacy
-ACPI (a proper superset of hardware-reduced), the kernel can run in hardware-
-reduced with the proper ACPI tables, but there is still ACPICA code that could
-be executed even though it is not allowed by the specification.  If one builds
-a hardware-reduced only ACPI, the kernel cannot run with ACPI tables that are
-for legacy mode.  To ensure compliance with ACPI, one must therefore build
-two separate kernels.  Once this problem has been properly fixed, we can then
-enable x86 hardware-reduced mode and use a single kernel.
-
-This patch used to be part of a set to implement stricter conformance with
-hardware reduced ACPI.  The code changes from that set are being re-thought
-in order to handle some non-compliant hardware, but this patch did not depend
-on those changes.  In the meantime, this patch is needed in order to enable
-ACPI core functionality for ARMv8 servers and hence is being submitted
-separately in order to aid that effort.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- drivers/acpi/Kconfig            | 13 +++++++++++++
- include/acpi/platform/aclinux.h |  6 ++++++
- 2 files changed, 19 insertions(+)
-
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 4770de5..961ea9e 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -343,6 +343,19 @@ config ACPI_BGRT
- 	  data from the firmware boot splash. It will appear under
- 	  /sys/firmware/acpi/bgrt/ .
- 
-+config ACPI_REDUCED_HARDWARE_ONLY
-+	bool "Hardware-reduced ACPI support only"
-+	def_bool n
-+	depends on ACPI && EXPERT
-+	help
-+	This config item changes the way the ACPI code is built.  When this
-+	option is selected, the kernel will use a specialized version of
-+	ACPICA that ONLY supports the ACPI "reduced hardware" mode.  The
-+	resulting kernel will be smaller but it will also be restricted to
-+	running in ACPI reduced hardware mode ONLY.
-+
-+	If you are unsure what to do, do not enable this option.
-+
- source "drivers/acpi/apei/Kconfig"
- 
- config ACPI_EXTLOG
-diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
-index 28f4f4d..7d71f08 100644
---- a/include/acpi/platform/aclinux.h
-+++ b/include/acpi/platform/aclinux.h
-@@ -52,6 +52,12 @@
- 
- #ifdef __KERNEL__
- 
-+/* Compile for reduced hardware mode only with this kernel config */
-+
-+#ifdef CONFIG_ACPI_REDUCED_HARDWARE_ONLY
-+#define ACPI_REDUCED_HARDWARE 1
-+#endif
-+
- #include <linux/string.h>
- #include <linux/kernel.h>
- #include <linux/ctype.h>
 -- 
-1.8.4.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/144666a9/attachment-0001.sig>
