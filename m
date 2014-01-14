@@ -1,36 +1,36 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 13 Jan 2014 19:19:40 -0500
-Subject: [PATCH 0/3] arm: remap non-modular uses of module_init properly
-Message-ID: <1389658783-9876-1-git-send-email-paul.gortmaker@windriver.com>
+Date: Mon, 13 Jan 2014 19:19:42 -0500
+Subject: [PATCH 2/3] arm: include module.h in drivers/bus/omap_l3_smx.c
+In-Reply-To: <1389658783-9876-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1389658783-9876-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1389658783-9876-3-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal is to move module_init/module_exit from init.h and into
-module.h -- however in doing so, we uncover several instances in
-ARM code where module_init is used somewhat incorrectly by non modular
-code, and a file that needs module.h but isn't sourcing it.  We need to
-make these fixups 1st before changing the headers so that we don't cause
-build failures later on.
+The config OMAP_INTERCONNECT that this driver depends on (in
+drivers/bus/Kconfig) is tristate.  So it can be a module.
 
-The changes are largely inert, however we do cause a largely trivial
-change in one initcall ordering -- that happens because module_init
-is really device_initcall; but I didn't use device_initcall because
-subsys_initcall seems somewhat more appropriate.
+Also there are module related setup calls within this driver.
+Explicitly add module.h to includes so it won't be a build failure
+when future cleanups are integrated and the implicit presence
+of certain module prototypes disappears.
 
-All modified files were build tested on today's linux next tree.
-
-Paul.
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
+ drivers/bus/omap_l3_smx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Paul Gortmaker (3):
-  arm: use subsys_initcall in non-modular pl320 IPC code
-  arm: include module.h in drivers/bus/omap_l3_smx.c
-  arm: don't use module_init in non-modular mach-vexpress/spc.c code
-
- arch/arm/mach-vexpress/spc.c | 2 +-
- drivers/bus/omap_l3_smx.c    | 1 +
- drivers/mailbox/pl320-ipc.c  | 2 +-
- 3 files changed, 3 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/bus/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
+index acc216491b8a..8a614332dcb9 100644
+--- a/drivers/bus/omap_l3_smx.c
++++ b/drivers/bus/omap_l3_smx.c
+@@ -23,6 +23,7 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
 -- 
 1.8.5.2
