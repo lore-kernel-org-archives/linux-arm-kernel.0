@@ -1,87 +1,39 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 14 Jan 2014 15:37:09 +0800
-Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk board.
-Message-ID: <1389685029-17323-1-git-send-email-b20788@freescale.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 14 Jan 2014 08:15:15 +0000
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <20140114003925.GH19878@titan.lakedaemon.net>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <1389174517.12612.87.camel@kazak.uk.xensource.com>
+ <20140114003925.GH19878@titan.lakedaemon.net>
+Message-ID: <1389687315.10695.12.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
-enable them, the keymap is as below:
+On Mon, 2014-01-13 at 19:39 -0500, Jason Cooper wrote:
+> Ian,
+> 
+> On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
+> > What is the plan for the board files for the ts* platforms? Are they
+> > going to go away? This seems to have happened for the Sheevaplug case,
+> > which is causing some transition pain for distros (e.g.
+> > http://bugs.debian.org/731345).
+> 
+> Sorry, I'm rather swamped at the moment.  From my cursory reading of the
+> thread, is it correct to say that this problem can be solved by enabling
+> the CONFIG_MACH_SHEEVAPLUG_DT config option?
 
-SW6:  0x00000067    /* KEY_UP */
-SW7:  0x0001006c    /* KEY_DOWN */
-SW8:  0x0002001c    /* KEY_ENTER */
-SW9:  0x01000066    /* KEY_HOME */
-SW10: 0x0101006a    /* KEY_RIGHT */
-SW11: 0x01020069    /* KEY_LEFT */
-SW12: 0x02000072    /* KEY_VOLUMEDOWN */
-SW13: 0x02010073    /* KEY_VOLUMEUP */
+That would have allows 3.11 to boot with DT, but for 3.11 we are OK with
+the board file support from a Debian PoV
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
- 2 files changed, 29 insertions(+)
+The real issue is the transition of the userspace components which
+configure the bootloader (called "flash-kernel" in Debian) which needs
+to know whether or not a DTB should be appended. I think we've now
+mostly solved that by teaching flash-kernel what the minimum kernel
+version which requires a DTB is (see [0] and [1]), I've set this to 3.12
+for Sheevaplug and Guruplug, I'll set it to whatever is appropriate on
+the ts* platforms when the time comes.
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index f5e4513..8d49a10 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -93,6 +93,17 @@
- 			fsl,pins = <MX6SL_FEC_PINGRP1>;
- 		};
- 
-+		pinctrl_kpp: kppgrp {
-+			fsl,pins = <
-+				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-+				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
-+				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
-+				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
-+				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
-+				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <MX6SL_UART1_PINGRP1>;
- 		};
-@@ -139,6 +150,22 @@
- 	};
- };
- 
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp>;
-+	linux,keymap = <
-+			0x00000067    /* KEY_UP */
-+			0x0001006c    /* KEY_DOWN */
-+			0x0002001c    /* KEY_ENTER */
-+			0x01000066    /* KEY_HOME */
-+			0x0101006a    /* KEY_RIGHT */
-+			0x01020069    /* KEY_LEFT */
-+			0x02000072    /* KEY_VOLUMEDOWN */
-+			0x02010073    /* KEY_VOLUMEUP */
-+		>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index a5ef3c3..a449c4f 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -393,8 +393,10 @@
- 			};
- 
- 			kpp: kpp at 020b8000 {
-+				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
- 				reg = <0x020b8000 0x4000>;
- 				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SL_CLK_DUMMY>;
- 			};
- 
- 			wdog1: wdog at 020bc000 {
--- 
-1.7.9.5
+Ian.
+
+[0] http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=731345http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=731345
+[1] http://anonscm.debian.org/gitweb/?p=d-i/flash-kernel.git;a=commit;h=f656a00daa4d1ada46203e6e1831ae574eb005f8
