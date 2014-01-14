@@ -1,25 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 Jan 2014 19:39:25 -0500
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <1389174517.12612.87.camel@kazak.uk.xensource.com>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <1389174517.12612.87.camel@kazak.uk.xensource.com>
-Message-ID: <20140114003925.GH19878@titan.lakedaemon.net>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 13 Jan 2014 16:42:46 -0800
+Subject: [PATCH V2 1/6] Documentation: add dts binding for X-Gene reboot
+ dts node.
+In-Reply-To: <201401132043.52491.arnd@arndb.de>
+References: <1389135041-16062-1-git-send-email-fkan@apm.com>
+ <201401131619.35030.arnd@arndb.de>
+ <CAL85gmCTsxng3jCaAcCjePE6Pxu7Jg98TDUqQrDFzsfW2GQwEg@mail.gmail.com>
+ <201401132043.52491.arnd@arndb.de>
+Message-ID: <CAL85gmCA4kBsRUMC_ENjGfCq5jM11iY5Jx_+A3V9XQDU0b7E0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ian,
+>
+> Is this related to the standard ARM SCU that manages multiprocessor
+> systems, or a different unit that uses the same name?
 
-On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
-> What is the plan for the board files for the ts* platforms? Are they
-> going to go away? This seems to have happened for the Sheevaplug case,
-> which is causing some transition pain for distros (e.g.
-> http://bugs.debian.org/731345).
+FKAN: You mean the snoop control unit in ARM. This is different from
+that, the main function of this unit is clk control.
 
-Sorry, I'm rather swamped at the moment.  From my cursory reading of the
-thread, is it correct to say that this problem can be solved by enabling
-the CONFIG_MACH_SHEEVAPLUG_DT config option?
+>
+> Since this is a global register range with a variety of things in it,
+> the best candidate IMHO would be to use the "syscon" driver. You can
+> mark the device node as 'compatible="apm,xgene-scu","syscon"' to let
+> it get picked up by the drivers/mfd/syscon driver, which creates
+> a "regmap" structure for it.
+>
+> The reset driver then uses a DT reference with a phandle to the
+> SCU node and calls syscon_regmap_lookup_by_phandle() to get the
+> regmap. It can get the register number inside the regmap from DT
+> as well and use the regmap API to perform the reset.
 
-thx,
-
-Jason.
+Thanks, will do.
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
