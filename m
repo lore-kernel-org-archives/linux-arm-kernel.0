@@ -1,53 +1,22 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 14 Jan 2014 18:44:09 -0500
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
-References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
- <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
- <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
- <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
- <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
- <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
- <52D5A60C.7080800@ti.com>
- <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
-Message-ID: <52D5CBC9.5020201@ti.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 15 Jan 2014 00:45:31 +0100
+Subject: [PATCH net-next 0/2] net: mvneta: simple cleanups
+Message-ID: <cover.1389742334.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 January 2014 04:13 PM, Nishanth Menon wrote:
-> On Tue, Jan 14, 2014 at 3:03 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->>
->>> ok.. some sort of Linaro thing about which I have no background about
->>> - but dont really care in this context.
->>>
->> Nothing related Linaro. Its just that platforms are supporting ARM BE
->> mode and Linaro folks had working patches for Panda. So I suggested
->> to get them on the lists.
-> 
-> I tend to think -> is this with OFF mode and CPUidle completely
-> working? All context save and restore works with this? on HS and GP
-> devices with BE mode builds? works on SDP4430,60 variations,
-> considered reuse with AM43xx which could use parts of that logic?
-> 
-> I mean to indicate that terms like "works on panda" tends always to be relative.
->
-Fair enough.
- 
-> It is nice to see it as a proof of concept, but I'd hate to see some
-> dead code lying around in kernel and folks blindly following suit and
-> introducing macros for new assembly for a feature that in practice
-> just one group of folks care about and creates additional burden for
-> rest of folks trying to keep that functionality going as we jump from
-> one "device tree" style churn to another "framework"? Not to mean that
-> good features should be kept away.. but personally, I could not find
-> convincing arguments in this case..
-> 
-I haven't looked at patch myself but as you pointed out if it adds
-dead code and makes the code un-readable then probably that something
-we shouldn't merge.
 
-Regards,
-Santosh
+Those two patches are intended for net-next. They apply on top of
+performance improvements patches from Willy for mvneta driver.
+They provide some simple cleanups for unused variables, function
+params or return values.
+
+Arnaud Ebalard (2):
+  net: mvneta: mvneta_tx_done_gbe() cleanups
+  net: mvneta: make mvneta_txq_done() return void
+
+ drivers/net/ethernet/marvell/mvneta.c | 26 ++++++++------------------
+ 1 file changed, 8 insertions(+), 18 deletions(-)
+
+-- 
+1.8.5.2
