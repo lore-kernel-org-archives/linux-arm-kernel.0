@@ -1,43 +1,34 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Tue, 14 Jan 2014 08:08:51 +0100
-Subject: [PATCH 2/2] BCM2835: Add I2S driver to device tree
-In-Reply-To: <52D4A780.7050907@wwwdotorg.org>
-References: <52D3CA6E.1010803@koalo.de> <52D3CB18.8040608@koalo.de>
- <52D4A780.7050907@wwwdotorg.org>
-Message-ID: <CABDT8WyCQK0o43wjrBbGWSAXS8gpE-sCR-g+1CC8OJMRsFyiGQ@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 13 Jan 2014 22:36:21 -0800
+Subject: [PATCH 5/6] ARM: DTS: tegra: add DFLL integration to the Dalmore
+ DTS file
+In-Reply-To: <52B38AE9.2030209@wwwdotorg.org>
+References: <20131219122857.3226.42830.stgit@tamien>
+ <20131219124929.3226.79335.stgit@tamien> <52B38AE9.2030209@wwwdotorg.org>
+Message-ID: <alpine.DEB.2.02.1401132233450.11672@tamien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.01.2014 03:57, Stephen Warren wrote:
-> On 01/13/2014 04:16 AM, Florian Meier wrote:
->> This adds the definitions for the BCM2835 I2S driver
->> to the device tree. Some GPIO settings are needed for
->> the correct pin functions.
+
+
+On Thu, 19 Dec 2013, Stephen Warren wrote:
+
+> On 12/19/2013 05:49 AM, Paul Walmsley wrote:
+>> Expose the DFLL device on the NVIDIA Tegra114 Dalmore board, and connect
+>> the DFLL (and FCPU cluster) voltage regulator.
 >
-> Patch 1/1 and the .dtsi portion of patch 2/2 look fine; I can apply
-> those after 3.14's merge window closes.
+>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
 >
-> However, I don't think I can apply the change to bcm2835-rpi-b.dts in
-> this patch; those pins are used for the board ID strapping on rev 1
-> boards,
+>> +NVIDIA Tegra114 DFLL clocksource data in the board DTS file
+>> +
+>> +Optional properties:
+>> +
+>> +- status : device availability -- managed by the DT integration code, not
+>> +           the DFLL driver.  Should be set to "okay" if the DFLL is to be
+>> +           used on this board type.
+>
+> There's certainly no need to document the same DT property twice.
 
-Yes, but I thought the board ID is never utilized. However, I have not
-tested that.
+I've just dropped this section, per your earlier suggestion.
 
-> and even on rev 2 boards, they're simply routed to a generic
-> header, rather than being dedicated for I2S usage. That part of the
-> patch would be better kept locally in your own kernel tree. Perhaps if
-> DT overlays ever take off, we can publish it as part of an I2S-specific
-> overlay.
-
-You are right. That might be a problem. Someone might want to use the
-pins for another functionality. I personally think the I2S
-functionality will be the most used functionality for those pins, but
-I accept it when you say that they better should be set as second I2C
-channel and generic GPIO pins (as it is by default).
-
-However, for an end user it doesn't seem to be a convenient solution
-to have a kernel tree for each possible combination of pin
-assignments.
-The "old way" would be to set the pin functionality while loading the
-i2s driver, but I assume that is not the right way to go, right?
+- Paul
