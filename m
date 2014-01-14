@@ -1,84 +1,250 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Tue, 14 Jan 2014 13:37:57 -0800
-Subject: [PATCH v4 1/2] ARM: imx: add select on ARCH_MXC for cpufreq
- support
-In-Reply-To: <20140113060102.GO23525@S2101-09.ap.freescale.net>
-References: <1389321592-33220-1-git-send-email-john.tobias.ph@gmail.com>
- <20140113032043.GF23525@S2101-09.ap.freescale.net>
- <CACUGKYMx_o6TLsvMxK3Gb+cmOUCX3Toj+6MeJmo=ahfyc=vXCA@mail.gmail.com>
- <20140113060102.GO23525@S2101-09.ap.freescale.net>
-Message-ID: <CACUGKYMT1FHjpP+Yx7wKo5SXGGm3C3R6Z4tag0J1bczyg9Z8mQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 14 Jan 2014 22:38:32 +0100
+Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
+ controller
+In-Reply-To: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
+References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <201401142238.32262.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I made a mistake. The HAVE_IMX_ANATOP doesn't require to move up. It
-should be ARCH_HAS_OPP.
+On Friday, January 03, 2014 at 11:53:51 PM, Frank Li wrote:
+> After enable DMA
+> 
+> spi-nor read speed is
+> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
+> 1+0 records in
+> 1+0 records out
+> 1048576 bytes (1.0 MB) copied, 0.720402 s, 1.5 MB/s
+> 
+> spi-nor write speed is
+> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
+> 1+0 records in
+> 1+0 records out
+> 1048576 bytes (1.0 MB) copied, 3.56044 s, 295 kB/s
+> 
+> Before enable DMA
+> 
+> spi-nor read speed is
+> dd if=/dev/mtd0 of=/dev/null bs=1M count=1
+> 1+0 records in
+> 1+0 records out
+> 1048576 bytes (1.0 MB) copied, 2.37717 s, 441 kB/s
+> 
+> spi-nor write speed is
+> 
+> dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
+> 1+0 records in
+> 1+0 records out
+> 1048576 bytes (1.0 MB) copied, 4.83181 s, 217 kB/s
+> 
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+[...]
 
+> +
+> +static void spi_imx_dma_rx_callback(void *cookie)
+> +{
+> +	struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
+> +
+> +	complete(&spi_imx->dma_rx_completion);
+> +
+> +}
+> +
+> +static void spi_imx_dma_tx_callback(void *cookie)
+> +{
+> +	struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
+> +
+> +	complete(&spi_imx->dma_tx_completion);
+> +}
+> +
+> +static int spi_imx_sdma_transfer(struct spi_device *spi,
+> +				struct spi_transfer *transfer)
+> +{
 
+This function needs splitting into multiple smaller ones, seriously. This 
+doesn't fit either on my rMBP's screen or on my desktop's _pivoted_ 27" 
+widescreen 2500x1400 LCD !
 
-On Sun, Jan 12, 2014 at 10:01 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Sun, Jan 12, 2014 at 08:54:18PM -0800, John Tobias wrote:
->> I tested leaving the HAVE_IMX_ANATOP under SOC_IMX6Q and SOC_IMX6SL.
->> The iMX6Q cpufreq driver won't show up in menu config / gconfig and
->> that's the reason why I added it.
->
-> I tested the following changes against my for-next branch, and I can see
-> iMX6Q cpufreq driver in menuconfig.  Note, the
-> drivers/cpufreq/Kconfig.arm change is on cpufreq tree, so I have to make
-> the change locally for the testing.
->
-> Shawn
->
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 1e70150..7071468 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -1,5 +1,7 @@
->  config ARCH_MXC
->         bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 ||
-> ARCH_MULTI_V6_V7
-> +       select ARCH_HAS_CPUFREQ
-> +       select ARCH_HAS_OPP
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_CPU_SUSPEND if PM
->         select ARM_PATCH_PHYS_VIRT
-> @@ -12,6 +14,7 @@ config ARCH_MXC
->         select MIGHT_HAVE_CACHE_L2X0 if ARCH_MULTI_V6_V7
->         select MULTI_IRQ_HANDLER
->         select PINCTRL
-> +       select PM_OPP if PM
->         select SOC_BUS
->         select SPARSE_IRQ
->         select USE_OF
-> @@ -787,8 +790,6 @@ config      SOC_IMX53
->
->  config SOC_IMX6Q
->         bool "i.MX6 Quad/DualLite support"
-> -       select ARCH_HAS_CPUFREQ
-> -       select ARCH_HAS_OPP
->         select ARM_ERRATA_754322
->         select ARM_ERRATA_764369 if SMP
->         select ARM_ERRATA_775420
-> @@ -808,7 +809,6 @@ config SOC_IMX6Q
->         select PL310_ERRATA_588369 if CACHE_PL310
->         select PL310_ERRATA_727915 if CACHE_PL310
->         select PL310_ERRATA_769419 if CACHE_PL310
-> -       select PM_OPP if PM
->
->         help
->           This enables support for Freescale i.MX6 Quad processor.
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index ce52ed9..21e069e 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -80,7 +80,7 @@ config ARM_HIGHBANK_CPUFREQ
->
->  config ARM_IMX6Q_CPUFREQ
->         tristate "Freescale i.MX6Q cpufreq support"
-> -       depends on SOC_IMX6Q
-> +       depends on ARCH_MXC
->         depends on REGULATOR_ANATOP
->         help
->           This adds cpufreq driver support for Freescale i.MX6Q SOC.
->
->
+> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+> +	int ret = 0;
+> +	int sg_num;
+> +	int loop;
+> +	int left;
+> +	u32 dma;
+> +
+> +	struct scatterlist *sg_rx, *sg_tx;
+> +	struct dma_async_tx_descriptor *txdesc;
+> +	struct dma_async_tx_descriptor *rxdesc;
+> +
+> +	init_completion(&spi_imx->dma_rx_completion);
+> +	init_completion(&spi_imx->dma_tx_completion);
+
+This should be reinit_completion(), the init_completion() should happen in the 
+probe function, CAREFUL about this !
+
+> +
+> +	/*
+> +	 * Get the valid physical address for the tx buf, if the rx buf address
+> +	 * is null or it cannot be mapped, we should allocate memory for it.
+> +	 */
+
+I will skip this function until it's properly split. But anyway...
+
+I know the MXC SPI controller works in full-duplex mode, thus must have two 
+equally big buffers (one for RX and one for TX) even if used in half-duplex 
+mode, right?
+
+The problem I perceive here is that when I do for example 4 MB long continuous 
+half-duplex transfer with the IMX SPI, your code will happily allocate 4MB big 
+buffer, right ?
+
+Hence my suggestion, won't it be better to split such long transfers into a 
+chain of DMA descriptors AND use a small (say, 16KiB) buffer for the unwanted 
+direction ? This way, you would allocate the small 16KiB block only once (heck, 
+you can even allocate it in probe() ), and each descriptor would point to this 
+block, overwriting it or sourcing zeroes from it .
+
+But please, correct me if I misunderstood your code.
+
+[...]
+
+> +
+> +static int spi_imx_pio_transfer(struct spi_device *spi,
+>  				struct spi_transfer *transfer)
+>  {
+>  	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+> @@ -729,6 +1088,27 @@ static int spi_imx_transfer(struct spi_device *spi,
+>  	return transfer->len;
+>  }
+> 
+> +static int spi_imx_transfer(struct spi_device *spi,
+> +				struct spi_transfer *transfer)
+> +{
+> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+> +
+> +	if (spi_imx->dma_chan_tx && spi_imx->dma_chan_rx) {
+
+You do have spi_imx->dma_is_inited variable , so use it here.
+
+> +		/*
+> +		 * Don't use sdma when the size of data to be transfered is
+> +		 * lower then SDMA wartermark.
+> +		 */
+> +		if ((transfer->len >= spi_imx->rx_wml) &&
+> +				(transfer->len > spi_imx->tx_wml)) {
+
+Why do you use -ge in the first test and -gt in the second ? Besides, the 
+formating of the condition is really weird.
+
+> +			spi_imx->usedma = 1;
+
+Don't you need to do some kind of locking here so that spi_imx->usedma won't be 
+overwritten if multiple users enter the spi_imx_transfer() function ? I am not 
+sure if this is called from a context already protected by the SPI framework's 
+mutex or not.
+
+> +			return spi_imx_sdma_transfer(spi, transfer);
+> +		}
+> +	}
+> +
+> +	spi_imx->usedma = 0;
+> +	return spi_imx_pio_transfer(spi, transfer);
+> +}
+> +
+>  static int spi_imx_setup(struct spi_device *spi)
+>  {
+>  	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+> @@ -778,6 +1158,56 @@ spi_imx_unprepare_message(struct spi_master *master,
+> struct spi_message *msg) return 0;
+>  }
+> 
+> +static int spi_imx_sdma_init(struct spi_imx_data *spi_imx)
+> +{
+> +	struct dma_slave_config slave_config = {};
+> +	struct device *dev = spi_imx->dev;
+> +	int ret;
+> +
+> +
+
+One newline too much here.
+
+> +	/* Prepare for TX : */
+
+I suppose this should be "Prepare TX DMA" ?
+
+> +	spi_imx->dma_chan_tx = dma_request_slave_channel(dev, "tx");
+> +	if (!spi_imx->dma_chan_tx) {
+> +		dev_err(dev, "cannot get the TX DMA channel!\n");
+
+Sentence usually starts with capital letter ;-)
+
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	slave_config.direction = DMA_MEM_TO_DEV;
+> +	slave_config.dst_addr = spi_imx->mapbase + MXC_CSPITXDATA;
+> +	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
+> +	ret = dmaengine_slave_config(spi_imx->dma_chan_tx, &slave_config);
+> +	if (ret) {
+> +		dev_err(dev, "error in TX dma configuration.");
+> +		goto err;
+> +	}
+> +
+> +	/* Prepare for RX : */
+> +	spi_imx->dma_chan_rx = dma_request_slave_channel(dev, "rx");
+> +	if (!spi_imx->dma_chan_rx) {
+> +		dev_dbg(dev, "cannot get the DMA channel.\n");
+
+I'd turn all these dev_err() calls here into dev_dbg() and I'd print an error 
+message if this function returns !0 at where's it's called from below.
+
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	slave_config.direction = DMA_DEV_TO_MEM;
+> +	slave_config.src_addr = spi_imx->mapbase + MXC_CSPIRXDATA;
+> +	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	slave_config.src_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
+> +	ret = dmaengine_slave_config(spi_imx->dma_chan_rx, &slave_config);
+> +	if (ret) {
+> +		dev_err(dev, "error in RX dma configuration.\n");
+> +		goto err;
+> +	}
+> +	spi_imx->dma_is_inited = 1;
+> +
+> +	return 0;
+> +err:
+> +	spi_imx_sdma_exit(spi_imx);
+> +	return ret;
+> +}
+> +
+>  static int spi_imx_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+> @@ -849,6 +1279,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
+> 
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (res)
+> +		spi_imx->mapbase = res->start;
+>  	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(spi_imx->base)) {
+>  		ret = PTR_ERR(spi_imx->base);
+> @@ -890,6 +1322,9 @@ static int spi_imx_probe(struct platform_device *pdev)
+> 
+>  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
+> 
+> +	spi_imx->dev = &pdev->dev;
+> +	spi_imx_sdma_init(spi_imx);
+
+You must check return value here. I would say you want to print an error message 
+here, but you also want to avoid failing entirely, just indicate the DMA 
+couldn't be init'd and you'd just use PIO.
+
+> +
+>  	spi_imx->devtype_data->reset(spi_imx);
+> 
+>  	spi_imx->devtype_data->intctrl(spi_imx, 0);
