@@ -1,194 +1,65 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 14 Jan 2014 15:03:00 +0200
-Subject: [PATCH v2 2/2] i2c: New bus driver for the QUP I2C controller
-In-Reply-To: <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1389704580.2794.17.camel@iivanov-dev.int.mm-sol.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 14 Jan 2014 07:10:52 -0600
+Subject: [PATCHv4 6/7] hwspinlock/omap: enable module before reading
+ SYSSTATUS register
+In-Reply-To: <1389658764-39199-7-git-send-email-s-anna@ti.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-7-git-send-email-s-anna@ti.com>
+Message-ID: <20140114131052.GA10818@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Bjorn, 
-
-Just two comments.
-
-On Mon, 2014-01-13 at 16:30 -0800, Bjorn Andersson wrote: 
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On Mon, Jan 13, 2014 at 06:19:23PM -0600, Suman Anna wrote:
+> The number of hwspinlocks are determined based on the value read
+> from the IP block's SYSSTATUS register. However, the module may
+> not be enabled and clocked, and the read may result in a bus error.
 > 
-> This bus driver supports the QUP i2c hardware controller in the Qualcomm
-> MSM SOCs.  The Qualcomm Universal Peripheral Engine (QUP) is a general
-> purpose data path engine with input/output FIFOs and an embedded i2c
-> mini-core. The driver supports FIFO mode (for low bandwidth	applications)
-> and block mode (interrupt generated for each block-size data transfer).
-> The driver currently does not support DMA transfers.
+> This particular issue is seen rather easily on AM33XX, since the
+> module wakeup is software controlled, and it is disabled out of
+> reset. Make sure the module is enabled and clocked before reading
+> the SYSSTATUS register.
 > 
-> Shamelessly based on codeaurora version of the driver.
-> 
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> [bjorn: updated to reflect i2c framework changes
->         splited up qup_i2c_enable() in enable/disable
->         don't overwrite ret value on error in xfer functions
->         initilize core for each transfer
->         remove explicit pinctrl selection
->         use existing clock instead of setting new core clock]
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 > ---
-
-<snip>
-
-> +
-> +static int qup_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct qup_i2c_dev *qup;
-> +	struct resource *res;
-> +	u32 val, io_mode, hw_ver, size;
-> +	int ret, fs_div, hs_div;
-> +	int src_clk_freq;
-> +
-> +	qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
-> +	if (!qup)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, qup);
-> +
-> +	ret = of_alias_get_id(node, "i2c");
-> +	if (ret >= 0)
-> +		pdev->id = ret;
-
-This is part of the i2c_add_adapter() and have to be dropped.
-
-> +
-> +	qup->dev = &pdev->dev;
-> +
-> +	qup->clk_freq = 100000;
-> +	if (!of_property_read_u32(node, "clock-frequency", &val))
-> +		qup->clk_freq = val;
-> +
-> +	/* We support frequencies up to FAST Mode(400KHz) */
-> +	if (qup->clk_freq <= 0 || qup->clk_freq > 400000) {
-> +		dev_err(qup->dev, "clock frequency not supported %d\n",
-> +			qup->clk_freq);
-> +		return -EIO;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	qup->base = devm_ioremap_resource(qup->dev, res);
-> +	if (IS_ERR(qup->base))
-> +		return PTR_ERR(qup->base);
-> +
-> +	qup->irq = platform_get_irq(pdev, 0);
-> +	if (qup->irq < 0) {
-> +		dev_err(qup->dev, "No IRQ defined\n");
-> +		return qup->irq;
-> +	}
-> +
-> +	qup->clk = devm_clk_get(qup->dev, "core");
-> +	if (IS_ERR(qup->clk)) {
-> +		dev_err(qup->dev, "Could not get core clock\n");
-> +		return PTR_ERR(qup->clk);
-> +	}
-> +
-> +	qup->pclk = devm_clk_get(qup->dev, "iface");
-> +	if (IS_ERR(qup->pclk)) {
-> +		dev_err(qup->dev, "Could not get iface clock\n");
-> +		return PTR_ERR(qup->pclk);
-> +	}
-> +
-> +	init_completion(&qup->xfer);
-> +
-> +	qup_i2c_enable_clocks(qup);
-> +
+>  drivers/hwspinlock/omap_hwspinlock.c | 21 ++++++++++++++-------
+>  1 file changed, 14 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
+> index 9f56fb2..194886e 100644
+> --- a/drivers/hwspinlock/omap_hwspinlock.c
+> +++ b/drivers/hwspinlock/omap_hwspinlock.c
+> @@ -101,10 +101,23 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
+>  	if (!io_base)
+>  		return -ENOMEM;
+>  
 > +	/*
-> +	 * Bootloaders might leave a pending interrupt on certain QUP's,
-> +	 * so we reset the core before registering for interrupts.
+> +	 * make sure the module is enabled and clocked before reading
+> +	 * the module SYSSTATUS register
 > +	 */
-> +	writel(1, qup->base + QUP_SW_RESET);
-> +	ret = qup_i2c_poll_state(qup, 0, true);
-> +	if (ret)
-> +		goto fail;
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_get_sync(&pdev->dev);
 > +
-> +	ret = devm_request_irq(qup->dev, qup->irq, qup_i2c_interrupt,
-> +			       IRQF_TRIGGER_HIGH, "i2c_qup", qup);
-> +	if (ret) {
-> +		dev_err(qup->dev, "Request %d IRQ failed\n", qup->irq);
-> +		goto fail;
-> +	}
-> +	disable_irq(qup->irq);
-> +
-> +	hw_ver = readl(qup->base + QUP_HW_VERSION);
-> +	dev_dbg(qup->dev, "%d Revision %x\n", pdev->id, hw_ver);
-> +
-> +	src_clk_freq = clk_get_rate(qup->clk);
-> +	fs_div = ((src_clk_freq / qup->clk_freq) / 2) - 3;
-> +	hs_div = 3;
-> +	qup->clk_ctl = (hs_div << 8) | (fs_div & 0xff);
-> +	qup->one_bit_t = (USEC_PER_SEC / qup->clk_freq) + 1;
-> +
-> +	io_mode = readl(qup->base + QUP_IO_MODE);
-> +
-> +	size = QUP_OUTPUT_BLOCK_SIZE(io_mode);
-> +	if (size)
-> +		qup->out_blk_sz = size * 16;
-> +	else
-> +		qup->out_blk_sz = 16;
-> +
-> +	size = QUP_INPUT_BLOCK_SIZE(io_mode);
-> +	if (size)
-> +		qup->in_blk_sz = size * 16;
-> +	else
-> +		qup->in_blk_sz = 16;
-> +
-> +	qup->xfer_time = msecs_to_jiffies(qup->out_fifo_sz);
-> +
+>  	/* Determine number of locks */
+>  	i = readl(io_base + SYSSTATUS_OFFSET);
+>  	i >>= SPINLOCK_NUMLOCKS_BIT_OFFSET;
+>  
 > +	/*
-> +	 * The block/fifo size w.r.t. 'actual data' is 1/2 due to 'tag'
-> +	 * associated with each byte written/received
+> +	 * runtime PM will make sure the clock of this module is
+> +	 * enabled again iff at least one lock is requested
 > +	 */
-> +	qup->out_blk_sz /= 2;
-> +	qup->in_blk_sz /= 2;
-> +
-> +	size = QUP_OUTPUT_FIFO_SIZE(io_mode);
-> +	qup->out_fifo_sz = qup->out_blk_sz * (2 << size);
-> +
-> +	size = QUP_INPUT_FIFO_SIZE(io_mode);
-> +	qup->in_fifo_sz = qup->in_blk_sz * (2 << size);
-> +
-> +	/*
-> +	 * Wait for FIFO number of bytes to be absolutely sure
-> +	 * that I2C write state machine is not idle. Each byte
-> +	 * takes 9 clock cycles. (8 bits + 1 ack)
-> +	 */
-> +	qup->wait_idle = qup->one_bit_t * 9;
-> +	qup->wait_idle *= qup->out_fifo_sz;
-> +
-> +	dev_info(qup->dev, "IN:block:%d, fifo:%d, OUT:block:%d, fifo:%d\n",
-> +		qup->in_blk_sz, qup->in_fifo_sz,
-> +		qup->out_blk_sz, qup->out_fifo_sz);
+> +	pm_runtime_put(&pdev->dev);
 
-This could be lowered to dbg, I think.
+there is a small race here (which was already present previously) where
+you could return from probe() in a failure case before your PM runtime
+put request then you would disable pm_runtime while the device was still
+alive.
 
-> +
-> +	i2c_set_adapdata(&qup->adap, qup);
-> +	qup->adap.algo = &qup_i2c_algo;
-> +	qup->adap.nr = pdev->id;
-> +	qup->adap.dev.parent = qup->dev;
-> +	qup->adap.dev.of_node = pdev->dev.of_node;
-> +	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
-> +
-> +	ret = i2c_add_numbered_adapter(&qup->adap);
-> +	if (!ret) {
-> +		pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
-> +		pm_runtime_use_autosuspend(qup->dev);
-> +		pm_runtime_enable(qup->dev);
-> +		return 0;
-> +	}
-> +fail:
-> +	qup_i2c_disable_clocks(qup);
-> +	return ret;
-> +}
-> +
-
-Thanks, 
-Ivan
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/0dd1b400/attachment.sig>
