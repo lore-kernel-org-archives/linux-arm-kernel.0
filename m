@@ -1,39 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Jan 2014 15:28:45 +0000
-Subject: [PATCH v2 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
-In-Reply-To: <20140114151404.GN19878@titan.lakedaemon.net>
-References: <1389711007-7239-1-git-send-email-simon.guinot@sequanux.org>
- <20140114151404.GN19878@titan.lakedaemon.net>
-Message-ID: <20140114152845.GI15937@n2100.arm.linux.org.uk>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Tue, 14 Jan 2014 16:30:12 +0100
+Subject: imx6dl/imx6q fec rmii mode with external ref_clk
+Message-ID: <20140114153012.GA22550@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 10:14:04AM -0500, Jason Cooper wrote:
-> Simon,
-> 
-> On Tue, Jan 14, 2014 at 03:50:04PM +0100, Simon Guinot wrote:
-> > Hello,
-> > 
-> > This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
-> > SoCs: once a disk is removed from a SATA port, then the re-plug events
-> > are not detected by the sata_mv driver.
-> > 
-> > This should be applied to the -stable kernels 3.10 and onwards. 
-> 
-> Please add a 'Fixes: <commit-hash> (oneline)' tag below the Cc: stable
-> tags.  It looks like the sata_mv binding and the Armada 370 DT booting
-> were both introduced in v3.6, so I would probably use:
-> 
-> Fixes: 9ae6f740b49f (arm: mach-mvebu: add support for Armada 370 and Armada XP with DT)
+Hi,
 
-Correction - it's format is:
+On the custom board we are developping (imx6q and imx6dl), we have connected
+the fec to a switch chip using rmii mode, and we let the switch provide the
+reference clock to gpio_16.
 
-Fixes: <commit-hash> ("oneline")
+I work currently with 3.13-rc8 and
 
-Double-quotes inside the parens.  (Don't ask me why, that's just how it
-was decided.)
+- I do not have ethernet access working (tx timeout)
+- I do not find in the dtb files a description of the pad settings for the
+RMII mode
+- when searching about the setting for bit 21 ing GPR1, which seems to
+be important for my setting to work, I found the following mail:
+	http://www.spinics.net/lists/devicetree/msg06450.html
+
+saying "So far, we haven't got any user with that setup (external phy or
+oscillator generates clock to pad GPIO_16).  When we do, we can add a
+device tree property for telling that."
+
+Is there any progress for that configuration since that mail ?
+
+Best regards
+
+Philippe
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+
+P.S.: here is my attempt for a dts entry for RMII mode :
+
+pinctrl_enet_4: enetgrp-4 {
+			fsl,pins = <
+				MX6QDL_PAD_ENET_MDC__ENET_MDC           0x1b0b0
+				MX6QDL_PAD_ENET_MDIO__ENET_MDIO         0x1b0b0
+				MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x1b0b0
+				MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0     0x1b0b0
+				MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1     0x1b0b0
+				MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN      0x1b0b0
+				MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER       0x1b0b0
+				MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0     0x1b0b0
+				MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1     0x1b0b0
+				MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN       0x1b0b0
+				MX6QDL_PAD_GPIO_19__ENET_TX_ER          0x1b0b0
+			>;
+		};
