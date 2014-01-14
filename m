@@ -1,27 +1,413 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Tue, 14 Jan 2014 04:10:56 +0000
-Subject: Possible regression of Mackerel/ASoC Simple Card in next-20130107
-In-Reply-To: <20140114022353.GA7053@verge.net.au>
-References: <20140108040017.GA11231@verge.net.au>
- <20140114022353.GA7053@verge.net.au>
-Message-ID: <4d593a7756024226a22d93cce2b78b9c@BY2PR03MB505.namprd03.prod.outlook.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 14 Jan 2014 17:12:35 +1300
+Subject: [PATCH v5 2/2] ehci-platform: Add support for clks and phy passed
+ through devicetree
+In-Reply-To: <1389653115-11028-3-git-send-email-hdegoede@redhat.com>
+References: <1389653115-11028-1-git-send-email-hdegoede@redhat.com>
+ <1389653115-11028-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <52D4B933.9080505@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+On 14/01/14 11:45, Hans de Goede wrote:
+> Currently ehci-platform is only used in combination with devicetree when used
+> with some Via socs. By extending it to (optionally) get clks and a phy from
+> devicetree, and enabling / disabling those on power_on / off, it can be used
+> more generically. Specifically after this commit it can be used for the
+> ehci controller on Allwinner sunxi SoCs.
+>
+> Since ehci-platform is intended to handle any generic enough non pci ehci
+> device, add a "usb-ehci" compatibility string.
+>
+> There already is a usb-ehci device-tree bindings document, update this
+> with clks and phy bindings info.
+>
+> Although actually quite generic so far the via,vt8500 compatibilty string
+> had its own bindings document. Somehow we even ended up with 2 of them. Since
+> these provide no extra information over the generic usb-ehci documentation,
+> this patch removes them.
+>
+> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
+> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
+> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
+> 2 drivers claiming the same compatibility string getting build on ppc.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  25 +++-
+>   .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
+>   .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
+>   drivers/usb/host/Kconfig                           |   1 +
+>   drivers/usb/host/ehci-platform.c                   | 149 +++++++++++++++++----
+>   5 files changed, 142 insertions(+), 60 deletions(-)
+>   delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>   delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> index fa18612..fad10f3 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> @@ -7,13 +7,14 @@ Required properties:
+>       (debug-port or other) can be also specified here, but only after
+>       definition of standard EHCI registers.
+>     - interrupts : one EHCI interrupt should be described here.
+> -If device registers are implemented in big endian mode, the device
+> -node should have "big-endian-regs" property.
+> -If controller implementation operates with big endian descriptors,
+> -"big-endian-desc" property should be specified.
+> -If both big endian registers and descriptors are used by the controller
+> -implementation, "big-endian" property can be specified instead of having
+> -both "big-endian-regs" and "big-endian-desc".
+> +
+> +Optional properties:
+> + - big-endian-regs : boolean, set this for hcds with big-endian registers
+> + - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+> + - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
+> + - clocks : a list of phandle + clock specifier pairs
+> + - phys : phandle + phy specifier pair
+> + - phy-names : "usb"
+>   
+>   Example (Sequoia 440EPx):
+>       ehci at e0000300 {
+> @@ -23,3 +24,13 @@ Example (Sequoia 440EPx):
+>   	   reg = <0 e0000300 90 0 e0000390 70>;
+>   	   big-endian;
+>      };
+> +
+> +Example (Allwinner sun4i A10 SoC):
+> +   ehci0: ehci at 0x01c14000 {
+> +	   compatible = "allwinner,sun4i-a10-ehci", "usb-ehci";
+> +	   reg = <0x01c14000 0x100>;
+> +	   interrupts = <39>;
+> +	   clocks = <&ahb_gates 1>;
+> +	   phys = <&usbphy 1>;
+> +	   phy-names = "usb";
+> +   };
+> diff --git a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+> deleted file mode 100644
+> index 17b3ad1..0000000
+> --- a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+> +++ /dev/null
+> @@ -1,15 +0,0 @@
+> -VIA/Wondermedia VT8500 EHCI Controller
+> ------------------------------------------------------
+> -
+> -Required properties:
+> -- compatible : "via,vt8500-ehci"
+> -- reg : Should contain 1 register ranges(address and length)
+> -- interrupts : ehci controller interrupt
+> -
+> -Example:
+> -
+> -	ehci at d8007900 {
+> -		compatible = "via,vt8500-ehci";
+> -		reg = <0xd8007900 0x200>;
+> -		interrupts = <43>;
+> -	};
+> diff --git a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+> deleted file mode 100644
+> index 5fb8fd6..0000000
+> --- a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+> +++ /dev/null
+> @@ -1,12 +0,0 @@
+> -VIA VT8500 and Wondermedia WM8xxx SoC USB controllers.
+> -
+> -Required properties:
+> - - compatible: Should be "via,vt8500-ehci" or "wm,prizm-ehci".
+> - - reg: Address range of the ehci registers. size should be 0x200
+> - - interrupts: Should contain the ehci interrupt.
+> -
+> -usb: ehci at D8007100 {
+> -	compatible = "wm,prizm-ehci", "usb-ehci";
+> -	reg = <0xD8007100 0x200>;
+> -	interrupts = <1>;
+> -};
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index a9707da..e28cbe0 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -255,6 +255,7 @@ config USB_EHCI_ATH79
+>   
+>   config USB_EHCI_HCD_PLATFORM
+>   	tristate "Generic EHCI driver for a platform device"
+> +	depends on !PPC_OF
+>   	default n
+>   	---help---
+>   	  Adds an EHCI host driver for a generic platform device, which
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index 7f30b71..5c4f892 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -3,6 +3,7 @@
+>    *
+>    * Copyright 2007 Steven Brown <sbrown@cortland.com>
+>    * Copyright 2010-2012 Hauke Mehrtens <hauke@hauke-m.de>
+> + * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+>    *
+>    * Derived from the ohci-ssb driver
+>    * Copyright 2007 Michael Buesch <m@bues.ch>
+> @@ -18,6 +19,7 @@
+>    *
+>    * Licensed under the GNU/GPL. See COPYING for details.
+>    */
+> +#include <linux/clk.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/err.h>
+>   #include <linux/kernel.h>
+> @@ -25,6 +27,7 @@
+>   #include <linux/io.h>
+>   #include <linux/module.h>
+>   #include <linux/of.h>
+> +#include <linux/phy/phy.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/usb.h>
+>   #include <linux/usb/hcd.h>
+> @@ -33,6 +36,13 @@
+>   #include "ehci.h"
+>   
+>   #define DRIVER_DESC "EHCI generic platform driver"
+> +#define EHCI_MAX_CLKS 3
+> +#define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+> +
+> +struct ehci_platform_priv {
+> +	struct clk *clks[EHCI_MAX_CLKS];
+> +	struct phy *phy;
+> +};
+>   
+>   static const char hcd_name[] = "ehci-platform";
+>   
+> @@ -64,38 +74,90 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+>   	return 0;
+>   }
+>   
+> +static int ehci_platform_power_on(struct platform_device *dev)
+> +{
+> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+> +	int clk, ret;
+> +
+> +	for (clk = 0; priv->clks[clk] && clk < EHCI_MAX_CLKS; clk++) {
+> +		ret = clk_prepare_enable(priv->clks[clk]);
+> +		if (ret)
+> +			goto err_disable_clks;
+> +	}
+> +
+> +	if (priv->phy) {
+> +		ret = phy_init(priv->phy);
+> +		if (ret)
+> +			goto err_disable_clks;
+> +
+> +		ret = phy_power_on(priv->phy);
+> +		if (ret)
+> +			goto err_exit_phy;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_exit_phy:
+> +	phy_exit(priv->phy);
+> +err_disable_clks:
+> +	while (--clk >= 0)
+> +		clk_disable_unprepare(priv->clks[clk]);
+> +
+> +	return ret;
+> +}
+> +
+> +static void ehci_platform_power_off(struct platform_device *dev)
+> +{
+> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+> +	int clk;
+> +
+> +	if (priv->phy) {
+> +		phy_power_off(priv->phy);
+> +		phy_exit(priv->phy);
+> +	}
+> +
+> +	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
+> +		if (priv->clks[clk])
+> +			clk_disable_unprepare(priv->clks[clk]);
+> +}
+> +
+>   static struct hc_driver __read_mostly ehci_platform_hc_driver;
+>   
+>   static const struct ehci_driver_overrides platform_overrides __initconst = {
+> -	.reset =	ehci_platform_reset,
+> +	.reset =		ehci_platform_reset,
+> +	.extra_priv_size =	sizeof(struct ehci_platform_priv),
+>   };
+>   
+> -static struct usb_ehci_pdata ehci_platform_defaults;
+> +static struct usb_ehci_pdata ehci_platform_defaults = {
+> +	.power_on =		ehci_platform_power_on,
+> +	.power_suspend =	ehci_platform_power_off,
+> +	.power_off =		ehci_platform_power_off,
+> +};
+>   
+>   static int ehci_platform_probe(struct platform_device *dev)
+>   {
+>   	struct usb_hcd *hcd;
+>   	struct resource *res_mem;
+> -	struct usb_ehci_pdata *pdata;
+> -	int irq;
+> -	int err;
+> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+> +	struct ehci_platform_priv *priv;
+> +	int clk, irq, err;
+>   
+>   	if (usb_disabled())
+>   		return -ENODEV;
+>   
+>   	/*
+> -	 * use reasonable defaults so platforms don't have to provide these.
+> -	 * with DT probing on ARM, none of these are set.
+> +	 * Use reasonable defaults so platforms don't have to provide these
+> +	 * with DT probing on ARM.
+>   	 */
+> -	if (!dev_get_platdata(&dev->dev))
+> -		dev->dev.platform_data = &ehci_platform_defaults;
+> +	if (!pdata)
+> +		pdata = &ehci_platform_defaults;
+>   
+>   	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
+>   	if (err)
+>   		return err;
+>   
+> -	pdata = dev_get_platdata(&dev->dev);
+> -
+>   	irq = platform_get_irq(dev, 0);
+>   	if (irq < 0) {
+>   		dev_err(&dev->dev, "no irq provided");
+> @@ -107,17 +169,40 @@ static int ehci_platform_probe(struct platform_device *dev)
+>   		return -ENXIO;
+>   	}
+>   
+> +	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
+> +			     dev_name(&dev->dev));
+> +	if (!hcd)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(dev, hcd);
+> +	dev->dev.platform_data = pdata;
+> +	priv = hcd_to_ehci_priv(hcd);
+> +
+> +	if (pdata == &ehci_platform_defaults && dev->dev.of_node) {
+> +		priv->phy = devm_phy_get(&dev->dev, "usb");
+> +		if (IS_ERR(priv->phy)) {
+> +			err = PTR_ERR(priv->phy);
+> +			if (err == -EPROBE_DEFER)
+> +				goto err_put_hcd;
+> +			priv->phy = NULL;
+> +		}
+> +
+> +		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
+> +			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
+> +			if (IS_ERR(priv->clks[clk])) {
+> +				err = PTR_ERR(priv->clks[clk]);
+> +				if (err == -EPROBE_DEFER)
+> +					goto err_put_clks;
+> +				priv->clks[clk] = NULL;
+> +				break;
+> +			}
+> +		}
+> +	}
+> +
+>   	if (pdata->power_on) {
+>   		err = pdata->power_on(dev);
+>   		if (err < 0)
+> -			return err;
+> -	}
+> -
+> -	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
+> -			     dev_name(&dev->dev));
+> -	if (!hcd) {
+> -		err = -ENOMEM;
+> -		goto err_power;
+> +			goto err_put_clks;
+>   	}
+>   
+>   	hcd->rsrc_start = res_mem->start;
+> @@ -126,21 +211,25 @@ static int ehci_platform_probe(struct platform_device *dev)
+>   	hcd->regs = devm_ioremap_resource(&dev->dev, res_mem);
+>   	if (IS_ERR(hcd->regs)) {
+>   		err = PTR_ERR(hcd->regs);
+> -		goto err_put_hcd;
+> +		goto err_power;
+>   	}
+>   	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>   	if (err)
+> -		goto err_put_hcd;
+> -
+> -	platform_set_drvdata(dev, hcd);
+> +		goto err_power;
+>   
+>   	return err;
+>   
+> -err_put_hcd:
+> -	usb_put_hcd(hcd);
+>   err_power:
+>   	if (pdata->power_off)
+>   		pdata->power_off(dev);
+> +err_put_clks:
+> +	while (--clk >= 0)
+> +		clk_put(priv->clks[clk]);
+> +err_put_hcd:
+> +	if (pdata == &ehci_platform_defaults)
+> +		dev->dev.platform_data = NULL;
+> +
+> +	usb_put_hcd(hcd);
+>   
+>   	return err;
+>   }
+> @@ -149,13 +238,19 @@ static int ehci_platform_remove(struct platform_device *dev)
+>   {
+>   	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>   	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+> +	int clk;
+>   
+>   	usb_remove_hcd(hcd);
+> -	usb_put_hcd(hcd);
+>   
+>   	if (pdata->power_off)
+>   		pdata->power_off(dev);
+>   
+> +	for (clk = 0; priv->clks[clk] && clk < EHCI_MAX_CLKS; clk++)
+> +		clk_put(priv->clks[clk]);
+> +
+> +	usb_put_hcd(hcd);
+> +
+>   	if (pdata == &ehci_platform_defaults)
+>   		dev->dev.platform_data = NULL;
+>   
+> @@ -206,8 +301,10 @@ static int ehci_platform_resume(struct device *dev)
+>   static const struct of_device_id vt8500_ehci_ids[] = {
+>   	{ .compatible = "via,vt8500-ehci", },
+>   	{ .compatible = "wm,prizm-ehci", },
+> +	{ .compatible = "usb-ehci", },
+>   	{}
+>   };
+> +MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
+>   
+>   static const struct platform_device_id ehci_platform_table[] = {
+>   	{ "ehci-platform", 0 },
 
-> >
-> > I noticed that next-20130107 does not boot on the Mackerel board does not
-> > boot using its defconfig. The boot log is as follows.
-> >
-> > I have not investigated any further as typically when I investigate
-> > problems in next they turn out to be known problems.
-> 
-> This problem does not appear to be present any more in next-20140113.
-> 
- 
-Maybe the following patch fixed this if the dts is not using.
 
-"ASoC: simple-card: fix a bug where cinfo will be NULL before using it"
+You have removed the documentation for the via,vt8500-ehci and 
+wm,prizm-ehci bindings (which in itself isn't really an issue), and left 
+them in the driver (again, not an issue) - except now we have two 
+bindings without any binding documentation?!?
 
-Thanks,
+I'm not sure where the 'wm,prizm-ehci' string came from (presumably me 
+some time ago), but it isn't used and could be dropped.
+All WonderMedia SoCs use the 'via,vt8500-ehci' - Doing a quick grep of 
+arch/arm/boot/dts shows no usage of 'wm,prizm-ehci'.
+
+Arguably, the dtsi files for the WonderMedia SoCs could be updated to 
+include 'usb-ehci' as a second compatible string, and the 
+'via,vt8500-ehci' could be dropped from the driver - but it does mean 
+that old dts files won't work with the current kernel (and I think 
+that's a no-no).
+
+Regards
+Tony P
