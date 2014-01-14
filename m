@@ -1,62 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 15 Jan 2014 08:49:54 +0900
-Subject: [PATCH 0/9] Renesas RSPI/QSPI DT support
-In-Reply-To: <CAMuHMdWMZE23JkEr7Weq6MWgPK5w-Gy_kus5HxvcLBdgPn5Daw@mail.gmail.com>
-References: <1389525222-3482-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdWmFa-XsderYDp4jMw6r7fnwpm5XgQGfz8gEbCryXEkHg@mail.gmail.com>
- <20140114005312.GF18217@verge.net.au>
- <CAMuHMdWMZE23JkEr7Weq6MWgPK5w-Gy_kus5HxvcLBdgPn5Daw@mail.gmail.com>
-Message-ID: <20140114234951.GA8769@verge.net.au>
+From: marc.ceeeee@gmail.com (Marc Carino)
+Date: Tue, 14 Jan 2014 15:48:48 -0800
+Subject: [PATCH v3 2/7] ARM: brcmstb: add debug UART for earlyprintk support
+In-Reply-To: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <1389743333-16741-3-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 09:40:34AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Jan 14, 2014 at 1:53 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Sun, Jan 12, 2014 at 01:55:19PM +0100, Geert Uytterhoeven wrote:
-> >> On Sun, Jan 12, 2014 at 12:13 PM, Geert Uytterhoeven
-> >> <geert@linux-m68k.org> wrote:
-> >
-> >         [1/9] spi: rspi: Add missing clk_disable() calls in error and cleanup paths
-> >         [2/9] spi: rspi: Convert to clk_prepare_enable/disable_unprepare
-> >         [3/9] spi: rspi: Use NULL as the clock ID
-> >         [4/9][V3] spi: rspi: Add DT support
-> >
-> >> >     [5/9] ARM: shmobile: r7s72100: Add RSPI clocks for DT
-> >> >     [6/9][V3] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-> >> >     [7/9][V3] ARM: shmobile: genmai reference: Add RSPI nodes
-> >> >     [8/9] ARM: shmobile: r8a7791 dtsi: Add QSPI node
-> >> >     [9/9] ARM: shmobile: koelsch: Add QSPI nodes
-> >>
-> >> Forgot to mention:
-> >>
-> >> The ARM/shmobile part is based on renesas-devel-v3.13-rc7-20140109v2, with
-> >> Magnus' pinctrl, Wolfram's riic, Simon's sh_eth, Valentine's i2c pinctrl
-> >> and Laurent's SCIF DT work applied on top.
-> >> [Simon: I don't know in which order you will merge these. If you want me
-> >>  to rebase my patches, just ask! Thanks!]
-> >
-> > Firstly, I would like an Ack from Magnus on the shmobile patches.
-> >
-> > With regards to merge order, my preference is to merge patches
-> > in parallel once their dependencies will no longer change.
-> >
-> > So for this series it lools like.
-> >
-> > 5/9: Can be merged independently of other patches in the series.
-> >      But there isn't much point in merging it until the rest of the
-> >      series is acked and tested.
-> 
-> OK.
-> 
-> > 6-9/9: Needs to wait until 4/9 has at least been acked by Mark
-> 
-> OK. Based on Mark's comments, there will be a V4.
-> 
-> >        Also, is 1/9 a run-time dependency of these changes?
-> 
-> 1/9 is a bugfix. I'll send a rebased version to Mark, as he wanted to
-> get that one in first.
-> 
-> 2-3/9 are run-time dependencies, but 2/9 won't apply without 1/9.
+Add the UART definitions needed to support earlyprintk on brcmstb machines.
 
-run-time dependencies of 6-9/9 ?
+Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/Kconfig.debug |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5765abf..266c699 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -94,6 +94,17 @@ choice
+ 		depends on ARCH_BCM2835
+ 		select DEBUG_UART_PL01X
+ 
++	config DEBUG_BRCMSTB_UART
++		bool "Use BRCMSTB UART for low-level debug"
++		depends on ARCH_BRCMSTB
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the first serial port on these devices.
++
++		  If you have a Broadcom STB chip and would like early print
++		  messages to appear over the UART, select this option.
++
+ 	config DEBUG_CLPS711X_UART1
+ 		bool "Kernel low-level debugging messages via UART1"
+ 		depends on ARCH_CLPS711X
+@@ -988,6 +999,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
++	default 0xf0406b00 if DEBUG_BRCMSTB_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
+ 	default 0x40090000 if ARCH_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+@@ -1029,6 +1041,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf0009000 if DEBUG_CNS3XXX
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
++	default 0xfc406b00 if DEBUG_BRCMSTB_UART
+ 	default 0xf11f1000 if ARCH_VERSATILE
+ 	default 0xf1600000 if ARCH_INTEGRATOR
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
+@@ -1091,7 +1104,8 @@ config DEBUG_UART_8250_WORD
+ 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
+ 		ARCH_KEYSTONE || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+-		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1
++		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1 || \
++		DEBUG_BRCMSTB_UART
+ 
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+-- 
+1.7.1
