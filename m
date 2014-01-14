@@ -1,33 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jan 2014 09:23:01 -0800
-Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
-In-Reply-To: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
- <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
-Message-ID: <CAOesGMi5bK6siLQ2dVkR7P30+5zQa8qsyxa3UsWj0Kw9OEXCPw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 14 Jan 2014 11:29:01 -0600
+Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx, AM43xx &
+ DRA7xx
+In-Reply-To: <52D56B13.2050409@ti.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-8-git-send-email-s-anna@ti.com>
+ <20140114131207.GB10818@saruman.home> <52D56B13.2050409@ti.com>
+Message-ID: <20140114172901.GB27374@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 7:58 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> On Thu, Jan 9, 2014 at 6:35 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
->> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
->> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
->> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
->
-> The Samsung Arndale board started failing boot from MMC root tests
-> starting with next-20140113 and I bisected it down to this patch.
-> Reverting this patch on top of next-20140114 gets Arndale booting
-> again from MMC.  Is there some supporting DT data that's missing for
-> Arndale?
+On Tue, Jan 14, 2014 at 10:51:31AM -0600, Anna, Suman wrote:
+> Felipe,
+> 
+> On 01/14/2014 07:12 AM, Felipe Balbi wrote:
+> >On Mon, Jan 13, 2014 at 06:19:24PM -0600, Suman Anna wrote:
+> >>HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
+> >>device families as well. The IPs are identical to that of
+> >>OMAP4/OMAP5, except for the number of locks.
+> >>
+> >>Add a depends on to the above family of SoCs to enable the
+> >>build support for OMAP hwspinlock driver for any of the above
+> >>SoC configs.
+> >>
+> >>Signed-off-by: Suman Anna <s-anna@ti.com>
+> >>---
+> >>  drivers/hwspinlock/Kconfig | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >>diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+> >>index 70637d2..3612cb5 100644
+> >>--- a/drivers/hwspinlock/Kconfig
+> >>+++ b/drivers/hwspinlock/Kconfig
+> >>@@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
+> >>
+> >>  config HWSPINLOCK_OMAP
+> >>  	tristate "OMAP Hardware Spinlock device"
+> >>-	depends on ARCH_OMAP4 || SOC_OMAP5
+> >>+	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
+> >
+> >how about just using ARCH_OMAP2PLUS ?
+> 
+> We do not want the driver to build in OMAP2-only and/or OMAP3-only
+> configurations, on which the hwspinlock IP is not even present.
 
-Rather, it looks like this patch changes behaviour and no longer uses
-dw_mci_get_cd() to find out if there's a card attached -- it switches
-to rely only on GPIO (see the last chunk in the patch). That seems
-broken?
+It won't be enabled by default, will it ? You're just saying that it
+_can_ be enabled. In fact, I would go one step further and use:
 
+	depends on ARCH_OMAP2PLUS || COMPILE_TEST
 
--Olof
+your choice though ;-)
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/05d03c96/attachment.sig>
