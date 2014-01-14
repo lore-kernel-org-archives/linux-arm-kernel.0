@@ -1,66 +1,112 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 14 Jan 2014 09:46:30 +0100
-Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
- SoCs
-In-Reply-To: <20140114021421.GK19878@titan.lakedaemon.net>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <20140114021421.GK19878@titan.lakedaemon.net>
-Message-ID: <52D4F966.6060200@free-electrons.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 14 Jan 2014 16:50:22 +0800
+Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk
+ board.
+In-Reply-To: <20140114082948.GC1896@S2101-09.ap.freescale.net>
+References: <1389685029-17323-1-git-send-email-b20788@freescale.com>
+ <20140114082948.GC1896@S2101-09.ap.freescale.net>
+Message-ID: <20140114085022.GA20128@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/2014 03:14, Jason Cooper wrote:
-> Gregory,
-> 
-> On Wed, Jan 08, 2014 at 04:06:25PM +0100, Gregory CLEMENT wrote:
->> Hi,
->>
->> Here come the 5th version of the series fixing the i2c bus hang on A0
->> version of the Armada XP SoCs. It occurred on the early release of the
->> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
->> (A0 stepping) have issues related to the i2c controller which prevent
->> to use the offload mechanism and lead to a kernel hang during boot.
->>
->> The main change are the use of marvell,mv78230-a0-i2c and that the
->> function mvebu_get_soc_id() is now local to mach-mvebu.
->>
->> The first patch add a mean to detect the SoCs version at run-time and
->> the second one use this feature in the driver.
->>
->> The 3 first patches should be applied on 3.13-rc and on stable kernel
->> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
->> "i2c: mv64xxx: Add I2C Transaction Generator support".
-> 
-> Ok, I've pulled this in by cherrypicking the commits.  I needed to add
-> the 'Fixes: ...' and 'Cc: stable ...' language, so the commit ids were
-> going to change anyhow.  I also added the note to the binding as we
-> discussed.  I've also based this against v3.13-rc1 as there doesn't
-> appear to be any need to drag in everything up to -rc6.
-> 
-> I've pushed this to mvebu/fixes.  Please take a look.  If it all looks
-> good I'll send the pull request off tomorrow.
-Hi Jason,
+On Tue, Jan 14, 2014 at 04:29:50PM +0800, Shawn Guo wrote:
 
-Everything looks perfect!
-
-Thanks for having improved it,
-
-Gregory
-
-> 
-> thx,
-> 
-> Jason.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+OK, I saw this define "#define MATRIX_KEY(row, col, code)"
+in include/dt-bindings/input/input.h, please ignore my first
+reply. Will do it in V2.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> On Tue, Jan 14, 2014 at 03:37:09PM +0800, Anson Huang wrote:
+> > i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
+> > enable them, the keymap is as below:
+> > 
+> > SW6:  0x00000067    /* KEY_UP */
+> > SW7:  0x0001006c    /* KEY_DOWN */
+> > SW8:  0x0002001c    /* KEY_ENTER */
+> > SW9:  0x01000066    /* KEY_HOME */
+> > SW10: 0x0101006a    /* KEY_RIGHT */
+> > SW11: 0x01020069    /* KEY_LEFT */
+> > SW12: 0x02000072    /* KEY_VOLUMEDOWN */
+> > SW13: 0x02010073    /* KEY_VOLUMEUP */
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
+> >  2 files changed, 29 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+> > index f5e4513..8d49a10 100644
+> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> > @@ -93,6 +93,17 @@
+> >  			fsl,pins = <MX6SL_FEC_PINGRP1>;
+> >  		};
+> >  
+> > +		pinctrl_kpp: kppgrp {
+> > +			fsl,pins = <
+> > +				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
+> > +				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
+> > +				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
+> > +				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
+> > +				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
+> > +				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
+> 
+> Rather than using whatever the config register gives us, why don't we
+> put a proper pad confg value for COLs just like ROWs?
+> 
+> > +			>;
+> > +		};
+> > +
+> >  		pinctrl_uart1: uart1grp {
+> >  			fsl,pins = <MX6SL_UART1_PINGRP1>;
+> >  		};
+> > @@ -139,6 +150,22 @@
+> >  	};
+> >  };
+> >  
+> > +&kpp {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_kpp>;
+> > +	linux,keymap = <
+> > +			0x00000067    /* KEY_UP */
+> > +			0x0001006c    /* KEY_DOWN */
+> > +			0x0002001c    /* KEY_ENTER */
+> > +			0x01000066    /* KEY_HOME */
+> > +			0x0101006a    /* KEY_RIGHT */
+> > +			0x01020069    /* KEY_LEFT */
+> > +			0x02000072    /* KEY_VOLUMEDOWN */
+> > +			0x02010073    /* KEY_VOLUMEUP */
+> 
+> You can use the macros defined in include/dt-bindings/input/input.h to
+> make them more readable.
+> 
+> Shawn
+> 
+> > +		>;
+> > +	status = "okay";
+> > +};
+> > +
+> >  &uart1 {
+> >  	pinctrl-names = "default";
+> >  	pinctrl-0 = <&pinctrl_uart1>;
+> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> > index a5ef3c3..a449c4f 100644
+> > --- a/arch/arm/boot/dts/imx6sl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> > @@ -393,8 +393,10 @@
+> >  			};
+> >  
+> >  			kpp: kpp at 020b8000 {
+> > +				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
+> >  				reg = <0x020b8000 0x4000>;
+> >  				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
+> > +				clocks = <&clks IMX6SL_CLK_DUMMY>;
+> >  			};
+> >  
+> >  			wdog1: wdog at 020bc000 {
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
+> 
