@@ -1,50 +1,26 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Tue, 14 Jan 2014 16:38:49 +0200
-Subject: [PATCH 4/5] arm: omap3: twl: use the new lookup method with usb
- phy
-In-Reply-To: <52CBFAC0.9040103@ti.com>
-References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
- <52AEDE43.8030005@ti.com> <20131216144314.GB22944@xps8300>
- <52CBFAC0.9040103@ti.com>
-Message-ID: <20140114143849.GB21169@xps8300>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jan 2014 14:39:45 +0000
+Subject: [PATCH] spi: davinci: fix build warning when printing
+ resource_size_t vars
+In-Reply-To: <1389707408-24785-1-git-send-email-grygorii.strashko@ti.com>
+References: <20140112110916.GR15937@n2100.arm.linux.org.uk>
+ <1389707408-24785-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140114143945.GP15567@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 07, 2014 at 06:31:52PM +0530, Kishon Vijay Abraham I wrote:
-> > In any case, having two device names to deal with does not add any
-> > more risk. These associations should always be made in the place where
-> > the phy device is created so you will always know it's device name.
-> 
-> huh.. we should also know the 'controller' device name while defining these
-> associations and in some cases the controller device and phy device are created
-> in entirely different places.
+On Tue, Jan 14, 2014 at 03:50:08PM +0200, Grygorii Strashko wrote:
+> Use %pa format specifier when printing variables of resource_size_t type
+> to fix build warnings:
+> drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'resource_size_t'
+> drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'resource_size_t'
 
-If you don't want to use the controller device name to do the
-matching, we can use the con_id string as well. I believe the lookup
-method I use in this set just needs a small change.
-
-Is that OK with you?
-
-
-> > Normally the platform code creates these associations in the same
-> > place it creates the platform devices, so you definitely know what the
-> > device names will be.
-> > 
-> > In this case it's actually created in drivers/mfd/twl-core.c, so I do
-> > need to update this and move the lookup table there. We can still
-> > deliver the user name as platform data, though I believe it's always
-> > "musb". Maybe we could actually skip that and just hard code the name?
-> 
-> I would rather leave the way it is modelled now.
-
-Do you mean, leave it in the platform code? Why? We would reduce the
-platform code by moving it to the mfd driver. Or did I misunderstood
-something?
-
-Hope I'm not forgetting something we have talked before my vacation.
-
-Thanks,
-
--- 
-heikki
+This doesn't apply against current code, it seems the same patch has
+already been applied.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/fc47ddf5/attachment.sig>
