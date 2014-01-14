@@ -1,33 +1,45 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 14 Jan 2014 16:24:06 +0100
-Subject: build_skb() and data corruption
-In-Reply-To: <1389620539.3720.157.camel@deadeye.wl.decadent.org.uk>
-References: <CACmBeS35RAEQ+t2vtYtFTKNT-VdQw20hURjTi193Jk8HG7UECA@mail.gmail.com>
- <1389620539.3720.157.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <CACmBeS1gTfdjwiCkHMViOnF6G2zjy3HSMm3NVq8Jiq5F22ynJA@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 14 Jan 2014 15:25:23 +0000
+Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
+In-Reply-To: <201401141426.16497.arnd@arndb.de>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <201401140752.33257.arnd@arndb.de>
+ <20140114114419.GH30907@bivouac.eciton.net>
+ <201401141426.16497.arnd@arndb.de>
+Message-ID: <CAF7UmSwGgQ9u505s3fhd5MmGLHHy1A=rJLZBshycKr+rTniH1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the replies, you led me to a new solution,
+On 14 January 2014 13:26, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > > Are you suggesting that I should #ifndef ARM in common code, or that I
+>> > > should neglect to document what the common code will do with data it is
+>> > > given by UEFI?
+>> >
+>> > It would probably be good to document the fact that it won't work,
+>> > possibly even having a BUG_ON statement in the code for this case.
+>>
+>> Why?
+>>
+>> You'll only touch that pointer if you enable CONFIG_ACPI, and if you
+>> do you probably want that address. Sounds a bit hostile to throw a BUG
+>> in the face of someone who's (for example) just succeeded to get Linux
+>> running on a Windows RT device.
+>
+> But we know that it can't work unless a lot of other things get changed
+> in the kernel.
 
+We know using ACPI cannot work without updates to the kernel.
+That doesn't mean we need to throw a BUG just because the
+firmware tells us a table exists.
 
-I now think build_skb() is not the right choice, my motivation for
-using it in the first place, that I thought it meant getting away with
-not copying memory.
+>> Although no other architectures supported by UEFI support big-endian,
+>> so to be honest, I don't want to have to be the first one to validate
+>> that in order to get the basic support into the kernel.
+>
+> I think there was a project to run UEFI on PowerPC on some stage, though
+> I can't find any code now.
 
-build_skb() is replaced by netdev_alloc_skb_ip_align() and memcpy()
-(derived from drivers/net/ethernet/realtek/r8169.c).
+That does sound familiar, but there is nothing in the specification.
 
-Read errors are gone, even without syncing DMA. Is it a good idea to
-do it anyway, i.e. leave calls to dma_sync_single_* in?
-
-Also, without build_skb(), kmalloc memory can be used (frag_size > 0),
-memory is used more efficiently, at least half of a page times 64
-previously wasted.
-
-New code here:
-https://bitbucket.org/Kasreyn/linux-next/src/92f5aeb3b58f8d8dffd9178b6b5ff46217156caa/drivers/net/ethernet/moxa/moxart_ether.c#cl-424
-
-
-Thanks,
-Jonas
+/
+    Leif
