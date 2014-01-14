@@ -1,13 +1,13 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 13 Jan 2014 16:27:12 -0800
-Subject: [PATCH 3.10 47/62] clk: clk-divider: fix divisor > 255 bug
-In-Reply-To: <20140114002710.464561569@linuxfoundation.org>
-References: <20140114002710.464561569@linuxfoundation.org>
-Message-ID: <20140114002711.801184188@linuxfoundation.org>
+Date: Mon, 13 Jan 2014 16:28:19 -0800
+Subject: [PATCH 3.12 58/77] clk: clk-divider: fix divisor > 255 bug
+In-Reply-To: <20140114002752.497010554@linuxfoundation.org>
+References: <20140114002752.497010554@linuxfoundation.org>
+Message-ID: <20140114002754.147369432@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-stable review patch.  If anyone has any objections, please let me know.
+3.12-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
