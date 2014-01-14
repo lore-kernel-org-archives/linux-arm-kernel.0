@@ -1,37 +1,48 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 13 Jan 2014 18:26:47 -0600
-Subject: [PATCH 3/3] ARM: dts: AM4372: Add hwspinlock node
-In-Reply-To: <1389659207-39445-1-git-send-email-s-anna@ti.com>
-References: <1389659207-39445-1-git-send-email-s-anna@ti.com>
-Message-ID: <1389659207-39445-4-git-send-email-s-anna@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 13 Jan 2014 16:27:12 -0800
+Subject: [PATCH 3.10 47/62] clk: clk-divider: fix divisor > 255 bug
+In-Reply-To: <20140114002710.464561569@linuxfoundation.org>
+References: <20140114002710.464561569@linuxfoundation.org>
+Message-ID: <20140114002711.801184188@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the hwspinlock device tree node for AM43xx family
-of SoCs.
+3.10-stable review patch.  If anyone has any objections, please let me know.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+------------------
+
+From: James Hogan <james.hogan@imgtec.com>
+
+commit 778037e1ccb75609846deca9e419449c1dc137fa upstream.
+
+Commit 6d9252bd9a4bb (clk: Add support for power of two type dividers)
+merged in v3.6 added the _get_val function to convert a divisor value to
+a register field value depending on the flags. However it used the type
+u8 for the div field, causing divisors larger than 255 to be masked
+and the resultant clock rate to be too high.
+
+E.g. in my case an 11bit divider was supposed to divide 24.576 MHz down
+to 32.768KHz. The divisor was correctly calculated as 750 (0x2ee). This
+was masked to 238 (0xee) resulting in a frequency of 103.26KHz.
+
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- arch/arm/boot/dts/am4372.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/clk/clk-divider.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 974d103..81bf21f 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -325,6 +325,13 @@
- 			status = "disabled";
- 		};
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -87,7 +87,7 @@ static unsigned int _get_table_val(const
+ 	return 0;
+ }
  
-+		hwspinlock: spinlock at 480ca000 {
-+			compatible = "ti,omap4-hwspinlock";
-+			reg = <0x480ca000 0x1000>;
-+			ti,hwmods = "spinlock";
-+			#hwlock-cells = <1>;
-+		};
-+
- 		i2c0: i2c at 44e0b000 {
- 			compatible = "ti,am4372-i2c","ti,omap4-i2c";
- 			reg = <0x44e0b000 0x1000>;
--- 
-1.8.4.3
+-static unsigned int _get_val(struct clk_divider *divider, u8 div)
++static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
+ {
+ 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
+ 		return div;
