@@ -1,39 +1,66 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 14 Jan 2014 08:15:15 +0000
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <20140114003925.GH19878@titan.lakedaemon.net>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <1389174517.12612.87.camel@kazak.uk.xensource.com>
- <20140114003925.GH19878@titan.lakedaemon.net>
-Message-ID: <1389687315.10695.12.camel@dagon.hellion.org.uk>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 14 Jan 2014 09:17:41 +0100
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140113174420.GC6934@e102568-lin.cambridge.arm.com>
+References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
+ <1389554441-27335-2-git-send-email-broonie@kernel.org>
+ <20140113161059.GA32720@e102568-lin.cambridge.arm.com>
+ <20140113163045.GB29039@sirena.org.uk>
+ <20140113174420.GC6934@e102568-lin.cambridge.arm.com>
+Message-ID: <CAKfTPtDHjytSWYBiqxECJ4TqDN6RL1uT+Vx5tCjzjdBL6N9+5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-01-13 at 19:39 -0500, Jason Cooper wrote:
-> Ian,
-> 
-> On Wed, Jan 08, 2014 at 09:48:37AM +0000, Ian Campbell wrote:
-> > What is the plan for the board files for the ts* platforms? Are they
-> > going to go away? This seems to have happened for the Sheevaplug case,
-> > which is causing some transition pain for distros (e.g.
-> > http://bugs.debian.org/731345).
-> 
-> Sorry, I'm rather swamped at the moment.  From my cursory reading of the
-> thread, is it correct to say that this problem can be solved by enabling
-> the CONFIG_MACH_SHEEVAPLUG_DT config option?
+On 13 January 2014 18:44, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Jan 13, 2014 at 04:30:45PM +0000, Mark Brown wrote:
+>> On Mon, Jan 13, 2014 at 04:10:59PM +0000, Lorenzo Pieralisi wrote:
+>> > On Sun, Jan 12, 2014 at 07:20:38PM +0000, Mark Brown wrote:
+>>
+>> > > +struct cpu_topology {
+>> > > + int thread_id;
+>> > > + int core_id;
+>> > > + int socket_id;
+>>
+>> > Is there any reason why we can't rename socket_id to cluster_id ? It won't
+>> > change our lives but at least we kind of know what it means in ARM world.
+>>
+>> I really don't care, whatever you guys want.
+>
+> s/socket_id/cluster_id
+>
+> unless we have a compelling reason to keep the socket_id naming, I do
+> not see it, given that cpu_topology is arch specific anyway.
+>
+> socket_id means really nothing in ARM world.
+>
+> Again, Vincent if you see a compelling reason to keep socket_id as in arm32
+> that I am missing please shout.
 
-That would have allows 3.11 to boot with DT, but for 3.11 we are OK with
-the board file support from a Debian PoV
+I don't have any compellingreason, i have just used the same name than
+other platform.
 
-The real issue is the transition of the userspace components which
-configure the bootloader (called "flash-kernel" in Debian) which needs
-to know whether or not a DTB should be appended. I think we've now
-mostly solved that by teaching flash-kernel what the minimum kernel
-version which requires a DTB is (see [0] and [1]), I've set this to 3.12
-for Sheevaplug and Guruplug, I'll set it to whatever is appropriate on
-the ts* platforms when the time comes.
+Vincent
 
-Ian.
-
-[0] http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=731345http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=731345
-[1] http://anonscm.debian.org/gitweb/?p=d-i/flash-kernel.git;a=commit;h=f656a00daa4d1ada46203e6e1831ae574eb005f8
+>
+>>
+>> > > +#define mc_capable()     (cpu_topology[0].socket_id != -1)
+>> > > +#define smt_capable()    (cpu_topology[0].thread_id != -1)
+>>
+>> > Are the two macros above still required in the kernel ? I can't see any
+>> > usage at present.
+>> >
+>> > Vincent, do you know why they were not removed in commit:
+>> >
+>> > 8e7fbcbc22c12414bcc9dfdd683637f58fb32759
+>> >
+>> > I am certainly missing something.
+>>
+>> They're defined by a bunch of other architectures (including x86).  If I
+>> had to guess I'd say the architectures are still providing the
+>> information so we don't need to go round adding it again if someone
+>> comes up with a use for it in the core.
+>
+> Yes, let's keep the macros, just wanted to make sure I got it right.
+>
+> Lorenzo
+>
