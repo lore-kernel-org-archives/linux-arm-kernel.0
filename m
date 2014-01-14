@@ -1,64 +1,40 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 14 Jan 2014 03:41:25 -0600
-Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
-In-Reply-To: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
-References: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
-Message-ID: <52D50645.40607@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Jan 2014 09:45:55 +0000
+Subject: LSK merge linux-stable review
+In-Reply-To: <52D48586.5030801@linaro.org>
+References: <20140110013011.GA6447@alex-shi> <52CF61CC.40305@linaro.org>
+ <20140110105615.GD925@arm.com> <52D01234.5040402@linaro.org>
+ <20140110163239.GF925@arm.com> <52D09FF8.8060308@linaro.org>
+ <20140113155525.GG11805@arm.com> <52D48586.5030801@linaro.org>
+Message-ID: <20140114094555.GA1088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Tue, Jan 14, 2014 at 12:32:06AM +0000, Alex Shi wrote:
+> On 01/13/2014 11:55 PM, Catalin Marinas wrote:
+> > On Sat, Jan 11, 2014 at 01:35:52AM +0000, Alex Shi wrote:
+> >>>> the first column '-/+' means contents was removed/added from file
+> >>>> 5e9d274. the 2nd column '-/+' means contents was removed/added from file
+> >>>> 9c93e12.
+> >>>>
+> >>>> Yes, The notify_cpu_starting kept in final file later.
+> >>>
+> >>> Just make sure it is in line with commit 7ade67b5984d0a (arm64: move
+> >>> enabling of GIC before CPUs are set online)
+> >>
+> >> Give you the part of modified smp.c file here :)
+> > 
+> > As I said, you may want to cherry pick 7ade67b5984d0a. It comes in handy
+> > with GICv3 support (if you later plan to back-port it to this version of
+> > LSK).
+> 
+> Sorry for not make it clear.
+> We had picked up 7ade67b5984d0a as I showed the contents of function
+> secondary_start_kernel().
 
-On 1/6/14 11:27 AM, dinguyen at altera.com wrote:
-> Hi Mike,
->
-> Please pull in these patches that cleans up the SOCFPGA clock driver. This is
-> V2 of the pull request that includes 4 patches from Steffen Trumtrar.
->
-> Thanks,
->
-> Dinh
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
->
-> for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
->
->   clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
->
-> ----------------------------------------------------------------
-> v2: SOCFPGA clk cleanups for 3.14
->
-> ----------------------------------------------------------------
-> Dinh Nguyen (3):
->       clk: socfpga: Map the clk manager base address in the clock driver
->       clk: socfpga: Look for the GPIO_DB_CLK by its offset
->       clk: socfpga: Remove socfpga_init_clocks
->
-> Steffen Trumtrar (4):
->       clk: socfpga: remove unused field
->       clk: socfpga: fix define typo
->       clk: socfpga: fix compile error
->       clk: socfpga: split clk code
->
->  arch/arm/mach-socfpga/socfpga.c  |    5 -
->  drivers/clk/socfpga/Makefile     |    3 +
->  drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
->  drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
->  drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
->  drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
->  drivers/clk/socfpga/clk.h        |   57 +++++++
->  7 files changed, 500 insertions(+), 321 deletions(-)
->  create mode 100644 drivers/clk/socfpga/clk-gate.c
->  create mode 100644 drivers/clk/socfpga/clk-periph.c
->  create mode 100644 drivers/clk/socfpga/clk-pll.c
->  create mode 100644 drivers/clk/socfpga/clk.h
-Please consider this pull-request.
+I don't think you picked it since this commit moves
+notify_cpu_starting() before set_cpu_online() which is not the case for
+the code you pasted.
 
-Thanks,
-Dinh
+-- 
+Catalin
