@@ -1,62 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Jan 2014 10:05:25 +0100
-Subject: [PATCH V6 6/8] Add EFI stub for ARM
-In-Reply-To: <1389371417-379-7-git-send-email-roy.franz@linaro.org>
-References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
- <1389371417-379-7-git-send-email-roy.franz@linaro.org>
-Message-ID: <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 14 Jan 2014 09:05:23 +0000
+Subject: [PATCH] ARM: asm: __und_usr_thumb need byteswap instructions in
+ BE case
+In-Reply-To: <1389652251-18298-1-git-send-email-victor.kamensky@linaro.org>
+References: <1389652251-18298-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140114090518.GA2222@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 January 2014 17:30, Roy Franz <roy.franz@linaro.org> wrote:
-> This patch adds EFI stub support for the ARM Linux kernel.  The EFI stub
-> operates similarly to the x86 stub: it is a shim between the EFI firmware
-> and the normal zImage entry point, and sets up the environment that the
-> zImage is expecting.  This includes loading the initrd (optionaly) and
-> device tree from the system partition based on the kernel command line.
-> The stub updates the device tree as necessary, adding entries for EFI
-> runtime services. The PE/COFF "MZ" header at offset 0 results in the
-> first instruction being an add that corrupts r5, which is not used by
-> the zImage interface.
->
-> Signed-off-by: Roy Franz <roy.franz@linaro.org>
-> Acked-by: Grant Likely <grant.likely@linaro.org>
+On Mon, Jan 13, 2014 at 02:30:51PM -0800, Victor Kamensky wrote:
+> __und_usr_thumb function deals with thumb2 opcodes. In case of BE
+> image, it needs to byteswap half word thumb2 encoded instructions
+> before further processing them.
+> 
+> Without this fix BE image user-land thread executing first VFP
+> instruction encoded in thumb2 fails with SIGILL, because kernel
+> does not recognize instruction and does not enable VFP.
+> 
+> Reported-by: Corey Melton <comelton@cisco.com>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+
+Good spot.  This looks like the correct fix to me.
+
+Acked-by: Dave Martin <Dave.Martin@arm.com>
+
 > ---
-
-[...]
-
-> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-> new file mode 100644
-> index 0000000..dbb7101
-> --- /dev/null
-> +++ b/arch/arm/boot/compressed/efi-header.S
-> @@ -0,0 +1,117 @@
-> +@ Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
-> +@
-> +@ This file contains the PE/COFF header that is part of the
-> +@ EFI stub.
-> +@
-> +
-> +       .org    0x3c
-> +       @
-> +       @ The PE header can be anywhere in the file, but for
-> +       @ simplicity we keep it together with the MSDOS header
-> +       @ The offset to the PE/COFF header needs to be at offset
-> +       @ 0x3C in the MSDOS header.
-> +       @ The only 2 fields of the MSDOS header that are used are this
-> +       @ PE/COFF offset, and the "MZ" bytes at offset 0x0.
-> +       @
-> +       .long   pe_header                       @ Offset to the PE header.
-> +
-> +      .align 3
-> +pe_header:
-> +       .ascii  "PE"
-> +       .short  0
-> +
-> +coff_header:
-> +       .short  0x01c2                          @ ARM or Thumb
-
-Could you explain why you are using 0x1c2 (Thumb) here and not 0x1c0 (ARM) ?
-
-Cheers,
-Ard.
+>  arch/arm/kernel/entry-armv.S | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index b3fb8c9..1879e8d 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -451,9 +451,11 @@ __und_usr_thumb:
+>  	.arch	armv6t2
+>  #endif
+>  2:	ldrht	r5, [r4]
+> +ARM_BE8(rev16	r5, r5)				@ little endian instruction
+>  	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
+>  	blo	__und_usr_fault_16		@ 16bit undefined instruction
+>  3:	ldrht	r0, [r2]
+> +ARM_BE8(rev16	r0, r0)				@ little endian instruction
+>  	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
+>  	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
+>  	orr	r0, r0, r5, lsl #16
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
