@@ -1,72 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Jan 2014 14:26:15 +0100
-Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
-In-Reply-To: <20140114114419.GH30907@bivouac.eciton.net>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <201401140752.33257.arnd@arndb.de>
- <20140114114419.GH30907@bivouac.eciton.net>
-Message-ID: <201401141426.16497.arnd@arndb.de>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Tue, 14 Jan 2014 13:38:16 +0000
+Subject: AArch64 kernel image decompression
+In-Reply-To: <201401141351.18988.marex@denx.de>
+References: <20140110170436.GS8153@joshc.qualcomm.com>
+ <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
+ <4250104.UfkPP3heXI@wuerfel> <201401141351.18988.marex@denx.de>
+Message-ID: <819346bb83b04348a266643afd5bd6f6@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 January 2014, Leif Lindholm wrote:
-> On Tue, Jan 14, 2014 at 07:52:32AM +0100, Arnd Bergmann wrote:
-> > > > > It uses the generic configuration table scanning to populate ACPI and
-> > > > > SMBIOS pointers.
-> > > > 
-> > > > As far as I'm concerned there are no plans to have ACPI support on ARM32,
-> > > > so I wonder what the code to populate the ACPI tables is about. Can
-> > > > you clarify this?
-> > > 
-> > > Are you suggesting that I should #ifndef ARM in common code, or that I
-> > > should neglect to document what the common code will do with data it is
-> > > given by UEFI?
-> > 
-> > It would probably be good to document the fact that it won't work,
-> > possibly even having a BUG_ON statement in the code for this case.
+> -----Original Message-----
+> From: Marek Vasut [mailto:marex at denx.de]
+> Sent: Tuesday, January 14, 2014 6:21 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Arnd Bergmann; Sharma Bhupesh-B45370; 'Catalin Marinas'; 'Josh
+> Cartwright'; 'Will Deacon'; Wolfgang Denk
+> Subject: Re: AArch64 kernel image decompression
 > 
-> Why?
+> On Monday, January 13, 2014 at 12:42:41 PM, Arnd Bergmann wrote:
+> > On Monday 13 January 2014 11:29:20 bhupesh.sharma at freescale.com wrote:
+> > > With the u-boot bootloader also having AArch64 support now (see
+> > > [1]), it would make sense to add the uImage and decompressor support
+> > > to the
+> > > AArch64 Makefile in Linux kernel as well, so that u-boot can also
+> > > boot uImages for AArch64 systems out-off-box.
+> > >
+> > > [1].
+> > > http://git.denx.de/?p=u-boot/u-boot-arm.git;a=shortlog;h=refs/heads/
+> > > aarc
+> > > h64
+> >
+> > u-boot should never have to use a uImage on arm64, since it already
+> > supports booting a vmlinux file.
 > 
-> You'll only touch that pointer if you enable CONFIG_ACPI, and if you
-> do you probably want that address. Sounds a bit hostile to throw a BUG
-> in the face of someone who's (for example) just succeeded to get Linux
-> running on a Windows RT device.
-
-But we know that it can't work unless a lot of other things get changed
-in the kernel.
-
-> > > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > > index 78a79a6a..1ab24cc 100644
-> > > > > --- a/arch/arm/Kconfig
-> > > > > +++ b/arch/arm/Kconfig
-> > > > > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
-> > > > >  	  the same virtual memory range as kmap so all early mappings must
-> > > > >  	  be unapped before paging_init() is called.
-> > > > >  
-> > > > > +config EFI
-> > > > > +	bool "UEFI runtime service support"
-> > > > > +	depends on OF && !CPU_BIG_ENDIAN
-> > > > 
-> > > > What is the dependency on !CPU_BIG_ENDIAN?
-> > > 
-> > > Mainly on code not being implemented to byte-reverse UCS strings.
-> > 
-> > Why would you byte-reverse /strings/? They normally just come in
-> > order of the characters, and UTF-16 strings are already defined
-> > as being big-endian or marked by the BOM character.
+> Just a side-note. The benefit of uImage (resp. please use fitImage, as
+> it's more
+> modern) is that it is protected by checksum against possible corruption.
+> Besides, U-Boot can do the decompression of uImage payload, so there's no
+> need to have decompressor in arm64 kernel.
 > 
-> Well, then that bit might just work[tm].
-> 
-> Although no other architectures supported by UEFI support big-endian,
-> so to be honest, I don't want to have to be the first one to validate
-> that in order to get the basic support into the kernel.
 
-I think there was a project to run UEFI on PowerPC on some stage, though
-I can't find any code now.
+I agree with Marek. Usually for non-cryptographic-secure (key based cryptography) boot
+method the CRC protection is usually the best possible protection against Image
+corruption. CRC check is usually used in a number of field-deployed solutions to ensure
+linux image sanity. 
 
-> Some of the data structures might need swizzling though...
-> Again - if there is demand, this can be dealt with at a later date.
-
-Ok.
-
-	Arnd
+Regards,
+Bhupesh
