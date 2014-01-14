@@ -1,219 +1,361 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Jan 2014 11:43:48 -0800
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-Message-ID: <20140114194348.GH14405@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 14 Jan 2014 12:17:40 -0800
+Subject: [PATCH 1/2] clk: hisilicon: add hi3620_mmc_clks
+In-Reply-To: <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140114201740.4167.52076@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Mostly nitpicks)
+Quoting Zhangfei Gao (2014-01-13 01:14:28)
+> Suggest by Arnd: abstract mmc tuning as clock behavior,
+> also because different soc have different tuning method and registers.
+> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 
-On 01/10, Andy Gross wrote:
-> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> found in the MSM 8x74 platforms.
-> 
-> Each BAM DMA device is associated with a specific on-chip peripheral.  Each
-> channel provides a uni-directional data transfer engine that is capable of
-> transferring data between the peripheral and system memory (System mode), or
-> between two peripherals (BAM2BAM).
-> 
-> The initial release of this driver only supports slave transfers between
-> peripherals and system memory.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
+Patch looks good to me with one exception. I do not have
+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt in the
+clk-next branch. Is there a stable branch I can pull in as a dependency?
+
+Thanks,
+Mike
+
 > ---
->  drivers/dma/Kconfig        |   9 +
->  drivers/dma/Makefile       |   1 +
->  drivers/dma/qcom_bam_dma.c | 843 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/dma/qcom_bam_dma.h | 268 ++++++++++++++
->  4 files changed, 1121 insertions(+)
->  create mode 100644 drivers/dma/qcom_bam_dma.c
->  create mode 100644 drivers/dma/qcom_bam_dma.h
+>  .../bindings/arm/hisilicon/hisilicon.txt           |   14 +
+>  .../devicetree/bindings/clock/hi3620-clock.txt     |    1 +
+>  drivers/clk/hisilicon/clk-hi3620.c                 |  267 ++++++++++++++++++++
+>  include/dt-bindings/clock/hi3620-clock.h           |    5 +
+>  4 files changed, 287 insertions(+)
 > 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index c823daa..e58e6d2 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -384,4 +384,13 @@ config DMATEST
->  config DMA_ENGINE_RAID
->  	bool
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index 8c7a4653508d..df0a452b8526 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -30,3 +30,17 @@ Example:
+>                 resume-offset = <0x308>;
+>                 reboot-offset = <0x4>;
+>         };
+> +
+> +PCTRL: Peripheral misc control register
+> +
+> +Required Properties:
+> +- compatible: "hisilicon,pctrl"
+> +- reg: Address and size of pctrl.
+> +
+> +Example:
+> +
+> +       /* for Hi3620 */
+> +       pctrl: pctrl at fca09000 {
+> +               compatible = "hisilicon,pctrl";
+> +               reg = <0xfca09000 0x1000>;
+> +       };
+> diff --git a/Documentation/devicetree/bindings/clock/hi3620-clock.txt b/Documentation/devicetree/bindings/clock/hi3620-clock.txt
+> index 4b71ab41be53..dad6269f52c5 100644
+> --- a/Documentation/devicetree/bindings/clock/hi3620-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/hi3620-clock.txt
+> @@ -7,6 +7,7 @@ Required Properties:
 >  
-> +config QCOM_BAM_DMA
-> +	tristate "QCOM BAM DMA support"
-> +	depends on ARCH_MSM || COMPILE_TEST
-
-I don't think writel_relaxed() is available on every arch, so
-it's possible this will break some random arch that doesn't have
-that function.
-
-> +	select DMA_ENGINE
-> +	select DMA_VIRTUAL_CHANNELS
-> +	---help---
-> +	  Enable support for the QCOM BAM DMA controller.  This controller
-> +	  provides DMA capabilities for a variety of on-chip devices.
+>  - compatible: should be one of the following.
+>    - "hisilicon,hi3620-clock" - controller compatible with Hi3620 SoC.
+> +  - "hisilicon,hi3620-mmc-clock" - controller specific for Hi3620 mmc.
+>  
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+> diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+> index f24ad6a3a797..54cc3475ec36 100644
+> --- a/drivers/clk/hisilicon/clk-hi3620.c
+> +++ b/drivers/clk/hisilicon/clk-hi3620.c
+> @@ -240,3 +240,270 @@ static void __init hi3620_clk_init(struct device_node *np)
+>                                    base);
+>  }
+>  CLK_OF_DECLARE(hi3620_clk, "hisilicon,hi3620-clock", hi3620_clk_init);
 > +
->  endif
-> diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-> new file mode 100644
-> index 0000000..7a84b02
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.c
-[...]
-> +static int bam_alloc_chan(struct dma_chan *chan)
-[...]
+> +struct hisi_mmc_clock {
+> +       unsigned int            id;
+> +       const char              *name;
+> +       const char              *parent_name;
+> +       unsigned long           flags;
+> +       u32                     clken_reg;
+> +       u32                     clken_bit;
+> +       u32                     div_reg;
+> +       u32                     div_off;
+> +       u32                     div_bits;
+> +       u32                     drv_reg;
+> +       u32                     drv_off;
+> +       u32                     drv_bits;
+> +       u32                     sam_reg;
+> +       u32                     sam_off;
+> +       u32                     sam_bits;
+> +};
 > +
-> +	/* Go ahead and initialize the pipe/channel hardware here
-> +	   - Reset the channel to clear internal state of the FIFO
-> +	   - Program in the FIFO address
-> +	   - Configure the irq based on the EE passed in from the DT entry
-> +	   - Set mode, direction and enable channel
+> +struct clk_mmc {
+> +       struct clk_hw   hw;
+> +       u32             id;
+> +       void __iomem    *clken_reg;
+> +       u32             clken_bit;
+> +       void __iomem    *div_reg;
+> +       u32             div_off;
+> +       u32             div_bits;
+> +       void __iomem    *drv_reg;
+> +       u32             drv_off;
+> +       u32             drv_bits;
+> +       void __iomem    *sam_reg;
+> +       u32             sam_off;
+> +       u32             sam_bits;
+> +};
 > +
-> +	   We do this here because the channel can only be enabled once and
-> +	   can only be disabled via a reset.  If done here, we don't have to
-> +	   manage additional state to figure out when to do this
-> +	*/
-
-Multi-line comments are of the form:
-
-	/*
-	 * comment
-	 */
-
+> +#define to_mmc(_hw) container_of(_hw, struct clk_mmc, hw)
 > +
-> +	bam_reset_channel(bdev, bchan->id);
+> +static struct hisi_mmc_clock hi3620_mmc_clks[] __initdata = {
+> +       { HI3620_SD_CIUCLK,     "sd_bclk1", "sd_clk", CLK_SET_RATE_PARENT, 0x1f8, 0, 0x1f8, 1, 3, 0x1f8, 4, 4, 0x1f8, 8, 4},
+> +       { HI3620_MMC_CIUCLK1,   "mmc_bclk1", "mmc_clk1", CLK_SET_RATE_PARENT, 0x1f8, 12, 0x1f8, 13, 3, 0x1f8, 16, 4, 0x1f8, 20, 4},
+> +       { HI3620_MMC_CIUCLK2,   "mmc_bclk2", "mmc_clk2", CLK_SET_RATE_PARENT, 0x1f8, 24, 0x1f8, 25, 3, 0x1f8, 28, 4, 0x1fc, 0, 4},
+> +       { HI3620_MMC_CIUCLK3,   "mmc_bclk3", "mmc_clk3", CLK_SET_RATE_PARENT, 0x1fc, 4, 0x1fc, 5, 3, 0x1fc, 8, 4, 0x1fc, 12, 4},
+> +};
 > +
-> +	/* write out 8 byte aligned address.  We have enough space for this
-> +	   because we allocated 1 more descriptor (8 bytes) than we can use */
-> +	writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
-> +			bdev->regs + BAM_P_DESC_FIFO_ADDR(bchan->id));
-> +	writel_relaxed(BAM_DESC_FIFO_SIZE, bdev->regs +
-> +			BAM_P_FIFO_SIZES(bchan->id));
-[...]
-> +
-> +/**
-> + * bam_dma_terminate_all - terminate all transactions
-> + * @chan: dma channel
-> + *
-> + * Idles channel and dequeues and frees all transactions
-> + * No callbacks are done
-> + *
-> +*/
-
-Weird '*' starting the line here and on the next function.
-
-> +static void bam_dma_terminate_all(struct dma_chan *chan)
+> +static unsigned long mmc_clk_recalc_rate(struct clk_hw *hw,
+> +                      unsigned long parent_rate)
 > +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +
-> +	bam_reset_channel(bdev, bchan->id);
-> +
-> +	vchan_free_chan_resources(&bchan->vc);
+> +       switch (parent_rate) {
+> +       case 26000000:
+> +               return 13000000;
+> +       case 180000000:
+> +               return 25000000;
+> +       case 360000000:
+> +               return 50000000;
+> +       case 720000000:
+> +               return 100000000;
+> +       default:
+> +               return parent_rate;
+> +       }
 > +}
 > +
-> +/**
-> + * bam_control - DMA device control
-> + * @chan: dma channel
-> + * @cmd: control cmd
-> + * @arg: cmd argument
-> + *
-> + * Perform DMA control command
-> + *
-> +*/
-> +static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> +	unsigned long arg)
+> +static long mmc_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+> +                             unsigned long *best_parent_rate,
+> +                             struct clk **best_parent_p)
 > +{
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +	struct bam_device *bdev = bchan->bdev;
-> +	int ret = 0;
-> +	unsigned long flag;
+> +       struct clk_mmc *mclk = to_mmc(hw);
+> +       unsigned long best = 0;
 > +
-[...]
-> +/**
-> + * bam_dma_irq - irq handler for bam controller
-> + * @irq: IRQ of interrupt
-> + * @data: callback data
-> + *
-> + * IRQ handler for the bam controller
-> + */
-> +static irqreturn_t bam_dma_irq(int irq, void *data)
+> +       if ((rate <= 13000000) && (mclk->id == HI3620_MMC_CIUCLK1)) {
+> +               rate = 13000000;
+> +               best = 26000000;
+> +       } else if (rate <= 26000000) {
+> +               rate = 25000000;
+> +               best = 180000000;
+> +       } else if (rate <= 52000000) {
+> +               rate = 50000000;
+> +               best = 360000000;
+> +       } else if (rate <= 100000000) {
+> +               rate = 100000000;
+> +               best = 720000000;
+> +       } else {
+> +               /* max is 180M */
+> +               rate = 180000000;
+> +               best = 1440000000;
+> +       }
+> +       *best_parent_rate = best;
+> +       return rate;
+> +}
+> +
+> +static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
 > +{
-> +	struct bam_device *bdev = (struct bam_device *)data;
-
-Unnecessary cast from void.
-
-> +static int bam_dma_probe(struct platform_device *pdev)
+> +       u32 i;
+> +
+> +       if (para >= 0) {
+> +               for (i = 0; i < len; i++) {
+> +                       if (para % 2)
+> +                               val |= 1 << (off + i);
+> +                       else
+> +                               val &= ~(1 << (off + i));
+> +                       para = para >> 1;
+> +               }
+> +       }
+> +       return val;
+> +}
+> +
+> +static int mmc_clk_set_timing(struct clk_hw *hw, unsigned long rate)
 > +{
-[...]
+> +       struct clk_mmc *mclk = to_mmc(hw);
+> +       unsigned long flags;
+> +       u32 sam, drv, div, val;
+> +       static DEFINE_SPINLOCK(mmc_clk_lock);
 > +
-> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +	if (!irq_res) {
-> +		dev_err(bdev->dev, "irq resource is missing\n");
-> +		return -EINVAL;
-> +	}
-
-Please use platform_get_irq() instead.
-
-> diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
-> new file mode 100644
-> index 0000000..2cb3b5f
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.h
-[...]
-> +#define BAM_CNFG_BITS_DEFAULT	(BAM_PIPE_CNFG |	\
-> +			BAM_NO_EXT_P_RST |		\
-> +			BAM_IBC_DISABLE |		\
-> +			BAM_SB_CLK_REQ |		\
-> +			BAM_PSM_CSW_REQ |		\
-> +			BAM_PSM_P_RES |			\
-> +			BAM_AU_P_RES |			\
-> +			BAM_SI_P_RES |			\
-> +			BAM_WB_P_RES |			\
-> +			BAM_WB_BLK_CSW |		\
-> +			BAM_WB_CSW_ACK_IDL |		\
-> +			BAM_WB_RETR_SVPNT |		\
-> +			BAM_WB_DSC_AVL_P_RST |		\
-> +			BAM_REG_P_EN |			\
-> +			BAM_PSM_P_HD_DATA |		\
-> +			BAM_AU_ACCUMED |		\
-> +			BAM_CMD_ENABLE)
+> +       switch (rate) {
+> +       case 13000000:
+> +               sam = 3;
+> +               drv = 1;
+> +               div = 1;
+> +               break;
+> +       case 25000000:
+> +               sam = 13;
+> +               drv = 6;
+> +               div = 6;
+> +               break;
+> +       case 50000000:
+> +               sam = 3;
+> +               drv = 6;
+> +               div = 6;
+> +               break;
+> +       case 100000000:
+> +               sam = 6;
+> +               drv = 4;
+> +               div = 6;
+> +               break;
+> +       default:
+> +               return -EINVAL;
+> +       }
 > +
-> +/* PIPE CTRL */
-> +#define	P_EN			BIT(1)
-
-Nit: Weird formatting here?
-
-> +#define P_DIRECTION		BIT(3)
-[...]
+> +       spin_lock_irqsave(&mmc_clk_lock, flags);
 > +
+> +       val = readl_relaxed(mclk->clken_reg);
+> +       val &= ~(1 << mclk->clken_bit);
+> +       writel_relaxed(val, mclk->clken_reg);
 > +
-> +struct bam_device {
-> +	void __iomem *regs;
-> +	struct device *dev;
-> +	struct dma_device common;
-> +	struct device_dma_parameters dma_parms;
-> +	struct bam_chan *channels;
-
-Maybe this should be a flexible array. It looks like probe might
-need to be rewritten to detect the number of channels from the
-hardware before assigning anything, but it should be possible.
-But it probably doesn't matter.
-
-> +	u32 num_channels;
-> +	u32 num_ees;
-> +	unsigned long enabled_ees;
-> +	int irq;
-
-Is irq used?
-
-> +	struct clk *bamclk;
+> +       val = readl_relaxed(mclk->sam_reg);
+> +       val = mmc_clk_delay(val, sam, mclk->sam_off, mclk->sam_bits);
+> +       writel_relaxed(val, mclk->sam_reg);
 > +
-> +	/* dma start transaction tasklet */
-> +	struct tasklet_struct task;
+> +       val = readl_relaxed(mclk->drv_reg);
+> +       val = mmc_clk_delay(val, drv, mclk->drv_off, mclk->drv_bits);
+> +       writel_relaxed(val, mclk->drv_reg);
+> +
+> +       val = readl_relaxed(mclk->div_reg);
+> +       val = mmc_clk_delay(val, div, mclk->div_off, mclk->div_bits);
+> +       writel_relaxed(val, mclk->div_reg);
+> +
+> +       val = readl_relaxed(mclk->clken_reg);
+> +       val |= 1 << mclk->clken_bit;
+> +       writel_relaxed(val, mclk->clken_reg);
+> +
+> +       spin_unlock_irqrestore(&mmc_clk_lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mmc_clk_prepare(struct clk_hw *hw)
+> +{
+> +       struct clk_mmc *mclk = to_mmc(hw);
+> +       unsigned long rate;
+> +
+> +       if (mclk->id == HI3620_MMC_CIUCLK1)
+> +               rate = 13000000;
+> +       else
+> +               rate = 25000000;
+> +
+> +       return mmc_clk_set_timing(hw, rate);
+> +}
+> +
+> +static int mmc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                            unsigned long parent_rate)
+> +{
+> +       return mmc_clk_set_timing(hw, rate);
+> +}
+> +
+> +static struct clk_ops clk_mmc_ops = {
+> +       .prepare = mmc_clk_prepare,
+> +       .determine_rate = mmc_clk_determine_rate,
+> +       .set_rate = mmc_clk_set_rate,
+> +       .recalc_rate = mmc_clk_recalc_rate,
 > +};
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> +
+> +static struct clk *hisi_register_clk_mmc(struct hisi_mmc_clock *mmc_clk,
+> +                       void __iomem *base, struct device_node *np)
+> +{
+> +       struct clk_mmc *mclk;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       mclk = kzalloc(sizeof(*mclk), GFP_KERNEL);
+> +       if (!mclk) {
+> +               pr_err("%s: fail to allocate mmc clk\n", __func__);
+> +               return ERR_PTR(-ENOMEM);
+> +       }
+> +
+> +       init.name = mmc_clk->name;
+> +       init.ops = &clk_mmc_ops;
+> +       init.flags = mmc_clk->flags | CLK_IS_BASIC;
+> +       init.parent_names = (mmc_clk->parent_name ? &mmc_clk->parent_name : NULL);
+> +       init.num_parents = (mmc_clk->parent_name ? 1 : 0);
+> +       mclk->hw.init = &init;
+> +
+> +       mclk->id = mmc_clk->id;
+> +       mclk->clken_reg = base + mmc_clk->clken_reg;
+> +       mclk->clken_bit = mmc_clk->clken_bit;
+> +       mclk->div_reg = base + mmc_clk->div_reg;
+> +       mclk->div_off = mmc_clk->div_off;
+> +       mclk->div_bits = mmc_clk->div_bits;
+> +       mclk->drv_reg = base + mmc_clk->drv_reg;
+> +       mclk->drv_off = mmc_clk->drv_off;
+> +       mclk->drv_bits = mmc_clk->drv_bits;
+> +       mclk->sam_reg = base + mmc_clk->sam_reg;
+> +       mclk->sam_off = mmc_clk->sam_off;
+> +       mclk->sam_bits = mmc_clk->sam_bits;
+> +
+> +       clk = clk_register(NULL, &mclk->hw);
+> +       if (WARN_ON(IS_ERR(clk)))
+> +               kfree(mclk);
+> +       return clk;
+> +}
+> +
+> +static void __init hi3620_mmc_clk_init(struct device_node *node)
+> +{
+> +       void __iomem *base;
+> +       int i, num = ARRAY_SIZE(hi3620_mmc_clks);
+> +       struct clk_onecell_data *clk_data;
+> +
+> +       if (!node) {
+> +               pr_err("failed to find pctrl node in DTS\n");
+> +               return;
+> +       }
+> +
+> +       base = of_iomap(node, 0);
+> +       if (!base) {
+> +               pr_err("failed to map pctrl\n");
+> +               return;
+> +       }
+> +
+> +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+> +       if (WARN_ON(!clk_data))
+> +               return;
+> +
+> +       clk_data->clks = kzalloc(sizeof(struct clk *) * num, GFP_KERNEL);
+> +       if (!clk_data->clks) {
+> +               pr_err("%s: fail to allocate mmc clk\n", __func__);
+> +               return;
+> +       }
+> +
+> +       for (i = 0; i < num; i++) {
+> +               struct hisi_mmc_clock *mmc_clk = &hi3620_mmc_clks[i];
+> +               clk_data->clks[mmc_clk->id] =
+> +                       hisi_register_clk_mmc(mmc_clk, base, node);
+> +       }
+> +
+> +       clk_data->clk_num = num;
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +}
+> +
+> +CLK_OF_DECLARE(hi3620_mmc_clk, "hisilicon,hi3620-mmc-clock", hi3620_mmc_clk_init);
+> diff --git a/include/dt-bindings/clock/hi3620-clock.h b/include/dt-bindings/clock/hi3620-clock.h
+> index 6eaa6a45e110..21b9d0e2eb0c 100644
+> --- a/include/dt-bindings/clock/hi3620-clock.h
+> +++ b/include/dt-bindings/clock/hi3620-clock.h
+> @@ -147,6 +147,11 @@
+>  #define HI3620_MMC_CLK3                217
+>  #define HI3620_MCU_CLK         218
+>  
+> +#define HI3620_SD_CIUCLK       0
+> +#define HI3620_MMC_CIUCLK1     1
+> +#define HI3620_MMC_CIUCLK2     2
+> +#define HI3620_MMC_CIUCLK3     3
+> +
+>  #define HI3620_NR_CLKS         219
+>  
+>  #endif /* __DTS_HI3620_CLOCK_H */
+> -- 
+> 1.7.9.5
+> 
