@@ -1,73 +1,89 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 14 Jan 2014 10:44:52 -0500
-Subject: [GIT PULL] ARM: mvebu: stable fix for v3.13
-Message-ID: <20140114154452.GP19878@titan.lakedaemon.net>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 14 Jan 2014 16:48:34 +0100
+Subject: [PATCH v2 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
+In-Reply-To: <20140114151404.GN19878@titan.lakedaemon.net>
+References: <1389711007-7239-1-git-send-email-simon.guinot@sequanux.org>
+ <20140114151404.GN19878@titan.lakedaemon.net>
+Message-ID: <20140114154834.GD32507@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And... despite typing the stable ML address quite often, I still got it
-wrong.  Need more coffee.
+On Tue, Jan 14, 2014 at 10:14:04AM -0500, Jason Cooper wrote:
+> Simon,
+> 
+> On Tue, Jan 14, 2014 at 03:50:04PM +0100, Simon Guinot wrote:
+> > Hello,
+> > 
+> > This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
+> > SoCs: once a disk is removed from a SATA port, then the re-plug events
+> > are not detected by the sata_mv driver.
+> > 
+> > This should be applied to the -stable kernels 3.10 and onwards. 
+> 
+> Please add a 'Fixes: <commit-hash> (oneline)' tag below the Cc: stable
+> tags.  It looks like the sata_mv binding and the Armada 370 DT booting
+> were both introduced in v3.6, so I would probably use:
+> 
+> Fixes: 9ae6f740b49f (arm: mach-mvebu: add support for Armada 370 and Armada XP with DT)
 
-thx,
+Hi Jason,
 
-Jason.
+I am not comfortable with this "Fixes: commit_id" notation. It states
+that the patch fixes a regression introduced by a given commit. This
+hardly makes sense to me because obviously the hotplug issue has not
+been introduced by:
 
-arm-soc folks,
+"arm: mach-mvebu: add support for Armada 370 and Armada XP with DT".
 
-Sorry for the lateness in the window on this one.  I'd like to see it
-get into v3.13 if possible, but if it doesn't get there till v3.13.1, I
-understand.
+I know that the purpose is purely administrative, but it is kind of
+weird...
 
-This fixes a boot hang experienced on some Openblocks AX3-4 boards.
-Once i2c transaction support was added, it was discovered that the A0
-revision of the Armada XP had broken offload support which causes the
-kernel to hang at boot.  The only way to detect this situation is to
-read the PCI config register to get the SoC revision, then disable
-offload if we are on an A0 SoC.
+> 
+> Is there a specific reason you say v3.10?
 
-Unfortunately, this makes for a rather large patch series against
-stable.  Doing the fix in a smaller patch would create a runtime
-dependency between i2c and PCI which we prefer to avoid.
+I could have said nothing as well.
 
-I'm Cc'ing Greg and linux-stable as a heads-up, and so they can comment
-or ask questions.
+As stable kernel older than 3.10 are no longer maintained, I think
+we don't need to point out a specific commit as a -stable target.
+Simply Cc'ing -stable without any extra informations should be good
+enough.
 
-thx,
+> 
+> Once you've incorporated Gregory's comments,
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Jason.
+OK.
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+Thanks,
 
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+Simon
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.13
-
-for you to fetch changes up to f8b94beb7e6a374cb0de531b72377c49857b35ca:
-
-  i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible (2014-01-14 02:09:17 +0000)
-
-----------------------------------------------------------------
-mvebu late fixes for v3.13
-
- - mvebu
-    - fix boot hang on Armada XP due to broken i2c offloading in A0 SoC revision
-	(specifically experienced on some early OpenBlocks AX3-4 boards)
-
-----------------------------------------------------------------
-Gregory CLEMENT (4):
-      ARM: mvebu: Add support to get the ID and the revision of a SoC
-      ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
-      i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
-      i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
-
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt        |   6 +-
- arch/arm/mach-mvebu/Makefile                       |   2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |  32 ++++++
- arch/arm/mach-mvebu/mvebu-soc-id.c                 | 119 +++++++++++++++++++++
- arch/arm/mach-mvebu/mvebu-soc-id.h                 |  32 ++++++
- drivers/i2c/busses/i2c-mv64xxx.c                   |   5 +
- 6 files changed, 194 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
- create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
+> 
+> > Lior Amsalem (1):
+> >   ata: sata_mv: fix disk hotplug for Armada 370/XP SoCs
+> > 
+> > Simon Guinot (2):
+> >   ata: sata_mv: introduce compatible string "marvell,armada-370-xp-sata"
+> >   ARM: mvebu: update the SATA compatible string for Armada 370/XP
+> > 
+> >  Documentation/devicetree/bindings/ata/marvell.txt |  2 +-
+> >  arch/arm/boot/dts/armada-370-xp.dtsi              |  2 +-
+> >  drivers/ata/sata_mv.c                             | 25 +++++++++++++++++++++++
+> >  3 files changed, 27 insertions(+), 2 deletions(-)
+> 
+> Tejun,
+> 
+> I see no point to breaking up this series only to have both pieces end
+> up in stable.  Are you ok with taking the whole thing?
+> 
+> thx,
+> 
+> Jason.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/e6b03fc5/attachment.sig>
