@@ -1,33 +1,57 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 14 Jan 2014 10:35:33 -0800
-Subject: [PATCH V2 1/6] Documentation: add dts binding for X-Gene reboot
- dts node.
-In-Reply-To: <201401140706.13406.arnd@arndb.de>
-References: <1389135041-16062-1-git-send-email-fkan@apm.com>
- <201401132043.52491.arnd@arndb.de>
- <CAL85gmCA4kBsRUMC_ENjGfCq5jM11iY5Jx_+A3V9XQDU0b7E0A@mail.gmail.com>
- <201401140706.13406.arnd@arndb.de>
-Message-ID: <CAL85gmD+34VKSHsGXWTbQ2w3razo_cKukfe=dSQJi+x-Zfvtpw@mail.gmail.com>
+From: s-anna@ti.com (Anna, Suman)
+Date: Tue, 14 Jan 2014 12:36:13 -0600
+Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx, AM43xx
+ & DRA7xx
+In-Reply-To: <20140114172901.GB27374@saruman.home>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-8-git-send-email-s-anna@ti.com>
+ <20140114131207.GB10818@saruman.home> <52D56B13.2050409@ti.com>
+ <20140114172901.GB27374@saruman.home>
+Message-ID: <52D5839D.9050100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 10:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 14 January 2014, Feng Kan wrote:
+On 01/14/2014 11:29 AM, Felipe Balbi wrote:
+> On Tue, Jan 14, 2014 at 10:51:31AM -0600, Anna, Suman wrote:
+>> Felipe,
 >>
->> >
->> > Is this related to the standard ARM SCU that manages multiprocessor
->> > systems, or a different unit that uses the same name?
+>> On 01/14/2014 07:12 AM, Felipe Balbi wrote:
+>>> On Mon, Jan 13, 2014 at 06:19:24PM -0600, Suman Anna wrote:
+>>>> HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
+>>>> device families as well. The IPs are identical to that of
+>>>> OMAP4/OMAP5, except for the number of locks.
+>>>>
+>>>> Add a depends on to the above family of SoCs to enable the
+>>>> build support for OMAP hwspinlock driver for any of the above
+>>>> SoC configs.
+>>>>
+>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>> ---
+>>>>   drivers/hwspinlock/Kconfig | 2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+>>>> index 70637d2..3612cb5 100644
+>>>> --- a/drivers/hwspinlock/Kconfig
+>>>> +++ b/drivers/hwspinlock/Kconfig
+>>>> @@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
+>>>>
+>>>>   config HWSPINLOCK_OMAP
+>>>>   	tristate "OMAP Hardware Spinlock device"
+>>>> -	depends on ARCH_OMAP4 || SOC_OMAP5
+>>>> +	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
+>>>
+>>> how about just using ARCH_OMAP2PLUS ?
 >>
->> FKAN: You mean the snoop control unit in ARM. This is different from
->> that, the main function of this unit is clk control.
+>> We do not want the driver to build in OMAP2-only and/or OMAP3-only
+>> configurations, on which the hwspinlock IP is not even present.
 >
-> Hmm, if it's *mainly* used for clocks, you may actually just want to
-> have a driver in drivers/clk for it that also performs a few of the
-> other things on the side.
+> It won't be enabled by default, will it ? You're just saying that it
+> _can_ be enabled.
 >
+Yes, that's correct. The menuconfig will not even show this driver at 
+present on OMAP2-only and/or OMAP3-only configs. I would prefer to keep 
+it that way.
 
-FKAN: there among other thing, reset controls, fuse id's and deep sleep
-resume registers... I like your idea of using syscon, we can have a node
-for SCU and then the specific driver to parse out the needed chunk to use.
-
->         Arnd
+regards
+Suman
