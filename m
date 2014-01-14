@@ -1,32 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 14 Jan 2014 13:51:18 +0100
-Subject: AArch64 kernel image decompression
-In-Reply-To: <4250104.UfkPP3heXI@wuerfel>
-References: <20140110170436.GS8153@joshc.qualcomm.com>
- <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
- <4250104.UfkPP3heXI@wuerfel>
-Message-ID: <201401141351.18988.marex@denx.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 14 Jan 2014 15:50:08 +0200
+Subject: [PATCH] spi: davinci: fix build warning when printing resource_size_t
+ vars
+In-Reply-To: <20140112110916.GR15937@n2100.arm.linux.org.uk>
+References: <20140112110916.GR15937@n2100.arm.linux.org.uk>
+Message-ID: <1389707408-24785-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 13, 2014 at 12:42:41 PM, Arnd Bergmann wrote:
-> On Monday 13 January 2014 11:29:20 bhupesh.sharma at freescale.com wrote:
-> > With the u-boot bootloader also having AArch64 support now (see [1]), it
-> > would make sense to add the uImage and decompressor support to the
-> > AArch64 Makefile in Linux kernel as well, so that u-boot can also boot
-> > uImages for AArch64 systems out-off-box.
-> > 
-> > [1].
-> > http://git.denx.de/?p=u-boot/u-boot-arm.git;a=shortlog;h=refs/heads/aarc
-> > h64
-> 
-> u-boot should never have to use a uImage on arm64, since it already
-> supports booting a vmlinux file.
+Use %pa format specifier when printing variables of resource_size_t type
+to fix build warnings:
+drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'resource_size_t'
+drivers/spi/spi-davinci.c:966:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'resource_size_t'
 
-Just a side-note. The benefit of uImage (resp. please use fitImage, as it's more 
-modern) is that it is protected by checksum against possible corruption. 
-Besides, U-Boot can do the decompression of uImage payload, so there's no need 
-to have decompressor in arm64 kernel.
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/spi/spi-davinci.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Best regards,
-Marek Vasut
+diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+index 50b2d88..d3f6386 100644
+--- a/drivers/spi/spi-davinci.c
++++ b/drivers/spi/spi-davinci.c
+@@ -963,8 +963,8 @@ static int davinci_spi_probe(struct platform_device *pdev)
+ 			goto free_clk;
+ 
+ 		dev_info(&pdev->dev, "DMA: supported\n");
+-		dev_info(&pdev->dev, "DMA: RX channel: %d, TX channel: %d, "
+-				"event queue: %d\n", dma_rx_chan, dma_tx_chan,
++		dev_info(&pdev->dev, "DMA: RX channel: %pa, TX channel: %pa, "
++				"event queue: %d\n", &dma_rx_chan, &dma_tx_chan,
+ 				pdata->dma_event_q);
+ 	}
+ 
+-- 
+1.7.9.5
