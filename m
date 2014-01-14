@@ -1,36 +1,44 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 13 Jan 2014 19:19:42 -0500
-Subject: [PATCH 2/3] arm: include module.h in drivers/bus/omap_l3_smx.c
+Date: Mon, 13 Jan 2014 19:19:41 -0500
+Subject: [PATCH 1/3] arm: use subsys_initcall in non-modular pl320 IPC code
 In-Reply-To: <1389658783-9876-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1389658783-9876-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1389658783-9876-3-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1389658783-9876-2-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config OMAP_INTERCONNECT that this driver depends on (in
-drivers/bus/Kconfig) is tristate.  So it can be a module.
+The drivers/mailbox/pl320-ipc.o is dependent on config PL320_MBOX
+which is declared as a bool.  Hence the code is never going to be
+modular.  So using module_init as an alias for __initcall can be
+somewhat misleading.
 
-Also there are module related setup calls within this driver.
-Explicitly add module.h to includes so it won't be a build failure
-when future cleanups are integrated and the implicit presence
-of certain module prototypes disappears.
+Fix this up now, so that we can relocate module_init from
+init.h into module.h in the future.  If we don't do this, we'd
+have to add module.h to obviously non-modular code, and that
+would be a worse thing.  Also add an inclusion of init.h, as
+that was previously implicit.
+
+Note that direct use of __initcall is discouraged, vs. one of the
+priority categorized subgroups.  As __initcall gets mapped onto
+device_initcall, our use of subsys_initcall (which seems to make
+sense for IPC code) will thus change this registration from a
+level 6-device to a level 4-subsys (i.e. slightly earlier).
+However no impact of that small difference is expected.
 
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/bus/omap_l3_smx.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mailbox/pl320-ipc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/bus/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
-index acc216491b8a..8a614332dcb9 100644
---- a/drivers/bus/omap_l3_smx.c
-+++ b/drivers/bus/omap_l3_smx.c
-@@ -23,6 +23,7 @@
-  */
- 
- #include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
+diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
+index d873cbae2fbb..b2737a2df1d3 100644
+--- a/drivers/mailbox/pl320-ipc.c
++++ b/drivers/mailbox/pl320-ipc.c
+@@ -195,4 +195,4 @@ static int __init ipc_init(void)
+ {
+ 	return amba_driver_register(&pl320_driver);
+ }
+-module_init(ipc_init);
++subsys_initcall(ipc_init);
 -- 
 1.8.5.2
