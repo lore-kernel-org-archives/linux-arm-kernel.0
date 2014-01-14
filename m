@@ -1,62 +1,142 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Jan 2014 11:29:01 -0600
-Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx, AM43xx &
- DRA7xx
-In-Reply-To: <52D56B13.2050409@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-8-git-send-email-s-anna@ti.com>
- <20140114131207.GB10818@saruman.home> <52D56B13.2050409@ti.com>
-Message-ID: <20140114172901.GB27374@saruman.home>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 14 Jan 2014 18:31:01 +0100
+Subject: [PATCH] dcp: aes: Move the AES operation type from actx to rctx
+Message-ID: <1389720661-5820-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 10:51:31AM -0600, Anna, Suman wrote:
-> Felipe,
-> 
-> On 01/14/2014 07:12 AM, Felipe Balbi wrote:
-> >On Mon, Jan 13, 2014 at 06:19:24PM -0600, Suman Anna wrote:
-> >>HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
-> >>device families as well. The IPs are identical to that of
-> >>OMAP4/OMAP5, except for the number of locks.
-> >>
-> >>Add a depends on to the above family of SoCs to enable the
-> >>build support for OMAP hwspinlock driver for any of the above
-> >>SoC configs.
-> >>
-> >>Signed-off-by: Suman Anna <s-anna@ti.com>
-> >>---
-> >>  drivers/hwspinlock/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
-> >>index 70637d2..3612cb5 100644
-> >>--- a/drivers/hwspinlock/Kconfig
-> >>+++ b/drivers/hwspinlock/Kconfig
-> >>@@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
-> >>
-> >>  config HWSPINLOCK_OMAP
-> >>  	tristate "OMAP Hardware Spinlock device"
-> >>-	depends on ARCH_OMAP4 || SOC_OMAP5
-> >>+	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
-> >
-> >how about just using ARCH_OMAP2PLUS ?
-> 
-> We do not want the driver to build in OMAP2-only and/or OMAP3-only
-> configurations, on which the hwspinlock IP is not even present.
+Move the AES operation type and mode from async crypto context to
+crypto request context. This allows for recycling of the async crypto
+context for different kinds of operations.
 
-It won't be enabled by default, will it ? You're just saying that it
-_can_ be enabled. In fact, I would go one step further and use:
+I found this problem when I used dm-crypt, which uses the same async
+crypto context (actx) for both encryption and decryption requests.
+Since the requests are enqueued into the processing queue, immediatelly
+storing the type of operation into async crypto context (actx) caused
+corruption of this information when encryption and decryption operations
+followed imediatelly one after the other. When the first operation was
+dequeued, the second operation was already enqueued and overwritten the
+type of operation in actx, thus causing incorrect result of the first
+operation.
 
-	depends on ARCH_OMAP2PLUS || COMPILE_TEST
+Fix this problem by storing the type of operation into the crypto request
+context.
 
-your choice though ;-)
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tom Lendacky <thomas.lendacky@amd.com>
+---
+ drivers/crypto/mxs-dcp.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
+diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
+index d41917c..48f12dd 100644
+--- a/drivers/crypto/mxs-dcp.c
++++ b/drivers/crypto/mxs-dcp.c
+@@ -83,13 +83,16 @@ struct dcp_async_ctx {
+ 	unsigned int			hot:1;
+ 
+ 	/* Crypto-specific context */
+-	unsigned int			enc:1;
+-	unsigned int			ecb:1;
+ 	struct crypto_ablkcipher	*fallback;
+ 	unsigned int			key_len;
+ 	uint8_t				key[AES_KEYSIZE_128];
+ };
+ 
++struct dcp_aes_req_ctx {
++	unsigned int	enc:1;
++	unsigned int	ecb:1;
++};
++
+ struct dcp_sha_req_ctx {
+ 	unsigned int	init:1;
+ 	unsigned int	fini:1;
+@@ -190,10 +193,12 @@ static int mxs_dcp_start_dma(struct dcp_async_ctx *actx)
+ /*
+  * Encryption (AES128)
+  */
+-static int mxs_dcp_run_aes(struct dcp_async_ctx *actx, int init)
++static int mxs_dcp_run_aes(struct dcp_async_ctx *actx,
++			   struct ablkcipher_request *req, int init)
+ {
+ 	struct dcp *sdcp = global_sdcp;
+ 	struct dcp_dma_desc *desc = &sdcp->coh->desc[actx->chan];
++	struct dcp_aes_req_ctx *rctx = ablkcipher_request_ctx(req);
+ 	int ret;
+ 
+ 	dma_addr_t key_phys = dma_map_single(sdcp->dev, sdcp->coh->aes_key,
+@@ -212,14 +217,14 @@ static int mxs_dcp_run_aes(struct dcp_async_ctx *actx, int init)
+ 	/* Payload contains the key. */
+ 	desc->control0 |= MXS_DCP_CONTROL0_PAYLOAD_KEY;
+ 
+-	if (actx->enc)
++	if (rctx->enc)
+ 		desc->control0 |= MXS_DCP_CONTROL0_CIPHER_ENCRYPT;
+ 	if (init)
+ 		desc->control0 |= MXS_DCP_CONTROL0_CIPHER_INIT;
+ 
+ 	desc->control1 = MXS_DCP_CONTROL1_CIPHER_SELECT_AES128;
+ 
+-	if (actx->ecb)
++	if (rctx->ecb)
+ 		desc->control1 |= MXS_DCP_CONTROL1_CIPHER_MODE_ECB;
+ 	else
+ 		desc->control1 |= MXS_DCP_CONTROL1_CIPHER_MODE_CBC;
+@@ -247,6 +252,7 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
+ 
+ 	struct ablkcipher_request *req = ablkcipher_request_cast(arq);
+ 	struct dcp_async_ctx *actx = crypto_tfm_ctx(arq->tfm);
++	struct dcp_aes_req_ctx *rctx = ablkcipher_request_ctx(req);
+ 
+ 	struct scatterlist *dst = req->dst;
+ 	struct scatterlist *src = req->src;
+@@ -271,7 +277,7 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
+ 	/* Copy the key from the temporary location. */
+ 	memcpy(key, actx->key, actx->key_len);
+ 
+-	if (!actx->ecb) {
++	if (!rctx->ecb) {
+ 		/* Copy the CBC IV just past the key. */
+ 		memcpy(key + AES_KEYSIZE_128, req->info, AES_KEYSIZE_128);
+ 		/* CBC needs the INIT set. */
+@@ -300,7 +306,7 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
+ 			 * submit the buffer.
+ 			 */
+ 			if (actx->fill == out_off || sg_is_last(src)) {
+-				ret = mxs_dcp_run_aes(actx, init);
++				ret = mxs_dcp_run_aes(actx, req, init);
+ 				if (ret)
+ 					return ret;
+ 				init = 0;
+@@ -391,13 +397,14 @@ static int mxs_dcp_aes_enqueue(struct ablkcipher_request *req, int enc, int ecb)
+ 	struct dcp *sdcp = global_sdcp;
+ 	struct crypto_async_request *arq = &req->base;
+ 	struct dcp_async_ctx *actx = crypto_tfm_ctx(arq->tfm);
++	struct dcp_aes_req_ctx *rctx = ablkcipher_request_ctx(req);
+ 	int ret;
+ 
+ 	if (unlikely(actx->key_len != AES_KEYSIZE_128))
+ 		return mxs_dcp_block_fallback(req, enc);
+ 
+-	actx->enc = enc;
+-	actx->ecb = ecb;
++	rctx->enc = enc;
++	rctx->ecb = ecb;
+ 	actx->chan = DCP_CHAN_CRYPTO;
+ 
+ 	mutex_lock(&sdcp->mutex[actx->chan]);
+@@ -484,7 +491,7 @@ static int mxs_dcp_aes_fallback_init(struct crypto_tfm *tfm)
+ 		return PTR_ERR(blk);
+ 
+ 	actx->fallback = blk;
+-	tfm->crt_ablkcipher.reqsize = sizeof(struct dcp_async_ctx);
++	tfm->crt_ablkcipher.reqsize = sizeof(struct dcp_aes_req_ctx);
+ 	return 0;
+ }
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/05d03c96/attachment.sig>
+1.8.5.2
