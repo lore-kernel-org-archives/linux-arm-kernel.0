@@ -1,63 +1,64 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 14 Jan 2014 18:38:58 +0900
-Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <52D3A43B.4030909@linaro.org>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
- <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
- <52CFFFDA.8050108@linaro.org>
- <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
- <52D3515B.7040008@linaro.org>
- <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
- <52D3A43B.4030909@linaro.org>
-Message-ID: <002801cf110c$731fd720$595f8560$%jun@samsung.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 14 Jan 2014 03:41:25 -0600
+Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
+In-Reply-To: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
+References: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
+Message-ID: <52D50645.40607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, January 13, 2014, Zhangfei Gao wrote:
-> Dear Seungwon
-> 
-> On 01/13/2014 01:32 PM, Seungwon Jeon wrote:
-> >>>>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-> >>>>>> +{
-> >>>>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
-> >>>>>> +	u32 rate = priv->clk_table[ios->timing];
-> >>>>>
-> 
-> >>
-> >> The function mmc_clk_determine_rate() will need the info which
-> >> controller it is, what's the init clock rate, what's the max clock rate,
-> >> and what's the limitation, which may be different as different soc, and
-> >> can not be hardcoded.
-> >> The limitation may in HS200 and SDR104 mode.
-> >>
-> >> The plan is only input init rate and max rate instead of the table,
-> >> while others directly use ios->clock, only if the the limitation resolved.
-> >
-> > Handling mmc clock for hi3620 is in drivers/clk/hisilicon/clk-hi3620.c, right?
-> > Currently only hi3620 has been introduced.
-> > If hi3620's host has a limitation, clk-hi3620.c can handle clock range(init, max) for source clock
-> enough.
-> > I feel like clock table is redundant.
-> > Ok. It's just my suggestion.  But I still point dependency of mode index number.
-> > K3's clock table refers and depends mode definition value from include/linux/mmc/host.h
-> > If new mode is added or modified, it should be considered and also may make complicated.
-> >
-> 
-> Looks like you dislike the clk_table very much :)
-Oh, I just want to remove dependency as I mentioned.
+Hi Mike,
 
-> 
-> Double checked with the silicon guy, currently it is said the limitation
-> in HS200 and SDR104 can be replaced by the max_rate, so clk_table can be
-> replaced with ios->clock directly, though they have concern it is not so
-> convinent when removing clk_table in case limitation rate is not equal
-> to max_rate again in future.
-I guess specific clock handling(clk-hi3620.c) can adjust required source clock rate.
-
-> 
-> Will update accordingly, thanks for the suggestion.
-Thank you for consideration.
+On 1/6/14 11:27 AM, dinguyen at altera.com wrote:
+> Hi Mike,
+>
+> Please pull in these patches that cleans up the SOCFPGA clock driver. This is
+> V2 of the pull request that includes 4 patches from Steffen Trumtrar.
+>
+> Thanks,
+>
+> Dinh
+>
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+>
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
+>
+> for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
+>
+>   clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
+>
+> ----------------------------------------------------------------
+> v2: SOCFPGA clk cleanups for 3.14
+>
+> ----------------------------------------------------------------
+> Dinh Nguyen (3):
+>       clk: socfpga: Map the clk manager base address in the clock driver
+>       clk: socfpga: Look for the GPIO_DB_CLK by its offset
+>       clk: socfpga: Remove socfpga_init_clocks
+>
+> Steffen Trumtrar (4):
+>       clk: socfpga: remove unused field
+>       clk: socfpga: fix define typo
+>       clk: socfpga: fix compile error
+>       clk: socfpga: split clk code
+>
+>  arch/arm/mach-socfpga/socfpga.c  |    5 -
+>  drivers/clk/socfpga/Makefile     |    3 +
+>  drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
+>  drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
+>  drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
+>  drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
+>  drivers/clk/socfpga/clk.h        |   57 +++++++
+>  7 files changed, 500 insertions(+), 321 deletions(-)
+>  create mode 100644 drivers/clk/socfpga/clk-gate.c
+>  create mode 100644 drivers/clk/socfpga/clk-periph.c
+>  create mode 100644 drivers/clk/socfpga/clk-pll.c
+>  create mode 100644 drivers/clk/socfpga/clk.h
+Please consider this pull-request.
 
 Thanks,
-Seungwon Jeon
+Dinh
