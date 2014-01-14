@@ -1,62 +1,26 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Wed, 15 Jan 2014 00:46:12 +0200
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
-References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
- <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
- <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
- <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
- <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
- <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
- <52D5A60C.7080800@ti.com>
- <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
-Message-ID: <CAArO44tKGZ57-YToTEK_wGtV2WaCXvOWdfqBvHPtJ4=uJCbdgw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 15 Jan 2014 02:49:15 +0300
+Subject: [PATCH] irq-gic: remove file name from heading comment
+In-Reply-To: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
+References: <201312140224.53928.sergei.shtylyov@cogentembedded.com>
+Message-ID: <52D5CCFB.1090205@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2014 23:13, Nishanth Menon <nm@ti.com> wrote:
-> On Tue, Jan 14, 2014 at 3:03 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->>
->>> ok.. some sort of Linaro thing about which I have no background about
->>> - but dont really care in this context.
->>>
->> Nothing related Linaro. Its just that platforms are supporting ARM BE
->> mode and Linaro folks had working patches for Panda. So I suggested
->> to get them on the lists.
->
-> I tend to think -> is this with OFF mode and CPUidle completely
-> working? All context save and restore works with this? on HS and GP
-> devices with BE mode builds? works on SDP4430,60 variations,
-> considered reuse with AM43xx which could use parts of that logic?
->
-> I mean to indicate that terms like "works on panda" tends always to be relative.
+Hello.
 
-Nishanth, let's be objective here.
-CPUidle on 4460 does *not* work in mainline for at least two kernel releases
-even for LE [1]. That fix exists because that "one group of folks"
-faced the issue
-during BE testing. Looks like not much people care about CPUIdle on OMAP4.
+On 12/14/2013 02:24 AM, Sergei Shtylyov wrote:
 
-> It is nice to see it as a proof of concept, but I'd hate to see some
-> dead code lying around in kernel and folks blindly following suit and
-> introducing macros for new assembly for a feature that in practice
-> just one group of folks care about and creates additional burden for
-> rest of folks trying to keep that functionality going as we jump from
-> one "device tree" style churn to another "framework"? Not to mean that
-> good features should be kept away.. but personally, I could not find
-> convincing arguments in this case..
+> File names in the heading comments  fell out of favor long ago, and this one
+> weren't even changed when the driver was moved from arch/arm/common/, so remove
+> it at last...
 
-In general I understand your concerns from previous e-mails, but I don't
-see a point to spend time for a generic solution for a single user.
-If there will be other platforms which need similar changes, then we can
-think of some generic solution. Let's drop this patch for now.
-We can just disable CPUidle for BE tasks or keep this patch forked.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-[1] https://lkml.org/lkml/2013/10/22/401
+> ---
+> The patch is against the 'irq/core' branch of the 'tip.git' repo.
 
--- 
-Regards,
-Taras Kondratiuk
+    Thomas, is there a chance that you merge this patch for 3.14? Is it even 
+the right branch for cleanups (I'm seeing fixes there)?
+
+WBR, Sergei
