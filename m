@@ -1,35 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Jan 2014 13:39:50 +0000
-Subject: [PATCH RFC 08/26] dmaengine: omap-dma: consolidate setup of CCR
-In-Reply-To: <20140113231227.GI27282@n2100.arm.linux.org.uk>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <E1VyjuU-0005EQ-H5@rmk-PC.arm.linux.org.uk>
- <20140113221425.GD7993@atomide.com>
- <20140113231227.GI27282@n2100.arm.linux.org.uk>
-Message-ID: <20140114133949.GJ27282@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 14 Jan 2014 14:42:26 +0100
+Subject: [PATCH] ARM: tegra: fix tegra_powergate_sequence_power_up() inline
+In-Reply-To: <1389650502-30017-1-git-send-email-swarren@wwwdotorg.org>
+References: <1389650502-30017-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140114134225.GC10936@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 11:12:27PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 13, 2014 at 02:14:26PM -0800, Tony Lindgren wrote:
-> > * Russell King <rmk+kernel@arm.linux.org.uk> [140102 07:17]:
-> > > Consolidate the setup of the channel control register.  Prepare the
-> > > basic value in the preparation of the DMA descriptor, and write it into
-> > > the register upon descriptor execution.
-> > 
-> > FYI, this patch seems to be the one that causes the
-> > "DMA timeout with device 55" error for omap1.
+On Mon, Jan 13, 2014 at 03:01:42PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Okay, looks like I've missed some bit of muxing for DMA signals or
-> something.  I've yet to find any information on this in the OMAP5912
-> docs, so I guess I'm going to have to do this not only blind, but also
-> without hardware.  GAH.
+> Remove an invalid semicolon from the inline dummy, thus solving:
+> In file included from drivers/gpu/drm/tegra/gr3d.c:15:0:
+> include/linux/tegra-powergate.h:119:1: error: expected identifier or '(' before '{' token
+> 
+> Fixes: 80b28791ff04 ("ARM: tegra: pass reset to tegra_powergate_sequence_power_up()")
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  include/linux/tegra-powergate.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Do you know which of the OMAP1 variants your device is?  Is it OMAP15xx
-or OMAP16xx?  It looks like OMAP15xx is easy to fix for this as it hasn't
-got the additional multiplexer on the DMA request signals.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Reviewed-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/db5f8a28/attachment-0001.sig>
