@@ -1,18 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 14 Jan 2014 09:48:53 -0700
-Subject: AArch64 kernel image decompression
-In-Reply-To: <201401140714.52400.arnd@arndb.de>
-References: <20140110170436.GS8153@joshc.qualcomm.com>
- <e79fa209ffc4485d8cae87bae3daa656@BN1PR03MB220.namprd03.prod.outlook.com>
- <CAOesGMi_QY6z_3QSdAs-3JaEUufgymJg=kiqpb9D6RNNjZF5sA@mail.gmail.com>
- <201401140714.52400.arnd@arndb.de>
-Message-ID: <52D56A75.20505@wwwdotorg.org>
+From: s-anna@ti.com (Anna, Suman)
+Date: Tue, 14 Jan 2014 10:51:31 -0600
+Subject: [PATCHv4 7/7] hwspinlock/omap: enable build for AM33xx, AM43xx
+ & DRA7xx
+In-Reply-To: <20140114131207.GB10818@saruman.home>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-8-git-send-email-s-anna@ti.com>
+ <20140114131207.GB10818@saruman.home>
+Message-ID: <52D56B13.2050409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2014 11:14 PM, Arnd Bergmann wrote:
-...
-> Note that uImage is fundamentally incompatible with multiplatform kernels,
-> since it hardcodes the load address in the image file.
+Felipe,
 
-FWIW, with "mkimage -T kernel_noload", that's no longer true.
+On 01/14/2014 07:12 AM, Felipe Balbi wrote:
+> On Mon, Jan 13, 2014 at 06:19:24PM -0600, Suman Anna wrote:
+>> HwSpinlocks are supported on AM33xx, AM43xx and DRA7xx SoC
+>> device families as well. The IPs are identical to that of
+>> OMAP4/OMAP5, except for the number of locks.
+>>
+>> Add a depends on to the above family of SoCs to enable the
+>> build support for OMAP hwspinlock driver for any of the above
+>> SoC configs.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>   drivers/hwspinlock/Kconfig | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+>> index 70637d2..3612cb5 100644
+>> --- a/drivers/hwspinlock/Kconfig
+>> +++ b/drivers/hwspinlock/Kconfig
+>> @@ -10,7 +10,7 @@ menu "Hardware Spinlock drivers"
+>>
+>>   config HWSPINLOCK_OMAP
+>>   	tristate "OMAP Hardware Spinlock device"
+>> -	depends on ARCH_OMAP4 || SOC_OMAP5
+>> +	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX || SOC_AM33XX || SOC_AM43XX
+>
+> how about just using ARCH_OMAP2PLUS ?
+
+We do not want the driver to build in OMAP2-only and/or OMAP3-only 
+configurations, on which the hwspinlock IP is not even present.
+
+regards
+Suman
