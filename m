@@ -1,34 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jan 2014 09:19:18 -0800
-Subject: AArch64 kernel image decompression
-In-Reply-To: <20140114134732.F0A1C3821F2@gemini.denx.de>
-References: <20140110170436.GS8153@joshc.qualcomm.com>
- <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
- <4250104.UfkPP3heXI@wuerfel> <201401141351.18988.marex@denx.de>
- <819346bb83b04348a266643afd5bd6f6@BN1PR03MB220.namprd03.prod.outlook.com>
- <20140114134732.F0A1C3821F2@gemini.denx.de>
-Message-ID: <CAOesGMj0HPWD=Mavt1ut+Oze4KQZHjhHmcKTcdKELaF=Or8XsA@mail.gmail.com>
+Date: Tue, 14 Jan 2014 09:23:01 -0800
+Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
+In-Reply-To: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
+ <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+Message-ID: <CAOesGMi5bK6siLQ2dVkR7P30+5zQa8qsyxa3UsWj0Kw9OEXCPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 5:47 AM, Wolfgang Denk <wd@denx.de> wrote:
-> Dear Bhupesh,
->
-> In message <819346bb83b04348a266643afd5bd6f6@BN1PR03MB220.namprd03.prod.outlook.com> you wrote:
+On Tue, Jan 14, 2014 at 7:58 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Thu, Jan 9, 2014 at 6:35 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+>> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
+>> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
+>> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
 >>
->> I agree with Marek. Usually for non-cryptographic-secure (key based cryptography) boot
->> method the CRC protection is usually the best possible protection against Image
->> corruption. CRC check is usually used in a number of field-deployed solutions to ensure
->> linux image sanity.
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 >
-> The FIT image approach as suggested by Marek also allows for secure
-> boot methods (like cryptographically signed images); this is used in
-> production for several systems, including the Google Chromebook.
+> The Samsung Arndale board started failing boot from MMC root tests
+> starting with next-20140113 and I bisected it down to this patch.
+> Reverting this patch on top of next-20140114 gets Arndale booting
+> again from MMC.  Is there some supporting DT data that's missing for
+> Arndale?
 
-This can very easily be misunderstood so I would like to clarify:
-Chromebooks do not use the fitImage version of signatures and
-verification, it is done independently from a separate library that
-wraps either a zImage (x86) or a fitImage (ARM).
+Rather, it looks like this patch changes behaviour and no longer uses
+dw_mci_get_cd() to find out if there's a card attached -- it switches
+to rely only on GPIO (see the last chunk in the patch). That seems
+broken?
 
 
 -Olof
