@@ -1,112 +1,78 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 14 Jan 2014 16:50:22 +0800
-Subject: [PATCH] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk
- board.
-In-Reply-To: <20140114082948.GC1896@S2101-09.ap.freescale.net>
-References: <1389685029-17323-1-git-send-email-b20788@freescale.com>
- <20140114082948.GC1896@S2101-09.ap.freescale.net>
-Message-ID: <20140114085022.GA20128@ubuntu>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 14 Jan 2014 10:57:21 +0200
+Subject: [PATCH v2 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <1389659437-16406-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389659437-16406-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1389689841.2794.8.camel@iivanov-dev.int.mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 04:29:50PM +0800, Shawn Guo wrote:
 
-OK, I saw this define "#define MATRIX_KEY(row, col, code)"
-in include/dt-bindings/input/input.h, please ignore my first
-reply. Will do it in V2.
+Thanks Bjorn, 
+
+I have prepared second version, but never send it out :-).
+One thing suggested by Mark was missed in this version.
 
 
-> On Tue, Jan 14, 2014 at 03:37:09PM +0800, Anson Huang wrote:
-> > i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
-> > enable them, the keymap is as below:
-> > 
-> > SW6:  0x00000067    /* KEY_UP */
-> > SW7:  0x0001006c    /* KEY_DOWN */
-> > SW8:  0x0002001c    /* KEY_ENTER */
-> > SW9:  0x01000066    /* KEY_HOME */
-> > SW10: 0x0101006a    /* KEY_RIGHT */
-> > SW11: 0x01020069    /* KEY_LEFT */
-> > SW12: 0x02000072    /* KEY_VOLUMEDOWN */
-> > SW13: 0x02010073    /* KEY_VOLUMEUP */
-> > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6sl-evk.dts |   27 +++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
-> >  2 files changed, 29 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-> > index f5e4513..8d49a10 100644
-> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> > @@ -93,6 +93,17 @@
-> >  			fsl,pins = <MX6SL_FEC_PINGRP1>;
-> >  		};
-> >  
-> > +		pinctrl_kpp: kppgrp {
-> > +			fsl,pins = <
-> > +				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-> > +				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
-> > +				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
-> > +				MX6SL_PAD_KEY_COL0__KEY_COL0    0x80000000
-> > +				MX6SL_PAD_KEY_COL1__KEY_COL1    0x80000000
-> > +				MX6SL_PAD_KEY_COL2__KEY_COL2    0x80000000
+On Mon, 2014-01-13 at 16:30 -0800, Bjorn Andersson wrote: 
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 > 
-> Rather than using whatever the config register gives us, why don't we
-> put a proper pad confg value for COLs just like ROWs?
+> The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
+> provide input and output FIFO's for it. I2C controller can operate
+> as master with supported bus speeds of 100Kbps and 400Kbps.
 > 
-> > +			>;
-> > +		};
-> > +
-> >  		pinctrl_uart1: uart1grp {
-> >  			fsl,pins = <MX6SL_UART1_PINGRP1>;
-> >  		};
-> > @@ -139,6 +150,22 @@
-> >  	};
-> >  };
-> >  
-> > +&kpp {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_kpp>;
-> > +	linux,keymap = <
-> > +			0x00000067    /* KEY_UP */
-> > +			0x0001006c    /* KEY_DOWN */
-> > +			0x0002001c    /* KEY_ENTER */
-> > +			0x01000066    /* KEY_HOME */
-> > +			0x0101006a    /* KEY_RIGHT */
-> > +			0x01020069    /* KEY_LEFT */
-> > +			0x02000072    /* KEY_VOLUMEDOWN */
-> > +			0x02010073    /* KEY_VOLUMEUP */
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> [bjorn: reformulated part of binding description and cleaned up example]
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>  .../devicetree/bindings/i2c/qcom,i2c-qup.txt       | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
 > 
-> You can use the macros defined in include/dt-bindings/input/input.h to
-> make them more readable.
-> 
-> Shawn
-> 
-> > +		>;
-> > +	status = "okay";
-> > +};
-> > +
-> >  &uart1 {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&pinctrl_uart1>;
-> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> > index a5ef3c3..a449c4f 100644
-> > --- a/arch/arm/boot/dts/imx6sl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> > @@ -393,8 +393,10 @@
-> >  			};
-> >  
-> >  			kpp: kpp at 020b8000 {
-> > +				compatible = "fsl,imx6sl-kpp", "fsl,imx21-kpp";
-> >  				reg = <0x020b8000 0x4000>;
-> >  				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +				clocks = <&clks IMX6SL_CLK_DUMMY>;
-> >  			};
-> >  
-> >  			wdog1: wdog at 020bc000 {
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> 
+> diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+> new file mode 100644
+> index 0000000..a99711b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+> @@ -0,0 +1,41 @@
+> +Qualcomm Universal Peripheral (QUP) I2C controller
+> +
+> +Required properties:
+> + - compatible: Should be "qcom,i2c-qup".
+> + - reg: Should contain QUP register address and length.
+> + - interrupts: Should contain I2C interrupt.
+> +
+> + - clocks: Should contain the core clock and the AHB clock.
+
++ - clocks: a list of phandle + clock-specifier pairs for each entry in
++           clock-names
+
+> + - clock-names: Should be "core" for the core clock and "iface" for the
+> +                AHB clock.
+> +
+> + - #address-cells: Should be <1> Address cells for i2c device address
+> + - #size-cells: Should be <0> as i2c addresses have no size component
+> +
+> +Optional properties:
+> + - clock-frequency: Should specify the desired i2c bus clock frequency in Hz,
+> +                    default is 100kHz if omitted.
+> +
+> +Child nodes should conform to i2c bus binding.
+> +
+> +Example:
+> +
+> + i2c2: i2c at f9924000 {
+> + 	compatible = "qcom,i2c-qup";
+> + 	reg = <0xf9924000 0x1000>;
+> + 	interrupts = <0 96 0>;
+> +
+> + 	clocks = <&gcc_blsp1_qup2_i2c_apps_clk>, <&gcc_blsp1_ahb_clk>;
+
+In the light of the latest patches from Stephen, this could be 
+
++ 	clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+
+
+Regards,
+Ivan
