@@ -1,89 +1,63 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Tue, 14 Jan 2014 17:34:22 +0800
-Subject: [PATCH V2] ARM: dts: imx6sl: add keypad support for i.mx6sl-evk
- board.
-In-Reply-To: <1389691663.16566847@f126.i.mail.ru>
-References: <1389691411-25231-1-git-send-email-b20788@freescale.com>
- <1389691663.16566847@f126.i.mail.ru>
-Message-ID: <20140114093422.GA29934@ubuntu>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Tue, 14 Jan 2014 18:38:58 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <52D3A43B.4030909@linaro.org>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389278112-7099-3-git-send-email-zhangfei.gao@linaro.org>
+ <003601cf0e09$5fb07c90$1f1175b0$%jun@samsung.com>
+ <52CFFFDA.8050108@linaro.org>
+ <001501cf1004$7b1f34b0$715d9e10$%jun@samsung.com>
+ <52D3515B.7040008@linaro.org>
+ <001c01cf1020$e3e1aed0$aba50c70$%jun@samsung.com>
+ <52D3A43B.4030909@linaro.org>
+Message-ID: <002801cf110c$731fd720$595f8560$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 01:27:43PM +0400, Alexander Shiyan wrote:
-> ???????, 14 ?????? 2014, 17:23 +08:00 ?? Anson Huang <b20788@freescale.com>:
-> > i.MX6SL EVK board has a 3*3 keypad matrix to support 8 keypads,
-> > enable them, the keymap is as below:
-> > 
-> > SW6:  MATRIX_KEY(0x0, 0x0, 0x67)  /* ROW0, COL0, KEY_UP */
-> > SW7:  MATRIX_KEY(0x0, 0x1, 0x6c)  /* ROW0, COL1, KEY_DOWN */
-> > SW8:  MATRIX_KEY(0x0, 0x2, 0x1c)  /* ROW0, COL2, KEY_ENTER */
-> > SW9:  MATRIX_KEY(0x1, 0x0, 0x66)  /* ROW1, COL0, KEY_HOME */
-> > SW10: MATRIX_KEY(0x1, 0x1, 0x6a)  /* ROW1, COL1, KEY_RIGHT */
-> > SW11: MATRIX_KEY(0x1, 0x2, 0x69)  /* ROW1, COL2, KEY_LEFT */
-> > SW12: MATRIX_KEY(0x2, 0x0, 0x72)  /* ROW2, COL0, KEY_VOLUMEDOWN */
-> > SW13: MATRIX_KEY(0x2, 0x1, 0x73)  /* ROW2, COL1, KEY_VOLUMEUP */
-> > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6sl-evk.dts |   28 ++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx6sl.dtsi    |    2 ++
-> >  2 files changed, 30 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-> > index f5e4513..a2a0399 100644
-> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> > @@ -8,6 +8,7 @@
-> >  
-> >  /dts-v1/;
-> >  
-> > +#include <dt-bindings/input/input.h>
-> >  #include "imx6sl.dtsi"
-> >  
-> >  / {
-> > @@ -93,6 +94,17 @@
-> >  			fsl,pins = <MX6SL_FEC_PINGRP1>;
-> >  		};
-> >  
-> > +		pinctrl_kpp: kppgrp {
-> > +			fsl,pins = <
-> > +				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-> > +				MX6SL_PAD_KEY_ROW1__KEY_ROW1    0x1b010
-> > +				MX6SL_PAD_KEY_ROW2__KEY_ROW2    0x1b0b0
-> > +				MX6SL_PAD_KEY_COL0__KEY_COL0    0x110b0
-> > +				MX6SL_PAD_KEY_COL1__KEY_COL1    0x110b0
-> > +				MX6SL_PAD_KEY_COL2__KEY_COL2    0x110b0
-> > +			>;
-> > +		};
-> > +
-> >  		pinctrl_uart1: uart1grp {
-> >  			fsl,pins = <MX6SL_UART1_PINGRP1>;
-> >  		};
-> > @@ -139,6 +151,22 @@
-> >  	};
-> >  };
-> >  
-> > +&kpp {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_kpp>;
-> > +	linux,keymap = <
-> > +			MATRIX_KEY(0x0, 0x0, 0x67)  /* ROW0, COL0, KEY_UP */
-> > +			MATRIX_KEY(0x0, 0x1, 0x6c)  /* ROW0, COL1, KEY_DOWN */
-> > +			MATRIX_KEY(0x0, 0x2, 0x1c)  /* ROW0, COL2, KEY_ENTER */
-> > +			MATRIX_KEY(0x1, 0x0, 0x66)  /* ROW1, COL0, KEY_HOME */
-> > +			MATRIX_KEY(0x1, 0x1, 0x6a)  /* ROW1, COL1, KEY_RIGHT */
-> > +			MATRIX_KEY(0x1, 0x2, 0x69)  /* ROW1, COL2, KEY_LEFT */
-> > +			MATRIX_KEY(0x2, 0x0, 0x72)  /* ROW2, COL0, KEY_VOLUMEDOWN */
-> > +			MATRIX_KEY(0x2, 0x1, 0x73)  /* ROW2, COL1, KEY_VOLUMEUP */
-> > +	>;
+On Mon, January 13, 2014, Zhangfei Gao wrote:
+> Dear Seungwon
 > 
-> So why you want to use hexadecimal values instead definitions for
-> keys from dt-bindings/input/input.h ?
-
-Sorry, I forget this after I send out the V2 patch, please check my V3 patch, sorry
-for your time.
-
-Anson.
+> On 01/13/2014 01:32 PM, Seungwon Jeon wrote:
+> >>>>>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+> >>>>>> +{
+> >>>>>> +	struct dw_mci_k3_priv_data *priv = host->priv;
+> >>>>>> +	u32 rate = priv->clk_table[ios->timing];
+> >>>>>
+> 
+> >>
+> >> The function mmc_clk_determine_rate() will need the info which
+> >> controller it is, what's the init clock rate, what's the max clock rate,
+> >> and what's the limitation, which may be different as different soc, and
+> >> can not be hardcoded.
+> >> The limitation may in HS200 and SDR104 mode.
+> >>
+> >> The plan is only input init rate and max rate instead of the table,
+> >> while others directly use ios->clock, only if the the limitation resolved.
+> >
+> > Handling mmc clock for hi3620 is in drivers/clk/hisilicon/clk-hi3620.c, right?
+> > Currently only hi3620 has been introduced.
+> > If hi3620's host has a limitation, clk-hi3620.c can handle clock range(init, max) for source clock
+> enough.
+> > I feel like clock table is redundant.
+> > Ok. It's just my suggestion.  But I still point dependency of mode index number.
+> > K3's clock table refers and depends mode definition value from include/linux/mmc/host.h
+> > If new mode is added or modified, it should be considered and also may make complicated.
+> >
+> 
+> Looks like you dislike the clk_table very much :)
+Oh, I just want to remove dependency as I mentioned.
 
 > 
-> ---
+> Double checked with the silicon guy, currently it is said the limitation
+> in HS200 and SDR104 can be replaced by the max_rate, so clk_table can be
+> replaced with ios->clock directly, though they have concern it is not so
+> convinent when removing clk_table in case limitation rate is not equal
+> to max_rate again in future.
+I guess specific clock handling(clk-hi3620.c) can adjust required source clock rate.
+
+> 
+> Will update accordingly, thanks for the suggestion.
+Thank you for consideration.
+
+Thanks,
+Seungwon Jeon
