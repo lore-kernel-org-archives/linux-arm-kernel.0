@@ -1,53 +1,55 @@
-From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
-Date: Tue, 14 Jan 2014 11:53:47 +0800
-Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for i.MX27/i.MX31
- CPUs
-In-Reply-To: <1389670245.433347746@f385.i.mail.ru>
-References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
- <1389448908.753471404@f40.i.mail.ru> <20140113213146.GM29475@pengutronix.de>
- <1389670245.433347746@f385.i.mail.ru>
-Message-ID: <52D4B4CB.6050609@gtsys.com.hk>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Tue, 14 Jan 2014 03:52:39 +0000
+Subject: AArch64 kernel image decompression
+In-Reply-To: <4250104.UfkPP3heXI@wuerfel>
+References: <20140110170436.GS8153@joshc.qualcomm.com>
+ <20140113111733.GD1189@mudshark.cambridge.arm.com>
+ <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
+ <4250104.UfkPP3heXI@wuerfel>
+Message-ID: <e79fa209ffc4485d8cae87bae3daa656@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 14, 2014 11:30 AM, Alexander Shiyan wrote:
-> ???????????, 13 ?????? 2014, 22:31 +01:00 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> On Sat, Jan 11, 2014 at 06:01:48PM +0400, Alexander Shiyan wrote:
->>> ???????, 11 ?????? 2014, 13:55 +01:00 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->>>> On Mon, Nov 11, 2013 at 11:09:16AM +0400, Alexander Shiyan wrote:
->>>>> Hello.
->>>>>
->>>>>>>>>> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
->>>>>>>>>>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
->>>>>>>>>>>
->>>>>>>>>>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
->>>>>>>>>>> ---
->>>>>>>>>>>      drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
->>>>>>>>>>>      1 file changed, 42 insertions(+)
->>>>> ...
->>>>>> At this point might be good to patch the imx27.dtsi with the usb defines.
->>>>> ...
->>>>>
->>>>> I have a working configuration for i.MX27 USB, but I prefer to make a few more
->>>>> tests before the addition of definitions in DTS. This will be a next step.
->>>>> Thanks.
->>>> Any news here?
->>> Not ready yet.
->> Are you still working at it? Would you mind sharing more details, like
->> your current tree/patch stack and what works/doesn't work for you?
->
-> Now my work on this is suspended, but will continue later.
-> I'll send you a personal letter with DT configuration.
-> Ports (both Host & OTG) are detected by kernel, but works Host only.
-> OTG not works nor as Host, nor as Device...
->
-> ---
-hi,
-I'm still working on my patches for imx27 and ULPI integration.  But 
-have more urgent things in the queue.
-I have a running version but it cant make it in the kernel. Rework on 
-platform device code needed.
-Just wait until the patches already accepted appears in the linux-next 
-before commit new patches.
+Hi Arnd,
 
-Chris
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, January 13, 2014 5:13 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Sharma Bhupesh-B45370; 'Will Deacon'; 'Josh Cartwright'; 'Catalin
+> Marinas'
+> Subject: Re: AArch64 kernel image decompression
+> 
+> On Monday 13 January 2014 11:29:20 bhupesh.sharma at freescale.com wrote:
+> >
+> > With the u-boot bootloader also having AArch64 support now (see [1]),
+> > it would make sense to add the uImage and decompressor support to the
+> > AArch64 Makefile in Linux kernel as well, so that u-boot can also boot
+> > uImages for AArch64 systems out-off-box.
+> >
+> > [1].
+> > http://git.denx.de/?p=u-boot/u-boot-arm.git;a=shortlog;h=refs/heads/aa
+> > rch64
+> 
+> u-boot should never have to use a uImage on arm64, since it already
+> supports booting a vmlinux file.
+> 
+> A more sensible thing to add would be vmlinux.gz support in u-boot, if
+> that doesn't exist already.
+> 
+
+AFAIK, u-boot requires a u-boot specific header (see [1]) on top of any image it wants to
+boot - whether it's a uncompressed vmlinux or a compressed vmlinux.gz
+
+In the ARM32 code base we had the Makefile rule to generate a uImage automatically (see [2]), with ARM64
+now, I am forced to compress the vmlinux and put a u-boot header on top of it using 'mkimage' and then
+feed the 'uImage' thus generated to the u-boot.
+
+So, it would be good if the ARM64 Makefile can mimic the ARM32 one in this aspect - now that we have
+a working u-boot capable of booting vanilla linux on an ARMv8 foundation model.
+
+[1]. http://www.denx.de/wiki/DULG/UBootImages
+[2]. https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/Makefile?id=refs/tags/next-20140110#n330
+
+Regards,
+Bhupesh
