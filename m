@@ -1,41 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 13 Jan 2014 18:41:35 -0500
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-In-Reply-To: <20140113233326.GG15937@n2100.arm.linux.org.uk>
-References: <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
- <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
- <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
- <20140112105958.GA9791@n2100.arm.linux.org.uk> <52D2B7C8.4060103@ti.com>
- <20140113123733.GU15937@n2100.arm.linux.org.uk> <52D3F7E0.3030206@ti.com>
- <20140113153128.6aaffb9af111ba75a7abd4db@linux-foundation.org>
- <20140113233326.GG15937@n2100.arm.linux.org.uk>
-Message-ID: <52D479AF.3010302@ti.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 14 Jan 2014 01:02:38 +0100
+Subject: [PATCH v6 5/6] ACPI: do not map/unmap memory regions for FADT
+ entries in reduced HW mode
+In-Reply-To: <52D471A7.9090907@linaro.org>
+References: <1389394340-2680-1-git-send-email-al.stone@linaro.org>
+ <3512616.qUD2F1beoi@vostro.rjw.lan> <52D471A7.9090907@linaro.org>
+Message-ID: <11986900.5FYeBqExXg@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 January 2014 06:33 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 13, 2014 at 03:31:28PM -0800, Andrew Morton wrote:
->> On Mon, 13 Jan 2014 09:27:44 -0500 Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->>
->>>> It seems to me to be absolutely silly to have code introduce a warning
->>>> yet push the fix for the warning via a completely different tree...
->>>>
->>> I mixed it up. Sorry. Some how I thought there was some other build
->>> configuration thrown the same warning with memblock series and hence
->>> suggested the patch to go via Andrew's tree.
->>
->> Yes, I too had assumed that the warning was caused by the bootmem
->> patches in -mm.
->>
->> But it in fact occurs in Linus's current tree.  I'll drop
->> mm-arm-fix-arms-__ffs-to-conform-to-avoid-warning-with-no_bootmem.patch
->> and I'll assume that rmk will fix this up at an appropriate time.
+On Monday, January 13, 2014 04:07:19 PM Al Stone wrote:
+> On 01/10/2014 04:32 PM, Rafael J. Wysocki wrote:
+> > On Friday, January 10, 2014 03:52:19 PM al.stone at linaro.org wrote:
+> >> From: Al Stone <al.stone@linaro.org>
+> >>
+> >> Several of the FADT fields are normally kept in specific memory
+> >> regions.  Since these fields are to be ignored in hardware reduced
+> >> ACPI mode, do not map those addresses when in that mode, and of
+> >> course do not release the mappings that have not been made.
+> >>
+> >> The function acpi_os_initialize() could become a stub in the header
+> >> file but is left here in case it can be of further use.
+> >
+> > Why exactly is this change necessary?
 > 
-> Thanks.  I'll apply my version and then I can pull Santosh's nobootmem
-> changes (which I've had a couple of times already) without adding to
-> the warnings.
+> Two reasons: (1) why do work we do not have to do?  and (2) it
+> seemed to make sense to me to have the code reflect the spec
+> accurately.
 > 
-Thanks Andrew and Russell for sorting out the patch queue.
+> > Will things work incorrectly on HW-reduced ACPI systems if we don't make it?
+> 
+> If the ACPI tables have all of these fields properly set to zero
+> in hardware reduced, this change does not need to be made.  If a
+> vendor provides broken ACPI tables where these values are valid,
+> but still sets hardware reduced in the FADT, these fields could
+> then be used as before -- but allowing them to be used would mean
+> we can no longer claim we are implementing hardware reduced correctly.
+> So things would work, but the system would by definition be in some
+> sort of undefined hybrid ACPI mode.
 
-Regards,
-Santosh
+So this is how it goes.  I'm being told that there are systems in existence
+where the HW-reduced bit is set for Windows RT compatibility, but otherwise
+the ACPI HW is fully functional on them.  Apparently, people are able to
+install and run Linux on those systems today.
+
+Question is, are they still going to be able to run Linux on them after the
+changes in this set?
+
+Rafael
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
