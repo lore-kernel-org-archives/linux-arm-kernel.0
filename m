@@ -1,57 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 14 Jan 2014 10:05:28 +0100
-Subject: [PATCH V2 0/3] SoC and board integration for QSPI on
- r8a7791/koelsch
-In-Reply-To: <20140114004638.GE18217@verge.net.au>
-References: <1389524433-2823-1-git-send-email-geert@linux-m68k.org>
- <20140114004638.GE18217@verge.net.au>
-Message-ID: <CAMuHMdWYqv41RwyZROmuSeD9F9RfFFyOuCxn+66NgJ3MbhsJvw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 14 Jan 2014 10:05:25 +0100
+Subject: [PATCH V6 6/8] Add EFI stub for ARM
+In-Reply-To: <1389371417-379-7-git-send-email-roy.franz@linaro.org>
+References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
+ <1389371417-379-7-git-send-email-roy.franz@linaro.org>
+Message-ID: <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, Jan 14, 2014 at 1:46 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Sun, Jan 12, 2014 at 12:00:29PM +0100, Geert Uytterhoeven wrote:
->> This series adds support for the Spansion s25fl512s SPI FLASH on the
->> r8a7791-based Koelsch board. It is based on
->> renesas-devel-v3.13-rc7-20140109v2, with Valentine's i2c pinctrl and
->> Laurent's SCIF DT work applied on top.
->> [Simon: I don't know in which order you will merge these. If you want me
->>  to rebase my patches, just ask! Thanks!]
+On 10 January 2014 17:30, Roy Franz <roy.franz@linaro.org> wrote:
+> This patch adds EFI stub support for the ARM Linux kernel.  The EFI stub
+> operates similarly to the x86 stub: it is a shim between the EFI firmware
+> and the normal zImage entry point, and sets up the environment that the
+> zImage is expecting.  This includes loading the initrd (optionaly) and
+> device tree from the system partition based on the kernel command line.
+> The stub updates the device tree as necessary, adding entries for EFI
+> runtime services. The PE/COFF "MZ" header at offset 0 results in the
+> first instruction being an add that corrupts r5, which is not used by
+> the zImage interface.
 >
-> I see that Laruent has taken patch 1/4.
->
-> Is it possible for me to merge patches 2-4/4 independently of that patch?
-> That is, can I apply them and still produce a kernel that boots. If so,
-> that is my preferred option. If not I will talk to Laurent about a branch
-> to base things on.
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> ---
 
-Yes you can. Note that RSPI still won't be enabled without "spi: rspi: Remove
-dependency on DMAE for SHMOBILE" (which has now landed in the spi tree).
-And with that patch applied, you'll get warnings like:
+[...]
 
-    pinmux core: sh-pfc does not support function qspi
-    sh-pfc pfc-r8a7791: invalid function qspi in map table
-    pinmux core: sh-pfc does not support function qspi
-    sh-pfc pfc-r8a7791: invalid function qspi in map table
+> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> new file mode 100644
+> index 0000000..dbb7101
+> --- /dev/null
+> +++ b/arch/arm/boot/compressed/efi-header.S
+> @@ -0,0 +1,117 @@
+> +@ Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
+> +@
+> +@ This file contains the PE/COFF header that is part of the
+> +@ EFI stub.
+> +@
+> +
+> +       .org    0x3c
+> +       @
+> +       @ The PE header can be anywhere in the file, but for
+> +       @ simplicity we keep it together with the MSDOS header
+> +       @ The offset to the PE/COFF header needs to be at offset
+> +       @ 0x3C in the MSDOS header.
+> +       @ The only 2 fields of the MSDOS header that are used are this
+> +       @ PE/COFF offset, and the "MZ" bytes at offset 0x0.
+> +       @
+> +       .long   pe_header                       @ Offset to the PE header.
+> +
+> +      .align 3
+> +pe_header:
+> +       .ascii  "PE"
+> +       .short  0
+> +
+> +coff_header:
+> +       .short  0x01c2                          @ ARM or Thumb
 
-which are harmless, and spi will still work, as that's the default pin config
-anyway.
+Could you explain why you are using 0x1c2 (Thumb) here and not 0x1c0 (ARM) ?
 
-> Also, I would like to get an Ack from Magnus.
-
-Sure.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers,
+Ard.
