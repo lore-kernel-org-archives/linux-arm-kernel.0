@@ -1,25 +1,72 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 07:58:13 -0800
-Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
-In-Reply-To: <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>
- <1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Jan 2014 10:59:45 -0500
+Subject: [PATCH v2 0/3] Fix SATA disk hotplug for Armada 370/XP SoCs
+In-Reply-To: <20140114154834.GD32507@kw.sim.vm.gnt>
+References: <1389711007-7239-1-git-send-email-simon.guinot@sequanux.org>
+ <20140114151404.GN19878@titan.lakedaemon.net>
+ <20140114154834.GD32507@kw.sim.vm.gnt>
+Message-ID: <20140114155945.GQ19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 9, 2014 at 6:35 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
-> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
-> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
-> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
->
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Simon,
 
-The Samsung Arndale board started failing boot from MMC root tests
-starting with next-20140113 and I bisected it down to this patch.
-Reverting this patch on top of next-20140114 gets Arndale booting
-again from MMC.  Is there some supporting DT data that's missing for
-Arndale?
+On Tue, Jan 14, 2014 at 04:48:34PM +0100, Simon Guinot wrote:
+> On Tue, Jan 14, 2014 at 10:14:04AM -0500, Jason Cooper wrote:
+> > Simon,
+> > 
+> > On Tue, Jan 14, 2014 at 03:50:04PM +0100, Simon Guinot wrote:
+> > > Hello,
+> > > 
+> > > This patch series fixes a SATA disk hotplug issue for the Armada 370/XP
+> > > SoCs: once a disk is removed from a SATA port, then the re-plug events
+> > > are not detected by the sata_mv driver.
+> > > 
+> > > This should be applied to the -stable kernels 3.10 and onwards. 
+> > 
+> > Please add a 'Fixes: <commit-hash> (oneline)' tag below the Cc: stable
+> > tags.  It looks like the sata_mv binding and the Armada 370 DT booting
+> > were both introduced in v3.6, so I would probably use:
+> > 
+> > Fixes: 9ae6f740b49f (arm: mach-mvebu: add support for Armada 370 and Armada XP with DT)
+> 
+> Hi Jason,
+> 
+> I am not comfortable with this "Fixes: commit_id" notation. It states
+> that the patch fixes a regression introduced by a given commit. This
+> hardly makes sense to me because obviously the hotplug issue has not
+> been introduced by:
+> 
+> "arm: mach-mvebu: add support for Armada 370 and Armada XP with DT".
+> 
+> I know that the purpose is purely administrative, but it is kind of
+> weird...
 
-Kevin
+True, the wording may not be the best, but the goal is to make it easier
+to do a 'tag --contains' search.  We could call it
+
+Repair-Something-Broken-Since-Introduced-by:
+
+in this case ;-)
+
+> > Is there a specific reason you say v3.10?
+> 
+> I could have said nothing as well.
+> 
+> As stable kernel older than 3.10 are no longer maintained, I think
+> we don't need to point out a specific commit as a -stable target.
+> Simply Cc'ing -stable without any extra informations should be good
+> enough.
+
+The reason I ask is that I'd like to know if, in debugging this issue,
+you discovered that the fix was not needed before v3.10 (hypothetically,
+say because sata hotplug was added in v3.10).
+
+The linux-stable team isn't the only people who find this information
+useful.  Distros maintaining older kernels would find it very helpful
+when going through -stable patches to know easily if a patch should be
+backported further, say to v3.8.
+
+thx,
+
+Jason.
