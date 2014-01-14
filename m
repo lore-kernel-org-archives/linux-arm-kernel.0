@@ -1,82 +1,41 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 14 Jan 2014 10:15:19 +0100
-Subject: [RFC] dma-mapping: Provide write-combine allocations
-In-Reply-To: <1389621188-3094-1-git-send-email-treding@nvidia.com>
-References: <1389621188-3094-1-git-send-email-treding@nvidia.com>
-Message-ID: <52D50027.60207@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Jan 2014 10:16:27 +0100
+Subject: [PATCH V4 1/6] ARM: dts: imx6q: add common compatible name for
+ reused modules
+In-Reply-To: <20140114022609.GA1896@S2101-09.ap.freescale.net>
+References: <1389614031-7253-1-git-send-email-b20788@freescale.com>
+ <20140113121016.GJ16215@pengutronix.de>
+ <20140113142249.GW23525@S2101-09.ap.freescale.net>
+ <20140113151623.GL16215@pengutronix.de>
+ <20140114022609.GA1896@S2101-09.ap.freescale.net>
+Message-ID: <20140114091626.GM16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 14, 2014 at 10:26:11AM +0800, Shawn Guo wrote:
+> 
+> Since the assembly function imx6_suspend() needs to check the cpu_type,
+> we have to keep it in imx6_cpu_pm_info.  So I assume you're suggesting
+> we remove the field from imx6_pm_socdata and determine the cpu_type by
+> comparing socdata pointer with particular imx6_pm_socdata like below?
+> 
+> 	if (socdata == &imx6q_pm_data)
+> 		pm_info->cpu_type = MXC_CPU_IMX6Q;
+> 	else if (socdata == &imx6dl_pm_data)
+> 		pm_info->cpu_type = MXC_CPU_IMX6DL;
+> 	else if (socdata == &imx6sl_pm_data)
+> 		pm_info->cpu_type = MXC_CPU_IMX6SL;
+> 
+> Looking at these if-clauses, I do not think we win too much from doing
+> thing in this way.
 
-On 2014-01-13 14:53, Thierry Reding wrote:
-> Provide an implementation for dma_{alloc,free}_writecombine() when the
-> architecture supports DMA attributes.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->   arch/arm/include/asm/dma-mapping.h | 16 ----------------
->   include/linux/dma-mapping.h        | 16 ++++++++++++++++
->   2 files changed, 16 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index e701a4d9aa59..96b7634a7edc 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -242,22 +242,6 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->   			void *cpu_addr, dma_addr_t dma_addr, size_t size,
->   			struct dma_attrs *attrs);
->   
-> -static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
-> -				       dma_addr_t *dma_handle, gfp_t flag)
-> -{
-> -	DEFINE_DMA_ATTRS(attrs);
-> -	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> -	return dma_alloc_attrs(dev, size, dma_handle, flag, &attrs);
-> -}
-> -
-> -static inline void dma_free_writecombine(struct device *dev, size_t size,
-> -				     void *cpu_addr, dma_addr_t dma_handle)
-> -{
-> -	DEFINE_DMA_ATTRS(attrs);
-> -	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> -	return dma_free_attrs(dev, size, cpu_addr, dma_handle, &attrs);
-> -}
-> -
->   /*
->    * This can be called during early boot to increase the size of the atomic
->    * coherent DMA pool above the default value of 256KiB. It must be called
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index fd4aee29ad10..8475e02b4bd1 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -249,6 +249,22 @@ struct dma_attrs;
->   #define dma_unmap_sg_attrs(dev, sgl, nents, dir, attrs) \
->   	dma_unmap_sg(dev, sgl, nents, dir)
->   
-> +#else
-> +static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
-> +					   dma_addr_t *dma_addr, gfp_t gfp)
-> +{
-> +	DEFINE_DMA_ATTRS(attrs);
-> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> +	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
-> +}
-> +
-> +static inline void dma_free_writecombine(struct device *dev, size_t size,
-> +					 void *cpu_addr, dma_addr_t dma_addr)
-> +{
-> +	DEFINE_DMA_ATTRS(attrs);
-> +	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-> +	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
-> +}
->   #endif /* CONFIG_HAVE_DMA_ATTRS */
->   
->   #ifdef CONFIG_NEED_DMA_MAP_STATE
+Indeed not. I thought the cpu_type field would be unused now, but this
+is not the case.
 
-I would also add dma_mmap_writecombine() to the above functions.
+Sascha
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
