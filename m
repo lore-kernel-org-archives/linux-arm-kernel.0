@@ -1,25 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jan 2014 14:10:10 +0000
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jan 2014 15:11:47 +0100
 Subject: [PATCH] ARM: S3C[24|64]xx: move includes back under <mach/> scope
 In-Reply-To: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
 References: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140114141010.GK15567@sirena.org.uk>
+Message-ID: <3526096.UdPXMDriCf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 02:53:38PM +0100, Linus Walleij wrote:
+On Tuesday 14 January 2014 14:53:38 Linus Walleij wrote:
 > When refactoring and breaking out the includes for the
 > machine-specific GPIO configuration, two files were created
 > in <linux/platform_data/gpio-samsung-s3c[24|64]xx.h>, but as
 > that namespace shall be used for defining data exchanged
 > between machines and drivers, using it for these broad macros
 > and config settings is wrong.
+> 
+> Move the headers back into the machine-local
+> <mach/gpio-samsung.h> file and think about the next step.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/cb346089/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
