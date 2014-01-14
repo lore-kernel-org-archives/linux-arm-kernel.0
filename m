@@ -1,54 +1,62 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 14:40:04 -0800
-Subject: [GIT PULL 4/4] GIC crossbar support for v3.14 merge window
-In-Reply-To: <20140109012215.GL31323@atomide.com> (Tony Lindgren's message of
- "Wed, 8 Jan 2014 17:22:16 -0800")
-References: <20140109011940.GI31323@atomide.com>
- <20140109012215.GL31323@atomide.com>
-Message-ID: <87r48a5gsb.fsf@linaro.org>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed, 15 Jan 2014 00:46:12 +0200
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+ <52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+ <52D55CE5.1060902@ti.com>
+ <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+ <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
+ <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+ <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
+ <52D5A60C.7080800@ti.com>
+ <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
+Message-ID: <CAArO44tKGZ57-YToTEK_wGtV2WaCXvOWdfqBvHPtJ4=uJCbdgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
+On 14 January 2014 23:13, Nishanth Menon <nm@ti.com> wrote:
+> On Tue, Jan 14, 2014 at 3:03 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>>
+>>> ok.. some sort of Linaro thing about which I have no background about
+>>> - but dont really care in this context.
+>>>
+>> Nothing related Linaro. Its just that platforms are supporting ARM BE
+>> mode and Linaro folks had working patches for Panda. So I suggested
+>> to get them on the lists.
 >
->   Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
+> I tend to think -> is this with OFF mode and CPUidle completely
+> working? All context save and restore works with this? on HS and GP
+> devices with BE mode builds? works on SDP4430,60 variations,
+> considered reuse with AM43xx which could use parts of that logic?
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/crossbar-signed
->
-> for you to fetch changes up to 70d4545544853e2d95909b919d4565ff32c3e3c5:
->
->   ARM: DRA: Enable Crossbar IP support for DRA7XX (2014-01-08 09:21:42 -0800)
->
-> ----------------------------------------------------------------
-> Add support for GIC crossbar that routes interrupts on newer omaps.
->
-> ----------------------------------------------------------------
+> I mean to indicate that terms like "works on panda" tends always to be relative.
 
-I think this one is a little late for v3.14 also, and should spend some
-more time in -next before v3.15.  Also...
+Nishanth, let's be objective here.
+CPUidle on 4460 does *not* work in mainline for at least two kernel releases
+even for LE [1]. That fix exists because that "one group of folks"
+faced the issue
+during BE testing. Looks like not much people care about CPUIdle on OMAP4.
 
-> Sricharan R (4):
->       irqchip: irq-gic: Add support for routable irqs
+> It is nice to see it as a proof of concept, but I'd hate to see some
+> dead code lying around in kernel and folks blindly following suit and
+> introducing macros for new assembly for a feature that in practice
+> just one group of folks care about and creates additional burden for
+> rest of folks trying to keep that functionality going as we jump from
+> one "device tree" style churn to another "framework"? Not to mean that
+> good features should be kept away.. but personally, I could not find
+> convincing arguments in this case..
 
-... I see a Reviewed-by from tglx on this one...
-        
->       irqchip: crossbar: Add support for Crossbar IP
+In general I understand your concerns from previous e-mails, but I don't
+see a point to spend time for a generic solution for a single user.
+If there will be other platforms which need similar changes, then we can
+think of some generic solution. Let's drop this patch for now.
+We can just disable CPUidle for BE tasks or keep this patch forked.
 
-...but no signs of irqchip mainainer review/ack on this one.
+[1] https://lkml.org/lkml/2013/10/22/401
 
-Ideally, these two irqchip ones would be merged through the irqchip
-maintainers...
-
->       ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
->       ARM: DRA: Enable Crossbar IP support for DRA7XX
-
-.. and then we'd take these two through arm-soc.
-
-If there are strong dependencies, we can take them all through arm-soc,
-but I'd like to see the tags from the irqchip maintainers first.
-
-Kevin
+-- 
+Regards,
+Taras Kondratiuk
