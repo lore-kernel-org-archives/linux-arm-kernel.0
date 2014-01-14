@@ -1,85 +1,35 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 14 Jan 2014 11:44:19 +0000
-Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
-In-Reply-To: <201401140752.33257.arnd@arndb.de>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <201401131943.10352.arnd@arndb.de>
- <20140113200135.GF30907@bivouac.eciton.net>
- <201401140752.33257.arnd@arndb.de>
-Message-ID: <20140114114419.GH30907@bivouac.eciton.net>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 14 Jan 2014 19:52:27 +0800
+Subject: [PATCH 1/2] clk: hisilicon: add hi3620_mmc_clks
+In-Reply-To: <002a01cf1115$19f6bde0$4de439a0$%jun@samsung.com>
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
+ <002a01cf1115$19f6bde0$4de439a0$%jun@samsung.com>
+Message-ID: <52D524FB.2050903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 07:52:32AM +0100, Arnd Bergmann wrote:
-> > > > It uses the generic configuration table scanning to populate ACPI and
-> > > > SMBIOS pointers.
-> > > 
-> > > As far as I'm concerned there are no plans to have ACPI support on ARM32,
-> > > so I wonder what the code to populate the ACPI tables is about. Can
-> > > you clarify this?
-> > 
-> > Are you suggesting that I should #ifndef ARM in common code, or that I
-> > should neglect to document what the common code will do with data it is
-> > given by UEFI?
+
+
+On 01/14/2014 06:40 PM, Seungwon Jeon wrote:
+> On Mon, January 13, 2014, Zhangfei Gao wrote:
+>> Suggest by Arnd: abstract mmc tuning as clock behavior,
+>> also because different soc have different tuning method and registers.
+>> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 > 
-> It would probably be good to document the fact that it won't work,
-> possibly even having a BUG_ON statement in the code for this case.
-
-Why?
-
-You'll only touch that pointer if you enable CONFIG_ACPI, and if you
-do you probably want that address. Sounds a bit hostile to throw a BUG
-in the face of someone who's (for example) just succeeded to get Linux
-running on a Windows RT device.
-
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 78a79a6a..1ab24cc 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
-> > > >  	  the same virtual memory range as kmap so all early mappings must
-> > > >  	  be unapped before paging_init() is called.
-> > > >  
-> > > > +config EFI
-> > > > +	bool "UEFI runtime service support"
-> > > > +	depends on OF && !CPU_BIG_ENDIAN
-> > > 
-> > > What is the dependency on !CPU_BIG_ENDIAN?
-> > 
-> > Mainly on code not being implemented to byte-reverse UCS strings.
+> I add my ack.
+> Please run 'checkpatch' and remove some warnings.
 > 
-> Why would you byte-reverse /strings/? They normally just come in
-> order of the characters, and UTF-16 strings are already defined
-> as being big-endian or marked by the BOM character.
-
-Well, then that bit might just work[tm].
-
-Although no other architectures supported by UEFI support big-endian,
-so to be honest, I don't want to have to be the first one to validate
-that in order to get the basic support into the kernel.
-
-Some of the data structures might need swizzling though...
-Again - if there is demand, this can be dealt with at a later date.
-
-> > > > +struct efi_memory_map memmap;
-> > > 
-> > > "memmap" is not a good name for a global identifier, particularly because
-> > > it's easily confused with the well-known "mem_map" array. This
-> > > wants namespace prefix like you other variable, or a "static" tag,
-> > > preferably both.
-> > 
-> > It is defined by include/linux/efi.h.
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 > 
-> This seems to be a mistake: there is no user of this variable outside
-> of arch/x86/platform/efi/efi.c and arch/x86/platform/efi/efi_64.c.
-> I think it should just be moved into an x86 specific header file,
-> or preferably be renamed in the process. There is also efi->memmap,
-> which seems to be the same pointer.
 
-Humm, seems I unknowingly removed the only remaining x86-external
-reference to this variable when I made efi_lookup_mapped_address a
-common function.
-Yeah, changing this makes sense.
+Thanks Seungwon.
 
-/
-    Leif
+Have checked before, and ignoring warnings of "line over 80 characters"
+seems more neat.
+
+Thanks
