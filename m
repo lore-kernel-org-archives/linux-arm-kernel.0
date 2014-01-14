@@ -1,21 +1,49 @@
-From: yifan.zhangm@gmail.com (Yifan Zhang)
-Date: Tue, 14 Jan 2014 18:13:21 +0800
-Subject: [PATCH] iommu/arm-smmu: change pud/pmd entry fill sequence
-In-Reply-To: <20140114100737.GA25681@mudshark.cambridge.arm.com>
-References: <1388750486-5060-1-git-send-email-yifan.zhangm@gmail.com>
- <20140106142833.GC10449@mudshark.cambridge.arm.com>
- <CAGZxSSSjhqg4vnw__qoW0zLibEG_1FChrHWFFUorkV65Sq0ogg@mail.gmail.com>
- <20140114100737.GA25681@mudshark.cambridge.arm.com>
-Message-ID: <CAGZxSSQZXUCqh+Wac0Eh+mjB6SWF-ZaHVaQvO1Fb6kCS_Eh54A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Jan 2014 11:16:45 +0100
+Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <52CC6782.4060309@broadcom.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-3-git-send-email-syin@broadcom.com>
+ <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
+ <52CC6782.4060309@broadcom.com>
+Message-ID: <CACRpkdYyz+zrzt0y135Wcq-yUMhiHOb1ov15+SsnVOcZvad96g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got it, Thanks :-)
+On Tue, Jan 7, 2014 at 9:45 PM, Sherman Yin <syin@broadcom.com> wrote:
+> On 14-01-07 09:15 AM, Linus Walleij wrote:
 
-On Tue, Jan 14, 2014 at 6:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jan 14, 2014 at 09:02:49AM +0000, Yifan Zhang wrote:
->> It seems this patch is still not merged yet, any concerns about it ?
+> Is that what you wanted to see in pinctrl-bindings.txt, or is there
+> something else you want to see added to that txt file?  I didn't want to add
+> the description of slew-rate arguments there because this is capri-specific.
+> I'm not quite sure what else to add.
+(...)
+> That doc already says bias-pull-up is specified in Ohm, and the specific
+> values are chip-specific, so I don't think they should be mentioned there.
+
+You're right, forget about this. I didn't realize the pinctrl bindings doc
+was that good...
+
+>>> +Optional Properties (for HDMI pins):
+>>> +
+>>> +- function:                    String. Specifies the pin mux selection.
+>>> Values
+>>> +                               must be one of: "alt1", "alt2", "alt3",
+>>> "alt4"
+>>> +- slew-rate:                   Integer. Controls slew rate.
+>>> +                                       0: Standard(100kbps)&
+>>> Fast(400kbps) mode
+>>> +                                       1: Highspeed (3.4Mbps) mode
+>>
+>> Hmmmm slew rate is not specifiec in "bps" but rather in
+>> something like volts per second. But maybe it's best to keep
+>> this value driver-specific.
 >
-> No, I was planning to send it at -rc1 with a CC stable.
->
-> Will
+> Right, I think the slew-rates values are capri specific.
+
+OK
+
+Yours,
+Linus Walleij
