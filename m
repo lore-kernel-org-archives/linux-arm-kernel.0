@@ -1,33 +1,33 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 14 Jan 2014 11:04:19 -0500
-Subject: [PATCH v8 3/4] ata: Add APM X-Gene SoC SATA host controller driver
-In-Reply-To: <20140114160312.GH12131@htj.dyndns.org>
-References: <1389031922-4309-3-git-send-email-lho@apm.com>
- <1389031922-4309-4-git-send-email-lho@apm.com>
- <52D052F9.8050703@redhat.com>
- <20140111193104.GD3257@mtj.dyndns.org>
- <6EB44142-06DA-4C9D-8999-CFA9EE30E03D@apm.com>
- <20140112114958.GA8509@mtj.dyndns.org>
- <CAPw-ZTmfKfPY3DRfJT6FQP78ULwfcjGG76cNfr9yk7UMdrO4wg@mail.gmail.com>
- <20140113160843.GB29053@htj.dyndns.org>
- <CAPw-ZT=A=c9-3BfP-LoDBXByQqfvATpAdS4NPPWB9+R1+GHfDA@mail.gmail.com>
- <20140114160312.GH12131@htj.dyndns.org>
-Message-ID: <20140114160419.GI12131@htj.dyndns.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 14 Jan 2014 08:04:40 -0800
+Subject: [PATCH] ARM: tegra: fix tegra_powergate_sequence_power_up() inline
+In-Reply-To: <20140114134225.GC10936@ulmo.nvidia.com> (Thierry Reding's
+ message of "Tue, 14 Jan 2014 14:42:26 +0100")
+References: <1389650502-30017-1-git-send-email-swarren@wwwdotorg.org>
+ <20140114134225.GC10936@ulmo.nvidia.com>
+Message-ID: <87k3e28s87.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:03:12AM -0500, Tejun Heo wrote:
-> > As mentioned, the flush requires immediately after reading the CI.
-> > Otherwise, there is still an chance that the command is completed and
-> > the OS notified the upper layer while the data is still in flight. For
-> > the initial version, I will remove the flush (IRQ wrapper) and submit
-> > separate patch.
-> 
-> The function is called with ap->lock held.  Nothing can happen
-> inbetween.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-Oh, or do you mean that upper layer may get data which hasn't finish
-transferring without the flush?
+> On Mon, Jan 13, 2014 at 03:01:42PM -0700, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>> 
+>> Remove an invalid semicolon from the inline dummy, thus solving:
+>> In file included from drivers/gpu/drm/tegra/gr3d.c:15:0:
+>> include/linux/tegra-powergate.h:119:1: error: expected identifier or '(' before '{' token
+>> 
+>> Fixes: 80b28791ff04 ("ARM: tegra: pass reset to tegra_powergate_sequence_power_up()")
+>> Reported-by: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>  include/linux/tegra-powergate.h | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Reviewed-by: Thierry Reding <treding@nvidia.com>
 
--- 
-tejun
+Applied to next/soc (where the offending patch was merged), merged into
+for-next, and pushed out.
+
+Kevin
