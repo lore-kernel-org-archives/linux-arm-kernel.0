@@ -1,41 +1,33 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Tue, 14 Jan 2014 15:21:27 +0100
-Subject: [PATCH] ARM: dts: imx28-apf28dev: add user button
-Message-ID: <1389709287-25742-1-git-send-email-sebastien.szymanski@armadeus.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 14 Jan 2014 15:20:36 +0100
+Subject: [PATCH] ARM: s3c24xx: explicit dependency on <plat/gpio-cfg.h>
+In-Reply-To: <1389708788-18331-1-git-send-email-linus.walleij@linaro.org>
+References: <1389708788-18331-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <2340755.WhXRgu2emH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
----
- arch/arm/boot/dts/imx28-apf28dev.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Am Dienstag, 14. Januar 2014, 15:13:08 schrieb Linus Walleij:
+> Previously the custom GPIO header for the S3C24xx would in turn
+> bring in the custom pin control implementation from
+> <plat/gpio-cfg.h>. This is not good as it mixes up two
+> subsystems and makes the dependencies hard to track. Make
+> the dependency explicit by explicitly including the pin
+> control header where needed.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Maintainers: this builds on top of the previous patch moving
+> headers back to <mach/*>. This will also boil in linux-next,
+> ACKs appreciated.
+> ---
 
-diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-index 334dea5..221cac4 100644
---- a/arch/arm/boot/dts/imx28-apf28dev.dts
-+++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-@@ -48,6 +48,7 @@
- 						MX28_PAD_LCD_D20__GPIO_1_20
- 						MX28_PAD_LCD_D21__GPIO_1_21
- 						MX28_PAD_LCD_D22__GPIO_1_22
-+						MX28_PAD_GPMI_CE1N__GPIO_0_17
- 					>;
- 					fsl,drive-strength = <MXS_DRIVE_4mA>;
- 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-@@ -193,4 +194,14 @@
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		user-button {
-+			label = "User button";
-+			gpios = <&gpio0 17 0>;
-+			linux,code = <0x100>;
-+		};
-+	};
- };
--- 
-1.8.3.2
+Acked-by: Heiko Stuebner <heiko@sntech.de>
