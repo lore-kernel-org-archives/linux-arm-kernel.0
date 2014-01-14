@@ -1,47 +1,44 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 14 Jan 2014 22:48:50 +0100
-Subject: [PATCH v5 0/4] Krait L1/L2 EDAC driver
-In-Reply-To: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
-References: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140114214850.GQ29865@pd.tnic>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jan 2014 21:49:10 +0000
+Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
+ controller
+In-Reply-To: <CAHrpEqS-_EBa2z+StMjk9upeyLWLff_p=bS+14TVMDQjoEHv+g@mail.gmail.com>
+References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
+ <CAHrpEqS-_EBa2z+StMjk9upeyLWLff_p=bS+14TVMDQjoEHv+g@mail.gmail.com>
+Message-ID: <20140114214910.GC15567@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 01:30:30PM -0800, Stephen Boyd wrote:
-> This patchset adds support for the Krait L1/L2 cache error detection
-> hardware. The first patch adds the Krait l2 indirection
-> register code. This patch is in need of an ACK from ARM folks.
-> The next two patches add the driver and the binding and 
-> the final patch hooks it all up by adding the device tree node.
-> 
-> I think Boris will pick up the first and third patches since they depend
-> on each other. The final dts change could go through arm-soc via davidb's tree
-> and the Documentation patch could go through the devicetree tree. Or patches 1
-> through 3 can go through Boris' tree.
-> 
-> Changes since v4:
->  * Prefixed l2 accessors functions with krait_
->  * Dropped first two patches as Boris says he picked them up
+On Thu, Jan 09, 2014 at 04:56:02PM -0600, Frank Li wrote:
 
-Hey Stephen,
+> > Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-I'm going to send upstream only
+> ping!
 
-[PATCH v4 1/6] edac: Don't try to cancel workqueue when it's never setup
+Don't send contentless pings, either your mail has been lost (in which
+case it'll need resending anyway) or this is just yet another mail to
+read.  You should also, as covered in SubmittingPatches, CC any patches
+to both the maintainers (remembering to use the address in MAINTAINERS)
+and the relevant mailing list.  For SPI that's:
 
-as it is a clear bugfix.
+SPI SUBSYSTEM
+M:      Mark Brown <broonie@kernel.org>
+L:      linux-spi at vger.kernel.org
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
+Q:      http://patchwork.kernel.org/project/spi-devel-general/list/
+S:      Maintained
+F:      Documentation/spi/
+F:      drivers/spi/
+F:      include/linux/spi/
+F:      include/uapi/linux/spi/
 
-The second one
-
-[PATCH v4 2/6] genirq: export percpu irq functions for module usage
-
-will have to wait for when the driver goes in. But the driver depends on
-"ARM: Add Krait L2 register accessor functions" which still waits for
-ACKs, right?
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+It's OK to send to other places as well but don't rely on them, for
+example my linux-arm-kernel folder currently has 1405 unread messages in
+it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/0446376b/attachment.sig>
