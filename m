@@ -1,46 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Jan 2014 07:12:23 -0600
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-Message-ID: <20140114131223.GC10818@saruman.home>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 14 Jan 2014 14:17:03 +0100
+Subject: [PATCH 4/7] drivers/pci/host: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1389700739-3696-4-git-send-email-wsa@the-dreams.de>
+References: <1389700739-3696-1-git-send-email-wsa@the-dreams.de>
+ <1389700739-3696-4-git-send-email-wsa@the-dreams.de>
+Message-ID: <201401141417.03349.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 06:19:17PM -0600, Suman Anna wrote:
-> This is an updated series mainly addressing Mark Rutland's comments
-> about hwlock specifier being always one-cell. The series adds the
-> support for #hwlock-cells property and adds a simple default OF
-> translate function.
+On Tuesday, January 14, 2014 at 12:58:55 PM, Wolfram Sang wrote:
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
 > 
-> The DTS patches from previous series have already been merged, and
-> needs this property to be added. This is handled in a separate series
-> that only deals with OMAP hwspinlock DTS patches.
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+
+True that,
+
+Acked-by: Marek Vasut <marex@denx.de>
+
+> ---
 > 
-> The series, along with the DTS patches, is tested on top of v3.13-rc8
-> plus Tero's v13 clock DT series and Tony's 3.14 staged branches. The
-> validation on OMAP5, DRA7, AM437 requires Tero's series with couple of
-> additional base patches for AM43xx. AM43xx functionality needs a hwmod
-> fix [1] for creating the associated omap_device as well.
+> Should go via subsystem tree
 > 
-> The validation logs on all the applicable OMAP SoCs are at:
->   OMAP4 - http://paste2.org/YJ7ZwG80
->   OMAP5 - http://paste2.org/c6vO96b9
->   DRA7  - http://paste2.org/tHvxN439
->   AM33x - http://paste2.org/AjCv0U4t
->   AM43x - http://paste2.org/2AKIPa55
+>  drivers/pci/host/pci-imx6.c | 5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index bd70af8..5002e23 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -426,11 +426,6 @@ static int __init imx6_pcie_probe(struct
+> platform_device *pdev) "imprecise external abort");
+> 
+>  	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!dbi_base) {
+> -		dev_err(&pdev->dev, "dbi_base memory resource not found\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	pp->dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
+>  	if (IS_ERR(pp->dbi_base)) {
+>  		ret = PTR_ERR(pp->dbi_base);
 
-I build tested your 3.13-rc8-v4 branch with the same script I used to
-build CCF series and hspinlock built without any problems ;-)
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/77e31aff/attachment.sig>
+Best regards,
+Marek Vasut
