@@ -1,33 +1,60 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 13 Jan 2014 18:26:44 -0600
-Subject: [PATCH 0/3] OMAP hwspinlock DT updates
-Message-ID: <1389659207-39445-1-git-send-email-s-anna@ti.com>
+Date: Mon, 13 Jan 2014 18:26:45 -0600
+Subject: [PATCH 1/3] ARM: dts: OMAP: Add #hwlock-cells property to hwspinlock
+ nodes
+In-Reply-To: <1389659207-39445-1-git-send-email-s-anna@ti.com>
+References: <1389659207-39445-1-git-send-email-s-anna@ti.com>
+Message-ID: <1389659207-39445-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a new generic property "#hwlock-cells" to the hwspinlock
+DT nodes on OMAP4, OMAP5 and AM33xx. This common property allows
+different platform implementations to define the args specifier
+length. OMAP implementations will always use a value of 1.
 
-This series updates the existing OMAP hwspinlock DT nodes to have a
-#hwlock-cells property as suggested by Mark Rutland [1], and adds the
-hwspinlock nodes for two other newer SoCs - DRA7xx and AM43xx.
-
-Posting the series separately from the driver DT adapation changes [2]
-to avoid maintainer confusion.
-
-[1] http://marc.info/?l=linux-omap&m=138433541420926&w=2
-[2] http://marc.info/?l=linux-omap&m=138965904015225&w=2 
-
-Suman Anna (3):
-  ARM: dts: OMAP: Add #hwlock-cells property to hwspinlock nodes
-  ARM: dts: DRA7: Add hwspinlock node
-  ARM: dts: AM4372: Add hwspinlock node
-
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
  arch/arm/boot/dts/am33xx.dtsi | 1 +
- arch/arm/boot/dts/am4372.dtsi | 7 +++++++
- arch/arm/boot/dts/dra7.dtsi   | 7 +++++++
  arch/arm/boot/dts/omap4.dtsi  | 1 +
  arch/arm/boot/dts/omap5.dtsi  | 1 +
- 5 files changed, 17 insertions(+)
+ 3 files changed, 3 insertions(+)
 
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index f6d8ffe..17a7cc3 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -292,6 +292,7 @@
+ 			compatible = "ti,omap4-hwspinlock";
+ 			reg = <0x480ca000 0x1000>;
+ 			ti,hwmods = "spinlock";
++			#hwlock-cells = <1>;
+ 		};
+ 
+ 		wdt2: wdt at 44e35000 {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index a1e0585..246780d 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -261,6 +261,7 @@
+ 			compatible = "ti,omap4-hwspinlock";
+ 			reg = <0x4a0f6000 0x1000>;
+ 			ti,hwmods = "spinlock";
++			#hwlock-cells = <1>;
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index fc3fad5..adb71af 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -291,6 +291,7 @@
+ 			compatible = "ti,omap4-hwspinlock";
+ 			reg = <0x4a0f6000 0x1000>;
+ 			ti,hwmods = "spinlock";
++			#hwlock-cells = <1>;
+ 		};
+ 
+ 		mcspi1: spi at 48098000 {
 -- 
 1.8.4.3
