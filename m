@@ -1,46 +1,54 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 15:46:33 -0800
-Subject: [GIT PULL] at91: cleanup for 3.14 #2
-In-Reply-To: <1389190989-8261-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Wed, 8 Jan 2014 15:23:09 +0100")
-References: <1389190989-8261-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <877ga25dpi.fsf@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 15 Jan 2014 00:46:52 +0100
+Subject: [PATCH net-next 2/2] net: mvneta: make mvneta_txq_done() return void
+In-Reply-To: <cover.1389742334.git.arno@natisbad.org>
+References: <cover.1389742334.git.arno@natisbad.org>
+Message-ID: <1e35971f3ee9f4d120bff5fe98179160998ea0fa.1389742334.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-> Arnd, Olof, Kevin,
->
-> A little "cleanup" pull-request for 3.14 that goes on top of the previous
-> AT91 cleanup material.
-> The thing to note from this pull-request is the beginning of board file removal
-> thank to the conversion to DT. We are still waiting for more feedback from
-> board maintainer to intensify the effort.
->
-> Thanks, best regards,
->
-> The following changes since commit b46e837d8ef1f3c777bbf9513e2cdb5d87d6c374:
->
->   ARM: at91/dt: remove old clk material (2013-12-02 15:31:29 +0100)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-cleanup2
->
-> for you to fetch changes up to e91a5555df5883bbc204b0e1f8e0489d3f7f3f2e:
->
->   ARM: at91: switch Calao QIL-A9260 board to DT (2013-12-19 17:27:30 +0100)
->
-> ----------------------------------------------------------------
-> Second cleanup pull-request for 3.14:
-> - a tiny fix for the recent AT91 CCF implementation
-> - the switch of one platform to DT with board file removal
->
-> ----------------------------------------------------------------
+The function return parameter is not used in mvneta_tx_done_gbe(),
+where the function is called. This patch makes the function return
+void.
 
-Pulled into next/cleanup.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Thanks,
-
-Kevin
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 8c5150124b5e..f418f4f20f94 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1314,15 +1314,16 @@ static void mvneta_txq_bufs_free(struct mvneta_port *pp,
+ }
+ 
+ /* Handle end of transmission */
+-static int mvneta_txq_done(struct mvneta_port *pp,
++static void mvneta_txq_done(struct mvneta_port *pp,
+ 			   struct mvneta_tx_queue *txq)
+ {
+ 	struct netdev_queue *nq = netdev_get_tx_queue(pp->dev, txq->id);
+ 	int tx_done;
+ 
+ 	tx_done = mvneta_txq_sent_desc_proc(pp, txq);
+-	if (tx_done == 0)
+-		return tx_done;
++	if (!tx_done)
++		return;
++
+ 	mvneta_txq_bufs_free(pp, txq, tx_done);
+ 
+ 	txq->count -= tx_done;
+@@ -1331,8 +1332,6 @@ static int mvneta_txq_done(struct mvneta_port *pp,
+ 		if (txq->size - txq->count >= MAX_SKB_FRAGS + 1)
+ 			netif_tx_wake_queue(nq);
+ 	}
+-
+-	return tx_done;
+ }
+ 
+ static void *mvneta_frag_alloc(const struct mvneta_port *pp)
+-- 
+1.8.5.2
