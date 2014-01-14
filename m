@@ -1,71 +1,25 @@
-From: dailemon.gl@gmail.com (Lemon Dai)
-Date: Tue, 14 Jan 2014 22:08:44 +0800
-Subject: Add .determine_rate to composite clk
-In-Reply-To: <CAJiWf8WJxf0S32bPiXGUu3Rwmh36xYdbd0VEpLTG-pwyvVnasg@mail.gmail.com>
-References: <CAJiWf8W6rCnnF9Tv+cpcqqshEb4ALD+J_RnYeLkaNVG-Rcd+QA@mail.gmail.com>
- <20140111102843.GU2941@lukather>
- <CAJiWf8WJxf0S32bPiXGUu3Rwmh36xYdbd0VEpLTG-pwyvVnasg@mail.gmail.com>
-Message-ID: <CAJiWf8Wvcu0pWBNd7xSm9ES7ApTNp27CXTHWBxbr4msfNd9xCA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jan 2014 14:10:10 +0000
+Subject: [PATCH] ARM: S3C[24|64]xx: move includes back under <mach/> scope
+In-Reply-To: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
+References: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140114141010.GK15567@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, Jan 14, 2014 at 02:53:38PM +0100, Linus Walleij wrote:
+> When refactoring and breaking out the includes for the
+> machine-specific GPIO configuration, two files were created
+> in <linux/platform_data/gpio-samsung-s3c[24|64]xx.h>, but as
+> that namespace shall be used for defining data exchanged
+> between machines and drivers, using it for these broad macros
+> and config settings is wrong.
 
-The commit 107f3198 in Mike's clk-next branch shows that:
-(about line 72 in drivers/clk/clk-composite.c)
-
-        } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
-                mux_hw->clk = hw->clk;
-                return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
-                                               best_parent_p);
-
-
- It should be fixed as follows, at least for reason that  NULL rate_hw
-may be used in the old code,
-
-        } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
-                mux_hw->clk = hw->clk;
- -              return mux_ops->determine_rate(rate_hw, rate, best_parent_rate,
- +             return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
-                                               best_parent_p);
-
---
-Best regards,
-Lemon Dai
-
-On Sun, Jan 12, 2014 at 11:56 AM, Lemon Dai <dailemon.gl@gmail.com> wrote:
-> Hi  Maxime,
->
-> Thank you for your reply and suggestion.
->  I am sorry for sending  a mail with such a lot of style issues before
-> reading Documentation/SubmittingPatches file.
->
-> Best wishes,
-> Lemon
->
-> On Sat, Jan 11, 2014 at 6:28 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi Lemon,
->>
->> On Sat, Jan 11, 2014 at 05:15:58PM +0800, Lemon Dai wrote:
->>> Hi Mike,
->>>
->>> As .determine_rate was added to struct clk and clk_mux_ops, maybe we
->>> should also copy determine_rate operation from mux_ops to
->>> clk_composite_ops in clk_register_composite( ),
->>> to make composite clk implementation more generic.
->>
->> A similar patch is on its way to 3.14 already (commit 107f3198 in
->> Mike's clk-next branch).
->>
->> Also, for future contributions, I'd suggest to read the
->> Documentation/SubmittingPatches file. Your patch had several style
->> issues that are covered in this file.
->>
->> Thanks!
->> Maxime
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux, Kernel and Android engineering
->> http://free-electrons.com
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/cb346089/attachment.sig>
