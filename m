@@ -1,77 +1,109 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 14 Jan 2014 20:09:10 +0100
-Subject: [PATCH 1/1] drivers: i2c: silence a compile warning in
- i2c-s3c2410.c
-In-Reply-To: <1389323025-4478-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389323025-4478-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20140114190910.GE10340@katana>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 14 Jan 2014 20:09:57 +0100
+Subject: [PATCH v3 2/3] ata: sata_mv: fix disk hotplug for Armada 370/XP SoCs
+In-Reply-To: <1389726281-8731-1-git-send-email-simon.guinot@sequanux.org>
+References: <1389726281-8731-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1389726606-8866-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 12:03:45PM +0900, Pankaj Dubey wrote:
-> If used 64 bit compiler GCC warns that:
-> 
-> drivers/i2c/busses/i2c-s3c2410.c: In function ?s3c24xx_get_device_quirks?:
-> drivers/i2c/busses/i2c-s3c2410.c:168:10: warning: cast from pointer to integer
-> of different size [-Wpointer-to-int-cast]
-> 
-> This patch fixes this by converting "unsigned int" to "unsigned long".
+From: Lior Amsalem <alior@marvell.com>
 
-Maybe switch to kernel_ulong_t? Since this is used in mod_devicetable.h
-all over.
+On Armada 370/XP SoCs, once a disk is removed from a SATA port, then the
+re-plug events are not detected by the sata_mv driver. This patch fixes
+the issue by updating the PHY speed in the LP_PHY_CTL register (0x58)
+according to the SControl speed.
 
-> 
-> CC: Kukjin Kim <kgene.kim@samsung.com>
-> CC: Wolfram Sang <wsa@the-dreams.de>
-> CC: linux-i2c at vger.kernel.org
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index bf8fb94..447dd98 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -101,7 +101,7 @@ enum s3c24xx_i2c_state {
->  
->  struct s3c24xx_i2c {
->  	wait_queue_head_t	wait;
-> -	unsigned int            quirks;
-> +	unsigned long            quirks;
+Note that this fix is only applied if the compatible string
+"marvell,armada-370-sata" is found in the SATA DT node.
 
-The indentation is corrupted.
+Fixes: 9ae6f740b49f ("arm: mach-mvebu: add support for Armada 370 and Armada XP with DT")
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: stable at vger.kernel.org # v3.6+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+---
+Changes since v1:
+- Only fix the LP_PHY_CTL register (0x58) if the compatible string
+  "marvell,armada-370-xp-sata" is found in the SATA DT node.
+- Update the commit message.
 
->  	unsigned int		suspended:1;
->  
->  	struct i2c_msg		*msg;
-> @@ -160,12 +160,13 @@ MODULE_DEVICE_TABLE(of, s3c24xx_i2c_match);
->   * Get controller type either from device tree or platform device variant.
->  */
->  
-> -static inline unsigned int s3c24xx_get_device_quirks(struct platform_device *pdev)
-> +static inline unsigned long
-> +	s3c24xx_get_device_quirks(struct platform_device *pdev)
+Changes since v2:
+- Use compatible string "marvell,armada-370-sata" instead of
+  "marvell,armada-370-xp-sata".
+- Provide more informations for -stable.
 
-Keep it one line please, ignoring the 80 char thing.
+ drivers/ata/sata_mv.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
->  {
->  	if (pdev->dev.of_node) {
->  		const struct of_device_id *match;
->  		match = of_match_node(s3c24xx_i2c_match, pdev->dev.of_node);
-> -		return (unsigned int)match->data;
-> +		return (unsigned long)match->data;
->  	}
->  
->  	return platform_get_device_id(pdev)->driver_data;
-
-The last line also returns kernel_ulong_t. No real difference, but using
-it is a little more consistent.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140114/e480c926/attachment-0001.sig>
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index 4ec5368c10f7..dc9d4b1ea4ec 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -304,6 +304,7 @@ enum {
+ 	MV5_LTMODE		= 0x30,
+ 	MV5_PHY_CTL		= 0x0C,
+ 	SATA_IFCFG		= 0x050,
++	LP_PHY_CTL		= 0x058,
+ 
+ 	MV_M2_PREAMP_MASK	= 0x7e0,
+ 
+@@ -431,6 +432,7 @@ enum {
+ 	MV_HP_CUT_THROUGH	= (1 << 10),	/* can use EDMA cut-through */
+ 	MV_HP_FLAG_SOC		= (1 << 11),	/* SystemOnChip, no PCI */
+ 	MV_HP_QUIRK_LED_BLINK_EN = (1 << 12),	/* is led blinking enabled? */
++	MV_HP_FIX_LP_PHY_CTL	= (1 << 13),	/* fix speed in LP_PHY_CTL ? */
+ 
+ 	/* Port private flags (pp_flags) */
+ 	MV_PP_FLAG_EDMA_EN	= (1 << 0),	/* is EDMA engine enabled? */
+@@ -1358,6 +1360,7 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+ 
+ 	if (ofs != 0xffffffffU) {
+ 		void __iomem *addr = mv_ap_base(link->ap) + ofs;
++		struct mv_host_priv *hpriv = link->ap->host->private_data;
+ 		if (sc_reg_in == SCR_CONTROL) {
+ 			/*
+ 			 * Workaround for 88SX60x1 FEr SATA#26:
+@@ -1374,6 +1377,18 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
+ 			 */
+ 			if ((val & 0xf) == 1 || (readl(addr) & 0xf) == 1)
+ 				val |= 0xf000;
++
++			if (hpriv->hp_flags & MV_HP_FIX_LP_PHY_CTL) {
++				void __iomem *lp_phy_addr =
++					mv_ap_base(link->ap) + LP_PHY_CTL;
++				/*
++				 * Set PHY speed according to SControl speed.
++				 */
++				if ((val & 0xf0) == 0x10)
++					writelfl(0x7, lp_phy_addr);
++				else
++					writelfl(0x227, lp_phy_addr);
++			}
+ 		}
+ 		writelfl(val, addr);
+ 		return 0;
+@@ -4110,6 +4125,15 @@ static int mv_platform_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		goto err;
+ 
++	/*
++	 * To allow disk hotplug on Armada 370/XP SoCs, the PHY speed must be
++	 * updated in the LP_PHY_CTL register.
++	 */
++	if (pdev->dev.of_node &&
++		of_device_is_compatible(pdev->dev.of_node,
++					"marvell,armada-370-sata"))
++		hpriv->hp_flags |= MV_HP_FIX_LP_PHY_CTL;
++
+ 	/* initialize adapter */
+ 	rc = mv_init_host(host);
+ 	if (rc)
+-- 
+1.8.5.2
