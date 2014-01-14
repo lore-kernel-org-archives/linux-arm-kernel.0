@@ -1,131 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 Jan 2014 11:43:37 +0000
-Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <1389554441-27335-3-git-send-email-broonie@kernel.org>
-References: <1389554441-27335-1-git-send-email-broonie@kernel.org>
- <1389554441-27335-3-git-send-email-broonie@kernel.org>
-Message-ID: <20140114114336.GB28912@e102568-lin.cambridge.arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 14 Jan 2014 11:44:19 +0000
+Subject: [PATCH v4 4/5] arm: Add [U]EFI runtime services support
+In-Reply-To: <201401140752.33257.arnd@arndb.de>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <201401131943.10352.arnd@arndb.de>
+ <20140113200135.GF30907@bivouac.eciton.net>
+ <201401140752.33257.arnd@arndb.de>
+Message-ID: <20140114114419.GH30907@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, Jan 14, 2014 at 07:52:32AM +0100, Arnd Bergmann wrote:
+> > > > It uses the generic configuration table scanning to populate ACPI and
+> > > > SMBIOS pointers.
+> > > 
+> > > As far as I'm concerned there are no plans to have ACPI support on ARM32,
+> > > so I wonder what the code to populate the ACPI tables is about. Can
+> > > you clarify this?
+> > 
+> > Are you suggesting that I should #ifndef ARM in common code, or that I
+> > should neglect to document what the common code will do with data it is
+> > given by UEFI?
+> 
+> It would probably be good to document the fact that it won't work,
+> possibly even having a BUG_ON statement in the code for this case.
 
-apart from a couple of minor nits and a question, it looks fine to me.
+Why?
 
-On Sun, Jan 12, 2014 at 07:20:39PM +0000, Mark Brown wrote:
-> +static void __init parse_core(struct device_node *core, int cluster_id,
-> +			      int core_id)
-> +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	int i, cpu;
-> +	struct device_node *t;
-> +
-> +	i = 0;
+You'll only touch that pointer if you enable CONFIG_ACPI, and if you
+do you probably want that address. Sounds a bit hostile to throw a BUG
+in the face of someone who's (for example) just succeeded to get Linux
+running on a Windows RT device.
 
-You could initialize i at declaration, I can understand why you are doing that
-explictly in parse_cluster (two loops, to make code clearer), but here
-it does not make much sense to add a line for that.
+> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > index 78a79a6a..1ab24cc 100644
+> > > > --- a/arch/arm/Kconfig
+> > > > +++ b/arch/arm/Kconfig
+> > > > @@ -1853,6 +1853,20 @@ config EARLY_IOREMAP
+> > > >  	  the same virtual memory range as kmap so all early mappings must
+> > > >  	  be unapped before paging_init() is called.
+> > > >  
+> > > > +config EFI
+> > > > +	bool "UEFI runtime service support"
+> > > > +	depends on OF && !CPU_BIG_ENDIAN
+> > > 
+> > > What is the dependency on !CPU_BIG_ENDIAN?
+> > 
+> > Mainly on code not being implemented to byte-reverse UCS strings.
+> 
+> Why would you byte-reverse /strings/? They normally just come in
+> order of the characters, and UTF-16 strings are already defined
+> as being big-endian or marked by the BOM character.
 
-> +	do {
-> +		snprintf(name, sizeof(name), "thread%d", i);
+Well, then that bit might just work[tm].
 
-If we wanted to be very picky, you need to copy "thread" just once (same
-goes for other strings), but we'd better leave code as is IMHO.
+Although no other architectures supported by UEFI support big-endian,
+so to be honest, I don't want to have to be the first one to validate
+that in order to get the basic support into the kernel.
 
-> +		t = of_get_child_by_name(core, name);
+Some of the data structures might need swizzling though...
+Again - if there is demand, this can be dealt with at a later date.
 
-Should we check the MT bit in MPIDR_EL1 before validating threads as well ?
+> > > > +struct efi_memory_map memmap;
+> > > 
+> > > "memmap" is not a good name for a global identifier, particularly because
+> > > it's easily confused with the well-known "mem_map" array. This
+> > > wants namespace prefix like you other variable, or a "static" tag,
+> > > preferably both.
+> > 
+> > It is defined by include/linux/efi.h.
+> 
+> This seems to be a mistake: there is no user of this variable outside
+> of arch/x86/platform/efi/efi.c and arch/x86/platform/efi/efi_64.c.
+> I think it should just be moved into an x86 specific header file,
+> or preferably be renamed in the process. There is also efi->memmap,
+> which seems to be the same pointer.
 
-I do not like the idea because this means reliance on MPIDR_EL1 for MT
-and DT for topology bits, but it might be a worthwhile check.
+Humm, seems I unknowingly removed the only remaining x86-external
+reference to this variable when I made efi_lookup_mapped_address a
+common function.
+Yeah, changing this makes sense.
 
-It is certainly odd to have a DT with threads and an MPIDR_EL1 with the MT
-bit clear.
-
-> +		if (t) {
-> +			leaf = false;
-> +			cpu = get_cpu_for_node(t);
-> +			if (cpu >= 0) {
-> +				cpu_topology[cpu].socket_id = cluster_id;
-> +				cpu_topology[cpu].core_id = core_id;
-> +				cpu_topology[cpu].thread_id = i;
-> +			} else {
-> +				pr_err("%s: Can't get CPU for thread\n",
-> +				       t->full_name);
-> +			}
-> +		}
-> +		i++;
-> +	} while (t);
-> +
-> +	cpu = get_cpu_for_node(core);
-> +	if (cpu >= 0) {
-> +		if (!leaf) {
-> +			pr_err("%s: Core has both threads and CPU\n",
-> +			       core->full_name);
-> +			return;
-> +		}
-> +
-> +		cpu_topology[cpu].socket_id = cluster_id;
-> +		cpu_topology[cpu].core_id = core_id;
-> +	} else if (leaf) {
-> +		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
-> +	}
-> +}
-> +
-> +static void __init parse_cluster(struct device_node *cluster, int depth)
-> +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	bool has_cores = false;
-> +	struct device_node *c;
-> +	static int cluster_id = 0;
-
-static int __initdata cluster_id;
-
-[...]
-
-> +static void __init parse_dt_topology(void)
-> +{
-> +	struct device_node *cn;
-> +
-> +	cn = of_find_node_by_path("/cpus");
-> +	if (!cn) {
-> +		pr_err("No CPU information found in DT\n");
-> +		return;
-> +	}
-> +
-> +	/*
-> +	 * If topology is provided as a cpu-map it is essentially a
-> +	 * root cluster.
-
-This comment is a bit misleading, because as you know, (1) topology
-can only be provided with cpu-map, (2) cpu-map is not a root cluster.
-
-> +	 */
-> +	cn = of_find_node_by_name(cn, "cpu-map");
-> +	if (!cn)
-> +		return;
-> +	parse_cluster(cn, 0);
-> +}
-> +
-> +#else
-> +static inline void parse_dt_topology(void) {}
-> +#endif
-> +
->  /*
->   * cpu topology table
->   */
-> @@ -87,5 +227,8 @@ void __init init_cpu_topology(void)
->  		cpumask_clear(&cpu_topo->core_sibling);
->  		cpumask_clear(&cpu_topo->thread_sibling);
->  	}
-> +
-> +	parse_dt_topology();
-> +
->  	smp_wmb();
->  }
-
-With the changes/comments above pending:
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+/
+    Leif
