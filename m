@@ -1,104 +1,53 @@
-From: courtney.cavin@sonymobile.com (Courtney Cavin)
-Date: Tue, 14 Jan 2014 15:44:03 -0800
-Subject: [PATCH v4 4/6] spmi: pmic_arb: add support for interrupt handling
-In-Reply-To: <0f3e257f098d5f1ec6e9f09ba4dbf055291f2d83.1389738151.git.joshc@codeaurora.org>
-References: <cover.1389738151.git.joshc@codeaurora.org>
- <0f3e257f098d5f1ec6e9f09ba4dbf055291f2d83.1389738151.git.joshc@codeaurora.org>
-Message-ID: <20140114234402.GD23276@sonymobile.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 14 Jan 2014 18:44:09 -0500
+Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
+In-Reply-To: <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
+References: <1389625399-24087-1-git-send-email-taras.kondratiuk@linaro.org>
+ <52D404DE.2020806@ti.com>
+ <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
+ <52D55CE5.1060902@ti.com>
+ <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
+ <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
+ <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
+ <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
+ <52D5A60C.7080800@ti.com>
+ <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
+Message-ID: <52D5CBC9.5020201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 07:41:38PM +0100, Josh Cartwright wrote:
-> The Qualcomm PMIC Arbiter, in addition to being a basic SPMI controller,
-> also implements interrupt handling for slave devices.  Note, this is
-> outside the scope of SPMI, as SPMI leaves interrupt handling completely
-> unspecified.
+On Tuesday 14 January 2014 04:13 PM, Nishanth Menon wrote:
+> On Tue, Jan 14, 2014 at 3:03 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>>
+>>> ok.. some sort of Linaro thing about which I have no background about
+>>> - but dont really care in this context.
+>>>
+>> Nothing related Linaro. Its just that platforms are supporting ARM BE
+>> mode and Linaro folks had working patches for Panda. So I suggested
+>> to get them on the lists.
 > 
-> Extend the driver to provide a irq_chip implementation and chained irq
-> handling which allows for these interrupts to be used.
+> I tend to think -> is this with OFF mode and CPUidle completely
+> working? All context save and restore works with this? on HS and GP
+> devices with BE mode builds? works on SDP4430,60 variations,
+> considered reuse with AM43xx which could use parts of that logic?
 > 
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
->  drivers/spmi/spmi-pmic-arb.c | 393 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 391 insertions(+), 2 deletions(-)
+> I mean to indicate that terms like "works on panda" tends always to be relative.
+>
+Fair enough.
+ 
+> It is nice to see it as a proof of concept, but I'd hate to see some
+> dead code lying around in kernel and folks blindly following suit and
+> introducing macros for new assembly for a feature that in practice
+> just one group of folks care about and creates additional burden for
+> rest of folks trying to keep that functionality going as we jump from
+> one "device tree" style churn to another "framework"? Not to mean that
+> good features should be kept away.. but personally, I could not find
+> convincing arguments in this case..
 > 
+I haven't looked at patch myself but as you pointed out if it adds
+dead code and makes the code un-readable then probably that something
+we shouldn't merge.
 
-Yay! Good to see this series.
-
-> diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
-> index 16083cd..32bed54 100644
-> --- a/drivers/spmi/spmi-pmic-arb.c
-> +++ b/drivers/spmi/spmi-pmic-arb.c
-> @@ -13,6 +13,9 @@
->  #include <linux/err.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/irq.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> @@ -103,6 +106,14 @@ enum pmic_arb_cmd_op_code {
->   * @cnfg:              address of the PMIC Arbiter configuration registers.
->   * @lock:              lock to synchronize accesses.
->   * @channel:           which channel to use for accesses.
-> + * @irq:               PMIC ARB interrupt.
-> + * @ee:                        the current Execution Environment
-> + * @min_apid:          minimum APID (used for bounding IRQ search)
-> + * @max_apid:          maximum APID
-> + * @mapping_table:     in-memory copy of PPID -> APID mapping table.
-> + * @domain:            irq domain object for PMIC IRQ domain
-> + * @spmic:             SPMI controller object
-> + * @apid_to_ppid:      cached mapping from APID to PPID
->   */
->  struct spmi_pmic_arb_dev {
->         void __iomem            *base;
-> @@ -110,6 +121,14 @@ struct spmi_pmic_arb_dev {
->         void __iomem            *cnfg;
->         spinlock_t              lock;
->         u8                      channel;
-> +       unsigned int            irq;
-> +       u8                      ee;
-> +       u8                      min_apid;
-> +       u8                      max_apid;
-> +       u32                     mapping_table[SPMI_MAPPING_TABLE_LEN];
-> +       struct irq_domain       *domain;
-> +       struct spmi_controller  *spmic;
-> +       u16                     apid_to_ppid[256];
->  };
-> 
->  static inline u32 pmic_arb_base_read(struct spmi_pmic_arb_dev *dev, u32 offset)
-> @@ -314,12 +333,333 @@ static int pmic_arb_write_cmd(struct spmi_controller *ctrl, u8 opc, u8 sid,
->         return rc;
->  }
-> 
-> +enum qpnpint_regs {
-> +       QPNPINT_REG_RT_STS              = 0x10,
-> +       QPNPINT_REG_SET_TYPE            = 0x11,
-> +       QPNPINT_REG_POLARITY_HIGH       = 0x12,
-> +       QPNPINT_REG_POLARITY_LOW        = 0x13,
-> +       QPNPINT_REG_LATCHED_CLR         = 0x14,
-> +       QPNPINT_REG_EN_SET              = 0x15,
-> +       QPNPINT_REG_EN_CLR              = 0x16,
-> +       QPNPINT_REG_LATCHED_STS         = 0x18,
-> +};
-> +
-> +struct spmi_pmic_arb_qpnpint_type {
-> +       u8 type; /* 1 -> edge */
-> +       u8 polarity_high;
-> +       u8 polarity_low;
-> +} __packed;
-> +
-
-While the rest of this driver uses 'pmic' or 'spmi_pmic', this patch
-adds 'qpnpint'.  Can we please just leave the software fabricated name
-'qpnp' out of any changes, as it isn't in any hardware spec?  Perhaps
-'pmic_int' or something along those lines?
-
-> +/* Simplified accessor functions for irqchip callbacks */
-> +static void qpnpint_spmi_write(struct irq_data *d, u8 reg, void *buf,
-> +                              size_t len)
-[...]
-
--Courtney
+Regards,
+Santosh
