@@ -1,41 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jan 2014 10:53:47 +0000
-Subject: [RFC 2/2] arm: Get rid of meminfo
-In-Reply-To: <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
- <1389765322-28582-3-git-send-email-lauraa@codeaurora.org>
- <20140115094957.GL15937@n2100.arm.linux.org.uk>
- <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
-Message-ID: <20140115105347.GM15937@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Jan 2014 10:54:46 +0000
+Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
+In-Reply-To: <20140115093641.4167.83109@quantum>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
+ <20140109015158.7168.60274@quantum>
+ <52D4B502.3080409@codeaurora.org>
+ <20140115093641.4167.83109@quantum>
+Message-ID: <20140115105446.GF15567@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 10:22:02AM +0000, Catalin Marinas wrote:
-> On 15 January 2014 09:49, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Jan 14, 2014 at 09:55:22PM -0800, Laura Abbott wrote:
-> >> memblock is now fully integrated into the kernel and is the prefered
-> >> method for tracking memory. Rather than reinvent the wheel with
-> >> meminfo, migrate to using memblock directly instead of meminfo as
-> >> an intermediate.
-> >
-> > The reason I never killed meminfo was that for some of the functions here
-> > is that meminfo has a slightly different property to memblock.
-> >
-> > With meminfo, each sparsemem section mapping or discontigmem node must be
-> > specified as a separate bank of memory, even if it is contiguous with the
-> > previous block.  This is so that the functions which walk the page arrays
-> > can do so efficiently (without having to convert from a PFN to a struct
-> > page for every page in the system, which is very inefficient.)
-> 
-> pfn_to_page() conversion is indeed expensive with sparsemem (on
-> 32-bit) but does meminfo actually add a noticeable improvement to the
-> boot time? I don't think so but it's worth testing (something a
-> thousand cycles maximum would be lost in the noise).
+On Wed, Jan 15, 2014 at 01:36:41AM -0800, Mike Turquette wrote:
 
-Why do you ask about boot time?
+> Providing common functions for the basic case (e.g. read-modify-write on
+> a register using a known mask) is reasonable. But that is exactly what
+> the existing basic clock types do (sans regmap) and they have all become
+> pretty ugly over time. And the clk-composite implementation just makes
+> me a sad panda.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+What we've tried to do with regulators is just have multiple helper
+functions in the core rather than trying to merge their implementation,
+the drivers pick the right one for their usage, and in cases where there
+aren't many drivers doing the same thing we just have the driver either
+copy the bits of the implementation they reuse or call the helper
+function from within the implementation.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/8b75c283/attachment.sig>
