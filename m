@@ -1,29 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jan 2014 11:06:43 +0100
-Subject: [PATCH] ARM: dts: sun7i: add pin muxing options for UART2
-In-Reply-To: <1389710990-16384-1-git-send-email-wens@csie.org>
-References: <1389710990-16384-1-git-send-email-wens@csie.org>
-Message-ID: <20140115100643.GJ3377@lukather>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 15 Jan 2014 18:07:49 +0800
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 10:49:50PM +0800, Chen-Yu Tsai wrote:
-> UART2 is used on CubieTruck to connect to the Bluetooth module.
-> Add the pin set used in this case.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+can not be checked by IS_ERR_VALUE.
+Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+otherwise sd detect may occasionally fail.
 
-Queued for 3.15, thanks!
-Maxime
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/mmc/host/dw_mmc.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index a776f24f4311..9ded62c8225e 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	int present;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+ 	struct dw_mci_board *brd = slot->host->pdata;
+-	int gpio_cd = !mmc_gpio_get_cd(mmc);
++	struct dw_mci *host = slot->host;
++	int gpio_cd = mmc_gpio_get_cd(mmc);
+ 
+ 	/* Use platform get_cd function, else try onboard card detect */
+ 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+@@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	else if (brd->get_cd)
+ 		present = !brd->get_cd(slot->id);
+ 	else if (!IS_ERR_VALUE(gpio_cd))
+-		present = !!gpio_cd;
++		present = !gpio_cd;
+ 	else
+ 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+ 			== 0 ? 1 : 0;
+ 
++	spin_lock_bh(&host->lock);
+ 	if (present) {
+ 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is present\n");
+@@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is not present\n");
+ 	}
++	spin_unlock_bh(&host->lock);
+ 
+ 	return present;
+ }
+@@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ 	return gpio;
+ }
+ 
+-/* find the cd gpio for a given slot; or -1 if none specified */
++/* find the cd gpio for a given slot */
+ static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
+ 					struct mmc_host *mmc)
+ {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/93282b61/attachment.sig>
+1.7.9.5
