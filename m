@@ -1,104 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jan 2014 08:46:47 +0100
-Subject: [PATCH v3.1 11/21] ARM: pxa: support ICP DAS LP-8x4x FPGA irq
-In-Reply-To: <1389308855-32588-1-git-send-email-ynvich@gmail.com>
-References: <1387309071-22382-12-git-send-email-ynvich@gmail.com>
- <1389308855-32588-1-git-send-email-ynvich@gmail.com>
-Message-ID: <CACRpkdaA_HBcRgBj9+x_RJquSnvy-r7Wqp-z=ZnoGaCBy+wamw@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 15 Jan 2014 08:46:53 +0100
+Subject: [PATCH 1/1] mmc: sdhci: fix lockdep error on tunning routine
+In-Reply-To: <CAA+hA=Sb+Ve2xyto9v6YirqcXnePK2aHzJgjGZOhEQJK5Z0jqQ@mail.gmail.com>
+References: <1387797184-18958-1-git-send-email-b29396@freescale.com>
+ <CAA+hA=TRQP7hS3+iXyHg3FuNQKA=chJi7Ne47Ew_4RJcQ6yong@mail.gmail.com>
+ <20140113120435.GQ31570@twins.programming.kicks-ass.net>
+ <CAA+hA=Sb+Ve2xyto9v6YirqcXnePK2aHzJgjGZOhEQJK5Z0jqQ@mail.gmail.com>
+Message-ID: <20140115084653.4f6aece8@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is looking much better!
+Hi,
 
-On Fri, Jan 10, 2014 at 12:07 AM, Sergei Ianovich <ynvich@gmail.com> wrote:
+Dong Aisheng wrote:
+> On Mon, Jan 13, 2014 at 8:04 PM, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Thu, Dec 26, 2013 at 03:58:20PM +0800, Dong Aisheng wrote:
+> >> > It's strange that this issue did not happen on kernel 3.10.17 with the same
+> >> > code. And looking at the code, before call spin_lock we already disable the mmc
+> >> > controller irq, per on my understanding, the deadlock given by lockdep may not
+> >> > be able to happen(pls fix me if wrong).
+> >> > May the lockdep not track the specific irq disable?
+> >> > Copy lockdep guy to comment.
+> >
+> > No, lockdep also doesn't know only that one line can take this lock.
+> > Lockdep only knows a lock is taken from IRQ context, and disabling one
+> > line still allows IRQs to happen and therefore it yells.
+> 
+> Okay, thanks for the information.
+> If that, kernel 3.10.17 has the same code, do you know why it does not trigger
+> such lockdep error?
+> 
+compiled with CONFIG_LOCKDEP disabled?
 
-> +++ b/drivers/irqchip/irq-lp8x4x.c
-(...)
 
-You could add some kerneldoc to this following struct (OK nitpick, but
-still nice, especially for the last two variables).
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> +struct lp8x4x_irq_data {
-> +       void                    *base;
-> +       struct irq_domain       *domain;
-> +       unsigned long           num_irq;
-> +       unsigned char           irq_sys_enabled;
-> +       unsigned char           irq_high_enabled;
-> +};
-> +
-> +static void lp8x4x_mask_irq(struct irq_data *d)
-> +{
-> +       unsigned mask;
-> +       unsigned long irq = d->hwirq;
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Name the local variable hwirq too so we know what it is.
-
-> +       struct lp8x4x_irq_data *host = irq_data_get_irq_chip_data(d);
-> +
-> +       if (!host) {
-> +               pr_err("lp8x4x: missing host data for irq %i\n", d->irq);
-> +               return;
-> +       }
-> +
-> +       if (irq >= host->num_irq) {
-> +               pr_err("lp8x4x: wrong irq handler for irq %i\n", d->irq);
-> +               return;
-> +       }
-
-This is on the hotpath. Do you *really* need these two checks?
-
-(...)
-> +static void lp8x4x_unmask_irq(struct irq_data *d)
-> +{
-> +       unsigned mask;
-> +       unsigned long irq = d->hwirq;
-
-Name the variable "hwirq".
-
-> +       struct lp8x4x_irq_data *host = irq_data_get_irq_chip_data(d);
-> +
-> +       if (!host) {
-> +               pr_err("lp8x4x: missing host data for irq %i\n", d->irq);
-> +               return;
-> +       }
-> +
-> +       if (irq >= host->num_irq) {
-> +               pr_err("lp8x4x: wrong irq handler for irq %i\n", d->irq);
-> +               return;
-> +       }
-
-Again overzealous error checks.
-
-(...)
-> +static void lp8x4x_irq_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +       int n;
-> +       unsigned long mask;
-> +       struct irq_chip *chip = irq_desc_get_chip(desc);
-> +       struct lp8x4x_irq_data *host = irq_desc_get_handler_data(desc);
-> +
-> +       if (!host)
-> +               return;
-
-I don't think this happens either?
-
-> +       chained_irq_enter(chip, desc);
-> +
-> +       for (;;) {
-> +               mask = ioread8(host->base + CLRHILVINT) & 0xff;
-> +               mask |= (ioread8(host->base + SECOINT) & SECOINT_MASK) << 8;
-> +               mask |= (ioread8(host->base + PRIMINT) & PRIMINT_MASK) << 8;
-> +               mask &= host->irq_high_enabled | (host->irq_sys_enabled << 8);
-> +               if (mask == 0)
-> +                       break;
-> +               for_each_set_bit(n, &mask, BITS_PER_LONG)
-> +                       generic_handle_irq(irq_find_mapping(host->domain, n));
-> +       }
-
-I like the looks of this.
-
-If you fix this:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
