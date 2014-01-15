@@ -1,65 +1,104 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Wed, 15 Jan 2014 21:26:28 +0900
-Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
-In-Reply-To: <52D67A9B.4090607@linaro.org>
-References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
- <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
- <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
- <52D67A9B.4090607@linaro.org>
-Message-ID: <001c01cf11ed$039b6270$0ad22750$%jun@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 13:33:38 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a
+ gpio used as an interrupt source.
+In-Reply-To: <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+ <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+Message-ID: <20140115123338.GC9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, January 15, 2014, Zhangfei Gao wrote:
-> On 01/15/2014 07:58 PM, Seungwon Jeon wrote:
-> > On Wed, January 15, 2014, Zhangfei Gao wrote:
-> >> Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
-> >> CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
-> >> can not be checked by IS_ERR_VALUE.
-> >> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
-> >> otherwise sd detect may occasionally fail.
+On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
+> Hi Boris,
+> 
+> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
+> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
 > >>
-> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >> Reported-by: Kevin Hilman <khilman@linaro.org>
-> >> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> ---
-> >>   drivers/mmc/host/dw_mmc.c |    9 ++++++---
-> >>   1 file changed, 6 insertions(+), 3 deletions(-)
+> >> Hello Nicolas, Jean-Christophe,
 > >>
-> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> >> index a776f24f4311..9ded62c8225e 100644
-> >> --- a/drivers/mmc/host/dw_mmc.c
-> >> +++ b/drivers/mmc/host/dw_mmc.c
-> >> @@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
-> >>   	int present;
-> >>   	struct dw_mci_slot *slot = mmc_priv(mmc);
-> >>   	struct dw_mci_board *brd = slot->host->pdata;
-> >> -	int gpio_cd = !mmc_gpio_get_cd(mmc);
-> >> +	struct dw_mci *host = slot->host;
-> >> +	int gpio_cd = mmc_gpio_get_cd(mmc);
+> >> As I was trying to enable the touchscreen on the at91sam9261ek with
+> >> device-tree support, I ran into an issue. The touchscreen driver needs
+> >> to know the state of the pendown gpio and also needs it as an
+> >> interrupt source.
 > >>
-> >>   	/* Use platform get_cd function, else try onboard card detect */
-> >>   	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
-> >> @@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
-> >>   	else if (brd->get_cd)
-> >>   		present = !brd->get_cd(slot->id);
-> >>   	else if (!IS_ERR_VALUE(gpio_cd))
-> >> -		present = !!gpio_cd;
-> >> +		present = !gpio_cd;
-> > !!gpio_cd or gpio_cd is correct, isn't it?
+> >> The problem is that when a gpio is used as an interrupt, it's
+> >> requested by the pinctrl driver during the xlate stage, marking it
+> >> unavaliable for the other driver.
+> >> It looks like the at91 pinctrl driver is the only one to use
+> >> gpio_request() in the xlate stage. Maybe we should remove this:
+> >
+> >
+> > You should only request it as a GPIO and then use gpio_to_irq to get the
+> > related IRQ.
+> > Because what is done here, is to solve the case where only the irq
+> > is request, and in this specific case we need to request the pin as a
+> > GPIO.
 > >
 > 
-> No, mmc_gpio_get_cd(mmc) has to revert.
-I'm missing something?
-If card is detected, mmc_gpio_get_cd() returns non-zero, right?
-I guess gpio_cd should be kept.
-
-> !!gpio_cd is used before since gpio_cd = !mmc_gpio_get_cd(mmc) is used
-> before.
+> That's what I did first, and was about to submit the patch for the
+> touchscreen driver.
+> However it doesn't feel right. Being able to get the state of a gpio
+> that is also an interrupt seems very useful to me, not only for a
+> touchscreen controller.
 > 
-> Thanks
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> I understand why it's being done here. It's a matter of being sure
+> that the GPIO is an input and that it'll not be configured otherwise
+> latter.
+> But:
+> 1) I'm wondering why the atmel pinctrl is the only one to do that.
+
+because this the only to start to do it right
+I had a very long discussion woth LinusW and Grant the Gpio need to stop to
+use gpio_to_irq & co for irq.
+
+I even send a proposition to do this work across the kernel t the CE-Linux for
+funding
+> 2) I believe that configuration of the direction can be done by
+> describing the GPIO in the DT. (pinctrl-at91.c line 592).
+No pinctrl is for pinmux ONLY not gpio direction & co
+
+Best Regards,
+J.
+
+> 3) If all the GPIOs are described in the DT with a proper pinmux
+> description, i believe the exclusion is also handled. It's probably
+> not the case today though.
+
+> 
+> >
+> > Best Regards,
+> >
+> > Boris
+> >
+> >>
+> >> diff --git a/drivers/pinctrl/pinctrl-at91.c
+> >> b/drivers/pinctrl/pinctrl-at91.c
+> >> index a7549c4..cf91a35 100644
+> >> --- a/drivers/pinctrl/pinctrl-at91.c
+> >> +++ b/drivers/pinctrl/pinctrl-at91.c
+> >> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
+> >> irq_domain *d,
+> >>          *out_hwirq = intspec[0];
+> >>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+> >>
+> >> -       ret = gpio_request(pin, ctrlr->full_name);
+> >> -       if (ret)
+> >> -               return ret;
+> >> -
+> >> -       ret = gpio_direction_input(pin);
+> >> -       if (ret)
+> >> -               return ret;
+> >> -
+> >>          return 0;
+> >>   }
+> >>
+> >> Jean-Jacques
+> >
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
