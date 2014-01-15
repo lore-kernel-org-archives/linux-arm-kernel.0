@@ -1,25 +1,76 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 Jan 2014 09:26:56 -0600
-Subject: [RFC 0/2] Early patches to get rid of meminfo
-In-Reply-To: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAL_JsqKfePTDKaDguubLtutNVbfY6QNdi1EVRA2YkbqTGP9=Nw@mail.gmail.com>
+Date: Wed, 15 Jan 2014 09:28:54 -0600
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <CAL_JsqKbFw4OSkjxYafuaDsmRPU3RXZB8dhJ4zxyaUwSRwfpPw@mail.gmail.com>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+ <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
+ <20140115124041.GD9558@ns203013.ovh.net>
+ <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
+ <CAL_JsqKbFw4OSkjxYafuaDsmRPU3RXZB8dhJ4zxyaUwSRwfpPw@mail.gmail.com>
+Message-ID: <CAL_JsqJFk7nJBv6dBLh9nMnyJbhuEb+PQYD9cTDUAXJjb8zdZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:55 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> Hi,
+Fixing DT list address...
+
+On Wed, Jan 15, 2014 at 9:16 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Jan 15, 2014 at 7:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 12:17 Wed 15 Jan     , Mark Rutland wrote:
+>>> > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> > > The new interrupts-extended property, which reuses the phandle+arguments
+>>> > > pattern used by GPIOs and other core bindings, still have some issue.
+>>> > >
+>>> > > If an SoC have already specifiy interrupt and a board want to add specific
+>>> > > interrupt such as GPIO (which can be optionnal) be need to re-define
+>>> > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
+>>> > > property.
+>>> > >
+>>> >
+>>> > NAK.
+>>> >
+>>> > This is a hack that works around a dts organisation issue. This is _not_
+>>> > a binding or parsing issue.
+>>>
+>>> So the DT is stupid. Yes w have board and SoC information
+>>> so we do not want to duplicate them. Having a way to descript SoC vs board
+>>> specific information need to be provided.
+>>
+>> I agree that the current situation isn't fantastic. That doesn't make
+>> the DT stupid. There are other solutions to this problem.
+>>
+>>>
+>>> >
+>>> > Properties can be overridden - just describe all of the interrupts in
+>>> > the final dts file.
+>>> this is wrong, which mean you duplicate informaation and duplicate bug and
+>>> fixes
+>>
+>> It's certainly not nice, but it doesn't make it wrong.
+>>
+>> The same problem can be found with any other list property that varies
+>> per-board. Hacking the parsing of each property is not a solution.
+>>
+>> Today the only way to implement what you want is to have the list in the
+>> final file.
+>>
+>> One way of working with that would be to have the common interrupts
+>> described in a shared macro in the soc file:
+>>
+>> #define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
 >
-> With the move away from bootmem and the convergence on memblock, it seems
-> like meminfo should be deprecated as well to avoid duplication. This is
-> a first pass attempt to just use memblock and not have meminfo integrated.
-> There is still a major issue in terms of actually specifying mem at location
-> on the command line but I wanted to send this out for some early feedback
-> before putting any more effort into this. I've done basic boot testing on
-> a simple DT target.
-
-Nice. One thing I would like to see done in this area is ARM using the
-default early_init_dt_add_memory_arch function. It currently doesn't
-because of the dependency on meminfo.
-
-Rob
+> Yuck. Please, let's not encourage this pattern.
+>
+>> Then the soc file can have:
+>>
+>>         interrupts = SOC_COMMON_INTERRUPTS;
+>>
+>> And the board can have:
+>>
+>>         interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
+>
+> Unless this is solved in dtc include mechanism, just duplicate the
+> interrupts in each board file. I'd rather have the duplication than
+> continued churn of refactoring dtsi files.
+>
+> Rob
