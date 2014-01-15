@@ -1,34 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jan 2014 09:00:24 +0100
-Subject: [PATCH v3 2/8] clk: sunxi: update clock-output-names dt binding
- documentation
-In-Reply-To: <1389257565-19797-3-git-send-email-wens@csie.org>
-References: <1389257565-19797-1-git-send-email-wens@csie.org>
- <1389257565-19797-3-git-send-email-wens@csie.org>
-Message-ID: <20140115080024.GC3377@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Jan 2014 09:12:47 +0100
+Subject: [PATCH 2/2] pinctrl: sirf: put gpio interrupt pin into input
+ status automatically
+In-Reply-To: <1389430123-8036-2-git-send-email-21cnbao@gmail.com>
+References: <1389430123-8036-1-git-send-email-21cnbao@gmail.com>
+ <1389430123-8036-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdbgPLzihp30ScbhTN9inO6WOnGrKpn1Gh_Q8vs2RyxT=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 04:52:39PM +0800, Chen-Yu Tsai wrote:
-> clock-output-names is now required for most of sunxi clock nodes, to
-> provide the name of the corresponding clock. Add the new requirements,
-> exceptions, as well as examples.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Sat, Jan 11, 2014 at 9:48 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> busses like i2c, spi and so on can parse the virq of their subnode automatically by
+> irq_of_parse_and_map(). for example, i2c will do that in of_i2c_register_devices().
+> people can put hwirq number attached to a gpio controller in dts, and drivers can
+> directly request the parsed virq.
+>
+> for example, for an i2c client as below,
+> tangoc-ts at 5c{
+>         compatible = "pixcir,tangoc-ts";
+>         interrupt-parent = <&gpio>;
+>         interrupts = <3 0>;
+>         reg = <0x5c>;
+> };
+> in i2c client probe(), it will request_irq(client->irq, ...) without
+> calling gpio_direction_input().
+> so here when we set irq type, we also put the pin to input direction.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Thanks!
-Maxime
+OK this makes perfect sense, and is not really related to DT: we recently
+concluded that it should always be possible to request an IRQ from an
+irqchip without having to interact with the GPIO interface first. So this is
+doing the right thing.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/815be5d1/attachment.sig>
+However to keep things strict we need to add calls to mark the GPIO
+lines used for IRQ, I'll see if I can fix a quick patch for this so you can
+test.
+
+Yours,
+Linus Walleij
