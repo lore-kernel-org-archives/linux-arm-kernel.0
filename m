@@ -1,129 +1,297 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 15 Jan 2014 11:41:19 -0500
-Subject: [PATCH v4 04/16] ARM: move generic thumb instruction parsing
- code to new files for use by other feature
-In-Reply-To: <1387543562.3404.35.camel@linaro1.home>
-References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-5-git-send-email-dave.long@linaro.org>
- <1387543562.3404.35.camel@linaro1.home>
-Message-ID: <52D6BA2F.4050104@linaro.org>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 15 Jan 2014 17:32:12 +0100
+Subject: [PATCHv12] ARM: dts: Add support for the cpuimx35 board from Eukrea
+ and its baseboard.
+Message-ID: <1389803532-8516-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/13 07:46, Jon Medhurst (Tixy) wrote:
-> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Move the thumb version of the kprobes instruction parsing code into more generic
->> files from where it can be used by uprobes and possibly other subsystems. The
->> symbol names will be made more generic in a subsequent part of this patchset.
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->
-> I just have two comments about probes-thumb.h ...
->
-> [...]
->
->> diff --git a/arch/arm/kernel/probes-thumb.h b/arch/arm/kernel/probes-thumb.h
->> new file mode 100644
->> index 0000000..3f39210
->> --- /dev/null
->> +++ b/arch/arm/kernel/probes-thumb.h
->> @@ -0,0 +1,136 @@
->> +/*
->> + * arch/arm/kernel/probes-arm.h
->> + *
->> + * Copyright 2013 Linaro Ltd.
->> + * Written by: David A. Long
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +#ifndef _ARM_KERNEL_PROBES_THUMB_H
->> +#define  _ARM_KERNEL_PROBES_THUMB_H
->> +
->> +/*
->> + * True if current instruction is in an IT block.
->> + */
->> +#define in_it_block(cpsr)	((cpsr & 0x06000c00) != 0x00000000)
->> +
->> +/*
->> + * Return the condition code to check for the currently executing instruction.
->> + * This is in ITSTATE<7:4> which is in CPSR<15:12> but is only valid if
->> + * in_it_block returns true.
->> + */
->> +#define current_cond(cpsr)	((cpsr >> 12) & 0xf)
->
-> Looks like you forgot to remove above two #defines from kprobes-thumb.c
-> when you moved them to this header file.
+The following devices/functionalities were added:
+ * Main and secondary UARTs.
+ * i2c and the pcf8563 device.
+ * Ethernet.
+ * NAND.
+ * The BP1 button.
+ * The LED.
+ * Watchdog
+ * SD.
 
-Fixed.
+Cc: Eric B?nard <eric@eukrea.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ChangeLog v11->v12:
+- Moved the pinctrl properties of the led1 and bp1 nodes to their respective parent nodes.
 
-> Also...
->
->> +enum probes_t32_action {
->> +	PROBES_T32_EMULATE_NONE,
->> +	PROBES_T32_SIMULATE_NOP,
->> +	PROBES_T32_LDMSTM,
->> +	PROBES_T32_LDRDSTRD,
->> +	PROBES_T32_TABLE_BRANCH,
->> +	PROBES_T32_TST,
->> +	PROBES_T32_CMP,
->> +	PROBES_T32_MOV,
->> +	PROBES_T32_ADDSUB,
->> +	PROBES_T32_LOGICAL,
->> +	PROBES_T32_ADDWSUBW_PC,
->> +	PROBES_T32_ADDWSUBW,
->> +	PROBES_T32_MOVW,
->> +	PROBES_T32_SAT,
->> +	PROBES_T32_BITFIELD,
->> +	PROBES_T32_SEV,
->> +	PROBES_T32_WFE,
->> +	PROBES_T32_MRS,
->> +	PROBES_T32_BRANCH_COND,
->> +	PROBES_T32_BRANCH,
->> +	PROBES_T32_PLDI,
->> +	PROBES_T32_LDR_LIT,
->> +	PROBES_T32_LDRSTR,
->> +	PROBES_T32_SIGN_EXTEND,
->> +	PROBES_T32_MEDIA,
->> +	PROBES_T32_REVERSE,
->> +	PROBES_T32_MUL_ADD,
->> +	PROBES_T32_MUL_ADD2,
->> +	PROBES_T32_MUL_ADD_LONG
->> +};
->> +
->> +enum probes_t16_action {
->> +	PROBES_T16_ADD_SP,
->> +	PROBES_T16_CBZ,
->> +	PROBES_T16_SIGN_EXTEND,
->> +	PROBES_T16_PUSH,
->> +	PROBES_T16_POP,
->> +	PROBES_T16_SEV,
->> +	PROBES_T16_WFE,
->> +	PROBES_T16_IT,
->> +	PROBES_T16_CMP,
->> +	PROBES_T16_ADDSUB,
->> +	PROBES_T16_LOGICAL,
->> +	PROBES_T16_BLX,
->> +	PROBES_T16_HIREGOPS,
->> +	PROBES_T16_LDR_LIT,
->> +	PROBES_T16_LDRHSTRH,
->> +	PROBES_T16_LDRSTR,
->> +	PROBES_T16_ADR,
->> +	PROBES_T16_LDMSTM,
->> +	PROBES_T16_BRANCH_COND,
->> +	PROBES_T16_BRANCH
->> +};
->> +
->
+ChangeLog v10->v11:
+- The other patches in this serie have already been applied in the for-next branch
+  in Shawn Guo's tree at git://git.linaro.org/people/shawnguo/linux-2.6.git :
+    4449d01 ARM i.MX35: build in pinctrl support.
+    cd01fd4 ARM: imx_v6_v7_defconfig: Enable some drivers used on the cpuimx35.
+- Reordered the Cc list and dropped the Cc to the devicetree binding maintainers.
+- Moved the pins of the hoggrp inside their respective node, the bp1 and led1 nodes
+  were updated accordingly.
+- The esdhc1's gpio was fixed: the card detect code will never uses the gpio "active"
+  high/low setting, instead it uses that GPIO as an IRQ.
+- Cosmetic fixes in the uart pinctrl nodes.
 
-Moved.
+ChangeLog v9->v10:
+- Added Fabio Estevam To the Cc list
 
--dl
+ChangeLog v8->v9:
+- Added the dtb target into arch/arm/boot/dts/Makefile.
+- Added a blank line before the pcf8563 node in the i2c1 node.
+- Whitespace cleanups as requested by Shawn Guo.
+- _' was used in label, it's now fixed (it has been replaced with '-').
+- The recently introduced defines for input and gpios are now used.
+- The uarts had the fsl,uart-has-rtscts property set, but they didn't use 
+  any rts and cts pins in the uart pinctrl nodes.
+
+ChangeLog v7->v8:
+- The commit message was improved.
+- The board specific iomuxc pins group configuration that were in imx35.dtsi were moved here.
+- The rest of the patch was updated accordingly.
+
+ChangeLog v6->v7:
+- Added Grant Likely in the Cc list.
+- Shortened the license.
+- The tsc2007 pads were moved in another patch.
+
+ChangeLog v5->v6:
+- Shawn Guo was added in the Cc.
+---
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |   59 +++++++++
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  137 ++++++++++++++++++++
+ 3 files changed, 197 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 570dcd6..98d3921 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -145,6 +145,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-phytec-phycard-s-som.dtb \
+ 	imx27-phytec-phycard-s-rdk.dtb \
+ 	imx31-bug.dtb \
++	imx35-eukrea-mbimxsd35-baseboard.dtb \
+ 	imx50-evk.dtb \
+ 	imx51-apf51.dtb \
+ 	imx51-apf51dev.dtb \
+diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+new file mode 100644
+index 0000000..303f789
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+@@ -0,0 +1,59 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "imx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,cpuimx35", "fsl,imx35";
++
++	memory {
++		reg = <0x80000000 0x8000000>; /* 128M */
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pcf8563 at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
++
++&iomuxc {
++	imx35-eukrea {
++		pinctrl_fec: fecgrp {
++			fsl,pins = <MX35_FEC_PINGRP1>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX35_I2C1_PINGRP1>;
++		};
++	};
++};
++
++&nfc {
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	nand-on-flash-bbt;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+new file mode 100644
+index 0000000..23f6fe1
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -0,0 +1,137 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "imx35-eukrea-cpuimx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_bp1>;
++
++		bp1 {
++			label = "BP1";
++			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
++			linux,code = <BTN_MISC>;
++			gpio-key,wakeup;
++			linux,input-type = <1>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led1>;
++
++		led1 {
++			label = "led1";
++			gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	cd-gpios = <&gpio3 24>;
++	status = "okay";
++};
++
++&i2c1 {
++	tlv320aic23: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++	};
++};
++
++&iomuxc {
++	imx35-eukrea {
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <MX35_AUDMUX_PINGRP1>;
++		};
++
++		pinctrl_bp1: bp1grp {
++			fsl,pins = <MX35_PAD_LD19__GPIO3_25  0x80000000>;
++		};
++
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,pins = <
++				  MX35_ESDHC1_PINGRP1
++				  MX35_PAD_LD18__GPIO3_24  0x80000000 /* CD */
++			>;
++		};
++
++		pinctrl_fec: fecgrp {
++			fsl,pins = <MX35_FEC_PINGRP1>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <MX35_I2C1_PINGRP1>;
++		};
++
++		pinctrl_led1: led1grp {
++			fsl,pins = <MX35_PAD_LD23__GPIO3_29  0x80000000>;
++		};
++
++		pinctrl_reg_lcd_3v3: reg-lcd-3v3 {
++			fsl,pins = <MX35_PAD_D3_CLS__GPIO1_4 0x80000000>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX35_UART1_PINGRP1
++				MX35_UART1_RTSCTS_PINGRP1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX35_UART2_PINGRP1
++				MX35_UART2_RTSCTS_PINGRP1
++			>;
++		};
++	};
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
+-- 
+1.7.9.5
