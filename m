@@ -1,39 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 15 Jan 2014 12:15:21 -0500
-Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
-In-Reply-To: <20140113140215.GZ15937@n2100.arm.linux.org.uk>
-References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140102113057.GI16456@n2100.arm.linux.org.uk>
- <20140102144724.GF19878@titan.lakedaemon.net>
- <20140102145835.GA6883@localhost> <20140112145206.GD6099@localhost>
- <20140113135858.GE11805@arm.com>
- <20140113140215.GZ15937@n2100.arm.linux.org.uk>
-Message-ID: <20140115171521.GY19878@titan.lakedaemon.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 15 Jan 2014 18:16:08 +0100
+Subject: [PATCH 2/3] ASoC: atmel_wm8904: make it available to choose clock
+In-Reply-To: <1389669956-2304-3-git-send-email-voice.shen@atmel.com>
+References: <1389669956-2304-1-git-send-email-voice.shen@atmel.com>
+ <1389669956-2304-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <52D6C258.6010204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Russell,
-
-On Mon, Jan 13, 2014 at 02:02:15PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 13, 2014 at 01:58:58PM +0000, Catalin Marinas wrote:
-> > On Sun, Jan 12, 2014 at 02:52:07PM +0000, Ezequiel Garcia wrote:
-> > > Catalin, Will: Can you ack as well, so Russell can take this?
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > (with the condition that Will promises to sort out the generic relaxed
-> > IO accessors and move this to generic code ;))
+On 14/01/2014 04:25, Bo Shen :
+> Make it available to choose the clock from TK pin or RK pin. This
+> is hardware design decided.
 > 
-> I think that's an impossibility, as there's no such thing as a "generic
-> relaxed IO accessor" and agreement on what that should be is very hard
-> to come by.
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+> 
+>  sound/soc/atmel/atmel_wm8904.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/sound/soc/atmel/atmel_wm8904.c b/sound/soc/atmel/atmel_wm8904.c
+> index b4e3690..b85088d 100644
+> --- a/sound/soc/atmel/atmel_wm8904.c
+> +++ b/sound/soc/atmel/atmel_wm8904.c
+> @@ -108,6 +108,7 @@ static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
+>  	struct device_node *codec_np, *cpu_np;
+>  	struct snd_soc_card *card = &atmel_asoc_wm8904_card;
+>  	struct snd_soc_dai_link *dailink = &atmel_asoc_wm8904_dailink;
+> +	struct atmel_ssc_info *ssc_info;
+>  	int ret;
+>  
+>  	if (!np) {
+> @@ -115,6 +116,15 @@ static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> +	ssc_info = devm_kzalloc(&pdev->dev, sizeof(*ssc_info), GFP_KERNEL);
 
-This has been Acked by myself and Catalin.  Do think it will make it in
-to v3.14?
+Isn't an atmel_ssc_info structure table already instantiated in
+sound/soc/atmel/atmel_ssc_dai.c ...
+I see, you copy the information contained in this field in the proper
+ssc_info of the DAI in the previous patch... Well, isn't it a better way
+to pass parameters to the DAI than this one?
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7930/1
 
-thx,
+> +	if (!ssc_info)
+> +		return -ENOMEM;
+> +
+> +	ssc_info->clk_from_rk_pin =
+> +		of_property_read_bool(np, "clk_from_rk_pin");
+> +
+> +	card->drvdata = (void *)ssc_info;
+> +
+>  	ret = snd_soc_of_parse_card_name(card, "atmel,model");
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "failed to parse card name\n");
+> 
 
-Jason.
+
+-- 
+Nicolas Ferre
