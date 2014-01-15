@@ -1,71 +1,54 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jan 2014 12:23:52 +0100
-Subject: [PATCH v2 12/12] at91: dt: sam9261: Added DM9000 in the device
- tree
-In-Reply-To: <1389270709-32662-13-git-send-email-jjhiblot@traphandler.com>
-References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
- <1389270709-32662-13-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140115112352.GQ14627@ns203013.ovh.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jan 2014 19:24:53 +0800
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
+ warning
+In-Reply-To: <1389777696.14001.14.camel@joe-AO722>
+References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+ <20140115065851.GC1914@S2101-09.ap.freescale.net>
+ <1389777696.14001.14.camel@joe-AO722>
+Message-ID: <20140115112451.GI1896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:31 Thu 09 Jan     , Jean-Jacques Hiblot wrote:
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  arch/arm/boot/dts/at91sam9261ek.dts | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+On Wed, Jan 15, 2014 at 01:21:36AM -0800, Joe Perches wrote:
+> On Wed, 2014-01-15 at 14:58 +0800, Shawn Guo wrote:
+> > On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
+> > > There should be no duplicate const specifiers for those static
+> > > constant character string arrays defined for clock mux options.
+> > > Also, the arrays are only taken as the 5th argument for the
+> > > imx_clk_mux() function, which is in the type of 'const char
+> > > **parents'.  So, let's remove the 2nd const specifier right
+> > > after 'char'.
+> > > 
+> > > This patch fixes these sparse warnings:
+> > > arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
+> []
+> > > diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+> []
+> > > @@ -18,27 +18,27 @@
+> > >  #include "clk.h"
+> > >  #include "common.h"
+> > >  
+> > > -static const char const *step_sels[]		= { "osc", "pll2_pfd2", };
+> > ...
+> > > +static const char *step_sels[]		= { "osc", "pll2_pfd2", };
+> > 
+> > So now we're getting the following checkpatch warning:
+> > 
+> > WARNING: static const char * array should probably be static const char * const
+> > 
+> > It was added into checkpatch.pl by commit cb710ec (scripts/checkpatch.pl:
+> > add warnings for static char that could be static const char).  I'm not
+> > sure which warning we should ignore, the sparse or the checkpatch one.
+> > 
+> > Joe, comments?
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-> index e92cb8e..a3d9d5a 100644
-> --- a/arch/arm/boot/dts/at91sam9261ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
-> @@ -76,6 +76,38 @@
->  		smc: smc at ffffec00 {
->  			status = "okay";
->  
-> +			ebi_cs2 at 2,0 {
-> +				status = "okay";
-> +				smc,converter = "nanosec";
-> +				smc,ncs_read_setup = <0>;
-> +				smc,nrd_setup = <20>;
-> +				smc,ncs_write_setup = <0>;
-> +				smc,nwe_setup = <20>;
-> +				smc,ncs_read_pulse = <80>;
-> +				smc,nrd_pulse = <40>;
-> +				smc,ncs_write_pulse = <80>;
-> +				smc,nwe_pulse = <40>;
-> +				smc,read_cycle = <160>;
-> +				smc,write_cycle = <160>;
-> +				smc,tdf_cycles = <10>;
-> +				smc,tdf_optimized = <0>;
-> +				smc,page_size = <0>;
-> +				smc,byte_access_type = <1>;
-> +				smc,bus_width = <1>;
-> +				smc,nwait_mode = <0>;
-> +				smc,read_mode = <1>;
-> +				smc,write_mode = <1>;
-> +
-> +				ethernet at 2,0 {
-> +					compatible = "davicom,dm9000";
-> +					reg = <0x0 0x2 0x4 0x2>;
-> +					interrupt-parent = <&pioC>;
-> +					interrupts = <11 IRQ_TYPE_EDGE_BOTH>;
-use the new binding no interrupt-parent now
-> +					local-mac-address = [00 00 de ad be ef];
-drop the mac this is board specific
-> +					davicom,no-eeprom;
-> +				};
-> +			};
-> +
->  			ebi_cs3 at 3,0 {
->  				status = "okay";
->  				smc,ncs_read_setup = <0>;
-> -- 
-> 1.8.5.2
+> Maybe the const **parents argument could be const * const *
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list:wqa
+> That could change a lot of declarations through.
+> You could also ignore checkpatch.
 
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Okay, for now, I will ignore the checkpatch warning for this case.
+Thanks, Joe.
+
+Shawn
