@@ -1,85 +1,60 @@
-From: ben@bwidawsk.net (Ben Widawsky)
-Date: Wed, 15 Jan 2014 12:08:19 -0800
-Subject: [Intel-gfx] [PATCH 1/2] drm: share drm_add_fake_info_node
-In-Reply-To: <CAKMK7uE7CSh1gcs341ji6duRH_FgNDhoMfZNc=4hoYf-an1M=w@mail.gmail.com>
-References: <1389708847-25038-1-git-send-email-benjamin.widawsky@intel.com>
- <20140114232510.GV4770@phenom.ffwll.local>
- <20140114234018.GK15937@n2100.arm.linux.org.uk>
- <CAKMK7uF0kFCsc=3Ny_BMPwDd1fqpY-D6baRRBe0Z8DBKcdGHhg@mail.gmail.com>
- <CAKMK7uE7CSh1gcs341ji6duRH_FgNDhoMfZNc=4hoYf-an1M=w@mail.gmail.com>
-Message-ID: <20140115200819.GB1210@bwidawsk.net>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 15 Jan 2014 12:09:02 -0800
+Subject: [PATCH 4/6] ARM: DTS: tegra: add the DFLL IP block to the T114
+ SoC file
+In-Reply-To: <20140115195025.GU20094@book.gsilab.sittig.org>
+References: <20131219122857.3226.42830.stgit@tamien>
+ <20131219123719.3226.44864.stgit@tamien> <52B389CD.8010004@wwwdotorg.org>
+ <alpine.DEB.2.02.1401132219150.11672@tamien>
+ <20140115195025.GU20094@book.gsilab.sittig.org>
+Message-ID: <52D6EADE.3020004@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 09:45:28AM +0100, Daniel Vetter wrote:
-> On Wed, Jan 15, 2014 at 9:39 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> > On Wed, Jan 15, 2014 at 12:40 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> On Wed, Jan 15, 2014 at 12:25:10AM +0100, Daniel Vetter wrote:
-> >>> On Tue, Jan 14, 2014 at 06:14:06AM -0800, Ben Widawsky wrote:
-> >>> > Both i915 and Armada had the exact same implementation. For an upcoming
-> >>> > patch, I'd like to call this function from two different source files in
-> >>> > i915, and having it available externally helps there too.
-> >>> >
-> >>> > While moving, add 'debugfs_' to the name in order to match the other drm
-> >>> > debugfs helper functions.
-> >>> >
-> >>> > Cc: linux-arm-kernel at lists.infradead.org
-> >>> > Cc: intel-gfx at lists.freedesktop.org
-> >>> > Signed-off-by: Ben Widawsky <ben@bwidawsk.net>
-> >>>
-> >>> drm_debugfs_create_files in drm_debugfs.c has the almost same code again.
-> >>> Now the problem here is that the interface is a bit botched up, since all
-> >>> the users in i915 and armada actaully faile to clean up teh debugfs dentry
-> >>> if drm_add_fake_info_node.
-> >>
-> >> That's not correct - armada does clean up these, I think you need to
-> >> take a closer look at the code.
-> >>
-> >> We do this by setting node->info_ent to the file operations structure,
-> >> which is a unique key to the file being registered.
-> >>
-> >> Upon failure to create the fake node, we appropriately call
-> >> drm_debugfs_remove_files() with the first argument being a pointer to
-> >> the file operations.  This causes drm_debugfs_remove_files() to match
-> >> the fake entry, call debugfs_remove() on the dentry, and remove the
-> >> node from the list, and free the node structure we allocated.
-> >>
-> >> Upon driver teardown, we also call drm_debugfs_remove_files() but with
-> >> each fops which should be registered, thus cleaning up each fake node
-> >> which was created.
-> >>
-> >> So, Armada does clean up these entries properly.
-> >
-> > Indeed I've missed that and it's just i915 that botches this. I still
-> > think the helper would be saner if it cleans up all its leftovers in
-> > the failure case.
-> 
-> Ok, now I've actually page all the stuff back in - if
-> drm_add_fake_info_node fails we don't set up a drm_info_node structure
-> and link it anywhere. Which means drm_debugfs_remove_files won't ever
-> find it and hence can't possibly call debugfs_remove. Which means the
-> debugfs dentry is leaked. So I think the semantics of that new debugfs
-> helper should get fixed to also allocate and clean up the debugfs
-> node.
-> 
-> I agree that i915 is even worse since it doesn't bother to clean up
-> any debugfs files at all in the failure case.
-> -Daniel
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+On 01/15/2014 11:50 AM, Gerhard Sittig wrote:
+> On Mon, Jan 13, 2014 at 22:27 -0800, Paul Walmsley wrote:
+>> On Thu, 19 Dec 2013, Stephen Warren wrote:
+>>
+>>> On 12/19/2013 05:49 AM, Paul Walmsley wrote:
+>>>> Add basic DT bindings for the DFLL IP block for the NVIDIA Tegra114 SoC.
+>>>> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-dfll.txt
+>>>> +- clocks : Must contain an array of two-cell arrays, one per clock.
+>>>> +           DFLL source clocks.  At minimum this should include the
+>>>> +           reference clock source and the IP block's main clock
+>>>> +           source.  Also it should contain the DFLL's I2C controller
+>>>> +           clock source.  The format is <&clock-provider-phandle
+>>>> +           clock-id>.
+>>> Entries in "clocks" aren't two cells, they're a phandle plus as many
+>>> cells as the node referenced by the phandle specifies.
+>> It's worth noting that the clock binding documentation itself refers
+>> to pairs:
+>>
+>> ----
+>>
+>> clocks:		List of phandle and clock specifier pairs, one pair
+>> 		for each clock input to the device.  Note: if the
+>> 		clock provider specifies '0' for #clock-cells, then
+>> 		only the phandle portion of the pair will appear.
+>>
+>> ----
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/clock-bindings.txt#n50
+>>
+>> But given the ambiguity of that documentation, I basically agree, so
+>> have changed it to:
+> Please note that there neither is an ambiguity nor a conflict
+> here, and that you actually acknowledge what Stephen said:
 
-Perhaps I don't understand what you want here. The only failure path in
-the fake entry creation does already call debugfs_remove.
+I do not agree that the Documentation is unambiguous.
 
-        if (node == NULL) {
-                debugfs_remove(ent);
-                return -ENOMEM;
-        }
+It is not correct to refer to a "pair" without a second item as a "pair."
 
-So long as the function succeeds, the node will be findable and removable.
+> This is exactly what Stephen said:  A "clocks" item does not need
+> to have two cells.  The pair of phandle and clock specifier don't
+> necessarily translate into two cells, instead the number of cells
+> depends on the clock provider.
 
--- 
-Ben Widawsky, Intel Open Source Technology Center
+I do agree with this, and have updated the documentation accordingly.
+
+
+- Paul
