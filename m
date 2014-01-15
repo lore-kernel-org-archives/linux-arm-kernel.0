@@ -1,53 +1,110 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 15 Jan 2014 07:41:32 +0100
-Subject: [GIT PULL] clockevents/clocksources: 3.13 fixes
-In-Reply-To: <52C14E45.5040403@linaro.org>
-References: <52C14E45.5040403@linaro.org>
-Message-ID: <20140115064132.GA12484@gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 15 Jan 2014 14:53:52 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
+ max_discard_to
+In-Reply-To: <CAPDyKFo1qe5tbCRvXtAV=nc9Bg6=ajWosnQudXvixw5134wscw@mail.gmail.com>
+References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
+ <CAPDyKFo1qe5tbCRvXtAV=nc9Bg6=ajWosnQudXvixw5134wscw@mail.gmail.com>
+Message-ID: <CAA+hA=TV4OyS2v_PhphYnXH7g6enJP80unnZgG=hT7jq9yyY9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Mon, Jan 13, 2014 at 9:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 17 December 2013 09:16, Dong Aisheng <b29396@freescale.com> wrote:
+>> Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
+>> 1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
+>> while 3~4 fix setting the max timeout.
+>> Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
+>> for those platform which have different timeout setting.
+>>
+>> This issue is firstly reported here by Ed Sutter:
+>> http://www.spinics.net/lists/linux-mmc/msg23375.html
+>> The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
+>> which cause the max_discard_bytes for eMMC is only 512, then the discard operation
+>> of mkfs.ext3 for an eMMC card is too slow, just like dead.
+>> With above patches, the issue can be fixed.
+>>
+>> Patch 5 adds the capability to calcalute the max_discard_to dynamically
+>> for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
+>>
+>> Originally the max_discard_to for a high speed sdhc card may be:
+>> mmc1: new high speed SDHC card at address aaaa
+>> mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
+>> After fix:
+>> mmc1: new high speed SDHC card at address aaaa
+>> mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
+>>
+>> It also improves the card discard performance a lot due to max_discard_sectors
+>> increase a lot.
+>>
+>> There's also discussion about remove max_discard_to limit here:
+>> http://www.spinics.net/lists/linux-mmc/msg23395.html
+>> But it does not help for uSDHC since we can observe data timeout
+>> on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
+>
+> Just some more input to this discussion.
+>
+> As you probably know, I am working on a solution which in principle
+> means we will fall back to use R1 responses instead of R1B.
+> Particularly in those cases were the host driver supports
+> MMC_CAP_WAIT_WHILE_BUSY and when it can't support the requested busy
+> detection timeout. In other words, we will fall back to use poll with
+> CMD13 instead, which is what happens already for those not supporting
+> MMC_CAP_WAIT_WHILE_BUSY.
+>
 
-> 
-> Hi Thomas and Ingo,
-> 
-> here is a pull request for a single fix for 3.13. It is based on the
-> latest timers/urgent update.
-> 
->  * Soren Brinkmann fixed the cadence_ttc driver where a call to
-> clk_get_rate happens in an interrupt context. More precisely in an
-> IPI when the broadcast timer is initialized for each cpu in the
-> cpuidle driver
-> 
-> Thanks
->   -- Daniel
-> 
-> The following changes since commit b0031f227e47919797dc0e1c1990f3ef151ff0cc:
-> 
->   Merge tag 's2mps11-build' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator
-> (2013-12-17 12:57:36 -0800)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.linaro.org/people/daniel.lezcano/linux.git
-> clockevents/3.13-fixes
-> 
-> for you to fetch changes up to c1dcc927dae01dfd4904ee82ce2c00b50eab6dc3:
-> 
->   clocksource: cadence_ttc: Fix mutex taken inside interrupt context
-> (2013-12-30 11:32:24 +0100)
-> 
-> ----------------------------------------------------------------
-> Soren Brinkmann (1):
->       clocksource: cadence_ttc: Fix mutex taken inside interrupt context
-> 
->  drivers/clocksource/cadence_ttc_timer.c |   21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
+Will be glad to see your patches for that feature.
 
-Pulled into tip:timers/urgent, thanks Daniel!
+This patch series is intend to fix different issues, it does not
+depend on your work.
+Patch 1~4 is totally for fixing imx timeout issues.
+Patch 5 is to add the capability to calcalute the max_discard_to dynamically.
+This is also a fix of calculating max_discard_to for controllers using
+SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
+It's especially useful for controllers using hw timeout with big
+timeout capability.
+They should be needed no matter whether polling way is used or not.
 
-	Ingo
+Regards
+Dong Aisheng
+
+> Kind regards
+> Ulf Hansson
+>
+>>
+>> ChangeLog:
+>> v1->v2:
+>>  1. change .get_max_timeout to .get_max_timeout_count to reuse some code
+>>  2. some other minor changes based on Shawn's comment.
+>>  3. patch 6 in v1 is dropped since not need anymore after change 1
+>>
+>>
+>>
+>> Dong Aisheng (5):
+>>   mmc: sdhci: add platfrom get_max_timeout_count hook
+>>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
+>>   mmc: sdhci: add platform set_timeout hook
+>>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+>>   mmc: sdhci: calculate max_discard_to dynamically for
+>>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+>>
+>>  drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
+>>  drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
+>>  drivers/mmc/host/sdhci.h           |    3 ++
+>>  3 files changed, 66 insertions(+), 23 deletions(-)
+>>
+>> --
+>> 1.7.2.rc3
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
