@@ -1,46 +1,33 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 14 Jan 2014 15:56:40 -0800
-Subject: [GIT PULL]ARM: sirf: dts update for 3.14
-In-Reply-To: <CAGsJ_4yx=U2dQ6ZkGAtvEwUPdWRwotJae8Sk+g+gqczV0JEo0w@mail.gmail.com>
- (Barry Song's message of "Thu, 9 Jan 2014 20:20:06 +0800")
-References: <CAGsJ_4yx=U2dQ6ZkGAtvEwUPdWRwotJae8Sk+g+gqczV0JEo0w@mail.gmail.com>
-Message-ID: <87y52i3yo7.fsf@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 15 Jan 2014 09:04:29 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.14
+In-Reply-To: <87a9ey8kt5.fsf@linaro.org>
+References: <cover.1389321620.git.horms+renesas@verge.net.au>
+ <87a9ey8kt5.fsf@linaro.org>
+Message-ID: <20140115000429.GF8769@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry Song <21cnbao@gmail.com> writes:
+On Tue, Jan 14, 2014 at 10:44:54AM -0800, Kevin Hilman wrote:
+> Simon Horman <horms+renesas@verge.net.au> writes:
+> 
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> >
+> > please consider these renesas ARM Based SoC Fixes for v3.14.
+> >
+> > This pull-request is based on the Third Round of Renesas ARM Based SoC
+> > Updates for v3.14, tagged as renesas-soc3-for-v3.14, which you have
+> > previously pulled.
+> >
+> > It resolves a problem introduced by a patch included in the second round of such
+> > changes, tagged as renesas-soc2-for-v3.14, which you have also previously
+> > pulled.
+> >
+> > renesas-soc3-for-v3.14 is based on renesas-soc2-for-v3.14.
+> 
+> Applied.
+> 
+> Since your soc3 branch was included in our next/soc branch, I've just
+> added the fix there as well.
 
-> Hi Olof,
-> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
->
->   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-> tags/sirf-dts-for-3.14
->
-> for you to fetch changes up to 73f68c01f468f072776d98f6bbf7fb367a1f2540:
->
->   ARM: dts: SiRF: add pin group for USP0 with only RX or TX frame sync
-> (2014-01-09 20:05:31 +0800)
->
-> ----------------------------------------------------------------
-> ARM: sirf: dts update for 3.14
->
-> some missed dt nodes or props for sirf dts for 3.14.
-> Among them:
->  - add lost clocks for cphifbg
->  - add lost bus_width, clock and status for sdhci
->  - add clock, frequence-voltage table for CPU0
->  - add lost minigpsrtc device node
->  - add lost usp1_uart_nostreamctrl pin group for atlas6
->  - add pin group for USP0 with only RX or TX frame sync
->
-> ----------------------------------------------------------------
-
-Pulled into next/dt.
-
-Thanks,
-
-Kevin
+Thanks.
