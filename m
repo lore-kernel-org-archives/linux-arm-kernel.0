@@ -1,291 +1,119 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Jan 2014 11:43:23 +0800
-Subject: [PATCH V5 1/3] ARM: imx: add suspend in ocram support for i.mx6q
-In-Reply-To: <1389681315-10231-1-git-send-email-b20788@freescale.com>
-References: <1389681315-10231-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140115034321.GD1896@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Jan 2014 22:46:34 -0500 (EST)
+Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
+In-Reply-To: <20140112105958.GA9791@n2100.arm.linux.org.uk>
+References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
+ <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
+ <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
+ <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
+ <20140112105958.GA9791@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.10.1401142238110.28907@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 02:35:13PM +0800, Anson Huang wrote:
-> When system enter suspend, we can set the DDR IO to
-> high-Z state to save DDR IOs' power consumption, this
-> operation can save many power(from ~26mA at 1.5V to ~15mA at 1.5V,
-> measured on i.MX6Q SabreSD board, R25) of DDR IOs. To
-> achieve that, we need to copy the suspend code to ocram
-> and run the low level hardware related code(set DDR IOs
-> to high-Z state) in ocram.
+On Sun, 12 Jan 2014, Russell King - ARM Linux wrote:
+
+> This patch makes their types match exactly with x86's definitions of
+> the same, which is the basic problem: on ARM, they all took "int" values
+> and returned "int"s, which leads to min() in nobootmem.c complaining.
 > 
-> If there is no ocram space available, then system will
-> still do suspend in external DDR, hence no DDR IOs will
-> be set to high-Z.
+>  arch/arm/include/asm/bitops.h | 54 +++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 44 insertions(+), 10 deletions(-)
+
+For the record:
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+The reason why macros were used at the time this was originally written 
+is because gcc used to have issues forwarding the constant nature of a 
+variable down multiple levels of inline functions and 
+__builtin_constant_p() always returned false.  But that was quite a long 
+time ago.
+
+
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index e691ec91e4d3..b2e298a90d76 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -254,25 +254,59 @@ static inline int constant_fls(int x)
+>  }
+>  
+>  /*
+> - * On ARMv5 and above those functions can be implemented around
+> - * the clz instruction for much better code efficiency.
+> + * On ARMv5 and above those functions can be implemented around the
+> + * clz instruction for much better code efficiency.  __clz returns
+> + * the number of leading zeros, zero input will return 32, and
+> + * 0x80000000 will return 0.
+>   */
+> +static inline unsigned int __clz(unsigned int x)
+> +{
+> +	unsigned int ret;
+> +
+> +	asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
+>  
+> +	return ret;
+> +}
+> +
+> +/*
+> + * fls() returns zero if the input is zero, otherwise returns the bit
+> + * position of the last set bit, where the LSB is 1 and MSB is 32.
+> + */
+>  static inline int fls(int x)
+>  {
+> -	int ret;
+> -
+>  	if (__builtin_constant_p(x))
+>  	       return constant_fls(x);
+>  
+> -	asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
+> -       	ret = 32 - ret;
+> -	return ret;
+> +	return 32 - __clz(x);
+> +}
+> +
+> +/*
+> + * __fls() returns the bit position of the last bit set, where the
+> + * LSB is 0 and MSB is 31.  Zero input is undefined.
+> + */
+> +static inline unsigned long __fls(unsigned long x)
+> +{
+> +	return fls(x) - 1;
+> +}
+> +
+> +/*
+> + * ffs() returns zero if the input was zero, otherwise returns the bit
+> + * position of the first set bit, where the LSB is 1 and MSB is 32.
+> + */
+> +static inline int ffs(int x)
+> +{
+> +	return fls(x & -x);
+> +}
+> +
+> +/*
+> + * __ffs() returns the bit position of the first bit set, where the
+> + * LSB is 0 and MSB is 31.  Zero input is undefined.
+> + */
+> +static inline unsigned long __ffs(unsigned long x)
+> +{
+> +	return ffs(x) - 1;
+>  }
+>  
+> -#define __fls(x) (fls(x) - 1)
+> -#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
+> -#define __ffs(x) (ffs(x) - 1)
+>  #define ffz(x) __ffs( ~(x) )
+>  
+>  #endif
 > 
-> The OCRAM usage layout is as below,
 > 
-> ocram suspend region(4K currently):
-> ======================== high address ======================
->                               .
->                               .
->                               .
->                               ^
->                               ^
->                               ^
->                       imx6_suspend code
->       reserved space(to make imx6_suspend aligned with 8)
-
-We can remove this line now, right?  Same for the comment in code.
-
->              PM_INFO structure(imx6_cpu_pm_info)
-> ======================== low address =======================
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-
-<snip>
-
-> +ENTRY(imx6_suspend)
-> +	ldr	r1, [r0, #PM_INFO_PBASE_OFFSET]
-> +	ldr	r2, [r0, #PM_INFO_RESUME_ADDR_OFFSET]
-> +	ldr	r3, [r0, #PM_INFO_CPU_TYPE_OFFSET]
-> +	ldr	r4, [r0, #PM_INFO_PM_INFO_SIZE_OFFSET]
-> +
-> +	/*
-> +	 * counting the resume address in iram
-> +	 * to set it in SRC register.
-> +	 */
-> +	ldr	r6, =imx6_suspend
-> +	ldr	r7, =resume
-> +	sub	r7, r7, r6
-> +	add	r8, r1, r4
-> +	add	r9, r8, r7
-> +
-> +	/*
-> +	 * make sure TLB contain the addr we want,
-> +	 * as we will access them after MMDC IO floated.
-> +	 */
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_CCM_V_OFFSET]
-> +	ldr	r6, [r11, #0x0]
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_GPC_V_OFFSET]
-> +	ldr	r6, [r11, #0x0]
-> +
-> +	/* use r11 to store the IO address */
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_SRC_V_OFFSET]
-> +	/* store physical resume addr and pm_info address. */
-> +	str	r9, [r11, #MX6Q_SRC_GPR1]
-> +	str	r1, [r11, #MX6Q_SRC_GPR2]
-> +
-> +	/* need to sync L2 cache before DSM. */
-> +	sync_l2_cache
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
-> +	/*
-> +	 * put DDR explicitly into self-refresh and
-> +	 * disable automatic power savings.
-> +	 */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	orr	r7, r7, #0x1
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +
-> +	/* make the DDR explicitly enter self-refresh. */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	orr	r7, r7, #(1 << 21)
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +
-> +poll_dvfs_set_1:
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	ands	r7, r7, #(1 << 25)
-> +	beq	poll_dvfs_set_1
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
-> +	ldr	r6, =0x0
-> +	ldr	r7, [r0, #PM_INFO_MMDC_IO_NUM_OFFSET]
-> +	ldr	r8, =PM_INFO_MMDC_IO_VAL_OFFSET
-
-If we add the following instruction here
-
-	add     r8, r0, r8
-
-> +set_mmdc_io_lpm:
-> +	ldr	r9, [r0, r8]
-
-, it can be replaced by the following one
- 
-	ldr     r9, [r8], #0x8
-
-> +	str	r6, [r11, r9]
-> +	add	r8, r8, #0x8
-
-, and then we can save this one in the loop, right?
-
-> +	sub	r7, r7, #0x1
-> +	cmp     r7, #0x0
-
-The sequence of 'sub ...; cmp ..., #0' and 'and ...; cmp ..., #0' can
-generally be replaced by 'subs ...' and 'ands' respectively to save one
-instruction, right?
-
-The above two comments apply to a few other places in the code.
-
-> +	bne	set_mmdc_io_lpm
-> +
-> +	/*
-> +	 * mask all GPC interrupts before
-> +	 * enabling the RBC counters to
-> +	 * avoid the counter starting too
-> +	 * early if an interupt is already
-> +	 * pending.
-> +	 */
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_GPC_V_OFFSET]
-> +	ldr	r6, [r11, #MX6Q_GPC_IMR1]
-> +	ldr	r7, [r11, #MX6Q_GPC_IMR2]
-> +	ldr	r8, [r11, #MX6Q_GPC_IMR3]
-> +	ldr	r9, [r11, #MX6Q_GPC_IMR4]
-> +
-> +	ldr	r10, =0xffffffff
-> +	str	r10, [r11, #MX6Q_GPC_IMR1]
-> +	str	r10, [r11, #MX6Q_GPC_IMR2]
-> +	str	r10, [r11, #MX6Q_GPC_IMR3]
-> +	str	r10, [r11, #MX6Q_GPC_IMR4]
-> +
-> +	/*
-> +	 * enable the RBC bypass counter here
-> +	 * to hold off the interrupts. RBC counter
-> +	 * = 32 (1ms), Minimum RBC delay should be
-> +	 * 400us for the analog LDOs to power down.
-> +	 */
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_CCM_V_OFFSET]
-> +	ldr	r10, [r11, #MX6Q_CCM_CCR]
-> +	bic	r10, r10, #(0x3f << 21)
-> +	orr	r10, r10, #(0x20 << 21)
-> +	str	r10, [r11, #MX6Q_CCM_CCR]
-> +
-> +	/* enable the counter. */
-> +	ldr	r10, [r11, #MX6Q_CCM_CCR]
-> +	orr	r10, r10, #(0x1 << 27)
-> +	str	r10, [r11, #MX6Q_CCM_CCR]
-> +
-> +	/* unmask all the GPC interrupts. */
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_GPC_V_OFFSET]
-> +	str	r6, [r11, #MX6Q_GPC_IMR1]
-> +	str	r7, [r11, #MX6Q_GPC_IMR2]
-> +	str	r8, [r11, #MX6Q_GPC_IMR3]
-> +	str	r9, [r11, #MX6Q_GPC_IMR4]
-> +
-> +	/*
-> +	 * now delay for a short while (3usec)
-> +	 * ARM is at 1GHz at this point
-> +	 * so a short loop should be enough.
-> +	 * this delay is required to ensure that
-> +	 * the RBC counter can start counting in
-> +	 * case an interrupt is already pending
-> +	 * or in case an interrupt arrives just
-> +	 * as ARM is about to assert DSM_request.
-> +	 */
-> +	ldr     r6, =2000
-> +rbc_loop:
-> +	sub     r6, r6, #0x1
-> +	cmp     r6, #0x0
-> +	bne     rbc_loop
-> +
-> +	/* Zzz, enter stop mode */
-> +	wfi
-> +	nop
-> +	nop
-> +	nop
-> +	nop
-> +
-> +	/*
-> +	 * run to here means there is pending
-> +	 * wakeup source, system should auto
-> +	 * resume, we need to restore MMDC IO first
-> +	 */
-
-The MMDC restoring code looks identical between the case of wakeup
-source pending and the normal resume case, except that the former runs
-at virtual address and the later runs at the physical.  Can we make
-a macro for it to save some code duplication?
-
-Shawn
-
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
-> +	ldr	r6, [r0, #PM_INFO_MMDC_IO_NUM_OFFSET]
-> +	ldr	r7, =PM_INFO_MMDC_IO_VAL_OFFSET
-> +restore_mmdc_io:
-> +	ldr	r8, [r0, r7]
-> +	add	r7, r7, #0x4
-> +	ldr	r9, [r0, r7]
-> +	add	r7, r7, #0x4
-> +	str	r9, [r11, r8]
-> +	sub	r6, r6, #0x1
-> +	cmp     r6, #0x0
-> +	bne	restore_mmdc_io
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
-> +	/* let DDR out of self-refresh. */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	bic	r7, r7, #(1 << 21)
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +
-> +poll_dvfs_clear_2:
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	ands	r7, r7, #(1 << 25)
-> +	bne     poll_dvfs_clear_2
-> +	/* enable DDR auto power saving */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	bic	r7, r7, #0x1
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	/* return to suspend finish */
-> +	mov	pc, lr
-> +
-> +resume:
-> +	/* invalidate L1 I-cache first */
-> +	mov     r6, #0x0
-> +	mcr     p15, 0, r6, c7, c5, 0
-> +	mcr     p15, 0, r6, c7, c5, 0
-> +	mcr     p15, 0, r6, c7, c5, 6
-> +	/* enable the Icache and branch prediction */
-> +	mov     r6, #0x1800
-> +	mcr     p15, 0, r6, c1, c0, 0
-> +	isb
-> +
-> +	/* get physical resume address from pm_info. */
-> +	ldr	lr, [r0, #PM_INFO_RESUME_ADDR_OFFSET]
-> +	/* clear core0's entry and parameter */
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_SRC_P_OFFSET]
-> +	mov	r7, #0
-> +	str	r7, [r11, #MX6Q_SRC_GPR1]
-> +	str	r7, [r11, #MX6Q_SRC_GPR2]
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_P_OFFSET]
-> +	ldr	r6, [r0, #PM_INFO_MMDC_IO_NUM_OFFSET]
-> +	ldr	r7, =PM_INFO_MMDC_IO_VAL_OFFSET
-> +dsm_restore_mmdc_io:
-> +	ldr	r8, [r0, r7]
-> +	add	r7, r7, #0x4
-> +	ldr	r9, [r0, r7]
-> +	add	r7, r7, #0x4
-> +	str	r9, [r11, r8]
-> +	sub	r6, r6, #0x1
-> +	cmp     r6, #0x0
-> +	bne	dsm_restore_mmdc_io
-> +
-> +	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_P_OFFSET]
-> +	/* let DDR out of self-refresh */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	bic	r7, r7, #(1 << 21)
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +
-> +poll_dvfs_clear_1:
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	ands	r7, r7, #(1 << 25)
-> +	bne	poll_dvfs_clear_1
-> +	/* enable DDR auto power saving */
-> +	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	bic	r7, r7, #0x1
-> +	str	r7, [r11, #MX6Q_MMDC_MAPSR]
-> +	mov	pc, lr
-> +ENDPROC(imx6_suspend)
 > -- 
-> 1.7.9.5
-> 
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
