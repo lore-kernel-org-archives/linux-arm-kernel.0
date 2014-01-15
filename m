@@ -1,59 +1,28 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 15 Jan 2014 19:58:25 +0100
-Subject: [PATCH v6 1/2] ohci-platform: Add support for devicetree
- instantiation
-In-Reply-To: <Pine.LNX.4.44L0.1401151123340.1587-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1401151123340.1587-100000@iolanthe.rowland.org>
-Message-ID: <52D6DA51.5050905@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jan 2014 11:03:58 -0800
+Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
+In-Reply-To: <20140115092857.4167.38854@quantum>
+References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
+ <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
+ <20140109015158.7168.60274@quantum>
+ <52CE055C.5030103@codeaurora.org>
+ <20140110054424.7168.46289@quantum>
+ <20140110070517.GE14405@codeaurora.org>
+ <20140115092857.4167.38854@quantum>
+Message-ID: <20140115190358.GA26193@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/15, Mike Turquette wrote:
+> 
+> So in summary: consolidation is over-rated. You can put your regmap
+> functions into drivers/clk/msm/ and not convert over to struct clk_desc
+> by the way, just to remove any confusion on that point.
+> 
 
-On 01/15/2014 05:30 PM, Alan Stern wrote:
-> On Wed, 15 Jan 2014, Hans de Goede wrote:
->
->> +static int ohci_platform_power_on(struct platform_device *dev)
->> +{
->> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
->> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
->> +	int clk, ret;
->> +
->> +	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++) {
->
-> You fixed this one...
->
->> @@ -125,13 +225,22 @@ static int ohci_platform_remove(struct platform_device *dev)
->>   {
->>   	struct usb_hcd *hcd = platform_get_drvdata(dev);
->>   	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
->> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
->> +	int clk;
->>
->>   	usb_remove_hcd(hcd);
->> -	usb_put_hcd(hcd);
->>
->>   	if (pdata->power_off)
->>   		pdata->power_off(dev);
->>
->> +	for (clk = 0; priv->clks[clk] && clk < OHCI_MAX_CLKS; clk++)
->
-> but not this one.  :-(  Same for the ehci-platform patch.
+Ok I've made the wrapper struct clk_regmap and posted the
+patches. I think I've addressed all your concerns.
 
-Oops, sorry about that, v7 coming up.
-
-> In fact, it might be easier to make this loop go backward, like
-> you do in the *_platform_power_off routines.
-
-I prefer keep doing things forward here, the backward loop in
-power_off is because the disable_unprepare must be done in reverse
-order if the prepare_enable calls.
-
-> Is there a devm-type routine that will take care of all this for you?
-
-Nope, the downside of getting the clocks by index rather then by name
-is that there are no devm routines for that.
-
-Regards,
-
-Hans
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
