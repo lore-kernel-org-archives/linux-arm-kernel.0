@@ -1,29 +1,47 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 15 Jan 2014 14:17:13 +0100
-Subject: [PATCH repost] at91: dt: i2c: add a new compatibility string for the
- at91sam9261
-Message-ID: <1389791833-7572-1-git-send-email-jjhiblot@traphandler.com>
+From: arete74@gmail.com (Gerardo Di Iorio)
+Date: Wed, 15 Jan 2014 14:28:01 +0100
+Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
+In-Reply-To: <3612364.BZBltgonI0@wuerfel>
+References: <20140109153404.GA21055@kvmhost> <20140115091006.GF3377@lukather>
+ <3612364.BZBltgonI0@wuerfel>
+Message-ID: <CAJZeo0YS1n6tDq0LwkQPPAXrtFaJNva1naWF82X4oLbpUJs0Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- drivers/i2c/busses/i2c-at91.c | 3 +++
- 1 file changed, 3 insertions(+)
+hi,
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 8edba9d..843d012 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -589,6 +589,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
- 		.compatible = "atmel,at91sam9260-i2c",
- 		.data = &at91sam9260_config,
- 	} , {
-+		.compatible = "atmel,at91sam9261-i2c",
-+		.data = &at91sam9261_config,
-+	} , {
- 		.compatible = "atmel,at91sam9g20-i2c",
- 		.data = &at91sam9g20_config,
- 	} , {
--- 
-1.8.5.2
+
+2014/1/15 Arnd Bergmann <arnd@arndb.de>
+>
+> On Wednesday 15 January 2014 10:10:06 Maxime Ripard wrote:
+> > On Thu, Jan 09, 2014 at 04:34:04PM +0100, Gerardo Di Iorio wrote:
+> > > Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
+> > >
+> > > Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
+> > > ---
+> > >  arch/arm/mach-sunxi/Kconfig | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > >
+> > > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> > > index 547004c..adb2574 100644
+> > > --- a/arch/arm/mach-sunxi/Kconfig
+> > > +++ b/arch/arm/mach-sunxi/Kconfig
+> > > @@ -1,5 +1,5 @@
+> > >  config ARCH_SUNXI
+> > > -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+> > > +       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
+> >
+> > I wonder if the sunxi (apart the weird letter case) is actually
+> > needed. Maybe we can just put "Allwinner SoCs" (it would be great if
+> > you could fix the SoCs case too).
+>
+> If you want to have exact naming, try to find something that excludes the
+> old Sun3i (F20) and earlier chips (unless someone is already planning
+> to work on them). Maybe also mention the "Boxchip" name, although that
+> seems to be falling out of use these days.
+>
+
+if we use "Allwinner AX SoC" ?
+
+>         Arnd
+>
