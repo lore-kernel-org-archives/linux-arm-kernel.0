@@ -1,27 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 18:15:10 +0100
-Subject: [PATCH v3 5/7] ARM: brcmstb: add misc. DT bindings for brcm,
- brcmstb-*
-In-Reply-To: <20140115171155.GK25824@e106331-lin.cambridge.arm.com>
-References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
- <1389743333-16741-6-git-send-email-marc.ceeeee@gmail.com>
- <20140115171155.GK25824@e106331-lin.cambridge.arm.com>
-Message-ID: <12927046.KPmoBiUFty@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 15 Jan 2014 12:15:21 -0500
+Subject: [PATCH v5 1/3] ARM: Introduce atomic MMIO modify
+In-Reply-To: <20140113140215.GZ15937@n2100.arm.linux.org.uk>
+References: <1386686497-20335-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1386686497-20335-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140102113057.GI16456@n2100.arm.linux.org.uk>
+ <20140102144724.GF19878@titan.lakedaemon.net>
+ <20140102145835.GA6883@localhost> <20140112145206.GD6099@localhost>
+ <20140113135858.GE11805@arm.com>
+ <20140113140215.GZ15937@n2100.arm.linux.org.uk>
+Message-ID: <20140115171521.GY19878@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 17:11:55 Mark Rutland wrote:
-> > +
-> > +Further, a node with the following compatible string shall be defined:
-> > +
-> > +    - compatible: "brcm,brcmstb-gen-ctrl-v1"
+Hey Russell,
+
+On Mon, Jan 13, 2014 at 02:02:15PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 13, 2014 at 01:58:58PM +0000, Catalin Marinas wrote:
+> > On Sun, Jan 12, 2014 at 02:52:07PM +0000, Ezequiel Garcia wrote:
+> > > Catalin, Will: Can you ack as well, so Russell can take this?
+> > 
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > 
+> > (with the condition that Will promises to sort out the generic relaxed
+> > IO accessors and move this to generic code ;))
 > 
-> It's probably better to say a brcmstb-gen-ctrl node (described below)
-> should be present, or you'll have two places to update the compatible
-> strings for each new variant...
+> I think that's an impossibility, as there's no such thing as a "generic
+> relaxed IO accessor" and agreement on what that should be is very hard
+> to come by.
 
-See my other reply on this node. The previous patch version had a different
-approach to these registers, and I suggested doing yet another one and
-using syscon.
+This has been Acked by myself and Catalin.  Do think it will make it in
+to v3.14?
 
-	Arnd
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7930/1
+
+thx,
+
+Jason.
