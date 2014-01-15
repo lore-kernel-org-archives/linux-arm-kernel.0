@@ -1,50 +1,71 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Wed, 15 Jan 2014 17:46:50 -0600
-Subject: [PATCHv4 6/7] hwspinlock/omap: enable module before reading
- SYSSTATUS register
-In-Reply-To: <52D56C3A.7000704@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-7-git-send-email-s-anna@ti.com>
- <20140114131052.GA10818@saruman.home> <20140114140440.GA15785@saruman.home>
- <52D56C3A.7000704@ti.com>
-Message-ID: <52D71DEA.6020602@ti.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 15 Jan 2014 15:59:27 -0800
+Subject: [PATCH v9 2/4] Documentation: Add documentation for APM X-Gene
+ SoC SATA host controller DTS binding
+In-Reply-To: <CAPw-ZTmn-aNJcLd1mZPRtog_ncq=GC94ULCJb-400oYqERYK5g@mail.gmail.com>
+References: <1389769910-15505-1-git-send-email-lho@apm.com>
+ <5905127.tqJ3nFt5cj@wuerfel>
+ <CAPw-ZTmVYfPLUVmtes3Gn8Z=+gyFtLoZxc-QUdHH7-ePjKAG9A@mail.gmail.com>
+ <4632602.a1zUZOeMuh@wuerfel>
+ <CAPw-ZTmn-aNJcLd1mZPRtog_ncq=GC94ULCJb-400oYqERYK5g@mail.gmail.com>
+Message-ID: <CAPw-ZT=QXwOVvpgJSL5qU8J2eEuAt3nnXJDfDwPXTTo7z4Fe-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
+Hi,
 
- >
-> On 01/14/2014 08:04 AM, Felipe Balbi wrote:
->> Hi again,
+>>> >> >> +- clocks             : Reference to the clock entry.
+>>> >> >> +- phys                       : PHY reference with parameter 0.
+>>> >> >
+>>> >> > The specific value of the phy-specifier shouldn't matter to this
+>>> >> > binding. What should matter is what it logically corresponds to.
+>>> >>
+>>> >> I not quite following this. Are you suggest that I drop the value 0.
+>>> >> In the binding, one needs to specify the mode of operation - 0 is for
+>>> >> SATA. Can you explain more?
+>>> >
+>>> > The SATA device should not care what the argument for the PHY
+>>> > device is. You could connect the same device to another PHY
+>>> > that has a different set of arguments, which is the whole point
+>>> > of abstracting it.
+>>> >
+>>>
+>>> I understand what you wrote here. We should not have an argument from
+>>> the host controller. Then my question is how should the PHY node
+>>> indicates that it needs to be configured itself as an SATA PHY?
 >>
->> On Tue, Jan 14, 2014 at 07:10:52AM -0600, Felipe Balbi wrote:
->>>> diff --git a/drivers/hwspinlock/omap_hwspinlock.c
->>>> b/drivers/hwspinlock/omap_hwspinlock.c
->>>> index 9f56fb2..194886e 100644
->>>> --- a/drivers/hwspinlock/omap_hwspinlock.c
->>>> +++ b/drivers/hwspinlock/omap_hwspinlock.c
->>>> @@ -101,10 +101,23 @@ static int omap_hwspinlock_probe(struct
->>>> platform_device *pdev)
->>>>       if (!io_base)
->>>>           return -ENOMEM;
->>>>
->>>> +    /*
->>>> +     * make sure the module is enabled and clocked before reading
->>>> +     * the module SYSSTATUS register
->>>> +     */
->>>> +    pm_runtime_enable(&pdev->dev);
->>>> +    pm_runtime_get_sync(&pdev->dev);
+>> The "phys" property should specify whatever the configuration of
+>> the phy device is supposed to be. It's just not the business of
+>> the sata driver or the sata binding to know what that configuration
+>> is.
 >>
->> another thing, you need to check return of pm_runtime_get_sync()
 >
-> OK, let me check this and your other comment, and the fix is probably a
-> separate patch.
+> Here is what I have and I am trying to piece this together:
+>
+> phy1 {
+>    #phy-cells = <0>;  /* No parameter as suggest by Mark */
+> };
+>
+> sata1 {
+>     :::
+>     phys = <&phy1>;
+> };
+>
+> What I don't get is how does one specify the mode
+> (SATA/USB/SGMII/etc)? As another parameter in the phy1 node?
 >
 
-I realized the changes relevant to your comments were introduced in this 
-patch, so just refreshed the patch with fixes instead of doing a 
-separate patch. I didn't do a v5 just for these change, and will do so 
-if there are more comments on the DT adaptation.
+May be I misread what Mark mentioned. The binding documentation should
+not specify the requirement of 0. And the binding of the dts should be
+as is:
 
-regards
-Suman
+phy1 {
+   #phy-cells = <1>;
+};
+
+sata1 {
+   :::
+   phys = <&phy1 0>;     where 0 indicates the mode of operation?
+};
+
+-Loc
