@@ -1,28 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 15 Jan 2014 11:03:58 -0800
-Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
-In-Reply-To: <20140115092857.4167.38854@quantum>
-References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
- <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
- <20140109015158.7168.60274@quantum>
- <52CE055C.5030103@codeaurora.org>
- <20140110054424.7168.46289@quantum>
- <20140110070517.GE14405@codeaurora.org>
- <20140115092857.4167.38854@quantum>
-Message-ID: <20140115190358.GA26193@codeaurora.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 15 Jan 2014 20:04:45 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
+ (David Laight's message of "Wed, 15 Jan 2014 09:59:10 +0000")
+References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
+ <20140114170719.GA12126@xanatos> <87bnzekz5l.fsf@natisbad.org>
+ <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
+Message-ID: <87mwix5anm.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15, Mike Turquette wrote:
-> 
-> So in summary: consolidation is over-rated. You can put your regmap
-> functions into drivers/clk/msm/ and not convert over to struct clk_desc
-> by the way, just to remove any confusion on that point.
-> 
+Hi David,
 
-Ok I've made the wrapper struct clk_regmap and posted the
-patches. I think I've addressed all your concerns.
+David Laight <David.Laight@ACULAB.COM> writes:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>> I tried current 3.13.0-rc8 w/ 35773dac5f86 reverted and the result is
+>> the same:
+>
+> That patch only affects an error code and stops the fs code retrying
+> for ever.
+
+Are you sure? ...
+
+> Does everything work if you comment out the code in xhci-ring.c that adds
+> NOP TRBs to the ring end in order to stop the LINK TRB appearing in the middle
+> of a TB.
+> The ethernet code needs it, but the disk transfers are (probably) aligned
+> such that they don't.
+
+... AFAICT, this is exactly what commit 35773dac5f86 does and reverting
+it does not help. If I am mistaken, can you point which part you want me
+to remove in the code to test?
+
+I am slowly starting to see a bisect session coming ;-)
+
+Cheers,
+
+a+
