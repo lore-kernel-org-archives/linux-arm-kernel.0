@@ -1,38 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 15 Jan 2014 09:31:18 +0100
-Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for
- LinkSprite pcDuino
-In-Reply-To: <alpine.DEB.2.02.1401131406230.17739@trabant.deployis.eu>
-References: <alpine.DEB.2.02.1401131406230.17739@trabant.deployis.eu>
-Message-ID: <20140115083118.GE3377@lukather>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 15 Jan 2014 09:39:20 +0100
+Subject: [Intel-gfx] [PATCH 1/2] drm: share drm_add_fake_info_node
+In-Reply-To: <20140114234018.GK15937@n2100.arm.linux.org.uk>
+References: <1389708847-25038-1-git-send-email-benjamin.widawsky@intel.com>
+ <20140114232510.GV4770@phenom.ffwll.local>
+ <20140114234018.GK15937@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uF0kFCsc=3Ny_BMPwDd1fqpY-D6baRRBe0Z8DBKcdGHhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 13, 2014 at 02:15:01PM +0100, Zoltan HERPAI wrote:
-> From b2cd1681fe988584028d280ca79249f4ebcb271c Mon Sep 17 00:00:00 2001
-> From: Zoltan HERPAI <wigyori@uid0.hu>
-> Date: Mon, 13 Jan 2014 14:00:12 +0100
-> Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for LinkSprite pcDuino
-> 
-> This patch will add a basic board support DT for the
-> LinkSprite pcDuino board.
-> 
-> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+On Wed, Jan 15, 2014 at 12:40 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 15, 2014 at 12:25:10AM +0100, Daniel Vetter wrote:
+>> On Tue, Jan 14, 2014 at 06:14:06AM -0800, Ben Widawsky wrote:
+>> > Both i915 and Armada had the exact same implementation. For an upcoming
+>> > patch, I'd like to call this function from two different source files in
+>> > i915, and having it available externally helps there too.
+>> >
+>> > While moving, add 'debugfs_' to the name in order to match the other drm
+>> > debugfs helper functions.
+>> >
+>> > Cc: linux-arm-kernel at lists.infradead.org
+>> > Cc: intel-gfx at lists.freedesktop.org
+>> > Signed-off-by: Ben Widawsky <ben@bwidawsk.net>
+>>
+>> drm_debugfs_create_files in drm_debugfs.c has the almost same code again.
+>> Now the problem here is that the interface is a bit botched up, since all
+>> the users in i915 and armada actaully faile to clean up teh debugfs dentry
+>> if drm_add_fake_info_node.
+>
+> That's not correct - armada does clean up these, I think you need to
+> take a closer look at the code.
+>
+> We do this by setting node->info_ent to the file operations structure,
+> which is a unique key to the file being registered.
+>
+> Upon failure to create the fake node, we appropriately call
+> drm_debugfs_remove_files() with the first argument being a pointer to
+> the file operations.  This causes drm_debugfs_remove_files() to match
+> the fake entry, call debugfs_remove() on the dentry, and remove the
+> node from the list, and free the node structure we allocated.
+>
+> Upon driver teardown, we also call drm_debugfs_remove_files() but with
+> each fops which should be registered, thus cleaning up each fake node
+> which was created.
+>
+> So, Armada does clean up these entries properly.
 
-Just a minor comment though, please use git send-email in the future
-to send your patches.
-
-Thanks!
-Maxime
-
+Indeed I've missed that and it's just i915 that botches this. I still
+think the helper would be saner if it cleans up all its leftovers in
+the failure case.
+-Daniel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/07e47466/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
