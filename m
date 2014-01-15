@@ -1,62 +1,156 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jan 2014 16:22:10 +0000
-Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
-In-Reply-To: <15344443.B6eHZOpkXH@wuerfel>
-References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
- <3154671.7LPLgq8X4K@wuerfel> <20140115160146.GO15937@n2100.arm.linux.org.uk>
- <15344443.B6eHZOpkXH@wuerfel>
-Message-ID: <20140115162210.GP15937@n2100.arm.linux.org.uk>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 15 Jan 2014 11:25:55 -0500
+Subject: [PATCH v4 05/16] ARM: use a function table for determining
+ instruction interpreter actions
+In-Reply-To: <1387543554.3404.34.camel@linaro1.home>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-6-git-send-email-dave.long@linaro.org>
+ <1387543554.3404.34.camel@linaro1.home>
+Message-ID: <52D6B693.9070801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 05:07:49PM +0100, Arnd Bergmann wrote:
-> On Wednesday 15 January 2014 16:01:46 Russell King - ARM Linux wrote:
-> > On Wed, Jan 15, 2014 at 02:59:59PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 15 January 2014 21:56:26 zhangfei wrote:
-> > > > However, in our board cd =0 when card is deteced while cd=1 when card is
-> > > > removed.
-> > > > In order to mmc_gpio_get_cd return 1, MMC_CAP2_CD_ACTIVE_HIGH has to be
-> > > > set, as well as new property "caps2-mmc-cd-active-low".
-> > > > 
-> > > > --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> > > > +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> > > > @@ -73,6 +73,8 @@ Optional properties:
-> > > > +* caps2-mmc-cd-active-low: cd pin is low when card active
-> > > > +
-> > > > 
-> > > > diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> > > > +       if (of_find_property(np, "caps2-mmc-cd-active-low", NULL))
-> > > > +               pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-> > > > +
-> > > 
-> > > The MMC_CAP2_CD_ACTIVE_HIGH flag should only be required for
-> > > legacy platforms. With DT parsing, you can normally specify
-> > > the polarity of the GPIO line in the GPIO specifier in DT.
-> > 
-> > Since when?
-> 
-> I just looked through the bindings and found that about half
-> of them allow passing polarity in the gpio specifier. I thought
-> it was more than that and IIRC the outcome of a previous discussion
-> was that when the gpio controller allows passing polarity, you
-> should use that rather than a separate flag.
-> 
-> Not a problem though, since we can use the cd-inverted and
-> wp-inverted properties.
+On 12/20/13 07:45, Jon Medhurst (Tixy) wrote:
+> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Make the instruction interpreter call back to semantic action functions
+>> through a function pointer array provided by the invoker.  The interpreter
+>> decodes the instructions into groups and uses the group number to index
+>> into the supplied array.  kprobes and uprobes code will each supply their
+>> own array of functions.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>
+> Because I've been very slow in reviewing these I've only just noticed
+> that some of the the comments I made on version one of this patch didn't
+> get a response. I've copied them again below (slightly edited)  and
+> heavily trimmed the patch...
+>
+>>   arch/arm/kernel/kprobes-arm.c    |  41 +++++++++++
+>>   arch/arm/kernel/kprobes-common.c |   3 +-
+>>   arch/arm/kernel/kprobes-thumb.c  |  92 ++++++++++++++++++------
+>>   arch/arm/kernel/kprobes.c        |  10 ++-
+>>   arch/arm/kernel/kprobes.h        |  14 ++--
+>>   arch/arm/kernel/probes-arm.c     | 114 +++++++++++++++---------------
+>>   arch/arm/kernel/probes-arm.h     |  37 ++++++++++
+>>   arch/arm/kernel/probes-thumb.c   | 149 +++++++++++++++++++--------------------
+>>   arch/arm/kernel/probes-thumb.h   |  14 ++--
+>>   arch/arm/kernel/probes.c         |  13 ++--
+>>   arch/arm/kernel/probes.h         |  15 ++--
+>>   11 files changed, 325 insertions(+), 177 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
+>> index a359475..ee329ff 100644
+>> --- a/arch/arm/kernel/kprobes-arm.c
+>> +++ b/arch/arm/kernel/kprobes-arm.c
+>> @@ -299,3 +299,44 @@ emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(struct kprobe *p, struct pt_regs *regs)
+>>   	regs->uregs[rdhi] = rdhiv;
+>>   	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
+>>   }
+>> +
+>> +const union decode_item kprobes_arm_actions[] = {
+>
+> I think it's best if we don't reuse the decode_item type here, this is a
+> different sort of table so probably best to have it's own union. Also,
+> if we do that, then decode_item can be simplified as it won't need to
+> have function pointers in it, i.e. we could end up with...
+>
+> union decode_action {
+>          kprobe_insn_handler_t   *handler;
+>          kprobe_custom_decode_t  *decoder;
+> };
+>
+> union decode_item {
+>          u32                     bits;
+>          const union decode_item *table;
+> };
+>
+> typedef enum kprobe_insn (kprobe_custom_decode_t)(kprobe_opcode_t,
+>                                                    struct arch_specific_insn *,
+>                                                    union decode_action *actions);
+>
+>
 
-Well, having this in the gpio level as well as in subsystems like MMC
-is going to create confusion - and from the results of this patch _IS_
-causing confusion.  You've just encouraged one implementation to have
-things setup such that mmc_gpio_get_cd() returns false when a card is
-inserted, rather than it correctly returning true.
+I've added the following:
 
-The issue here is that we'll potentially now end up with _three_
-inversions.  One in the GPIO layers.  One in mmc_gpio_get_cd(), and
-another in every driver which uses the GPIO layer inversion.  This
-is hardly the right approach as it leads to multiple points where
-confusion about the inverted status can occur.
+typedef enum kprobe_insn (probes_custom_decode_t)(kprobe_opcode_t,
+		struct arch_specific_insn *,
+		struct decode_header *);
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+union decode_action {
+	kprobe_insn_handler_t	*handler;
+	probes_custom_decode_t	*decoder;
+};
+
+Note the third argument actually passed into the decoder functions is 
+the decode table entry.  decode_action is only used to select a 
+decode/emulate/simullate function.
+
+> A second point, I think it would be a good idea to make sure these
+> action arrays are the size we expect by adding an entry at the end of
+> the relevant enumeration and using that to set the size of the arrays.
+> E.g. for this one
+>
+> enum probes_arm_action {
+>          ...
+>          ...
+>          NUM_PROBES_ARM_ACTIONS
+> };
+>
+> and then use it like:
+>
+> const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+>
+> That way, we at least make any uninitialised entries are null (I
+> assume?) which is safer than accidentally indexing beyond the array.
+>
+>
+
+Done.
+
+>> +	[PROBES_EMULATE_NONE] = {.handler = kprobe_emulate_none},
+>> +	[PROBES_SIMULATE_NOP] = {.handler = kprobe_simulate_nop},
+>> +	[PROBES_PRELOAD_IMM] = {.handler = kprobe_simulate_nop},
+>
+> [...]
+>
+>
+>> diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
+>> index d14d224..2238972 100644
+>> --- a/arch/arm/kernel/probes.h
+>> +++ b/arch/arm/kernel/probes.h
+>> @@ -131,7 +131,8 @@ void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs);
+>>   void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs);
+>>
+>>   enum kprobe_insn __kprobes
+>> -kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi);
+>> +kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>> +		struct decode_header *h);
+>>
+>>   /*
+>>    * Test if load/store instructions writeback the address register.
+>> @@ -334,7 +335,7 @@ struct decode_custom {
+>>
+>>   #define DECODE_CUSTOM(_mask, _value, _decoder)			\
+>>   	DECODE_HEADER(DECODE_TYPE_CUSTOM, _mask, _value, 0),	\
+>> -	{.decoder = (_decoder)}
+>> +	{.bits = (_decoder)}
+>>
+>
+> This third and final comment is probably just bike shedding...
+>
+> 'bits' looks a bit funny here. I've been trying to think of a way of
+> making it nicer but it's difficult. The actual value is one of three
+> different enums, so if we were to add another members to decode_item it
+> would just have to be "int action", at least that would read nicer in
+> these macros and where it gets read out in probes_decode_insn.
+>
+
+I agree.  I've added an "int action" to the decode_item union, and use 
+it instead of "bits" for the action array index.
+
+I've also updated the description of how this all works, in the comments.
+
+-dl
