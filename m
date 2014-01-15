@@ -1,69 +1,34 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Tue, 14 Jan 2014 17:47:27 -0800
-Subject: [PATCH V6 6/8] Add EFI stub for ARM
-In-Reply-To: <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
-References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
- <1389371417-379-7-git-send-email-roy.franz@linaro.org>
- <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
-Message-ID: <CAFECyb9jx4NA0v_qNgrto4qG3KV3fBOpGh839Mnvbjody4xwYA@mail.gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 15 Jan 2014 09:40:25 +0800
+Subject: [PATCH 1/2] clk: hisilicon: add hi3620_mmc_clks
+In-Reply-To: <20140114201740.4167.52076@quantum>
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
+ <20140114201740.4167.52076@quantum>
+Message-ID: <52D5E709.7040105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 1:05 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 10 January 2014 17:30, Roy Franz <roy.franz@linaro.org> wrote:
->> This patch adds EFI stub support for the ARM Linux kernel.  The EFI stub
->> operates similarly to the x86 stub: it is a shim between the EFI firmware
->> and the normal zImage entry point, and sets up the environment that the
->> zImage is expecting.  This includes loading the initrd (optionaly) and
->> device tree from the system partition based on the kernel command line.
->> The stub updates the device tree as necessary, adding entries for EFI
->> runtime services. The PE/COFF "MZ" header at offset 0 results in the
->> first instruction being an add that corrupts r5, which is not used by
->> the zImage interface.
+Dear Mike
+
+On 01/15/2014 04:17 AM, Mike Turquette wrote:
+> Quoting Zhangfei Gao (2014-01-13 01:14:28)
+>> Suggest by Arnd: abstract mmc tuning as clock behavior,
+>> also because different soc have different tuning method and registers.
+>> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
 >>
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> Acked-by: Grant Likely <grant.likely@linaro.org>
->> ---
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 >
-> [...]
->
->> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
->> new file mode 100644
->> index 0000000..dbb7101
->> --- /dev/null
->> +++ b/arch/arm/boot/compressed/efi-header.S
->> @@ -0,0 +1,117 @@
->> +@ Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
->> +@
->> +@ This file contains the PE/COFF header that is part of the
->> +@ EFI stub.
->> +@
->> +
->> +       .org    0x3c
->> +       @
->> +       @ The PE header can be anywhere in the file, but for
->> +       @ simplicity we keep it together with the MSDOS header
->> +       @ The offset to the PE/COFF header needs to be at offset
->> +       @ 0x3C in the MSDOS header.
->> +       @ The only 2 fields of the MSDOS header that are used are this
->> +       @ PE/COFF offset, and the "MZ" bytes at offset 0x0.
->> +       @
->> +       .long   pe_header                       @ Offset to the PE header.
->> +
->> +      .align 3
->> +pe_header:
->> +       .ascii  "PE"
->> +       .short  0
->> +
->> +coff_header:
->> +       .short  0x01c2                          @ ARM or Thumb
->
-> Could you explain why you are using 0x1c2 (Thumb) here and not 0x1c0 (ARM) ?
->
-> Cheers,
-> Ard.
+> Patch looks good to me with one exception. I do not have
+> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt in the
+> clk-next branch. Is there a stable branch I can pull in as a dependency?
 
-Nope.  It should be 0x1c0.
+Mach-hisi just have been uploaeded.
+Have tried next-20140114, the patch can be applied successfully.
+While v3.13-rc8 still can not.
 
-Roy
+Is this fine?
+
+Thanks
