@@ -1,28 +1,18 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed, 15 Jan 2014 20:15:44 +0000
-Subject: v3.12 regression from "ARM: kirkwood: convert to DT irqchip and
- clocksource" on non-DT kirkwood platforms
-In-Reply-To: <52D6E785.4000706@gmail.com>
-References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
- <52D651CD.5020307@gmail.com>
- <1389777972.12434.115.camel@kazak.uk.xensource.com>
- <52D6E785.4000706@gmail.com>
-Message-ID: <1389816944.10695.55.camel@dagon.hellion.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 15 Jan 2014 15:26:21 -0500 (EST)
+Subject: [PATCH v7 0/2] ohci and ehci-platform clks, phy and dt support
+In-Reply-To: <1389813883-567-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1401151525400.1587-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-01-15 at 20:54 +0100, Sebastian Hesselbarth wrote:
-> please try the following two patches on top of v3.13-rc8 and report
-> back, if it solves the regression.
+On Wed, 15 Jan 2014, Hans de Goede wrote:
 
-Yes, it works fine, thanks!
+> Hi All,
+> 
+> This version of my ohci and ehci-platform clks, phy and dt support patch-set,
+> really fixes the 2 small bugs Alan found.
 
-Tested-by: Ian Campbell <ijc@hellion.org.uk>
+All okay -- this time I can't find anything to complain about.  :-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/3e39ef73/attachment.sig>
+Alan Stern
