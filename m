@@ -1,81 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jan 2014 13:46:53 +0000
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <20140115124041.GD9558@ns203013.ovh.net>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
- <20140115124041.GD9558@ns203013.ovh.net>
-Message-ID: <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
+From: anssi.hannula@iki.fi (Anssi Hannula)
+Date: Wed, 15 Jan 2014 15:48:29 +0200
+Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
+ audio support for TDA998x trough McASP I2S bus
+In-Reply-To: <52D67099.1040904@ti.com>
+References: <cover.1387535299.git.jsarha@ti.com>
+ <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
+ <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
+Message-ID: <52D691AD.3010206@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 12:17 Wed 15 Jan     , Mark Rutland wrote:
-> > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > The new interrupts-extended property, which reuses the phandle+arguments
-> > > pattern used by GPIOs and other core bindings, still have some issue.
-> > > 
-> > > If an SoC have already specifiy interrupt and a board want to add specific
-> > > interrupt such as GPIO (which can be optionnal) be need to re-define
-> > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
-> > > property.
-> > > 
-> > 
-> > NAK.
-> > 
-> > This is a hack that works around a dts organisation issue. This is _not_
-> > a binding or parsing issue.
+15.01.2014 13:27, Jyri Sarha kirjoitti:
+> On 12/31/2013 03:25 PM, Mark Brown wrote:
+>> On Fri, Dec 20, 2013 at 12:39:38PM +0200, Jyri Sarha wrote:
+>>> support. The only supported sample format is SNDRV_PCM_FORMAT_S32_LE.
+>>> The 8 least significant bits are ignored.
+>>
+>> Where does this constraint come from?
+>>
 > 
-> So the DT is stupid. Yes w have board and SoC information
-> so we do not want to duplicate them. Having a way to descript SoC vs board
-> specific information need to be provided.
+>  From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N 
+> register statically to a value that works only with 4 byte samples. 
+> According to my tests it is possible to support 3 and 2 byte samples too 
+> by changing the CTS_N register value, but I am not sure if the 
+> configuration can be changed on the fly. My data sheet of the nxp chip 
+> is very vague about the register definitions, but I suppose the register 
+> configures some clock divider on the chip. HDMI supports only upto 24bit 
+> audio and the data sheet states that any extraneous least significant 
+> bits are ignored.
 
-I agree that the current situation isn't fantastic. That doesn't make
-the DT stupid. There are other solutions to this problem.
+That sounds strange, CTS/N values only depend on audio sample rate and
+TMDS/video clock, not on the audio format or the size of samples (HDMI
+spec sec 7.2 - Audio Sample Clock Capture and Regeneration).
 
-> 
-> > 
-> > Properties can be overridden - just describe all of the interrupts in
-> > the final dts file.
-> this is wrong, which mean you duplicate informaation and duplicate bug and
-> fixes
+Sure there isn't anything more going on (like the used HDMI sink being
+more tolerant to wrong CTS/N with 4-byte samples, or more likely
+something else I can't immediately think of)?
 
-It's certainly not nice, but it doesn't make it wrong.
 
-The same problem can be found with any other list property that varies
-per-board. Hacking the parsing of each property is not a solution.
+BTW, radeon driver has some code that calculates static CTS/N values
+since the hw autogeneration is not reliable there:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/radeon/r600_hdmi.c
+Not that it directly helps now, but just for the record...
 
-Today the only way to implement what you want is to have the list in the
-final file.
-
-One way of working with that would be to have the common interrupts
-described in a shared macro in the soc file:
-
-#define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
-
-Then the soc file can have:
-
-	interrupts = SOC_COMMON_INTERRUPTS;
-
-And the board can have:
-
-	interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
-
-That gains functionality equivalent to your proposal, without
-introducing new code or new edge cases in interrupt parsing. However, it
-does make it unclear how many interrupts are described, and it won't
-interact well with interrupt-names.
-
-Another, more invasive option would be extend the dts syntax and teach
-dtc to handle property appending. Then the soc dts could stay as it is,
-and the board dts could have something like:
-
-	/append-property/ interrupts = <&intc1 6 1>;
-	/append-property/ interrupt-names = "board-specific-irq";
-
-Both these options solve the issue at the source, are general to other
-properties, and allow more than one level of hierarchy (the proposed
-interrupts-extended-2 only allows one level).
-
-Thanks,
-Mark.
+-- 
+Anssi Hannula
