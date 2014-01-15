@@ -1,44 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 19:20:22 +0100
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <20140115174519.GE17530@lunn.ch>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <201401151736.46280.arnd@arndb.de> <20140115174519.GE17530@lunn.ch>
-Message-ID: <4773460.bSrjnYju7q@wuerfel>
+From: marc.ceeeee@gmail.com (Marc)
+Date: Wed, 15 Jan 2014 10:22:07 -0800
+Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for
+ Broadcom 7445
+In-Reply-To: <201401151410.39112.arnd@arndb.de>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <1389743333-16741-8-git-send-email-marc.ceeeee@gmail.com>
+ <201401151410.39112.arnd@arndb.de>
+Message-ID: <61E0E2A7-F7FC-4397-8E92-06CC409912B9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 18:45:19 Andrew Lunn wrote:
-> > > But i'm also a little bit concerned by the "unique number" and this
-> > > ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
-> > > path supposed to be stable? This unique number is not stable. An
-> > > unwitting change to the DT could cause its value to change. Do we need
-> > > to make it stable?
-> > > 
-> > 
-> > One possibility would be to create an artificial bus in DT for all
-> > gpio-keys devices, use #address-cells=<1> and #size-cells=<0>
-> > for it, and give each device a unique reg property. Not sure if that
-> > would be considered an elegant solution though.
-> 
-> Hi Arnd
-> 
-> Can i imply from your answer that you think 
-> 
-> /dev/input/by-path/platform-gpio_keys.3-event
-> 
-> should be stable?
+Hi Arnd,
 
-No, I have no idea whether it should be or not. I was just trying
-to come up with a way to make it stable if that's desired.
+Thank you for the suggestion - it's exactly what we were looking for!
 
-> A quick look at udev rules seems to suggestion this is an issue for
-> input/gpio-keys and maybe audio and video if there is a top level DT
-> property collecting the different sub devices together for ASOC and
-> V4L.
+Regards,
+Marc
 
-For some other subsystems, we have entries in /aliases/ to sort
-them. Maybe that would work here to get a stable path independent
-of the location in DT.
+Sent from my phone
 
-	Arnd
+> On Jan 15, 2014, at 5:10 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+>> On Wednesday 15 January 2014, Marc Carino wrote:
+>> +       gen-ctrl {
+>> +               compatible = "brcm,brcmstb-gen-ctrl-v1";
+>> +               reg = <0xf0404304 0x4
+>> +                      0xf0404308 0x4
+>> +                      0xf03e2578 0x4
+>> +                      0xf03e2488 0x10
+>> +                      0xf0452000 0x20>;
+>> +       };
+> 
+> Sorry I didn't get back to you on this when we discussed the previous
+> version. I'm actually less happy with this DT representation than the
+> original. What I take from your description is that you have multiple
+> register ranges that basically combine more-or-less random registers
+> that belong into different Linux subsystems.
+> 
+> I think the best way to deal with this is to have the "syscon" driver
+> handle the multiplexing between the various drivers that need access
+> to the registers. It would look something like (taking the numbers
+> from your previous patch):
+> 
+>    ahb {
+>        ranges = <0 0xf0000000 0x1000000>; /* 16 MB remapped registers */
+> 
+>        hif-cpubuictrl: syscon at 3e2400 {
+>            compatible = "brcm,7445-cpubioctrl", "syscon";
+>            reg = <0x3e2000, 0x1000>;
+>        };
+> 
+>        hif-continuation: syscon at 45200 {
+>            compatible = "brcm,7445-hif-continuation", "syscon";
+>            reg = <0x452000, 0x1000>;
+>        };
+> 
+>        sun-top-ctrl: ...
+>    };
+> 
+> This lets the syscon driver find and map the three register areas.
+> Drivers that need access to the registers then do 
+> 
+>    reset {
+>        compatible = "brcm,7445-reset-ctrl";
+>        syscon = <&sun-top-ctrl 0x300 0x100>;
+>        #reset-cells = <1>;
+>    };
+> 
+> And then you can add a regular device driver to drivers/reset that provides
+> a device_reset() API to other drivers, or a system-reset function to be
+> registered as arm_pm_restart. This driver would use
+> syscon_regmap_lookup_by_phandle() to get access to a regmap pointer,
+> and then use either hardcoded offsets into the regmap, or get those
+> offsets from numbers in the devicetree, as provided in the example
+> above.
+> 
+>    Arnd
