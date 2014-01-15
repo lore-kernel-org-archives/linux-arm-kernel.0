@@ -1,36 +1,29 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 Jan 2014 21:37:06 -0800
-Subject: [PATCH v2] clk: sirf: re-arch to make the codes support both
- prima2 and atlas6
-In-Reply-To: <1388986699-6470-1-git-send-email-21cnbao@gmail.com>
-References: <1388986699-6470-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20140115053706.4167.23616@quantum>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 15 Jan 2014 11:13:25 +0530
+Subject: [PATCH 1/2] clk: tegra: Staticize tegra_clk_periph_no_gate_ops
+Message-ID: <1389764606-14102-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Barry Song (2014-01-05 21:38:19)
-> diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
-> new file mode 100644
-> index 0000000..21e776a
-> --- /dev/null
-> +++ b/drivers/clk/sirf/clk-atlas6.c
-> @@ -0,0 +1,153 @@
-> +/*
-> + * Clock tree for CSR SiRFatlasVI
-> + *
-> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/bitops.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-private.h>
+tegra_clk_periph_no_gate_ops is a local symbol.
 
-Please do not use clk-private.h. It is slated for removal (some day...).
-Do you actually need it?
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/tegra/clk-periph.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-Mike
+diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+index 356e9b804421..9e899c18af86 100644
+--- a/drivers/clk/tegra/clk-periph.c
++++ b/drivers/clk/tegra/clk-periph.c
+@@ -130,7 +130,7 @@ static const struct clk_ops tegra_clk_periph_nodiv_ops = {
+ 	.disable = clk_periph_disable,
+ };
+ 
+-const struct clk_ops tegra_clk_periph_no_gate_ops = {
++static const struct clk_ops tegra_clk_periph_no_gate_ops = {
+ 	.get_parent = clk_periph_get_parent,
+ 	.set_parent = clk_periph_set_parent,
+ 	.recalc_rate = clk_periph_recalc_rate,
+-- 
+1.7.9.5
