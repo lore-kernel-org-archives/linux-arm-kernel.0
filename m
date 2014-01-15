@@ -1,57 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 15 Jan 2014 11:23:40 -0800
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140115171323.GA22739@atomide.com>
-References: <20140109231513.GA11648@saruman.home>
- <20140110161352.GG6665@saruman.home>
- <52D02037.3090705@ti.com> <20140110185110.GM31323@atomide.com>
- <52D53084.1070105@ti.com> <20140114203613.GA604@saruman.home>
- <20140115020421.GA24195@saruman.home> <20140115031632.4167.2698@quantum>
- <20140115035011.4167.96678@quantum> <20140115171323.GA22739@atomide.com>
-Message-ID: <20140115192340.4167.87685@quantum>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 15 Jan 2014 20:25 +0100
+Subject: [PATCH V3 1/5] pinctrl: sh-pfc: r7s72100: Add RSPI support
+In-Reply-To: <CACRpkdaZyZ1NUhOkXjJQ5_fBx+NiLTaUGX-iAh50UU9SRvt7hQ@mail.gmail.com>
+References: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
+ <1389523723-2288-2-git-send-email-geert@linux-m68k.org>
+ <CACRpkdaZyZ1NUhOkXjJQ5_fBx+NiLTaUGX-iAh50UU9SRvt7hQ@mail.gmail.com>
+Message-ID: <2085554.0lEim16vcc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2014-01-15 09:13:23)
-> * Mike Turquette <mturquette@linaro.org> [140114 19:52]:
-> > > 
-> > > These 40 patches apply very cleanly on top of clk-next with 2
-> > > exceptions:
-> > > 
-> > > 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
-> > > because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
-> > > on 3.13-rc1).
-> > > 
-> > > 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
-> > > resolved correctly but would like verification.
-> > > 
-> > > I'd prefer to simply merge these patches into clk-next, which is the
-> > > most straightforward route. Any ideas on how to handle the missing
-> > > AM35xx dtsi data? It can always go as a separate fix after this stuff
-> > > gets merged which, ironically, is how that file was created in the first
-> > > place.
+Hi Linus,
+
+On Wednesday 15 January 2014 10:14:53 Linus Walleij wrote:
+> On Sun, Jan 12, 2014 at 11:48 AM, Geert Uytterhoeven
 > 
-> You could do something like this to take advantage of fast forward and
-> not have to do a merge back from mainline:
+> <geert@linux-m68k.org> wrote:
+> > From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > 
+> > V2:
+> >   - No changes
+> > 
+> > V3:
+> >   - No changes
 > 
-> $ git checkout -b am3517-clk v3.13-rc8 # or any other -rc with am3517.dtsi
-> $ git merge clk-next-omap # this fast forwards clk-next-omap to the desired -rc
-> $ git am am3517-clk-patch
-> $ git checkout clk-next
-> $ git merge clk-next-omap # this fast forwards clk-next to the desired -rc
+> I'm expecting Laurent to queue this patch when he's happy with it
+> (maybe he already said so in some other mail).
 
-Tony,
+I'm fine with the patch, but I'm still waiting for Magnus to submit the next 
+version of the r7s72100 pinctrl support.
 
-That makes sense, but is there anything bad about doing that for a
-branch you intend to send as a pull request? I don't see how any of the
-commits get re-written or anything... I just wonder if there is some
-subtlety that I am not accounting for that makes this approach bad for
-sending to Linus.
-
+-- 
 Regards,
-Mike
 
-> 
-> Regards,
-> 
-> Tony 
+Laurent Pinchart
