@@ -1,48 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jan 2014 11:31:16 +0000
-Subject: [PATCH v7 2/4] Documentation: Add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver binding documentation
-In-Reply-To: <1389769840-15469-3-git-send-email-lho@apm.com>
-References: <1389769840-15469-1-git-send-email-lho@apm.com>
- <1389769840-15469-2-git-send-email-lho@apm.com>
- <1389769840-15469-3-git-send-email-lho@apm.com>
-Message-ID: <20140115113116.GC25824@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Jan 2014 11:38:50 +0000
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1389785930-28507-1-git-send-email-broonie@kernel.org>
+References: <1389785930-28507-1-git-send-email-broonie@kernel.org>
+Message-ID: <1389785930-28507-5-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 07:10:38AM +0000, Loc Ho wrote:
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  .../devicetree/bindings/phy/apm-xgene-phy.txt      |   94 ++++++++++++++++++++
->  1 files changed, 94 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-> new file mode 100644
-> index 0000000..4ffbae0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
-> @@ -0,0 +1,94 @@
-> +* APM X-Gene 15Gbps Multi-purpose PHY nodes
-> +
-> +PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
-> +PHY (pair of lanes) has its own node.
-> +
-> +Required properties:
-> +- compatible		: Shall be "apm,xgene-phy" or
-> +			  "apm,xgene-phy-ext". The "apm,xgene-phy" describes
-> +			  an PHY with internal reference PLL located within
-> +			  the IP. The "apm,xgene-phy-ext" describes an PHY
-> +			  where the internal reference PLL located outside of
-> +			  the IP.
+From: Mark Brown <broonie@linaro.org>
 
-How about:
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
-- compatible: shall contain one of:
-  * "apm,xgene-phy" - PHY has an internal reference PLL.
-  * "apm,xgene-phy-ext" - PHYs has an external reference PLL.
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
 
-Cheers,
-Mark.
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 951b55e24f13..0728264e14ee 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -177,6 +177,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.8.5.2
