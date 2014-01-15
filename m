@@ -1,25 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jan 2014 10:40:53 +0100
-Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
- SoCs
-In-Reply-To: <52D5896B.6000209@broadcom.com>
-References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-3-git-send-email-syin@broadcom.com>
- <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
- <52CC6782.4060309@broadcom.com>
- <CACRpkdYyz+zrzt0y135Wcq-yUMhiHOb1ov15+SsnVOcZvad96g@mail.gmail.com>
- <52D5896B.6000209@broadcom.com>
-Message-ID: <CACRpkdYCmMguUPFRAUHf186_ciKcchBZLGfgqn_VcSMiZi+a8Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 10:40:56 +0100
+Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
+In-Reply-To: <20140115091006.GF3377@lukather>
+References: <20140109153404.GA21055@kvmhost> <20140115091006.GF3377@lukather>
+Message-ID: <3612364.BZBltgonI0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 8:00 PM, Sherman Yin <syin@broadcom.com> wrote:
+On Wednesday 15 January 2014 10:10:06 Maxime Ripard wrote:
+> On Thu, Jan 09, 2014 at 04:34:04PM +0100, Gerardo Di Iorio wrote:
+> > Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
+> > 
+> > Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
+> > ---
+> >  arch/arm/mach-sunxi/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> > index 547004c..adb2574 100644
+> > --- a/arch/arm/mach-sunxi/Kconfig
+> > +++ b/arch/arm/mach-sunxi/Kconfig
+> > @@ -1,5 +1,5 @@
+> >  config ARCH_SUNXI
+> > -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+> > +       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
+> 
+> I wonder if the sunxi (apart the weird letter case) is actually
+> needed. Maybe we can just put "Allwinner SoCs" (it would be great if
+> you could fix the SoCs case too).
 
-> Great!  Is there anything else you would like to see changed before this
-> patchset can be accepted?
+If you want to have exact naming, try to find something that excludes the
+old Sun3i (F20) and earlier chips (unless someone is already planning
+to work on them). Maybe also mention the "Boxchip" name, although that
+seems to be falling out of use these days.
 
-I'd like some sign of life from the DT binding maintainers.
-
-Yours,
-Linus Walleij
+	Arnd
