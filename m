@@ -1,49 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jan 2014 17:19:54 +0000
-Subject: [PATCH v3 3/7] ARM: do CPU-specific init for Broadcom Brahma15
- cores
-In-Reply-To: <1389743333-16741-4-git-send-email-marc.ceeeee@gmail.com>
-References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
- <1389743333-16741-4-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <20140115171953.GB28782@mudshark.cambridge.arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 15 Jan 2014 18:23:26 +0100
+Subject: [PATCHv9][ 2/2] ARM: dts: mbimxsd35: Add sound support.
+In-Reply-To: <1389806606-21521-1-git-send-email-denis@eukrea.com>
+References: <1389806606-21521-1-git-send-email-denis@eukrea.com>
+Message-ID: <1389806606-21521-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:48:49PM +0000, Marc Carino wrote:
-> Perform any CPU-specific initialization required on the
-> Broadcom Brahma-15 core.
-> 
-> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/mm/proc-v7.S |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index bd17819..98ea423 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -193,6 +193,7 @@ __v7_cr7mp_setup:
->  	b	1f
->  __v7_ca7mp_setup:
->  __v7_ca15mp_setup:
-> +__v7_b15mp_setup:
->  	mov	r10, #0
->  1:
->  #ifdef CONFIG_SMP
-> @@ -494,6 +495,16 @@ __v7_ca15mp_proc_info:
->  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
->  
->  	/*
-> +	 * Broadcom Corporation Brahma-B15 processor.
-> +	 */
-> +	.type	__v7_b15mp_proc_info, #object
-> +__v7_b15mp_proc_info:
-> +	.long	0x420f00f0
-> +	.long	0xff0ffff0
-> +	__v7_proc __v7_b15mp_setup, hwcaps = HWCAP_IDIV
+Cc: Eric B?nard <eric@eukrea.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v8->v9:
+- Better Cc list.
 
-You only need to specify HWCAP_IDIV if you screwed up your idregs (namely
-CPUID_EXT_ISAR0). Do you actually need this for your core?
+ChangeLog v7->v8:
+- Ajusted to match the driver changes.
+---
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Will
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+index 23f6fe1..3e207df 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -46,6 +46,14 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	sound {
++		compatible = "eukrea,asoc-tlv320";
++		eukrea,model = "imx35-eukrea-tlv320aic23";
++		ssi-controller = <&ssi1>;
++		fsl,mux-int-port = <1>;
++		fsl,mux-ext-port = <4>;
++	};
+ };
+ 
+ &audmux {
+@@ -118,6 +126,7 @@
+ };
+ 
+ &ssi1 {
++	codec-handle = <&tlv320aic23>;
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+-- 
+1.7.9.5
