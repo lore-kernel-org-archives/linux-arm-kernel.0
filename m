@@ -1,41 +1,53 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 15 Jan 2014 09:55:34 -0800
-Subject: [PATCH v2 6/7] devicetree: bindings: Document Krait performance
- monitor units (PMU)
+Date: Wed, 15 Jan 2014 09:55:32 -0800
+Subject: [PATCH v2 4/7] ARM: perf_event: Add hook for event index clearing
 In-Reply-To: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
 References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1389808535-23852-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389808535-23852-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Krait PMU compatible string.
+On Krait processors we have a many-to-one relationship between
+raw CPU events and the event programmed into the PMNx counter.
+Two raw CPU events could map to the same value programmed in the
+PMNx counter. To avoid this problem, we check for collisions
+during the get_event_idx() callback by setting a bit in a bitmap
+whenever a certain event is used in a PMNx counter (see the next
+patch). Unfortunately, we don't have a hook to clear this bit in
+the bitmap when the event is deleted so let's add an optional
+clear_event_idx() callback for this purpose.
 
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/pmu.h   | 1 +
+ arch/arm/kernel/perf_event.c | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 3e1e498fea96..ce731441e64f 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -16,7 +16,14 @@ Required properties:
- 	"arm,arm11mpcore-pmu"
- 	"arm,arm1176-pmu"
- 	"arm,arm1136-pmu"
--- interrupts : 1 combined interrupt or 1 per core.
-+	"qcom,krait-pmu"
-+- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-+               interrupt (PPI) then 1 interrupt should be specified.
-+
-+Optional properties:
-+
-+- qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
-+                     events.
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index f24edad26c70..994ac445e792 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -71,6 +71,7 @@ struct arm_pmu {
+ 	void		(*disable)(struct perf_event *event);
+ 	int		(*get_event_idx)(struct pmu_hw_events *hw_events,
+ 					 struct perf_event *event);
++	void		(*clear_event_idx)(struct perf_event *event);
+ 	int		(*set_event_filter)(struct hw_perf_event *evt,
+ 					    struct perf_event_attr *attr);
+ 	u32		(*read_counter)(struct perf_event *event);
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index e76750980b38..06c6b191c8db 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -207,6 +207,8 @@ armpmu_del(struct perf_event *event, int flags)
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	hw_events->events[idx] = NULL;
+ 	clear_bit(idx, hw_events->used_mask);
++	if (armpmu->clear_event_idx)
++		armpmu->clear_event_idx(event);
  
- Example:
- 
+ 	perf_event_update_userpage(event);
+ }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
