@@ -1,67 +1,91 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 15 Jan 2014 20:54:45 +0100
-Subject: v3.12 regression from "ARM: kirkwood: convert to DT irqchip and
- clocksource" on non-DT kirkwood platforms
-In-Reply-To: <1389777972.12434.115.camel@kazak.uk.xensource.com>
-References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
- <52D651CD.5020307@gmail.com>
- <1389777972.12434.115.camel@kazak.uk.xensource.com>
-Message-ID: <52D6E785.4000706@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 15 Jan 2014 19:58:21 +0000 (UTC)
+Subject: OMAP baseline test results for v3.13-rc8
+Message-ID: <alpine.DEB.2.02.1401151953580.20720@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2014 10:26 AM, Ian Campbell wrote:
-> On Wed, 2014-01-15 at 10:15 +0100, Sebastian Hesselbarth wrote:
->> On 01/15/14 09:40, Ian Campbell wrote:
->>> The bootlogs are below or in the bug. It stops after "Console: colour
->>> dummy device 80x30", I think next would normally be the
->>> BogoMIPS/calibrate_delay output.
->>
->> That would indicate the timer (clocksource) or irq (irqchip) is not
->> running correctly. Again, that could be non-DT and DT fighting for it.
->> I'll investigate that.
->
-> That seems logical.
->
->> In the meantime, can you recompile your kernel and set
->> CONFIG_ARCH_KIRKWOOD_DT=n ?
->
-> I can confirm that v3.13-rc8 with CONFIG_ARCH_KIRKWOOD_DT=n works.
->
+
+Here are some basic OMAP test results for Linux v3.13-rc8.
+Logs and other details at:
+
+    http://www.pwsan.com/omap/testlogs/test_v3.13-rc8/20140113013852/
 
 
-Ian,
+Test summary
+------------
 
-please try the following two patches on top of v3.13-rc8 and report
-back, if it solves the regression.
+Build: zImage:
+    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
 
-I have tested this on a revived non-DT Kirkwood Dockstar with and
-without DT support enabled. I also compile tested it for Orion5x
-and Dove.
+Build: uImage+dtb:
+    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es
 
-While I will not send any patches for non-DT mach-dove boards as
-none of them is really used anymore, Gregory is on Cc for hopefully
-testing orion5x.
+Build: uImage:
+    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig
 
-For possible -stable patches, I know it is quite a huge patch but
-I didn't dare to touch arch/arm/kernel/foo for this kind of regression.
+Boot to userspace:
+    skip ( 2/ 2): 5912osk, 4460varsomom
+    Pass (10/10): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517
 
-Sebastian
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
 
-(I hope the fscking Thunderbird inlines both patches correctly)
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3530es3beagle, 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 37xxevm, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 1/ 5): 3530es3beagle
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-orion-provide-C-style-interrupt-handler-for-MULT.patch
-Type: text/x-patch
-Size: 2724 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/2abdebf2/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ARM-kirkwood-set-C-style-handle_irq-if-MULTI_IRQ_HAN.patch
-Type: text/x-patch
-Size: 8378 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/2abdebf2/attachment-0001.bin>
+vmlinux object size
+(delta in bytes from test_v3.13-rc7 (d6e0a2dd12f4067a5bcefb8bbd8ddbeff800afbc)):
+   text     data      bss    total  kernel
+    +45        0        0      +45  omap1_defconfig
+    +49       -8        0      +41  omap1_defconfig_1510innovator_only
+    +77        0        0      +77  omap1_defconfig_5912osk_only
+     +5        0        0       +5  omap2plus_defconfig
+    +25        0        0      +25  omap2plus_defconfig_2430sdp_only
+     +5        0        0       +5  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
+      0        0        0        0  omap2plus_defconfig_n800_only_a
+     +5        0        0       +5  omap2plus_defconfig_no_pm
+    +69        0        0      +69  omap2plus_defconfig_omap2_4_only
+     +5        0        0       +5  omap2plus_defconfig_omap3_4_only
+    +80        0      -88       -8  rmk_omap3430_ldp_allnoconfig
+    +65        0        0      +65  rmk_omap3430_ldp_oldconfig
+    -16        0      -24      -40  rmk_omap4430_sdp_allnoconfig
+   +125        0        0     +125  rmk_omap4430_sdp_oldnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.13-rc7 (d6e0a2dd12f4067a5bcefb8bbd8ddbeff800afbc))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
