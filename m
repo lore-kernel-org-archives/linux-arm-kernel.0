@@ -1,38 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 15 Jan 2014 18:45:19 +0100
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <201401151736.46280.arnd@arndb.de>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <1389174517.12612.87.camel@kazak.uk.xensource.com>
- <20140111210443.GT9681@lunn.ch> <201401151736.46280.arnd@arndb.de>
-Message-ID: <20140115174519.GE17530@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jan 2014 09:55:30 -0800
+Subject: [PATCH v2 2/7] ARM: perf_event: Assign pdev pointer earlier for CPU
+ PMUs
+In-Reply-To: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389808535-23852-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > But i'm also a little bit concerned by the "unique number" and this
-> > ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
-> > path supposed to be stable? This unique number is not stable. An
-> > unwitting change to the DT could cause its value to change. Do we need
-> > to make it stable?
-> > 
-> 
-> One possibility would be to create an artificial bus in DT for all
-> gpio-keys devices, use #address-cells=<1> and #size-cells=<0>
-> for it, and give each device a unique reg property. Not sure if that
-> would be considered an elegant solution though.
+We want to inspect the of_node that the pdev is pointing to in
+the Krait CPU specific PMU initialization function. Assign it
+earlier so that we don't crash with a NULL pointer dereference.
 
-Hi Arnd
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/perf_event_cpu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Can i imply from your answer that you think 
-
-/dev/input/by-path/platform-gpio_keys.3-event
-
-should be stable?
-
-A quick look at udev rules seems to suggestion this is an issue for
-input/gpio-keys and maybe audio and video if there is a top level DT
-property collecting the different sub devices together for ASOC and
-V4L.
-
-Thanks
-	Andrew
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 6efd8aab15df..68d02ca0ca1b 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -311,6 +311,9 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	cpu_pmu = pmu;
++	cpu_pmu->plat_device = pdev;
++
+ 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+ 		ret = init_fn(pmu);
+@@ -323,8 +326,6 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		goto out_free;
+ 	}
+ 
+-	cpu_pmu = pmu;
+-	cpu_pmu->plat_device = pdev;
+ 	cpu_pmu_init(cpu_pmu);
+ 	ret = armpmu_register(cpu_pmu, PERF_TYPE_RAW);
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
