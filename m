@@ -1,89 +1,630 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 15 Jan 2014 14:19:58 +0800
-Subject: [PATCH] ARM: imx: clk-vf610: Suppress duplicate const sparse warning
-Message-ID: <1389766798-16691-1-git-send-email-Ying.Liu@freescale.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 15 Jan 2014 13:21:05 +0800
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There should be no duplicate const specifiers for those static
-constant character string arrays defined for clock mux options.
-Also, the arrays are only taken as the 5th argument for the
-imx_clk_mux() function, which is in the type of 'const char
-**parents'.  So, let's remove the 2nd const specifier right
-after 'char'.
+Add dma support for lpuart. This function depend on DMA driver. 
+You can turn on it by SERIAL_FSL_LPUART_DMA=y. And It works if dts node has dma properties.
 
-This patch fixes these sparse warnings:
-arch/arm/mach-imx/clk-vf610.c:66:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:67:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:68:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:69:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:70:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:71:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:72:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:73:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:74:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:75:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:76:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:77:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:78:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:79:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:80:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:81:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:83:25: warning: duplicate const
-arch/arm/mach-imx/clk-vf610.c:84:25: warning: duplicate const
-
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 ---
- arch/arm/mach-imx/clk-vf610.c |   36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+ .../devicetree/bindings/serial/fsl-lpuart.txt      |  21 +-
+ drivers/tty/serial/Kconfig                         |   7 +
+ drivers/tty/serial/fsl_lpuart.c                    | 457 ++++++++++++++++++++-
+ 3 files changed, 473 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-index b169a39..41ba8f4 100644
---- a/arch/arm/mach-imx/clk-vf610.c
-+++ b/arch/arm/mach-imx/clk-vf610.c
-@@ -63,25 +63,25 @@ static void __iomem *anatop_base;
- static void __iomem *ccm_base;
+diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+index 6fd1dd1..7509080 100644
+--- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
++++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+@@ -4,11 +4,24 @@ Required properties:
+ - compatible : Should be "fsl,<soc>-lpuart"
+ - reg : Address and length of the register set for the device
+ - interrupts : Should contain uart interrupt
++- clocks : from common clock binding: handle to uart clock
++- clock-names : from common clock binding: Shall be "ipg"
++
++Optional properties:
++- dma-names: Should contain "lpuart-tx" for transmit and "lpuart-rx" for receive channels
++- dmas: Should contain dma specifiers for transmit and receive channels
++
++Note: Optional properties for DMA support, If need this properties is must.
  
- /* sources for multiplexer clocks, this is used multiple times */
--static const char const *fast_sels[]	= { "firc", "fxosc", };
--static const char const *slow_sels[]	= { "sirc_32k", "sxosc", };
--static const char const *pll1_sels[]	= { "pll1_main", "pll1_pfd1", "pll1_pfd2", "pll1_pfd3", "pll1_pfd4", };
--static const char const *pll2_sels[]	= { "pll2_main", "pll2_pfd1", "pll2_pfd2", "pll2_pfd3", "pll2_pfd4", };
--static const char const *sys_sels[]	= { "fast_clk_sel", "slow_clk_sel", "pll2_pfd_sel", "pll2_main", "pll1_pfd_sel", "pll3_main", };
--static const char const *ddr_sels[]	= { "pll2_pfd2", "sys_sel", };
--static const char const *rmii_sels[]	= { "enet_ext", "audio_ext", "enet_50m", "enet_25m", };
--static const char const *enet_ts_sels[]	= { "enet_ext", "fxosc", "audio_ext", "usb", "enet_ts", "enet_25m", "enet_50m", };
--static const char const *esai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
--static const char const *sai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
--static const char const *nfc_sels[]	= { "platform_bus", "pll1_pfd1", "pll3_pfd1", "pll3_pfd3", };
--static const char const *qspi_sels[]	= { "pll3_main", "pll3_pfd4", "pll2_pfd4", "pll1_pfd4", };
--static const char const *esdhc_sels[]	= { "pll3_main", "pll3_pfd3", "pll1_pfd3", "platform_bus", };
--static const char const *dcu_sels[]	= { "pll1_pfd2", "pll3_main", };
--static const char const *gpu_sels[]	= { "pll2_pfd2", "pll3_pfd2", };
--static const char const *vadc_sels[]	= { "pll6_main_div", "pll3_main_div", "pll3_main", };
-+static const char *fast_sels[]	= { "firc", "fxosc", };
-+static const char *slow_sels[]	= { "sirc_32k", "sxosc", };
-+static const char *pll1_sels[]	= { "pll1_main", "pll1_pfd1", "pll1_pfd2", "pll1_pfd3", "pll1_pfd4", };
-+static const char *pll2_sels[]	= { "pll2_main", "pll2_pfd1", "pll2_pfd2", "pll2_pfd3", "pll2_pfd4", };
-+static const char *sys_sels[]	= { "fast_clk_sel", "slow_clk_sel", "pll2_pfd_sel", "pll2_main", "pll1_pfd_sel", "pll3_main", };
-+static const char *ddr_sels[]	= { "pll2_pfd2", "sys_sel", };
-+static const char *rmii_sels[]	= { "enet_ext", "audio_ext", "enet_50m", "enet_25m", };
-+static const char *enet_ts_sels[]	= { "enet_ext", "fxosc", "audio_ext", "usb", "enet_ts", "enet_25m", "enet_50m", };
-+static const char *esai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
-+static const char *sai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
-+static const char *nfc_sels[]	= { "platform_bus", "pll1_pfd1", "pll3_pfd1", "pll3_pfd3", };
-+static const char *qspi_sels[]	= { "pll3_main", "pll3_pfd4", "pll2_pfd4", "pll1_pfd4", };
-+static const char *esdhc_sels[]	= { "pll3_main", "pll3_pfd3", "pll1_pfd3", "platform_bus", };
-+static const char *dcu_sels[]	= { "pll1_pfd2", "pll3_main", };
-+static const char *gpu_sels[]	= { "pll2_pfd2", "pll3_pfd2", };
-+static const char *vadc_sels[]	= { "pll6_main_div", "pll3_main_div", "pll3_main", };
- /* FTM counter clock source, not module clock */
--static const char const *ftm_ext_sels[]	= {"sirc_128k", "sxosc", "fxosc_half", "audio_ext", };
--static const char const *ftm_fix_sels[]	= { "sxosc", "ipg_bus", };
-+static const char *ftm_ext_sels[]	= {"sirc_128k", "sxosc", "fxosc_half", "audio_ext", };
-+static const char *ftm_fix_sels[]	= { "sxosc", "ipg_bus", };
+ Example:
  
- static struct clk_div_table pll4_main_div_table[] = {
- 	{ .val = 0, .div = 1 },
+ uart0: serial at 40027000 {
+-	       compatible = "fsl,vf610-lpuart";
+-	       reg = <0x40027000 0x1000>;
+-	       interrupts = <0 61 0x00>;
+-       };
++		compatible = "fsl,vf610-lpuart";
++		reg = <0x40027000 0x1000>;
++		interrupts = <0 61 0x00>;
++		clocks = <&clks VF610_CLK_UART0>;
++		clock-names = "ipg";
++		dma-names = "lpuart-tx","lpuart-rx";
++		dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>,
++			<&edma0 0 VF610_EDMA_MUXID0_UART0_RX>;
++	};
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index a3817ab..ab3910b 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1509,6 +1509,13 @@ config SERIAL_FSL_LPUART_CONSOLE
+ 	  If you have enabled the lpuart serial port on the Freescale SoCs,
+ 	  you can make it the console by answering Y to this option.
+ 
++config SERIAL_FSL_LPUART_DMA
++	bool "Freescale lpuart serial port dma support"
++	depends on FSL_EDMA=y && SERIAL_FSL_LPUART=y
++	help
++	  DMA support for the on-chip lpuart on some Freescale SOCs,
++	  you can turn on the dma support for lpuart by answering Y to this option.
++
+ config SERIAL_ST_ASC
+ 	tristate "ST ASC serial port support"
+ 	select SERIAL_CORE
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 67b8946..5fdcb18 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -13,14 +13,19 @@
+ #define SUPPORT_SYSRQ
+ #endif
+ 
+-#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/console.h>
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++#include <linux/dmapool.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+-#include <linux/clk.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <linux/console.h>
++#include <linux/of_dma.h>
+ #include <linux/serial_core.h>
++#include <linux/slab.h>
+ #include <linux/tty_flip.h>
+ 
+ /* All registers are 8-bit width */
+@@ -112,6 +117,12 @@
+ #define UARTSFIFO_TXOF		0x02
+ #define UARTSFIFO_RXUF		0x01
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++#define DMA_MAXBURST		16
++#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
++#define FSL_UART_RX_DMA_BUFFER_SIZE	64
++#endif
++
+ #define DRIVER_NAME	"fsl-lpuart"
+ #define DEV_NAME	"ttyLP"
+ #define UART_NR		6
+@@ -121,6 +132,26 @@ struct lpuart_port {
+ 	struct clk		*clk;
+ 	unsigned int		txfifo_size;
+ 	unsigned int		rxfifo_size;
++
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++	bool			lpuart_dma_use;
++	struct dma_chan		*dma_tx_chan;
++	struct dma_chan		*dma_rx_chan;
++	struct dma_async_tx_descriptor  *dma_tx_desc;
++	struct dma_async_tx_descriptor  *dma_rx_desc;
++	dma_addr_t		dma_tx_buf_bus;
++	dma_addr_t		dma_rx_buf_bus;
++	dma_cookie_t		dma_tx_cookie;
++	dma_cookie_t		dma_rx_cookie;
++	unsigned char		*dma_tx_buf_virt;
++	unsigned char		*dma_rx_buf_virt;
++	unsigned int		dma_tx_bytes;
++	unsigned int		dma_rx_bytes;
++	int			dma_tx_in_progress;
++	int			dma_rx_in_progress;
++	unsigned int		dma_rx_timeout;
++	struct timer_list	lpuart_timer;
++#endif
+ };
+ 
+ static struct of_device_id lpuart_dt_ids[] = {
+@@ -131,6 +162,12 @@ static struct of_device_id lpuart_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++/* Forward declare this for the dma callbacks*/
++static void lpuart_dma_tx_complete(void *arg);
++static void lpuart_dma_rx_complete(void *arg);
++#endif
++
+ static void lpuart_stop_tx(struct uart_port *port)
+ {
+ 	unsigned char temp;
+@@ -152,6 +189,212 @@ static void lpuart_enable_ms(struct uart_port *port)
+ {
+ }
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++static void lpuart_copy_rx_to_tty(struct lpuart_port *sport,
++		struct tty_port *tty, int count)
++{
++	int copied;
++
++	sport->port.icount.rx += count;
++
++	if (!tty) {
++		dev_err(sport->port.dev, "No tty port\n");
++		return;
++	}
++
++	dma_sync_single_for_cpu(sport->port.dev, sport->dma_rx_buf_bus,
++			FSL_UART_RX_DMA_BUFFER_SIZE, DMA_FROM_DEVICE);
++	copied = tty_insert_flip_string(tty,
++			((unsigned char *)(sport->dma_rx_buf_virt)), count);
++
++	if (copied != count) {
++		WARN_ON(1);
++		dev_err(sport->port.dev, "RxData copy to tty layer failed\n");
++	}
++
++	dma_sync_single_for_device(sport->port.dev, sport->dma_rx_buf_bus,
++			FSL_UART_RX_DMA_BUFFER_SIZE, DMA_TO_DEVICE);
++}
++
++static void lpuart_pio_tx(struct lpuart_port *sport)
++{
++	struct circ_buf *xmit = &sport->port.state->xmit;
++	unsigned long flags;
++
++	spin_lock_irqsave(&sport->port.lock, flags);
++
++	while (!uart_circ_empty(xmit) &&
++		readb(sport->port.membase + UARTTCFIFO) < sport->txfifo_size) {
++		writeb(xmit->buf[xmit->tail], sport->port.membase + UARTDR);
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		sport->port.icount.tx++;
++	}
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(&sport->port);
++
++	if (uart_circ_empty(xmit))
++		writeb(readb(sport->port.membase + UARTCR5) | UARTCR5_TDMAS,
++			sport->port.membase + UARTCR5);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
++}
++
++static int lpuart_dma_tx(struct lpuart_port *sport, unsigned long count)
++{
++	struct circ_buf *xmit = &sport->port.state->xmit;
++	dma_addr_t tx_bus_addr;
++
++	dma_sync_single_for_device(sport->port.dev, sport->dma_tx_buf_bus,
++				UART_XMIT_SIZE, DMA_TO_DEVICE);
++	sport->dma_tx_bytes = count & ~(DMA_MAXBURST_MASK);
++	tx_bus_addr = sport->dma_tx_buf_bus + xmit->tail;
++	sport->dma_tx_desc = dmaengine_prep_slave_single(sport->dma_tx_chan,
++					tx_bus_addr, sport->dma_tx_bytes,
++					DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
++
++	if (!sport->dma_tx_desc) {
++		dev_err(sport->port.dev, "Not able to get desc for tx\n");
++		return -EIO;
++	}
++
++	sport->dma_tx_desc->callback = lpuart_dma_tx_complete;
++	sport->dma_tx_desc->callback_param = sport;
++	sport->dma_tx_in_progress = 1;
++	sport->dma_tx_cookie = dmaengine_submit(sport->dma_tx_desc);
++	dma_async_issue_pending(sport->dma_tx_chan);
++
++	return 0;
++}
++
++static void lpuart_prepare_tx(struct lpuart_port *sport)
++{
++	struct circ_buf *xmit = &sport->port.state->xmit;
++	unsigned long count =  CIRC_CNT_TO_END(xmit->head,
++					xmit->tail, UART_XMIT_SIZE);
++
++	if (!count)
++		return;
++
++	if (count < DMA_MAXBURST)
++		writeb(readb(sport->port.membase + UARTCR5) & ~UARTCR5_TDMAS,
++				sport->port.membase + UARTCR5);
++	else {
++		writeb(readb(sport->port.membase + UARTCR5) | UARTCR5_TDMAS,
++				sport->port.membase + UARTCR5);
++		lpuart_dma_tx(sport, count);
++	}
++}
++
++static void lpuart_dma_tx_complete(void *arg)
++{
++	struct lpuart_port *sport = arg;
++	struct circ_buf *xmit = &sport->port.state->xmit;
++	unsigned long flags;
++
++	async_tx_ack(sport->dma_tx_desc);
++
++	spin_lock_irqsave(&sport->port.lock, flags);
++
++	xmit->tail = (xmit->tail + sport->dma_tx_bytes) & (UART_XMIT_SIZE - 1);
++	sport->dma_tx_in_progress = 0;
++
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(&sport->port);
++
++	lpuart_prepare_tx(sport);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
++}
++
++static int lpuart_dma_rx(struct lpuart_port *sport)
++{
++	dma_sync_single_for_device(sport->port.dev, sport->dma_rx_buf_bus,
++			FSL_UART_RX_DMA_BUFFER_SIZE, DMA_TO_DEVICE);
++	sport->dma_rx_desc = dmaengine_prep_slave_single(sport->dma_rx_chan,
++			sport->dma_rx_buf_bus, FSL_UART_RX_DMA_BUFFER_SIZE,
++			DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
++
++	if (!sport->dma_rx_desc) {
++		dev_err(sport->port.dev, "Not able to get desc for rx\n");
++		return -EIO;
++	}
++
++	sport->dma_rx_desc->callback = lpuart_dma_rx_complete;
++	sport->dma_rx_desc->callback_param = sport;
++	sport->dma_rx_in_progress = 1;
++	sport->dma_rx_cookie = dmaengine_submit(sport->dma_rx_desc);
++	dma_async_issue_pending(sport->dma_rx_chan);
++
++	return 0;
++}
++
++static void lpuart_dma_rx_complete(void *arg)
++{
++	struct lpuart_port *sport = arg;
++	struct tty_port *port = &sport->port.state->port;
++	unsigned long flags;
++
++	async_tx_ack(sport->dma_rx_desc);
++
++	spin_lock_irqsave(&sport->port.lock, flags);
++
++	sport->dma_rx_in_progress = 0;
++	lpuart_copy_rx_to_tty(sport, port, FSL_UART_RX_DMA_BUFFER_SIZE);
++	tty_flip_buffer_push(port);
++	lpuart_dma_rx(sport);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
++}
++
++static void lpuart_timer_func(unsigned long data)
++{
++	struct lpuart_port *sport = (struct lpuart_port *)data;
++	struct tty_port *port = &sport->port.state->port;
++	struct dma_tx_state state;
++	unsigned long flags;
++	unsigned char temp;
++	int count;
++
++	del_timer(&sport->lpuart_timer);
++	dmaengine_pause(sport->dma_rx_chan);
++	dmaengine_tx_status(sport->dma_rx_chan, sport->dma_rx_cookie, &state);
++	dmaengine_terminate_all(sport->dma_rx_chan);
++	count = FSL_UART_RX_DMA_BUFFER_SIZE - state.residue;
++	async_tx_ack(sport->dma_rx_desc);
++
++	spin_lock_irqsave(&sport->port.lock, flags);
++
++	sport->dma_rx_in_progress = 0;
++	lpuart_copy_rx_to_tty(sport, port, count);
++	tty_flip_buffer_push(port);
++	temp = readb(sport->port.membase + UARTCR5);
++	writeb(temp & ~UARTCR5_RDMAS, sport->port.membase + UARTCR5);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
++}
++
++static inline void lpuart_prepare_rx(struct lpuart_port *sport)
++{
++	unsigned long flags;
++	unsigned char temp;
++
++	spin_lock_irqsave(&sport->port.lock, flags);
++
++	init_timer(&sport->lpuart_timer);
++	sport->lpuart_timer.function = lpuart_timer_func;
++	sport->lpuart_timer.data = (unsigned long)sport;
++	sport->lpuart_timer.expires = jiffies + sport->dma_rx_timeout;
++	add_timer(&sport->lpuart_timer);
++
++	lpuart_dma_rx(sport);
++	temp = readb(sport->port.membase + UARTCR5);
++	writeb(temp | UARTCR5_RDMAS, sport->port.membase + UARTCR5);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
++}
++#endif
++
+ static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
+ {
+ 	struct circ_buf *xmit = &sport->port.state->xmit;
+@@ -172,14 +415,26 @@ static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
+ 
+ static void lpuart_start_tx(struct uart_port *port)
+ {
+-	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
++	struct lpuart_port *sport = container_of(port,
++			struct lpuart_port, port);
++	struct circ_buf *xmit = &sport->port.state->xmit;
+ 	unsigned char temp;
+ 
+ 	temp = readb(port->membase + UARTCR2);
+ 	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++	if (sport->lpuart_dma_use) {
++		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
++			lpuart_prepare_tx(sport);
++	} else {
++		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
++			lpuart_transmit_buffer(sport);
++	}
++#else
+ 	if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
+ 		lpuart_transmit_buffer(sport);
++#endif
+ }
+ 
+ static irqreturn_t lpuart_txint(int irq, void *dev_id)
+@@ -279,12 +534,27 @@ static irqreturn_t lpuart_int(int irq, void *dev_id)
+ 
+ 	sts = readb(sport->port.membase + UARTSR1);
+ 
+-	if (sts & UARTSR1_RDRF)
++	if (sts & UARTSR1_RDRF) {
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++		if (sport->lpuart_dma_use)
++			lpuart_prepare_rx(sport);
++		else
++			lpuart_rxint(irq, dev_id);
++#else
+ 		lpuart_rxint(irq, dev_id);
+-
++#endif
++	}
+ 	if (sts & UARTSR1_TDRE &&
+-		!(readb(sport->port.membase + UARTCR5) & UARTCR5_TDMAS))
++		!(readb(sport->port.membase + UARTCR5) & UARTCR5_TDMAS)) {
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++		if (sport->lpuart_dma_use)
++			lpuart_pio_tx(sport);
++		else
++			lpuart_txint(irq, dev_id);
++#else
+ 		lpuart_txint(irq, dev_id);
++#endif
++	}
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -366,19 +636,179 @@ static void lpuart_setup_watermark(struct lpuart_port *sport)
+ 	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
+ 			sport->port.membase + UARTCFIFO);
+ 
+-	writeb(2, sport->port.membase + UARTTWFIFO);
++	writeb(0, sport->port.membase + UARTTWFIFO);
+ 	writeb(1, sport->port.membase + UARTRWFIFO);
+ 
+ 	/* Restore cr2 */
+ 	writeb(cr2_saved, sport->port.membase + UARTCR2);
+ }
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++static int lpuart_dma_tx_request(struct uart_port *port)
++{
++	struct lpuart_port *sport = container_of(port,
++					struct lpuart_port, port);
++	struct dma_chan *tx_chan;
++	struct dma_slave_config dma_tx_sconfig;
++	dma_addr_t dma_bus;
++	unsigned char *dma_buf;
++	int ret;
++
++	tx_chan  = dma_request_slave_channel(sport->port.dev, "lpuart-tx");
++
++	if (!tx_chan) {
++		dev_err(sport->port.dev, "Dma tx channel request failed!\n");
++		return -ENODEV;
++	}
++
++	dma_bus = dma_map_single(tx_chan->device->dev,
++				sport->port.state->xmit.buf,
++				UART_XMIT_SIZE, DMA_TO_DEVICE);
++
++	if (dma_mapping_error(tx_chan->device->dev, dma_bus)) {
++		dev_err(sport->port.dev, "dma_map_single tx failed\n");
++		dma_release_channel(tx_chan);
++		return -ENOMEM;
++	}
++
++	dma_buf = sport->port.state->xmit.buf;
++	dma_tx_sconfig.dst_addr = sport->port.mapbase + UARTDR;
++	dma_tx_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	dma_tx_sconfig.dst_maxburst = DMA_MAXBURST;
++	dma_tx_sconfig.direction = DMA_MEM_TO_DEV;
++	ret = dmaengine_slave_config(tx_chan, &dma_tx_sconfig);
++
++	if (ret < 0) {
++		dev_err(sport->port.dev,
++				"Dma slave config failed, err = %d\n", ret);
++		dma_release_channel(tx_chan);
++		return ret;
++	}
++
++	sport->dma_tx_chan = tx_chan;
++	sport->dma_tx_buf_virt = dma_buf;
++	sport->dma_tx_buf_bus = dma_bus;
++	sport->dma_tx_in_progress = 0;
++
++	return 0;
++}
++
++static int lpuart_dma_rx_request(struct uart_port *port)
++{
++	struct lpuart_port *sport = container_of(port,
++					struct lpuart_port, port);
++	struct dma_chan *rx_chan;
++	struct dma_slave_config dma_rx_sconfig;
++	dma_addr_t dma_bus;
++	unsigned char *dma_buf;
++	int ret;
++
++	rx_chan  = dma_request_slave_channel(sport->port.dev, "lpuart-rx");
++
++	if (!rx_chan) {
++		dev_err(sport->port.dev, "Dma rx channel request failed!\n");
++		return -ENODEV;
++	}
++
++	dma_buf = devm_kzalloc(sport->port.dev,
++				FSL_UART_RX_DMA_BUFFER_SIZE, GFP_KERNEL);
++
++	if (!dma_buf) {
++		dev_err(sport->port.dev, "Dma rx alloc failed\n");
++		dma_release_channel(rx_chan);
++		return -ENOMEM;
++	}
++
++	dma_bus = dma_map_single(rx_chan->device->dev, dma_buf,
++				FSL_UART_RX_DMA_BUFFER_SIZE, DMA_FROM_DEVICE);
++
++	if (dma_mapping_error(rx_chan->device->dev, dma_bus)) {
++		dev_err(sport->port.dev, "dma_map_single rx failed\n");
++		dma_release_channel(rx_chan);
++		return -ENOMEM;
++	}
++
++	dma_rx_sconfig.src_addr = sport->port.mapbase + UARTDR;
++	dma_rx_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	dma_rx_sconfig.src_maxburst = 1;
++	dma_rx_sconfig.direction = DMA_DEV_TO_MEM;
++	ret = dmaengine_slave_config(rx_chan, &dma_rx_sconfig);
++
++	if (ret < 0) {
++		dev_err(sport->port.dev,
++				"Dma slave config failed, err = %d\n", ret);
++		dma_release_channel(rx_chan);
++		return ret;
++	}
++
++	sport->dma_rx_chan = rx_chan;
++	sport->dma_rx_buf_virt = dma_buf;
++	sport->dma_rx_buf_bus = dma_bus;
++	sport->dma_rx_in_progress = 0;
++
++	sport->dma_rx_timeout = (sport->port.timeout - HZ / 50) *
++				FSL_UART_RX_DMA_BUFFER_SIZE * 3 /
++				sport->rxfifo_size / 2;
++
++	if (sport->dma_rx_timeout < msecs_to_jiffies(20))
++		sport->dma_rx_timeout = msecs_to_jiffies(20);
++
++	return 0;
++}
++
++static void lpuart_dma_tx_free(struct uart_port *port)
++{
++	struct lpuart_port *sport = container_of(port,
++					struct lpuart_port, port);
++	struct dma_chan *dma_chan;
++
++	dma_unmap_single(sport->port.dev, sport->dma_tx_buf_bus,
++			UART_XMIT_SIZE, DMA_TO_DEVICE);
++	dma_chan = sport->dma_tx_chan;
++	sport->dma_tx_chan = NULL;
++	sport->dma_tx_buf_bus = 0;
++	sport->dma_tx_buf_virt = NULL;
++	dma_release_channel(dma_chan);
++}
++
++static void lpuart_dma_rx_free(struct uart_port *port)
++{
++	struct lpuart_port *sport = container_of(port,
++					struct lpuart_port, port);
++	struct dma_chan *dma_chan;
++
++	dma_unmap_single(sport->port.dev, sport->dma_rx_buf_bus,
++			FSL_UART_RX_DMA_BUFFER_SIZE, DMA_FROM_DEVICE);
++
++	dma_chan = sport->dma_rx_chan;
++	sport->dma_rx_chan = NULL;
++	sport->dma_rx_buf_bus = 0;
++	sport->dma_rx_buf_virt = NULL;
++	dma_release_channel(dma_chan);
++}
++#endif
++
+ static int lpuart_startup(struct uart_port *port)
+ {
+ 	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
+ 	int ret;
+ 	unsigned long flags;
+ 	unsigned char temp;
++
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++	struct platform_device *pdev = to_platform_device(port->dev);
++	struct device_node *np = pdev->dev.of_node;
++
++	if (of_get_property(np, "dmas", NULL)) {
++		sport->lpuart_dma_use = true;
++		lpuart_dma_tx_request(port);
++		lpuart_dma_rx_request(port);
++		temp = readb(port->membase + UARTCR5);
++		writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
++	} else
++		sport->lpuart_dma_use = false;
++#endif
++
+ 	ret = devm_request_irq(port->dev, port->irq, lpuart_int, 0,
+ 				DRIVER_NAME, sport);
+ 	if (ret)
+@@ -413,6 +843,13 @@ static void lpuart_shutdown(struct uart_port *port)
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ 
+ 	devm_free_irq(port->dev, port->irq, sport);
++
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++	if (sport->lpuart_dma_use) {
++		lpuart_dma_tx_free(port);
++		lpuart_dma_rx_free(port);
++	}
++#endif
+ }
+ 
+ static void
+@@ -854,6 +1291,10 @@ static int __init lpuart_serial_init(void)
+ 
+ 	pr_info("serial: Freescale lpuart driver\n");
+ 
++#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
++	pr_info("serial: Freescale lpuart dma support\n");
++#endif
++
+ 	ret = uart_register_driver(&lpuart_reg);
+ 	if (ret)
+ 		return ret;
 -- 
-1.7.9.5
+1.8.4
