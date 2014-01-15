@@ -1,40 +1,41 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 15 Jan 2014 10:01:09 -0800
-Subject: [RFC 0/2] Early patches to get rid of meminfo
-In-Reply-To: <20140115135020.GJ30907@bivouac.eciton.net>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
- <20140115135020.GJ30907@bivouac.eciton.net>
-Message-ID: <52D6CCE5.4010104@codeaurora.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 19:06:15 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a
+ gpio used as an interrupt source.
+In-Reply-To: <52D3C166.5050908@overkiz.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+Message-ID: <20140115180615.GJ9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/15/2014 5:50 AM, Leif Lindholm wrote:
-> Hi Laura,
->
-> On Tue, Jan 14, 2014 at 09:55:20PM -0800, Laura Abbott wrote:
->> With the move away from bootmem and the convergence on memblock, it seems
->> like meminfo should be deprecated as well to avoid duplication. This is
->> a first pass attempt to just use memblock and not have meminfo integrated.
->> There is still a major issue in terms of actually specifying mem at location
->> on the command line but I wanted to send this out for some early feedback
->> before putting any more effort into this. I've done basic boot testing on
->> a simple DT target.
->
-> I can't see 1/2 and 2/2 - either in my inbox or in the archive.
-> Could you resend?
->
-> /
->      Leif
+On 11:35 Mon 13 Jan     , boris brezillon wrote:
+> On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+> >Hello Nicolas, Jean-Christophe,
+> >
+> >As I was trying to enable the touchscreen on the at91sam9261ek with
+> >device-tree support, I ran into an issue. The touchscreen driver needs
+> >to know the state of the pendown gpio and also needs it as an
+> >interrupt source.
+> >
+> >The problem is that when a gpio is used as an interrupt, it's
+> >requested by the pinctrl driver during the xlate stage, marking it
+> >unavaliable for the other driver.
+> >It looks like the at91 pinctrl driver is the only one to use
+> >gpio_request() in the xlate stage. Maybe we should remove this:
+> 
+> You should only request it as a GPIO and then use gpio_to_irq to get the
+> related IRQ.
 
+This here a HUGE issue in the hole kernel
 
-The patches are being held for moderation because apparently they have 
-"a suspicious header". Not sure how the cover letter made it through but 
-the patches didn't. If they don't get approved by end of the day I'll 
-try re-sending.
+You should NEVER known ti's a gpio in the driver at all gpio_to_irq should never
+exist you need to only see the irq
 
-Thanks,
-Laura
+> Because what is done here, is to solve the case where only the irq
+> is request, and in this specific case we need to request the pin as a
+> GPIO.
+this need to be handled at irq level not drivers
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best Regards,
+J.
