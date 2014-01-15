@@ -1,29 +1,43 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 15 Jan 2014 15:31:45 +0800
-Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
-In-Reply-To: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
-References: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
- <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <52D63961.1030808@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jan 2014 15:35:40 +0800
+Subject: imx6dl/imx6q fec rmii mode with external ref_clk
+In-Reply-To: <20140114153012.GA22550@frolo.macqel>
+References: <20140114153012.GA22550@frolo.macqel>
+Message-ID: <20140115073536.GD1914@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
+On Tue, Jan 14, 2014 at 04:30:12PM +0100, Philippe De Muyter wrote:
+> Hi,
+> 
+> On the custom board we are developping (imx6q and imx6dl), we have connected
+> the fec to a switch chip using rmii mode, and we let the switch provide the
+> reference clock to gpio_16.
+> 
+> I work currently with 3.13-rc8 and
+> 
+> - I do not have ethernet access working (tx timeout)
+> - I do not find in the dtb files a description of the pad settings for the
+> RMII mode
+> - when searching about the setting for bit 21 ing GPR1, which seems to
+> be important for my setting to work, I found the following mail:
+> 	http://www.spinics.net/lists/devicetree/msg06450.html
 
-Would you mind check whehter this patch solve the issue of "The Samsung 
-Arndale board started failing boot from MMC".
+Just for testing your hardware, does the following change make the
+Ethernet work for you?
 
-I am sorry about that.
+Shawn
 
-On 01/15/2014 03:15 PM, Zhangfei Gao wrote:
-> Introdeced from commit b7db86adfa58b
-commit should be bf626e5550f24aec24975a0e85ad8e572ca76a6b, from mmc-next
-
-> CDETECT is ingored since IS_ERR_VALUE(!mmc_gpio_get_cd(mmc)) does not work
-> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT
->
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> ---
->   drivers/mmc/host/dw_mmc.c |    9 ++++++---
->   1 file changed, 6 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/mach-imx/mach-imx6q.c
+b/arch/arm/mach-imx/mach-imx6q.c
+index e51e3da..be8d074 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -188,7 +188,7 @@ static void __init imx6q_1588_init(void)
+        if (!IS_ERR(gpr))
+                regmap_update_bits(gpr, IOMUXC_GPR1,
+                                IMX6Q_GPR1_ENET_CLK_SEL_MASK,
+-                               IMX6Q_GPR1_ENET_CLK_SEL_ANATOP);
++                               0);
+        else
+                pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
