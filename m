@@ -1,44 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jan 2014 09:12:47 +0100
-Subject: [PATCH 2/2] pinctrl: sirf: put gpio interrupt pin into input
- status automatically
-In-Reply-To: <1389430123-8036-2-git-send-email-21cnbao@gmail.com>
-References: <1389430123-8036-1-git-send-email-21cnbao@gmail.com>
- <1389430123-8036-2-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdbgPLzihp30ScbhTN9inO6WOnGrKpn1Gh_Q8vs2RyxT=w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 15 Jan 2014 09:14:54 +0100
+Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for
+ LinkSprite pcDuino
+In-Reply-To: <alpine.DEB.2.02.1401131406230.17739@trabant.deployis.eu>
+References: <alpine.DEB.2.02.1401131406230.17739@trabant.deployis.eu>
+Message-ID: <20140115081453.GD3377@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 11, 2014 at 9:48 AM, Barry Song <21cnbao@gmail.com> wrote:
+Hi,
 
-> From: Barry Song <Baohua.Song@csr.com>
->
-> busses like i2c, spi and so on can parse the virq of their subnode automatically by
-> irq_of_parse_and_map(). for example, i2c will do that in of_i2c_register_devices().
-> people can put hwirq number attached to a gpio controller in dts, and drivers can
-> directly request the parsed virq.
->
-> for example, for an i2c client as below,
-> tangoc-ts at 5c{
->         compatible = "pixcir,tangoc-ts";
->         interrupt-parent = <&gpio>;
->         interrupts = <3 0>;
->         reg = <0x5c>;
-> };
-> in i2c client probe(), it will request_irq(client->irq, ...) without
-> calling gpio_direction_input().
-> so here when we set irq type, we also put the pin to input direction.
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Mon, Jan 13, 2014 at 02:15:01PM +0100, Zoltan HERPAI wrote:
+> From b2cd1681fe988584028d280ca79249f4ebcb271c Mon Sep 17 00:00:00 2001
+> From: Zoltan HERPAI <wigyori@uid0.hu>
+> Date: Mon, 13 Jan 2014 14:00:12 +0100
+> Subject: [PATCH v2] ARM: sun4i: dt: Add basic board support for LinkSprite pcDuino
+> 
+> This patch will add a basic board support DT for the
+> LinkSprite pcDuino board.
+> 
+> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
 
-OK this makes perfect sense, and is not really related to DT: we recently
-concluded that it should always be possible to request an IRQ from an
-irqchip without having to interact with the GPIO interface first. So this is
-doing the right thing.
+Queued in sunxi/dt-for-3.15
 
-However to keep things strict we need to add calls to mark the GPIO
-lines used for IRQ, I'll see if I can fix a quick patch for this so you can
-test.
+Thanks!
+Maxime
 
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/23616294/attachment.sig>
