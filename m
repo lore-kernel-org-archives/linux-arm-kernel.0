@@ -1,36 +1,41 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Wed, 15 Jan 2014 11:49:23 +0100
-Subject: imx6dl/imx6q fec rmii mode with external ref_clk
-In-Reply-To: <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
-References: <20140114153012.GA22550@frolo.macqel>
- <20140115073536.GD1914@S2101-09.ap.freescale.net>
- <20140115094551.GA26117@frolo.macqel>
- <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
-Message-ID: <20140115104923.GA1239@frolo.macqel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jan 2014 10:53:47 +0000
+Subject: [RFC 2/2] arm: Get rid of meminfo
+In-Reply-To: <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
+References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
+ <1389765322-28582-3-git-send-email-lauraa@codeaurora.org>
+ <20140115094957.GL15937@n2100.arm.linux.org.uk>
+ <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
+Message-ID: <20140115105347.GM15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 08:13:15AM -0200, Fabio Estevam wrote:
-> On Wed, Jan 15, 2014 at 7:45 AM, Philippe De Muyter <phdm@macq.eu> wrote:
+On Wed, Jan 15, 2014 at 10:22:02AM +0000, Catalin Marinas wrote:
+> On 15 January 2014 09:49, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Jan 14, 2014 at 09:55:22PM -0800, Laura Abbott wrote:
+> >> memblock is now fully integrated into the kernel and is the prefered
+> >> method for tracking memory. Rather than reinvent the wheel with
+> >> meminfo, migrate to using memblock directly instead of meminfo as
+> >> an intermediate.
+> >
+> > The reason I never killed meminfo was that for some of the functions here
+> > is that meminfo has a slightly different property to memblock.
+> >
+> > With meminfo, each sparsemem section mapping or discontigmem node must be
+> > specified as a separate bank of memory, even if it is contiguous with the
+> > previous block.  This is so that the functions which walk the page arrays
+> > can do so efficiently (without having to convert from a PFN to a struct
+> > page for every page in the system, which is very inefficient.)
 > 
-> > Here are my patches (I have called my board imx6dl-p6-2094):
-> > Do I need to replace the hex value after MX6QDL_PAD_GPIO_16__ENET_REF_CLK
-> > by something else ?
-> 
-> hummingboard uses:
-> 
-> MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0xc0000000
+> pfn_to_page() conversion is indeed expensive with sparsemem (on
+> 32-bit) but does meminfo actually add a noticeable improvement to the
+> boot time? I don't think so but it's worth testing (something a
+> thousand cycles maximum would be lost in the noise).
 
-I quickly tried that, but that does not solve my problem (still tx timeout)
-
-> 
-> Check arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi in linux-next.
-
-I will look there now.
-
-Thanks
-
-Philippe
+Why do you ask about boot time?
 
 -- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
