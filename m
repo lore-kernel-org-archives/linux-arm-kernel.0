@@ -1,43 +1,57 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Wed, 15 Jan 2014 14:07:11 +0000
-Subject: [PATCH 0/2] Introduce PTE_WRITE for arm64
-Message-ID: <1389794833-7505-1-git-send-email-steve.capper@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 15 Jan 2014 19:41:17 +0530
+Subject: [PATCH 2/5] phy: add support for indexed lookup
+In-Reply-To: <20140114142310.GA21169@xps8300>
+References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1386601737-8735-3-git-send-email-heikki.krogerus@linux.intel.com>
+ <52AEDDE2.8060406@ti.com> <20131216143227.GA22944@xps8300>
+ <52CC03D4.50603@ti.com> <20140114142310.GA21169@xps8300>
+Message-ID: <52D69705.6010500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for a separate PTE_WRITE bit, allowing one to
-distinguish between writable clean ptes and read only ptes. At the
-moment we have the following bit encodings:
+Hi Heikki,
 
-                                PTE_DIRTY       PTE_RDONLY
-!pte_dirty && !pte_write        0               1
-!pte_dirty && pte_write         0               1
-pte_dirty && !pte_write         1               1
-pte_dirty && pte_write          1               0
+On Tuesday 14 January 2014 07:53 PM, Heikki Krogerus wrote:
+> Hi Kishon,
+> 
+> And happy new year..
 
-One reason we need to add the distinction is to fix a problem with huge
-pages, described here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/215155.html
+Happy new year :-)
+> 
+> On Tue, Jan 07, 2014 at 07:10:36PM +0530, Kishon Vijay Abraham I wrote:
+>>>>>  /**
+>>>>> - * phy_get() - lookup and obtain a reference to a phy.
+>>>>> + * phy_get_index() - obtain a phy based on index
+>>>>
+>>>> NAK. It still takes a 'char' argument and the name is misleading.
+>>>> Btw are you replacing phy_get() or adding a new API in addition to phy_get()?
+>>>
+>>> Additional API. The phy_get() would in practice act as a wrapper after
+>>
+>> In this patch it looks like you've replaced phy_get().
+>>> this. It could actually be just a #define macro in the include file.
+>>> The function naming I just copied straight from gpiolib.c. I did not
+>>> have the imagination for anything fancier.
+>>>
+>>> I would like to be able to use some function like phy_get_index() and
+>>> be able to deliver it both the name and the index. With DT you guys
+>>> will always be able to use the name (and the string will always
+>>> supersede the index if we do it like this), but with ACPI, and possibly
+>>> the platform lookup tables, the index can be used...
+>>
+>> I think in that case, we should drop the 'string' from phy_get_index since we
+>> have the other API to handle that? I don't know about ACPI, but is it not
+>> possible to use strings with ACPI?
+> 
+> No unfortunately. We just have what the ACPI tables provide. The PHYs
+> would be "child" device entries under the controller and we can only
+> get handle to them based on the index.
+> 
+> I think I'll skip this patch from this set. Let's wait until we have
+> an actual ACPI DSDT describing some PHYs.
 
-The patch in the link above attempts to address this issue by bypassing
-set_pte_at in the huge page code, but it was decided that the lack of
-distinction between writable clean ptes and read only ptes should be
-addressed instead as it could likely lead to other issues that we've
-not yet seen.
+yeah.. sure.
 
-The first patch in the series expands out PTE_BIT_FUNC to make life
-much easier for cscope and tags users. Whilst the second patch actually
-introduces PTE_WRITE.
-
-LPAE on ARM is also affected by this issue and will need a similar
-patch.
- 
-Steve Capper (2):
-  arm64: mm: Remove PTE_BIT_FUNC macro
-  arm64: mm: Introduce PTE_WRITE
-
- arch/arm64/include/asm/pgtable.h | 93 +++++++++++++++++++++++++++-------------
- 1 file changed, 63 insertions(+), 30 deletions(-)
-
--- 
-1.8.1.4
+Cheers
+Kishon
