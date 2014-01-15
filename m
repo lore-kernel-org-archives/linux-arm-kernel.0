@@ -1,44 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 15 Jan 2014 09:55:28 -0800
-Subject: [PATCH v2 0/7] Support Krait CPU PMUs
-Message-ID: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 15 Jan 2014 09:55:33 -0800
+Subject: [RFC 2/2] arm: Get rid of meminfo
+In-Reply-To: <20140115112516.GA17371@arm.com>
+References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
+ <1389765322-28582-3-git-send-email-lauraa@codeaurora.org>
+ <20140115094957.GL15937@n2100.arm.linux.org.uk>
+ <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
+ <20140115105347.GM15937@n2100.arm.linux.org.uk>
+ <20140115112516.GA17371@arm.com>
+Message-ID: <52D6CB95.1000402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the Krait CPU PMUs. I split the main patch
-up into two parts: first the basic support that gets us just the architected
-events and second the full support patch that tackles the PMRESR interface.
+On 1/15/2014 3:25 AM, Catalin Marinas wrote:
+> On Wed, Jan 15, 2014 at 10:53:47AM +0000, Russell King - ARM Linux wrote:
+>> On Wed, Jan 15, 2014 at 10:22:02AM +0000, Catalin Marinas wrote:
+>>> On 15 January 2014 09:49, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>>> On Tue, Jan 14, 2014 at 09:55:22PM -0800, Laura Abbott wrote:
+>>>>> memblock is now fully integrated into the kernel and is the prefered
+>>>>> method for tracking memory. Rather than reinvent the wheel with
+>>>>> meminfo, migrate to using memblock directly instead of meminfo as
+>>>>> an intermediate.
+>>>>
+>>>> The reason I never killed meminfo was that for some of the functions here
+>>>> is that meminfo has a slightly different property to memblock.
+>>>>
+>>>> With meminfo, each sparsemem section mapping or discontigmem node must be
+>>>> specified as a separate bank of memory, even if it is contiguous with the
+>>>> previous block.  This is so that the functions which walk the page arrays
+>>>> can do so efficiently (without having to convert from a PFN to a struct
+>>>> page for every page in the system, which is very inefficient.)
+>>>
+>>> pfn_to_page() conversion is indeed expensive with sparsemem (on
+>>> 32-bit) but does meminfo actually add a noticeable improvement to the
+>>> boot time? I don't think so but it's worth testing (something a
+>>> thousand cycles maximum would be lost in the noise).
+>>
+>> Why do you ask about boot time?
+>
+> Is meminfo used on a critical path at run-time?
+>
 
-Please note, this patchset relies on the per-cpu irq patch from Vinayak Kale,
-7f4a8e7b1943 (genirq: Add an accessor for IRQ_PER_CPU flag, 2013-12-04),
-that's sitting in linux-next. Patches are based on commit 21dea6695134 
-(ARM: msm_defconfig: Enable restart driver, 2013-12-20) in linux-next.
+As far as I can tell, the only place meminfo is used after 
+initialization is in show_mem which isn't a critical path. Are there 
+other paths I missed?
 
-Changes since v1:
- * Dropped sparse warning patch
- * Reworked percpu irq support patch to hide double pointers in dispatch func
- * Expanded on comments explaining Krait raw event syntax
- * Expanded on DT binding
- * Added qcom,no-pc-write property instead of using cpuid scheme
-
-Stephen Boyd (7):
-  ARM: perf_event: Support percpu irqs for the CPU PMU
-  ARM: perf_event: Assign pdev pointer earlier for CPU PMUs
-  ARM: perf_event: Add basic support for Krait CPU PMUs
-  ARM: perf_event: Add hook for event index clearing
-  ARM: perf_event: Fully support Krait CPU PMU events
-  devicetree: bindings: Document Krait performance monitor units (PMU)
-  ARM: dts: msm: Add krait-pmu to platforms with Krait CPUs
-
- Documentation/devicetree/bindings/arm/pmu.txt |   9 +-
- arch/arm/boot/dts/qcom-msm8960-cdp.dts        |   6 +
- arch/arm/boot/dts/qcom-msm8974.dtsi           |   5 +
- arch/arm/include/asm/pmu.h                    |   1 +
- arch/arm/kernel/perf_event.c                  |  16 +-
- arch/arm/kernel/perf_event_cpu.c              | 103 +++--
- arch/arm/kernel/perf_event_v7.c               | 550 ++++++++++++++++++++++++++
- 7 files changed, 656 insertions(+), 34 deletions(-)
-
+Thanks,
+Laura
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
