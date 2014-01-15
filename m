@@ -1,54 +1,91 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Jan 2014 19:24:53 +0800
-Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
- warning
-In-Reply-To: <1389777696.14001.14.camel@joe-AO722>
-References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
- <20140115065851.GC1914@S2101-09.ap.freescale.net>
- <1389777696.14001.14.camel@joe-AO722>
-Message-ID: <20140115112451.GI1896@S2101-09.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 12:25:28 +0100
+Subject: [PATCH v2 09/12] at91: dt: sam9261: Pinmux DT entries for the
+ SMC/EBI interface
+In-Reply-To: <1389270709-32662-10-git-send-email-jjhiblot@traphandler.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+ <1389270709-32662-10-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140115112528.GR14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 01:21:36AM -0800, Joe Perches wrote:
-> On Wed, 2014-01-15 at 14:58 +0800, Shawn Guo wrote:
-> > On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
-> > > There should be no duplicate const specifiers for those static
-> > > constant character string arrays defined for clock mux options.
-> > > Also, the arrays are only taken as the 5th argument for the
-> > > imx_clk_mux() function, which is in the type of 'const char
-> > > **parents'.  So, let's remove the 2nd const specifier right
-> > > after 'char'.
-> > > 
-> > > This patch fixes these sparse warnings:
-> > > arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
-> []
-> > > diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-> []
-> > > @@ -18,27 +18,27 @@
-> > >  #include "clk.h"
-> > >  #include "common.h"
-> > >  
-> > > -static const char const *step_sels[]		= { "osc", "pll2_pfd2", };
-> > ...
-> > > +static const char *step_sels[]		= { "osc", "pll2_pfd2", };
-> > 
-> > So now we're getting the following checkpatch warning:
-> > 
-> > WARNING: static const char * array should probably be static const char * const
-> > 
-> > It was added into checkpatch.pl by commit cb710ec (scripts/checkpatch.pl:
-> > add warnings for static char that could be static const char).  I'm not
-> > sure which warning we should ignore, the sparse or the checkpatch one.
-> > 
-> > Joe, comments?
+On 13:31 Thu 09 Jan     , Jean-Jacques Hiblot wrote:
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  arch/arm/boot/dts/at91sam9261.dtsi | 54 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
 > 
-> Maybe the const **parents argument could be const * const *
+> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+> index cd219b9..695d5d2 100644
+> --- a/arch/arm/boot/dts/at91sam9261.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
+> @@ -317,6 +317,60 @@
+>  							 >;
+>  					};
+>  				};
+> +				smc {
+> +					pinctrl_smc_nwait: smc_nwait-0 {
+> +						atmel,pins = <AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_a23_a25: smc_a23_a25-0 {
+use better name this is not clear
+> +						atmel,pins =
+> +							<AT91_PIOA 30 AT91_PERIPH_B AT91_PINCTRL_NONE
+> +							 AT91_PIOA 31 AT91_PERIPH_B AT91_PINCTRL_NONE
+> +							 AT91_PIOC 3  AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_d16_d31: smc_d16_d31-0 {
+> +						atmel,pins =
+> +							<AT91_PIOC 16 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 17 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 18 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 19 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 20 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 21 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 22 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 23 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 24 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 25 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 26 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 27 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 28 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_NONE
+> +							 AT91_PIOC 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_ncs4: smc_ncs4-0 {
+> +						atmel,pins = <AT91_PIOC 4 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_ncs5: smc_ncs5-0 {
+> +						atmel,pins = <AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_nandoe: smc_nandoe-0 {
+> +						atmel,pins = <AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_ncs6: smc_ncs6-0 {
+> +						atmel,pins = <AT91_PIOC 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_nandwe: smc_nandwe-0 {
+> +						atmel,pins = <AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_ncs7: smc_ncs7-0 {
+> +						atmel,pins = <AT91_PIOC 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_cfce1: smc_cfce1-0 {
+> +						atmel,pins = <AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +					pinctrl_smc_cfce2: smc_cfce2-0 {
+> +						atmel,pins = <AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+> +					};
+> +				};
+>  				pioA: gpio at fffff400 {
+>  					compatible = "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff400 0x200>;
+> -- 
+> 1.8.5.2
 > 
-> That could change a lot of declarations through.
-> You could also ignore checkpatch.
-
-Okay, for now, I will ignore the checkpatch warning for this case.
-Thanks, Joe.
-
-Shawn
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
