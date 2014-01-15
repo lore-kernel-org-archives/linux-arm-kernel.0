@@ -1,42 +1,73 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 15 Jan 2014 18:27:49 +0800
-Subject: [PATCH 1/1] mmc: sdhci: fix lockdep error on tunning routine
-In-Reply-To: <20140115100904.GX31570@twins.programming.kicks-ass.net>
-References: <1387797184-18958-1-git-send-email-b29396@freescale.com>
- <CAA+hA=TRQP7hS3+iXyHg3FuNQKA=chJi7Ne47Ew_4RJcQ6yong@mail.gmail.com>
- <20140113120435.GQ31570@twins.programming.kicks-ass.net>
- <CAA+hA=Sb+Ve2xyto9v6YirqcXnePK2aHzJgjGZOhEQJK5Z0jqQ@mail.gmail.com>
- <20140115100904.GX31570@twins.programming.kicks-ass.net>
-Message-ID: <CAA+hA=R=rYe=y0AFw1SBAA8CgSfiio=J3qWBUmwputC681FakA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Jan 2014 10:33:37 +0000
+Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
+In-Reply-To: <52D5A4D1.9030403@codeaurora.org>
+References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
+ <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
+ <20140109104943.GB17838@mudshark.cambridge.arm.com>
+ <52CEF5C9.1010701@codeaurora.org>
+ <20140110105813.GB10455@mudshark.cambridge.arm.com>
+ <20140110193657.GG14405@codeaurora.org>
+ <20140113115213.GE1189@mudshark.cambridge.arm.com>
+ <52D5A4D1.9030403@codeaurora.org>
+Message-ID: <20140115103337.GB15422@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 6:09 PM, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Jan 15, 2014 at 03:19:27PM +0800, Dong Aisheng wrote:
->> On Mon, Jan 13, 2014 at 8:04 PM, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Thu, Dec 26, 2013 at 03:58:20PM +0800, Dong Aisheng wrote:
->> >> > It's strange that this issue did not happen on kernel 3.10.17 with the same
->> >> > code. And looking at the code, before call spin_lock we already disable the mmc
->> >> > controller irq, per on my understanding, the deadlock given by lockdep may not
->> >> > be able to happen(pls fix me if wrong).
->> >> > May the lockdep not track the specific irq disable?
->> >> > Copy lockdep guy to comment.
->> >
->> > No, lockdep also doesn't know only that one line can take this lock.
->> > Lockdep only knows a lock is taken from IRQ context, and disabling one
->> > line still allows IRQs to happen and therefore it yells.
->>
->> Okay, thanks for the information.
->> If that, kernel 3.10.17 has the same code, do you know why it does not trigger
->> such lockdep error?
->
-> No idea; there haven't really been big lockdep changes recently.
+Hi Stephen,
 
-Okay, thanks.
-Anyway, this patch fix should be needed to avoid the lockdep error.
+On Tue, Jan 14, 2014 at 08:57:53PM +0000, Stephen Boyd wrote:
+> On 01/13/14 03:52, Will Deacon wrote:
+> > I also don't think that's the right solution, based on the above. It's
+> > actually pretty hard to work out what's the right thing to do here...
+> 
+> Yes it doesn't seem like the right solution.
+> 
+> >
+> > We *could* have a per-cpu pointer to the cpu_pmu_pointer, but then we'd
+> > need to update the IRQ handlers, including things like the CCI PMU which
+> > really doesn't care about per-cpu stuff. So after all this, the shim we have
+> > around the IRQ handler for the U8500 SPI workarounds might be the right
+> > thing after all -- it allows us to consolidate the conversion of a pcpu
+> > pointer into the relevant instance (actually any instance, since they'd all
+> > point at the same thing) for the current CPU.
+> >
+> > What do you think to having that shim throw away the second level pcpu
+> > pointer in the case of a PPI? (probably means we need to revisit that
+> > renaming again).
+> 
+> Ok I think I understand what you're getting at. We pass a per-cpu
+> pointer to the cpu_pmu pointer as the dev_id argument to the PPI irq
+> handler, and then we check to see if the irq is per-cpu inside the
+> armpmu_dispatch_irq() function and throw away the second level of
+> pointer, i.e.
+> 
+> static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+> {
+>         struct arm_pmu *armpmu;
+>         struct platform_device *plat_device;
+>         struct arm_pmu_platdata *plat;
+> 
+>         if (irq_is_percpu(irq))
+>                 dev = *(struct arm_pmu_cpu **)dev;
+>         armpmu = dev;
+>         plat_device = armpmu->plat_device;
+>         plat = dev_get_platdata(&plat_device->dev);
+> 
+>         if (plat && plat->handle_irq)
+>                 return plat->handle_irq(irq, dev, armpmu->handle_irq);
+>         else
+>                 return armpmu->handle_irq(irq, dev);
+> }
 
-Chirs,
-Can you pick it up?
+Yup, that's what I was trying to explain (badly). Thanks.
 
-Regards
-Dong Aisheng
+> We still need to make a per-cpu variable to hold the pointer, and assign
+> it during cpu_pmu_init like this patch does. Hopefully that is ok.
+
+I think that's ok. The percpu code in genirq requires a pcpu token (for good
+reason) and the irq handler needs to get at the pmu structure. The
+alternative is adding pointers from something like the pmu_hw_events to the
+arm_pmu, but I think that's more ugly.
+
+Will
