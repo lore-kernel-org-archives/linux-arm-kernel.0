@@ -1,203 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 15 Jan 2014 01:28:57 -0800
-Subject: [PATCH v4 02/15] clk: Allow drivers to pass in a regmap
-In-Reply-To: <20140110070517.GE14405@codeaurora.org>
-References: <1387847559-18330-1-git-send-email-sboyd@codeaurora.org>
- <1387847559-18330-3-git-send-email-sboyd@codeaurora.org>
- <20140109015158.7168.60274@quantum> <52CE055C.5030103@codeaurora.org>
- <20140110054424.7168.46289@quantum> <20140110070517.GE14405@codeaurora.org>
-Message-ID: <20140115092857.4167.38854@quantum>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed, 15 Jan 2014 17:34:02 +0800
+Subject: [PATCH 1/2] clk: hisilicon: add hi3620_mmc_clks
+In-Reply-To: <20140115082908.4167.34040@quantum>
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
+ <20140114201740.4167.52076@quantum> <52D5E709.7040105@linaro.org>
+ <20140115035339.4167.51194@quantum> <52D623CC.50009@linaro.org>
+ <20140115082908.4167.34040@quantum>
+Message-ID: <52D6560A.20705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-01-09 23:05:17)
-> On 01/09, Mike Turquette wrote:
-> > If we're going to use these wrappers, why make it regmap specific? The
-> > struct clk_desc patches[1][2] can achieve this, but in a more generic
-> > way.
-> > 
-> 
-> I think you're suggesting a way to avoid adding a
-> clk_register_regmap() function? But won't we need to write the
-> same code:
-> 
->         if (dev && dev_get_regmap(dev, NULL))
->                 [clk_type]->regmap = dev_get_regmap(dev, NULL);
->         else if (dev && dev->parent)
->                 [clk_type]->regmap = dev_get_regmap(dev->parent, NULL);
-> 
-> everytime we want to assign the regmap pointer to a different clock type?
-> A macro might work for this little snippet, but it wouldn't have
-> any type safety.
 
-Hi Stephen,
+On 01/15/2014 04:29 PM, Mike Turquette wrote:
+> Quoting Haojian Zhuang (2014-01-14 21:59:40)
+>> On 01/15/2014 11:53 AM, Mike Turquette wrote:
+>>> Quoting zhangfei (2014-01-14 17:40:25)
+>>>> Dear Mike
+>>>>
+>>>> On 01/15/2014 04:17 AM, Mike Turquette wrote:
+>>>>> Quoting Zhangfei Gao (2014-01-13 01:14:28)
+>>>>>> Suggest by Arnd: abstract mmc tuning as clock behavior,
+>>>>>> also because different soc have different tuning method and registers.
+>>>>>> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
+>>>>>>
+>>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>>>>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>>>> Patch looks good to me with one exception. I do not have
+>>>>> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt in the
+>>>>> clk-next branch. Is there a stable branch I can pull in as a dependency?
+>>>> Mach-hisi just have been uploaeded.
+>>>> Have tried next-20140114, the patch can be applied successfully.
+>>>> While v3.13-rc8 still can not.
+>>>>
+>>>> Is this fine?
+>>> Can you give me a link to the branch that introduces
+>>> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt?
+>>>
+>>> I guess the patch introducing it is going through arm-soc. Is this going
+>>> in for 3.14? If so then perhaps the clk tree and the arm-soc tree can
+>>> share a stable branch that introduces it.
+>>>
+>>> Regards,
+>>> Mike
+>>>
+>> Some patches are merged into arm-soc, and others are in clk tree.
+>> If sharing a stable branch between arm-soc and clk tree, it only means
+>> that we need to revert all commits that are in arm-soc and clk tree.
+>> I think it's too complex.
+> I'm suggesting reverting any patches that are applied to arm-soc. I'm
+> only suggesting that there might be a common branch that both the clk
+> and arm-soc trees can depend on to fix this problem.
+>
+>> How about split the patch? The patch on document should enter in arm-soc.
+> That is one approach. You might want to run it past the arm-soc folks
+> first to see if they will take in the binding definition for 3.14.
+>
+> Regards,
+> Mike
+>
+Yes, so I already made Kevin in this loop. Let's see whether he has
+any comments on it.
 
-Avoiding a new clk_register_regmap() function is one thing worth doing.
-But additionally I think that this regmap infrastructure in the core
-code still is not the right way forward.
-
-Looking at patch #3 I can already see how those helper functions will
-grow just like the basic clock type implementations. Take a look at
-drivers/clk/clk-divider.c and check out the HIWORD_MASK stuff. That
-really shouldn't belong there, but multiple platforms are using the
-Designware IP that needs this so in the Name Of Consolidation it was
-done. Basically that code is gross.
-
-A more relevant example: look at the gate clock with a busy bit
-implementation in arch/arm/mach-imx/clk-gate2.c. The same could be done
-for your clk_enable_regmap() function: someone could subclass it and add
-a busy bit or status bit to poll on. But should they? The extra layer of
-indirection buys us nothing and takes a clean piece of code and
-complicates it.
-
-I'd rather your .enable, .disable and .is_enabled implementations live
-in drivers/clk/msm/ so that we can avoid this sort of feature creep in
-the future. It's perfectly fine if others implement the same code in
-their clock drivers.
-
-With all of that said, then there is no point in keeping struct regmap
-*regmap inside of struct clk_hw. It can be moved inside of your struct
-clk_rcg, struct clk_branch and struct clk_pll definitions.
-
-> 
-> > > 
-> > > 
-> > > 2) Interfaces: Add a void *data in struct clk_hw that can point to
-> > > whatever I want and still have the same clk_regmap_register() and
-> > > devm_clk_regmap_register()
-> > > 
-> > > Example:
-> > > 
-> > > struct clk_hw {
-> > >         struct clk *clk;
-> > >         const struct clk_init_data *init;
-> > >         void *data;
-> > > };
-> > > 
-> > > struct clk_regmap {
-> > >         struct regmap *regmap;
-> > >         unsigned int enable_reg;
-> > >         unsigned int enable_mask;
-> > >         bool enable_is_inverted;
-> > > };
-> > > 
-> > > struct clk_branch {
-> > >         u32     hwcg_reg;
-> > >         u32     halt_reg;
-> > >         u8      hwcg_bit;
-> > >         u8      halt_bit;
-> > >         u8      halt_check;
-> > > 
-> > >         struct clk_hw;
-> > > };
-> > > 
-> > > static struct clk_branch gsbi1_uart_clk = {
-> > >         .halt_reg = 0x2fcc,
-> > >         .halt_bit = 10,
-> > >         .hw = {
-> > >                 .data = &(struct clk_regmap){
-> > >                         .enable_reg = 0x29d4,
-> > >                         .enable_mask = BIT(9),
-> > >                  };
-> > >                 .init = &(struct clk_init_data){
-> > >                         .name = "gsbi1_uart_clk",
-> > >                         .parent_names = (const char *[]){
-> > >                                 "gsbi1_uart_src",
-> > >                         },
-> > >                         .num_parents = 1,
-> > >                         .ops = &clk_branch_ops,
-> > >                         .flags = CLK_SET_RATE_PARENT,
-> > >                 },
-> > >         },
-> > > };
-> > > 
-> > > I guess option 2 is less likely given your comment about clk_hw being
-> > > nothing more than a traversal mechanism.
-> > 
-> > Instead of private data, how about a .register() callback function that
-> > can point to anything you like? The clk_desc patches implement this and
-> > it would suffice for registering regmap ops or anything else, without
-> > polluting struct clk_hw.
-> > 
-> > [1] http://www.spinics.net/lists/linux-omap/msg101822.html
-> > [2] http://www.spinics.net/lists/linux-omap/msg101698.html
-> > 
-> > So you could statically define gsbi1_uart_clk with:
-> > 
-> > static struct clk_branch_desc gsbi1_uart_clk_desc = {
-> >       .halt_reg = 0x2fcc,
-> >       .halt_bit = 10,
-> >       .enable_reg = 0x29d4,
-> >       .enable_mask = BIT(9),
-> >       .desc = {
-> >               .name = "gsbi1_uart_clk",
-> >               .parent_names = (const char *[]){
-> >                       "gsbi1_uart_src",
-> >               },
-> >               .num_parents = 1,
-> >               .ops = &clk_branch_ops,
-> >               .flags = CLK_SET_RATE_PARENT,
-> >       },
-> > };
-> > 
-> > And then register it with:
-> > 
-> > clk_register_desc(NULL, &gsbi1_uart_clk_desc.desc);
-> > 
-> > This is very analogous to the way that you use use &gsbi1_uart_clk.hw
-> > but it is more generic and also doesn't pollute clk_hw any further. I
-> > also think your static data is quite a bit prettier using this method.
-> > 
-> > Thoughts?
-> 
-> Is the plan to allocate a struct clk_branch at runtime and then
-> copy all the fields over one by one? I'm trying to avoid that
-> because it takes more time and more runtime memory. If I had to
-> go the descriptor route I would probably avoid copying any fields
-> and just point to the descriptor from struct clk_branch, i.e.
-> 
->  struct clk_branch {
->         struct clk_branch_desc *desc;
->         struct clk_hw;
->  };
-> 
-> but that still seems wasteful to allocate a bunch of little
-> pointer wrappers when I could have just embedded the clk_hw
-> struct inside the clk_branch struct from the start.
-> 
-
-The pointer copy stuff was done so that every instance of struct
-clk_init_data could be marked as __initdata.
-
-> It feels another key point is being missed though. The regmap
-> pointer and the enable_reg/enable_mask is embedded in clk_hw to
-> allow the same code to be used by different types of surrounding
-> structs. Each struct: clk_pll, clk_rcg, and clk_branch in this
-> series use the regmap interface to enable/disable the clock and
-> they can easily do so by passing something that's always
-> available from struct clk_hw (be it via a wrapper struct, private
-> data member, or addition of new fields to clk_hw). If the regmap
-> members move into each specific type of clock we can't just pass
-> a single pointer to the enable/disable regmap functions anymore.
-> This is the reason why I suggested a driver data pointer or
-> container struct so that everything regmap related is contained
-> within one type.
-
-I get understand the goal of reuse and I applaud it. But even if we did
-pack the regmap data into struct clk_hw it would start to grow out of
-control as I mentioned in a previous email. In order for this to work
-you have to package more than just struct regmap *regmap into struct
-clk_hw. You need the register offset as well as any relevant masks and
-bit field values. And then you need more stuff for muxes and dividers.
-And hey now you need busy/poll register values and another platform
-needs to program shadow registers before flipping the Go Bit ... the
-list goes on and on.
-
-So in summary: consolidation is over-rated. You can put your regmap
-functions into drivers/clk/msm/ and not convert over to struct clk_desc
-by the way, just to remove any confusion on that point.
-
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+Regards
+Haojian
