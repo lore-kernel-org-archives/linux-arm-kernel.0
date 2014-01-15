@@ -1,34 +1,93 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 15 Jan 2014 16:51:00 +0100
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
- audio support for TDA998x trough McASP I2S bus
-In-Reply-To: <52D67099.1040904@ti.com>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
-Message-ID: <20140115165100.3bfab96f@armhf>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 15 Jan 2014 23:51:01 +0800
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <52D6A9FF.3000603@linaro.org>
+References: <52D6A9FF.3000603@linaro.org>
+Message-ID: <1389801061-6023-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jan 2014 13:27:21 +0200
-Jyri Sarha <jsarha@ti.com> wrote:
+Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+can not be checked by IS_ERR_VALUE.
+Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+otherwise sd detect may occasionally fail.
 
->  From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N 
-> register statically to a value that works only with 4 byte samples. 
-> According to my tests it is possible to support 3 and 2 byte samples too 
-> by changing the CTS_N register value, but I am not sure if the 
-> configuration can be changed on the fly. My data sheet of the nxp chip 
-> is very vague about the register definitions, but I suppose the register 
-> configures some clock divider on the chip. HDMI supports only upto 24bit 
-> audio and the data sheet states that any extraneous least significant 
-> bits are ignored.
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/mmc/host/dw_mmc.c  |   12 +++++++++---
+ include/linux/mmc/dw_mmc.h |    1 +
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-In the tda998x driver, the CTS_N is automatic (AIP_CNTRL_0_ACR_MAN is
-not set).
-
-Then, in my Cubox (Marvell A510 + tda19988), the 16, 24 and 32 bits
-formats are working well with I2S input at any rate.
-
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index a776f24f4311..8326e54b96a8 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	int present;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+ 	struct dw_mci_board *brd = slot->host->pdata;
+-	int gpio_cd = !mmc_gpio_get_cd(mmc);
++	struct dw_mci *host = slot->host;
++	int gpio_cd = mmc_gpio_get_cd(mmc);
+ 
+ 	/* Use platform get_cd function, else try onboard card detect */
+ 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+@@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	else if (brd->get_cd)
+ 		present = !brd->get_cd(slot->id);
+ 	else if (!IS_ERR_VALUE(gpio_cd))
+-		present = !!gpio_cd;
++		present = gpio_cd ^ brd->cd_inverted;
+ 	else
+ 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+ 			== 0 ? 1 : 0;
+ 
++	spin_lock_bh(&host->lock);
+ 	if (present) {
+ 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is present\n");
+@@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is not present\n");
+ 	}
++	spin_unlock_bh(&host->lock);
+ 
+ 	return present;
+ }
+@@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ 	return gpio;
+ }
+ 
+-/* find the cd gpio for a given slot; or -1 if none specified */
++/* find the cd gpio for a given slot */
+ static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
+ 					struct mmc_host *mmc)
+ {
+@@ -2411,6 +2414,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+ 	if (of_find_property(np, "caps2-mmc-hs200-1_2v", NULL))
+ 		pdata->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
+ 
++	if (of_get_property(np, "cd-inverted", NULL))
++		pdata->cd_inverted = 1;
++
+ 	return pdata;
+ }
+ 
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 6ce7d2cd3c7a..4535282589ab 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -238,6 +238,7 @@ struct dw_mci_board {
+ 	u32 caps;	/* Capabilities */
+ 	u32 caps2;	/* More capabilities */
+ 	u32 pm_caps;	/* PM capabilities */
++	u8 cd_inverted;
+ 	/*
+ 	 * Override fifo depth. If 0, autodetect it from the FIFOTH register,
+ 	 * but note that this may not be reliable after a bootloader has used
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.9.5
