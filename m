@@ -1,119 +1,72 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Jan 2014 22:46:34 -0500 (EST)
-Subject: [PATCH] mm: nobootmem: avoid type warning about alignment value
-In-Reply-To: <20140112105958.GA9791@n2100.arm.linux.org.uk>
-References: <1385249326-9089-1-git-send-email-santosh.shilimkar@ti.com>
- <529217C7.6030304@cogentembedded.com> <52935762.1080409@ti.com>
- <20131209165044.cf7de2edb8f4205d5ac02ab0@linux-foundation.org>
- <20131210005454.GX4360@n2100.arm.linux.org.uk> <52A66826.7060204@ti.com>
- <20140112105958.GA9791@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.10.1401142238110.28907@knanqh.ubzr>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 14 Jan 2014 19:50:11 -0800
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140115031632.4167.2698@quantum>
+References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
+ <20140109231513.GA11648@saruman.home> <52CFC2F1.706@ti.com>
+ <20140110161352.GG6665@saruman.home> <52D02037.3090705@ti.com>
+ <20140110185110.GM31323@atomide.com> <52D53084.1070105@ti.com>
+ <20140114203613.GA604@saruman.home> <20140115020421.GA24195@saruman.home>
+ <20140115031632.4167.2698@quantum>
+Message-ID: <20140115035011.4167.96678@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Jan 2014, Russell King - ARM Linux wrote:
-
-> This patch makes their types match exactly with x86's definitions of
-> the same, which is the basic problem: on ARM, they all took "int" values
-> and returned "int"s, which leads to min() in nobootmem.c complaining.
+Quoting Mike Turquette (2014-01-14 19:16:32)
+> Quoting Felipe Balbi (2014-01-14 18:04:21)
+> > Hi,
+> > 
+> > On Tue, Jan 14, 2014 at 02:36:13PM -0600, Felipe Balbi wrote:
+> > > > Felipe, care to run your randconfig magic for this?
+> > > 
+> > > This branch builds just fine so far, I still have omap5 multiplaform and
+> > > uniplatform builds, but since that was working before i'm assuming it
+> > > won't break.
+> > 
+> > No build failures in any of my 18 seeds (5 randconfigs of each), I'd
+> > attach logs, but it's a 2.8MiB tarball, if anyone cares enough, I can
+> > send it.
+> > 
+> > FWIW:
+> > 
+> > Acked-by: Felipe Balbi <balbi@ti.com>
 > 
->  arch/arm/include/asm/bitops.h | 54 +++++++++++++++++++++++++++++++++++--------
->  1 file changed, 44 insertions(+), 10 deletions(-)
-
-For the record:
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-The reason why macros were used at the time this was originally written 
-is because gcc used to have issues forwarding the constant nature of a 
-variable down multiple levels of inline functions and 
-__builtin_constant_p() always returned false.  But that was quite a long 
-time ago.
-
-
-> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-> index e691ec91e4d3..b2e298a90d76 100644
-> --- a/arch/arm/include/asm/bitops.h
-> +++ b/arch/arm/include/asm/bitops.h
-> @@ -254,25 +254,59 @@ static inline int constant_fls(int x)
->  }
->  
->  /*
-> - * On ARMv5 and above those functions can be implemented around
-> - * the clz instruction for much better code efficiency.
-> + * On ARMv5 and above those functions can be implemented around the
-> + * clz instruction for much better code efficiency.  __clz returns
-> + * the number of leading zeros, zero input will return 32, and
-> + * 0x80000000 will return 0.
->   */
-> +static inline unsigned int __clz(unsigned int x)
-> +{
-> +	unsigned int ret;
-> +
-> +	asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
->  
-> +	return ret;
-> +}
-> +
-> +/*
-> + * fls() returns zero if the input is zero, otherwise returns the bit
-> + * position of the last set bit, where the LSB is 1 and MSB is 32.
-> + */
->  static inline int fls(int x)
->  {
-> -	int ret;
-> -
->  	if (__builtin_constant_p(x))
->  	       return constant_fls(x);
->  
-> -	asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
-> -       	ret = 32 - ret;
-> -	return ret;
-> +	return 32 - __clz(x);
-> +}
-> +
-> +/*
-> + * __fls() returns the bit position of the last bit set, where the
-> + * LSB is 0 and MSB is 31.  Zero input is undefined.
-> + */
-> +static inline unsigned long __fls(unsigned long x)
-> +{
-> +	return fls(x) - 1;
-> +}
-> +
-> +/*
-> + * ffs() returns zero if the input was zero, otherwise returns the bit
-> + * position of the first set bit, where the LSB is 1 and MSB is 32.
-> + */
-> +static inline int ffs(int x)
-> +{
-> +	return fls(x & -x);
-> +}
-> +
-> +/*
-> + * __ffs() returns the bit position of the first bit set, where the
-> + * LSB is 0 and MSB is 31.  Zero input is undefined.
-> + */
-> +static inline unsigned long __ffs(unsigned long x)
-> +{
-> +	return ffs(x) - 1;
->  }
->  
-> -#define __fls(x) (fls(x) - 1)
-> -#define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
-> -#define __ffs(x) (ffs(x) - 1)
->  #define ffz(x) __ffs( ~(x) )
->  
->  #endif
+> Felipe,
 > 
+> That's great to hear. Thanks for testing.
 > 
-> -- 
-> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-> Estimate before purchase was "up to 13.2Mbit".
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Tero & Tony,
 > 
+> These 40 patches apply very cleanly on top of clk-next with 2
+> exceptions:
+> 
+> 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
+> because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
+> on 3.13-rc1).
+> 
+> 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
+> resolved correctly but would like verification.
+> 
+> I'd prefer to simply merge these patches into clk-next, which is the
+> most straightforward route. Any ideas on how to handle the missing
+> AM35xx dtsi data? It can always go as a separate fix after this stuff
+> gets merged which, ironically, is how that file was created in the first
+> place.
+
+I've pushed my branch. Tero can you take a look and let me know if you
+see any problems?
+
+git://git.linaro.org/people/mike.turquette/linux.git clk-next-omap
+
+Thanks!
+Mike
+
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > cheers
+> > 
+> > -- 
+> > balbi
