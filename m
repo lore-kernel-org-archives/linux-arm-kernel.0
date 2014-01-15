@@ -1,73 +1,44 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 Jan 2014 20:32:06 -0800
-Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
-In-Reply-To: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
-References: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140115043206.4167.50892@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Jan 2014 20:37:27 -0800
+Subject: AArch64 kernel image decompression
+In-Reply-To: <20140114185302.0B0813821F2@gemini.denx.de>
+References: <20140110170436.GS8153@joshc.qualcomm.com>
+ <69dfcb9d142443638e4ccfedd92c4f05@BN1PR03MB220.namprd03.prod.outlook.com>
+ <4250104.UfkPP3heXI@wuerfel> <201401141351.18988.marex@denx.de>
+ <819346bb83b04348a266643afd5bd6f6@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140114134732.F0A1C3821F2@gemini.denx.de>
+ <CAOesGMj0HPWD=Mavt1ut+Oze4KQZHjhHmcKTcdKELaF=Or8XsA@mail.gmail.com>
+ <20140114185302.0B0813821F2@gemini.denx.de>
+Message-ID: <CAOesGMg+tvXqhNgj=jw08LwBxztvm7hGshfRCgbze0d8jj4pOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting dinguyen at altera.com (2014-01-06 09:27:26)
-> Hi Mike,
-> 
-> Please pull in these patches that cleans up the SOCFPGA clock driver. This is
-> V2 of the pull request that includes 4 patches from Steffen Trumtrar.
-> 
-> Thanks,
-> 
-> Dinh
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
-> 
-> for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
-> 
->   clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
-> 
-> ----------------------------------------------------------------
-> v2: SOCFPGA clk cleanups for 3.14
-> 
-> ----------------------------------------------------------------
-> Dinh Nguyen (3):
->       clk: socfpga: Map the clk manager base address in the clock driver
->       clk: socfpga: Look for the GPIO_DB_CLK by its offset
+Hi,
 
-Hi Dinh,
+On Tue, Jan 14, 2014 at 10:53 AM, Wolfgang Denk <wd@denx.de> wrote:
+> Dear Olof,
+>
+> In message <CAOesGMj0HPWD=Mavt1ut+Oze4KQZHjhHmcKTcdKELaF=Or8XsA@mail.gmail.com> you wrote:
+>>
+>> > The FIT image approach as suggested by Marek also allows for secure
+>> > boot methods (like cryptographically signed images); this is used in
+>> > production for several systems, including the Google Chromebook.
+>>
+>> This can very easily be misunderstood so I would like to clarify:
+>> Chromebooks do not use the fitImage version of signatures and
+>> verification, it is done independently from a separate library that
+>> wraps either a zImage (x86) or a fitImage (ARM).
+>
+> This is not what I'm talking about.  What I mean is the support for
+> Verified Boot (see [1]) and FIT Signature Verification (see [2]) which
+> is done with plain FIT images, without additional wrapping.
+>
+> [1] http://git.denx.de/?p=u-boot.git;a=blob;f=doc/uImage.FIT/verified-boot.txt
+> [2] http://git.denx.de/?p=u-boot.git;a=blob;f=doc/uImage.FIT/signature.txt
 
-Patch "clk: socfpga: Look for the GPIO_DB_CLK by its offset" still
-causes a compilation error. I know it gets fixed by "clk: socfpga: fix
-compile error" later on but this still breaks git bisect.
+The incorrect part of your statement was the claim that it was used
+for secure boot on ARM Chromebooks. It is not -- the u-boot
+implementation is completely different from what is used there.
 
-Can you please fold the fixes into the patches that introduce the bugs?
-No need to keep them separate since they are all part of the same pull
-request.
 
-Regards,
-Mike
-
->       clk: socfpga: Remove socfpga_init_clocks
-> 
-> Steffen Trumtrar (4):
->       clk: socfpga: remove unused field
->       clk: socfpga: fix define typo
->       clk: socfpga: fix compile error
->       clk: socfpga: split clk code
-> 
->  arch/arm/mach-socfpga/socfpga.c  |    5 -
->  drivers/clk/socfpga/Makefile     |    3 +
->  drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
->  drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
->  drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
->  drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
->  drivers/clk/socfpga/clk.h        |   57 +++++++
->  7 files changed, 500 insertions(+), 321 deletions(-)
->  create mode 100644 drivers/clk/socfpga/clk-gate.c
->  create mode 100644 drivers/clk/socfpga/clk-periph.c
->  create mode 100644 drivers/clk/socfpga/clk-pll.c
->  create mode 100644 drivers/clk/socfpga/clk.h
-> 
+-Olof
