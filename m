@@ -1,7 +1,7 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 15 Jan 2014 14:19:34 +0800
-Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse warning
-Message-ID: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+Date: Wed, 15 Jan 2014 14:19:58 +0800
+Subject: [PATCH] ARM: imx: clk-vf610: Suppress duplicate const sparse warning
+Message-ID: <1389766798-16691-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,85 +13,77 @@ imx_clk_mux() function, which is in the type of 'const char
 after 'char'.
 
 This patch fixes these sparse warnings:
-arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:22:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:23:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:24:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:25:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:26:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:27:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:28:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:29:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:30:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:31:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:32:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:33:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:34:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:35:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:36:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:37:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:38:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:39:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:40:25: warning: duplicate const
-arch/arm/mach-imx/clk-imx6sl.c:41:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:66:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:67:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:68:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:69:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:70:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:71:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:72:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:73:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:74:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:75:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:76:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:77:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:78:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:79:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:80:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:81:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:83:25: warning: duplicate const
+arch/arm/mach-imx/clk-vf610.c:84:25: warning: duplicate const
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6sl.c |   42 ++++++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+ arch/arm/mach-imx/clk-vf610.c |   36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index c0c4ef5..9fad29a9 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -18,27 +18,27 @@
- #include "clk.h"
- #include "common.h"
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index b169a39..41ba8f4 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -63,25 +63,25 @@ static void __iomem *anatop_base;
+ static void __iomem *ccm_base;
  
--static const char const *step_sels[]		= { "osc", "pll2_pfd2", };
--static const char const *pll1_sw_sels[]		= { "pll1_sys", "step", };
--static const char const *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
--static const char const *ocram_sels[]		= { "periph", "ocram_alt_sels", };
--static const char const *pre_periph_sels[]	= { "pll2_bus", "pll2_pfd2", "pll2_pfd0", "pll2_198m", };
--static const char const *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
--static const char const *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
--static const char const *periph_sels[]		= { "pre_periph_sel", "periph_clk2_podf", };
--static const char const *periph2_sels[]		= { "pre_periph2_sel", "periph2_clk2_podf", };
--static const char const *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
--static const char const *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
--static const char const *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_post_div", "dummy", };
--static const char const *perclk_sels[]		= { "ipg", "osc", };
--static const char const *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
--static const char const *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
--static const char const *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
--static const char const *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
--static const char const *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd1", "pll3_pfd1", };
--static const char const *audio_sels[]		= { "pll4_post_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
--static const char const *ecspi_sels[]		= { "pll3_60m", "osc", };
--static const char const *uart_sels[]		= { "pll3_80m", "osc", };
-+static const char *step_sels[]		= { "osc", "pll2_pfd2", };
-+static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
-+static const char *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
-+static const char *ocram_sels[]		= { "periph", "ocram_alt_sels", };
-+static const char *pre_periph_sels[]	= { "pll2_bus", "pll2_pfd2", "pll2_pfd0", "pll2_198m", };
-+static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
-+static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
-+static const char *periph_sels[]	= { "pre_periph_sel", "periph_clk2_podf", };
-+static const char *periph2_sels[]	= { "pre_periph2_sel", "periph2_clk2_podf", };
-+static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
-+static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
-+static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_post_div", "dummy", };
-+static const char *perclk_sels[]	= { "ipg", "osc", };
-+static const char *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
-+static const char *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
-+static const char *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
-+static const char *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
-+static const char *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd1", "pll3_pfd1", };
-+static const char *audio_sels[]		= { "pll4_post_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
-+static const char *ecspi_sels[]		= { "pll3_60m", "osc", };
-+static const char *uart_sels[]		= { "pll3_80m", "osc", };
+ /* sources for multiplexer clocks, this is used multiple times */
+-static const char const *fast_sels[]	= { "firc", "fxosc", };
+-static const char const *slow_sels[]	= { "sirc_32k", "sxosc", };
+-static const char const *pll1_sels[]	= { "pll1_main", "pll1_pfd1", "pll1_pfd2", "pll1_pfd3", "pll1_pfd4", };
+-static const char const *pll2_sels[]	= { "pll2_main", "pll2_pfd1", "pll2_pfd2", "pll2_pfd3", "pll2_pfd4", };
+-static const char const *sys_sels[]	= { "fast_clk_sel", "slow_clk_sel", "pll2_pfd_sel", "pll2_main", "pll1_pfd_sel", "pll3_main", };
+-static const char const *ddr_sels[]	= { "pll2_pfd2", "sys_sel", };
+-static const char const *rmii_sels[]	= { "enet_ext", "audio_ext", "enet_50m", "enet_25m", };
+-static const char const *enet_ts_sels[]	= { "enet_ext", "fxosc", "audio_ext", "usb", "enet_ts", "enet_25m", "enet_50m", };
+-static const char const *esai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
+-static const char const *sai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
+-static const char const *nfc_sels[]	= { "platform_bus", "pll1_pfd1", "pll3_pfd1", "pll3_pfd3", };
+-static const char const *qspi_sels[]	= { "pll3_main", "pll3_pfd4", "pll2_pfd4", "pll1_pfd4", };
+-static const char const *esdhc_sels[]	= { "pll3_main", "pll3_pfd3", "pll1_pfd3", "platform_bus", };
+-static const char const *dcu_sels[]	= { "pll1_pfd2", "pll3_main", };
+-static const char const *gpu_sels[]	= { "pll2_pfd2", "pll3_pfd2", };
+-static const char const *vadc_sels[]	= { "pll6_main_div", "pll3_main_div", "pll3_main", };
++static const char *fast_sels[]	= { "firc", "fxosc", };
++static const char *slow_sels[]	= { "sirc_32k", "sxosc", };
++static const char *pll1_sels[]	= { "pll1_main", "pll1_pfd1", "pll1_pfd2", "pll1_pfd3", "pll1_pfd4", };
++static const char *pll2_sels[]	= { "pll2_main", "pll2_pfd1", "pll2_pfd2", "pll2_pfd3", "pll2_pfd4", };
++static const char *sys_sels[]	= { "fast_clk_sel", "slow_clk_sel", "pll2_pfd_sel", "pll2_main", "pll1_pfd_sel", "pll3_main", };
++static const char *ddr_sels[]	= { "pll2_pfd2", "sys_sel", };
++static const char *rmii_sels[]	= { "enet_ext", "audio_ext", "enet_50m", "enet_25m", };
++static const char *enet_ts_sels[]	= { "enet_ext", "fxosc", "audio_ext", "usb", "enet_ts", "enet_25m", "enet_50m", };
++static const char *esai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
++static const char *sai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
++static const char *nfc_sels[]	= { "platform_bus", "pll1_pfd1", "pll3_pfd1", "pll3_pfd3", };
++static const char *qspi_sels[]	= { "pll3_main", "pll3_pfd4", "pll2_pfd4", "pll1_pfd4", };
++static const char *esdhc_sels[]	= { "pll3_main", "pll3_pfd3", "pll1_pfd3", "platform_bus", };
++static const char *dcu_sels[]	= { "pll1_pfd2", "pll3_main", };
++static const char *gpu_sels[]	= { "pll2_pfd2", "pll3_pfd2", };
++static const char *vadc_sels[]	= { "pll6_main_div", "pll3_main_div", "pll3_main", };
+ /* FTM counter clock source, not module clock */
+-static const char const *ftm_ext_sels[]	= {"sirc_128k", "sxosc", "fxosc_half", "audio_ext", };
+-static const char const *ftm_fix_sels[]	= { "sxosc", "ipg_bus", };
++static const char *ftm_ext_sels[]	= {"sirc_128k", "sxosc", "fxosc_half", "audio_ext", };
++static const char *ftm_fix_sels[]	= { "sxosc", "ipg_bus", };
  
- static struct clk_div_table clk_enet_ref_table[] = {
- 	{ .val = 0, .div = 20, },
+ static struct clk_div_table pll4_main_div_table[] = {
+ 	{ .val = 0, .div = 1 },
 -- 
 1.7.9.5
