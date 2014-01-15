@@ -1,57 +1,80 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 15 Jan 2014 20:10:03 +0800
-Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
-In-Reply-To: <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
-References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
- <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
- <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
-Message-ID: <52D67A9B.4090607@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 12:17:50 +0000
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> The new interrupts-extended property, which reuses the phandle+arguments
+> pattern used by GPIOs and other core bindings, still have some issue.
+> 
+> If an SoC have already specifiy interrupt and a board want to add specific
+> interrupt such as GPIO (which can be optionnal) be need to re-define
+> interrupts-extended. So allow to have an optionnale interrupts-extended-2
+> property.
+> 
 
+NAK.
 
-On 01/15/2014 07:58 PM, Seungwon Jeon wrote:
-> On Wed, January 15, 2014, Zhangfei Gao wrote:
->> Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
->> CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
->> can not be checked by IS_ERR_VALUE.
->> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
->> otherwise sd detect may occasionally fail.
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Reported-by: Kevin Hilman <khilman@linaro.org>
->> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
->> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
->> ---
->>   drivers/mmc/host/dw_mmc.c |    9 ++++++---
->>   1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index a776f24f4311..9ded62c8225e 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
->>   	int present;
->>   	struct dw_mci_slot *slot = mmc_priv(mmc);
->>   	struct dw_mci_board *brd = slot->host->pdata;
->> -	int gpio_cd = !mmc_gpio_get_cd(mmc);
->> +	struct dw_mci *host = slot->host;
->> +	int gpio_cd = mmc_gpio_get_cd(mmc);
->>
->>   	/* Use platform get_cd function, else try onboard card detect */
->>   	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
->> @@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
->>   	else if (brd->get_cd)
->>   		present = !brd->get_cd(slot->id);
->>   	else if (!IS_ERR_VALUE(gpio_cd))
->> -		present = !!gpio_cd;
->> +		present = !gpio_cd;
-> !!gpio_cd or gpio_cd is correct, isn't it?
->
+This is a hack that works around a dts organisation issue. This is _not_
+a binding or parsing issue.
 
-No, mmc_gpio_get_cd(mmc) has to revert.
-!!gpio_cd is used before since gpio_cd = !mmc_gpio_get_cd(mmc) is used
-before.
+Properties can be overridden - just describe all of the interrupts in
+the final dts file.
 
-Thanks
+> Today the problem is ofen solve by defining a gpio-xxx property and then do a gpio_to_irq
+> in the C code. *Which is wrong!!*. We need to describe the IRQ.
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> ---
+> 
+> We have the same issue on pinctrl
+>  .../devicetree/bindings/interrupt-controller/interrupts.txt    |  4 ++++
+>  drivers/of/irq.c                                               | 10 ++++++++--
+>  2 files changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> index 1486497..5d559fd 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> @@ -25,8 +25,12 @@ to reference multiple interrupt parents. Each entry in this property contains
+>  both the parent phandle and the interrupt specifier. "interrupts-extended"
+>  should only be used when a device has multiple interrupt parents.
+>  
+> +The "interrupts-extended-2" allow to extend at board level node interrupt without
+> +having to re-define the SoC interrupts.
+> +
+>    Example:
+>  	interrupts-extended = <&intc1 5 1>, <&intc2 1 0>;
+> +	interrupts-extended-2 = <&intc1 6 1>
+>  
+>  A device node may contain either "interrupts" or "interrupts-extended", but not
+>  both. If both properties are present, then the operating system should log an
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 786b0b4..bc36710 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -307,8 +307,14 @@ int of_irq_parse_one(struct device_node *device, int index, struct of_phandle_ar
+>  		/* Try the new-style interrupts-extended */
+>  		res = of_parse_phandle_with_args(device, "interrupts-extended",
+>  						"#interrupt-cells", index, out_irq);
+> -		if (res)
+> -			return -EINVAL;
+> +		if (res) {
+> +			/* Try the new-style interrupts-extended-2 */
+> +			res = of_parse_phandle_with_args(device, "interrupts-extended-2",
+> +							"#interrupt-cells", index, out_irq);
+
+This also breaks error reporting.
+
+What if you have an interrupt in the middle of interrupts-extended which
+fails to parse? This will jump to the interrupts-extended-2 property and
+grab the wrong interrupt rather than propagating the error.
+
+Thanks,
+Mark.
