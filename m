@@ -1,28 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jan 2014 10:14:53 +0100
-Subject: [PATCH V3 1/5] pinctrl: sh-pfc: r7s72100: Add RSPI support
-In-Reply-To: <1389523723-2288-2-git-send-email-geert@linux-m68k.org>
-References: <1389523723-2288-1-git-send-email-geert@linux-m68k.org>
- <1389523723-2288-2-git-send-email-geert@linux-m68k.org>
-Message-ID: <CACRpkdaZyZ1NUhOkXjJQ5_fBx+NiLTaUGX-iAh50UU9SRvt7hQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 15 Jan 2014 10:10:06 +0100
+Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
+In-Reply-To: <20140109153404.GA21055@kvmhost>
+References: <20140109153404.GA21055@kvmhost>
+Message-ID: <20140115091006.GF3377@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 12, 2014 at 11:48 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Jan 09, 2014 at 04:34:04PM +0100, Gerardo Di Iorio wrote:
+> Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
+> 
+> Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
 > ---
-> V2:
->   - No changes
-> V3:
->   - No changes
+>  arch/arm/mach-sunxi/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 547004c..adb2574 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_SUNXI
+> -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+> +       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
 
-I'm expecting Laurent to queue this patch when he's happy with it
-(maybe he already said so in some other mail).
+I wonder if the sunxi (apart the weird letter case) is actually
+needed. Maybe we can just put "Allwinner SoCs" (it would be great if
+you could fix the SoCs case too).
 
-Yours,
-Linus Walleij
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/fce18948/attachment-0001.sig>
