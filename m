@@ -1,46 +1,73 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 Jan 2014 19:53:39 -0800
-Subject: [PATCH 1/2] clk: hisilicon: add hi3620_mmc_clks
-In-Reply-To: <52D5E709.7040105@linaro.org>
-References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
- <1389604469-8064-2-git-send-email-zhangfei.gao@linaro.org>
- <20140114201740.4167.52076@quantum> <52D5E709.7040105@linaro.org>
-Message-ID: <20140115035339.4167.51194@quantum>
+Date: Tue, 14 Jan 2014 20:32:06 -0800
+Subject: [GIT PULL] clk: socfpga: Clean-ups for 3.14
+In-Reply-To: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
+References: <1389029246-27434-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140115043206.4167.50892@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting zhangfei (2014-01-14 17:40:25)
-> Dear Mike
+Quoting dinguyen at altera.com (2014-01-06 09:27:26)
+> Hi Mike,
 > 
-> On 01/15/2014 04:17 AM, Mike Turquette wrote:
-> > Quoting Zhangfei Gao (2014-01-13 01:14:28)
-> >> Suggest by Arnd: abstract mmc tuning as clock behavior,
-> >> also because different soc have different tuning method and registers.
-> >> hi3620_mmc_clks is added to handle mmc clock specifically on hi3620.
-> >>
-> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> >
-> > Patch looks good to me with one exception. I do not have
-> > Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt in the
-> > clk-next branch. Is there a stable branch I can pull in as a dependency?
+> Please pull in these patches that cleans up the SOCFPGA clock driver. This is
+> V2 of the pull request that includes 4 patches from Steffen Trumtrar.
 > 
-> Mach-hisi just have been uploaeded.
-> Have tried next-20140114, the patch can be applied successfully.
-> While v3.13-rc8 still can not.
+> Thanks,
 > 
-> Is this fine?
+> Dinh
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v2
+> 
+> for you to fetch changes up to d5387681665e58bafc1a9c745182f03aab0579c3:
+> 
+>   clk: socfpga: split clk code (2014-01-06 11:22:22 -0600)
+> 
+> ----------------------------------------------------------------
+> v2: SOCFPGA clk cleanups for 3.14
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (3):
+>       clk: socfpga: Map the clk manager base address in the clock driver
+>       clk: socfpga: Look for the GPIO_DB_CLK by its offset
 
-Can you give me a link to the branch that introduces
-Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt?
+Hi Dinh,
 
-I guess the patch introducing it is going through arm-soc. Is this going
-in for 3.14? If so then perhaps the clk tree and the arm-soc tree can
-share a stable branch that introduces it.
+Patch "clk: socfpga: Look for the GPIO_DB_CLK by its offset" still
+causes a compilation error. I know it gets fixed by "clk: socfpga: fix
+compile error" later on but this still breaks git bisect.
+
+Can you please fold the fixes into the patches that introduce the bugs?
+No need to keep them separate since they are all part of the same pull
+request.
 
 Regards,
 Mike
 
+>       clk: socfpga: Remove socfpga_init_clocks
 > 
-> Thanks
+> Steffen Trumtrar (4):
+>       clk: socfpga: remove unused field
+>       clk: socfpga: fix define typo
+>       clk: socfpga: fix compile error
+>       clk: socfpga: split clk code
+> 
+>  arch/arm/mach-socfpga/socfpga.c  |    5 -
+>  drivers/clk/socfpga/Makefile     |    3 +
+>  drivers/clk/socfpga/clk-gate.c   |  223 ++++++++++++++++++++++++++
+>  drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
+>  drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
+>  drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
+>  drivers/clk/socfpga/clk.h        |   57 +++++++
+>  7 files changed, 500 insertions(+), 321 deletions(-)
+>  create mode 100644 drivers/clk/socfpga/clk-gate.c
+>  create mode 100644 drivers/clk/socfpga/clk-periph.c
+>  create mode 100644 drivers/clk/socfpga/clk-pll.c
+>  create mode 100644 drivers/clk/socfpga/clk.h
+> 
