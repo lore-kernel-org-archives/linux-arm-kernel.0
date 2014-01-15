@@ -1,51 +1,63 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 15 Jan 2014 11:10:56 -0800
-Subject: [RESEND][RFC PATCH 1/2] mm/memblock: add memblock_get_current_limit
-In-Reply-To: <1389813057-26572-1-git-send-email-lauraa@codeaurora.org>
-References: <1389813057-26572-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1389813057-26572-2-git-send-email-lauraa@codeaurora.org>
+Date: Wed, 15 Jan 2014 11:10:55 -0800
+Subject: [RESEND][RFC PATCH 0/2] Early patches to get rid of meminfo
+Message-ID: <1389813057-26572-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Appart from setting the limit of memblock, it's also useful to be able
-to get the limit to avoid recalculating it every time. Add the function
-to do so.
+Hi,
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- include/linux/memblock.h |    2 ++
- mm/memblock.c            |    5 +++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+With the move away from bootmem and the convergence on memblock, it seems
+like meminfo should be deprecated as well to avoid duplication. This is
+a first pass attempt to just use memblock and not have meminfo integrated.
+There is still a major issue in terms of actually specifying mem at location
+on the command line but I wanted to send this out for some early feedback
+before putting any more effort into this. I've done basic boot testing on
+a simple DT target.
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 1ef6636..8a20a51 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -252,6 +252,8 @@ static inline void memblock_dump_all(void)
- void memblock_set_current_limit(phys_addr_t limit);
- 
- 
-+phys_addr_t memblock_get_current_limit(void);
-+
- /*
-  * pfn conversion functions
-  *
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 64ed243..0ec3fc7 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1423,6 +1423,11 @@ void __init_memblock memblock_set_current_limit(phys_addr_t limit)
- 	memblock.current_limit = limit;
- }
- 
-+phys_addr_t __init_memblock memblock_get_current_limit(void)
-+{
-+	return memblock.current_limit;
-+}
-+
- static void __init_memblock memblock_dump(struct memblock_type *type, char *name)
- {
- 	unsigned long long base, size;
+Thanks,
+Laura
+
+Laura Abbott (2):
+  mm/memblock: add memblock_get_current_limit
+  arm: Get rid of meminfo
+
+ arch/arm/include/asm/mach/arch.h         |    4 +-
+ arch/arm/include/asm/memblock.h          |    3 +-
+ arch/arm/include/asm/setup.h             |   23 ------
+ arch/arm/kernel/atags_parse.c            |    5 +-
+ arch/arm/kernel/setup.c                  |   33 +++------
+ arch/arm/mach-clps711x/board-clep7312.c  |    7 +-
+ arch/arm/mach-clps711x/board-edb7211.c   |   10 +--
+ arch/arm/mach-clps711x/board-p720t.c     |    2 +-
+ arch/arm/mach-footbridge/cats-hw.c       |    2 +-
+ arch/arm/mach-footbridge/netwinder-hw.c  |    2 +-
+ arch/arm/mach-msm/board-halibut.c        |    6 --
+ arch/arm/mach-msm/board-mahimahi.c       |   13 +--
+ arch/arm/mach-msm/board-msm7x30.c        |    3 +-
+ arch/arm/mach-msm/board-sapphire.c       |   13 +--
+ arch/arm/mach-msm/board-trout.c          |    8 +-
+ arch/arm/mach-orion5x/common.c           |    3 +-
+ arch/arm/mach-orion5x/common.h           |    3 +-
+ arch/arm/mach-pxa/cm-x300.c              |    3 +-
+ arch/arm/mach-pxa/corgi.c                |   10 +--
+ arch/arm/mach-pxa/eseries.c              |    9 +-
+ arch/arm/mach-pxa/poodle.c               |    8 +-
+ arch/arm/mach-pxa/spitz.c                |    9 +--
+ arch/arm/mach-pxa/tosa.c                 |    8 +-
+ arch/arm/mach-realview/core.c            |   11 +--
+ arch/arm/mach-realview/core.h            |    3 +-
+ arch/arm/mach-realview/realview_pb1176.c |    8 +-
+ arch/arm/mach-realview/realview_pbx.c    |   17 ++---
+ arch/arm/mach-s3c24xx/mach-smdk2413.c    |    8 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c       |    8 +-
+ arch/arm/mach-sa1100/assabet.c           |    2 +-
+ arch/arm/mm/init.c                       |   61 ++++++----------
+ arch/arm/mm/mmu.c                        |  122 ++++++++++--------------------
+ include/linux/memblock.h                 |    2 +
+ mm/memblock.c                            |    5 +
+ 34 files changed, 150 insertions(+), 284 deletions(-)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
