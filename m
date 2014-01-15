@@ -1,51 +1,65 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 15 Jan 2014 21:26:22 +0900
-Subject: [PATCH 04/04] ARM: shmobile: r8a7790 CCI configuration
-In-Reply-To: <20140115122539.9437.63968.sendpatchset@w520>
-References: <20140115122539.9437.63968.sendpatchset@w520>
-Message-ID: <20140115122622.9437.27236.sendpatchset@w520>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Wed, 15 Jan 2014 21:26:28 +0900
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <52D67A9B.4090607@linaro.org>
+References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
+ <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
+ <52D67A9B.4090607@linaro.org>
+Message-ID: <001c01cf11ed$039b6270$0ad22750$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+On Wed, January 15, 2014, Zhangfei Gao wrote:
+> On 01/15/2014 07:58 PM, Seungwon Jeon wrote:
+> > On Wed, January 15, 2014, Zhangfei Gao wrote:
+> >> Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+> >> CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+> >> can not be checked by IS_ERR_VALUE.
+> >> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+> >> otherwise sd detect may occasionally fail.
+> >>
+> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >> Reported-by: Kevin Hilman <khilman@linaro.org>
+> >> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >> ---
+> >>   drivers/mmc/host/dw_mmc.c |    9 ++++++---
+> >>   1 file changed, 6 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> >> index a776f24f4311..9ded62c8225e 100644
+> >> --- a/drivers/mmc/host/dw_mmc.c
+> >> +++ b/drivers/mmc/host/dw_mmc.c
+> >> @@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+> >>   	int present;
+> >>   	struct dw_mci_slot *slot = mmc_priv(mmc);
+> >>   	struct dw_mci_board *brd = slot->host->pdata;
+> >> -	int gpio_cd = !mmc_gpio_get_cd(mmc);
+> >> +	struct dw_mci *host = slot->host;
+> >> +	int gpio_cd = mmc_gpio_get_cd(mmc);
+> >>
+> >>   	/* Use platform get_cd function, else try onboard card detect */
+> >>   	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+> >> @@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+> >>   	else if (brd->get_cd)
+> >>   		present = !brd->get_cd(slot->id);
+> >>   	else if (!IS_ERR_VALUE(gpio_cd))
+> >> -		present = !!gpio_cd;
+> >> +		present = !gpio_cd;
+> > !!gpio_cd or gpio_cd is correct, isn't it?
+> >
+> 
+> No, mmc_gpio_get_cd(mmc) has to revert.
+I'm missing something?
+If card is detected, mmc_gpio_get_cd() returns non-zero, right?
+I guess gpio_cd should be kept.
 
-Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
-
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/smp-r8a7790.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
---- 0005/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2014-01-15 15:40:56.000000000 +0900
-@@ -28,6 +28,11 @@
- #define CA15RESCNT	0x0040
- #define CA7RESCNT	0x0044
- #define MERAM		0xe8080000
-+#define CCI_BASE	0xf0090000
-+#define CCI_SLAVE3	0x4000
-+#define CCI_SLAVE4	0x5000
-+#define CCI_SNOOP	0x0000
-+#define CCI_STATUS	0x000c
- 
- static struct rcar_sysc_ch r8a7790_ca15_scu = {
- 	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
-@@ -71,6 +76,16 @@ static void __init r8a7790_smp_prepare_c
- 	r8a7790_pm_init();
- 	rcar_sysc_power_up(&r8a7790_ca15_scu);
- 	rcar_sysc_power_up(&r8a7790_ca7_scu);
-+
-+	/* enable snoop and DVM */
-+	p = ioremap_nocache(CCI_BASE, 0x8000);
-+	writel_relaxed(readl_relaxed(p + CCI_SLAVE3 + CCI_SNOOP) | 0x3,
-+		p + CCI_SLAVE3 + CCI_SNOOP);    /* ca15 */
-+	writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
-+		p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
-+	while (__raw_readl(p + CCI_STATUS));
-+	/* wait for pending bit low */
-+	iounmap(p);
- }
- 
- struct smp_operations r8a7790_smp_ops __initdata = {
+> !!gpio_cd is used before since gpio_cd = !mmc_gpio_get_cd(mmc) is used
+> before.
+> 
+> Thanks
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
