@@ -1,170 +1,550 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 15 Jan 2014 13:27:21 +0200
-Subject: [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI audio support
- for TDA998x trough McASP I2S bus
-In-Reply-To: <20131231132555.GA31886@sirena.org.uk>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk>
-Message-ID: <52D67099.1040904@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 12:31:59 +0100
+Subject: [PATCH v2 01/12] at91: dt: Add at91sam9261 dt SoC support
+In-Reply-To: <52D56D5B.5000505@atmel.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+ <1389270709-32662-2-git-send-email-jjhiblot@traphandler.com>
+ <52D56D5B.5000505@atmel.com>
+Message-ID: <20140115113159.GT14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/2013 03:25 PM, Mark Brown wrote:
-> On Fri, Dec 20, 2013 at 12:39:38PM +0200, Jyri Sarha wrote:
->
->> Add machine driver support for BeagleBone-Black and other boards with
->> tilcdc support and NXP TDA998X HDMI transmitter connected to McASP
->> port in I2S mode. The 44100 Hz sample-rate and it's multiples can not
->> be supported on Beaglebone-Black because of limited clock-rate
->
-> Can the drivers infer this from the clocks?
+On 18:01 Tue 14 Jan     , Nicolas Ferre wrote:
+> On 09/01/2014 13:31, Jean-Jacques Hiblot :
+> > This patch adds the basics to support the Device Tree on a sam9261-based platform
+> > 
+> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > ---
+> >  arch/arm/boot/dts/at91sam9261.dtsi | 476 +++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-at91/at91sam9261.c   |  15 ++
+> >  2 files changed, 491 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+> > new file mode 100644
+> > index 0000000..773c3d6
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/at91sam9261.dtsi
+> > @@ -0,0 +1,476 @@
+> > +/*
+> > + * at91sam9261.dtsi - Device Tree Include file for AT91SAM9261 SoC
+> > + *
+> > + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > + *
+> > + * Licensed under GPLv2 only.
+> > + */
+> > +
+> > +#include "skeleton.dtsi"
+> > +#include <dt-bindings/pinctrl/at91.h>
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +
+> > +/ {
+> > +	model = "Atmel AT91SAM9261 family SoC";
+> > +	compatible = "atmel,at91sam9261";
+> > +	interrupt-parent = <&aic>;
+> > +
+> > +	aliases {
+> > +		serial0 = &dbgu;
+> > +		serial1 = &usart0;
+> > +		serial2 = &usart1;
+> > +		serial3 = &usart2;
+> > +		gpio0 = &pioA;
+> > +		gpio1 = &pioB;
+> > +		gpio2 = &pioC;
+> > +		tcb0 = &tcb0;
+> > +		i2c0 = &i2c0;
+> > +		ssc0 = &ssc0;
+> > +		ssc1 = &ssc1;
+> > +	};
+> > +	cpus {
+> > +		#address-cells = <0>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu {
+> > +			compatible = "arm,arm926ej-s";
+> > +			device_type = "cpu";
+> > +		};
+> > +	};
+> > +
+> > +	memory {
+> > +		reg = <0x20000000 0x08000000>;
+> > +	};
+> > +
+> > +	ahb {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +
+> > +		apb {
+> > +			compatible = "simple-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			ranges;
+> 
+> I know that it is not always done but can you please sort all nodes by
+> ascending address order? It is always simple to deal with node additions
+> when sorted this way.
+> 
+> > +
+> > +			aic: interrupt-controller at fffff000 {
+> > +				#interrupt-cells = <3>;
+> > +				compatible = "atmel,at91rm9200-aic";
+> > +				interrupt-controller;
+> > +				reg = <0xfffff000 0x200>;
+> > +				atmel,external-irqs = <29 30 31>;
+> > +			};
+> > +
+> > +			pmc: pmc at fffffc00 {
+> > +				compatible = "atmel,at91rm9200-pmc";
+> > +				reg = <0xfffffc00 0x100>;
+> > +			};
+> > +
+> > +			ramc: ramc at ffffea00 {
+> > +				compatible = "atmel,at91sam9260-sdramc";
+> > +				reg = <0xffffea00 0x200>;
+> > +			};
+> > +
+> > +			pit: timer at fffffd30 {
+> > +				compatible = "atmel,at91sam9260-pit";
+> > +				reg = <0xfffffd30 0xf>;
+> > +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> > +			};
+> > +
+> > +			tcb0: timer at fffa0000 {
+> > +				compatible = "atmel,at91rm9200-tcb";
+> > +				reg = <0xfffa0000 0x100>;
+> > +				interrupts = < 17 IRQ_TYPE_LEVEL_HIGH 0
+> > +					18 IRQ_TYPE_LEVEL_HIGH 0
+> > +					19 IRQ_TYPE_LEVEL_HIGH 0
+> > +					>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			rstc at fffffd00 {
+> > +				compatible = "atmel,at91sam9260-rstc";
+> > +				reg = <0xfffffd00 0x10>;
+> > +			};
+> > +
+> > +			shdwc at fffffd10 {
+> > +				compatible = "atmel,at91sam9260-shdwc";
+> > +				reg = <0xfffffd10 0x10>;
+> > +			};
+> > +
+> > +			pinctrl at fffff400 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <1>;
+> > +				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
+> > +				ranges = <0xfffff400 0xfffff400 0xa00>;
+> > +
+> > +				atmel,mux-mask = <
+> > +				      /*    A         B     */
+> > +				       0xffffffff 0xfffffff7  /* pioA */
+> > +				       0xffffffff 0xfffffff4  /* pioB */
+> > +				       0xffffffff 0xffffff07  /* pioC */
+> > +				      >;
+> > +
+> > +				/* shared pinctrl settings */
+> > +				dbgu {
+> > +					pinctrl_dbgu: dbgu-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 9  AT91_PERIPH_A AT91_PINCTRL_NONE	        /* PA9  periph A */
+> 
+> You may have to remove comments for pin descriptions. It is not needed
+> anymore with pre-processor macros.
+> 
+> > +							 AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PA10 periph A with pullup */
+> > +					};
+> > +				};
+> > +
+> > +				usart0 {
+> > +					pinctrl_usart0: usart0-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC8 periph A with pullup */
+> > +							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PC9 periph A */
+> > +					};
+> > +
+> > +					pinctrl_usart0_rts: usart0_rts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PC10 periph A */
+> > +					};
+> > +
+> > +					pinctrl_usart0_cts: usart0_cts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PC11 periph A */
+> > +					};
+> > +				};
+> > +
+> > +				usart1 {
+> > +					pinctrl_usart1: usart1-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC12 periph A with pullup */
+> > +							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE>;		/* PC13 periph A */
+> > +					};
+> > +
+> > +					pinctrl_usart1_rts: usart1_rts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA12 periph B */
+> > +					};
+> > +
+> > +					pinctrl_usart1_cts: usart1_cts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA13 periph B */
+> > +					};
+> > +				};
+> > +
+> > +				usart2 {
+> > +					pinctrl_usart2: usart2-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC14 periph A with pullup */
+> > +							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;		/* PC15 periph A */
+> > +					};
+> > +
+> > +					pinctrl_usart2_rts: usart2_rts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA15 periph B */
+> > +					};
+> > +
+> > +					pinctrl_usart2_cts: usart2_cts-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA16 periph B */
+> > +					};
+> > +				};
+> > +
+> > +				nand {
+> > +					pinctrl_nand: nand-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOC 15 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP	/* PC15 gpio RDY pin pull_up*/
+> > +							 AT91_PIOC 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;	/* PC14 gpio enable pin pull_up */
+> > +					};
+> > +				};
+> > +
+> > +				mmc0 {
+> > +					pinctrl_mmc0_clk: mmc0_clk-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA2 periph B */
+> > +					};
+> > +
+> > +					pinctrl_mmc0_slot0_cmd_dat0: mmc0_slot0_cmd_dat0-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 1 AT91_PERIPH_B AT91_PINCTRL_PULL_UP		/* PA1 periph B with pullup */
+> > +							 AT91_PIOA 0 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;	/* PA0 periph B with pullup */
+> > +					};
+> > +
+> > +					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 4 AT91_PERIPH_B AT91_PINCTRL_PULL_UP		/* PA4 periph B with pullup */
+> > +							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_PULL_UP		/* PA5 periph B with pullup */
+> > +							 AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;	/* PA6 periph B with pullup */
+> > +					};
+> > +					};
+> > +
+> > +				ssc0 {
+> > +					pinctrl_ssc0_tx: ssc0_tx-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOB 21 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB21 periph A */
+> > +							 AT91_PIOB 22 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB22 periph A */
+> > +							 AT91_PIOB 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB23 periph A */
+> > +					};
+> > +
+> > +					pinctrl_ssc0_rx: ssc0_rx-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOB 24 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB24 periph A */
+> > +							 AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB25 periph A */
+> > +							 AT91_PIOB 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB26 periph A */
+> > +					};
+> > +				};
+> > +
+> > +				ssc1 {
+> > +					pinctrl_ssc1_tx: ssc1_tx-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA17 periph B */
+> > +							 AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA18 periph B */
+> > +							 AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA19 periph B */
+> > +					};
+> > +
+> > +					pinctrl_ssc1_rx: ssc1_rx-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA20 periph B */
+> > +							 AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA21 periph B */
+> > +							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA22 periph B */
+> > +					};
+> > +				};
+> > +
+> > +				spi0 {
+> > +					pinctrl_spi0: spi0-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA0 periph A SPI0_MISO pin */
+> > +							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA1 periph A SPI0_MOSI pin */
+> > +							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA2 periph A SPI0_SPCK pin */
+> > +					};
+> > +					};
+> > +
+> > +				spi1 {
+> > +					pinctrl_spi1: spi1-0 {
+> > +						atmel,pins =
+> > +							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB30 periph A SPI1_MISO pin */
+> > +							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB31 periph A SPI1_MOSI pin */
+> > +							 AT91_PIOB 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB29 periph A SPI1_SPCK pin */
+> > +					};
+> > +				};
+> > +
+> > +				tcb0 {
+> > +					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
+> > +						atmel,pins = <AT91_PIOC 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
+> > +						atmel,pins = <AT91_PIOC 17 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
+> > +						atmel,pins = <AT91_PIOC 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
+> > +						atmel,pins = <AT91_PIOC 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
+> > +						atmel,pins = <AT91_PIOC 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
+> > +						atmel,pins = <AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
+> > +						atmel,pins = <AT91_PIOC 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
+> > +						atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +
+> > +					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
+> > +						atmel,pins = <AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> > +					};
+> > +				};
+> > +
+> > +				pioA: gpio at fffff400 {
+> > +					compatible = "atmel,at91rm9200-gpio";
+> > +					reg = <0xfffff400 0x200>;
+> > +					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+> > +					#gpio-cells = <2>;
+> > +					gpio-controller;
+> > +					interrupt-controller;
+> > +					#interrupt-cells = <2>;
+> > +				};
+> > +
+> > +				pioB: gpio at fffff600 {
+> > +					compatible = "atmel,at91rm9200-gpio";
+> > +					reg = <0xfffff600 0x200>;
+> > +					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+> > +					#gpio-cells = <2>;
+> > +					gpio-controller;
+> > +					interrupt-controller;
+> > +					#interrupt-cells = <2>;
+> > +				};
+> > +
+> > +				pioC: gpio at fffff800 {
+> > +					compatible = "atmel,at91rm9200-gpio";
+> > +					reg = <0xfffff800 0x200>;
+> > +					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+> > +					#gpio-cells = <2>;
+> > +					gpio-controller;
+> > +					interrupt-controller;
+> > +					#interrupt-cells = <2>;
+> > +				};
+> > +			};
+> > +
+> > +			dbgu: serial at fffff200 {
+> > +				compatible = "atmel,at91sam9260-usart";
+> > +				reg = <0xfffff200 0x200>;
+> > +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_dbgu>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			usart0: serial at fffb0000 {
+> > +				compatible = "atmel,at91sam9260-usart";
+> > +				reg = <0xfffb0000 0x200>;
+> > +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+> > +				atmel,use-dma-rx;
+> > +				atmel,use-dma-tx;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_usart0>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			usart1: serial at ffffb400 {
+> > +				compatible = "atmel,at91sam9260-usart";
+> > +				reg = <0xfffb4000 0x200>;
+> > +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+> > +				atmel,use-dma-rx;
+> > +				atmel,use-dma-tx;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_usart1>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			usart2: serial at fff94000 {
+> > +				compatible = "atmel,at91sam9260-usart";
+> > +				reg = <0xfffb8000 0x200>;
+> > +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+> > +				atmel,use-dma-rx;
+> > +				atmel,use-dma-tx;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_usart2>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			ssc0: ssc at fffbc000 {
+> > +				compatible = "atmel,at91rm9200-ssc";
+> > +				reg = <0xfffbc000 0x4000>;
+> > +				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			ssc1: ssc at fffc0000 {
+> > +				compatible = "atmel,at91rm9200-ssc";
+> > +				reg = <0xfffc0000 0x4000>;
+> > +				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			usb1: gadget at fffa4000 {
+> > +				compatible = "atmel,at91rm9200-udc";
+> > +				reg = <0xfffa4000 0x4000>;
+> > +				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			i2c0: i2c at fffac000 {
+> > +				compatible = "atmel,at91sam9261-i2c";
+> 
+> isn't it "atmel,at91sam9260-i2c" ?
+> 
+> > +				reg = <0xfffac000 0x100>;
+> > +				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			mmc0: mmc at fffa8000 {
+> > +				compatible = "atmel,hsmci";
+> > +				reg = <0xfffa8000 0x600>;
+> > +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			watchdog at fffffd40 {
+> > +				compatible = "atmel,at91sam9260-wdt";
+> > +				reg = <0xfffffd40 0x10>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			spi0: spi at fffc8000 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				compatible = "atmel,at91rm9200-spi";
+> > +				reg = <0xfffc8000 0x200>;
+> > +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_spi0>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			spi1: spi at fffcc000 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				compatible = "atmel,at91rm9200-spi";
+> > +				reg = <0xfffcc000 0x200>;
+> > +				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&pinctrl_spi1>;
+> > +				status = "disabled";
+> > +			};
+> > +		};
+> > +
+> > +		nand0: nand at 40000000 {
+> > +			compatible = "atmel,at91rm9200-nand";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			reg = <0x40000000 0x10000000>;
+> > +			atmel,nand-addr-offset = <22>;
+> > +			atmel,nand-cmd-offset = <21>;
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&pinctrl_nand>;
+> > +
+> > +			gpios = <&pioC 15 GPIO_ACTIVE_HIGH
+> > +				&pioC 14 GPIO_ACTIVE_HIGH
+> > +				0
+> > +				>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		usb0: ohci at 00500000 {
+> > +			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+> > +			reg = <0x00500000 0x100000>;
+> > +			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+> > +			status = "disabled";
+> > +		};
+> > +	};
+> > +
+> > +	i2c at 0 {
+> > +		compatible = "i2c-gpio";
+> > +		gpios = <&pioA 7 GPIO_ACTIVE_HIGH /* sda */
+> > +			 &pioA 8 GPIO_ACTIVE_HIGH /* scl */
+> > +			>;
+> > +		i2c-gpio,sda-open-drain;
+> > +		i2c-gpio,scl-open-drain;
+> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		status = "disabled";
+> > +	};
+> > +};
+> > diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> > index 6276b4c..200d17a 100644
+> > --- a/arch/arm/mach-at91/at91sam9261.c
+> > +++ b/arch/arm/mach-at91/at91sam9261.c
+> > @@ -189,6 +189,21 @@ static struct clk_lookup periph_clocks_lookups[] = {
+> >  	CLKDEV_CON_ID("pioA", &pioA_clk),
+> >  	CLKDEV_CON_ID("pioB", &pioB_clk),
+> >  	CLKDEV_CON_ID("pioC", &pioC_clk),
+> > +	/* more usart lookup table for DT entries */
+> > +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+> > +	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+> > +	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
+> > +	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
+> > +	/* more tc lookup table for DT entries */
+> > +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+> > +	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+> > +	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+> > +	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+> > +	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+> > +	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+> 
+> Yes, this is where I would like the CCF to be implemented...
 
-It does. The commit message is referring to a BBB HW specific feature. 
-Guess I should remove that note from the commit message, since it does 
-not concern the code itself.
+all new SoC need to CCF the old implementation is just for already present SoC
+in dt
 
->
->> support. The only supported sample format is SNDRV_PCM_FORMAT_S32_LE.
->> The 8 least significant bits are ignored.
->
-> Where does this constraint come from?
->
+and also no interrupt-parent and interrupts anymore
+we use now interrupts-extended
 
- From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N 
-register statically to a value that works only with 4 byte samples. 
-According to my tests it is possible to support 3 and 2 byte samples too 
-by changing the CTS_N register value, but I am not sure if the 
-configuration can be changed on the fly. My data sheet of the nxp chip 
-is very vague about the register definitions, but I suppose the register 
-configures some clock divider on the chip. HDMI supports only upto 24bit 
-audio and the data sheet states that any extraneous least significant 
-bits are ignored.
-
->> +	struct snd_soc_card_drvdata_davinci *drvdata =
->> +		(struct snd_soc_card_drvdata_davinci *)
->> +		snd_soc_card_get_drvdata(soc_card);
->
-> Again with the casting.
->
-
-I'll fix that.
-
->> +	runtime->hw.rate_min = drvdata->rate_constraint->list[0];
->> +	runtime->hw.rate_max = drvdata->rate_constraint->list[
->> +		drvdata->rate_constraint->count - 1];
->> +	runtime->hw.rates = SNDRV_PCM_RATE_KNOT;
->> +
->> +	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
->> +				   drvdata->rate_constraint);
->> +	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_CHANNELS,
->> +				     2, 2);
->
-> Why not just set all this statically when registering the DAI?
-
-Because there is no relevant DAI to where to put these limitations. I 
-did not want to add yet another dummy codec driver, but decided to use 
-the already existing ASoC HDMI codec. By default the driver support all 
-audio params supported by HDMI. The limitations are coming from NXP 
-chip, the NXP driver, and because the chip is used in i2s mode. In other 
-words the limitation is coming from machine setup, not from the DAIs.
-
->
->> +static unsigned int evm_get_bclk(struct snd_pcm_hw_params *params)
->> +{
->> +	int sample_size = snd_pcm_format_width(params_format(params));
->> +	int rate = params_rate(params);
->> +	int channels = params_channels(params);
->> +
->> +	return sample_size * channels * rate;
->> +}
->
-> snd_soc_params_to_frame_size().
->
-
-Rather snd_soc_params_to_bclk(), but thanks. I'll use that.
-
->> +static int evm_tda998x_hw_params(struct snd_pcm_substream *substream,
->> +				 struct snd_pcm_hw_params *params)
->> +{
->> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->> +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
->> +	struct snd_soc_codec *codec = rtd->codec;
->> +	struct snd_soc_card *soc_card = codec->card;
->> +	struct platform_device *pdev = to_platform_device(soc_card->dev);
->> +	unsigned int bclk_freq = evm_get_bclk(params);
->> +	unsigned sysclk = ((struct snd_soc_card_drvdata_davinci *)
->> +			   snd_soc_card_get_drvdata(soc_card))->sysclk;
->> +	int ret;
->> +
->> +	ret = snd_soc_dai_set_clkdiv(cpu_dai, 1, sysclk / bclk_freq);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "can't set CPU DAI clock divider %d\n",
->> +			ret);
->> +		return ret;
->> +	}
->
-> This looks like something the DAI driver ought to be able to work out
-> for itself based on the clock rate and sample format.
->
-
-I guess that could be done.
-
-Peter, what do you say if I set BCLK divider automatically if mcasp 
-set_sysclk() has been called with SND_SOC_CLOCK_IN?
-
->> +static unsigned int tda998x_hdmi_rates[] = {
->> +	32000,
->> +	44100,
->> +	48000,
->> +	88200,
->> +	96000,
->> +};
->
-> The changelog said that 44.1kHz and its multiples couldn't be supported
-> - is that just the multiples?
->
-
-As I mentioned earlier, that is a BBB HW limitation only, the code 
-bellow is able to decide what rates are available based on the sysclk rate.
-
->> +static struct snd_pcm_hw_constraint_list *evm_tda998x_rate_constraint(
->> +	struct snd_soc_card *soc_card)
->> +{
->> +	struct platform_device *pdev = to_platform_device(soc_card->dev);
->> +	unsigned sysclk = ((struct snd_soc_card_drvdata_davinci *)
->> +			   snd_soc_card_get_drvdata(soc_card))->sysclk;
->> +	struct snd_pcm_hw_constraint_list *ret;
->> +	unsigned int *rates;
->> +	int i = 0, j = 0;
->> +
->> +	ret = devm_kzalloc(soc_card->dev, sizeof(*ret) +
->> +			   sizeof(tda998x_hdmi_rates), GFP_KERNEL);
->> +	if (!ret) {
->> +		dev_err(&pdev->dev, "Unable to allocate rate constraint!\n");
->
-> OOM is already very verbose, don't bother.
->
-
-Ok, I'll remove that.
-
->> +		return NULL;
->> +	}
->> +
->> +	rates = (unsigned int *)&ret[1];
->> +	ret->list = rates;
->> +	ret->mask = 0;
->> +	for (; i < ARRAY_SIZE(tda998x_hdmi_rates); i++) {
->
-> This is all very hard to read.  Why has the assignment of i been moved
-> up to the declaration rather than put here as is idiomatic, what's all
-> the casting going on with ret and in general?
->
-
-No excuse for i initialization, I'll fix that. The casting is just to 
-survive with just one kmalloc call instead of separate memory blobs for
-struct snd_pcm_hw_constraint_list and referred list of supported sample 
-rates. I'll allocate a second blob, if that is easier to read.
-
-Best regards,
-Jyri
+Best Regards,
+J.
