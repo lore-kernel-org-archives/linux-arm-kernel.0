@@ -1,42 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 17:36:45 +0100
-Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
-In-Reply-To: <20140111210443.GT9681@lunn.ch>
-References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
- <1389174517.12612.87.camel@kazak.uk.xensource.com>
- <20140111210443.GT9681@lunn.ch>
-Message-ID: <201401151736.46280.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 16:39:32 +0000
+Subject: [PATCH v4 2/4] pinctrl: Add pinctrl binding for Broadcom Capri
+ SoCs
+In-Reply-To: <CACRpkdYCmMguUPFRAUHf186_ciKcchBZLGfgqn_VcSMiZi+a8Q@mail.gmail.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-3-git-send-email-syin@broadcom.com>
+ <CACRpkdaAq15wKD900SqN1sQFLBATiuA3vNoua+KJGHU+gdCgqg@mail.gmail.com>
+ <52CC6782.4060309@broadcom.com>
+ <CACRpkdYyz+zrzt0y135Wcq-yUMhiHOb1ov15+SsnVOcZvad96g@mail.gmail.com>
+ <52D5896B.6000209@broadcom.com>
+ <CACRpkdYCmMguUPFRAUHf186_ciKcchBZLGfgqn_VcSMiZi+a8Q@mail.gmail.com>
+Message-ID: <20140115163932.GI25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 January 2014, Andrew Lunn wrote:
-> The id of -1 causes platform_device_add() to set the device name to
-> plain "gpio-keys".
-> 
-> When using DT, the device name is created by the function
-> of_device_make_bus_id(). It has the following comment:
-> 
->  * This routine will first try using either the dcr-reg or the reg property
->  * value to derive a unique name.  As a last resort it will use the node
->  * name followed by a unique number.
-> 
-> Since the gpio_keys node does not have a reg properties, it gets a
-> unique number appended to it. We end up with the device name
-> "gpio_keys.3"
-> 
-> So as it stands, it does not appear i can make the DT system use the
-> same device name as a board system.
-> 
-> But i'm also a little bit concerned by the "unique number" and this
-> ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
-> path supposed to be stable? This unique number is not stable. An
-> unwitting change to the DT could cause its value to change. Do we need
-> to make it stable?
-> 
+Hi Linus,
 
-One possibility would be to create an artificial bus in DT for all
-gpio-keys devices, use #address-cells=<1> and #size-cells=<0>
-for it, and give each device a unique reg property. Not sure if that
-would be considered an elegant solution though.
+On Wed, Jan 15, 2014 at 09:40:53AM +0000, Linus Walleij wrote:
+> On Tue, Jan 14, 2014 at 8:00 PM, Sherman Yin <syin@broadcom.com> wrote:
+> 
+> > Great!  Is there anything else you would like to see changed before this
+> > patchset can be accepted?
+> 
+> I'd like some sign of life from the DT binding maintainers.
 
-	Arnd
+Let's check the electrocardiogram...
+
+           _             _          _        _        _
+__________/ \   ________/ \   _____/ \   ___/ \   ___/ \   __
+             \_/           \_/        \_/      \_/      \_/
+
+
+I don't see anything objectionable in the binding.
+
+Linus, if you think that this binding is sane, feel free to add my ack.
+
+Cheers,
+Mark.
