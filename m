@@ -1,148 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 10:25:34 +0100
-Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
-In-Reply-To: <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
-References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
- <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201401151025.34628.arnd@arndb.de>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 15 Jan 2014 09:26:12 +0000
+Subject: v3.12 regression from "ARM: kirkwood: convert to DT irqchip and
+ clocksource" on non-DT kirkwood platforms
+In-Reply-To: <52D651CD.5020307@gmail.com>
+References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
+ <52D651CD.5020307@gmail.com>
+Message-ID: <1389777972.12434.115.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014, Yuan Yao wrote:
-> Add dma support for lpuart. This function depend on DMA driver. 
-> You can turn on it by SERIAL_FSL_LPUART_DMA=y. And It works if dts node has dma properties.
+On Wed, 2014-01-15 at 10:15 +0100, Sebastian Hesselbarth wrote:
+> On 01/15/14 09:40, Ian Campbell wrote:
+> > The bootlogs are below or in the bug. It stops after "Console: colour
+> > dummy device 80x30", I think next would normally be the
+> > BogoMIPS/calibrate_delay output.
 > 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> That would indicate the timer (clocksource) or irq (irqchip) is not
+> running correctly. Again, that could be non-DT and DT fighting for it.
+> I'll investigate that.
 
-Most of the changes you did look good, but I have to say I'm not a fan of
-the #ifdef you added. I don't think you actually need to have the compile-time
-selection, and it would be best to just drop that part.
+That seems logical.
 
-If you have a good reason to keep it, please change the code to
-more readable "if (IS_ENABLED(CONFIG_FSL_LPUART_DMA))" constructs.
-If you decide to do this, you will find that you need far fewer
-such conditionals because a lot of the code will automatically
-get dropped by the compiler.
-  
->  uart0: serial at 40027000 {
-> -	       compatible = "fsl,vf610-lpuart";
-> -	       reg = <0x40027000 0x1000>;
-> -	       interrupts = <0 61 0x00>;
-> -       };
-> +		compatible = "fsl,vf610-lpuart";
-> +		reg = <0x40027000 0x1000>;
-> +		interrupts = <0 61 0x00>;
-> +		clocks = <&clks VF610_CLK_UART0>;
-> +		clock-names = "ipg";
-> +		dma-names = "lpuart-tx","lpuart-rx";
-> +		dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>,
-> +			<&edma0 0 VF610_EDMA_MUXID0_UART0_RX>;
-> +	};
+> In the meantime, can you recompile your kernel and set
+> CONFIG_ARCH_KIRKWOOD_DT=n ?
 
-You still haven't addressed my comment about removing the VF610_EDMA_MUXID0_UART0_TX
-macros.
+I can confirm that v3.13-rc8 with CONFIG_ARCH_KIRKWOOD_DT=n works.
 
->  
-> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> +#define DMA_MAXBURST		16
-> +#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
-> +#define FSL_UART_RX_DMA_BUFFER_SIZE	64
-> +#endif
-
-For this part there was no need for the #ifdef to start with.
-
->  #define DRIVER_NAME	"fsl-lpuart"
->  #define DEV_NAME	"ttyLP"
->  #define UART_NR		6
-> @@ -121,6 +132,26 @@ struct lpuart_port {
->  	struct clk		*clk;
->  	unsigned int		txfifo_size;
->  	unsigned int		rxfifo_size;
-> +
-> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> +	bool			lpuart_dma_use;
-> +	struct dma_chan		*dma_tx_chan;
-> +	struct dma_chan		*dma_rx_chan;
-> +	struct dma_async_tx_descriptor  *dma_tx_desc;
-> +	struct dma_async_tx_descriptor  *dma_rx_desc;
-> +	dma_addr_t		dma_tx_buf_bus;
-> +	dma_addr_t		dma_rx_buf_bus;
-> +	dma_cookie_t		dma_tx_cookie;
-> +	dma_cookie_t		dma_rx_cookie;
-> +	unsigned char		*dma_tx_buf_virt;
-> +	unsigned char		*dma_rx_buf_virt;
-> +	unsigned int		dma_tx_bytes;
-> +	unsigned int		dma_rx_bytes;
-> +	int			dma_tx_in_progress;
-> +	int			dma_rx_in_progress;
-> +	unsigned int		dma_rx_timeout;
-> +	struct timer_list	lpuart_timer;
-> +#endif
->  };
-
-This part will result in a slight increase in data size even if
-dma support is turned off at compile time.
-
->  
->  	temp = readb(port->membase + UARTCR2);
->  	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
->  
-> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> +	if (sport->lpuart_dma_use) {
-> +		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
-> +			lpuart_prepare_tx(sport);
-> +	} else {
-> +		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
-> +			lpuart_transmit_buffer(sport);
-> +	}
-> +#else
->  	if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
->  		lpuart_transmit_buffer(sport);
-> +#endif
->  }
-
-So this can simply become
-
-+	if (IS_ENABLED(CONFIG_SERIAL_FSL_LPUART_DMA) && sport->lpuart_dma_use) {
-+		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
-+			lpuart_prepare_tx(sport);
-+	} else {
-+		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
-+			lpuart_trans	mit_buffer(sport);
-+	}
-
-and the compiler will silently drop the lpuart_prepare_tx() function and everything
-it calls that isn't used elsewhere.
-
-
-> +
-> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> +	struct platform_device *pdev = to_platform_device(port->dev);
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	if (of_get_property(np, "dmas", NULL)) {
-> +		sport->lpuart_dma_use = true;
-> +		lpuart_dma_tx_request(port);
-> +		lpuart_dma_rx_request(port);
-> +		temp = readb(port->membase + UARTCR5);
-> +		writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
-> +	} else
-> +		sport->lpuart_dma_use = false;	
-> +#endif
-
-Same here.
-
-> @@ -854,6 +1291,10 @@ static int __init lpuart_serial_init(void)
->  
->  	pr_info("serial: Freescale lpuart driver\n");
->  
-> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> +	pr_info("serial: Freescale lpuart dma support\n");
-> +#endif
-> +
-
-This message is not helpful in the long run, I'd rather see you drop the
-other one as well. Note that this function is called on *all* platforms
-when the driver is enabled, not just on those that actually have the uart.
-
-	Arnd
+Thanks,
+Ian.
