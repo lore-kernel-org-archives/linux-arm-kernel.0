@@ -1,56 +1,98 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 15 Jan 2014 16:09:01 +0100
-Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
-In-Reply-To: <20140109173505.GB8899@obsidianresearch.com>
-References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
- <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
- <20140108183418.GA12358@obsidianresearch.com> <52CDA032.3010804@overkiz.com>
- <20140108191339.GB12358@obsidianresearch.com> <52CE5F82.6070802@overkiz.com>
- <20140109173505.GB8899@obsidianresearch.com>
-Message-ID: <52D6A48D.4080302@overkiz.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 16:25:14 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a
+ gpio used as an interrupt source.
+In-Reply-To: <CACh+v5Oda3hDZ_nTMuWocnJfL_8OarZB9h+dnXnHzeEvva33AA@mail.gmail.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+ <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+ <20140115123338.GC9558@ns203013.ovh.net>
+ <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
+ <20140115132035.GE9558@ns203013.ovh.net>
+ <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
+ <20140115135617.GF9558@ns203013.ovh.net>
+ <CACh+v5Oda3hDZ_nTMuWocnJfL_8OarZB9h+dnXnHzeEvva33AA@mail.gmail.com>
+Message-ID: <20140115152514.GH9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+On 15:41 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> > On 14:44 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> >> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+> >> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> >> >> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
+> >> >> >> Hi Boris,
+> >> >> >>
+> >> >> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
+> >> >> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+> >> >> >> >>
+> >> >> >> >> Hello Nicolas, Jean-Christophe,
+> >> >> >> >>
+> >> >> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
+> >> >> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
+> >> >> >> >> to know the state of the pendown gpio and also needs it as an
+> >> >> >> >> interrupt source.
+> >> >> >> >>
+> >> >> >> >> The problem is that when a gpio is used as an interrupt, it's
+> >> >> >> >> requested by the pinctrl driver during the xlate stage, marking it
+> >> >> >> >> unavaliable for the other driver.
+> >> >> >> >> It looks like the at91 pinctrl driver is the only one to use
+> >> >> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
+> >> >> >> >
+> >> >> >> >
+> >> >> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
+> >> >> >> > related IRQ.
+> >> >> >> > Because what is done here, is to solve the case where only the irq
+> >> >> >> > is request, and in this specific case we need to request the pin as a
+> >> >> >> > GPIO.
+> >> >> >> >
+> >> >> >>
+> >> >> >> That's what I did first, and was about to submit the patch for the
+> >> >> >> touchscreen driver.
+> >> >> >> However it doesn't feel right. Being able to get the state of a gpio
+> >> >> >> that is also an interrupt seems very useful to me, not only for a
+> >> >> >> touchscreen controller.
+> >> >> >>
+> >> >> >> I understand why it's being done here. It's a matter of being sure
+> >> >> >> that the GPIO is an input and that it'll not be configured otherwise
+> >> >> >> latter.
+> >> >> >> But:
+> >> >> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
+> >> >> >
+> >> >> > because this the only to start to do it right
+> >> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
+> >> >> > use gpio_to_irq & co for irq.
+> >> >> How can you get the value of the gpio that is also an interrupt source then ?
+> >> >> Can you give a short example?
+> >> >
+> >> > you just have to check the irq source
+> >> >
+> >> > failing or raising
+> >> >
+> >> > but on 9261 impossible the gpio does not have such detail
+> >> >
+> >> > but anyway this is the invert you need to get the information from the IRQ no the way
+> >> > arround
+> >>
+> >> Should I modify the touchscreen driver to use irq_to_gpio() in this
+> >> case then ? or is this also not proper ?
+> >>
+> > no as said by arnd irq_to_gpio does not exsit
+> >
+> > that's why I said the irq need to provide you the information as it's a
+> > raising or failing irq
+> 
+> Even when this kind of information is available it's not enough to
+> know for sure the state of the gpio. Think of short pulses such as the
+> glitches you have when you press a button.
 
-On 09/01/2014 18:35, Jason Gunthorpe wrote:
-> On Thu, Jan 09, 2014 at 09:36:18AM +0100, boris brezillon wrote:
->
->>> You might want to check if you can boil down the DT timings from the
->>> huge list to just an ONFI mode number..
->> Sure, but the sunxi driver needs at least 19 of them...
-> So does mvebu's NAND driver..
->
-> What I ment was you could have a
->
->    onfi,nand-timing-mode = 0
->
-> in the DT. Each of the modes defines all ~19 parameters, higher modes
-> are faster.
->
-> Pick a mode value that fits all the parameters of the connected
-> non-ONFI flash.
->
-> This would be instead of defining each parameter
-> individually.. Provide some helpers to convert from a onfi mode number
-> to all the onfi defined timing parameters so that drivers can
-> configure the HW..
-
-Are you suggesting we should provide a function that converts these
-modes into a nand_timings struct, or just use the timing modes and
-let the NAND controller drivers configure its IP accordingly ?
-
-I found the ONFI timing tables in this document:
-
-www.*onfi*.org/~/media/*ONFI*/specs/*onfi*_3_1_spec.pdf? (chapter 4.16).
-
-I suppose my nand_timings struct should use the names described
-page 110-111 (at least if we decide to use nand_timings and not
-nand_timing_modes), right ?
+this why you have debounce in the gpio IP to solve this
 
 Best Regards,
-
-Boris
-
->
-> Jason
+J.
+> 
+> >
+> > Best Regards,
+> > J.
