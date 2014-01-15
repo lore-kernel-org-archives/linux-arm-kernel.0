@@ -1,40 +1,97 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Jan 2014 14:17:27 +0800
-Subject: [PATCH v2 1/2] spi: spi-imx: enable dma support for escpi
- controller
-In-Reply-To: <CAHrpEqT+9P_rRqaEd8O-FjR21=juF-NSTE8_umVJ83-6riO2_w@mail.gmail.com>
-References: <1388789632-12238-1-git-send-email-Frank.Li@freescale.com>
- <20140114060254.GB1914@S2101-09.ap.freescale.net>
- <CAHrpEqT+9P_rRqaEd8O-FjR21=juF-NSTE8_umVJ83-6riO2_w@mail.gmail.com>
-Message-ID: <20140115061725.GH1896@S2101-09.ap.freescale.net>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 15 Jan 2014 14:19:34 +0800
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse warning
+Message-ID: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 03:52:01PM -0600, Frank Li wrote:
-> >> @@ -778,6 +1158,56 @@ spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
-> >>       return 0;
-> >>  }
-> >>
-> >> +static int spi_imx_sdma_init(struct spi_imx_data *spi_imx)
-> >> +{
-> >> +     struct dma_slave_config slave_config = {};
-> >> +     struct device *dev = spi_imx->dev;
-> >> +     int ret;
-> >> +
-> >> +
-> >> +     /* Prepare for TX : */
-> >> +     spi_imx->dma_chan_tx = dma_request_slave_channel(dev, "tx");
-> >> +     if (!spi_imx->dma_chan_tx) {
-> >> +             dev_err(dev, "cannot get the TX DMA channel!\n");
-> >
-> > So we will see this error message for each type of imx spi device,
-> > though the driver only supports DMA for imx51-ecspi.
-> >
-> > Shawn
-> 
-> How to handle this one? change to devinfo? Or check check if imx51-ecspi?
+There should be no duplicate const specifiers for those static
+constant character string arrays defined for clock mux options.
+Also, the arrays are only taken as the 5th argument for the
+imx_clk_mux() function, which is in the type of 'const char
+**parents'.  So, let's remove the 2nd const specifier right
+after 'char'.
 
-I think we should check device type and only initialize DMA for
-imx51-ecspi type of devices.
+This patch fixes these sparse warnings:
+arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:22:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:23:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:24:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:25:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:26:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:27:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:28:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:29:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:30:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:31:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:32:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:33:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:34:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:35:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:36:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:37:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:38:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:39:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:40:25: warning: duplicate const
+arch/arm/mach-imx/clk-imx6sl.c:41:25: warning: duplicate const
 
-Shawn
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c |   42 ++++++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index c0c4ef5..9fad29a9 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -18,27 +18,27 @@
+ #include "clk.h"
+ #include "common.h"
+ 
+-static const char const *step_sels[]		= { "osc", "pll2_pfd2", };
+-static const char const *pll1_sw_sels[]		= { "pll1_sys", "step", };
+-static const char const *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
+-static const char const *ocram_sels[]		= { "periph", "ocram_alt_sels", };
+-static const char const *pre_periph_sels[]	= { "pll2_bus", "pll2_pfd2", "pll2_pfd0", "pll2_198m", };
+-static const char const *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
+-static const char const *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
+-static const char const *periph_sels[]		= { "pre_periph_sel", "periph_clk2_podf", };
+-static const char const *periph2_sels[]		= { "pre_periph2_sel", "periph2_clk2_podf", };
+-static const char const *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
+-static const char const *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
+-static const char const *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_post_div", "dummy", };
+-static const char const *perclk_sels[]		= { "ipg", "osc", };
+-static const char const *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
+-static const char const *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
+-static const char const *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
+-static const char const *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
+-static const char const *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd1", "pll3_pfd1", };
+-static const char const *audio_sels[]		= { "pll4_post_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
+-static const char const *ecspi_sels[]		= { "pll3_60m", "osc", };
+-static const char const *uart_sels[]		= { "pll3_80m", "osc", };
++static const char *step_sels[]		= { "osc", "pll2_pfd2", };
++static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
++static const char *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
++static const char *ocram_sels[]		= { "periph", "ocram_alt_sels", };
++static const char *pre_periph_sels[]	= { "pll2_bus", "pll2_pfd2", "pll2_pfd0", "pll2_198m", };
++static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
++static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
++static const char *periph_sels[]	= { "pre_periph_sel", "periph_clk2_podf", };
++static const char *periph2_sels[]	= { "pre_periph2_sel", "periph2_clk2_podf", };
++static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
++static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
++static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_post_div", "dummy", };
++static const char *perclk_sels[]	= { "ipg", "osc", };
++static const char *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
++static const char *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
++static const char *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
++static const char *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
++static const char *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd1", "pll3_pfd1", };
++static const char *audio_sels[]		= { "pll4_post_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
++static const char *ecspi_sels[]		= { "pll3_60m", "osc", };
++static const char *uart_sels[]		= { "pll3_80m", "osc", };
+ 
+ static struct clk_div_table clk_enet_ref_table[] = {
+ 	{ .val = 0, .div = 20, },
+-- 
+1.7.9.5
