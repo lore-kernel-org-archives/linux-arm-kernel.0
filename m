@@ -1,94 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jan 2014 12:09:46 +0000
-Subject: [PATCH v7 3/4] PHY: add APM X-Gene SoC 15Gbps Multi-purpose
- PHY driver
-In-Reply-To: <1389769840-15469-4-git-send-email-lho@apm.com>
-References: <1389769840-15469-1-git-send-email-lho@apm.com>
- <1389769840-15469-2-git-send-email-lho@apm.com>
- <1389769840-15469-3-git-send-email-lho@apm.com>
- <1389769840-15469-4-git-send-email-lho@apm.com>
-Message-ID: <20140115120946.GD25824@e106331-lin.cambridge.arm.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 15 Jan 2014 20:10:03 +0800
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
+References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
+ <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
+Message-ID: <52D67A9B.4090607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 07:10:39AM +0000, Loc Ho wrote:
-
-[...]
-
-> + * The APM X-Gene PHY consists of two PLL clock macro's (CMU) and lanes.
-> + * The first PLL clock macro is used for internal reference clock. The second
-> + * PLL clock macro is used to generate the clock for the PHY. This driver
-> + * configures the first PLL CMU, the second PLL CMU, and programs the PHY to
-> + * operate according to the mode of operation. The first PLL CMU is only
-> + * required if internal clock is enabled.
-> + *
-> + * Logical Layer Out Of HW module units:
-> + *
-> + * -----------------
-> + * | Internal      |    |------|
-> + * | Ref PLL CMU   |----|      |     -------------    ---------
-> + * ------------ ----    | MUX  |-----|PHY PLL CMU|----| Serdes|
-> + *                      |      |     |           |    ---------
-> + * External Clock ------|      |     -------------
-> + *                      |------|
-> + *
-> + * The Ref PLL CMU CSR (Configureation System Registers) is accessed
-> + * indirectly from the SDS offset at 0x2000. It is only required for
-> + * internal reference clock.
-> + * The PHY PLL CMU CSR is accessed indirectly from the SDS offset at 0x0000.
-> + * The Serdes CSR is accessed indirectly from the SDS offset at 0x0400.
-> + *
-> + * The Ref PLL CMU can be located within the same PHY IP or outside the PHY IP
-> + * due to shared Ref PLL CMU. For PHY with Ref PLL CMU shared with another IP,
-> + * it is located outside the PHY IP. This is the case for the PHY located
-> + * at 0x1f23a000 (SATA Port 4/5). For such PHY, another resource is required
-> + * to located the SDS/Ref PLL CMU module and its clock for that IP enabled.
-> + *
-> + * Currently, this driver only supports SATA mode with external clock.
-> + */
-
-Having looked at this and the binding, I'm confused as to why we need an
-additional reg entry when we're using the external clock.
-
-Surely the second resource (the external CMU base) is a property of the
-shared ref PLL clock, rather than the PHY itself. How do you handle two
-units trying to use the shared PLL?
-
-I think makes sense to model the ref PLL CMU as a separate clock, and
-use clock-names to differentiate between the two inputs to the mux:
-
-external: external_clock {
-        compatible = "fixed-clock";
-        clock-frequency = < ... >;
-	#clock-cells = <0>;
-};
-
-ref_pll: reference_clock {
-        compatible = "apm,xgene-ref-pll";
-        reg = < .... >;
-        #clock-cells = <0>;
-};
-
-phy {
-        compatible = "apm,xgene-phy";
-        reg = < ... >;
-        clocks = <&ref_pll>, <&external>;
-        clock-names = "ref-pll", "external";
-	...
-};
 
 
-That also means the phy only needs a single compatible string -- you can
-figure out what to do by probing the set of clocks.
+On 01/15/2014 07:58 PM, Seungwon Jeon wrote:
+> On Wed, January 15, 2014, Zhangfei Gao wrote:
+>> Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+>> CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+>> can not be checked by IS_ERR_VALUE.
+>> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+>> otherwise sd detect may occasionally fail.
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Reported-by: Kevin Hilman <khilman@linaro.org>
+>> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>   drivers/mmc/host/dw_mmc.c |    9 ++++++---
+>>   1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index a776f24f4311..9ded62c8225e 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+>>   	int present;
+>>   	struct dw_mci_slot *slot = mmc_priv(mmc);
+>>   	struct dw_mci_board *brd = slot->host->pdata;
+>> -	int gpio_cd = !mmc_gpio_get_cd(mmc);
+>> +	struct dw_mci *host = slot->host;
+>> +	int gpio_cd = mmc_gpio_get_cd(mmc);
+>>
+>>   	/* Use platform get_cd function, else try onboard card detect */
+>>   	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+>> @@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+>>   	else if (brd->get_cd)
+>>   		present = !brd->get_cd(slot->id);
+>>   	else if (!IS_ERR_VALUE(gpio_cd))
+>> -		present = !!gpio_cd;
+>> +		present = !gpio_cd;
+> !!gpio_cd or gpio_cd is correct, isn't it?
+>
 
-Does that make sense? Is there something I'm missing?
+No, mmc_gpio_get_cd(mmc) has to revert.
+!!gpio_cd is used before since gpio_cd = !mmc_gpio_get_cd(mmc) is used
+before.
 
-[...]
-
-> +       /* Retrieve optional clock */
-> +       ctx->clk = clk_get(&pdev->dev, NULL);
-
-There's no clocks proeprty in the binding. Please add one.
-
-Cheers,
-Mark.
+Thanks
