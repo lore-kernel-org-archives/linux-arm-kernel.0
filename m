@@ -1,42 +1,96 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 15 Jan 2014 14:02:09 +0800
-Subject: [PATCH v2] clk: sirf: re-arch to make the codes support both
- prima2 and atlas6
-In-Reply-To: <20140115053706.4167.23616@quantum>
-References: <1388986699-6470-1-git-send-email-21cnbao@gmail.com>
- <20140115053706.4167.23616@quantum>
-Message-ID: <CAGsJ_4x4L2rerQ18w=C7VUQmF8hR3qXrzbsmxAK5kUkoXR06YA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jan 2014 14:12:14 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add LVDS support
+In-Reply-To: <1389739887-21272-1-git-send-email-festevam@gmail.com>
+References: <1389739887-21272-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140115061212.GG1896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/15 Mike Turquette <mturquette@linaro.org>:
-> Quoting Barry Song (2014-01-05 21:38:19)
->> diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
->> new file mode 100644
->> index 0000000..21e776a
->> --- /dev/null
->> +++ b/drivers/clk/sirf/clk-atlas6.c
->> @@ -0,0 +1,153 @@
->> +/*
->> + * Clock tree for CSR SiRFatlasVI
->> + *
->> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
->> + *
->> + * Licensed under GPLv2 or later.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/bitops.h>
->> +#include <linux/io.h>
->> +#include <linux/clk.h>
->> +#include <linux/clk-private.h>
->
-> Please do not use clk-private.h. It is slated for removal (some day...).
-> Do you actually need it?
+On Tue, Jan 14, 2014 at 08:51:27PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Add LVDS support for mx6 sabreauto boards.
 
-removed in v3.
->
-> Regards,
-> Mike
+I would stall imx-drm device addition for a while, as the ongoing
+componentised imx-drm transition will require some incompatible changes.
 
--barry
+Shawn
+
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 43 ++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 088b0d2..47c5a3f 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -22,6 +22,14 @@
+>  		spdif-controller = <&spdif>;
+>  		spdif-in;
+>  	};
+> +
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm3 0 5000000>;
+> +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> +		default-brightness-level = <7>;
+> +		status = "okay";
+> +	};
+>  };
+>  
+>  &ecspi1 {
+> @@ -86,6 +94,10 @@
+>  			fsl,pins = <MX6QDL_GPMI_NAND_PINGRP1>;
+>  		};
+>  
+> +		pinctrl_pwm3: pwm1grp {
+> +			fsl,pins = <MX6QDL_PWM3_PINGRP1>;
+> +		};
+> +
+>  		pinctrl_spdif: spdifgrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
+> @@ -118,6 +130,37 @@
+>  	};
+>  };
+>  
+> +&ldb {
+> +	status = "okay";
+> +
+> +	lvds-channel at 0 {
+> +		fsl,data-mapping = "spwg";
+> +		fsl,data-width = <18>;
+> +		status = "okay";
+> +
+> +		display-timings {
+> +			native-mode = <&timing0>;
+> +			timing0: hsd100pxn1 {
+> +				clock-frequency = <65000000>;
+> +				hactive = <1024>;
+> +				vactive = <768>;
+> +				hback-porch = <220>;
+> +				hfront-porch = <40>;
+> +				vback-porch = <21>;
+> +				vfront-porch = <7>;
+> +				hsync-len = <60>;
+> +				vsync-len = <10>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "okay";
+> +};
+> +
+>  &spdif {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_spdif>;
+> -- 
+> 1.8.1.2
+> 
