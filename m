@@ -1,132 +1,81 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 15 Jan 2014 14:44:24 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <20140115132035.GE9558@ns203013.ovh.net>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com>
- <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
- <20140115123338.GC9558@ns203013.ovh.net>
- <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
- <20140115132035.GE9558@ns203013.ovh.net>
-Message-ID: <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 13:46:53 +0000
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <20140115124041.GD9558@ns203013.ovh.net>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+ <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
+ <20140115124041.GD9558@ns203013.ovh.net>
+Message-ID: <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
->> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
->> >> Hi Boris,
->> >>
->> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
->> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
->> >> >>
->> >> >> Hello Nicolas, Jean-Christophe,
->> >> >>
->> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
->> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
->> >> >> to know the state of the pendown gpio and also needs it as an
->> >> >> interrupt source.
->> >> >>
->> >> >> The problem is that when a gpio is used as an interrupt, it's
->> >> >> requested by the pinctrl driver during the xlate stage, marking it
->> >> >> unavaliable for the other driver.
->> >> >> It looks like the at91 pinctrl driver is the only one to use
->> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
->> >> >
->> >> >
->> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
->> >> > related IRQ.
->> >> > Because what is done here, is to solve the case where only the irq
->> >> > is request, and in this specific case we need to request the pin as a
->> >> > GPIO.
->> >> >
->> >>
->> >> That's what I did first, and was about to submit the patch for the
->> >> touchscreen driver.
->> >> However it doesn't feel right. Being able to get the state of a gpio
->> >> that is also an interrupt seems very useful to me, not only for a
->> >> touchscreen controller.
->> >>
->> >> I understand why it's being done here. It's a matter of being sure
->> >> that the GPIO is an input and that it'll not be configured otherwise
->> >> latter.
->> >> But:
->> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
->> >
->> > because this the only to start to do it right
->> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
->> > use gpio_to_irq & co for irq.
->> How can you get the value of the gpio that is also an interrupt source then ?
->> Can you give a short example?
->
-> you just have to check the irq source
->
-> failing or raising
->
-> but on 9261 impossible the gpio does not have such detail
->
-> but anyway this is the invert you need to get the information from the IRQ no the way
-> arround
+On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:17 Wed 15 Jan     , Mark Rutland wrote:
+> > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > The new interrupts-extended property, which reuses the phandle+arguments
+> > > pattern used by GPIOs and other core bindings, still have some issue.
+> > > 
+> > > If an SoC have already specifiy interrupt and a board want to add specific
+> > > interrupt such as GPIO (which can be optionnal) be need to re-define
+> > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
+> > > property.
+> > > 
+> > 
+> > NAK.
+> > 
+> > This is a hack that works around a dts organisation issue. This is _not_
+> > a binding or parsing issue.
+> 
+> So the DT is stupid. Yes w have board and SoC information
+> so we do not want to duplicate them. Having a way to descript SoC vs board
+> specific information need to be provided.
 
-Should I modify the touchscreen driver to use irq_to_gpio() in this
-case then ? or is this also not proper ?
+I agree that the current situation isn't fantastic. That doesn't make
+the DT stupid. There are other solutions to this problem.
 
->
-> so the gpio driver may need to be updated to provide such information to the
-> touch driver
->
-> Best Regards,
-> J.
->>
->> >
->> > I even send a proposition to do this work across the kernel t the CE-Linux for
->> > funding
->> >> 2) I believe that configuration of the direction can be done by
->> >> describing the GPIO in the DT. (pinctrl-at91.c line 592).
->> > No pinctrl is for pinmux ONLY not gpio direction & co
->> >
->> > Best Regards,
->> > J.
->> >
->> >> 3) If all the GPIOs are described in the DT with a proper pinmux
->> >> description, i believe the exclusion is also handled. It's probably
->> >> not the case today though.
->> >
->> >>
->> >> >
->> >> > Best Regards,
->> >> >
->> >> > Boris
->> >> >
->> >> >>
->> >> >> diff --git a/drivers/pinctrl/pinctrl-at91.c
->> >> >> b/drivers/pinctrl/pinctrl-at91.c
->> >> >> index a7549c4..cf91a35 100644
->> >> >> --- a/drivers/pinctrl/pinctrl-at91.c
->> >> >> +++ b/drivers/pinctrl/pinctrl-at91.c
->> >> >> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
->> >> >> irq_domain *d,
->> >> >>          *out_hwirq = intspec[0];
->> >> >>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
->> >> >>
->> >> >> -       ret = gpio_request(pin, ctrlr->full_name);
->> >> >> -       if (ret)
->> >> >> -               return ret;
->> >> >> -
->> >> >> -       ret = gpio_direction_input(pin);
->> >> >> -       if (ret)
->> >> >> -               return ret;
->> >> >> -
->> >> >>          return 0;
->> >> >>   }
->> >> >>
->> >> >> Jean-Jacques
->> >> >
->> >> >
->> >>
->> >> _______________________________________________
->> >> linux-arm-kernel mailing list
->> >> linux-arm-kernel at lists.infradead.org
->> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> > 
+> > Properties can be overridden - just describe all of the interrupts in
+> > the final dts file.
+> this is wrong, which mean you duplicate informaation and duplicate bug and
+> fixes
+
+It's certainly not nice, but it doesn't make it wrong.
+
+The same problem can be found with any other list property that varies
+per-board. Hacking the parsing of each property is not a solution.
+
+Today the only way to implement what you want is to have the list in the
+final file.
+
+One way of working with that would be to have the common interrupts
+described in a shared macro in the soc file:
+
+#define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
+
+Then the soc file can have:
+
+	interrupts = SOC_COMMON_INTERRUPTS;
+
+And the board can have:
+
+	interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
+
+That gains functionality equivalent to your proposal, without
+introducing new code or new edge cases in interrupt parsing. However, it
+does make it unclear how many interrupts are described, and it won't
+interact well with interrupt-names.
+
+Another, more invasive option would be extend the dts syntax and teach
+dtc to handle property appending. Then the soc dts could stay as it is,
+and the board dts could have something like:
+
+	/append-property/ interrupts = <&intc1 6 1>;
+	/append-property/ interrupt-names = "board-specific-irq";
+
+Both these options solve the issue at the source, are general to other
+properties, and allow more than one level of hierarchy (the proposed
+interrupts-extended-2 only allows one level).
+
+Thanks,
+Mark.
