@@ -1,60 +1,139 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Wed, 15 Jan 2014 14:01:47 +0000
-Subject: [PATCH 04/04] ARM: shmobile: r8a7790 CCI configuration
-In-Reply-To: <20140115122622.9437.27236.sendpatchset@w520>
-References: <20140115122539.9437.63968.sendpatchset@w520>
- <20140115122622.9437.27236.sendpatchset@w520>
-Message-ID: <52D694CB.5020807@arm.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Wed, 15 Jan 2014 14:07:13 +0000
+Subject: [PATCH 2/2] arm64: mm: Introduce PTE_WRITE
+In-Reply-To: <1389794833-7505-1-git-send-email-steve.capper@arm.com>
+References: <1389794833-7505-1-git-send-email-steve.capper@arm.com>
+Message-ID: <1389794833-7505-3-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We have the following means for encoding writable or dirty ptes:
 
-On 15/01/14 12:26, Magnus Damm wrote:
-> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> 
-> Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
-> 
-> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  arch/arm/mach-shmobile/smp-r8a7790.c |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> --- 0005/arch/arm/mach-shmobile/smp-r8a7790.c
-> +++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2014-01-15 15:40:56.000000000 +0900
-> @@ -28,6 +28,11 @@
->  #define CA15RESCNT	0x0040
->  #define CA7RESCNT	0x0044
->  #define MERAM		0xe8080000
-> +#define CCI_BASE	0xf0090000
-> +#define CCI_SLAVE3	0x4000
-> +#define CCI_SLAVE4	0x5000
-> +#define CCI_SNOOP	0x0000
-> +#define CCI_STATUS	0x000c
->  
->  static struct rcar_sysc_ch r8a7790_ca15_scu = {
->  	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
-> @@ -71,6 +76,16 @@ static void __init r8a7790_smp_prepare_c
->  	r8a7790_pm_init();
->  	rcar_sysc_power_up(&r8a7790_ca15_scu);
->  	rcar_sysc_power_up(&r8a7790_ca7_scu);
-> +
-> +	/* enable snoop and DVM */
-> +	p = ioremap_nocache(CCI_BASE, 0x8000);
-> +	writel_relaxed(readl_relaxed(p + CCI_SLAVE3 + CCI_SNOOP) | 0x3,
-> +		p + CCI_SLAVE3 + CCI_SNOOP);    /* ca15 */
-> +	writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
-> +		p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
-> +	while (__raw_readl(p + CCI_STATUS));
-> +	/* wait for pending bit low */
-> +	iounmap(p);
->  }
+                                PTE_DIRTY       PTE_RDONLY
+!pte_dirty && !pte_write        0               1
+!pte_dirty && pte_write         0               1
+pte_dirty && !pte_write         1               1
+pte_dirty && pte_write          1               0
 
-I have mentioned this before, please use drivers/bus/arm-cci.c
-That already does the job you need here and you need to use CCI DT bindings
-for base address.
+So we can't distinguish between writable clean ptes and read only
+ptes. This can cause problems with ptes being incorrectly flagged as
+read only when they are writable but not dirty.
 
-Regards,
-Sudeep
+This patch introduces a new software bit PTE_WRITE which allows us to
+correctly identify writable ptes. PTE_RDONLY is now only clear for
+valid ptes where a page is both writable and dirty.
+
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/pgtable.h | 48 +++++++++++++++++++++-------------------
+ 1 file changed, 25 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 27c7839..b524dcd 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -28,7 +28,7 @@
+ #define PTE_FILE		(_AT(pteval_t, 1) << 2)	/* only when !pte_present() */
+ #define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
+ #define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
+-				/* bit 57 for PMD_SECT_SPLITTING */
++#define PTE_WRITE		(_AT(pteval_t, 1) << 57)
+ #define PTE_PROT_NONE		(_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
+ 
+ /*
+@@ -67,15 +67,15 @@ extern pgprot_t pgprot_default;
+ 
+ #define _MOD_PROT(p, b)		__pgprot_modify(p, 0, b)
+ 
+-#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
+-#define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
+-#define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+-#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_RDONLY)
+-#define PAGE_READONLY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+-#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_RDONLY)
+-#define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+-#define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
++#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE | PTE_PXN | PTE_UXN)
++#define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
++#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
++#define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
++#define PAGE_READONLY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
++#define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
++#define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ 
+ #define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+@@ -83,13 +83,13 @@ extern pgprot_t pgprot_default;
+ #define PAGE_S2			__pgprot_modify(pgprot_default, PTE_S2_MEMATTR_MASK, PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+ #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDWR | PTE_UXN)
+ 
+-#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
+-#define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+-#define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+-#define __PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_RDONLY)
+-#define __PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+-#define __PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_RDONLY)
++#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
++#define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
++#define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
++#define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define __PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
++#define __PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define __PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+ 
+ #endif /* __ASSEMBLY__ */
+ 
+@@ -140,7 +140,7 @@ extern struct page *empty_zero_page;
+ #define pte_dirty(pte)		(pte_val(pte) & PTE_DIRTY)
+ #define pte_young(pte)		(pte_val(pte) & PTE_AF)
+ #define pte_special(pte)	(pte_val(pte) & PTE_SPECIAL)
+-#define pte_write(pte)		(!(pte_val(pte) & PTE_RDONLY))
++#define pte_write(pte)		(pte_val(pte) & PTE_WRITE)
+ #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
+ 
+ #define pte_valid_user(pte) \
+@@ -148,13 +148,13 @@ extern struct page *empty_zero_page;
+ 
+ static inline pte_t pte_wrprotect(pte_t pte)
+ {
+-	pte_val(pte) |= PTE_RDONLY;
++	pte_val(pte) &= ~PTE_WRITE;
+ 	return pte;
+ }
+ 
+ static inline pte_t pte_mkwrite(pte_t pte)
+ {
+-	pte_val(pte) &= ~PTE_RDONLY;
++	pte_val(pte) |= PTE_WRITE;
+ 	return pte;
+ }
+ 
+@@ -201,8 +201,10 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	if (pte_valid_user(pte)) {
+ 		if (pte_exec(pte))
+ 			__sync_icache_dcache(pte, addr);
+-		if (!pte_dirty(pte))
+-			pte = pte_wrprotect(pte);
++		if (pte_dirty(pte) && pte_write(pte))
++			pte_val(pte) &= ~PTE_RDONLY;
++		else
++			pte_val(pte) |= PTE_RDONLY;
+ 	}
+ 
+ 	set_pte(ptep, pte);
+@@ -376,7 +378,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+ {
+ 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
+-			      PTE_PROT_NONE | PTE_VALID;
++			      PTE_PROT_NONE | PTE_VALID | PTE_WRITE;
+ 	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
+ 	return pte;
+ }
+-- 
+1.8.1.4
