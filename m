@@ -1,62 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 15 Jan 2014 10:15:57 +0100
-Subject: v3.12 regression from "ARM: kirkwood: convert to DT irqchip and
- clocksource" on non-DT kirkwood platforms
-In-Reply-To: <1389775235.10695.51.camel@dagon.hellion.org.uk>
-References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
-Message-ID: <52D651CD.5020307@gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 15 Jan 2014 14:41:01 +0530
+Subject: [PATCH] ARM: S3C[24|64]xx: move includes back under <mach/> scope
+In-Reply-To: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
+References: <1389707618-17011-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAHbNUh29qGSt-isqOAdVVO3x0w2mDTVnKeH+Sc_rkfkOiXc_mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/14 09:40, Ian Campbell wrote:
-> Debian kernel's have been suffering a hang on boot on kirkwood platforms
-> since 3.12, http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=735172.
+On 14 January 2014 19:23, Linus Walleij <linus.walleij@linaro.org> wrote:
+> When refactoring and breaking out the includes for the
+> machine-specific GPIO configuration, two files were created
+> in <linux/platform_data/gpio-samsung-s3c[24|64]xx.h>, but as
+> that namespace shall be used for defining data exchanged
+> between machines and drivers, using it for these broad macros
+> and config settings is wrong.
 >
-> The issue has been seen on various QNAP TS platforms, mine is a TS-419
-> but TS-119 and TS-212's have also been seen to fail. In all cases this
-> is using the legacy board file based support not the DT support (which
-> is only for TS-219 so far in any case AFAIK, I am not using Andrew
-> Lunn's DT patches for TS-41x).
-
-Ian,
-
-thanks for the detailed report below. I quickly checked your .config and
-saw you have CONFIG_ARCH_KIRKWOOD_DT=y although I understand you are not
-booting DT here.
-
-There may be some interference with both non-DT/DT compiled in, I'll
-check that later.
-
-> The bootlogs are below or in the bug. It stops after "Console: colour
-> dummy device 80x30", I think next would normally be the
-> BogoMIPS/calibrate_delay output.
-
-That would indicate the timer (clocksource) or irq (irqchip) is not
-running correctly. Again, that could be non-DT and DT fighting for it.
-I'll investigate that.
-
-In the meantime, can you recompile your kernel and set
-CONFIG_ARCH_KIRKWOOD_DT=n ?
-
-Sebastian
-
-> I bisected it down to:
->          commit 2326f04321a9aec591c1d159b3a9d12c2bf89438
->          Author: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->          Date:   Tue Jul 2 15:15:07 2013 +0200
+> Move the headers back into the machine-local
+> <mach/gpio-samsung.h> file and think about the next step.
 >
->              ARM: kirkwood: convert to DT irqchip and clocksource
+
+<snip>
+
+> diff --git a/arch/arm/plat-samsung/pm-gpio.c b/arch/arm/plat-samsung/pm-gpio.c
+> index c4efa1c2a5d1..a9f7a37c4173 100644
+> --- a/arch/arm/plat-samsung/pm-gpio.c
+> +++ b/arch/arm/plat-samsung/pm-gpio.c
+> @@ -19,12 +19,7 @@
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
 >
->              With recent support for true irqchip and clocksource drivers for Orion
->              SoCs, now make use of it on DT enabled Kirkwood boards.
->
->              This also introduces a new Kconfig option for legacy (non-DT) Kirkwood
->              where old code is moved out to and polishes DT board file a little bit.
->
->              Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->              Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->
-> and reverting this on top of v3.12 allows the platform to boot
-> successfully. I've also reproduced with v3.13-rc8 and the revert was not
-> so trivial there, but I think I've done it right and it corrects the
-> problem.
+> -#ifdef CONFIG_ARCH_S3C24XX
+> -#include <linux/platform_data/gpio-samsung-s3c24xx.h>
+> -#endif
+> -#ifdef CONFIG_ARCH_S3C64XX
+> -#include <linux/platform_data/gpio-samsung-s3c64xx.h>
+> -#endif
+> +#include <mach/gpio-samsung.h>
+
+This inclusion should be protected by a check for CONFIG_ARCH_S3C24XX
+|| CONFIG_ARCH_S3C64XX. Currently generating build errors for
+s5p64x0_defconfig, s5pc100_defconfig and s5pv210_defconfig on
+next-20140115.
+
+-- 
+Tushar Behera
