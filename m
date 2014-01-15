@@ -1,43 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Jan 2014 11:25:17 +0000
-Subject: [RFC 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140115105347.GM15937@n2100.arm.linux.org.uk>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
- <1389765322-28582-3-git-send-email-lauraa@codeaurora.org>
- <20140115094957.GL15937@n2100.arm.linux.org.uk>
- <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
- <20140115105347.GM15937@n2100.arm.linux.org.uk>
-Message-ID: <20140115112516.GA17371@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jan 2014 19:27:54 +0800
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
+ warning
+In-Reply-To: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140115112753.GJ1896@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 10:53:47AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 15, 2014 at 10:22:02AM +0000, Catalin Marinas wrote:
-> > On 15 January 2014 09:49, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Tue, Jan 14, 2014 at 09:55:22PM -0800, Laura Abbott wrote:
-> > >> memblock is now fully integrated into the kernel and is the prefered
-> > >> method for tracking memory. Rather than reinvent the wheel with
-> > >> meminfo, migrate to using memblock directly instead of meminfo as
-> > >> an intermediate.
-> > >
-> > > The reason I never killed meminfo was that for some of the functions here
-> > > is that meminfo has a slightly different property to memblock.
-> > >
-> > > With meminfo, each sparsemem section mapping or discontigmem node must be
-> > > specified as a separate bank of memory, even if it is contiguous with the
-> > > previous block.  This is so that the functions which walk the page arrays
-> > > can do so efficiently (without having to convert from a PFN to a struct
-> > > page for every page in the system, which is very inefficient.)
-> > 
-> > pfn_to_page() conversion is indeed expensive with sparsemem (on
-> > 32-bit) but does meminfo actually add a noticeable improvement to the
-> > boot time? I don't think so but it's worth testing (something a
-> > thousand cycles maximum would be lost in the noise).
+On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
+> There should be no duplicate const specifiers for those static
+> constant character string arrays defined for clock mux options.
+> Also, the arrays are only taken as the 5th argument for the
+> imx_clk_mux() function, which is in the type of 'const char
+> **parents'.  So, let's remove the 2nd const specifier right
+> after 'char'.
 > 
-> Why do you ask about boot time?
+> This patch fixes these sparse warnings:
+> arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:22:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:23:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:24:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:25:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:26:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:27:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:28:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:29:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:30:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:31:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:32:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:33:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:34:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:35:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:36:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:37:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:38:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:39:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:40:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:41:25: warning: duplicate const
+> 
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 
-Is meminfo used on a critical path at run-time?
-
--- 
-Catalin
+Applied both, thanks.
