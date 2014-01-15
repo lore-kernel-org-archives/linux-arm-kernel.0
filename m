@@ -1,73 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jan 2014 10:33:37 +0000
-Subject: [PATCH 2/7] ARM: perf_event: Support percpu irqs for the CPU PMU
-In-Reply-To: <52D5A4D1.9030403@codeaurora.org>
-References: <1389221984-10973-1-git-send-email-sboyd@codeaurora.org>
- <1389221984-10973-3-git-send-email-sboyd@codeaurora.org>
- <20140109104943.GB17838@mudshark.cambridge.arm.com>
- <52CEF5C9.1010701@codeaurora.org>
- <20140110105813.GB10455@mudshark.cambridge.arm.com>
- <20140110193657.GG14405@codeaurora.org>
- <20140113115213.GE1189@mudshark.cambridge.arm.com>
- <52D5A4D1.9030403@codeaurora.org>
-Message-ID: <20140115103337.GB15422@mudshark.cambridge.arm.com>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Wed, 15 Jan 2014 11:49:23 +0100
+Subject: imx6dl/imx6q fec rmii mode with external ref_clk
+In-Reply-To: <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
+References: <20140114153012.GA22550@frolo.macqel>
+ <20140115073536.GD1914@S2101-09.ap.freescale.net>
+ <20140115094551.GA26117@frolo.macqel>
+ <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
+Message-ID: <20140115104923.GA1239@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, Jan 15, 2014 at 08:13:15AM -0200, Fabio Estevam wrote:
+> On Wed, Jan 15, 2014 at 7:45 AM, Philippe De Muyter <phdm@macq.eu> wrote:
+> 
+> > Here are my patches (I have called my board imx6dl-p6-2094):
+> > Do I need to replace the hex value after MX6QDL_PAD_GPIO_16__ENET_REF_CLK
+> > by something else ?
+> 
+> hummingboard uses:
+> 
+> MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0xc0000000
 
-On Tue, Jan 14, 2014 at 08:57:53PM +0000, Stephen Boyd wrote:
-> On 01/13/14 03:52, Will Deacon wrote:
-> > I also don't think that's the right solution, based on the above. It's
-> > actually pretty hard to work out what's the right thing to do here...
-> 
-> Yes it doesn't seem like the right solution.
-> 
-> >
-> > We *could* have a per-cpu pointer to the cpu_pmu_pointer, but then we'd
-> > need to update the IRQ handlers, including things like the CCI PMU which
-> > really doesn't care about per-cpu stuff. So after all this, the shim we have
-> > around the IRQ handler for the U8500 SPI workarounds might be the right
-> > thing after all -- it allows us to consolidate the conversion of a pcpu
-> > pointer into the relevant instance (actually any instance, since they'd all
-> > point at the same thing) for the current CPU.
-> >
-> > What do you think to having that shim throw away the second level pcpu
-> > pointer in the case of a PPI? (probably means we need to revisit that
-> > renaming again).
-> 
-> Ok I think I understand what you're getting at. We pass a per-cpu
-> pointer to the cpu_pmu pointer as the dev_id argument to the PPI irq
-> handler, and then we check to see if the irq is per-cpu inside the
-> armpmu_dispatch_irq() function and throw away the second level of
-> pointer, i.e.
-> 
-> static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
-> {
->         struct arm_pmu *armpmu;
->         struct platform_device *plat_device;
->         struct arm_pmu_platdata *plat;
-> 
->         if (irq_is_percpu(irq))
->                 dev = *(struct arm_pmu_cpu **)dev;
->         armpmu = dev;
->         plat_device = armpmu->plat_device;
->         plat = dev_get_platdata(&plat_device->dev);
-> 
->         if (plat && plat->handle_irq)
->                 return plat->handle_irq(irq, dev, armpmu->handle_irq);
->         else
->                 return armpmu->handle_irq(irq, dev);
-> }
+I quickly tried that, but that does not solve my problem (still tx timeout)
 
-Yup, that's what I was trying to explain (badly). Thanks.
+> 
+> Check arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi in linux-next.
 
-> We still need to make a per-cpu variable to hold the pointer, and assign
-> it during cpu_pmu_init like this patch does. Hopefully that is ok.
+I will look there now.
 
-I think that's ok. The percpu code in genirq requires a pcpu token (for good
-reason) and the irq handler needs to get at the pmu structure. The
-alternative is adding pointers from something like the pmu_hw_events to the
-arm_pmu, but I think that's more ugly.
+Thanks
 
-Will
+Philippe
+
+-- 
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
