@@ -1,104 +1,185 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jan 2014 13:33:38 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a
- gpio used as an interrupt source.
-In-Reply-To: <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com>
- <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
-Message-ID: <20140115123338.GC9558@ns203013.ovh.net>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 15 Jan 2014 06:36:52 -0600
+Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the "altr,
+ socfpga-gate-clk"
+In-Reply-To: <52CF6D67.1000803@samsung.com>
+References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
+ <1389303079-19808-2-git-send-email-dinguyen@altera.com>
+ <52CF6D67.1000803@samsung.com>
+Message-ID: <52D680E4.6090608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
-> Hi Boris,
-> 
-> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
-> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
-> >>
-> >> Hello Nicolas, Jean-Christophe,
-> >>
-> >> As I was trying to enable the touchscreen on the at91sam9261ek with
-> >> device-tree support, I ran into an issue. The touchscreen driver needs
-> >> to know the state of the pendown gpio and also needs it as an
-> >> interrupt source.
-> >>
-> >> The problem is that when a gpio is used as an interrupt, it's
-> >> requested by the pinctrl driver during the xlate stage, marking it
-> >> unavaliable for the other driver.
-> >> It looks like the at91 pinctrl driver is the only one to use
-> >> gpio_request() in the xlate stage. Maybe we should remove this:
-> >
-> >
-> > You should only request it as a GPIO and then use gpio_to_irq to get the
-> > related IRQ.
-> > Because what is done here, is to solve the case where only the irq
-> > is request, and in this specific case we need to request the pin as a
-> > GPIO.
-> >
-> 
-> That's what I did first, and was about to submit the patch for the
-> touchscreen driver.
-> However it doesn't feel right. Being able to get the state of a gpio
-> that is also an interrupt seems very useful to me, not only for a
-> touchscreen controller.
-> 
-> I understand why it's being done here. It's a matter of being sure
-> that the GPIO is an input and that it'll not be configured otherwise
-> latter.
-> But:
-> 1) I'm wondering why the atmel pinctrl is the only one to do that.
+Hi Mike,
 
-because this the only to start to do it right
-I had a very long discussion woth LinusW and Grant the Gpio need to stop to
-use gpio_to_irq & co for irq.
+On 1/9/14 9:47 PM, Jaehoon Chung wrote:
+> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>
+> On 01/10/2014 06:31 AM, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> The clk-phase property is used to represent the 2 clock phase values that is
+>> needed for the SD/MMC driver. Add a prepare function to the clk_ops, that will
+>> use the syscon driver to set sdmmc_clk's phase shift that is located in the
+>> system manager.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>> Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>> v9: none
+>> v8: Use degrees in the clk-phase binding property
+>> v7: Add dts property to represent the clk phase of the sdmmc_clk. Add a
+>>     prepare function to the gate clk that will toggle clock phase setting.
+>>     Remove the "altr,socfpga-sdmmc-sdr-clk" clock type.
+>> v6: Add a new clock type "altr,socfpga-sdmmc-sdr-clk" that will be used to
+>>     set the phase shift settings.
+>> v5: Use the "snps,dw-mshc" binding
+>> v4: Use the sdmmc_clk prepare function to set the phase shift settings
+>> v3: Not use the syscon driver because as of 3.13-rc1, the syscon driver is
+>>     loaded after the clock driver.
+>> v2: Use the syscon driver
+>> ---
+>>  .../devicetree/bindings/clock/altr_socfpga.txt     |    5 ++
+>>  arch/arm/boot/dts/socfpga.dtsi                     |    1 +
+>>  drivers/clk/socfpga/clk-gate.c                     |   68 ++++++++++++++++++++
+>>  3 files changed, 74 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+>> index 0045433..5dfd145 100644
+>> --- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+>> +++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+>> @@ -23,3 +23,8 @@ Optional properties:
+>>          and the bit index.
+>>  - div-reg : For "socfpga-gate-clk", div-reg contains the divider register, bit shift,
+>>          and width.
+>> +- clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
+>> +	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
+>> +	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
+>> +	hold/delay times that is needed for the SD/MMC CIU clock. The values of both
+>> +	can be 0-315 degrees, in 45 degree increments.
+>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> index f936476..e776512 100644
+>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> @@ -413,6 +413,7 @@
+>>  						compatible = "altr,socfpga-gate-clk";
+>>  						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
+>>  						clk-gate = <0xa0 8>;
+>> +						clk-phase = <0 135>;
+>>  					};
+>>  
+>>  					nand_x_clk: nand_x_clk {
+>> diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
+>> index 4efcf4e..501d513 100644
+>> --- a/drivers/clk/socfpga/clk-gate.c
+>> +++ b/drivers/clk/socfpga/clk-gate.c
+>> @@ -19,7 +19,9 @@
+>>  #include <linux/clkdev.h>
+>>  #include <linux/clk-provider.h>
+>>  #include <linux/io.h>
+>> +#include <linux/mfd/syscon.h>
+>>  #include <linux/of.h>
+>> +#include <linux/regmap.h>
+>>  
+>>  #include "clk.h"
+>>  
+>> @@ -35,6 +37,11 @@
+>>  
+>>  #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
+>>  
+>> +/* SDMMC Group for System Manager defines */
+>> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET    0x108
+>> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel) \
+>> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
+>> +
+>>  static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
+>>  {
+>>  	u32 l4_src;
+>> @@ -115,7 +122,61 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
+>>  	return parent_rate / div;
+>>  }
+>>  
+>> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
+>> +{
+>> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
+>> +	struct regmap *sys_mgr_base_addr;
+>> +	int i;
+>> +	u32 hs_timing;
+>> +	u32 clk_phase[2];
+>> +
+>> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
+>> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+>> +		if (IS_ERR(sys_mgr_base_addr)) {
+>> +			pr_err("%s: failed to find altr,sys-mgr regmap!\n", __func__);
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +		for (i = 0; i < 2; i++) {
+>> +			switch (socfpgaclk->clk_phase[i]) {
+>> +			case 0:
+>> +				clk_phase[i] = 0;
+>> +				break;
+>> +			case 45:
+>> +				clk_phase[i] = 1;
+>> +				break;
+>> +			case 90:
+>> +				clk_phase[i] = 2;
+>> +				break;
+>> +			case 135:
+>> +				clk_phase[i] = 3;
+>> +				break;
+>> +			case 180:
+>> +				clk_phase[i] = 4;
+>> +				break;
+>> +			case 225:
+>> +				clk_phase[i] = 5;
+>> +				break;
+>> +			case 270:
+>> +				clk_phase[i] = 6;
+>> +				break;
+>> +			case 315:
+>> +				clk_phase[i] = 7;
+>> +				break;
+>> +			default:
+>> +				clk_phase[i] = 0;
+>> +				break;
+>> +			}
+>> +		}
+>> +		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
+>> +		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
+>> +			hs_timing);
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>>  static struct clk_ops gateclk_ops = {
+>> +	.prepare = socfpga_clk_prepare,
+>>  	.recalc_rate = socfpga_clk_recalc_rate,
+>>  	.get_parent = socfpga_clk_get_parent,
+>>  	.set_parent = socfpga_clk_set_parent,
+>> @@ -126,6 +187,7 @@ static void __init __socfpga_gate_init(struct device_node *node,
+>>  {
+>>  	u32 clk_gate[2];
+>>  	u32 div_reg[3];
+>> +	u32 clk_phase[2];
+>>  	u32 fixed_div;
+>>  	struct clk *clk;
+>>  	struct socfpga_gate_clk *socfpga_clk;
+>> @@ -166,6 +228,12 @@ static void __init __socfpga_gate_init(struct device_node *node,
+>>  		socfpga_clk->div_reg = 0;
+>>  	}
+>>  
+>> +	rc = of_property_read_u32_array(node, "clk-phase", clk_phase, 2);
+>> +	if (!rc) {
+>> +		socfpga_clk->clk_phase[0] = clk_phase[0];
+>> +		socfpga_clk->clk_phase[1] = clk_phase[1];
+>> +	}
+>> +
+>>  	of_property_read_string(node, "clock-output-names", &clk_name);
+>>  
+>>  	init.name = clk_name;
+>>
+Can you apply this to your clk tree?
 
-I even send a proposition to do this work across the kernel t the CE-Linux for
-funding
-> 2) I believe that configuration of the direction can be done by
-> describing the GPIO in the DT. (pinctrl-at91.c line 592).
-No pinctrl is for pinmux ONLY not gpio direction & co
-
-Best Regards,
-J.
-
-> 3) If all the GPIOs are described in the DT with a proper pinmux
-> description, i believe the exclusion is also handled. It's probably
-> not the case today though.
-
-> 
-> >
-> > Best Regards,
-> >
-> > Boris
-> >
-> >>
-> >> diff --git a/drivers/pinctrl/pinctrl-at91.c
-> >> b/drivers/pinctrl/pinctrl-at91.c
-> >> index a7549c4..cf91a35 100644
-> >> --- a/drivers/pinctrl/pinctrl-at91.c
-> >> +++ b/drivers/pinctrl/pinctrl-at91.c
-> >> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
-> >> irq_domain *d,
-> >>          *out_hwirq = intspec[0];
-> >>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
-> >>
-> >> -       ret = gpio_request(pin, ctrlr->full_name);
-> >> -       if (ret)
-> >> -               return ret;
-> >> -
-> >> -       ret = gpio_direction_input(pin);
-> >> -       if (ret)
-> >> -               return ret;
-> >> -
-> >>          return 0;
-> >>   }
-> >>
-> >> Jean-Jacques
-> >
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Dinh
