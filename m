@@ -1,43 +1,53 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 15 Jan 2014 12:09:01 +0100
-Subject: [PATCH] at91: dt: i2c: add a new compatibility string for the
- at91sam9261
-In-Reply-To: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
-References: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140115110901.GQ17817@ldesroches-Latitude-E6320>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Wed, 15 Jan 2014 13:12:03 +0200
+Subject: [PATCH RFC v2 REPOST 2/8] ASoC: davinci-evm: Add named clock
+ reference to DT bindings
+In-Reply-To: <20131231131617.GZ31886@sirena.org.uk>
+References: <cover.1387535299.git.jsarha@ti.com>
+ <c1ae738c9b6cd9f2e595eed1f4981378ded46925.1387535302.git.jsarha@ti.com>
+ <20131231131617.GZ31886@sirena.org.uk>
+Message-ID: <52D66D03.1040608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 11:24:27AM +0100, Jean-Jacques Hiblot wrote:
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On 12/31/2013 03:16 PM, Mark Brown wrote:
+> On Fri, Dec 20, 2013 at 12:38:27PM +0200, Jyri Sarha wrote:
+>
+>> +static int evm_startup(struct snd_pcm_substream *substream)
+>> +{
+>> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +	struct snd_soc_card *soc_card = rtd->codec->card;
+>> +	struct clk *mclk = ((struct snd_soc_card_drvdata_davinci *)
+>> +			    snd_soc_card_get_drvdata(soc_card))->mclk;
+>
+> Why do you need to cast away void?  Ths indicates something is going
+> wrong here though I can't see what.
 
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+I'll fix that.
 
-Thanks
+>> +	mclk = of_clk_get_by_name(np, "ti,codec-clock");
+>> +	if (PTR_ERR(mclk) == -EPROBE_DEFER) {
+>> +		return -EPROBE_DEFER;
+>> +	} else if (IS_ERR(mclk)) {
+>> +		dev_dbg(&pdev->dev, "Codec clock not found.\n");
+>> +		mclk = NULL;
+>> +	}
+>
+> The driver will unconditionally enable and disable the clock which I'd
+> not expect to work well if we got an error, I'd expect either NULL checks
+> on use or a fixed clock to be registered from code in the case where
+> we're using the old binding.
+>
 
-> ---
->  drivers/i2c/busses/i2c-at91.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 8edba9d..843d012 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -589,6 +589,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
->  		.compatible = "atmel,at91sam9260-i2c",
->  		.data = &at91sam9260_config,
->  	} , {
-> +		.compatible = "atmel,at91sam9261-i2c",
-> +		.data = &at91sam9261_config,
-> +	} , {
->  		.compatible = "atmel,at91sam9g20-i2c",
->  		.data = &at91sam9g20_config,
->  	} , {
-> -- 
-> 1.8.5.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+In the drivers/clk/clk.c the clk == NULL is always checked before using 
+the pointer. However, adding NULL checks would save couple of 
+lock-unlock cycles. I'll add them.
+
+> I'd also expect to see devm_clk_get() used here, with the standard
+> clock-names based lookup from DT.
+>
+
+I'll fix that.
+
+Best regards,
+Jyri
