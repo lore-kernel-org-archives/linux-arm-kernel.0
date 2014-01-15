@@ -1,7 +1,9 @@
 From: yao.yuan@freescale.com (Yuan Yao)
-Date: Wed, 15 Jan 2014 13:21:04 +0800
+Date: Wed, 15 Jan 2014 13:24:47 +0800
 Subject: [PATCH v3 1/2] ARM: dts: vf610: lpuart: Add eDMA support
-Message-ID: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+In-Reply-To: <1389763488-27361-1-git-send-email-yao.yuan@freescale.com>
+References: <1389763488-27361-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1389763488-27361-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
