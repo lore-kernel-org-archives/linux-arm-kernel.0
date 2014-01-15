@@ -1,42 +1,78 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 Jan 2014 11:59:24 +0100
-Subject: [PATCH] at91: dt: i2c: add a new compatibility string for the
- at91sam9261
-In-Reply-To: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
-References: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <52D66A0C.4090509@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 11:05:37 +0000
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+ <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/2014 11:24, Jean-Jacques Hiblot :
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks Jean-Jacques.
-
-Side note: do not forget i2c maintainer and ml.
-
+On Wed, Jan 15, 2014 at 05:21:05AM +0000, Yuan Yao wrote:
+> Add dma support for lpuart. This function depend on DMA driver.
+> You can turn on it by SERIAL_FSL_LPUART_DMA=y. And It works if dts node has dma properties.
+> 
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 > ---
->  drivers/i2c/busses/i2c-at91.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  .../devicetree/bindings/serial/fsl-lpuart.txt      |  21 +-
+>  drivers/tty/serial/Kconfig                         |   7 +
+>  drivers/tty/serial/fsl_lpuart.c                    | 457 ++++++++++++++++++++-
+>  3 files changed, 473 insertions(+), 12 deletions(-)
 > 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 8edba9d..843d012 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -589,6 +589,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
->  		.compatible = "atmel,at91sam9260-i2c",
->  		.data = &at91sam9260_config,
->  	} , {
-> +		.compatible = "atmel,at91sam9261-i2c",
-> +		.data = &at91sam9261_config,
-> +	} , {
->  		.compatible = "atmel,at91sam9g20-i2c",
->  		.data = &at91sam9g20_config,
->  	} , {
-> 
+> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> index 6fd1dd1..7509080 100644
+> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> @@ -4,11 +4,24 @@ Required properties:
+>  - compatible : Should be "fsl,<soc>-lpuart"
+>  - reg : Address and length of the register set for the device
+>  - interrupts : Should contain uart interrupt
+> +- clocks : from common clock binding: handle to uart clock
+> +- clock-names : from common clock binding: Shall be "ipg"
 
+Why are these now requried if they weren't previously? That breaks old
+dts. I can't see any new code touching clocks. Was this an old but
+undocumented requirement?
 
--- 
-Nicolas Ferre
+Could you please reword this so clocks is defined in terms of
+clock-names so as to make the relationship between them clear:
+
+- clocks: a list of phandles + clock-specifier pairs, one for each entry
+  in clock-names
+
+- clock-names: should contain:
+   * "ipg" - the uart clock
+
+> +
+> +Optional properties:
+> +- dma-names: Should contain "lpuart-tx" for transmit and "lpuart-rx" for receive channels
+> +- dmas: Should contain dma specifiers for transmit and receive channels
+
+Likewise could you please define dmas in terms of dma-names please. Why
+not just "tx" and "rx" as other bindings use?
+
+[...]
+
+> +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> +       struct platform_device *pdev = to_platform_device(port->dev);
+> +       struct device_node *np = pdev->dev.of_node;
+> +
+> +       if (of_get_property(np, "dmas", NULL)) {
+> +               sport->lpuart_dma_use = true;
+> +               lpuart_dma_tx_request(port);
+> +               lpuart_dma_rx_request(port);
+> +               temp = readb(port->membase + UARTCR5);
+> +               writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
+
+Rather than reading the raw dt to find out if you have dmas, can you not
+just attempt to request the dmas and if either fail give up on using
+them?
+
+> +       } else
+> +               sport->lpuart_dma_use = false;
+
+Nit: if you have brackets on one half of an if-else, they should be on
+the other half too (even if i's a single line).
+
+Cheers,
+Mark.
