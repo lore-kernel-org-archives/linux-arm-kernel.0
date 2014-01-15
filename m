@@ -1,50 +1,54 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 15 Jan 2014 11:44:12 -0500
-Subject: [PATCH v4 07/16] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <1387547729.3404.50.camel@linaro1.home>
-References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-8-git-send-email-dave.long@linaro.org>
- <1387547729.3404.50.camel@linaro1.home>
-Message-ID: <52D6BADC.2040607@linaro.org>
+From: jason.wessel@windriver.com (Jason Wessel)
+Date: Wed, 15 Jan 2014 10:44:27 -0600
+Subject: [PATCH v6 3/3] KGDB: make kgdb_breakpoint() as noinline
+In-Reply-To: <1387453851-19341-4-git-send-email-vijay.kilari@gmail.com>
+References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
+ <1387453851-19341-4-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <52D6BAEB.3040607@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/13 08:55, Jon Medhurst (Tixy) wrote:
-> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Change the generic ARM probes code to pass in the opcode and architecture-specific
->> structure separately instead of using struct kprobe, so we do not pollute
->> code being used only for uprobes or other non-kprobes instruction
->> interpretation.
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm/include/asm/probes.h    |   9 +-
->>   arch/arm/kernel/kprobes-arm.c    |  77 ++++++-------
->>   arch/arm/kernel/kprobes-common.c |  42 ++++---
->>   arch/arm/kernel/kprobes-thumb.c  | 239 +++++++++++++++++++--------------------
->>   arch/arm/kernel/kprobes.c        |   2 +-
->>   arch/arm/kernel/kprobes.h        |   2 +-
->>   arch/arm/kernel/probes-arm.c     |  33 +++---
->>   arch/arm/kernel/probes-arm.h     |  29 ++---
->>   arch/arm/kernel/probes-thumb.c   |  18 ++-
->>   arch/arm/kernel/probes-thumb.h   |  51 ---------
->>   arch/arm/kernel/probes.c         |  14 ++-
->>   arch/arm/kernel/probes.h         |   8 +-
->>   12 files changed, 246 insertions(+), 278 deletions(-)
+On 12/19/2013 05:50 AM, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 >
-> Looks OK to me, though it looks like this patch includes some header
-> file cleanups that should have been part of the previous patch? I.e. all
-> the changes to probes-thumb.h and probes-arm.h. And also the
-> re-application of 'static' to functions in kprobes-thumb.c and
-> kprobes-arm.c.
+> The function kgdb_breakpoint() sets up break point at
+> compile time by calling arch_kgdb_breakpoint();
+> Though this call is surrounded by wmb() barrier,
+> the compile can still re-order the break point,
+> because this scheduling barrier is not a code motion
+> barrier in gcc.
 >
-> I'm not sure it's worth the hassle of trying to unpick those changes
-> though, it doesn't impact the end result or bisect-bility.
+> Making kgdb_breakpoint() as noinline solves this problem
+> of code reording around break point instruction and also
+> avoids problem of being called as inline function from
+> other places
 >
+> More details about discussion on this can be found here
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
+>
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-I moved the changes around as suggested.
+Acked-by: Jason Wessel <jason.wessel@windriver.com>
 
--dl
+
+Cheers,
+Jason.
+
+> ---
+>  kernel/debug/debug_core.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
+> index 7d2f35e..cf04798 100644
+> --- a/kernel/debug/debug_core.c
+> +++ b/kernel/debug/debug_core.c
+> @@ -1034,7 +1034,7 @@ int dbg_io_get_char(void)
+>   * otherwise as a quick means to stop program execution and "break" into
+>   * the debugger.
+>   */
+> -void kgdb_breakpoint(void)
+> +noinline void kgdb_breakpoint(void)
+>  {
+>  	atomic_inc(&kgdb_setting_breakpoint);
+>  	wmb(); /* Sync point before breakpoint */
