@@ -1,31 +1,42 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Wed, 15 Jan 2014 11:55:18 +0100
-Subject: imx6dl/imx6q fec rmii mode with external ref_clk
-In-Reply-To: <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
-References: <20140114153012.GA22550@frolo.macqel>
- <20140115073536.GD1914@S2101-09.ap.freescale.net>
- <20140115094551.GA26117@frolo.macqel>
- <CAOMZO5AhTLN+aCRH0FOVFO3uoZqe=2DpSiAHO2NCCTd=yJSyHg@mail.gmail.com>
-Message-ID: <20140115105517.GA1776@frolo.macqel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 15 Jan 2014 11:59:24 +0100
+Subject: [PATCH] at91: dt: i2c: add a new compatibility string for the
+ at91sam9261
+In-Reply-To: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
+References: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52D66A0C.4090509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 08:13:15AM -0200, Fabio Estevam wrote:
-> On Wed, Jan 15, 2014 at 7:45 AM, Philippe De Muyter <phdm@macq.eu> wrote:
-> 
-> > Here are my patches (I have called my board imx6dl-p6-2094):
-> > Do I need to replace the hex value after MX6QDL_PAD_GPIO_16__ENET_REF_CLK
-> > by something else ?
-> 
-> hummingboard uses:
-> 
-> MX6QDL_PAD_GPIO_16__ENET_REF_CLK    0xc0000000
-> 
-> Check arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi in linux-next.
+On 15/01/2014 11:24, Jean-Jacques Hiblot :
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 
-They use RGMII, while I have RMII :(
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Philippe
+Thanks Jean-Jacques.
+
+Side note: do not forget i2c maintainer and ml.
+
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index 8edba9d..843d012 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -589,6 +589,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
+>  		.compatible = "atmel,at91sam9260-i2c",
+>  		.data = &at91sam9260_config,
+>  	} , {
+> +		.compatible = "atmel,at91sam9261-i2c",
+> +		.data = &at91sam9261_config,
+> +	} , {
+>  		.compatible = "atmel,at91sam9g20-i2c",
+>  		.data = &at91sam9g20_config,
+>  	} , {
+> 
+
 
 -- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Nicolas Ferre
