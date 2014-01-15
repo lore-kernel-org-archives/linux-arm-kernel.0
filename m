@@ -1,104 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jan 2014 19:00:08 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a
- gpio used as an interrupt source.
-In-Reply-To: <CACh+v5P1Q9TTxUy3Kf1isJVieFi23C+R03Aoah-nDt9wYmaA9Q@mail.gmail.com>
-References: <52D3C166.5050908@overkiz.com>
- <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
- <20140115123338.GC9558@ns203013.ovh.net>
- <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
- <20140115132035.GE9558@ns203013.ovh.net>
- <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
- <20140115135617.GF9558@ns203013.ovh.net>
- <CACh+v5Oda3hDZ_nTMuWocnJfL_8OarZB9h+dnXnHzeEvva33AA@mail.gmail.com>
- <20140115152514.GH9558@ns203013.ovh.net>
- <CACh+v5P1Q9TTxUy3Kf1isJVieFi23C+R03Aoah-nDt9wYmaA9Q@mail.gmail.com>
-Message-ID: <20140115180008.GI9558@ns203013.ovh.net>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 15 Jan 2014 10:01:09 -0800
+Subject: [RFC 0/2] Early patches to get rid of meminfo
+In-Reply-To: <20140115135020.GJ30907@bivouac.eciton.net>
+References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
+ <20140115135020.GJ30907@bivouac.eciton.net>
+Message-ID: <52D6CCE5.4010104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:30 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
-> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> > On 15:41 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
-> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> >> > On 14:44 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
-> >> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> >> >> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
-> >> >> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> >> >> >> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
-> >> >> >> >> Hi Boris,
-> >> >> >> >>
-> >> >> >> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
-> >> >> >> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
-> >> >> >> >> >>
-> >> >> >> >> >> Hello Nicolas, Jean-Christophe,
-> >> >> >> >> >>
-> >> >> >> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
-> >> >> >> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
-> >> >> >> >> >> to know the state of the pendown gpio and also needs it as an
-> >> >> >> >> >> interrupt source.
-> >> >> >> >> >>
-> >> >> >> >> >> The problem is that when a gpio is used as an interrupt, it's
-> >> >> >> >> >> requested by the pinctrl driver during the xlate stage, marking it
-> >> >> >> >> >> unavaliable for the other driver.
-> >> >> >> >> >> It looks like the at91 pinctrl driver is the only one to use
-> >> >> >> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
-> >> >> >> >> >
-> >> >> >> >> >
-> >> >> >> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
-> >> >> >> >> > related IRQ.
-> >> >> >> >> > Because what is done here, is to solve the case where only the irq
-> >> >> >> >> > is request, and in this specific case we need to request the pin as a
-> >> >> >> >> > GPIO.
-> >> >> >> >> >
-> >> >> >> >>
-> >> >> >> >> That's what I did first, and was about to submit the patch for the
-> >> >> >> >> touchscreen driver.
-> >> >> >> >> However it doesn't feel right. Being able to get the state of a gpio
-> >> >> >> >> that is also an interrupt seems very useful to me, not only for a
-> >> >> >> >> touchscreen controller.
-> >> >> >> >>
-> >> >> >> >> I understand why it's being done here. It's a matter of being sure
-> >> >> >> >> that the GPIO is an input and that it'll not be configured otherwise
-> >> >> >> >> latter.
-> >> >> >> >> But:
-> >> >> >> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
-> >> >> >> >
-> >> >> >> > because this the only to start to do it right
-> >> >> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
-> >> >> >> > use gpio_to_irq & co for irq.
-> >> >> >> How can you get the value of the gpio that is also an interrupt source then ?
-> >> >> >> Can you give a short example?
-> >> >> >
-> >> >> > you just have to check the irq source
-> >> >> >
-> >> >> > failing or raising
-> >> >> >
-> >> >> > but on 9261 impossible the gpio does not have such detail
-> >> >> >
-> >> >> > but anyway this is the invert you need to get the information from the IRQ no the way
-> >> >> > arround
-> >> >>
-> >> >> Should I modify the touchscreen driver to use irq_to_gpio() in this
-> >> >> case then ? or is this also not proper ?
-> >> >>
-> >> > no as said by arnd irq_to_gpio does not exsit
-> >> >
-> >> > that's why I said the irq need to provide you the information as it's a
-> >> > raising or failing irq
-> >>
-> >> Even when this kind of information is available it's not enough to
-> >> know for sure the state of the gpio. Think of short pulses such as the
-> >> glitches you have when you press a button.
-> >
-> > this why you have debounce in the gpio IP to solve this
-> 
-> Unfortunately, the debounce filter in the IP not appropriate to handle
-> the glitches such as what you have in the case of a button.
-> It may be good enough to filter EMI induced pulses but not mechanical
-> ones which are way too long.
+On 1/15/2014 5:50 AM, Leif Lindholm wrote:
+> Hi Laura,
+>
+> On Tue, Jan 14, 2014 at 09:55:20PM -0800, Laura Abbott wrote:
+>> With the move away from bootmem and the convergence on memblock, it seems
+>> like meminfo should be deprecated as well to avoid duplication. This is
+>> a first pass attempt to just use memblock and not have meminfo integrated.
+>> There is still a major issue in terms of actually specifying mem at location
+>> on the command line but I wanted to send this out for some early feedback
+>> before putting any more effort into this. I've done basic boot testing on
+>> a simple DT target.
+>
+> I can't see 1/2 and 2/2 - either in my inbox or in the archive.
+> Could you resend?
+>
+> /
+>      Leif
 
-so use deglitch one this will do the tric
 
-Best Regards,
-J.
+The patches are being held for moderation because apparently they have 
+"a suspicious header". Not sure how the cover letter made it through but 
+the patches didn't. If they don't get approved by end of the day I'll 
+try re-sending.
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
