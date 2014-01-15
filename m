@@ -1,44 +1,144 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Jan 2014 19:27:54 +0800
-Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
- warning
-In-Reply-To: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
-References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20140115112753.GJ1896@S2101-09.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 12:27:29 +0100
+Subject: [PATCH v2 03/12] at91: dt: sam9261: Added support for the lcd
+ display
+In-Reply-To: <52CED74B.3030806@overkiz.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+ <1389270709-32662-4-git-send-email-jjhiblot@traphandler.com>
+ <52CED74B.3030806@overkiz.com>
+Message-ID: <20140115112729.GS14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
-> There should be no duplicate const specifiers for those static
-> constant character string arrays defined for clock mux options.
-> Also, the arrays are only taken as the 5th argument for the
-> imx_clk_mux() function, which is in the type of 'const char
-> **parents'.  So, let's remove the 2nd const specifier right
-> after 'char'.
+On 18:07 Thu 09 Jan     , boris brezillon wrote:
+> On 09/01/2014 13:31, Jean-Jacques Hiblot wrote:
+> >Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> >---
+> >  arch/arm/boot/dts/at91sam9261.dtsi  | 37 ++++++++++++++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/at91sam9261ek.dts | 31 +++++++++++++++++++++++++++++++
+> >  arch/arm/mach-at91/at91sam9261.c    |  1 +
+> >  3 files changed, 68 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+> >index 773c3d6..cd219b9 100644
+> >--- a/arch/arm/boot/dts/at91sam9261.dtsi
+> >+++ b/arch/arm/boot/dts/at91sam9261.dtsi
+> >@@ -290,7 +290,33 @@
+> >  						atmel,pins = <AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+> >  					};
+> >  				};
+> >-
+> >+				fb {
+> >+					pinctrl_fb: fb-0 {
+> >+						atmel,pins =
+> >+							<AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB1 periph A */
+> >+							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB2 periph A */
+> >+							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB3 periph A */
+> >+							 AT91_PIOB 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB7 periph A */
+> >+							 AT91_PIOB 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB8 periph A */
+> >+							 AT91_PIOB 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB9 periph A */
+> >+							 AT91_PIOB 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB10 periph A */
+> >+							 AT91_PIOB 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB11 periph A */
+> >+							 AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A */
+> >+							 AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB15 periph A */
+> >+							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB16 periph A */
+> >+							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB17 periph A */
+> >+							 AT91_PIOB 18 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB18 periph A */
+> >+							 AT91_PIOB 19 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB19 periph A */
+> >+							 AT91_PIOB 20 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB20 periph A */
+> >+							 AT91_PIOB 23 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB23 periph B */
+> >+							 AT91_PIOB 24 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB24 periph B */
+> >+							 AT91_PIOB 25 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB25 periph B */
+> >+							 AT91_PIOB 26 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB26 periph B */
+> >+							 AT91_PIOB 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB27 periph B */
+> >+							 AT91_PIOB 28 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PB28 periph B */
+> >+							 >;
+> >+					};
+> >+				};
+> >  				pioA: gpio at fffff400 {
+> >  					compatible = "atmel,at91rm9200-gpio";
+> >  					reg = <0xfffff400 0x200>;
+> >@@ -436,6 +462,15 @@
+> >  			};
+> >  		};
+> >+		fb0: fb at 0x00600000 {
+> >+			compatible = "atmel,at91sam9261-lcdc";
+> >+			reg = <0x00600000 0x1000>;
+> >+			interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+> >+			pinctrl-names = "default";
+> >+			pinctrl-0 = <&pinctrl_fb>;
+> >+			status = "disabled";
+> >+		};
+> >+
+> >  		nand0: nand at 40000000 {
+> >  			compatible = "atmel,at91rm9200-nand";
+> >  			#address-cells = <1>;
+> >diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+> >index f3d22a9..03c05fc 100644
+> >--- a/arch/arm/boot/dts/at91sam9261ek.dts
+> >+++ b/arch/arm/boot/dts/at91sam9261ek.dts
+> >@@ -52,6 +52,37 @@
+> >  				reg = <0x0 0x20000>;
+> >  			};
+> >  		};
 > 
-> This patch fixes these sparse warnings:
-> arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:22:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:23:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:24:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:25:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:26:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:27:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:28:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:29:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:30:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:31:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:32:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:33:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:34:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:35:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:36:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:37:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:38:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:39:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:40:25: warning: duplicate const
-> arch/arm/mach-imx/clk-imx6sl.c:41:25: warning: duplicate const
-> 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> One more nitpick :
+> I think this should be taken out in another patch (first 9261 lcdc support,
+> then ek board lcd def) :p.
 
-Applied both, thanks.
+yes mandatory
+
+Best Regards,
+J.
+> 
+> >+
+> >+		fb0: fb at 0x00600000 {
+> >+			display = <&display0>;
+> >+			status = "okay";
+> >+			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
+> >+			display0: display {
+> >+				bits-per-pixel = <16>;
+> >+				atmel,lcdcon-backlight;
+> >+				atmel,dmacon = <0x1>;
+> >+				atmel,lcdcon2 = <0x80008002>;
+> >+				atmel,guard-time = <1>;
+> >+				atmel,lcd-wiring-mode = "BRG";
+> >+
+> >+				display-timings {
+> >+					native-mode = <&timing0>;
+> >+					timing0: timing0 {
+> >+						clock-frequency = <4965000>;
+> >+						hactive = <240>;
+> >+						vactive = <320>;
+> >+						hback-porch = <1>;
+> >+						hfront-porch = <33>;
+> >+						vback-porch = <1>;
+> >+						vfront-porch = <0>;
+> >+						hsync-len = <5>;
+> >+						vsync-len = <1>;
+> >+						hsync-active = <1>;
+> >+						vsync-active = <1>;
+> >+					};
+> >+				};
+> >+			};
+> >+		};
+> >  	};
+> >  	leds {
+> >diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> >index 200d17a..a67bfe6 100644
+> >--- a/arch/arm/mach-at91/at91sam9261.c
+> >+++ b/arch/arm/mach-at91/at91sam9261.c
+> >@@ -197,6 +197,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+> >  	/* more tc lookup table for DT entries */
+> >  	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+> >  	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
+> >+	CLKDEV_CON_DEV_ID("hclk", "600000.fb", &hck1),
+> >  	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+> >  	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+> >  	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
