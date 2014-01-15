@@ -1,40 +1,82 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jan 2014 12:54:17 +0100
-Subject: [PATCH 3/3] Binding: atmel-wm8904: add option to choose clock
-In-Reply-To: <1389669956-2304-4-git-send-email-voice.shen@atmel.com>
-References: <1389669956-2304-1-git-send-email-voice.shen@atmel.com>
- <1389669956-2304-4-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140115115417.GA9558@ns203013.ovh.net>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Wed, 15 Jan 2014 20:58:47 +0900
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389780469-32633-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <001701cf11e9$25b5fe50$7121faf0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:25 Tue 14 Jan     , Bo Shen wrote:
-> Add the option to choose clock output on which pin connect to SSC.
-> Default is on TK pin to SSC, add clk_from_rk_pin option, the clock
-> is on RK pin to SSC.
+On Wed, January 15, 2014, Zhangfei Gao wrote:
+> Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+> CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+> can not be checked by IS_ERR_VALUE.
+> Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+> otherwise sd detect may occasionally fail.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Reported-by: Kevin Hilman <khilman@linaro.org>
+> Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
 > ---
+>  drivers/mmc/host/dw_mmc.c |    9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
 > 
->  Documentation/devicetree/bindings/sound/atmel-wm8904.txt | 2 ++
->  1 file changed, 2 insertions(+)
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index a776f24f4311..9ded62c8225e 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+>  	int present;
+>  	struct dw_mci_slot *slot = mmc_priv(mmc);
+>  	struct dw_mci_board *brd = slot->host->pdata;
+> -	int gpio_cd = !mmc_gpio_get_cd(mmc);
+> +	struct dw_mci *host = slot->host;
+> +	int gpio_cd = mmc_gpio_get_cd(mmc);
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> index 8bbe50c..68a5c1a 100644
-> --- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> +++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> @@ -33,6 +33,8 @@ Required properties:
->  
->  Optional properties:
->    - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
-> +  - clk_from_rk_pin: according to hardware design, clk privide on rk pin
-							  provide
+>  	/* Use platform get_cd function, else try onboard card detect */
+>  	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+> @@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+>  	else if (brd->get_cd)
+>  		present = !brd->get_cd(slot->id);
+>  	else if (!IS_ERR_VALUE(gpio_cd))
+> -		present = !!gpio_cd;
+> +		present = !gpio_cd;
+!!gpio_cd or gpio_cd is correct, isn't it?
 
-	?? no example?
-> +    to ssc device
->  
->  Example:
->  sound {
-> -- 
-> 1.8.5.2
+Thanks,
+Seungwon Jeon
+
+>  	else
+>  		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+>  			== 0 ? 1 : 0;
 > 
+> +	spin_lock_bh(&host->lock);
+>  	if (present) {
+>  		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+>  		dev_dbg(&mmc->class_dev, "card is present\n");
+> @@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+>  		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+>  		dev_dbg(&mmc->class_dev, "card is not present\n");
+>  	}
+> +	spin_unlock_bh(&host->lock);
+> 
+>  	return present;
+>  }
+> @@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+>  	return gpio;
+>  }
+> 
+> -/* find the cd gpio for a given slot; or -1 if none specified */
+> +/* find the cd gpio for a given slot */
+>  static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
+>  					struct mmc_host *mmc)
+>  {
+> --
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
