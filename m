@@ -1,25 +1,37 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 15 Jan 2014 13:50:20 +0000
-Subject: [RFC 0/2] Early patches to get rid of meminfo
-In-Reply-To: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140115135020.GJ30907@bivouac.eciton.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 14:48:13 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+In-Reply-To: <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <20140115132035.GE9558@ns203013.ovh.net>
+ <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
+Message-ID: <8007592.fj8kc2EY8M@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Wednesday 15 January 2014 14:44:24 Jean-Jacques Hiblot wrote:
+> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> >> > because this the only to start to do it right
+> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
+> >> > use gpio_to_irq & co for irq.
+> >> How can you get the value of the gpio that is also an interrupt source then ?
+> >> Can you give a short example?
+> >
+> > you just have to check the irq source
+> >
+> > failing or raising
+> >
+> > but on 9261 impossible the gpio does not have such detail
+> >
+> > but anyway this is the invert you need to get the information from the IRQ no the way
+> > arround
+> 
+> Should I modify the touchscreen driver to use irq_to_gpio() in this
+> case then ? or is this also not proper ?
 
-On Tue, Jan 14, 2014 at 09:55:20PM -0800, Laura Abbott wrote:
-> With the move away from bootmem and the convergence on memblock, it seems
-> like meminfo should be deprecated as well to avoid duplication. This is
-> a first pass attempt to just use memblock and not have meminfo integrated.
-> There is still a major issue in terms of actually specifying mem at location
-> on the command line but I wanted to send this out for some early feedback
-> before putting any more effort into this. I've done basic boot testing on
-> a simple DT target.
+irq_to_gpio no longer exists.
 
-I can't see 1/2 and 2/2 - either in my inbox or in the archive.
-Could you resend?
-
-/
-    Leif
+	Arnd
