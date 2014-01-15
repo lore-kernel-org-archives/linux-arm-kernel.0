@@ -1,29 +1,27 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 15 Jan 2014 11:24:27 +0100
-Subject: [PATCH] at91: dt: i2c: add a new compatibility string for the
- at91sam9261
-Message-ID: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
+Date: Wed, 15 Jan 2014 11:24:46 +0100
+Subject: [PATCH] at91: dt: sam9263: fixed compatibility string for the I2C
+Message-ID: <1389781486-29670-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- drivers/i2c/busses/i2c-at91.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 8edba9d..843d012 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -589,6 +589,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
- 		.compatible = "atmel,at91sam9260-i2c",
- 		.data = &at91sam9260_config,
- 	} , {
-+		.compatible = "atmel,at91sam9261-i2c",
-+		.data = &at91sam9261_config,
-+	} , {
- 		.compatible = "atmel,at91sam9g20-i2c",
- 		.data = &at91sam9g20_config,
- 	} , {
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index c8fa9b9..7d6dd09 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -523,7 +523,7 @@
+ 			};
+ 
+ 			i2c0: i2c at fff88000 {
+-				compatible = "atmel,at91sam9263-i2c";
++				compatible = "atmel,at91sam9260-i2c";
+ 				reg = <0xfff88000 0x100>;
+ 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
 -- 
 1.8.5.2
