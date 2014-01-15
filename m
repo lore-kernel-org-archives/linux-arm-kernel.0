@@ -1,91 +1,61 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 15 Jan 2014 15:41:04 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <20140115135617.GF9558@ns203013.ovh.net>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com>
- <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
- <20140115123338.GC9558@ns203013.ovh.net>
- <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
- <20140115132035.GE9558@ns203013.ovh.net>
- <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
- <20140115135617.GF9558@ns203013.ovh.net>
-Message-ID: <CACh+v5Oda3hDZ_nTMuWocnJfL_8OarZB9h+dnXnHzeEvva33AA@mail.gmail.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Wed, 15 Jan 2014 14:44:22 +0000
+Subject: [PATCH v1 3/5] pinctrl: st: Add software edge trigger interrupt
+ support.
+In-Reply-To: <CACRpkdbFGOm2xm5H+of_NuJ6DVmBDcEODZbDxVU8nGC-RU64Tw@mail.gmail.com>
+References: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+ <1389711141-21090-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdbFGOm2xm5H+of_NuJ6DVmBDcEODZbDxVU8nGC-RU64Tw@mail.gmail.com>
+Message-ID: <52D69EC6.8010705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> On 14:44 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
->> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
->> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> >> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
->> >> >> Hi Boris,
->> >> >>
->> >> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
->> >> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
->> >> >> >>
->> >> >> >> Hello Nicolas, Jean-Christophe,
->> >> >> >>
->> >> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
->> >> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
->> >> >> >> to know the state of the pendown gpio and also needs it as an
->> >> >> >> interrupt source.
->> >> >> >>
->> >> >> >> The problem is that when a gpio is used as an interrupt, it's
->> >> >> >> requested by the pinctrl driver during the xlate stage, marking it
->> >> >> >> unavaliable for the other driver.
->> >> >> >> It looks like the at91 pinctrl driver is the only one to use
->> >> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
->> >> >> >
->> >> >> >
->> >> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
->> >> >> > related IRQ.
->> >> >> > Because what is done here, is to solve the case where only the irq
->> >> >> > is request, and in this specific case we need to request the pin as a
->> >> >> > GPIO.
->> >> >> >
->> >> >>
->> >> >> That's what I did first, and was about to submit the patch for the
->> >> >> touchscreen driver.
->> >> >> However it doesn't feel right. Being able to get the state of a gpio
->> >> >> that is also an interrupt seems very useful to me, not only for a
->> >> >> touchscreen controller.
->> >> >>
->> >> >> I understand why it's being done here. It's a matter of being sure
->> >> >> that the GPIO is an input and that it'll not be configured otherwise
->> >> >> latter.
->> >> >> But:
->> >> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
->> >> >
->> >> > because this the only to start to do it right
->> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
->> >> > use gpio_to_irq & co for irq.
->> >> How can you get the value of the gpio that is also an interrupt source then ?
->> >> Can you give a short example?
->> >
->> > you just have to check the irq source
->> >
->> > failing or raising
->> >
->> > but on 9261 impossible the gpio does not have such detail
->> >
->> > but anyway this is the invert you need to get the information from the IRQ no the way
->> > arround
->>
->> Should I modify the touchscreen driver to use irq_to_gpio() in this
->> case then ? or is this also not proper ?
->>
-> no as said by arnd irq_to_gpio does not exsit
->
-> that's why I said the irq need to provide you the information as it's a
-> raising or failing irq
+Thankyou for reviewing the patch.
 
-Even when this kind of information is available it's not enough to
-know for sure the state of the gpio. Think of short pulses such as the
-glitches you have when you press a button.
+On 15/01/14 14:27, Linus Walleij wrote:
+> On Tue, Jan 14, 2014 at 3:52 PM,  <srinivas.kandagatla@st.com> wrote:
+> 
+>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
+>> ST pin controller does not have hardware support for detecting edge
+>> triggered interrupts, It only has level triggering support.
+>> This patch attempts to fake up edge triggers from hw level trigger
+>> support in software. With this facility now the gpios can be easily used
+>> for keypads, otherwise it would be difficult for drivers like keypads to
+>> work with level trigger interrupts.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> 
+> Clever! Mostly I like the patch as it is but:
+> 
+>>         for_each_set_bit(n, &port_active, BITS_PER_LONG) {
+>> +               /* check if we are detecting fake edges ... */
+>> +               pin_edge_cfg = ST_IRQ_EDGE_CONF(bank_edge_mask, n);
+>> +
+>> +               if (pin_edge_cfg) {
+>> +                       /* edge detection. */
+>> +                       val = st_gpio_get(&bank->gpio_chip, n);
+>> +                       if (val)
+>> +                               writel(BIT(n), bank->base + REG_PIO_SET_PCOMP);
+>> +                       else
+>> +                               writel(BIT(n), bank->base + REG_PIO_CLR_PCOMP);
+>> +
+>> +                       if (pin_edge_cfg != ST_IRQ_EDGE_BOTH &&
+>> +                               !((pin_edge_cfg & ST_IRQ_EDGE_FALLING) ^ val))
+>> +                                       continue;
+>> +               }
+>> +
+> 
+> Please insert comments here to explain what you are actually doing
+> because I sure as hell do not understand this code without comments
+> describing the trick used.
 
->
-> Best Regards,
-> J.
+I agree, I will document this logic in next version.
+
+Thanks,
+srini
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
