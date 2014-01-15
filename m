@@ -1,92 +1,60 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jan 2014 15:01:39 +0100
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
- <20140115124041.GD9558@ns203013.ovh.net>
- <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
-Message-ID: <20140115140139.GG9558@ns203013.ovh.net>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Wed, 15 Jan 2014 14:01:47 +0000
+Subject: [PATCH 04/04] ARM: shmobile: r8a7790 CCI configuration
+In-Reply-To: <20140115122622.9437.27236.sendpatchset@w520>
+References: <20140115122539.9437.63968.sendpatchset@w520>
+ <20140115122622.9437.27236.sendpatchset@w520>
+Message-ID: <52D694CB.5020807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:46 Wed 15 Jan     , Mark Rutland wrote:
-> On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 12:17 Wed 15 Jan     , Mark Rutland wrote:
-> > > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > The new interrupts-extended property, which reuses the phandle+arguments
-> > > > pattern used by GPIOs and other core bindings, still have some issue.
-> > > > 
-> > > > If an SoC have already specifiy interrupt and a board want to add specific
-> > > > interrupt such as GPIO (which can be optionnal) be need to re-define
-> > > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
-> > > > property.
-> > > > 
-> > > 
-> > > NAK.
-> > > 
-> > > This is a hack that works around a dts organisation issue. This is _not_
-> > > a binding or parsing issue.
-> > 
-> > So the DT is stupid. Yes w have board and SoC information
-> > so we do not want to duplicate them. Having a way to descript SoC vs board
-> > specific information need to be provided.
-> 
-> I agree that the current situation isn't fantastic. That doesn't make
-> the DT stupid. There are other solutions to this problem.
-> 
-> > 
-> > > 
-> > > Properties can be overridden - just describe all of the interrupts in
-> > > the final dts file.
-> > this is wrong, which mean you duplicate informaation and duplicate bug and
-> > fixes
-> 
-> It's certainly not nice, but it doesn't make it wrong.
-> 
-> The same problem can be found with any other list property that varies
-> per-board. Hacking the parsing of each property is not a solution.
+Hi,
 
-agreed we have the same issue on pinctrl as example and it's become a
-nightmare
+On 15/01/14 12:26, Magnus Damm wrote:
+> From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 > 
-> Today the only way to implement what you want is to have the list in the
-> final file.
+> Add the settings of CCI-400 for enabling ca15/ca7 snoop on r8a7790.
 > 
-> One way of working with that would be to have the common interrupts
-> described in a shared macro in the soc file:
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
 > 
-> #define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
+>  arch/arm/mach-shmobile/smp-r8a7790.c |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
-> Then the soc file can have:
-> 
-> 	interrupts = SOC_COMMON_INTERRUPTS;
-> 
-> And the board can have:
-> 
-> 	interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
-hugly for me as a board could work on x SoC so the final dt could be compile
-for more than 1 SoC if you one alias
-> 
-> That gains functionality equivalent to your proposal, without
-> introducing new code or new edge cases in interrupt parsing. However, it
-> does make it unclear how many interrupts are described, and it won't
-> interact well with interrupt-names.
-> 
-> Another, more invasive option would be extend the dts syntax and teach
-> dtc to handle property appending. Then the soc dts could stay as it is,
-> and the board dts could have something like:
-> 
-> 	/append-property/ interrupts = <&intc1 6 1>;
-> 	/append-property/ interrupt-names = "board-specific-irq";
-> 
-> Both these options solve the issue at the source, are general to other
-> properties, and allow more than one level of hierarchy (the proposed
-> interrupts-extended-2 only allows one level).
-agreed here but this touch dtc
+> --- 0005/arch/arm/mach-shmobile/smp-r8a7790.c
+> +++ work/arch/arm/mach-shmobile/smp-r8a7790.c	2014-01-15 15:40:56.000000000 +0900
+> @@ -28,6 +28,11 @@
+>  #define CA15RESCNT	0x0040
+>  #define CA7RESCNT	0x0044
+>  #define MERAM		0xe8080000
+> +#define CCI_BASE	0xf0090000
+> +#define CCI_SLAVE3	0x4000
+> +#define CCI_SLAVE4	0x5000
+> +#define CCI_SNOOP	0x0000
+> +#define CCI_STATUS	0x000c
+>  
+>  static struct rcar_sysc_ch r8a7790_ca15_scu = {
+>  	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
+> @@ -71,6 +76,16 @@ static void __init r8a7790_smp_prepare_c
+>  	r8a7790_pm_init();
+>  	rcar_sysc_power_up(&r8a7790_ca15_scu);
+>  	rcar_sysc_power_up(&r8a7790_ca7_scu);
+> +
+> +	/* enable snoop and DVM */
+> +	p = ioremap_nocache(CCI_BASE, 0x8000);
+> +	writel_relaxed(readl_relaxed(p + CCI_SLAVE3 + CCI_SNOOP) | 0x3,
+> +		p + CCI_SLAVE3 + CCI_SNOOP);    /* ca15 */
+> +	writel_relaxed(readl_relaxed(p + CCI_SLAVE4 + CCI_SNOOP) | 0x3,
+> +		p + CCI_SLAVE4 + CCI_SNOOP);    /* ca7 */
+> +	while (__raw_readl(p + CCI_STATUS));
+> +	/* wait for pending bit low */
+> +	iounmap(p);
+>  }
 
-Best Regards,
-J.
-> 
-> Thanks,
-> Mark.
+I have mentioned this before, please use drivers/bus/arm-cci.c
+That already does the job you need here and you need to use CCI DT bindings
+for base address.
+
+Regards,
+Sudeep
