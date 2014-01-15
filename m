@@ -1,81 +1,132 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 15 Jan 2014 15:41:14 +0200
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140115035011.4167.96678@quantum>
-References: <1389276051-1326-1-git-send-email-t-kristo@ti.com>
- <20140109231513.GA11648@saruman.home> <52CFC2F1.706@ti.com>
- <20140110161352.GG6665@saruman.home> <52D02037.3090705@ti.com>
- <20140110185110.GM31323@atomide.com> <52D53084.1070105@ti.com>
- <20140114203613.GA604@saruman.home> <20140115020421.GA24195@saruman.home>
- <20140115031632.4167.2698@quantum> <20140115035011.4167.96678@quantum>
-Message-ID: <52D68FFA.8000806@ti.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 15 Jan 2014 14:44:24 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+In-Reply-To: <20140115132035.GE9558@ns203013.ovh.net>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+ <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+ <20140115123338.GC9558@ns203013.ovh.net>
+ <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
+ <20140115132035.GE9558@ns203013.ovh.net>
+Message-ID: <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2014 05:50 AM, Mike Turquette wrote:
-> Quoting Mike Turquette (2014-01-14 19:16:32)
->> Quoting Felipe Balbi (2014-01-14 18:04:21)
->>> Hi,
->>>
->>> On Tue, Jan 14, 2014 at 02:36:13PM -0600, Felipe Balbi wrote:
->>>>> Felipe, care to run your randconfig magic for this?
->>>>
->>>> This branch builds just fine so far, I still have omap5 multiplaform and
->>>> uniplatform builds, but since that was working before i'm assuming it
->>>> won't break.
->>>
->>> No build failures in any of my 18 seeds (5 randconfigs of each), I'd
->>> attach logs, but it's a 2.8MiB tarball, if anyone cares enough, I can
->>> send it.
->>>
->>> FWIW:
->>>
->>> Acked-by: Felipe Balbi <balbi@ti.com>
->>
->> Felipe,
->>
->> That's great to hear. Thanks for testing.
->>
->> Tero & Tony,
->>
->> These 40 patches apply very cleanly on top of clk-next with 2
->> exceptions:
->>
->> 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
->> because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
->> on 3.13-rc1).
->>
->> 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
->> resolved correctly but would like verification.
->>
->> I'd prefer to simply merge these patches into clk-next, which is the
->> most straightforward route. Any ideas on how to handle the missing
->> AM35xx dtsi data? It can always go as a separate fix after this stuff
->> gets merged which, ironically, is how that file was created in the first
->> place.
+2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+>> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
+>> >> Hi Boris,
+>> >>
+>> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
+>> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+>> >> >>
+>> >> >> Hello Nicolas, Jean-Christophe,
+>> >> >>
+>> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
+>> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
+>> >> >> to know the state of the pendown gpio and also needs it as an
+>> >> >> interrupt source.
+>> >> >>
+>> >> >> The problem is that when a gpio is used as an interrupt, it's
+>> >> >> requested by the pinctrl driver during the xlate stage, marking it
+>> >> >> unavaliable for the other driver.
+>> >> >> It looks like the at91 pinctrl driver is the only one to use
+>> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
+>> >> >
+>> >> >
+>> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
+>> >> > related IRQ.
+>> >> > Because what is done here, is to solve the case where only the irq
+>> >> > is request, and in this specific case we need to request the pin as a
+>> >> > GPIO.
+>> >> >
+>> >>
+>> >> That's what I did first, and was about to submit the patch for the
+>> >> touchscreen driver.
+>> >> However it doesn't feel right. Being able to get the state of a gpio
+>> >> that is also an interrupt seems very useful to me, not only for a
+>> >> touchscreen controller.
+>> >>
+>> >> I understand why it's being done here. It's a matter of being sure
+>> >> that the GPIO is an input and that it'll not be configured otherwise
+>> >> latter.
+>> >> But:
+>> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
+>> >
+>> > because this the only to start to do it right
+>> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
+>> > use gpio_to_irq & co for irq.
+>> How can you get the value of the gpio that is also an interrupt source then ?
+>> Can you give a short example?
 >
-> I've pushed my branch. Tero can you take a look and let me know if you
-> see any problems?
+> you just have to check the irq source
 >
-> git://git.linaro.org/people/mike.turquette/linux.git clk-next-omap
+> failing or raising
+>
+> but on 9261 impossible the gpio does not have such detail
+>
+> but anyway this is the invert you need to get the information from the IRQ no the way
+> arround
 
-Hey Mike,
-
-Can't see any issues there, also gave it a quick boot test with the 
-boards I have access to and seems to work fine.
-
--Tero
+Should I modify the touchscreen driver to use irq_to_gpio() in this
+case then ? or is this also not proper ?
 
 >
-> Thanks!
-> Mike
+> so the gpio driver may need to be updated to provide such information to the
+> touch driver
 >
+> Best Regards,
+> J.
 >>
->> Regards,
->> Mike
->>
->>>
->>> cheers
->>>
->>> --
->>> balbi
+>> >
+>> > I even send a proposition to do this work across the kernel t the CE-Linux for
+>> > funding
+>> >> 2) I believe that configuration of the direction can be done by
+>> >> describing the GPIO in the DT. (pinctrl-at91.c line 592).
+>> > No pinctrl is for pinmux ONLY not gpio direction & co
+>> >
+>> > Best Regards,
+>> > J.
+>> >
+>> >> 3) If all the GPIOs are described in the DT with a proper pinmux
+>> >> description, i believe the exclusion is also handled. It's probably
+>> >> not the case today though.
+>> >
+>> >>
+>> >> >
+>> >> > Best Regards,
+>> >> >
+>> >> > Boris
+>> >> >
+>> >> >>
+>> >> >> diff --git a/drivers/pinctrl/pinctrl-at91.c
+>> >> >> b/drivers/pinctrl/pinctrl-at91.c
+>> >> >> index a7549c4..cf91a35 100644
+>> >> >> --- a/drivers/pinctrl/pinctrl-at91.c
+>> >> >> +++ b/drivers/pinctrl/pinctrl-at91.c
+>> >> >> @@ -1463,14 +1463,6 @@ static int at91_gpio_irq_domain_xlate(struct
+>> >> >> irq_domain *d,
+>> >> >>          *out_hwirq = intspec[0];
+>> >> >>          *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>> >> >>
+>> >> >> -       ret = gpio_request(pin, ctrlr->full_name);
+>> >> >> -       if (ret)
+>> >> >> -               return ret;
+>> >> >> -
+>> >> >> -       ret = gpio_direction_input(pin);
+>> >> >> -       if (ret)
+>> >> >> -               return ret;
+>> >> >> -
+>> >> >>          return 0;
+>> >> >>   }
+>> >> >>
+>> >> >> Jean-Jacques
+>> >> >
+>> >> >
+>> >>
+>> >> _______________________________________________
+>> >> linux-arm-kernel mailing list
+>> >> linux-arm-kernel at lists.infradead.org
+>> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
