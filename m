@@ -1,69 +1,168 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Jan 2014 11:35:48 -0800
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140115192340.4167.87685@quantum>
-References: <20140110161352.GG6665@saruman.home> <52D02037.3090705@ti.com>
- <20140110185110.GM31323@atomide.com> <52D53084.1070105@ti.com>
- <20140114203613.GA604@saruman.home>
- <20140115020421.GA24195@saruman.home>
- <20140115031632.4167.2698@quantum>
- <20140115035011.4167.96678@quantum>
- <20140115171323.GA22739@atomide.com>
- <20140115192340.4167.87685@quantum>
-Message-ID: <20140115193547.GF7993@atomide.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 15 Jan 2014 14:31:10 -0500
+Subject: [PATCH v4 13/16] ARM: Add an emulate flag to the kprobes/uprobes
+ instruction decode functions
+In-Reply-To: <1387551482.3404.63.camel@linaro1.home>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-14-git-send-email-dave.long@linaro.org>
+ <1387551482.3404.63.camel@linaro1.home>
+Message-ID: <52D6E1FE.8000303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [140115 11:25]:
-> Quoting Tony Lindgren (2014-01-15 09:13:23)
-> > * Mike Turquette <mturquette@linaro.org> [140114 19:52]:
-> > > > 
-> > > > These 40 patches apply very cleanly on top of clk-next with 2
-> > > > exceptions:
-> > > > 
-> > > > 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
-> > > > because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
-> > > > on 3.13-rc1).
-> > > > 
-> > > > 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
-> > > > resolved correctly but would like verification.
-> > > > 
-> > > > I'd prefer to simply merge these patches into clk-next, which is the
-> > > > most straightforward route. Any ideas on how to handle the missing
-> > > > AM35xx dtsi data? It can always go as a separate fix after this stuff
-> > > > gets merged which, ironically, is how that file was created in the first
-> > > > place.
-> > 
-> > You could do something like this to take advantage of fast forward and
-> > not have to do a merge back from mainline:
-> > 
-> > $ git checkout -b am3517-clk v3.13-rc8 # or any other -rc with am3517.dtsi
-> > $ git merge clk-next-omap # this fast forwards clk-next-omap to the desired -rc
-> > $ git am am3517-clk-patch
-> > $ git checkout clk-next
-> > $ git merge clk-next-omap # this fast forwards clk-next to the desired -rc
-> 
-> That makes sense, but is there anything bad about doing that for a
-> branch you intend to send as a pull request? I don't see how any of the
-> commits get re-written or anything... I just wonder if there is some
-> subtlety that I am not accounting for that makes this approach bad for
-> sending to Linus.
+On 12/20/13 09:58, Jon Medhurst (Tixy) wrote:
+> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Add an emulate flag into the instruction interpreter, primarily for uprobes
+>> support.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>>   arch/arm/kernel/kprobes.c      |  3 ++-
+>>   arch/arm/kernel/kprobes.h      |  1 +
+>>   arch/arm/kernel/probes-arm.c   |  4 ++--
+>>   arch/arm/kernel/probes-arm.h   |  2 +-
+>>   arch/arm/kernel/probes-thumb.c |  8 ++++----
+>>   arch/arm/kernel/probes-thumb.h |  4 ++--
+>>   arch/arm/kernel/probes.c       | 32 +++++++++++++++++++++++---------
+>>   arch/arm/kernel/probes.h       |  2 +-
+>>   8 files changed, 36 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+>> index 0d9d49b..04690f9 100644
+>> --- a/arch/arm/kernel/kprobes.c
+>> +++ b/arch/arm/kernel/kprobes.c
+>> @@ -87,7 +87,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>>   	p->opcode = insn;
+>>   	p->ainsn.insn = tmp_insn;
+>>
+>> -	switch ((*decode_insn)(insn, &p->ainsn, actions)) {
+>> +	switch ((*decode_insn)(insn, &p->ainsn,
+>> +			       true, actions)) {
+>
+> Any reason why the function args need splitting over two lines?
 
-No there should not be any issues. That's the preferred way to keep
-development branches updated and pullable in long term without any need
-to rebase.
+I undid the that change.
 
-Note that there will be only a merge commit if there is a conflict,
-otherwise the fast forward will be transparent. So the trick to avoiding
-rebasing and back merges is to apply patches against what they need in a
-local branch, then after testing merge that local branch into the development
-branch. Then for the upsteam pull request, you just need to make it against
-the -rc you merged in.
+>>   	case INSN_REJECTED:	/* not supported */
+>>   		return -EINVAL;
+>>
+>
+> [...]
+>
+>> --- a/arch/arm/kernel/probes.c
+>> +++ b/arch/arm/kernel/probes.c
+>> @@ -193,7 +193,7 @@ void __kprobes probes_emulate_none(probes_opcode_t opcode,
+>>    */
+>>   static probes_opcode_t __kprobes
+>>   prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>> -								bool thumb)
+>> +			bool thumb)
+>
+> Seems like a spurious indentation change.
 
-AFAIK what Linus does not like is doing a back merge to a development
-branch from mainline, probably as it adds a pointless commit. Or rebasing
-a branch as that way it won't stay pullable.
+Fixed.
 
-Regards,
+>>   {
+>>   #ifdef CONFIG_THUMB2_KERNEL
+>>   	if (thumb) {
+>> @@ -218,7 +218,7 @@ prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>>    */
+>>   static void  __kprobes
+>>   set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>> -								bool thumb)
+>> +			bool thumb)
+>
+> Another spurious whitespace change.
 
-Tony
+Fixed.
+
+>>   {
+>>   #ifdef CONFIG_THUMB2_KERNEL
+>>   	if (thumb) {
+>> @@ -253,7 +253,7 @@ set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>>    * non-zero value, the corresponding nibble in pinsn is validated and modified
+>>    * according to the type.
+>>    */
+>> -static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
+>> +static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs, bool modify)
+>>   {
+>>   	probes_opcode_t insn = *pinsn;
+>>   	probes_opcode_t mask = 0xf; /* Start at least significant nibble */
+>> @@ -317,9 +317,16 @@ static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
+>>   		/* Replace value of nibble with new register number... */
+>>   		insn &= ~mask;
+>>   		insn |= new_bits & mask;
+>> +		if (modify) {
+>> +			/* Replace value of nibble with new register number */
+>> +			insn &= ~mask;
+>> +			insn |= new_bits & mask;
+>> +		}
+>
+> Huh? As is, the above addition doesn't do anything because insn has
+> already been modified. I guess you played with the idea that you needed
+> to avoid changing insn (you don't) and then didn't undo the experiment
+> quite right. :-)
+>
+
+The conditional modification of the instruction was part of Rabin's 
+original work for uprobes, but I messed up the merge from an earlier 
+working version of my patches.  My intention was/is to delete the old 
+unconditional code.  Sounds like maybe you disagree though.  The intent 
+is to only modify the instruction in the kprobes case.
+
+>>   	}
+>>
+>> -	*pinsn = insn;
+>> +	if (modify)
+>> +		*pinsn = insn;
+>> +
+>>   	return true;
+>>
+>>   reject:
+>> @@ -380,14 +387,15 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
+>>    */
+>>   int __kprobes
+>>   probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>> -				const union decode_item *table, bool thumb,
+>> -				const union decode_item *actions)
+>> +		   const union decode_item *table, bool thumb,
+>> +		   bool emulate, const union decode_item *actions)
+>>   {
+>>   	struct decode_header *h = (struct decode_header *)table;
+>>   	struct decode_header *next;
+>>   	bool matched = false;
+>>
+>> -	insn = prepare_emulated_insn(insn, asi, thumb);
+>> +	if (emulate)
+>> +		insn = prepare_emulated_insn(insn, asi, thumb);
+>>
+>>   	for (;; h = next) {
+>>   		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
+>> @@ -402,7 +410,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>>   		if (!matched && (insn & h->mask.bits) != h->value.bits)
+>>   			continue;
+>>
+>> -		if (!decode_regs(&insn, regs))
+>> +		if (!decode_regs(&insn, regs, emulate))
+>>   			return INSN_REJECTED;
+>>
+>>   		switch (type) {
+>> @@ -415,7 +423,8 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+>>
+>>   		case DECODE_TYPE_CUSTOM: {
+>>   			struct decode_custom *d = (struct decode_custom *)h;
+>> -			return actions[d->decoder.bits].decoder(insn, asi, h);
+>> +			return actions[d->decoder.bits].decoder(insn,
+>> +					asi, h);
+>
+> No need to split the above line, you haven't changed it and it doesn't
+> exceed 80 characters anyway.
+
+Fixed.
+
+> [Rest of patch cut]
+>
+
+-dl
