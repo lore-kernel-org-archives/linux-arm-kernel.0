@@ -1,76 +1,106 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 Jan 2014 09:28:54 -0600
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <CAL_JsqKbFw4OSkjxYafuaDsmRPU3RXZB8dhJ4zxyaUwSRwfpPw@mail.gmail.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
- <20140115124041.GD9558@ns203013.ovh.net>
- <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
- <CAL_JsqKbFw4OSkjxYafuaDsmRPU3RXZB8dhJ4zxyaUwSRwfpPw@mail.gmail.com>
-Message-ID: <CAL_JsqJFk7nJBv6dBLh9nMnyJbhuEb+PQYD9cTDUAXJjb8zdZg@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 15 Jan 2014 16:30:45 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+In-Reply-To: <20140115152514.GH9558@ns203013.ovh.net>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+ <CACh+v5OHtPXrUWQE82qsj7ajSVHFRnHTs7e1s4EUFQi7oxcgfA@mail.gmail.com>
+ <20140115123338.GC9558@ns203013.ovh.net>
+ <CACh+v5MyWs3Z6MEvx9Rq6XaopcDppmjWaEUt036vBRf0Uy9aAg@mail.gmail.com>
+ <20140115132035.GE9558@ns203013.ovh.net>
+ <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
+ <20140115135617.GF9558@ns203013.ovh.net>
+ <CACh+v5Oda3hDZ_nTMuWocnJfL_8OarZB9h+dnXnHzeEvva33AA@mail.gmail.com>
+ <20140115152514.GH9558@ns203013.ovh.net>
+Message-ID: <CACh+v5P1Q9TTxUy3Kf1isJVieFi23C+R03Aoah-nDt9wYmaA9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing DT list address...
+2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> On 15:41 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+>> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> > On 14:44 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+>> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> >> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
+>> >> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> >> >> > On 12:05 Mon 13 Jan     , Jean-Jacques Hiblot wrote:
+>> >> >> >> Hi Boris,
+>> >> >> >>
+>> >> >> >> 2014/1/13 boris brezillon <b.brezillon@overkiz.com>:
+>> >> >> >> > On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+>> >> >> >> >>
+>> >> >> >> >> Hello Nicolas, Jean-Christophe,
+>> >> >> >> >>
+>> >> >> >> >> As I was trying to enable the touchscreen on the at91sam9261ek with
+>> >> >> >> >> device-tree support, I ran into an issue. The touchscreen driver needs
+>> >> >> >> >> to know the state of the pendown gpio and also needs it as an
+>> >> >> >> >> interrupt source.
+>> >> >> >> >>
+>> >> >> >> >> The problem is that when a gpio is used as an interrupt, it's
+>> >> >> >> >> requested by the pinctrl driver during the xlate stage, marking it
+>> >> >> >> >> unavaliable for the other driver.
+>> >> >> >> >> It looks like the at91 pinctrl driver is the only one to use
+>> >> >> >> >> gpio_request() in the xlate stage. Maybe we should remove this:
+>> >> >> >> >
+>> >> >> >> >
+>> >> >> >> > You should only request it as a GPIO and then use gpio_to_irq to get the
+>> >> >> >> > related IRQ.
+>> >> >> >> > Because what is done here, is to solve the case where only the irq
+>> >> >> >> > is request, and in this specific case we need to request the pin as a
+>> >> >> >> > GPIO.
+>> >> >> >> >
+>> >> >> >>
+>> >> >> >> That's what I did first, and was about to submit the patch for the
+>> >> >> >> touchscreen driver.
+>> >> >> >> However it doesn't feel right. Being able to get the state of a gpio
+>> >> >> >> that is also an interrupt seems very useful to me, not only for a
+>> >> >> >> touchscreen controller.
+>> >> >> >>
+>> >> >> >> I understand why it's being done here. It's a matter of being sure
+>> >> >> >> that the GPIO is an input and that it'll not be configured otherwise
+>> >> >> >> latter.
+>> >> >> >> But:
+>> >> >> >> 1) I'm wondering why the atmel pinctrl is the only one to do that.
+>> >> >> >
+>> >> >> > because this the only to start to do it right
+>> >> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
+>> >> >> > use gpio_to_irq & co for irq.
+>> >> >> How can you get the value of the gpio that is also an interrupt source then ?
+>> >> >> Can you give a short example?
+>> >> >
+>> >> > you just have to check the irq source
+>> >> >
+>> >> > failing or raising
+>> >> >
+>> >> > but on 9261 impossible the gpio does not have such detail
+>> >> >
+>> >> > but anyway this is the invert you need to get the information from the IRQ no the way
+>> >> > arround
+>> >>
+>> >> Should I modify the touchscreen driver to use irq_to_gpio() in this
+>> >> case then ? or is this also not proper ?
+>> >>
+>> > no as said by arnd irq_to_gpio does not exsit
+>> >
+>> > that's why I said the irq need to provide you the information as it's a
+>> > raising or failing irq
+>>
+>> Even when this kind of information is available it's not enough to
+>> know for sure the state of the gpio. Think of short pulses such as the
+>> glitches you have when you press a button.
+>
+> this why you have debounce in the gpio IP to solve this
 
-On Wed, Jan 15, 2014 at 9:16 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Wed, Jan 15, 2014 at 7:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 12:17 Wed 15 Jan     , Mark Rutland wrote:
->>> > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> > > The new interrupts-extended property, which reuses the phandle+arguments
->>> > > pattern used by GPIOs and other core bindings, still have some issue.
->>> > >
->>> > > If an SoC have already specifiy interrupt and a board want to add specific
->>> > > interrupt such as GPIO (which can be optionnal) be need to re-define
->>> > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
->>> > > property.
->>> > >
->>> >
->>> > NAK.
->>> >
->>> > This is a hack that works around a dts organisation issue. This is _not_
->>> > a binding or parsing issue.
->>>
->>> So the DT is stupid. Yes w have board and SoC information
->>> so we do not want to duplicate them. Having a way to descript SoC vs board
->>> specific information need to be provided.
->>
->> I agree that the current situation isn't fantastic. That doesn't make
->> the DT stupid. There are other solutions to this problem.
->>
->>>
->>> >
->>> > Properties can be overridden - just describe all of the interrupts in
->>> > the final dts file.
->>> this is wrong, which mean you duplicate informaation and duplicate bug and
->>> fixes
->>
->> It's certainly not nice, but it doesn't make it wrong.
->>
->> The same problem can be found with any other list property that varies
->> per-board. Hacking the parsing of each property is not a solution.
->>
->> Today the only way to implement what you want is to have the list in the
->> final file.
->>
->> One way of working with that would be to have the common interrupts
->> described in a shared macro in the soc file:
->>
->> #define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
+Unfortunately, the debounce filter in the IP not appropriate to handle
+the glitches such as what you have in the case of a button.
+It may be good enough to filter EMI induced pulses but not mechanical
+ones which are way too long.
+
 >
-> Yuck. Please, let's not encourage this pattern.
->
->> Then the soc file can have:
+> Best Regards,
+> J.
 >>
->>         interrupts = SOC_COMMON_INTERRUPTS;
->>
->> And the board can have:
->>
->>         interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
->
-> Unless this is solved in dtc include mechanism, just duplicate the
-> interrupts in each board file. I'd rather have the duplication than
-> continued churn of refactoring dtsi files.
->
-> Rob
+>> >
+>> > Best Regards,
+>> > J.
