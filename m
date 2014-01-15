@@ -1,56 +1,68 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 15 Jan 2014 11:47:00 +0000
-Subject: [PATCH V6 6/8] Add EFI stub for ARM
-In-Reply-To: <CAFECyb9jbVHjM7--tRgbjfS9_MaAAvOhR3qXEKPKS6eW23V9Kg@mail.gmail.com>
-References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
- <1389371417-379-7-git-send-email-roy.franz@linaro.org>
- <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
- <CAFECyb9jx4NA0v_qNgrto4qG3KV3fBOpGh839Mnvbjody4xwYA@mail.gmail.com>
- <CAFECyb9jbVHjM7--tRgbjfS9_MaAAvOhR3qXEKPKS6eW23V9Kg@mail.gmail.com>
-Message-ID: <20140115114700.GI30907@bivouac.eciton.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 12:47:25 +0100
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+Message-ID: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 06:16:58PM -0800, Roy Franz wrote:
-> >>> +      .align 3
-> >>> +pe_header:
-> >>> +       .ascii  "PE"
-> >>> +       .short  0
-> >>> +
-> >>> +coff_header:
-> >>> +       .short  0x01c2                          @ ARM or Thumb
-> >>
-> >> Could you explain why you are using 0x1c2 (Thumb) here and not 0x1c0 (ARM) ?
-> >
-> > Nope.  It should be 0x1c0.
-> 
-> OK, now I resolved the nagging feeling that I had already fixed
-> this...   Right now, the EDK2 UEFI implementation
-> requires the machine type for ARM to be "0x1c2".  I don't think that
-> this is correct, but correcting this in EDK2 slipped through
-> the cracks, but is now back on my todo list.
+The new interrupts-extended property, which reuses the phandle+arguments
+pattern used by GPIOs and other core bindings, still have some issue.
 
-Nope, it should be 0x1c2.
+If an SoC have already specifiy interrupt and a board want to add specific
+interrupt such as GPIO (which can be optionnal) be need to re-define
+interrupts-extended. So allow to have an optionnale interrupts-extended-2
+property.
 
-0x1c0 is the COFF code for ARM only, which corresponds roughly with
-OABI - which is not supported (and never will be) by the UEFI
-specification.
-0x1c2 means ARM or Thumb (Interworking), which is what we have.
+Today the problem is ofen solve by defining a gpio-xxx property and then do a gpio_to_irq
+in the C code. *Which is wrong!!*. We need to describe the IRQ.
 
-The UEFI specification (correctly) neglects to even mention 0x1c0
-and 0x1c4.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+---
 
-Do also note that the COFF information relates to the executable,
-the stub. The rest of the kernel image is just a blob as far as UEFI
-is concerned.
+We have the same issue on pinctrl
+ .../devicetree/bindings/interrupt-controller/interrupts.txt    |  4 ++++
+ drivers/of/irq.c                                               | 10 ++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-> I think that for now we should leave this as 0x1c2 so that the
-> unpatched EDK2 builds will boot it, and some time after EDK2 is
-> updated
-> this can be changed.  I'll work on a patch for EDK2 and get the
-> discussion going on that list to resolve this in EDK2.
-
-No need.
-
-/
-    Leif
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+index 1486497..5d559fd 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+@@ -25,8 +25,12 @@ to reference multiple interrupt parents. Each entry in this property contains
+ both the parent phandle and the interrupt specifier. "interrupts-extended"
+ should only be used when a device has multiple interrupt parents.
+ 
++The "interrupts-extended-2" allow to extend at board level node interrupt without
++having to re-define the SoC interrupts.
++
+   Example:
+ 	interrupts-extended = <&intc1 5 1>, <&intc2 1 0>;
++	interrupts-extended-2 = <&intc1 6 1>
+ 
+ A device node may contain either "interrupts" or "interrupts-extended", but not
+ both. If both properties are present, then the operating system should log an
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index 786b0b4..bc36710 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -307,8 +307,14 @@ int of_irq_parse_one(struct device_node *device, int index, struct of_phandle_ar
+ 		/* Try the new-style interrupts-extended */
+ 		res = of_parse_phandle_with_args(device, "interrupts-extended",
+ 						"#interrupt-cells", index, out_irq);
+-		if (res)
+-			return -EINVAL;
++		if (res) {
++			/* Try the new-style interrupts-extended-2 */
++			res = of_parse_phandle_with_args(device, "interrupts-extended-2",
++							"#interrupt-cells", index, out_irq);
++			if (res)
++				return -EINVAL;
++		}
++
+ 		return of_irq_parse_raw(addr, out_irq);
+ 	}
+ 	intlen /= sizeof(*intspec);
+-- 
+1.8.4.3
