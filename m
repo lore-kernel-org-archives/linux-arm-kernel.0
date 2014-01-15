@@ -1,46 +1,66 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 15 Jan 2014 21:10:31 +0800
-Subject: [linux-sunxi] [PATCH] pinctrl: sunxi: Honor GPIO output initial
- vaules
-In-Reply-To: <20140115100241.GI3377@lukather>
-References: <1389711021-16430-1-git-send-email-wens@csie.org>
- <000001cf1189$fc0f8120$f42e8360$@gmail.com>
- <CAGb2v64hs1B=5Ss40AD6K=GTOiYqJrG_vCOxrPzWmjjVgFGvXg@mail.gmail.com>
- <20140115100241.GI3377@lukather>
-Message-ID: <CAGb2v64fRmHbBaHY7R_0ATT9y9UsmwBeWYR2UqYy15fqkzC9Qw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 14:10:38 +0100
+Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for
+ Broadcom 7445
+In-Reply-To: <1389743333-16741-8-git-send-email-marc.ceeeee@gmail.com>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <1389743333-16741-8-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <201401151410.39112.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 15 January 2014, Marc Carino wrote:
+> +       gen-ctrl {
+> +               compatible = "brcm,brcmstb-gen-ctrl-v1";
+> +               reg = <0xf0404304 0x4
+> +                      0xf0404308 0x4
+> +                      0xf03e2578 0x4
+> +                      0xf03e2488 0x10
+> +                      0xf0452000 0x20>;
+> +       };
 
-On Wed, Jan 15, 2014 at 6:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> Nice catch :)
->
-> On Wed, Jan 15, 2014 at 04:21:12PM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Wed, Jan 15, 2014 at 8:37 AM, Ma Haijun <mahaijuns@gmail.com> wrote:
->> > Hi,
->> >
->> > I think it is better to set the output value first to avoid glitch.
->>
->> If I understand the user manual correctly, setting the output value
->> before changing the pin to output function first will have no effect.
->
-> I just tested it on my A31, and it is working as expected (the output
-> value isn't output until the direction is changed).
->
-> It would be great if you could test this as well on your device, and
-> change it like suggested.
+Sorry I didn't get back to you on this when we discussed the previous
+version. I'm actually less happy with this DT representation than the
+original. What I take from your description is that you have multiple
+register ranges that basically combine more-or-less random registers
+that belong into different Linux subsystems.
 
-Tested on A20, works as you described. Output value is queued and changed
-when pin function is changed to output.
+I think the best way to deal with this is to have the "syscon" driver
+handle the multiplexing between the various drivers that need access
+to the registers. It would look something like (taking the numbers
+from your previous patch):
 
-I will rearrange the function calls and resend.
+	ahb {
+		ranges = <0 0xf0000000 0x1000000>; /* 16 MB remapped registers */
 
+		hif-cpubuictrl: syscon at 3e2400 {
+			compatible = "brcm,7445-cpubioctrl", "syscon";
+			reg = <0x3e2000, 0x1000>;
+		};
 
-Cheers
-ChenYu
+		hif-continuation: syscon at 45200 {
+			compatible = "brcm,7445-hif-continuation", "syscon";
+			reg = <0x452000, 0x1000>;
+		};
+
+		sun-top-ctrl: ...
+	};
+
+This lets the syscon driver find and map the three register areas.
+Drivers that need access to the registers then do 
+
+	reset {
+		compatible = "brcm,7445-reset-ctrl";
+		syscon = <&sun-top-ctrl 0x300 0x100>;
+		#reset-cells = <1>;
+	};
+
+And then you can add a regular device driver to drivers/reset that provides
+a device_reset() API to other drivers, or a system-reset function to be
+registered as arm_pm_restart. This driver would use
+syscon_regmap_lookup_by_phandle() to get access to a regmap pointer,
+and then use either hardcoded offsets into the regmap, or get those
+offsets from numbers in the devicetree, as provided in the example
+above.
+
+	Arnd
