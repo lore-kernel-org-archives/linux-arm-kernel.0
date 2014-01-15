@@ -1,44 +1,42 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 15 Jan 2014 11:30:11 -0500 (EST)
-Subject: [PATCH v6 1/2] ohci-platform: Add support for devicetree
- instantiation
-In-Reply-To: <1389802104-17330-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1401151123340.1587-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 17:36:45 +0100
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <20140111210443.GT9681@lunn.ch>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <1389174517.12612.87.camel@kazak.uk.xensource.com>
+ <20140111210443.GT9681@lunn.ch>
+Message-ID: <201401151736.46280.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jan 2014, Hans de Goede wrote:
+On Saturday 11 January 2014, Andrew Lunn wrote:
+> The id of -1 causes platform_device_add() to set the device name to
+> plain "gpio-keys".
+> 
+> When using DT, the device name is created by the function
+> of_device_make_bus_id(). It has the following comment:
+> 
+>  * This routine will first try using either the dcr-reg or the reg property
+>  * value to derive a unique name.  As a last resort it will use the node
+>  * name followed by a unique number.
+> 
+> Since the gpio_keys node does not have a reg properties, it gets a
+> unique number appended to it. We end up with the device name
+> "gpio_keys.3"
+> 
+> So as it stands, it does not appear i can make the DT system use the
+> same device name as a board system.
+> 
+> But i'm also a little bit concerned by the "unique number" and this
+> ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
+> path supposed to be stable? This unique number is not stable. An
+> unwitting change to the DT could cause its value to change. Do we need
+> to make it stable?
+> 
 
-> +static int ohci_platform_power_on(struct platform_device *dev)
-> +{
-> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
-> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
-> +	int clk, ret;
-> +
-> +	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++) {
+One possibility would be to create an artificial bus in DT for all
+gpio-keys devices, use #address-cells=<1> and #size-cells=<0>
+for it, and give each device a unique reg property. Not sure if that
+would be considered an elegant solution though.
 
-You fixed this one...
-
-> @@ -125,13 +225,22 @@ static int ohci_platform_remove(struct platform_device *dev)
->  {
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->  	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
-> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
-> +	int clk;
->  
->  	usb_remove_hcd(hcd);
-> -	usb_put_hcd(hcd);
->  
->  	if (pdata->power_off)
->  		pdata->power_off(dev);
->  
-> +	for (clk = 0; priv->clks[clk] && clk < OHCI_MAX_CLKS; clk++)
-
-but not this one.  :-(  Same for the ehci-platform patch.
-
-In fact, it might be easier to make this loop go backward, like
-you do in the *_platform_power_off routines.
-
-Is there a devm-type routine that will take care of all this for you?
-
-Alan Stern
+	Arnd
