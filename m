@@ -1,45 +1,27 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 15 Jan 2014 11:11:47 -0600
-Subject: [PATCH v4 4/6] spmi: pmic_arb: add support for interrupt handling
-In-Reply-To: <20140114234402.GD23276@sonymobile.com>
-References: <cover.1389738151.git.joshc@codeaurora.org>
- <0f3e257f098d5f1ec6e9f09ba4dbf055291f2d83.1389738151.git.joshc@codeaurora.org>
- <20140114234402.GD23276@sonymobile.com>
-Message-ID: <20140115171147.GX8153@joshc.qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 18:15:10 +0100
+Subject: [PATCH v3 5/7] ARM: brcmstb: add misc. DT bindings for brcm,
+ brcmstb-*
+In-Reply-To: <20140115171155.GK25824@e106331-lin.cambridge.arm.com>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <1389743333-16741-6-git-send-email-marc.ceeeee@gmail.com>
+ <20140115171155.GK25824@e106331-lin.cambridge.arm.com>
+Message-ID: <12927046.KPmoBiUFty@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 03:44:03PM -0800, Courtney Cavin wrote:
-> On Tue, Jan 14, 2014 at 07:41:38PM +0100, Josh Cartwright wrote:
-> > The Qualcomm PMIC Arbiter, in addition to being a basic SPMI controller,
-> > also implements interrupt handling for slave devices.  Note, this is
-> > outside the scope of SPMI, as SPMI leaves interrupt handling completely
-> > unspecified.
-> > 
-> > Extend the driver to provide a irq_chip implementation and chained irq
-> > handling which allows for these interrupts to be used.
-> > 
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > ---
-> >  drivers/spmi/spmi-pmic-arb.c | 393 ++++++++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 391 insertions(+), 2 deletions(-)
-[..]
-> > +struct spmi_pmic_arb_qpnpint_type {
-> > +       u8 type; /* 1 -> edge */
-> > +       u8 polarity_high;
-> > +       u8 polarity_low;
-> > +} __packed;
+On Wednesday 15 January 2014 17:11:55 Mark Rutland wrote:
 > > +
+> > +Further, a node with the following compatible string shall be defined:
+> > +
+> > +    - compatible: "brcm,brcmstb-gen-ctrl-v1"
 > 
-> While the rest of this driver uses 'pmic' or 'spmi_pmic', this patch
-> adds 'qpnpint'.  Can we please just leave the software fabricated name
-> 'qpnp' out of any changes, as it isn't in any hardware spec?  Perhaps
-> 'pmic_int' or something along those lines?
+> It's probably better to say a brcmstb-gen-ctrl node (described below)
+> should be present, or you'll have two places to update the compatible
+> strings for each new variant...
 
-QPNP is not a software-created concept.  It is a hardware concept, where
-it places requirements on the layout of a peripherals' register space,
-and how interrupts are expected to behave, among other things.
+See my other reply on this node. The previous patch version had a different
+approach to these registers, and I suggested doing yet another one and
+using syscon.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+	Arnd
