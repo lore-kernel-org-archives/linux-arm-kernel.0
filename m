@@ -1,31 +1,40 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 15 Jan 2014 18:16:13 +0100
-Subject: [PATCH 3/7] iommu/omap: Convert to devicetree
-In-Reply-To: <20140102010150.GA9933@earth.universe>
-References: <1387284818-28739-1-git-send-email-florian.vaussard@epfl.ch>
- <1387284818-28739-4-git-send-email-florian.vaussard@epfl.ch>
- <1764051.JiGg1d3s1L@avalon> <20140102010150.GA9933@earth.universe>
-Message-ID: <52D6C25D.8050005@epfl.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jan 2014 10:47:21 -0800
+Subject: [PATCH v5 01/14] reset: Silence warning in reset-controller.h
+In-Reply-To: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389811654-21397-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+If a user of <linux/reset-controller.h> doesn't include
+<linux/of.h> before including reset-controller.h they'll get a
+warning as follows:
 
-On 01/02/2014 02:01 AM, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Thu, Jan 02, 2014 at 01:13:42AM +0100, Laurent Pinchart wrote:
->>> +		.of_match_table = omap_iommu_of_match,
->>
->> If CONFIG_OF isn't defined (pretty unlikely I agree, but a possibility you 
->> seem to be prepared for nonetheless given the above #if), this will fail to 
->> compile.
-> 
-> FYI: This is avoided in other drivers by using
-> of_match_ptr(omap_iommu_of_match), which is replaced with NULL by
-> the preprocessor if CONFIG_OF is not defined.
-> 
+  include/linux/reset-controller.h:44:17:
+  warning: 'struct of_phandle_args' declared inside parameter list
 
-Thank you for the hint.
+This is because of_phandle_args is not forward declared. Add the
+declaration to silence this warning.
 
-Florian
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/linux/reset-controller.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index 2f61311ae3e0..41a4695fde08 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -21,6 +21,7 @@ struct reset_control_ops {
+ 
+ struct module;
+ struct device_node;
++struct of_phandle_args;
+ 
+ /**
+  * struct reset_controller_dev - reset controller entity that might
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
