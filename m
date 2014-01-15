@@ -1,33 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 12:17:07 +0100
-Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
-In-Reply-To: <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
-References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
- <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
- <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
-Message-ID: <15900408.Osb5heuoGi@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 11:18:39 +0000
+Subject: [PATCH v9 2/4] Documentation: Add documentation for APM X-Gene
+ SoC SATA host controller DTS binding
+In-Reply-To: <1389769910-15505-3-git-send-email-lho@apm.com>
+References: <1389769910-15505-1-git-send-email-lho@apm.com>
+ <1389769910-15505-2-git-send-email-lho@apm.com>
+ <1389769910-15505-3-git-send-email-lho@apm.com>
+Message-ID: <20140115111839.GB25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 11:05:37 Mark Rutland wrote:
-> On Wed, Jan 15, 2014 at 05:21:05AM +0000, Yuan Yao wrote:
-> > --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> > +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> > @@ -4,11 +4,24 @@ Required properties:
-> >  - compatible : Should be "fsl,<soc>-lpuart"
-> >  - reg : Address and length of the register set for the device
-> >  - interrupts : Should contain uart interrupt
-> > +- clocks : from common clock binding: handle to uart clock
-> > +- clock-names : from common clock binding: Shall be "ipg"
+On Wed, Jan 15, 2014 at 07:11:48AM +0000, Loc Ho wrote:
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  .../devicetree/bindings/ata/apm-xgene.txt          |   68 ++++++++++++++++++++
+>  1 files changed, 68 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
 > 
-> Why are these now requried if they weren't previously? That breaks old
-> dts. I can't see any new code touching clocks. Was this an old but
-> undocumented requirement?
+> diff --git a/Documentation/devicetree/bindings/ata/apm-xgene.txt b/Documentation/devicetree/bindings/ata/apm-xgene.txt
+> new file mode 100644
+> index 0000000..3d1421a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/apm-xgene.txt
+> @@ -0,0 +1,68 @@
+> +* APM X-Gene 6.0 Gb/s SATA host controller nodes
+> +
+> +SATA host controller nodes are defined to describe on-chip Serial ATA
+> +controllers. Each SATA controller (pair of ports) have its own node.
+> +
+> +Required properties:
+> +- compatible		: Shall be "apm,xgene-ahci-sgmii" if mux'ed with SGMII
+> +			  or "apm,xgene-ahci-pcie" if mux'ed with PCIe.
+> +- reg			: First memory resource shall be the AHCI memory
+> +			  resource.
+> +			  Second memory resource shall be the host controller
+> +			  memory resource.
+> +- interrupts		: Interrupt mapping for SATA host controller IRQ.
 
-It was previously required but not documented. I asked Yuan Yao to
-add the text to the binding along with the new "dmas" addition.
+s/Interrupt-mapping/interrupt-specifier/
 
-It would have been cleaner to do this as a separate patch, but at
-the very least it should be mentioned in the changelog.
+> +- clocks		: Reference to the clock entry.
+> +- phys			: PHY reference with parameter 0.
 
-	Arnd
+The specific value of the phy-specifier shouldn't matter to this
+binding. What should matter is what it logically corresponds to.
+
+> +- phy-names		: Name of the PHY. Shall be "sata-6g".
+
+Could you define phys in terms of phy-names please? It makes the
+relationship clearer:
+
+- phys: a list of phandles + phy-sciefiers, one for each entry in
+  phy-names
+
+- phy-names: Should contain:
+  * "sata-6g" for the SATA PHY <notes about requirements go here>
+
+Cheers,
+Mark.
