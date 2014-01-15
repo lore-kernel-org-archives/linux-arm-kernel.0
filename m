@@ -1,114 +1,66 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 15 Jan 2014 00:11:50 -0700
-Subject: [PATCH v9 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
- entries
-In-Reply-To: <1389769910-15505-4-git-send-email-lho@apm.com>
-References: <1389769910-15505-1-git-send-email-lho@apm.com>
- <1389769910-15505-2-git-send-email-lho@apm.com>
- <1389769910-15505-3-git-send-email-lho@apm.com>
- <1389769910-15505-4-git-send-email-lho@apm.com>
-Message-ID: <1389769910-15505-5-git-send-email-lho@apm.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 15 Jan 2014 15:15:59 +0800
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+References: <CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+Message-ID: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+Introdeced from commit b7db86adfa58b
+CDETECT is ingored since IS_ERR_VALUE(!mmc_gpio_get_cd(mmc)) does not work
+Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index a1f475d..34900d2 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Reported-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/mmc/host/dw_mmc.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index a776f24f4311..9ded62c8225e 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	int present;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+ 	struct dw_mci_board *brd = slot->host->pdata;
+-	int gpio_cd = !mmc_gpio_get_cd(mmc);
++	struct dw_mci *host = slot->host;
++	int gpio_cd = mmc_gpio_get_cd(mmc);
  
- 		serial0: serial at 1c020000 {
-@@ -269,5 +311,38 @@
- 			apm,tx-boost-gain = <31 31 31 31 31 31>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 10>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
+ 	/* Use platform get_cd function, else try onboard card detect */
+ 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+@@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	else if (brd->get_cd)
+ 		present = !brd->get_cd(slot->id);
+ 	else if (!IS_ERR_VALUE(gpio_cd))
+-		present = !!gpio_cd;
++		present = !gpio_cd;
+ 	else
+ 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+ 			== 0 ? 1 : 0;
+ 
++	spin_lock_bh(&host->lock);
+ 	if (present) {
+ 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is present\n");
+@@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is not present\n");
+ 	}
++	spin_unlock_bh(&host->lock);
+ 
+ 	return present;
+ }
+@@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ 	return gpio;
+ }
+ 
+-/* find the cd gpio for a given slot; or -1 if none specified */
++/* find the cd gpio for a given slot */
+ static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
+ 					struct mmc_host *mmc)
+ {
 -- 
-1.5.5
+1.7.9.5
