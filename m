@@ -1,135 +1,74 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 16 Jan 2014 01:26:11 +0300
-Subject: [PATCH v5 net-next 2/4] sh_eth: Add support for r7s72100
-In-Reply-To: <1389766341-14001-3-git-send-email-horms+renesas@verge.net.au>
-References: <1389766341-14001-1-git-send-email-horms+renesas@verge.net.au>
- <1389766341-14001-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <52D70B03.9040506@cogentembedded.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 15 Jan 2014 22:40:02 +0100
+Subject: [PATCH v6 0/6] ARM: rockchip: add smp functionality
+Message-ID: <27256277.YJ687suYy5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-On 01/15/2014 09:12 AM, Simon Horman wrote:
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-> This is a fast ethernet controller.
+Tested on both a BQ Curie2 (rk3066a / dual core) and
+on a Radxa Rock (rk3188 / quad core).
 
-    I have to say it's not exact enough patch description: R7S72100 is not 
-Ethernet controller itself, it's a SoC containing the Ethernet controller.
+changes since v5:
+- Grant Likely liked it better to "specify reserved regions of the
+  memory instead of the valid ranges", so go back to the mmio-sram-reserved
+  property originally suggested by Rob Herring
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+changes since v4:
+- rebase on top of the recent rk3188 board support
+- implement suggestion from Matt Sealey in moving the sram-limit from
+  marking reserved regions to marking available regions - hopefully
+  I got the usage right 
+- remove __CPUINIT as suggested by Fabio Estevam
 
-> ---
-> v5
-> * As suggested by Sergei Shtylyov
->    - Do not use sh_eth_chip_reset_r8a7740 as it accesses non-existent
->      RMII registers. Instead use sh_eth_chip_reset.
->    - Do not use sh_eth_set_rate_gether as it accesses non-existent registers.
->    - Do not use reserved LCHNG bit of ECSR
->    - Do not use reserved LCHNGIP bit of ECSIPR
->    - Document that R8A779x also needs a 16 bit shift of the RFS bits
->    - Do not document that the R7S72100 has GECMR, it does not
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
 
-   The above change list was moved from v2 section and doesn't match the real 
-changes done in v5. ;-)
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
 
-> v4
-> * As requested by David Miller
->    - Use a boolean for the return value of sh_eth_is_rz_fast_ether()
->    - Correct coding style in sh_eth_get_stats()
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
 
-> v3
-> * No change
 
-> v2
-> * As suggested by Magnus Damm and Sergei Shtylyov
->    - r7s72100 ethernet is not gigabit so do not refer to it as such
+Heiko Stuebner (6):
+  dt-bindings: sram: describe option to reserve parts of the memory
+  misc: sram: implement mmio-sram-reserved option
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit
+  ARM: rockchip: add smp bringup code
 
-> * As suggested by Magnus Damm
->    - As RZ specific register layout rather than using the gigabit layout
->      which includes registers that do not exist on this chip.
-> ---
->   drivers/net/ethernet/renesas/sh_eth.c | 126 ++++++++++++++++++++++++++++++++--
->   drivers/net/ethernet/renesas/sh_eth.h |   3 +-
->   2 files changed, 121 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
+ arch/arm/boot/dts/rk3188.dtsi                      |    6 +
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   30 +++
+ arch/arm/mach-rockchip/platsmp.c                   |  208 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |  118 ++++++++++-
+ 13 files changed, 443 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
 
-> diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
-> index 4f5cfad..a7a0555 100644
-> --- a/drivers/net/ethernet/renesas/sh_eth.c
-> +++ b/drivers/net/ethernet/renesas/sh_eth.c
-> @@ -190,6 +190,64 @@ static const u16 sh_eth_offset_fast_rcar[SH_ETH_MAX_REGISTER_OFFSET] = {
->   	[TRIMD]		= 0x027c,
->   };
->
-> +static const u16 sh_eth_offset_fast_rz[SH_ETH_MAX_REGISTER_OFFSET] = {
-
-    Shouldn't this map precede R-Car one since this SoC is newer the same way 
-you've reordered *enum* values, etc.? Sorry for not noticing in the previous 
-review...
-
-[...]
-> +	[ARSTR]		= 0x0000,
-> +	[TSU_CTRST]	= 0x0004,
-> +	[TSU_VTAG0]	= 0x0058,
-> +	[TSU_ADSBSY]	= 0x0060,
-> +	[TSU_TEN]	= 0x0064,
-> +	[TXNLCR0]	= 0x0080,
-> +	[TXALCR0]	= 0x0084,
-> +	[RXNLCR0]	= 0x0088,
-> +	[RXALCR0]	= 0x008C,
-
-    Well, the above counter register subgroup stands out from the TSU_* 
-registers in the Gigabit mapping, not sure if we should follow that. These 
-registers are not currently used anyway...
-
-> +	[TSU_ADRH0]	= 0x0100,
-> +	[TSU_ADRL0]	= 0x0104,
-> +	[TSU_ADRH31]	= 0x01f8,
-> +	[TSU_ADRL31]	= 0x01fc,
-> +};
-> +
->   static const u16 sh_eth_offset_fast_sh4[SH_ETH_MAX_REGISTER_OFFSET] = {
->   	[ECMR]		= 0x0100,
->   	[RFLR]		= 0x0108,
-> @@ -318,6 +376,14 @@ static bool sh_eth_is_gether(struct sh_eth_private *mdp)
->   		return false;
->   }
->
-> +static bool sh_eth_is_rz_fast_ether(struct sh_eth_private *mdp)
-> +{
-> +	if (mdp->reg_offset == sh_eth_offset_fast_rz)
-> +		return true;
-> +	else
-> +		return false;
-
-    Perhaps you should compress the above functions to one-liners as Joe has 
-suggested. Or I/you could do it in a separate patch...
-
-> +}
-> +
->   static void sh_eth_select_mii(struct net_device *ndev)
->   {
->   	u32 value = 0x0;
-[...]
-> @@ -1309,9 +1409,9 @@ static int sh_eth_rx(struct net_device *ndev, u32 intr_status, int *quota)
->
->   		/* In case of almost all GETHER/ETHERs, the Receive Frame State
->   		 * (RFS) bits in the Receive Descriptor 0 are from bit 9 to
-> -		 * bit 0. However, in case of the R8A7740's GETHER, the RFS
-> -		 * bits are from bit 25 to bit 16. So, the driver needs right
-> -		 * shifting by 16.
-> +		 * bit 0. However, in case of the R8A7740, R8A779x and
-
-    Small nit: comma needed before "and" as far as I know English grammar.
-
-> +		 * R7S72100 the RFS bits are from bit 25 to bit 16. So, the
-> +		 * driver needs right shifting by 16.
->   		 */
->   		if (mdp->cd->shift_rd0)
->   			desc_status >>= 16;
-
-    Other than that, this looks fine now, you can add my:
-
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-WBR, Sergei
+-- 
+1.7.10.4
