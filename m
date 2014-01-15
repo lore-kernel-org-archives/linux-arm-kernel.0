@@ -1,50 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 Jan 2014 18:17:21 +0100
-Subject: [PATCH 3/3] Binding: atmel-wm8904: add option to choose clock
-In-Reply-To: <1389669956-2304-4-git-send-email-voice.shen@atmel.com>
-References: <1389669956-2304-1-git-send-email-voice.shen@atmel.com>
- <1389669956-2304-4-git-send-email-voice.shen@atmel.com>
-Message-ID: <52D6C2A1.4080405@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 17:20:05 +0000
+Subject: [PATCH v3 6/7] ARM: brcmstb: gic: add compatible string for
+ Broadcom Brahma15
+In-Reply-To: <1389743333-16741-7-git-send-email-marc.ceeeee@gmail.com>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <1389743333-16741-7-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <20140115172005.GL25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/2014 04:25, Bo Shen :
-> Add the option to choose clock output on which pin connect to SSC.
-> Default is on TK pin to SSC, add clk_from_rk_pin option, the clock
-
-Please do not use "_" in DT properties. It is a common pattern to use
-"-" instead.
-
-> is on RK pin to SSC.
+On Tue, Jan 14, 2014 at 11:48:52PM +0000, Marc Carino wrote:
+> Document the Broadcom Brahma B15 GIC implementation as compatible
+> with the ARM GIC standard.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
+>  Documentation/devicetree/bindings/arm/gic.txt |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
->  Documentation/devicetree/bindings/sound/atmel-wm8904.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> index 8bbe50c..68a5c1a 100644
-> --- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> +++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> @@ -33,6 +33,8 @@ Required properties:
->  
->  Optional properties:
->    - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
-> +  - clk_from_rk_pin: according to hardware design, clk privide on rk pin
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 3dfb0c0..b7d7970 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -15,6 +15,7 @@ Main node required properties:
+>  	"arm,cortex-a9-gic"
+>  	"arm,cortex-a7-gic"
+>  	"arm,arm11mp-gic"
+> +	"brcm,brahma15-gic"
 
-typo + more description is needed:
-Please tell that it is a boolean property, that by default it is using
-the TK pin (like in the commit message in fact).
+Similarly to the cpu binding patch, I think this should be
+"brcm,brahma-b15-gic".
 
-Bye,
+It doesn't have to be done here, but it might make sense to add
+"arm,gic-v2" for arbitrary GICv2 implementations to use as a fallback
+compatible string.
 
-> +    to ssc device
->  
->  Example:
->  sound {
-> 
-
-
--- 
-Nicolas Ferre
+Cheers,
+Mark.
