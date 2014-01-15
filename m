@@ -1,111 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jan 2014 17:11:55 +0000
-Subject: [PATCH v3 5/7] ARM: brcmstb: add misc. DT bindings for
- brcm,brcmstb-*
-In-Reply-To: <1389743333-16741-6-git-send-email-marc.ceeeee@gmail.com>
-References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
- <1389743333-16741-6-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <20140115171155.GK25824@e106331-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jan 2014 09:13:23 -0800
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140115035011.4167.96678@quantum>
+References: <20140109231513.GA11648@saruman.home> <52CFC2F1.706@ti.com>
+ <20140110161352.GG6665@saruman.home> <52D02037.3090705@ti.com>
+ <20140110185110.GM31323@atomide.com> <52D53084.1070105@ti.com>
+ <20140114203613.GA604@saruman.home>
+ <20140115020421.GA24195@saruman.home>
+ <20140115031632.4167.2698@quantum>
+ <20140115035011.4167.96678@quantum>
+Message-ID: <20140115171323.GA22739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:48:51PM +0000, Marc Carino wrote:
-> Document the bindings that the Broadcom STB platform needs
-> for proper bootup.
-> 
-> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  .../devicetree/bindings/arm/brcm-brcmstb.txt       |   43 ++++++++++++++++++++
->  1 files changed, 43 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
-> new file mode 100644
-> index 0000000..5f1aba7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
-> @@ -0,0 +1,43 @@
-> +Broadcom STB platforms Device Tree Bindings
-> +-------------------------------------------
-> +Boards with Broadcom Brahma15 ARM-based BCM7xxx SoC shall have the following
-> +properties.
-> +
-> +Required root node properties:
-> +
-> +    - compatible = "brcm,brcmstb-<chip_id>";
+* Mike Turquette <mturquette@linaro.org> [140114 19:52]:
+> > 
+> > These 40 patches apply very cleanly on top of clk-next with 2
+> > exceptions:
+> > 
+> > 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
+> > because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
+> > on 3.13-rc1).
+> > 
+> > 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
+> > resolved correctly but would like verification.
+> > 
+> > I'd prefer to simply merge these patches into clk-next, which is the
+> > most straightforward route. Any ideas on how to handle the missing
+> > AM35xx dtsi data? It can always go as a separate fix after this stuff
+> > gets merged which, ironically, is how that file was created in the first
+> > place.
 
-I'd prefer it if variants were listed explicitly (as it makes it far
-easier to grep for). Something like:
+You could do something like this to take advantage of fast forward and
+not have to do a merge back from mainline:
 
-- compatible: should contain one of:
-  * "brcm,brcmsrb-7445"
-  * "brcm,brcmsrb-7446"
+$ git checkout -b am3517-clk v3.13-rc8 # or any other -rc with am3517.dtsi
+$ git merge clk-next-omap # this fast forwards clk-next-omap to the desired -rc
+$ git am am3517-clk-patch
+$ git checkout clk-next
+$ git merge clk-next-omap # this fast forwards clk-next to the desired -rc
 
-> +
-> +Further, a node with the following compatible string shall be defined:
-> +
-> +    - compatible: "brcm,brcmstb-gen-ctrl-v1"
+Regards,
 
-It's probably better to say a brcmstb-gen-ctrl node (described below)
-should be present, or you'll have two places to update the compatible
-strings for each new variant...
-
-> +
-> +brcmstb-gen-ctrl
-> +----------------
-> +This node describes the registers needed for reset and CPU power control.
-> +
-> +    - compatible: "brcm,brcmstb-gen-ctrl-v1"
-> +    - properties:
-
-This looks odd, compatible is itself a property.
-
-> +        o reg = <rst-src-en-reg-base len
-> +                 sw-mstr-rst-reg-base len
-> +                 cpu-rst-cfg-reg-base len
-> +                 cpu-pwr-zone-ctrl-reg-base len
-> +                 stb-boot-hi-addr0-reg len>;
-
-This would be nicer as something like follows, but with less
-abberviation (unless these names are from a datasheet for the hardware).
-
-- reg: a list of base-address size pairs:
-  * The first entry should cover the sw-mstr-rst registers
-  * The second entry should cover the cpu-rst-cfg registers
-  * The third entry should cover the cpu-pwr-zone registers
-  * The fourth entry should cover the stb-boot-hi-addr0 registers
-
-It may make sense to use reg-names, future revisions might change
-things.
-
-> +
-> +example:
-> +/ {
-> +    model = "Broadcom STB";
-> +    compatible =  "brcm,brcmstb-7445";
-> +
-> +    /* snip */
-> +
-> +    gen-ctrl {
-> +        compatible = "brcm,brcmstb-gen-ctrl-v1";
-> +        reg = <0xf0404304 0x4
-> +               0xf0404308 0x4
-> +               0xf03e2578 0x4
-> +               0xf03e2488 0x10
-> +               0xf0452000 0x20>;
-
-Nit: please bracket each entry individually:
-
-reg = <0xf0404304 0x4>,
-      <0xf0404308 0x4>,
-      <0xf03e2578 0x4>,
-      <0xf03e2488 0x10>,
-      <0xf0452000 0x20>;
-
-Also, these look to be single registers in a larger register bank. Is
-there any reason you can't describe the bank(s) they are in? That'll
-give you more flexibility in the driver...
-
-Thanks,
-Mark
+Tony 
