@@ -1,72 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 Jan 2014 09:16:07 -0600
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115121750.GE25824@e106331-lin.cambridge.arm.com>
- <20140115124041.GD9558@ns203013.ovh.net>
- <20140115134653.GF25824@e106331-lin.cambridge.arm.com>
-Message-ID: <CAL_JsqKbFw4OSkjxYafuaDsmRPU3RXZB8dhJ4zxyaUwSRwfpPw@mail.gmail.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 15 Jan 2014 16:09:01 +0100
+Subject: [RFC PATCH 3/9] of: mtd: add NAND timings retrieval support
+In-Reply-To: <20140109173505.GB8899@obsidianresearch.com>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+ <1389190924-26226-4-git-send-email-b.brezillon@overkiz.com>
+ <20140108183418.GA12358@obsidianresearch.com> <52CDA032.3010804@overkiz.com>
+ <20140108191339.GB12358@obsidianresearch.com> <52CE5F82.6070802@overkiz.com>
+ <20140109173505.GB8899@obsidianresearch.com>
+Message-ID: <52D6A48D.4080302@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 7:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 15, 2014 at 12:40:41PM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 12:17 Wed 15 Jan     , Mark Rutland wrote:
->> > On Wed, Jan 15, 2014 at 11:47:25AM +0000, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> > > The new interrupts-extended property, which reuses the phandle+arguments
->> > > pattern used by GPIOs and other core bindings, still have some issue.
->> > >
->> > > If an SoC have already specifiy interrupt and a board want to add specific
->> > > interrupt such as GPIO (which can be optionnal) be need to re-define
->> > > interrupts-extended. So allow to have an optionnale interrupts-extended-2
->> > > property.
->> > >
->> >
->> > NAK.
->> >
->> > This is a hack that works around a dts organisation issue. This is _not_
->> > a binding or parsing issue.
->>
->> So the DT is stupid. Yes w have board and SoC information
->> so we do not want to duplicate them. Having a way to descript SoC vs board
->> specific information need to be provided.
->
-> I agree that the current situation isn't fantastic. That doesn't make
-> the DT stupid. There are other solutions to this problem.
->
->>
->> >
->> > Properties can be overridden - just describe all of the interrupts in
->> > the final dts file.
->> this is wrong, which mean you duplicate informaation and duplicate bug and
->> fixes
->
-> It's certainly not nice, but it doesn't make it wrong.
->
-> The same problem can be found with any other list property that varies
-> per-board. Hacking the parsing of each property is not a solution.
->
-> Today the only way to implement what you want is to have the list in the
-> final file.
->
-> One way of working with that would be to have the common interrupts
-> described in a shared macro in the soc file:
->
-> #define SOC_COMMON_INTERRUPTS <&intc1 5 1>, <&intc2 1 0>
+Hello Jason,
 
-Yuck. Please, let's not encourage this pattern.
-
-> Then the soc file can have:
+On 09/01/2014 18:35, Jason Gunthorpe wrote:
+> On Thu, Jan 09, 2014 at 09:36:18AM +0100, boris brezillon wrote:
 >
->         interrupts = SOC_COMMON_INTERRUPTS;
+>>> You might want to check if you can boil down the DT timings from the
+>>> huge list to just an ONFI mode number..
+>> Sure, but the sunxi driver needs at least 19 of them...
+> So does mvebu's NAND driver..
 >
-> And the board can have:
+> What I ment was you could have a
 >
->         interrupts = SOC_COMMON_INTERRUPTS, <&intc1 6 1>;
+>    onfi,nand-timing-mode = 0
+>
+> in the DT. Each of the modes defines all ~19 parameters, higher modes
+> are faster.
+>
+> Pick a mode value that fits all the parameters of the connected
+> non-ONFI flash.
+>
+> This would be instead of defining each parameter
+> individually.. Provide some helpers to convert from a onfi mode number
+> to all the onfi defined timing parameters so that drivers can
+> configure the HW..
 
-Unless this is solved in dtc include mechanism, just duplicate the
-interrupts in each board file. I'd rather have the duplication than
-continued churn of refactoring dtsi files.
+Are you suggesting we should provide a function that converts these
+modes into a nand_timings struct, or just use the timing modes and
+let the NAND controller drivers configure its IP accordingly ?
 
-Rob
+I found the ONFI timing tables in this document:
+
+www.*onfi*.org/~/media/*ONFI*/specs/*onfi*_3_1_spec.pdf? (chapter 4.16).
+
+I suppose my nand_timings struct should use the names described
+page 110-111 (at least if we decide to use nand_timings and not
+nand_timing_modes), right ?
+
+Best Regards,
+
+Boris
+
+>
+> Jason
