@@ -1,69 +1,84 @@
-From: pinskia@gmail.com (Andrew Pinski)
-Date: Wed, 15 Jan 2014 15:31:39 -0800
-Subject: [PATCH v6 0/3] AArch64: KGDB support
-In-Reply-To: <20140106181201.GE1096@mudshark.cambridge.arm.com>
-References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
- <20140106181201.GE1096@mudshark.cambridge.arm.com>
-Message-ID: <CA+=Sn1=o8D_bUCWdoe80ayOCCX9JJy7=Nac_SmfAvGemooV+hw@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 15 Jan 2014 17:36:48 -0600
+Subject: [UPDATED PATCHv4 6/7] hwspinlock/omap: enable module before reading
+ SYSSTATUS register
+In-Reply-To: <1389658764-39199-7-git-send-email-s-anna@ti.com>
+References: <1389658764-39199-7-git-send-email-s-anna@ti.com>
+Message-ID: <1389829008-31941-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 6, 2014 at 10:12 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Vijay,
->
-> On Thu, Dec 19, 2013 at 11:50:48AM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Based on the step-handler and break-handler hooks patch from
->> Sandeepa, KGDB debugging support is added for EL1
->> debug in AArch64 mode. Any updates that come for Patch 1 from
->> Sandeepa will be rebased in next version
->>
->> With second patch,register layout is updated to be inline with GDB tool.
->> Basic GDB connection, break point set/clear and info commands
->> are supported except step/next debugging
->>
->> With third patch, step/next debugging support is added, where in
->> pc is updated to point to the instruction to be stepped and
->> stopped.
->>
->> With fourth patch, the compile time breakpoint instruction
->> reordering is fixed by making kgbd_breakpoint() as noinline
->>
->> Tested with ARM64 simulator
->>
->> v6:
->>  - Change pstate register to 8 bytes to make endian nuetral.
->>    Use GDB below GDB patch to display pstate in Big endian mode.
->>    https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
->>    Thanks to Andrew.
->
-> Thanks for getting this new version out. Just a few things before it can be
-> applied:
->
->   1. Can you please use "arm64:" instead of "AArch64:" in the patch
->      subjects?
->
->   2. Can you get an ack from somebody like Jason on the final patch please?
->
->   3. Can you rebase onto the for-next/core branch at the arm64 repo:
->
->        git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
->
->      you'll get a trivial conflict against arch/arm64/kernel/Makefile.
->
->   4. Can you make sure that the gdb patch you linked to actually gets
->      merged? There is still some discussion by the looks of it.
+The number of hwspinlocks are determined based on the value read
+from the IP block's SYSSTATUS register. However, the module may
+not be enabled and clocked, and the read may result in a bus error.
 
+This particular issue is seen rather easily on AM33XX, since the
+module wakeup is software controlled, and it is disabled out of
+reset. Make sure the module is enabled and clocked before reading
+the SYSSTATUS register.
 
-I merged it last week:
-https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=a4d9ba85ec5597a6a556afe26b712e878374b9dd
-.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/hwspinlock/omap_hwspinlock.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-Thanks,
-Andrew Pinski
-
->
-> Cheers,
->
-> Will
+diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
+index 9f56fb2..7764291 100644
+--- a/drivers/hwspinlock/omap_hwspinlock.c
++++ b/drivers/hwspinlock/omap_hwspinlock.c
+@@ -101,10 +101,29 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
+ 	if (!io_base)
+ 		return -ENOMEM;
+ 
++	/*
++	 * make sure the module is enabled and clocked before reading
++	 * the module SYSSTATUS register
++	 */
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		goto iounmap_base;
++	}
++
+ 	/* Determine number of locks */
+ 	i = readl(io_base + SYSSTATUS_OFFSET);
+ 	i >>= SPINLOCK_NUMLOCKS_BIT_OFFSET;
+ 
++	/*
++	 * runtime PM will make sure the clock of this module is
++	 * enabled again iff at least one lock is requested
++	 */
++	ret = pm_runtime_put_sync(&pdev->dev);
++	if (ret < 0)
++		goto iounmap_base;
++
+ 	/* one of the four lsb's must be set, and nothing else */
+ 	if (hweight_long(i & 0xf) != 1 || i > 8) {
+ 		ret = -EINVAL;
+@@ -124,12 +143,6 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
+ 	for (i = 0, hwlock = &bank->lock[0]; i < num_locks; i++, hwlock++)
+ 		hwlock->priv = io_base + LOCK_BASE_OFFSET + sizeof(u32) * i;
+ 
+-	/*
+-	 * runtime PM will make sure the clock of this module is
+-	 * enabled iff at least one lock is requested
+-	 */
+-	pm_runtime_enable(&pdev->dev);
+-
+ 	ret = hwspin_lock_register(bank, &pdev->dev, &omap_hwspinlock_ops,
+ 						base_id, num_locks);
+ 	if (ret)
+@@ -138,9 +151,9 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ reg_fail:
+-	pm_runtime_disable(&pdev->dev);
+ 	kfree(bank);
+ iounmap_base:
++	pm_runtime_disable(&pdev->dev);
+ 	iounmap(io_base);
+ 	return ret;
+ }
+-- 
+1.8.4.3
