@@ -1,158 +1,95 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Wed, 15 Jan 2014 10:45:51 +0100
-Subject: imx6dl/imx6q fec rmii mode with external ref_clk
-In-Reply-To: <20140115073536.GD1914@S2101-09.ap.freescale.net>
-References: <20140114153012.GA22550@frolo.macqel>
- <20140115073536.GD1914@S2101-09.ap.freescale.net>
-Message-ID: <20140115094551.GA26117@frolo.macqel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Jan 2014 10:46:18 +0100
+Subject: [PATCH V6 6/8] Add EFI stub for ARM
+In-Reply-To: <CAFECyb9jbVHjM7--tRgbjfS9_MaAAvOhR3qXEKPKS6eW23V9Kg@mail.gmail.com>
+References: <1389371417-379-1-git-send-email-roy.franz@linaro.org>
+ <1389371417-379-7-git-send-email-roy.franz@linaro.org>
+ <CAKv+Gu9OfieNhvj07tQv+ucQomZhDVDxwdV3Z9Tm+HaHE8HG-Q@mail.gmail.com>
+ <CAFECyb9jx4NA0v_qNgrto4qG3KV3fBOpGh839Mnvbjody4xwYA@mail.gmail.com>
+ <CAFECyb9jbVHjM7--tRgbjfS9_MaAAvOhR3qXEKPKS6eW23V9Kg@mail.gmail.com>
+Message-ID: <CAKv+Gu8yW3z3fAeZcA92s_URDcxMFhOqeWuxSiWxbdVGdHH+yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 03:35:40PM +0800, Shawn Guo wrote:
-> On Tue, Jan 14, 2014 at 04:30:12PM +0100, Philippe De Muyter wrote:
-> > Hi,
-> > 
-> > On the custom board we are developping (imx6q and imx6dl), we have connected
-> > the fec to a switch chip using rmii mode, and we let the switch provide the
-> > reference clock to gpio_16.
-> > 
-> > I work currently with 3.13-rc8 and
-> > 
-> > - I do not have ethernet access working (tx timeout)
-> > - I do not find in the dtb files a description of the pad settings for the
-> > RMII mode
-> > - when searching about the setting for bit 21 ing GPR1, which seems to
-> > be important for my setting to work, I found the following mail:
-> > 	http://www.spinics.net/lists/devicetree/msg06450.html
-> 
-> Just for testing your hardware, does the following change make the
-> Ethernet work for you?
-> 
-> Shawn
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c
-> b/arch/arm/mach-imx/mach-imx6q.c
-> index e51e3da..be8d074 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -188,7 +188,7 @@ static void __init imx6q_1588_init(void)
->         if (!IS_ERR(gpr))
->                 regmap_update_bits(gpr, IOMUXC_GPR1,
->                                 IMX6Q_GPR1_ENET_CLK_SEL_MASK,
-> -                               IMX6Q_GPR1_ENET_CLK_SEL_ANATOP);
-> +                               0);
->         else
->                 pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
-> 
+On 15 January 2014 03:16, Roy Franz <roy.franz@linaro.org> wrote:
+> On Tue, Jan 14, 2014 at 5:47 PM, Roy Franz <roy.franz@linaro.org> wrote:
+>> On Tue, Jan 14, 2014 at 1:05 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 10 January 2014 17:30, Roy Franz <roy.franz@linaro.org> wrote:
+>>>> This patch adds EFI stub support for the ARM Linux kernel.  The EFI stub
+>>>> operates similarly to the x86 stub: it is a shim between the EFI firmware
+>>>> and the normal zImage entry point, and sets up the environment that the
+>>>> zImage is expecting.  This includes loading the initrd (optionaly) and
+>>>> device tree from the system partition based on the kernel command line.
+>>>> The stub updates the device tree as necessary, adding entries for EFI
+>>>> runtime services. The PE/COFF "MZ" header at offset 0 results in the
+>>>> first instruction being an add that corrupts r5, which is not used by
+>>>> the zImage interface.
+>>>>
+>>>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>>>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>>> ---
+>>>
+>>> [...]
+>>>
+>>>> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+>>>> new file mode 100644
+>>>> index 0000000..dbb7101
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/compressed/efi-header.S
+>>>> @@ -0,0 +1,117 @@
+>>>> +@ Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
+>>>> +@
+>>>> +@ This file contains the PE/COFF header that is part of the
+>>>> +@ EFI stub.
+>>>> +@
+>>>> +
+>>>> +       .org    0x3c
+>>>> +       @
+>>>> +       @ The PE header can be anywhere in the file, but for
+>>>> +       @ simplicity we keep it together with the MSDOS header
+>>>> +       @ The offset to the PE/COFF header needs to be at offset
+>>>> +       @ 0x3C in the MSDOS header.
+>>>> +       @ The only 2 fields of the MSDOS header that are used are this
+>>>> +       @ PE/COFF offset, and the "MZ" bytes at offset 0x0.
+>>>> +       @
+>>>> +       .long   pe_header                       @ Offset to the PE header.
+>>>> +
+>>>> +      .align 3
 
-I tried your patch (above mine, see below), and here is what I get :
+Btw you also have a whitespace error here.
 
-[  180.015659] fec 2188000.ethernet eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=2188000.ethernet:01, irq=-1)
-[  180.015861] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-[  182.013790] libphy: 2188000.ethernet:01 - Link is Up - 100/Full
-[  182.014134] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
-[  226.001667] ------------[ cut here ]------------
-[  226.001740] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:264 dev_watchdog+0x27c/0x2a0()
-[  226.001758] NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
+>>>> +pe_header:
+>>>> +       .ascii  "PE"
+>>>> +       .short  0
+>>>> +
+>>>> +coff_header:
+>>>> +       .short  0x01c2                          @ ARM or Thumb
+>>>
+>>> Could you explain why you are using 0x1c2 (Thumb) here and not 0x1c0 (ARM) ?
+>>>
+>>> Cheers,
+>>> Ard.
+>>
+>> Nope.  It should be 0x1c0.
+>>
+>> Roy
+>
+> OK, now I resolved the nagging feeling that I had already fixed
+> this...   Right now, the EDK2 UEFI implementation
+> requires the machine type for ARM to be "0x1c2".  I don't think that
+> this is correct, but correcting this in EDK2 slipped through
+> the cracks, but is now back on my todo list.
+>
+> I think that for now we should leave this as 0x1c2 so that the
+> unpatched EDK2 builds will boot it, and some time after EDK2 is
+> updated
+> this can be changed.  I'll work on a patch for EDK2 and get the
+> discussion going on that list to resolve this in EDK2.
+>
 
+OK. I have updated sbsigntool (Linaro's version) so it supports
+either, but I agree that using the ARM constant is the correct way.
 
-Here are my patches (I have called my board imx6dl-p6-2094):
-Do I need to replace the hex value after MX6QDL_PAD_GPIO_16__ENET_REF_CLK
-by something else ?
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d57c1a6..bc115f7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx53-mba53.dtb \
- 	imx53-qsb.dtb \
- 	imx53-smd.dtb \
-+	imx6dl-p6-2094.dtb \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-p6-2094.dts b/arch/arm/boot/dts/imx6dl-p6-2094.dts
-new file mode 100644
-index 0000000..526e83a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-p6-2094.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-sabresd.dtsi"
-+
-+&usdhc4 {
-+	non-removable;
-+#if 0
-+	vmmc-supply = <&reg_3p3v>;
-+#endif
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4_1>;
-+	bus-width = <8>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_4>;
-+	phy-mode = "rmii";
-+	status = "okay";
-+};
-+
-+/ {
-+	model = "Macq i.MX6 DualLite P6-2094 Board";
-+	compatible = "fsl,imx6dl-sabresd", "fsl,imx6dl";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index e75e11b..d850ff1 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -181,7 +181,9 @@
- 				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
-+#if 0 /* conflicts with pinctrl_enet_4:MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN */
- 				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-+#endif
- 			>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index fb28b2e..7a0b341 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -729,6 +729,22 @@
- 							MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
- 						>;
- 					};
-+
-+					pinctrl_enet_4: enetgrp-4 {
-+						fsl,pins = <
-+							MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+							MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+							MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b0	/* RMII */
-+							MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0	/* MII/RMII */
-+							MX6QDL_PAD_GPIO_19__ENET_TX_ER		0x1b0b0	/* MII/RMII */
-+						>;
-+					};
- 				};
- 
- 				esai {
 -- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Ard.
