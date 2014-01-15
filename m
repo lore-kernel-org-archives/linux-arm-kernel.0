@@ -1,50 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Jan 2014 19:03:55 +0100
-Subject: [RFC 0/2] Early patches to get rid of meminfo
-In-Reply-To: <52D6CCE5.4010104@codeaurora.org>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
- <20140115135020.GJ30907@bivouac.eciton.net>
- <52D6CCE5.4010104@codeaurora.org>
-Message-ID: <CAKv+Gu9bPJZFKoUFEW=-HvLJF8yaao6KJfwvQKgw4V+hgNZSJA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jan 2014 19:20:22 +0100
+Subject: [PATCH] ARM: Kirkwood: Add DT description of QNAP 419
+In-Reply-To: <20140115174519.GE17530@lunn.ch>
+References: <1389048557-16364-1-git-send-email-andrew@lunn.ch>
+ <201401151736.46280.arnd@arndb.de> <20140115174519.GE17530@lunn.ch>
+Message-ID: <4773460.bSrjnYju7q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2014 19:01, Laura Abbott <lauraa@codeaurora.org> wrote:
-> On 1/15/2014 5:50 AM, Leif Lindholm wrote:
->>
->> Hi Laura,
->>
->> On Tue, Jan 14, 2014 at 09:55:20PM -0800, Laura Abbott wrote:
->>>
->>> With the move away from bootmem and the convergence on memblock, it seems
->>> like meminfo should be deprecated as well to avoid duplication. This is
->>> a first pass attempt to just use memblock and not have meminfo
->>> integrated.
->>> There is still a major issue in terms of actually specifying mem at location
->>> on the command line but I wanted to send this out for some early feedback
->>> before putting any more effort into this. I've done basic boot testing on
->>> a simple DT target.
->>
->>
->> I can't see 1/2 and 2/2 - either in my inbox or in the archive.
->> Could you resend?
->>
->> /
->>      Leif
->
->
->
-> The patches are being held for moderation because apparently they have "a
-> suspicious header". Not sure how the cover letter made it through but the
-> patches didn't. If they don't get approved by end of the day I'll try
-> re-sending.
->
+On Wednesday 15 January 2014 18:45:19 Andrew Lunn wrote:
+> > > But i'm also a little bit concerned by the "unique number" and this
+> > > ending up in /dev/input/by-path/platform-gpio_keys.3-event. Is this
+> > > path supposed to be stable? This unique number is not stable. An
+> > > unwitting change to the DT could cause its value to change. Do we need
+> > > to make it stable?
+> > > 
+> > 
+> > One possibility would be to create an artificial bus in DT for all
+> > gpio-keys devices, use #address-cells=<1> and #size-cells=<0>
+> > for it, and give each device a unique reg property. Not sure if that
+> > would be considered an elegant solution though.
+> 
+> Hi Arnd
+> 
+> Can i imply from your answer that you think 
+> 
+> /dev/input/by-path/platform-gpio_keys.3-event
+> 
+> should be stable?
 
-Hi Laura,
+No, I have no idea whether it should be or not. I was just trying
+to come up with a way to make it stable if that's desired.
 
-This is a known issue that is triggered by the fact that the word
-PATCH is missing from your subject line.
-Could you resend but replace 'RFC' with 'RFC PATCH' ?
+> A quick look at udev rules seems to suggestion this is an issue for
+> input/gpio-keys and maybe audio and video if there is a top level DT
+> property collecting the different sub devices together for ASOC and
+> V4L.
 
--- 
-Ard.
+For some other subsystems, we have entries in /aliases/ to sort
+them. Maybe that would work here to get a stable path independent
+of the location in DT.
+
+	Arnd
