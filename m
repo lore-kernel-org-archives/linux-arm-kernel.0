@@ -1,44 +1,49 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Wed, 15 Jan 2014 16:41:44 -0500
-Subject: [PATCH] aarch64: always map VDSO at worst case alignment
-Message-ID: <20140115214144.GF18705@redacted.bos.redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 15 Jan 2014 22:42:01 +0100
+Subject: [PATCH v6 3/6] ARM: rockchip: add snoop-control-unit
+In-Reply-To: <27256277.YJ687suYy5@phil>
+References: <27256277.YJ687suYy5@phil>
+Message-ID: <1697706.8itCTnp9pp@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on ARM64 with 4K pages set, GDB fails to load the VDSO with
-the error "Failed to read a valid object file image from memory" as it
-is applying the phdr alignment to the vma, and attempting to read below
-where the VDSO is mapped. This is because our segment alignment is 64K
-in the ELF headers, but the VDSO only has PAGE_SIZE alignment from
-get_unmapped_area.
+This adds the device-node and config select to enable the
+scu in all Rockchip Cortex-A9 SoCs.
 
-Work around this by calling vm_unmapped_area directly, and specifying
-the worst case alignment (64K) directly.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+---
+ arch/arm/boot/dts/rk3xxx.dtsi  |    5 +++++
+ arch/arm/mach-rockchip/Kconfig |    1 +
+ 2 files changed, 6 insertions(+)
 
-With this patch applied, I no longer have issues loading the VDSO in
-gdb (and no more error message every time I run a program inside it.)
-
-Signed-off-by: Kyle McMartin <kyle@redhat.com>
-
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -163,7 +163,18 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 	vdso_mapping_len = (vdso_pages + 1) << PAGE_SHIFT;
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 0fcbcfd..0a3d5b1 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -26,6 +26,11 @@
+ 		compatible = "simple-bus";
+ 		ranges;
  
- 	down_write(&mm->mmap_sem);
--	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-+	{
-+		/* the VDSO must be worst-case aligned to 64K */
-+		struct vm_unmapped_area_info info =
-+			{
-+				.flags = 0,
-+				.length = vdso_mapping_len,
-+				.low_limit = mm->mmap_base,
-+				.high_limit = TASK_SIZE,
-+				.align_mask = (1 << 16) - 1,
-+			};
-+		vdso_base = vm_unmapped_area(&info);
-+	}
- 	if (IS_ERR_VALUE(vdso_base)) {
- 		ret = vdso_base;
- 		goto up_fail;
++		scu at 1013c000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0x1013c000 0x100>;
++		};
++
+ 		gic: interrupt-controller at 1013d000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			interrupt-controller;
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index cf073de..412cbcf 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -5,6 +5,7 @@ config ARCH_ROCKCHIP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_GIC
+ 	select CACHE_L2X0
++	select HAVE_ARM_SCU
+ 	select HAVE_ARM_TWD if SMP
+ 	select HAVE_SMP
+ 	select COMMON_CLK
+-- 
+1.7.10.4
