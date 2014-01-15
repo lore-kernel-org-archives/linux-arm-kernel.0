@@ -1,30 +1,71 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 15 Jan 2014 12:20:38 +0100
-Subject: [PATCH] at91: dt: i2c: add a new compatibility string for the
- at91sam9261
-In-Reply-To: <52D66A0C.4090509@atmel.com>
-References: <1389781467-29626-1-git-send-email-jjhiblot@traphandler.com>
- <52D66A0C.4090509@atmel.com>
-Message-ID: <20140115112038.GA2656@katana>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jan 2014 12:23:52 +0100
+Subject: [PATCH v2 12/12] at91: dt: sam9261: Added DM9000 in the device
+ tree
+In-Reply-To: <1389270709-32662-13-git-send-email-jjhiblot@traphandler.com>
+References: <1389270709-32662-1-git-send-email-jjhiblot@traphandler.com>
+ <1389270709-32662-13-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140115112352.GQ14627@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 11:59:24AM +0100, Nicolas Ferre wrote:
-> On 15/01/2014 11:24, Jean-Jacques Hiblot :
-> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On 13:31 Thu 09 Jan     , Jean-Jacques Hiblot wrote:
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  arch/arm/boot/dts/at91sam9261ek.dts | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+> index e92cb8e..a3d9d5a 100644
+> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+> @@ -76,6 +76,38 @@
+>  		smc: smc at ffffec00 {
+>  			status = "okay";
+>  
+> +			ebi_cs2 at 2,0 {
+> +				status = "okay";
+> +				smc,converter = "nanosec";
+> +				smc,ncs_read_setup = <0>;
+> +				smc,nrd_setup = <20>;
+> +				smc,ncs_write_setup = <0>;
+> +				smc,nwe_setup = <20>;
+> +				smc,ncs_read_pulse = <80>;
+> +				smc,nrd_pulse = <40>;
+> +				smc,ncs_write_pulse = <80>;
+> +				smc,nwe_pulse = <40>;
+> +				smc,read_cycle = <160>;
+> +				smc,write_cycle = <160>;
+> +				smc,tdf_cycles = <10>;
+> +				smc,tdf_optimized = <0>;
+> +				smc,page_size = <0>;
+> +				smc,byte_access_type = <1>;
+> +				smc,bus_width = <1>;
+> +				smc,nwait_mode = <0>;
+> +				smc,read_mode = <1>;
+> +				smc,write_mode = <1>;
+> +
+> +				ethernet at 2,0 {
+> +					compatible = "davicom,dm9000";
+> +					reg = <0x0 0x2 0x4 0x2>;
+> +					interrupt-parent = <&pioC>;
+> +					interrupts = <11 IRQ_TYPE_EDGE_BOTH>;
+use the new binding no interrupt-parent now
+> +					local-mac-address = [00 00 de ad be ef];
+drop the mac this is board specific
+> +					davicom,no-eeprom;
+> +				};
+> +			};
+> +
+>  			ebi_cs3 at 3,0 {
+>  				status = "okay";
+>  				smc,ncs_read_setup = <0>;
+> -- 
+> 1.8.5.2
 > 
-> Thanks Jean-Jacques.
 > 
-> Side note: do not forget i2c maintainer and ml.
+> _______________________________________________
+> linux-arm-kernel mailing list:wqa
 
-Yes, I don't have the original patch, needs resend.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140115/a3375a31/attachment.sig>
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
