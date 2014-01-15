@@ -1,110 +1,69 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 15 Jan 2014 14:53:52 +0800
-Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
- max_discard_to
-In-Reply-To: <CAPDyKFo1qe5tbCRvXtAV=nc9Bg6=ajWosnQudXvixw5134wscw@mail.gmail.com>
-References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
- <CAPDyKFo1qe5tbCRvXtAV=nc9Bg6=ajWosnQudXvixw5134wscw@mail.gmail.com>
-Message-ID: <CAA+hA=TV4OyS2v_PhphYnXH7g6enJP80unnZgG=hT7jq9yyY9w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jan 2014 14:58:54 +0800
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
+ warning
+In-Reply-To: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140115065851.GC1914@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
+> There should be no duplicate const specifiers for those static
+> constant character string arrays defined for clock mux options.
+> Also, the arrays are only taken as the 5th argument for the
+> imx_clk_mux() function, which is in the type of 'const char
+> **parents'.  So, let's remove the 2nd const specifier right
+> after 'char'.
+> 
+> This patch fixes these sparse warnings:
+> arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:22:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:23:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:24:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:25:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:26:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:27:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:28:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:29:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:30:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:31:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:32:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:33:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:34:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:35:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:36:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:37:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:38:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:39:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:40:25: warning: duplicate const
+> arch/arm/mach-imx/clk-imx6sl.c:41:25: warning: duplicate const
+> 
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx6sl.c |   42 ++++++++++++++++++++--------------------
+>  1 file changed, 21 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+> index c0c4ef5..9fad29a9 100644
+> --- a/arch/arm/mach-imx/clk-imx6sl.c
+> +++ b/arch/arm/mach-imx/clk-imx6sl.c
+> @@ -18,27 +18,27 @@
+>  #include "clk.h"
+>  #include "common.h"
+>  
+> -static const char const *step_sels[]		= { "osc", "pll2_pfd2", };
+...
+> +static const char *step_sels[]		= { "osc", "pll2_pfd2", };
 
-On Mon, Jan 13, 2014 at 9:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 17 December 2013 09:16, Dong Aisheng <b29396@freescale.com> wrote:
->> Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
->> 1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
->> while 3~4 fix setting the max timeout.
->> Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
->> for those platform which have different timeout setting.
->>
->> This issue is firstly reported here by Ed Sutter:
->> http://www.spinics.net/lists/linux-mmc/msg23375.html
->> The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
->> which cause the max_discard_bytes for eMMC is only 512, then the discard operation
->> of mkfs.ext3 for an eMMC card is too slow, just like dead.
->> With above patches, the issue can be fixed.
->>
->> Patch 5 adds the capability to calcalute the max_discard_to dynamically
->> for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
->>
->> Originally the max_discard_to for a high speed sdhc card may be:
->> mmc1: new high speed SDHC card at address aaaa
->> mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
->> After fix:
->> mmc1: new high speed SDHC card at address aaaa
->> mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
->>
->> It also improves the card discard performance a lot due to max_discard_sectors
->> increase a lot.
->>
->> There's also discussion about remove max_discard_to limit here:
->> http://www.spinics.net/lists/linux-mmc/msg23395.html
->> But it does not help for uSDHC since we can observe data timeout
->> on a Toshiba SD3.0 cards if we do not disable data timeout interrupt.
->
-> Just some more input to this discussion.
->
-> As you probably know, I am working on a solution which in principle
-> means we will fall back to use R1 responses instead of R1B.
-> Particularly in those cases were the host driver supports
-> MMC_CAP_WAIT_WHILE_BUSY and when it can't support the requested busy
-> detection timeout. In other words, we will fall back to use poll with
-> CMD13 instead, which is what happens already for those not supporting
-> MMC_CAP_WAIT_WHILE_BUSY.
->
+So now we're getting the following checkpatch warning:
 
-Will be glad to see your patches for that feature.
+WARNING: static const char * array should probably be static const char * const
 
-This patch series is intend to fix different issues, it does not
-depend on your work.
-Patch 1~4 is totally for fixing imx timeout issues.
-Patch 5 is to add the capability to calcalute the max_discard_to dynamically.
-This is also a fix of calculating max_discard_to for controllers using
-SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK.
-It's especially useful for controllers using hw timeout with big
-timeout capability.
-They should be needed no matter whether polling way is used or not.
+It was added into checkpatch.pl by commit cb710ec (scripts/checkpatch.pl:
+add warnings for static char that could be static const char).  I'm not
+sure which warning we should ignore, the sparse or the checkpatch one.
 
-Regards
-Dong Aisheng
+Joe, comments?
 
-> Kind regards
-> Ulf Hansson
->
->>
->> ChangeLog:
->> v1->v2:
->>  1. change .get_max_timeout to .get_max_timeout_count to reuse some code
->>  2. some other minor changes based on Shawn's comment.
->>  3. patch 6 in v1 is dropped since not need anymore after change 1
->>
->>
->>
->> Dong Aisheng (5):
->>   mmc: sdhci: add platfrom get_max_timeout_count hook
->>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
->>   mmc: sdhci: add platform set_timeout hook
->>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
->>   mmc: sdhci: calculate max_discard_to dynamically for
->>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
->>
->>  drivers/mmc/host/sdhci-esdhc-imx.c |   20 +++++++++++
->>  drivers/mmc/host/sdhci.c           |   66 +++++++++++++++++++++++------------
->>  drivers/mmc/host/sdhci.h           |    3 ++
->>  3 files changed, 66 insertions(+), 23 deletions(-)
->>
->> --
->> 1.7.2.rc3
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Shawn
