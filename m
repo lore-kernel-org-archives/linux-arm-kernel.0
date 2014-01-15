@@ -1,297 +1,99 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 15 Jan 2014 17:32:12 +0100
-Subject: [PATCHv12] ARM: dts: Add support for the cpuimx35 board from Eukrea
- and its baseboard.
-Message-ID: <1389803532-8516-1-git-send-email-denis@eukrea.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 15 Jan 2014 11:43:05 -0500
+Subject: [PATCH v4 02/16] ARM: move shared uprobe/kprobe definitions into
+ new include file
+In-Reply-To: <1387543568.3404.36.camel@linaro1.home>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-3-git-send-email-dave.long@linaro.org>
+ <1387543568.3404.36.camel@linaro1.home>
+Message-ID: <52D6BA99.6020409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following devices/functionalities were added:
- * Main and secondary UARTs.
- * i2c and the pcf8563 device.
- * Ethernet.
- * NAND.
- * The BP1 button.
- * The LED.
- * Watchdog
- * SD.
+On 12/20/13 07:46, Jon Medhurst (Tixy) wrote:
+> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Separate the kprobe-only definitions from the definitions needed by
+>> both kprobes and uprobes.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>>   arch/arm/include/asm/kprobes.h | 15 +--------------
+>>   arch/arm/include/asm/probes.h  | 18 ++++++++++++++++++
+>>   2 files changed, 19 insertions(+), 14 deletions(-)
+>>   create mode 100644 arch/arm/include/asm/probes.h
+>>
+>> diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+>> index f82ec22..30fc11b 100644
+>> --- a/arch/arm/include/asm/kprobes.h
+>> +++ b/arch/arm/include/asm/kprobes.h
+>> @@ -28,21 +28,8 @@
+>>   #define kretprobe_blacklist_size	0
+>>
+>>   typedef u32 kprobe_opcode_t;
+>> -
+>>   struct kprobe;
+>> -typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+>> -typedef unsigned long (kprobe_check_cc)(unsigned long);
+>> -typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+>> -typedef void (kprobe_insn_fn_t)(void);
+>> -
+>> -/* Architecture specific copy of original instruction. */
+>> -struct arch_specific_insn {
+>> -	kprobe_opcode_t			*insn;
+>> -	kprobe_insn_handler_t		*insn_handler;
+>> -	kprobe_check_cc			*insn_check_cc;
+>> -	kprobe_insn_singlestep_t	*insn_singlestep;
+>> -	kprobe_insn_fn_t		*insn_fn;
+>> -};
+>> +#include <asm/probes.h>
+>>
+>>   struct prev_kprobe {
+>>   	struct kprobe *kp;
+>> diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+>> new file mode 100644
+>> index 0000000..21da148
+>> --- /dev/null
+>> +++ b/arch/arm/include/asm/probes.h
+>> @@ -0,0 +1,18 @@
+>
+> This new file doesn't have any copyright/license notice, I suggest you
+> copy the one from kprobes.h and include a note to say this new files
+> contents were copied, e.g. start it like...
+>
+> /*
+>   * arch/arm/include/asm/probes.h
+>   *
+>   * Original contents copied from arch/arm/include/asm/kprobes.h
+>   * which contains the following notice...
+>   *
+>   * Copyright (C) 2006, 2007 Motorola Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+> [...]
+>
 
-Cc: Eric B?nard <eric@eukrea.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
-ChangeLog v11->v12:
-- Moved the pinctrl properties of the led1 and bp1 nodes to their respective parent nodes.
+Fixed.
 
-ChangeLog v10->v11:
-- The other patches in this serie have already been applied in the for-next branch
-  in Shawn Guo's tree at git://git.linaro.org/people/shawnguo/linux-2.6.git :
-    4449d01 ARM i.MX35: build in pinctrl support.
-    cd01fd4 ARM: imx_v6_v7_defconfig: Enable some drivers used on the cpuimx35.
-- Reordered the Cc list and dropped the Cc to the devicetree binding maintainers.
-- Moved the pins of the hoggrp inside their respective node, the bp1 and led1 nodes
-  were updated accordingly.
-- The esdhc1's gpio was fixed: the card detect code will never uses the gpio "active"
-  high/low setting, instead it uses that GPIO as an IRQ.
-- Cosmetic fixes in the uart pinctrl nodes.
+>> +#ifndef _ASM_PROBES_H
+>> +#define _ASM_PROBES_H
+>> +
+>> +typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+>> +typedef unsigned long (kprobe_check_cc)(unsigned long);
+>> +typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+>> +typedef void (kprobe_insn_fn_t)(void);
+>> +
+>> +/* Architecture specific copy of original instruction. */
+>> +struct arch_specific_insn {
+>> +	kprobe_opcode_t			*insn;
+>> +	kprobe_insn_handler_t		*insn_handler;
+>> +	kprobe_check_cc			*insn_check_cc;
+>> +	kprobe_insn_singlestep_t	*insn_singlestep;
+>> +	kprobe_insn_fn_t		*insn_fn;
+>> +};
+>> +
+>> +#endif
+>
 
-ChangeLog v9->v10:
-- Added Fabio Estevam To the Cc list
-
-ChangeLog v8->v9:
-- Added the dtb target into arch/arm/boot/dts/Makefile.
-- Added a blank line before the pcf8563 node in the i2c1 node.
-- Whitespace cleanups as requested by Shawn Guo.
-- _' was used in label, it's now fixed (it has been replaced with '-').
-- The recently introduced defines for input and gpios are now used.
-- The uarts had the fsl,uart-has-rtscts property set, but they didn't use 
-  any rts and cts pins in the uart pinctrl nodes.
-
-ChangeLog v7->v8:
-- The commit message was improved.
-- The board specific iomuxc pins group configuration that were in imx35.dtsi were moved here.
-- The rest of the patch was updated accordingly.
-
-ChangeLog v6->v7:
-- Added Grant Likely in the Cc list.
-- Shortened the license.
-- The tsc2007 pads were moved in another patch.
-
-ChangeLog v5->v6:
-- Shawn Guo was added in the Cc.
----
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |   59 +++++++++
- .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  137 ++++++++++++++++++++
- 3 files changed, 197 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 570dcd6..98d3921 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -145,6 +145,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-phytec-phycard-s-som.dtb \
- 	imx27-phytec-phycard-s-rdk.dtb \
- 	imx31-bug.dtb \
-+	imx35-eukrea-mbimxsd35-baseboard.dtb \
- 	imx50-evk.dtb \
- 	imx51-apf51.dtb \
- 	imx51-apf51dev.dtb \
-diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-new file mode 100644
-index 0000000..303f789
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX35";
-+	compatible = "eukrea,cpuimx35", "fsl,imx35";
-+
-+	memory {
-+		reg = <0x80000000 0x8000000>; /* 128M */
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+&iomuxc {
-+	imx35-eukrea {
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <MX35_FEC_PINGRP1>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX35_I2C1_PINGRP1>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-new file mode 100644
-index 0000000..23f6fe1
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -0,0 +1,137 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "imx35-eukrea-cpuimx35.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX35";
-+	compatible = "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_bp1>;
-+
-+		bp1 {
-+			label = "BP1";
-+			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
-+			linux,code = <BTN_MISC>;
-+			gpio-key,wakeup;
-+			linux,input-type = <1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led1>;
-+
-+		led1 {
-+			label = "led1";
-+			gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	cd-gpios = <&gpio3 24>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	tlv320aic23: codec at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&iomuxc {
-+	imx35-eukrea {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <MX35_AUDMUX_PINGRP1>;
-+		};
-+
-+		pinctrl_bp1: bp1grp {
-+			fsl,pins = <MX35_PAD_LD19__GPIO3_25  0x80000000>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				  MX35_ESDHC1_PINGRP1
-+				  MX35_PAD_LD18__GPIO3_24  0x80000000 /* CD */
-+			>;
-+		};
-+
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <MX35_FEC_PINGRP1>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX35_I2C1_PINGRP1>;
-+		};
-+
-+		pinctrl_led1: led1grp {
-+			fsl,pins = <MX35_PAD_LD23__GPIO3_29  0x80000000>;
-+		};
-+
-+		pinctrl_reg_lcd_3v3: reg-lcd-3v3 {
-+			fsl,pins = <MX35_PAD_D3_CLS__GPIO1_4 0x80000000>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX35_UART1_PINGRP1
-+				MX35_UART1_RTSCTS_PINGRP1
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX35_UART2_PINGRP1
-+				MX35_UART2_RTSCTS_PINGRP1
-+			>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+-dl
