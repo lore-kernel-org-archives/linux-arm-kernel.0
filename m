@@ -1,66 +1,70 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 15 Jan 2014 16:44:03 +0800
-Subject: [PATCH 1/1] mmc: sdhci: fix lockdep error on tunning routine
-In-Reply-To: <20140115084653.4f6aece8@ipc1.ka-ro>
-References: <1387797184-18958-1-git-send-email-b29396@freescale.com>
- <CAA+hA=TRQP7hS3+iXyHg3FuNQKA=chJi7Ne47Ew_4RJcQ6yong@mail.gmail.com>
- <20140113120435.GQ31570@twins.programming.kicks-ass.net>
- <CAA+hA=Sb+Ve2xyto9v6YirqcXnePK2aHzJgjGZOhEQJK5Z0jqQ@mail.gmail.com>
- <20140115084653.4f6aece8@ipc1.ka-ro>
-Message-ID: <CAA+hA=TdWSFX7phF-HdL6aYreuTBQdmhvP1f1W_CoT0j5G1rag@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 15 Jan 2014 09:45:28 +0100
+Subject: [Intel-gfx] [PATCH 1/2] drm: share drm_add_fake_info_node
+In-Reply-To: <CAKMK7uF0kFCsc=3Ny_BMPwDd1fqpY-D6baRRBe0Z8DBKcdGHhg@mail.gmail.com>
+References: <1389708847-25038-1-git-send-email-benjamin.widawsky@intel.com>
+ <20140114232510.GV4770@phenom.ffwll.local>
+ <20140114234018.GK15937@n2100.arm.linux.org.uk>
+ <CAKMK7uF0kFCsc=3Ny_BMPwDd1fqpY-D6baRRBe0Z8DBKcdGHhg@mail.gmail.com>
+Message-ID: <CAKMK7uE7CSh1gcs341ji6duRH_FgNDhoMfZNc=4hoYf-an1M=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 3:46 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> Hi,
->
-> Dong Aisheng wrote:
->> On Mon, Jan 13, 2014 at 8:04 PM, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Thu, Dec 26, 2013 at 03:58:20PM +0800, Dong Aisheng wrote:
->> >> > It's strange that this issue did not happen on kernel 3.10.17 with the same
->> >> > code. And looking at the code, before call spin_lock we already disable the mmc
->> >> > controller irq, per on my understanding, the deadlock given by lockdep may not
->> >> > be able to happen(pls fix me if wrong).
->> >> > May the lockdep not track the specific irq disable?
->> >> > Copy lockdep guy to comment.
->> >
->> > No, lockdep also doesn't know only that one line can take this lock.
->> > Lockdep only knows a lock is taken from IRQ context, and disabling one
->> > line still allows IRQs to happen and therefore it yells.
+On Wed, Jan 15, 2014 at 9:39 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Wed, Jan 15, 2014 at 12:40 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Jan 15, 2014 at 12:25:10AM +0100, Daniel Vetter wrote:
+>>> On Tue, Jan 14, 2014 at 06:14:06AM -0800, Ben Widawsky wrote:
+>>> > Both i915 and Armada had the exact same implementation. For an upcoming
+>>> > patch, I'd like to call this function from two different source files in
+>>> > i915, and having it available externally helps there too.
+>>> >
+>>> > While moving, add 'debugfs_' to the name in order to match the other drm
+>>> > debugfs helper functions.
+>>> >
+>>> > Cc: linux-arm-kernel at lists.infradead.org
+>>> > Cc: intel-gfx at lists.freedesktop.org
+>>> > Signed-off-by: Ben Widawsky <ben@bwidawsk.net>
+>>>
+>>> drm_debugfs_create_files in drm_debugfs.c has the almost same code again.
+>>> Now the problem here is that the interface is a bit botched up, since all
+>>> the users in i915 and armada actaully faile to clean up teh debugfs dentry
+>>> if drm_add_fake_info_node.
 >>
->> Okay, thanks for the information.
->> If that, kernel 3.10.17 has the same code, do you know why it does not trigger
->> such lockdep error?
+>> That's not correct - armada does clean up these, I think you need to
+>> take a closer look at the code.
 >>
-> compiled with CONFIG_LOCKDEP disabled?
+>> We do this by setting node->info_ent to the file operations structure,
+>> which is a unique key to the file being registered.
+>>
+>> Upon failure to create the fake node, we appropriately call
+>> drm_debugfs_remove_files() with the first argument being a pointer to
+>> the file operations.  This causes drm_debugfs_remove_files() to match
+>> the fake entry, call debugfs_remove() on the dentry, and remove the
+>> node from the list, and free the node structure we allocated.
+>>
+>> Upon driver teardown, we also call drm_debugfs_remove_files() but with
+>> each fops which should be registered, thus cleaning up each fake node
+>> which was created.
+>>
+>> So, Armada does clean up these entries properly.
 >
+> Indeed I've missed that and it's just i915 that botches this. I still
+> think the helper would be saner if it cleans up all its leftovers in
+> the failure case.
 
-I did compile with LOCKDEP enabled.
-See below for a part of my .config
-CONFIG_DEBUG_SPINLOCK=y
-CONFIG_DEBUG_MUTEXES=y
-CONFIG_DEBUG_LOCK_ALLOC=y
-CONFIG_PROVE_LOCKING=y
-CONFIG_LOCKDEP=y
-# CONFIG_LOCK_STAT is not set
-# CONFIG_DEBUG_LOCKDEP is not set
-CONFIG_TRACE_IRQFLAGS=y
-CONFIG_DEBUG_ATOMIC_SLEEP=y
+Ok, now I've actually page all the stuff back in - if
+drm_add_fake_info_node fails we don't set up a drm_info_node structure
+and link it anywhere. Which means drm_debugfs_remove_files won't ever
+find it and hence can't possibly call debugfs_remove. Which means the
+debugfs dentry is leaked. So I think the semantics of that new debugfs
+helper should get fixed to also allocate and clean up the debugfs
+node.
 
-That's why i think it's strange.
-
-Regards
-Dong Aisheng
-
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
+I agree that i915 is even worse since it doesn't bother to clean up
+any debugfs files at all in the failure case.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
