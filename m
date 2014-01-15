@@ -1,53 +1,202 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 15 Jan 2014 09:55:33 -0800
-Subject: [RFC 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140115112516.GA17371@arm.com>
-References: <1389765322-28582-1-git-send-email-lauraa@codeaurora.org>
- <1389765322-28582-3-git-send-email-lauraa@codeaurora.org>
- <20140115094957.GL15937@n2100.arm.linux.org.uk>
- <CAHkRjk4rkbLVReY7PQqO6DYB3erf6pRj4c4VoBe3iszkc9B5GA@mail.gmail.com>
- <20140115105347.GM15937@n2100.arm.linux.org.uk>
- <20140115112516.GA17371@arm.com>
-Message-ID: <52D6CB95.1000402@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jan 2014 09:55:29 -0800
+Subject: [PATCH v2 1/7] ARM: perf_event: Support percpu irqs for the CPU PMU
+In-Reply-To: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/15/2014 3:25 AM, Catalin Marinas wrote:
-> On Wed, Jan 15, 2014 at 10:53:47AM +0000, Russell King - ARM Linux wrote:
->> On Wed, Jan 15, 2014 at 10:22:02AM +0000, Catalin Marinas wrote:
->>> On 15 January 2014 09:49, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>>> On Tue, Jan 14, 2014 at 09:55:22PM -0800, Laura Abbott wrote:
->>>>> memblock is now fully integrated into the kernel and is the prefered
->>>>> method for tracking memory. Rather than reinvent the wheel with
->>>>> meminfo, migrate to using memblock directly instead of meminfo as
->>>>> an intermediate.
->>>>
->>>> The reason I never killed meminfo was that for some of the functions here
->>>> is that meminfo has a slightly different property to memblock.
->>>>
->>>> With meminfo, each sparsemem section mapping or discontigmem node must be
->>>> specified as a separate bank of memory, even if it is contiguous with the
->>>> previous block.  This is so that the functions which walk the page arrays
->>>> can do so efficiently (without having to convert from a PFN to a struct
->>>> page for every page in the system, which is very inefficient.)
->>>
->>> pfn_to_page() conversion is indeed expensive with sparsemem (on
->>> 32-bit) but does meminfo actually add a noticeable improvement to the
->>> boot time? I don't think so but it's worth testing (something a
->>> thousand cycles maximum would be lost in the noise).
->>
->> Why do you ask about boot time?
->
-> Is meminfo used on a critical path at run-time?
->
+Some CPU PMUs are wired up with one PPI for all the CPUs instead
+of with a different SPI for each CPU. Add support for these
+devices.
 
-As far as I can tell, the only place meminfo is used after 
-initialization is in show_mem which isn't a critical path. Are there 
-other paths I missed?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/perf_event.c     | 14 ++++--
+ arch/arm/kernel/perf_event_cpu.c | 97 ++++++++++++++++++++++++++++------------
+ 2 files changed, 80 insertions(+), 31 deletions(-)
 
-Thanks,
-Laura
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 789d846a9184..e76750980b38 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -16,6 +16,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/uaccess.h>
++#include <linux/irq.h>
++#include <linux/irqdesc.h>
+ 
+ #include <asm/irq_regs.h>
+ #include <asm/pmu.h>
+@@ -295,9 +297,15 @@ validate_group(struct perf_event *event)
+ 
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+-	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
+-	struct platform_device *plat_device = armpmu->plat_device;
+-	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
++	struct arm_pmu *armpmu;
++	struct platform_device *plat_device;
++	struct arm_pmu_platdata *plat;
++
++	if (irq_is_percpu(irq))
++		dev = *(struct arm_pmu_cpu **)dev;
++	armpmu = dev;
++	plat_device = armpmu->plat_device;
++	plat = dev_get_platdata(&plat_device->dev);
+ 
+ 	if (plat && plat->handle_irq)
+ 		return plat->handle_irq(irq, dev, armpmu->handle_irq);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 20d553c9f5e2..6efd8aab15df 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -25,6 +25,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/irq.h>
++#include <linux/irqdesc.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+@@ -33,6 +35,7 @@
+ /* Set at runtime when we know what CPU type we are. */
+ static struct arm_pmu *cpu_pmu;
+ 
++static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
+ static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
+ static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
+ static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+@@ -71,6 +74,26 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
+ 	return this_cpu_ptr(&cpu_hw_events);
+ }
+ 
++static void cpu_pmu_enable_percpu_irq(void *data)
++{
++	struct arm_pmu *cpu_pmu = data;
++	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	int irq = platform_get_irq(pmu_device, 0);
++
++	enable_percpu_irq(irq, IRQ_TYPE_NONE);
++	cpumask_set_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
++}
++
++static void cpu_pmu_disable_percpu_irq(void *data)
++{
++	struct arm_pmu *cpu_pmu = data;
++	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	int irq = platform_get_irq(pmu_device, 0);
++
++	cpumask_clear_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
++	disable_percpu_irq(irq);
++}
++
+ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ {
+ 	int i, irq, irqs;
+@@ -78,12 +101,18 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ 
+ 	irqs = min(pmu_device->num_resources, num_possible_cpus());
+ 
+-	for (i = 0; i < irqs; ++i) {
+-		if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
+-			continue;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0)
+-			free_irq(irq, cpu_pmu);
++	irq = platform_get_irq(pmu_device, 0);
++	if (irq >= 0 && irq_is_percpu(irq)) {
++		on_each_cpu(cpu_pmu_disable_percpu_irq, cpu_pmu, 1);
++		free_percpu_irq(irq, &percpu_pmu);
++	} else {
++		for (i = 0; i < irqs; ++i) {
++			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
++				continue;
++			irq = platform_get_irq(pmu_device, i);
++			if (irq >= 0)
++				free_irq(irq, cpu_pmu);
++		}
+ 	}
+ }
+ 
+@@ -101,33 +130,44 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 		return -ENODEV;
+ 	}
+ 
+-	for (i = 0; i < irqs; ++i) {
+-		err = 0;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq < 0)
+-			continue;
+-
+-		/*
+-		 * If we have a single PMU interrupt that we can't shift,
+-		 * assume that we're running on a uniprocessor machine and
+-		 * continue. Otherwise, continue without this interrupt.
+-		 */
+-		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+-			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-				    irq, i);
+-			continue;
+-		}
+-
+-		err = request_irq(irq, handler,
+-				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+-				  cpu_pmu);
++	irq = platform_get_irq(pmu_device, 0);
++	if (irq >= 0 && irq_is_percpu(irq)) {
++		err = request_percpu_irq(irq, handler, "arm-pmu", &percpu_pmu);
+ 		if (err) {
+ 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+ 				irq);
+ 			return err;
+ 		}
+-
+-		cpumask_set_cpu(i, &cpu_pmu->active_irqs);
++		on_each_cpu(cpu_pmu_enable_percpu_irq, cpu_pmu, 1);
++	} else {
++		for (i = 0; i < irqs; ++i) {
++			err = 0;
++			irq = platform_get_irq(pmu_device, i);
++			if (irq < 0)
++				continue;
++
++			/*
++			 * If we have a single PMU interrupt that we can't shift,
++			 * assume that we're running on a uniprocessor machine and
++			 * continue. Otherwise, continue without this interrupt.
++			 */
++			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
++				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++					    irq, i);
++				continue;
++			}
++
++			err = request_irq(irq, handler,
++					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
++					  cpu_pmu);
++			if (err) {
++				pr_err("unable to request IRQ%d for ARM PMU counters\n",
++					irq);
++				return err;
++			}
++
++			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
++		}
+ 	}
+ 
+ 	return 0;
+@@ -141,6 +181,7 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		events->events = per_cpu(hw_events, cpu);
+ 		events->used_mask = per_cpu(used_mask, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
++		per_cpu(percpu_pmu, cpu) = cpu_pmu;
+ 	}
+ 
+ 	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
