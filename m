@@ -1,77 +1,40 @@
-From: courtney.cavin@sonymobile.com (Courtney Cavin)
-Date: Tue, 14 Jan 2014 16:13:45 -0800
-Subject: [PATCH v4 5/6] spmi: document the PMIC arbiter SPMI bindings
-In-Reply-To: <6dbb1c77001542e093d3af09ea976d402ed24d17.1389738151.git.joshc@codeaurora.org>
-References: <cover.1389738151.git.joshc@codeaurora.org>
- <6dbb1c77001542e093d3af09ea976d402ed24d17.1389738151.git.joshc@codeaurora.org>
-Message-ID: <20140115001344.GE23276@sonymobile.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 15 Jan 2014 09:09:09 +0800
+Subject: [PATCH 1/3] mmc: dw_mmc: use slot-gpio to handle cd pin
+In-Reply-To: <CAOesGMi5bK6siLQ2dVkR7P30+5zQa8qsyxa3UsWj0Kw9OEXCPw@mail.gmail.com>
+References: <1389278112-7099-1-git-send-email-zhangfei.gao@linaro.org>	<1389278112-7099-2-git-send-email-zhangfei.gao@linaro.org>	<CAGa+x85awFYsrU9Gggirpaip3vggtSqu5GinVzss=nfNcp4nww@mail.gmail.com>
+ <CAOesGMi5bK6siLQ2dVkR7P30+5zQa8qsyxa3UsWj0Kw9OEXCPw@mail.gmail.com>
+Message-ID: <52D5DFB5.7@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 07:41:39PM +0100, Josh Cartwright wrote:
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
->  .../bindings/spmi/qcom,spmi-pmic-arb.txt           | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
-> new file mode 100644
-> index 0000000..9e50cb3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
-> @@ -0,0 +1,46 @@
-> +Qualcomm SPMI Controller (PMIC Arbiter)
-> +
-> +The SPMI PMIC Arbiter is found on the Snapdragon 800 Series.  It is an SPMI
-> +controller with wrapping arbitration logic to allow for multiple on-chip
-> +devices to control a single SPMI master.
-> +
-> +The PMIC Arbiter can also act as an interrupt controller, providing interrupts
-> +to slave devices.
-> +
-> +See spmi.txt for the generic SPMI controller binding requirements for child
-> +nodes.
-> +
-> +Required properties:
-> +- compatible : should be "qcom,spmi-pmic-arb".
-> +- reg-names  : should be "core", "intr", "cnfg"
-> +- reg : register specifiers, must contain 3 entries, in the follow order:
-> +     core registers, interrupt controller registers, configuration registers
 
-As far as I can tell, patch 3/6 doesn't require these to be in any
-order, as it uses 'reg-names' to fetch the values. Perhaps the
-following:
 
-reg-names : must contain:
-	"core" - core registers
-	"intr" - interrupt controller registers
-	"cnfg" - configuration registers
-reg : A list of address + size pairs for the regs listed in reg-names
+On 01/15/2014 01:23 AM, Olof Johansson wrote:
+> On Tue, Jan 14, 2014 at 7:58 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> On Thu, Jan 9, 2014 at 6:35 AM, Zhangfei Gao <zhangfei.gao@linaro.org> wrote:
+>>> Suggested by Jaehoon: Use slot-gpio to handle cd-gpio
+>>> Add function dw_mci_of_get_cd_gpio to check "cd-gpios" from dts.
+>>> mmc_gpio_request_cd and mmc_gpio_get_cd are used to handle cd pin
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>
+>> The Samsung Arndale board started failing boot from MMC root tests
+>> starting with next-20140113 and I bisected it down to this patch.
+>> Reverting this patch on top of next-20140114 gets Arndale booting
+>> again from MMC.  Is there some supporting DT data that's missing for
+>> Arndale?
+>
+> Rather, it looks like this patch changes behaviour and no longer uses
+> dw_mci_get_cd() to find out if there's a card attached -- it switches
+> to rely only on GPIO (see the last chunk in the patch). That seems
+> broken?
+>
+Oops,
+Change using dw_mci_get_cd set flag DW_MMC_CARD_PRESENT.
+And dw_mci_get_cd is called from mmc_rescan, a litter later than 
+dw_mci_probe.
+Is that too late?
 
-> +- #address-cells : must be set to 2
-> +- #size-cells : must be set to 0
-> +- qcom,ee : indicates the active Execution Environment identifier (0-5)
-> +- qcom,channel : which of the PMIC Arb provided channels to use for accesses (0-5)
-
-These two are new.... Is it expected that they should be required?
-
-> +- interrupt-controller : indicates the PMIC arbiter is an interrupt controller
-
-Although it's probably fairly understood that this is a boolean, it
-wouldn't hurt to mention that here.  It might also be worth referencing
-devicetree/binding/interrupt-controller/interrupts.txt in your opening
-blurb.
-
-> +- #interrupt-cells = <4>:  interrupts are specified as a 4-tuple:
-
-Nitpick: This '= <X>' differs from the above 'must be set to X' format.
-
-> +    cell 1: slave ID for the requested interrupt (0-15)
-> +    cell 2: peripheral ID for requested interrupt (0-255)
-> +    cell 3: the requested peripheral interrupt (0-7)
-> +    cell 4: interrupt flags indicating level-sense information, as defined in
-> +            dt-bindings/interrupt-controller/irq.h
-[...]
-
--Courtney
+Thanks
