@@ -1,68 +1,44 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 15 Jan 2014 18:28:14 +0200
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
- audio support for TDA998x trough McASP I2S bus
-In-Reply-To: <52D691AD.3010206@iki.fi>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
- <52D691AD.3010206@iki.fi>
-Message-ID: <52D6B71E.5000702@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 15 Jan 2014 11:30:11 -0500 (EST)
+Subject: [PATCH v6 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1389802104-17330-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1401151123340.1587-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2014 03:48 PM, Anssi Hannula wrote:
-> 15.01.2014 13:27, Jyri Sarha kirjoitti:
->> On 12/31/2013 03:25 PM, Mark Brown wrote:
->>> On Fri, Dec 20, 2013 at 12:39:38PM +0200, Jyri Sarha wrote:
->>>> support. The only supported sample format is SNDRV_PCM_FORMAT_S32_LE.
->>>> The 8 least significant bits are ignored.
->>>
->>> Where does this constraint come from?
->>>
->>
->>   From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N
->> register statically to a value that works only with 4 byte samples.
->> According to my tests it is possible to support 3 and 2 byte samples too
->> by changing the CTS_N register value, but I am not sure if the
->> configuration can be changed on the fly. My data sheet of the nxp chip
->> is very vague about the register definitions, but I suppose the register
->> configures some clock divider on the chip. HDMI supports only upto 24bit
->> audio and the data sheet states that any extraneous least significant
->> bits are ignored.
->
-> That sounds strange, CTS/N values only depend on audio sample rate and
-> TMDS/video clock, not on the audio format or the size of samples (HDMI
-> spec sec 7.2 - Audio Sample Clock Capture and Regeneration).
->
-> Sure there isn't anything more going on (like the used HDMI sink being
-> more tolerant to wrong CTS/N with 4-byte samples, or more likely
-> something else I can't immediately think of)?
->
+On Wed, 15 Jan 2014, Hans de Goede wrote:
 
-On theoretical level I am not really sure about anything, because have 
-not been able to get my hands on proper NXP TDA19988 documentation.
+> +static int ohci_platform_power_on(struct platform_device *dev)
+> +{
+> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
+> +	int clk, ret;
+> +
+> +	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++) {
 
-However, while playing around with my Beaglebone-Black I have have found 
-out in practice that by changing CTS_N register's (page 0x11 reg 0x0c) 
-K_SEL bits (bit 2 to 0)[1] I can get 2, 3 and 4 byte samples to work 
-consistently by setting:
+You fixed this one...
 
-K_SEL = 1 for SNDRV_PCM_FORMAT_S16_LE
-K_SEL = 2 for SNDRV_PCM_FORMAT_S24_3LE
-K_SEL = 3 for SNDRV_PCM_FORMAT_S32_LE
+> @@ -125,13 +225,22 @@ static int ohci_platform_remove(struct platform_device *dev)
+>  {
+>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>  	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
+> +	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
+> +	int clk;
+>  
+>  	usb_remove_hcd(hcd);
+> -	usb_put_hcd(hcd);
+>  
+>  	if (pdata->power_off)
+>  		pdata->power_off(dev);
+>  
+> +	for (clk = 0; priv->clks[clk] && clk < OHCI_MAX_CLKS; clk++)
 
-Because I do not really know what is going on, I did not want to suggest 
-any changes to the driver and just use the format that works with the 
-current driver version.
+but not this one.  :-(  Same for the ehci-platform patch.
 
-The HDMI sinks I have been using are a Toshiba 22B2LF1G and Thomson 
-42E90NF32 televisions. About those I just know that they both behave the 
-same way.
+In fact, it might be easier to make this loop go backward, like
+you do in the *_platform_power_off routines.
 
-Best regards,
-Jyri
+Is there a devm-type routine that will take care of all this for you?
 
-[1] The closest data sheet that has any description about the chip 
-registers I have found is this: 
-http://media.digikey.com/pdf/Data%20Sheets/NXP%20PDFs/TDA9983B.pdf
+Alan Stern
