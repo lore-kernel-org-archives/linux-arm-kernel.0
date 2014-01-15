@@ -1,37 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jan 2014 14:48:13 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <20140115132035.GE9558@ns203013.ovh.net>
- <CACh+v5Mccz47VMxDcrAC1NY30cY53gxEmp5MG4+n0PNn5RrsSw@mail.gmail.com>
-Message-ID: <8007592.fj8kc2EY8M@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jan 2014 13:50:52 +0000
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <15900408.Osb5heuoGi@wuerfel>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+ <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
+ <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
+ <15900408.Osb5heuoGi@wuerfel>
+Message-ID: <20140115135052.GG25824@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 14:44:24 Jean-Jacques Hiblot wrote:
-> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> > On 14:04 Wed 15 Jan     , Jean-Jacques Hiblot wrote:
-> >> 2014/1/15 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> >> > because this the only to start to do it right
-> >> > I had a very long discussion woth LinusW and Grant the Gpio need to stop to
-> >> > use gpio_to_irq & co for irq.
-> >> How can you get the value of the gpio that is also an interrupt source then ?
-> >> Can you give a short example?
-> >
-> > you just have to check the irq source
-> >
-> > failing or raising
-> >
-> > but on 9261 impossible the gpio does not have such detail
-> >
-> > but anyway this is the invert you need to get the information from the IRQ no the way
-> > arround
+On Wed, Jan 15, 2014 at 11:17:07AM +0000, Arnd Bergmann wrote:
+> On Wednesday 15 January 2014 11:05:37 Mark Rutland wrote:
+> > On Wed, Jan 15, 2014 at 05:21:05AM +0000, Yuan Yao wrote:
+> > > --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> > > +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> > > @@ -4,11 +4,24 @@ Required properties:
+> > >  - compatible : Should be "fsl,<soc>-lpuart"
+> > >  - reg : Address and length of the register set for the device
+> > >  - interrupts : Should contain uart interrupt
+> > > +- clocks : from common clock binding: handle to uart clock
+> > > +- clock-names : from common clock binding: Shall be "ipg"
+> > 
+> > Why are these now requried if they weren't previously? That breaks old
+> > dts. I can't see any new code touching clocks. Was this an old but
+> > undocumented requirement?
 > 
-> Should I modify the touchscreen driver to use irq_to_gpio() in this
-> case then ? or is this also not proper ?
+> It was previously required but not documented. I asked Yuan Yao to
+> add the text to the binding along with the new "dmas" addition.
 
-irq_to_gpio no longer exists.
+Ok.
 
-	Arnd
+> 
+> It would have been cleaner to do this as a separate patch, but at
+> the very least it should be mentioned in the changelog.
+
+Having it in the changelog would be nice.
+
+Cheers,
+Mark.
