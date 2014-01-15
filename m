@@ -1,156 +1,295 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 15 Jan 2014 11:25:55 -0500
-Subject: [PATCH v4 05/16] ARM: use a function table for determining
- instruction interpreter actions
-In-Reply-To: <1387543554.3404.34.camel@linaro1.home>
-References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-6-git-send-email-dave.long@linaro.org>
- <1387543554.3404.34.camel@linaro1.home>
-Message-ID: <52D6B693.9070801@linaro.org>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Wed, 15 Jan 2014 16:21:10 +0000
+Subject: [PATCH v1 2/5] pinctrl: st: Add Interrupt support.
+In-Reply-To: <CACRpkdY=uTtE8CMyQocQcV4c7xmvR_it1ue03kSfKmaLQX_sxA@mail.gmail.com>
+References: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+ <1389711134-21049-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdY=uTtE8CMyQocQcV4c7xmvR_it1ue03kSfKmaLQX_sxA@mail.gmail.com>
+Message-ID: <52D6B576.2090503@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/13 07:45, Jon Medhurst (Tixy) wrote:
-> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Make the instruction interpreter call back to semantic action functions
->> through a function pointer array provided by the invoker.  The interpreter
->> decodes the instructions into groups and uses the group number to index
->> into the supplied array.  kprobes and uprobes code will each supply their
->> own array of functions.
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->
-> Because I've been very slow in reviewing these I've only just noticed
-> that some of the the comments I made on version one of this patch didn't
-> get a response. I've copied them again below (slightly edited)  and
-> heavily trimmed the patch...
->
->>   arch/arm/kernel/kprobes-arm.c    |  41 +++++++++++
->>   arch/arm/kernel/kprobes-common.c |   3 +-
->>   arch/arm/kernel/kprobes-thumb.c  |  92 ++++++++++++++++++------
->>   arch/arm/kernel/kprobes.c        |  10 ++-
->>   arch/arm/kernel/kprobes.h        |  14 ++--
->>   arch/arm/kernel/probes-arm.c     | 114 +++++++++++++++---------------
->>   arch/arm/kernel/probes-arm.h     |  37 ++++++++++
->>   arch/arm/kernel/probes-thumb.c   | 149 +++++++++++++++++++--------------------
->>   arch/arm/kernel/probes-thumb.h   |  14 ++--
->>   arch/arm/kernel/probes.c         |  13 ++--
->>   arch/arm/kernel/probes.h         |  15 ++--
->>   11 files changed, 325 insertions(+), 177 deletions(-)
->>
->> diff --git a/arch/arm/kernel/kprobes-arm.c b/arch/arm/kernel/kprobes-arm.c
->> index a359475..ee329ff 100644
->> --- a/arch/arm/kernel/kprobes-arm.c
->> +++ b/arch/arm/kernel/kprobes-arm.c
->> @@ -299,3 +299,44 @@ emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(struct kprobe *p, struct pt_regs *regs)
->>   	regs->uregs[rdhi] = rdhiv;
->>   	regs->ARM_cpsr = (regs->ARM_cpsr & ~APSR_MASK) | (cpsr & APSR_MASK);
->>   }
+Thankyou for the detailed comments.
+
+On 15/01/14 14:15, Linus Walleij wrote:
+> On Tue, Jan 14, 2014 at 3:52 PM,  <srinivas.kandagatla@st.com> wrote:
+> 
+>> ST Pincontroller GPIO bank can have one of the two possible types of
+>> interrupt-wirings.
+> 
+> Interesting :-)
+> 
+>> +Pin controller node:
+>> +Required properties:
+>>  - compatible   : should be "st,<SOC>-<pio-block>-pinctrl"
+>>         like st,stih415-sbc-pinctrl, st,stih415-front-pinctrl and so on.
+>> -- gpio-controller : Indicates this device is a GPIO controller
+>> -- #gpio-cells    : Should be one. The first cell is the pin number.
+>> +- st,syscfg            : Should be a phandle of the syscfg node.
+
+> 
+> So why do you add this? This is totally unused by your driver.
+The document got re-ordered by adding new information.
+st,syscfg is not a new field, we use it for getting hold of regmap instance.
+
+I will re-check if this addition was due to some white spaces.
+> 
+>>  - st,retime-pin-mask   : Should be mask to specify which pins can be retimed.
+>>         If the property is not present, it is assumed that all the pins in the
+>>         bank are capable of retiming. Retiming is mainly used to improve the
+>>         IO timing margins of external synchronous interfaces.
+>> -- st,bank-name         : Should be a name string for this bank as
+>> -                       specified in datasheet.
+> 
+> Why do you have this property? The driver is not using it.
+Its used for bank label.
+> 
+> And what is wrong with just using that name for the node?
+On ST chips the gpio banks are named irregularly in some instances.
+They are named like PIO0, PIO1 , PIO100, PIO101 and so on. Same naming
+is used across board schematics too, so Its easy for debugging if we
+have this consistency in the driver as well.
+
+As node names are in pio at address format, which are not same as
+bank-names in the datasheet.
+> 
+>> -- st,syscfg            : Should be a phandle of the syscfg node.
+>> +- ranges       : specifies the ranges for the pin controller memory.
+> 
+> And what are they used for? I've never seen this before.
+This was suggested when I first submitted the driver.
+The intention here was to describe the mapping between pinctrl (parent)
+node and the gpio bank(children) nodes.
+
+I will fix the document for this too in next version.
+
+> 
+>> +Optional properties:
+>> +- interrupts   : Interrupt number of the irqmux. If the interrupt is shared
+>> +  with other gpio banks via irqmux.
+>> +  a irqline and gpio banks.
+>> +- reg          : irqmux memory resource. If irqmux is present.
+>> +- reg-names    : irqmux resource should be named as "irqmux".
 >> +
->> +const union decode_item kprobes_arm_actions[] = {
->
-> I think it's best if we don't reuse the decode_item type here, this is a
-> different sort of table so probably best to have it's own union. Also,
-> if we do that, then decode_item can be simplified as it won't need to
-> have function pointers in it, i.e. we could end up with...
->
-> union decode_action {
->          kprobe_insn_handler_t   *handler;
->          kprobe_custom_decode_t  *decoder;
-> };
->
-> union decode_item {
->          u32                     bits;
->          const union decode_item *table;
-> };
->
-> typedef enum kprobe_insn (kprobe_custom_decode_t)(kprobe_opcode_t,
->                                                    struct arch_specific_insn *,
->                                                    union decode_action *actions);
->
->
-
-I've added the following:
-
-typedef enum kprobe_insn (probes_custom_decode_t)(kprobe_opcode_t,
-		struct arch_specific_insn *,
-		struct decode_header *);
-
-union decode_action {
-	kprobe_insn_handler_t	*handler;
-	probes_custom_decode_t	*decoder;
-};
-
-Note the third argument actually passed into the decoder functions is 
-the decode table entry.  decode_action is only used to select a 
-decode/emulate/simullate function.
-
-> A second point, I think it would be a good idea to make sure these
-> action arrays are the size we expect by adding an entry at the end of
-> the relevant enumeration and using that to set the size of the arrays.
-> E.g. for this one
->
-> enum probes_arm_action {
->          ...
->          ...
->          NUM_PROBES_ARM_ACTIONS
-> };
->
-> and then use it like:
->
-> const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
->
-> That way, we at least make any uninitialised entries are null (I
-> assume?) which is safer than accidentally indexing beyond the array.
->
->
-
-Done.
-
->> +	[PROBES_EMULATE_NONE] = {.handler = kprobe_emulate_none},
->> +	[PROBES_SIMULATE_NOP] = {.handler = kprobe_simulate_nop},
->> +	[PROBES_PRELOAD_IMM] = {.handler = kprobe_simulate_nop},
->
-> [...]
->
->
->> diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
->> index d14d224..2238972 100644
->> --- a/arch/arm/kernel/probes.h
->> +++ b/arch/arm/kernel/probes.h
->> @@ -131,7 +131,8 @@ void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs);
->>   void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs);
+>> +GPIO controller node.
+>> +Required properties:
+>> +- gpio-controller : Indicates this device is a GPIO controller
+>> +- #gpio-cells    : Should be one. The first cell is the pin number.
+>> +- st,bank-name   : Should be a name string for this bank as specified in
+>> +  datasheet.
+> 
+> Again, why?
+> 
+>> +Optional properties:
+>> +- interrupts   : Interrupt number for this gpio bank. If there is a dedicated
+>> +  interrupt wired up for this gpio bank.
+>> +
+>> +- interrupt-controller : Indicates this device is a interrupt controller. GPIO
+>> +  bank can be an interrupt controller iff one of the interrupt type either via
+>> +irqmux or a dedicated interrupt per bank is specified.
+>> +
+>> +- #interrupt-cells: the value of this property should be 2.
+>> +     - First Cell: represents the external gpio interrupt number local to the
+>> +       external gpio interrupt space of the controller.
+>> +     - Second Cell: flags to identify the type of the interrupt
+>> +       - 1 = rising edge triggered
+>> +       - 2 = falling edge triggered
+>> +       - 3 = rising and falling edge triggered
+>> +       - 4 = high level triggered
+>> +       - 8 = low level triggered
+> 
+> Correct, but reference symbols from:
+> include/dt-bindings/interrupt-controller/irq.h
+> in example.
+Ok.
+> 
+> 
 >>
->>   enum kprobe_insn __kprobes
->> -kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi);
->> +kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->> +		struct decode_header *h);
->>
->>   /*
->>    * Test if load/store instructions writeback the address register.
->> @@ -334,7 +335,7 @@ struct decode_custom {
->>
->>   #define DECODE_CUSTOM(_mask, _value, _decoder)			\
->>   	DECODE_HEADER(DECODE_TYPE_CUSTOM, _mask, _value, 0),	\
->> -	{.decoder = (_decoder)}
->> +	{.bits = (_decoder)}
->>
->
-> This third and final comment is probably just bike shedding...
->
-> 'bits' looks a bit funny here. I've been trying to think of a way of
-> making it nicer but it's difficult. The actual value is one of three
-> different enums, so if we were to add another members to decode_item it
-> would just have to be "int action", at least that would read nicer in
-> these macros and where it gets read out in probes_decode_insn.
->
+>>  Example:
+>>         pin-controller-sbc {
+> 
+> Please put in an updated example making use of all the
+> new props.
+Will do it in next version.
+> 
+> 
+> (...)
+>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> 
+>> @@ -271,6 +276,8 @@ struct st_gpio_bank {
+>>         struct pinctrl_gpio_range       range;
+>>         void __iomem                    *base;
+>>         struct st_pio_control           pc;
+>> +       struct  irq_domain              *domain;
+>> +       int                             gpio_irq;
+> 
+> Why are you putting this IRQ into the state container when it can be
+> a function local variable in probe()?
+I agree, this should be a local variable.
+> 
+>>  struct st_pinctrl {
+>> @@ -284,6 +291,8 @@ struct st_pinctrl {
+>>         int                             ngroups;
+>>         struct regmap                   *regmap;
+>>         const struct st_pctl_data       *data;
+>> +       void __iomem                    *irqmux_base;
+>> +       int                             irqmux_irq;
+> 
+> Dito. I think.
+I agree, this should be a local variable too.
+> 
+>> +static int st_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+>> +{
+>> +       struct st_gpio_bank *bank = gpio_chip_to_bank(chip);
+>> +       int virq;
+> 
+> Just name this variable "irq". It is no more virtual than any other
+> IRQ.
+Ok.
 
-I agree.  I've added an "int action" to the decode_item union, and use 
-it instead of "bits" for the action array index.
+> 
+>> +
+>> +       if (bank->domain && (offset < chip->ngpio))
+>> +               virq = irq_create_mapping(bank->domain, offset);
+> 
+> No, don't do the create_mapping() call in the .to_irq() function.
+> Call irq_create_mapping() for *all* valid hwirqs in probe() and use
+> irq_find_mapping() here.
+Ok.
 
-I've also updated the description of how this all works, in the comments.
+> 
+>> +static void st_gpio_irq_disable(struct irq_data *d)
+>> +{
+>> +       struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+>> +
+>> +       writel(BIT(d->hwirq), bank->base + REG_PIO_CLR_PMASK);
+>> +}
+>> +
+>> +static void st_gpio_irq_enable(struct irq_data *d)
+>> +{
+>> +       struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+>> +
+>> +       writel(BIT(d->hwirq), bank->base + REG_PIO_SET_PMASK);
+>> +}
+> 
+> I *strongly* suspect that these two should be replaced with
+> _mask()/_unmask() rather than using disable/enable.
+> 
+> Because that seems to be what they are doing.
+I will do this change in next version.
+> 
+> (...)
+>> +static void __gpio_irq_handler(struct st_gpio_bank *bank)
+>> +{
+>> +       unsigned long port_in, port_mask, port_comp, port_active;
+>> +       int n;
+>> +
+>> +       port_in = readl(bank->base + REG_PIO_PIN);
+>> +       port_comp = readl(bank->base + REG_PIO_PCOMP);
+>> +       port_mask = readl(bank->base + REG_PIO_PMASK);
+>> +
+>> +       port_active = (port_in ^ port_comp) & port_mask;
+>> +
+>> +       for_each_set_bit(n, &port_active, BITS_PER_LONG) {
+>> +               generic_handle_irq(irq_find_mapping(bank->domain, n));
+> 
+> So what happens if new IRQs appear in the register while you are
+> inside this loop?
+I agree, there is a possibility of missing interrupt here, doing similar
+to what you suggested makes sense.
+> 
+> Check this recent patch:
+> http://marc.info/?l=linux-arm-kernel&m=138979164119464&w=2
+> 
+> Especially this:
+> 
+> + for (;;) {
+> +     mask = ioread8(host->base + CLRHILVINT) & 0xff;
+> +     mask |= (ioread8(host->base + SECOINT) & SECOINT_MASK) << 8;
+> +     mask |= (ioread8(host->base + PRIMINT) & PRIMINT_MASK) << 8;
+> +     mask &= host->irq_high_enabled | (host->irq_sys_enabled << 8);
+> +     if (mask == 0)
+> +         break;
+> +     for_each_set_bit(n, &mask, BITS_PER_LONG)
+> +     generic_handle_irq(irq_find_mapping(host->domain, n));
+> + }
+> 
+> 
+>> +static struct irq_chip st_gpio_irqchip = {
+>> +       .name           = "GPIO",
+>> +       .irq_disable    = st_gpio_irq_disable,
+>> +       .irq_mask       = st_gpio_irq_disable,
+>> +       .irq_unmask     = st_gpio_irq_enable,
+> 
+> Just implement mask/unmask as indicated earlier.
+> 
+>> +       .irq_set_type   = st_gpio_irq_set_type,
+>> +};
+> 
+> You need to mark IRQ GPIO lines as used for IRQ.
+> 
+> Add startup() and shutdown() hooks similar to those I add
+> in this patch:
+> 
+> http://marc.info/?l=linux-gpio&m=138977709114785&w=2
 
--dl
+Will add this in next version.
+
+> 
+>> +static int st_gpio_irq_domain_xlate(struct irq_domain *d,
+>> +       struct device_node *ctrlr, const u32 *intspec, unsigned int intsize,
+>> +       irq_hw_number_t *out_hwirq, unsigned int *out_type)
+>> +{
+>> +       struct st_gpio_bank *bank = d->host_data;
+>> +       int ret;
+>> +       int pin = bank->gpio_chip.base + intspec[0];
+>> +
+>> +       if (WARN_ON(intsize < 2))
+>> +               return -EINVAL;
+>> +
+>> +       *out_hwirq = intspec[0];
+>> +       *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>> +
+>> +       ret = gpio_request(pin, ctrlr->full_name);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       ret = gpio_direction_input(pin);
+>> +       if (ret)
+>> +               return ret;
+> 
+> We recently concluded that you should *NOT* call
+> gpio_request() and gpio_direction_input() from xlate or similar.
+
+Great, I can get rid of this function and use generic xlate function
+instead.
+> 
+> Instead: set up the hardware directly in mask/unmask callbacks
+> so that the irqchip can trigger IRQs directly without any
+> interaction with the GPIO subsystem.
+Ok, got it.
+> 
+> By implementing the startup/shutdown hooks as indicated
+> above you can still indicate to the GPIO subsystem what is
+> going on and it will enforce that e.g. the line is not set to
+> output.
+> 
+Ok.
+
+>> +               bank->domain  = irq_domain_add_linear(np,
+>> +                                               ST_GPIO_PINS_PER_BANK,
+>> +                                               &st_gpio_irq_ops, bank);
+>> +               if (!bank->domain)
+>> +                       dev_err(dev, "Failed to add irq domain for [%s]\n",
+>> +                               np->full_name);
+>> +       } else {
+>> +               dev_info(dev, "No IRQ support for [%s] bank\n", np->full_name);
+> 
+> Why is the [bank name] inside [brackets]?
+There is no strong reason, I will remove it.
+
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
