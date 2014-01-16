@@ -1,102 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 Jan 2014 18:33:26 +0000
-Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
-In-Reply-To: <20140116180505.GA30925@codeaurora.org>
-References: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
- <1389735034-21430-3-git-send-email-sboyd@codeaurora.org>
- <20140115102701.GA27314@e102568-lin.cambridge.arm.com>
- <20140115165623.GJ14405@codeaurora.org>
- <20140116013840.GA674@codeaurora.org>
- <20140116113332.GC25540@e102568-lin.cambridge.arm.com>
- <20140116180505.GA30925@codeaurora.org>
-Message-ID: <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu, 16 Jan 2014 11:35:29 -0700
+Subject: [PATCH] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to
+ enforce this ACPI mode
+In-Reply-To: <201401161155.27592.arnd@arndb.de>
+References: <1389731822-21336-1-git-send-email-al.stone@linaro.org>
+ <15081767.3kxW799CSQ@wuerfel> <52D7414C.7080206@linaro.org>
+ <201401161155.27592.arnd@arndb.de>
+Message-ID: <52D82671.6000200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 06:05:05PM +0000, Stephen Boyd wrote:
-> On 01/16, Lorenzo Pieralisi wrote:
-> > On Thu, Jan 16, 2014 at 01:38:40AM +0000, Stephen Boyd wrote:
-> > > On 01/15, Stephen Boyd wrote:
-> > > > 
-> > > > Ah sorry, I forgot to put the compatible property here like in
-> > > > the dts change. I'll do that in the next revision. Yes we need a
-> > > > compatible property here to match the platform driver.
-> > > > 
-> > > 
-> > > This is the replacement patch
-> > > 
-> > > -----8<------
-> > > From: Stephen Boyd <sboyd@codeaurora.org>
-> > > Subject: [PATCH v9] devicetree: bindings: Document Krait CPU/L1 EDAC
-> > > 
-> > > The Krait CPU/L1 error reporting device is made up a per-CPU
-> > > interrupt. While we're here, document the next-level-cache
-> > > property that's used by the Krait EDAC driver.
-> > > 
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Kumar Gala <galak@codeaurora.org>
-> > > Cc: <devicetree@vger.kernel.org>
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/arm/cpus.txt | 58 ++++++++++++++++++++++++++
-> > >  1 file changed, 58 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> > > index 91304353eea4..03a529e791c4 100644
-> > > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > > @@ -62,6 +62,20 @@ nodes to be present and contain the properties described below.
-> > >  		Value type: <u32>
-> > >  		Definition: must be set to 0
-> > >  
-> > > +	- compatible
-> > > +		Usage: optional
-> > > +		Value type: <string>
-> > > +		Definition: should be one of the compatible strings listed
-> > > +			    in the cpu node compatible property. This property
-> > > +			    shall only be present if all the cpu nodes have the
-> > > +			    same compatible property.
-> > 
-> > Do we really want to do that ? I am not sure. A cpus node is supposed to
-> > be a container node, we should not define this binding just because we
-> > know the kernel creates a platform device for it then.
-> 
-> This is just copying more of the ePAPR spec into this document.
-> It just so happens that having a compatible field here allows a
-> platform device to be created. I don't see why that's a problem.
+On 01/16/2014 03:55 AM, Arnd Bergmann wrote:
+> On Thursday 16 January 2014, Al Stone wrote:
+>> On 01/14/2014 02:26 PM, Arnd Bergmann wrote:
+>>> On Tuesday 14 January 2014 13:37:02 al.stone at linaro.org wrote:
+>>>> +config ACPI_REDUCED_HARDWARE_ONLY
+>>>> +       bool "Hardware-reduced ACPI support only"
+>>>> +       def_bool n
+>>>> +       depends on ACPI && EXPERT
+>>>
+>>> I think this will cause a Kconfig warning if you try to select this
+>>> on ARM64 without turning on EXPERT as well.
+>>>
+>>> It should be ok if you express it as
+>>>
+>>> config ACPI_REDUCED_HARDWARE_ONLY
+>>>          bool "Hardware-reduced ACPI support only" if EXPERT
+>>>          def_bool n
+>>>          depends on ACPI
+>>>
+>>>
+>>>        Arnd
+>>>
+>>
+>> I am very puzzled.  I went back and re-did my configs from
+>> before, tried a few new ones, and tried with both expressions
+>> above, but I could not get a Kconfig warning.  Do you have an
+>> example .config that shows the warning?
+>>
+>
+> I don't have a source tree that allows turning on ACPI on arm64
+> to easily test this. To clarify: the warning will only happen if
+> you also add this piece to arch/arm64/Kconfig:
+>
+> 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>
+> 	Arnd
+>
 
-I do not see why you cannot define a node like pmu or arch-timer and stick
-a compatible property in there. cpus node does not represent a device, and
-must not be created as a platform device, that's my opinion.
+Right; I assumed I had to have that SELECT.  My apologies -- I
+still cannot reproduce the warning.  I'll resubmit the patch
+incorporating the suggestion, though, since the result ends up
+being the same -- you must have ACPI and EXPERT selected in order
+to enable ACPI_REDUCED_HARDWARE_ONLY.
 
-What would you do for big.LITTLE systems ? We are going to create two
-cpus node because we need two platform devices ? I really think there
-must be a better way to implement this, but I will let DT maintainers
-make a decision.
+Thanks.
 
-> > interrupts is a cpu node property and I think it should be kept as such.
-> > 
-> > I know it will be duplicated and I know you can't rely on a platform
-> > device for probing (since if I am not mistaken, removing a compatible
-> > string from cpus prevents its platform device creation), but that's an issue
-> > related to how the kernel works, you should not define DT bindings to solve
-> > that IMHO.
-> 
-> The interrupts property is also common for all cpus so it seems
-> fine to collapse the value down into a PPI specifier indicating
-> that all CPUs get the interrupt, similar to how we compress the
-> information about the compatible string.
-
-I think it is nicer to create a device node (as I said, like a pmu or an
-arch-timer) and define interrupts there along with a proper compatible
-property. This would serve the same purpose without adding properties in
-the cpus node.
-
-cpu-edac {
-	compatible = "qcom,cpu-edac";
-	interrupts = <...>;
-};
-
-Thanks,
-Lorenzo
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
