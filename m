@@ -1,56 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Jan 2014 17:09:54 +0000
-Subject: [RFC 06/18] regmap: Formalise use of non-bus context
-In-Reply-To: <1389272911.23721.49.camel@hornet>
-References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com> <
- 1387815830-8794-7-git-send-email-pawel.moll@arm.com> <20131224124538.
- GZ30815@sirena.org.uk> <1389272911.23721.49.camel@hornet>
-Message-ID: <20140116170954.C3CBCC40973@trevor.secretlab.ca>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Thu, 16 Jan 2014 12:06:36 -0500
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
+ warning
+In-Reply-To: <20140115065851.GC1914@S2101-09.ap.freescale.net> (Shawn Guo's
+ message of "Wed, 15 Jan 2014 14:58:54 +0800")
+References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+ <20140115065851.GC1914@S2101-09.ap.freescale.net>
+Message-ID: <87fvon6elf.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Jan 2014 13:08:31 +0000, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Tue, 2013-12-24 at 12:45 +0000, Mark Brown wrote:
-> > I'd note that I wasn't CCed on most of this series so I'm not entirely
-> > sure what it's trying to do.
-> 
-> Apologies. The series is quite long and I didn't want to bother too many
-> people with mostly irrelevant changes. Will copy you on the whole thing
-> next time.
-> 
-> > > Bus-less maps (ones with reg_read and reg_write functions
-> > > defined in regmap_config) were given the context passed
-> > > in regmap_init(), but it was still called "bus_context".
-> > > 
-> > > This patch formalises this aspect by renaming it to simple
-> > > "context" and adds the missing link, free_context function
-> > > in regmap_config, which allows bus-less maps to use the
-> > > context in classic way.
-> > 
-> > This should be two patches, one patch to do the rename and one to add
-> > the operation.  
-> 
-> Sure, will do.
-> 
-> > The obvious question here is why is this callback useful
-> > - what is being allocated in a regmap specific context that needs to be
-> > lifetime managed separately to the thing doing the creation?  I can't
-> > see any obvious reason why this would ever get used.
-> 
-> First of all, it's just a generalization of the free_context already
-> existing in regmap_bus (and used by regmap-mmio). And in case of this
-> series it is being used to release extra resource added allocated for a
-> "busless" regmap_config. Briefly, I'm using devm_regmap_init() to
-> "attach" a custom regmap configuration to a device when it is being
-> created (which is then dev_get_regmap()-ed in the driver, as you saw in
-> the regulator patch) and its context is a pointer to kzallocated data.
-> free_context is used to release it when devm resource is being removed.
 
-Have you thought through all the implications here? What you've
-described effectively changes the devm model. devm operates under the
-assumption that devm data only exists between probe() and remove() time.
-If you 'preload' devm data then the preloaded data will get discarded at
-remove() time which breaks if the driver is remove and probed again at
-runtime.
+> On Wed, Jan 15, 2014 at 02:19:34PM +0800, Liu Ying wrote:
+>> There should be no duplicate const specifiers for those static
+>> constant character string arrays defined for clock mux options.
+>> Also, the arrays are only taken as the 5th argument for the
+>> imx_clk_mux() function, which is in the type of 'const char
+>> **parents'.  So, let's remove the 2nd const specifier right
+>> after 'char'.
+>>
+>> This patch fixes these sparse warnings:
+>> arch/arm/mach-imx/clk-imx6sl.c:21:25: warning: duplicate const
 
-g.
+[snip]
+
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> ---
+>> arch/arm/mach-imx/clk-imx6sl.c | 42 ++++++++++++++++++++--------------------
+>> 1 file changed, 21 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+>> index c0c4ef5..9fad29a9 100644
+>> --- a/arch/arm/mach-imx/clk-imx6sl.c
+>> +++ b/arch/arm/mach-imx/clk-imx6sl.c
+>>>> -18,27 +18,27 @@
+>> #include "clk.h"
+>> #include "common.h"
+>>
+>> -static const char const *step_sels[] = { "osc", "pll2_pfd2", };
+> ...
+>> +static const char *step_sels[] = { "osc", "pll2_pfd2", };
+
+On 15 Jan 2014, shawn.guo at linaro.org wrote:
+
+> So now we're getting the following checkpatch warning:
+>
+> WARNING: static const char * array should probably be static const char *
+> 	const
+>
+> It was added into checkpatch.pl by commit cb710ec (scripts/checkpatch.pl:
+> add warnings for static char that could be static const char).  I'm not
+> sure which warning we should ignore, the sparse or the checkpatch one.
+
+I think both scripts/programs are right.  There is a difference.
+
+ static const char const * step_sels[] = { "osc", "pll2_pfd2", }; /* dup */
+ static const char * const step_sels[] = { "osc", "pll2_pfd2", }; /* ok */
+ static char const * const step_sels[] = { "osc", "pll2_pfd2", }; /* ok */
+
+I think that 'type const * const' is a const pointer to const data, but
+'const type const *' is just a const pointer (with duplicate).  The
+patches have made the data non-const?
+
+Fwiw,
+Bill Pringlemeir.
