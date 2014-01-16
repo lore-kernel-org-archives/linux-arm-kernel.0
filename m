@@ -1,75 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 16 Jan 2014 14:07:56 +0100
-Subject: Multiple CCR definitions (was: Re: mmc: omap_hsmmc: use the generic
- config for omap2plus devices)
-Message-ID: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jan 2014 14:19:11 +0100
+Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <1387592016-13740-4-git-send-email-syin@broadcom.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-4-git-send-email-syin@broadcom.com>
+Message-ID: <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 10, 2013 at 11:05 PM, Linux Kernel Mailing List
-<linux-kernel@vger.kernel.org> wrote:
->     mmc: omap_hsmmc: use the generic config for omap2plus devices
+On Sat, Dec 21, 2013 at 3:13 AM, Sherman Yin <syin@broadcom.com> wrote:
+
+'> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
 >
->     OMAP's hs_mmc driver is used for MMC controller operation on many
->     omap2plus SoCs (OMAP2430, OMAP3, 4, 5 and AM335x).
->
->     Considering that the device tree entries are already present for these,
->     allow the driver to be built using the config ARCH_OMAP2PLUS rather
->     than individually adding a config for each SoC to enable the
->     support.
->
->     Use COMPILE_TEST to enable the build for other platforms.
->
->     Signed-off-by: Amarinder Bindra <a-bindra@ti.com>
->     Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->     Cc: Nishanth Menon <nm@ti.com>
->     Acked-by: Felipe Balbi <balbi@ti.com>
->     Acked-by: Balaji T K <balajitk@ti.com>
->     Signed-off-by: Chris Ball <cjb@laptop.org>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
 > ---
->  drivers/mmc/host/Kconfig |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 84102bc..b8ce939 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -284,11 +284,11 @@ config MMC_OMAP
->
->  config MMC_OMAP_HS
->         tristate "TI OMAP High Speed Multimedia Card Interface support"
-> -       depends on SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4
-> +       depends on ARCH_OMAP2PLUS || COMPILE_TEST
+> v4: - PINCTRL selected in Kconfig, PINCTRL_CAPRI selected in bcm_defconfig
+>     - make use of regmap
+>     - change CAPRI_PIN_UPDATE from macro to inline function.
+>     - Handle pull-up strength arg in Ohm instead of enum
 
-sh-allmodconfig (http://kisskb.ellerman.id.au/kisskb/buildresult/10477672/):
-include/linux/omap-dma.h:171:8: error: expected identifier before
-numeric constant
-make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
+Patch applied. It is really good now! It's late before the merge
+window, but you've done a tremendous work on this driver and
+I don't want to delay its deployment further.
 
-It fails because sh #defines "CCR", which is one of the enum values in
-include/linux/omap-dma.h.
+But note:
 
-I expect a similar failure on blackfin, which also has #define CCR.
+>  arch/arm/configs/bcm_defconfig  |    1 +
+>  arch/arm/mach-bcm/Kconfig       |    1 +
 
-Possible solutions:
-  1. Rename CCR in sh/bfin to e.g. SH_CCR resp. BF_CCR.
-  2. Use "depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM)
-  3. Stop using include/linux/omap-dma.h, as it says:
+I've optimistically applied these two hunks of the patch as well,
+but if there is any conflict with the ARM SoC tree I will just rebase
+the patch and pull these *out*.
 
-     *  Legacy OMAP DMA handling defines and functions
-     *
-     *  NOTE: Do not use these any longer.
-     *
-     *  Use the generic dmaengine functions as defined in
-     *  include/linux/dmaengine.h.
+ARM SoC maintainers: be warned if something collides.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
