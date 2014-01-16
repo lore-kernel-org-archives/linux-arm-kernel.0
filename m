@@ -1,178 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Jan 2014 22:12:01 +0100
-Subject: [PATCH 3/4] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140116194003.GN17314@sirena.org.uk>
-References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389892285-11745-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140116194003.GN17314@sirena.org.uk>
-Message-ID: <20140116211201.GC3351@lukather>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 16 Jan 2014 13:39:54 -0800
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140115193547.GF7993@atomide.com>
+References: <20140110161352.GG6665@saruman.home>
+ <20140110185110.GM31323@atomide.com>
+ <52D53084.1070105@ti.com> <20140114203613.GA604@saruman.home>
+ <20140115020421.GA24195@saruman.home> <20140115031632.4167.2698@quantum>
+ <20140115035011.4167.96678@quantum> <20140115171323.GA22739@atomide.com>
+ <20140115192340.4167.87685@quantum> <20140115193547.GF7993@atomide.com>
+Message-ID: <20140116213954.4167.37071@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Thu, Jan 16, 2014 at 07:40:03PM +0000, Mark Brown wrote:
-> On Thu, Jan 16, 2014 at 06:11:24PM +0100, Maxime Ripard wrote:
+Quoting Tony Lindgren (2014-01-15 11:35:48)
+> * Mike Turquette <mturquette@linaro.org> [140115 11:25]:
+> > Quoting Tony Lindgren (2014-01-15 09:13:23)
+> > > * Mike Turquette <mturquette@linaro.org> [140114 19:52]:
+> > > > > 
+> > > > > These 40 patches apply very cleanly on top of clk-next with 2
+> > > > > exceptions:
+> > > > > 
+> > > > > 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
+> > > > > because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
+> > > > > on 3.13-rc1).
+> > > > > 
+> > > > > 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
+> > > > > resolved correctly but would like verification.
+> > > > > 
+> > > > > I'd prefer to simply merge these patches into clk-next, which is the
+> > > > > most straightforward route. Any ideas on how to handle the missing
+> > > > > AM35xx dtsi data? It can always go as a separate fix after this stuff
+> > > > > gets merged which, ironically, is how that file was created in the first
+> > > > > place.
+> > > 
+> > > You could do something like this to take advantage of fast forward and
+> > > not have to do a merge back from mainline:
+> > > 
+> > > $ git checkout -b am3517-clk v3.13-rc8 # or any other -rc with am3517.dtsi
+> > > $ git merge clk-next-omap # this fast forwards clk-next-omap to the desired -rc
+> > > $ git am am3517-clk-patch
+> > > $ git checkout clk-next
+> > > $ git merge clk-next-omap # this fast forwards clk-next to the desired -rc
+> > 
+> > That makes sense, but is there anything bad about doing that for a
+> > branch you intend to send as a pull request? I don't see how any of the
+> > commits get re-written or anything... I just wonder if there is some
+> > subtlety that I am not accounting for that makes this approach bad for
+> > sending to Linus.
 > 
-> Looks pretty clean, a few fairly small things below.
+> No there should not be any issues. That's the preferred way to keep
+> development branches updated and pullable in long term without any need
+> to rebase.
 > 
-> > +- clocks: phandle to the clocks feeding the SPI controller. Two are
-> > +          needed:
-> > +  - "ahb": the gated AHB parent clock
-> > +  - "mod": the parent module clock
+> Note that there will be only a merge commit if there is a conflict,
+> otherwise the fast forward will be transparent. So the trick to avoiding
+> rebasing and back merges is to apply patches against what they need in a
+> local branch, then after testing merge that local branch into the development
+> branch. Then for the upsteam pull request, you just need to make it against
+> the -rc you merged in.
 > 
-> I guess you should specify that this needs to be done with clock-names
-> too then?
+> AFAIK what Linus does not like is doing a back merge to a development
+> branch from mainline, probably as it adds a pointless commit. Or rebasing
+> a branch as that way it won't stay pullable.
 
-Yep, right.
+Hi all,
 
-> > --- a/drivers/spi/Makefile
-> > +++ b/drivers/spi/Makefile
-> > @@ -69,6 +69,7 @@ obj-$(CONFIG_SPI_SH_HSPI)		+= spi-sh-hspi.o
-> >  obj-$(CONFIG_SPI_SH_MSIOF)		+= spi-sh-msiof.o
-> >  obj-$(CONFIG_SPI_SH_SCI)		+= spi-sh-sci.o
-> >  obj-$(CONFIG_SPI_SIRF)		+= spi-sirf.o
-> > +obj-$(CONFIG_ARCH_SUNXI)		+= spi-sun6i.o
+I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
+Tero's series. This includes the AM3517 bits now. I've pushed this
+branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
+final sanity test before I merge this into clk-next?
+
+Thanks!
+Mike
+
 > 
-> I would expect a new Kconfig symbol for this.
-
-Hmmm, yeah, sorry, some hacky leftover.
-
-> > +static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
-> > +{
-> > +	u32 reg, cnt;
-> > +	u8 byte;
-> > +
-> > +	/* See how much data are available */
+> Regards,
 > 
-> data is available.
-> 
-> > +	while (len--) {
-> > +		byte = readb(sspi->base_addr + SUN6I_RXDATA_REG);
-> > +		if (sspi->rx_buf)
-> > +			*sspi->rx_buf++ = byte;
-> > +	}
-> 
-> It seems like this hardware is only able to handle bidirectional
-> operation - this is actually quite common and isn't always as simple as
-> it is here.  Can I persuade you to put something in the core which
-> provides dummy data buffers for this case?  I was thinking flags like
-> must_tx and must_rx or something but didn't get around to this yet.
-
-I'm pretty sure It can support unidirectionnal operations as well. I
-just didn't found out how yet. There's actually three counters to set
-whenever I setup the transfer, two of them seem to be to set the
-number of bytes to send, and the last one the overall number of bursts
-to set on the clock line, so I guess that we can either set it only in
-RX (with the first two to 0, the last one to spi_transfer->len), only
-in TX or both (by programming all three to spi_transfer->len).
-
-> > +static int sun6i_spi_finish_transfer(struct spi_device *spi,
-> > +				     struct spi_transfer *tfr,
-> > +				     bool cs_change)
-> > +{
-> > +	struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
-> > +
-> > +	sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
-> > +
-> > +	if (tfr->delay_usecs)
-> > +		udelay(tfr->delay_usecs);
-> 
-> If you implement this using transfer_one() (as you should) the core will
-> do this for you.
-
-Oh, nice. I overlooked it.
-
-> > +	if (status & SUN6I_INT_CTL_RF_OVF) {
-> > +		sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
-> > +		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_RF_OVF);
-> > +		return IRQ_HANDLED;
-> > +	}
-> 
-> This looks like an overflow - a log message would be helpful for users
-> and you should possibly be flagging an error on the current transfer.
-
-Hmmm, that was an attempt at receiving more bytes than the FIFO can
-handle, but I guess the FIFO full interrupt would be more appropriate
-for this.
-
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	sspi->base_addr = devm_request_and_ioremap(&pdev->dev, res);
-> > +	if (!sspi->base_addr) {
-> > +		dev_err(&pdev->dev, "Unable to remap IO\n");
-> > +		ret = -ENXIO;
-> > +		goto err;
-> > +	}
-> 
-> devm_ioremap_resource() is nicer in that it returns an error and then
-> you don't need to log either since it's noisy itself.
-
-Ack.
-
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		dev_err(&pdev->dev, "No spi IRQ specified\n");
-> > +		ret = -ENXIO;
-> 
-> Don't overwrite the error code.
-
-Ack.
-
-> > +	ret = clk_set_rate(sspi->mclk, 100000000);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "Couldn't change module clock rate\n");
-> > +		goto err2;
-> > +	}
-> 
-> Does this really need to be fatal (or done at all)?  There seems to be
-> another reasonably flexible divider in the IP and it's more common to
-> either set this per transfer to something that rounds nicely or just use
-> the default and rely on the dividers.
-
-The default parent of the module clock runs at 24MHz, that means that
-we won't be able to reach a spi clock higher than 12MHz, which seems
-quite low. We can always change the rate in the transfer setup code
-though, if needs be.
-
-> > +	ret = clk_prepare_enable(sspi->mclk);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "Couldn't enable clock 'ahb spi'\n");
-> > +		goto err2;
-> > +	}
-> 
-> I would recommend moving these to runtime PM so the clocks are only
-> active when the device is actually in use, the core will do the runtime
-> PM management if you set auto_runtime_pm so it's really easy to
-> implement.
-
-Ok, nice.
-
-
-> > +	ret = reset_control_deassert(sspi->rstc);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "Couldn't deassert the device from reset\n");
-> > +		goto err3;
-> > +	}
-> > +
-> > +	sun6i_spi_write(sspi, SUN6I_GBL_CTL_REG,
-> > +			SUN6I_GBL_CTL_BUS_ENABLE | SUN6I_GBL_CTL_MASTER | SUN6I_GBL_CTL_TP);
-> 
-> Similarly here the IP could be kept in reset when not in use.
-
-Ok.
-
-Thanks a lot!
-Maxime
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140116/59276491/attachment-0001.sig>
+> Tony
