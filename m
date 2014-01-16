@@ -1,43 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 16 Jan 2014 13:52:17 -0800
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <74872027.r5ouCtzAgs@wuerfel>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <74872027.r5ouCtzAgs@wuerfel>
-Message-ID: <CAOesGMg1mkb=Jw0fbeJo5oRGoTnW2XJ2=xZrJeJY66=7sxb5LA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 16 Jan 2014 13:54:50 -0800
+Subject: [GIT PULL] A DaVinci SoC update for v3.14
+In-Reply-To: <52CFD8F5.5010100@ti.com> (Sekhar Nori's message of "Fri, 10 Jan
+ 2014 16:56:45 +0530")
+References: <52CFD8F5.5010100@ti.com>
+Message-ID: <87d2jroamt.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 1:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 16 January 2014 09:15:17 Olof Johansson wrote:
->>
->> > b) We need to add a way to attach a device_node to an sdio_func,
->> > so that a function driver can find additional DT properties.
->> > This part should be relatively simple once (a) is done and
->> > should only need a little code but no new binding. The code
->> > would be similar to what we do for amba, i2c or spi devices.
->>
->> This isn't actually needed for this functionality, but might be needed
->> for other things...
->>
+Sekhar Nori <nsekhar@ti.com> writes:
+
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
 >
-> There is at least one sdio driver (cw1200) that needs to get
-> a MAC address from DT and has the same kind of hack that
-> you mention to work around it at the moment (actually worse,
-> it's not even using auxdata). The MAC address is certainly
-> a property of the device, not the host. This is of course
-> the same problem that we have on various development boards
-> with USB ethernet controllers lacking an EEPROM.
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.14/soc
+>
+> for you to fetch changes up to 4408c26bc37fa8ada493ad41a6c7659b76fff483:
+>
+>   ARM: davinci: clock: return 0 upon error from clk_round_rate() (2013-11-27 14:48:33 +0530)
+>
+> ----------------------------------------------------------------
+> A patch to fix the return value of clk_round_rate()
+>
+> ----------------------------------------------------------------
 
-Yeah, definitely overlap with the on-board usb ethernet adapters where
-the vendor hasn't bothered with an eeprom.
+Pulled into next/soc,
 
-> Getting the device to probe in the first place is more important,
-> and this is a much simpler problem though.
+Thanks,
 
-Yes, agreed -- both needs solving but they're separate issues.
-
-
--Olof
+Kevin
