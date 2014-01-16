@@ -1,56 +1,57 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Thu, 16 Jan 2014 15:25:41 +0800
-Subject: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to header file
-In-Reply-To: <201312142002.38423.arnd@arndb.de>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <201312112348.06755.arnd@arndb.de>
- <2CC2A0A4A178534D93D5159BF3BCB66189F95F669D@EAPEX1MAIL1.st.com>
- <201312142002.38423.arnd@arndb.de>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FBE8D5D6@EAPEX1MAIL1.st.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 16 Jan 2014 15:29:24 +0800
+Subject: [PATCH V6 1/3] ARM: imx: add suspend in ocram support for i.mx6q
+In-Reply-To: <1389840105-17625-1-git-send-email-b20788@freescale.com>
+References: <1389840105-17625-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140116072922.GB4049@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Jan 16, 2014 at 10:41:43AM +0800, Anson Huang wrote:
+> +/*
+> + * ==================== low level suspend ====================
+> + *
+> + * Better to follow below rules to use ARM registers:
+> + * r0: pm_info structure address;
+> + * r1 ~ r5: for saving pm_info members;
 
+The register r5 is free to use now.
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Sunday, December 15, 2013 12:33 AM
-> To: Mohit KUMAR DCG
-> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
-> Pratyush ANAND; spear-devel; Viresh Kumar
-> Subject: Re: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to
-> header file
-> 
-> On Friday 13 December 2013, Mohit KUMAR DCG wrote:
-> > > The RST bits should probably go into a drivers/reset driver. Not
-> > > sure what the other registers do, but I'm sure we can find a driver
-> > > for these too, possibly they should be part of the PHY driver?
-> >
-> > -  Perhaps if we implement phy and reset driver then we may not
-> > require to move these definitions and it will address most of your
-> > comments on SPEar13xx pcie driver. I am understanding and working on
-> > this.l
-> >
+> + * r6 ~ r10: free registers;
+> + * r11: io base address.
+> + *
+> + * suspend ocram space layout:
+> + * ======================== high address ======================
+> + *                              .
+> + *                              .
+> + *                              .
+> + *                              ^
+> + *                              ^
+> + *                              ^
+> + *                      imx6_suspend code
+> + *              PM_INFO structure(imx6_cpu_pm_info)
+> + * ======================== low address =======================
+> + */
 
-Though we are almost ready with v2. But few concerns:
+<snip>
 
-There are Spear soc common register used for misc configurations of clock, reset etc  for all ips.  Few of 
-registers from the same area are also used for pcie/sata muxing and auxiliary clock configurations.
-For example: sata_miphy_init in arch/arm/mach-spear/spear1340.c also uses these registers.
+> +	/*
+> +	 * now delay for a short while (3usec)
+> +	 * ARM is at 1GHz at this point
+> +	 * so a short loop should be enough.
+> +	 * this delay is required to ensure that
+> +	 * the RBC counter can start counting in
+> +	 * case an interrupt is already pending
+> +	 * or in case an interrupt arrives just
+> +	 * as ARM is about to assert DSM_request.
+> +	 */
+> +	ldr     r6, =2000
+> +rbc_loop:
+> +	sub     r6, r6, #0x1
+> +	cmp     r6, #0x0
 
-We have moved all these sata specific spear1340 configurations in a separate driver.  On the basis of spear-ahci dt 
-Node this driver's probe is called, which further adds ahci platform driver.
-We plan to put all spear1340/1310_pcie_miphy_init/exit functions of patch 9/12 of this series in
-The same driver.
+Use 'subs' instead to save the 'cmp'.
 
-Now our concern is, what could be the best place to keep that driver, phy, reset or any other framework?
-Or we keep this new driver in arch/arm/mach-spear only.
+Shawn
 
-Regards
-Mohit
-
-> 
-> Ok, very good.
-> 
-> 	Arnd
+> +	bne     rbc_loop
