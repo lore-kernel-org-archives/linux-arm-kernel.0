@@ -1,38 +1,56 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 16 Jan 2014 17:03:20 +0000
-Subject: [RFC 04/18] driver core & of: Mark of_nodes of added device as
- populated
-In-Reply-To: <CAL_JsqJGQFstgFu=tpho91C0iv4eH9XSCAVKfXXQO4Z+yD-0tw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Jan 2014 17:09:54 +0000
+Subject: [RFC 06/18] regmap: Formalise use of non-bus context
+In-Reply-To: <1389272911.23721.49.camel@hornet>
 References: <1387815830-8794-1-git-send-email-pawel.moll@arm.com> <
- 1387815830-8794-5-git-send-email-pawel.moll@arm.com> <
- CAL_JsqJGQFstgFu=tpho91C0iv4eH9XSCAVKfXXQO4Z+yD-0tw@mail.gmail.com>
-Message-ID: <20140116170320.F083BC40973@trevor.secretlab.ca>
+ 1387815830-8794-7-git-send-email-pawel.moll@arm.com> <20131224124538.
+ GZ30815@sirena.org.uk> <1389272911.23721.49.camel@hornet>
+Message-ID: <20140116170954.C3CBCC40973@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Jan 2014 11:28:01 -0600, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Dec 23, 2013 at 10:23 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> > In "Device Tree powered" systems, platform devices are usually
-> > massively populated with of_platform_populate() call, executed
-> > at some level of initcalls, either by generic architecture
-> > or by platform-specific code.
-> >
-> > There are situations though where certain devices must be
-> > created (and bound with drivers) before all the others.
-> > This presents small challenge in DT-driven systems, as
-> > devices explicitly created in early code would be created
-> > again by of_platform_populate().
+On Thu, 09 Jan 2014 13:08:31 +0000, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Tue, 2013-12-24 at 12:45 +0000, Mark Brown wrote:
+> > I'd note that I wasn't CCed on most of this series so I'm not entirely
+> > sure what it's trying to do.
 > 
-> Isn't this already at least partially solved with the aux data
-> support? I'm guessing the difference here is how the early device is
-> created.
+> Apologies. The series is quite long and I didn't want to bother too many
+> people with mostly irrelevant changes. Will copy you on the whole thing
+> next time.
+> 
+> > > Bus-less maps (ones with reg_read and reg_write functions
+> > > defined in regmap_config) were given the context passed
+> > > in regmap_init(), but it was still called "bus_context".
+> > > 
+> > > This patch formalises this aspect by renaming it to simple
+> > > "context" and adds the missing link, free_context function
+> > > in regmap_config, which allows bus-less maps to use the
+> > > context in classic way.
+> > 
+> > This should be two patches, one patch to do the rename and one to add
+> > the operation.  
+> 
+> Sure, will do.
+> 
+> > The obvious question here is why is this callback useful
+> > - what is being allocated in a regmap specific context that needs to be
+> > lifetime managed separately to the thing doing the creation?  I can't
+> > see any obvious reason why this would ever get used.
+> 
+> First of all, it's just a generalization of the free_context already
+> existing in regmap_bus (and used by regmap-mmio). And in case of this
+> series it is being used to release extra resource added allocated for a
+> "busless" regmap_config. Briefly, I'm using devm_regmap_init() to
+> "attach" a custom regmap configuration to a device when it is being
+> created (which is then dev_get_regmap()-ed in the driver, as you saw in
+> the regulator patch) and its context is a pointer to kzallocated data.
+> free_context is used to release it when devm resource is being removed.
 
-Still, creating a device early and then trying to remember that it has
-been done does nothing but add complexity for a very small number of use
-cases. I still would much rather see things that need really early setup
-to avoid the device model entirely and do the bare minimum needed to
-allow the kernel to get to initcall time. In the cases where a subsystem
-API requires a struct device, I would consider using a dummy throwaway
-struct device for the early bits.
+Have you thought through all the implications here? What you've
+described effectively changes the devm model. devm operates under the
+assumption that devm data only exists between probe() and remove() time.
+If you 'preload' devm data then the preloaded data will get discarded at
+remove() time which breaks if the driver is remove and probed again at
+runtime.
 
 g.
