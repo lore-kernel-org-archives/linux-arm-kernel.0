@@ -1,54 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 16 Jan 2014 14:34:23 +0800
-Subject: [PATCH v2] pinctrl: sunxi: Honor GPIO output initial vaules
-Message-ID: <1389854063-31016-1-git-send-email-wens@csie.org>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 16 Jan 2014 06:54:24 +0000
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+ <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
+ <20140115110537.GA25824@e106331-lin.cambridge.arm.com>
+Message-ID: <b55917fd1b664ebeaeb135330ff806bd@DM2PR03MB349.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIO users, such as fixed-regulator, request GPIO output with
-initial value of 1. This was ignored by sunxi driver.
+Hi, mark
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+> -----Original Message-----
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +       struct platform_device *pdev = to_platform_device(port->dev);
+> > +       struct device_node *np = pdev->dev.of_node;
+> > +
+> > +       if (of_get_property(np, "dmas", NULL)) {
+> > +               sport->lpuart_dma_use = true;
+> > +               lpuart_dma_tx_request(port);
+> > +               lpuart_dma_rx_request(port);
+> > +               temp = readb(port->membase + UARTCR5);
+> > +               writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
+> 
+> Rather than reading the raw dt to find out if you have dmas, can you not
+> just attempt to request the dmas and if either fail give up on using them?
 
-Changes since v2:
-
-  * Set output value before setting the pin function to avoid a glitch.
-
-
- drivers/pinctrl/pinctrl-sunxi.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 119d2dd..6ebf306 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -469,12 +469,6 @@ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	return val;
- }
- 
--static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
--					unsigned offset, int value)
--{
--	return pinctrl_gpio_direction_output(chip->base + offset);
--}
--
- static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
- 				unsigned offset, int value)
- {
-@@ -498,6 +492,13 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
- 	spin_unlock_irqrestore(&pctl->lock, flags);
- }
- 
-+static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
-+					unsigned offset, int value)
-+{
-+	sunxi_pinctrl_gpio_set(chip, offset, value);
-+	return pinctrl_gpio_direction_output(chip->base + offset);
-+}
-+
- static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
- 				const struct of_phandle_args *gpiospec,
- 				u32 *flags)
--- 
-1.8.5.2
+Yes, the dma request function can also confirm it. But maybe it's better that add the judge
+as a dma entrance first?
+I think if the dmas is be written it means dma want be support. At this time, rather than 
+silently change to no dma model, we may throw the error when some errors happened.
+But dma request failed may have many other reasons. Also the judge will just run only once, 
+it will not waste of performance.
+If the dmas is not be written, we don't need to do anything about dma.
