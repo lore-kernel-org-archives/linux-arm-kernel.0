@@ -1,35 +1,35 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 16 Jan 2014 13:43:24 -0800
-Subject: [GIT PULL] DaVinci DT updates for v3.14
-In-Reply-To: <52CFC2CB.3050909@ti.com> (Sekhar Nori's message of "Fri, 10 Jan
- 2014 15:22:11 +0530")
-References: <52CFC2CB.3050909@ti.com>
-Message-ID: <87k3dzob5v.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jan 2014 22:46:26 +0100
+Subject: How to support SDIO wifi/bt in DT
+In-Reply-To: <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
+ <3215037.8HVCjAeS8g@wuerfel>
+ <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+Message-ID: <74872027.r5ouCtzAgs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+On Thursday 16 January 2014 09:15:17 Olof Johansson wrote:
+> 
+> > b) We need to add a way to attach a device_node to an sdio_func,
+> > so that a function driver can find additional DT properties.
+> > This part should be relatively simple once (a) is done and
+> > should only need a little code but no new binding. The code
+> > would be similar to what we do for amba, i2c or spi devices.
+> 
+> This isn't actually needed for this functionality, but might be needed
+> for other things...
+> 
 
-> The following changes since commit 374b105797c3d4f29c685f3be535c35f5689b30e:
->
->   Linux 3.13-rc3 (2013-12-06 09:34:04 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.14/dt
->
-> for you to fetch changes up to 3a9574f2aa4ffd9b867321a1f298893410bd3718:
->
->   ARM: davinci: da850 evm: add GPIO pinumux entries DT node (2013-12-15 18:40:49 +0530)
->
-> ----------------------------------------------------------------
-> DaVinci device tree file updates to add GPIO
-> support.
->
-> ----------------------------------------------------------------
+There is at least one sdio driver (cw1200) that needs to get
+a MAC address from DT and has the same kind of hack that
+you mention to work around it at the moment (actually worse,
+it's not even using auxdata). The MAC address is certainly
+a property of the device, not the host. This is of course
+the same problem that we have on various development boards
+with USB ethernet controllers lacking an EEPROM.
 
-Pulled into next/dt.
+Getting the device to probe in the first place is more important,
+and this is a much simpler problem though.
 
-Thanks,
-
-Kevin
+	Arnd
