@@ -1,32 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 16 Jan 2014 14:16:18 +0800
-Subject: [PATCHv12] ARM: dts: Add support for the cpuimx35 board from
- Eukrea and its baseboard.
-In-Reply-To: <1389803532-8516-1-git-send-email-denis@eukrea.com>
-References: <1389803532-8516-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140116061616.GA4049@S2101-09.ap.freescale.net>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 16 Jan 2014 07:16:15 +0100
+Subject: [PATCH net-next 0/2] net: mvneta: simple cleanups
+In-Reply-To: <20140115.154122.1485420525760591929.davem@davemloft.net>
+References: <cover.1389742334.git.arno@natisbad.org>
+ <20140115.154122.1485420525760591929.davem@davemloft.net>
+Message-ID: <20140116061615.GB15597@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 05:32:12PM +0100, Denis Carikli wrote:
-> The following devices/functionalities were added:
->  * Main and secondary UARTs.
->  * i2c and the pcf8563 device.
->  * Ethernet.
->  * NAND.
->  * The BP1 button.
->  * The LED.
->  * Watchdog
->  * SD.
-> 
-> Cc: Eric B?nard <eric@eukrea.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi David,
 
-Applied, thanks.
+On Wed, Jan 15, 2014 at 03:41:22PM -0800, David Miller wrote:
+> From: Arnaud Ebalard <arno@natisbad.org>
+> Date: Wed, 15 Jan 2014 00:45:31 +0100
+> 
+> > 
+> > Those two patches are intended for net-next. They apply on top of
+> > performance improvements patches from Willy for mvneta driver.
+> > They provide some simple cleanups for unused variables, function
+> > params or return values.
+> > 
+> > Arnaud Ebalard (2):
+> >   net: mvneta: mvneta_tx_done_gbe() cleanups
+> >   net: mvneta: make mvneta_txq_done() return void
+> 
+> These patches do not apply to net-next, please respin.
+
+They depend on the two series I sent, I verified that they apply well
+once these two series are applied to net-next.
+
+Would you prefer that we resend a complete series with all the patches
+at once ?
+
+Thanks,
+Willy
