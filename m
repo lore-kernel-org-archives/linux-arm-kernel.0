@@ -1,44 +1,106 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 16 Jan 2014 17:08:23 +0100
-Subject: [PATCH v2] ARM: dts: tps65910 backup battery regulator
-In-Reply-To: <1387539808-24910-3-git-send-email-mpa@pengutronix.de>
-References: <1387539808-24910-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <1389888503-32013-1-git-send-email-mpa@pengutronix.de>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 16 Jan 2014 09:09:54 -0700
+Subject: No subject
+Message-ID: <1389888598-29690-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a devicetree node for the backup battery regulator.
+This patch adds support for APM X-Gene SoC 15Gbps Multi-purpose PHY. This
+is the physical layer interface for the corresponding host controller. This
+driver uses the new PHY generic framework posted by Kishon Vijay Abrahm.
+In addition, the new PHY generic framework is patched to provide an
+function to set the speed of the PHY.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+v8
+* Update binding documentation
+* Remove XGENE_PHY_DTS and XGENE_PHY_EXT_DTS defines
+* Remove support for internal clock
+* Remove support for external reference CMU
+* Remove the need for external reference resource DTS entry and its related
+  code
+
+v7
+* Add/Update PHY CMU/lane parameters and its default values
+* Rename variable enable_manual_cal to preA3Chip
+* Remove function phy_rd, phy_wr, and phy_wr_flush
+* Change function cmu_wr, cmu_rd, cmu_toggle1to0, cmu_clrbits, cmu_setbits,
+  serdes_wr, serdes_rd, serdes_clrbits, and serdes_setbits to take context
+  instead void *
+* Remove function serdes_toggle1to0
+* Decrease the polling time from 10ms to 1ms on CMU calibration complete
+  detection
+* Move all SATA specify code in function xgene_phy_hw_initialize into
+  function xgene_phy_hw_init_sata
+* Add usleep_range after starting summer/latch calibrations
+* Add usleep_range between receiver reset (function xgene_phy_reset_rxd)
+* Save and restore PHY register 31 instead writing 0 in function
+  xgene_phy_gen_avg_val
+* Update function xgene_phy_sata_force_gen programming sequences
+* Add support to reset the receiver lane in function xgene_phy_set_speed
+  if speed is 0
+* Update PHY parameters in DTS per controller
+* Some minor code clean up
+
+v6
+* Move PHY document to Documentation/devicetree/binding/phy
+* Remove _ADDR from all register defines
+* Update clock-names property for sataphy1clk, sataphy2clk, and sataphy3clk
+
+v5
+* Update DTS binding documentation
+* Remove direct clock access and use clock interface instead
+* Change override parameters to decimal instead hex values
+* Change apm,tx-amplitude, apm,tx-pre-cursor1, apm,tx-pre-cursor2,
+  apm,tx-post-cursor to be unit of uV
+
+v4
+* Update documentation with 'apm,' instead 'apm-'
+* Change DTS override parameter to have 'apm,'
+* Add select GENERIC_PHY to Kconfig PHY_XGENE
+* Make override parameters to be pair of three values instead one
+* Some minor comment and indentation changes
+* Remove error register addition offset
+* Add ULL to constants
+* Use module_init instead subsys_initcall
+* Make DTS node based on first register address
+* Update override setting values
+
+v3
+* Major re-write of the code based on various review comments
+* Support external clock only at the moment
+* Support SATA mode only at the moment
+* No UEFI support at the moment
+
+v2
+* Remove port knowledge from functions
+* Make all functions static
+* Remove ID completely
+* Make resource requirement based on compatible type
+* Rename override PHY parameters with more descriptive name
+* Add override PHY parameter for per controller, per port, and per speed
+* Patch the generic PHY frame to expose set_speed operation
+
+v1
+* Initial version
+
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
 ---
-Hi,
+Loc Ho (4):
+  PHY: Add function set_speed to generic PHY framework
+  Documentation: Add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+    binding documentation
+  PHY: add APM X-Gene SoC 15Gbps Multi-purpose PHY driver
+  arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY DTS entries
 
-Mark Brown applied [1] the other part of the series which adds 'vbb' as
-regulator-compatible. I forgot to add you in Cc.
-
-Regards,
-
-Markus
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289815/focus=290089
-
- arch/arm/boot/dts/tps65910.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
-index 92693a8..b0ac665 100644
---- a/arch/arm/boot/dts/tps65910.dtsi
-+++ b/arch/arm/boot/dts/tps65910.dtsi
-@@ -82,5 +82,10 @@
- 			reg = <12>;
- 			regulator-compatible = "vmmc";
- 		};
-+
-+		vbb_reg: regulator at 13 {
-+			reg = <13>;
-+			regulator-compatible = "vbb";
-+		};
- 	};
- };
--- 
-1.8.5.2
+ .../devicetree/bindings/phy/apm-xgene-phy.txt      |   79 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   75 +
+ drivers/phy/Kconfig                                |    7 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   21 +
+ drivers/phy/phy-xgene.c                            | 1793 ++++++++++++++++++++
+ include/linux/phy/phy.h                            |    8 +
+ 7 files changed, 1985 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+ create mode 100644 drivers/phy/phy-xgene.c
