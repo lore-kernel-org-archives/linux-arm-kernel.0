@@ -1,127 +1,190 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 16 Jan 2014 13:44:21 +0100
-Subject: [PATCH 09/11] ARM: dts: Add nodes for SMMUs on Calxeda ECX-2000
-In-Reply-To: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1389876263-25759-10-git-send-email-andreas.herrmann@calxeda.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 16 Jan 2014 13:48:19 +0100
+Subject: [PATCH] ARM: dts: imx6q: Add support for Zealz GK802
+Message-ID: <1389876499-24247-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- arch/arm/boot/dts/ecx-2000.dts    |   44 +++++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/ecx-common.dtsi |    9 +++++---
- 2 files changed, 48 insertions(+), 5 deletions(-)
+Add support for the GK802 'QUAD CORE Mini PC', which seems to be loosely
+based on the Freescale i.MX6Q HDMI dongle reference design.
+It is supposedly identical to the Hiapad Hi802.
 
-diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
-index 2ccbb57f..722de49 100644
---- a/arch/arm/boot/dts/ecx-2000.dts
-+++ b/arch/arm/boot/dts/ecx-2000.dts
-@@ -76,10 +76,11 @@
- 	};
- 
- 	soc {
--		ranges = <0x00000000 0x00000000 0x00000000 0xffffffff>;
-+		ranges = <0x0 0x0 0x0 0xffffffff>;
- 
- 		timer {
--			compatible = "arm,cortex-a15-timer", "arm,armv7-timer"; 			interrupts = <1 13 0xf08>,
-+			compatible = "arm,cortex-a15-timer", "arm,armv7-timer";
-+			interrupts = <1 13 0xf08>,
- 				<1 14 0xf08>,
- 				<1 11 0xf08>,
- 				<1 10 0xf08>;
-@@ -109,6 +110,45 @@
- 			interrupts = <0 76 4  0 75 4  0 74 4  0 73 4>;
- 		};
- 	};
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/imx6q-gk802.dts | 151 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 152 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-gk802.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index aeb8053..9ed00a0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -171,6 +171,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-arm2.dtb \
+ 	imx6q-cm-fx6.dtb \
+ 	imx6q-dmo-edmqmx6.dtb \
++	imx6q-gk802.dtb \
+ 	imx6q-gw51xx.dtb \
+ 	imx6q-gw52xx.dtb \
+ 	imx6q-gw53xx.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-gk802.dts b/arch/arm/boot/dts/imx6q-gk802.dts
+new file mode 100644
+index 0000000..0d010df
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-gk802.dts
+@@ -0,0 +1,151 @@
++/*
++ * Copyright (C) 2013 Philipp Zabel
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	soc at 920000000 {
-+		ranges = <0x9 0x20000000 0x9 0x20000000 0x290000>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
++/dts-v1/;
++#include "imx6q.dtsi"
++
++/ {
++	model = "Zealz GK802";
++	compatible = "zealz,imx6q-gk802", "fsl,imx6q";
++
++	chosen {
++		linux,stdout-path = &uart4;
++	};
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
 +		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
 +
-+		smmu_mac0: smmu at 920000000 {
-+			compatible = "arm,mmu-400";
-+			reg = <0x9 0x20000000 0x10000>;
-+			#global-interrupts = <1>;
-+			interrupts = <0 106 4 0 106 4>;
-+			mmu-masters = <&mac0 0 1>;
-+			calxeda,smmu-secure-config-access;
-+			arm,smmu-isolate-devices;
-+		};
-+
-+		smmu_mac1: smmu at 920080000 {
-+			compatible = "arm,mmu-400";
-+			reg = <0x9 0x20080000 0x10000>;
-+			#global-interrupts = <1>;
-+			interrupts = <0 108 4 0 108 4>;
-+			mmu-masters = <&mac1 0 1>;
-+			calxeda,smmu-secure-config-access;
-+			arm,smmu-isolate-devices;
-+		};
-+
-+		smmu_sata: smmu at 920180000 {
-+			compatible = "arm,mmu-400";
-+			reg = <0x00000009 0x20180000 0x10000>;
-+			mmu-masters = <&sata 0 1 2 3 4 5 6 7 8 9>;
-+			#global-interrupts = <1>;
-+			interrupts = <0 114 4 0 114 4>;
-+			calxeda,smmu-secure-config-access;
-+			arm,smmu-isolate-devices;
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
 +		};
 +	};
 +
- };
- 
- /include/ "ecx-common.dtsi"
-diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
-index b90045a..ad9b2fd 100644
---- a/arch/arm/boot/dts/ecx-common.dtsi
-+++ b/arch/arm/boot/dts/ecx-common.dtsi
-@@ -33,7 +33,7 @@
- 		compatible = "simple-bus";
- 		interrupt-parent = <&intc>;
- 
--		sata at ffe08000 {
-+		sata: sata at ffe08000 {
- 			compatible = "calxeda,hb-ahci";
- 			reg = <0xffe08000 0x10000>;
- 			interrupts = <0 83 4>;
-@@ -43,6 +43,7 @@
- 					     &combophy0 3>;
- 			calxeda,sgpio-gpio =<&gpioh 5 1 &gpioh 6 1 &gpioh 7 1>;
- 			calxeda,led-order = <4 0 1 2 3>;
-+			#stream-id-cells = <10>;
- 		};
- 
- 		sdhci at ffe0e000 {
-@@ -210,18 +211,20 @@
- 			clock-names = "apb_pclk";
- 		};
- 
--		ethernet at fff50000 {
-+		mac0: ethernet at fff50000 {
- 			compatible = "calxeda,hb-xgmac";
- 			reg = <0xfff50000 0x1000>;
- 			interrupts = <0 77 4  0 78 4  0 79 4>;
- 			dma-coherent;
-+			#stream-id-cells = <2>;
- 		};
- 
--		ethernet at fff51000 {
-+		mac1: ethernet at fff51000 {
- 			compatible = "calxeda,hb-xgmac";
- 			reg = <0xfff51000 0x1000>;
- 			interrupts = <0 80 4  0 81 4  0 82 4>;
- 			dma-coherent;
-+			#stream-id-cells = <2>;
- 		};
- 
- 		combophy0: combo-phy at fff58000 {
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		recovery-button {
++			label = "recovery";
++			gpios = <&gpio3 16 1>;
++			linux,code = <0x198>; /* KEY_RESTART */
++			gpio-key,wakeup;
++		};
++	};
++};
++
++/* Internal I2C */
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_gk802>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	/* SDMC DM2016 1024 bit EEPROM + 128 bit OTP */
++	eeprom: dm2016 at 51 {
++		compatible = "sdmc,dm2016";
++		reg = <0x51>;
++	};
++};
++
++/* External I2C via HDMI */
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3_gk802>;
++	clock-frequency = <100000>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	hog {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				/* Recovery button, active-low */
++				MX6QDL_PAD_EIM_D16__GPIO3_IO16  0x100b1
++				/* RTL8192CU enable GPIO, active-low */
++				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x1b0b0
++			>;
++		};
++	};
++
++	i2c {
++		pinctrl_i2c2_gk802: i2c2grp-1 {
++			fsl,pins = <MX6QDL_I2C2_PINGRP2>;
++		};
++
++		pinctrl_i2c3_gk802: i2c3grp-1 {
++			fsl,pins = <MX6QDL_I2C3_PINGRP3>;
++		};
++	};
++
++	uart {
++		pinctrl_uart4: uart4grp {
++			fsl,pins = <MX6QDL_UART4_PINGRP1>;
++		};
++	};
++
++	usdhc {
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
++		};
++
++		pinctrl_usdhc4: usdhc4grp {
++			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
++		};
++	};
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	status = "okay";
++};
++
++/* External USB-A port (USBOTG) */
++&usbotg {
++	disable-over-current;
++	status = "okay";
++};
++
++/* Internal USB port (USBH1), connected to RTL8192CU */
++&usbh1 {
++	disable-over-current;
++	status = "okay";
++};
++
++/* External microSD */
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	bus-width = <4>;
++	cd-gpios = <&gpio6 11 0>;
++	vmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
++
++/* Internal microSD */
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <4>;
++	vmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
 -- 
-1.7.9.5
+1.8.5.2
