@@ -1,114 +1,64 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 16 Jan 2014 09:11:27 -0700
-Subject: [PATCH v10 4/4] arm64: Add APM X-Gene SoC SATA host controller DTS
- entries
-In-Reply-To: <1389888687-29741-4-git-send-email-lho@apm.com>
-References: <1389888687-29741-1-git-send-email-lho@apm.com>
- <1389888687-29741-2-git-send-email-lho@apm.com>
- <1389888687-29741-3-git-send-email-lho@apm.com>
- <1389888687-29741-4-git-send-email-lho@apm.com>
-Message-ID: <1389888687-29741-5-git-send-email-lho@apm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 16 Jan 2014 16:27:55 +0000
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <20140109184251.GL17838@mudshark.cambridge.arm.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+ <201401091204.17932.arnd@arndb.de>
+ <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+ <20140109184251.GL17838@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+On Thu, 9 Jan 2014, Will Deacon wrote:
+> On Thu, Jan 09, 2014 at 12:47:24PM +0000, Stefano Stabellini wrote:
+> > On Thu, 9 Jan 2014, Arnd Bergmann wrote:
+> > > On Thursday 09 January 2014, Will Deacon wrote:
+> > > > On Wed, Jan 08, 2014 at 06:00:23PM +0000, Stefano Stabellini wrote:
+> > > > > Remove !GENERIC_ATOMIC64 build dependency:
+> > > > > - rename atomic64_xchg to armv7_atomic64_xchg and define it even ifdef
+> > > > >   GENERIC_ATOMIC64;
+> > > > > - call armv7_atomic64_xchg directly from xen/events.h.
+> > > > > 
+> > > > > Remove !CPU_V6 build dependency:
+> > > > > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+> > > > >   CONFIG_CPU_V6;
+> > > > > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16.
+> > > > > 
+> > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > > CC: arnd at arndb.de
+> > > > > CC: linux at arm.linux.org.uk
+> > > > > CC: will.deacon at arm.com
+> > > > > CC: gang.chen at asianux.com
+> > > > > CC: catalin.marinas at arm.com
+> > > > > CC: jaccon.bastiaansen at gmail.com
+> > > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > > CC: linux-kernel at vger.kernel.org
+> > > > > 
+> > > > 
+> > > > I'm confused here. It looks like you want to call armv7 code in a v6 kernel.
+> > > > What am I missing?
+> > > 
+> > > This is about being able to build a kernel that runs on ARMv6 and ARMv7
+> > > and also includes Xen. Because of obvious hardware limitations, Xen
+> > > will only run on v7, but currently you cannot even build it once you
+> > > enable (pre-v6K) ARMv6 support, since the combined v6+v7 kernel can't
+> > > do atomic accesses in a generic way on non-32bit variables.
+> > 
+> > Yep, that's right.
+> 
+> Ok, thanks for the explanation. Looking at the patch, I wonder whether it's
+> not cleaner just to implement xchg code separately for Xen? The Linux code
+> isn't always sufficient (due to the GENERIC_ATOMIC64 stuff) and most of the
+> churn coming out of this patch is an attempt to provide some small code
+> reuse at the cost of code readability.
+> 
+> What do others think?
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index b1e9cc9..ae9d145 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -268,5 +310,38 @@
- 			apm,tx-boost-gain = <31 31 31 31 31 31>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 10>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
--- 
-1.5.5
+I am OK with that, in fact my first version of the patch did just that:
+
+http://marc.info/?l=linux-arm-kernel&m=138436406724990&w=2
+
+Is that what you had in mind?
