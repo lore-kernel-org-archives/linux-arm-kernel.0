@@ -1,74 +1,209 @@
 From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Thu, 16 Jan 2014 15:35:45 +0000
-Subject: [PATCH v2 0/4] pinctrl: st: Add interrupt controller support.
-In-Reply-To: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
+Date: Thu, 16 Jan 2014 15:37:31 +0000
+Subject: [PATCH v2 2/4] pinctrl: st: Add software edge trigger interrupt
+ support.
+In-Reply-To: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1389886651-31990-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Hi Linus W, 
+ST pin controller does not have hardware support for detecting edge
+triggered interrupts, It only has level triggering support.
+This patch attempts to fake up edge triggers from hw level trigger
+support in software. With this facility now the gpios can be easily used
+for keypads, otherwise it would be difficult for drivers like keypads to
+work with level trigger interrupts.
 
-Thankyou for reviewing v1 of the patch-set the comments were very useful.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c |  116 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 114 insertions(+), 2 deletions(-)
 
-This series of v2 patches add interrupt controller support to ST pinctrl
-driver incorporating all the review comments.
-
-ST pin controller GPIO bank can have one of the two possible types of
-interrupt-wirings.
-
-First type is via irqmux, single interrupt is used by multiple gpio
-banks. This reduces number of interrupts numbers required by pin controller.
-All these gpio banks belong to a single pin controller.
-
-Second type has a dedicated interrupt per gpio bank. Interrupt number usage is
-very high in this case.
-
-This patch adds support to both these wirings.
-
-Also, ST pin controller hardware only supports level triggered interrupts.
-However for drivers like gpio keypad requires edge trigger interrupt support,
-so one of the patch adds edge trigger interrupt support in software by using
-the existing level trigger support in hardware.
-
-Patch 01: Adds level interrupt support to pin controller.
-Patch 02 Adds software edge trigger support.
-Patch 03,04 : Updates STiH415, STiH416 dts files for interrupt support.
-
-
-Changes since v1:
-	Updated below changes suggest by Linus W.
-	- Added updated example in binding document.
-	- removed un-necessary varibles in st_gpio_bank and st_pinctrl struct.
-	- renamed irq disabled/enabled functions with masked/unmasked
-	  functions.
-	- Fixed a issue in interrupt handler which could miss interrupts.
-	- Added new hooks startup and shutdown which can mark gpio lines.
-	- create irq mapping at probe stage instead of doing it in to_irq.
-	- removed driver specfic irq_domain xlate function with generic one.
-	- Added extra documention for software edge trigger support.
-	- reformated few debug messages.
-
-I did skip the first patch from my last v1 patchset as you have already
-applied it.
-
-Thanks,
-srini
-
-
-Srinivas Kandagatla (4):
-  pinctrl: st: Add Interrupt support.
-  pinctrl: st: Add software edge trigger interrupt support.
-  ARM:STi: STiH416: Add interrupt support for pin controller
-  ARM:STi: STiH415: Add interrupt support for pin controller
-
- .../devicetree/bindings/pinctrl/pinctrl-st.txt     |   73 ++++-
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |   75 +++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |   81 +++++
- drivers/pinctrl/pinctrl-st.c                       |  337 +++++++++++++++++++-
- 4 files changed, 558 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 51e4f3a..9fb66aa 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -271,12 +271,59 @@ struct st_pctl_group {
+ 	struct st_pinconf	*pin_conf;
+ };
+ 
++/*
++ * Edge triggers are not supported at hardware level, it is supported by
++ * software by exploiting the level trigger support in hardware.
++ * Software uses a virtual register (EDGE_CONF) for edge trigger configuration
++ * of each gpio pin in a GPIO bank.
++ *
++ * Each bank has a 32 bit EDGE_CONF register which is divided in to 8 parts of
++ * 4-bits. Each 4-bit space is allocated for each pin in a gpio bank.
++ *
++ * bit allocation per pin is:
++ * Bits:  [0 - 3] | [4 - 7]  [8 - 11] ... ... ... ...  [ 28 - 31]
++ *       --------------------------------------------------------
++ *       |  pin-0  |  pin-2 | pin-3  | ... ... ... ... | pin -7 |
++ *       --------------------------------------------------------
++ *
++ *  A pin can have one of following the values in its edge configuration field.
++ *
++ *	-------   ----------------------------
++ *	[0-3]	- Description
++ *	-------   ----------------------------
++ *	0000	- No edge IRQ.
++ *	0001	- Falling edge IRQ.
++ *	0010	- Rising edge IRQ.
++ *	0011	- Rising and Falling edge IRQ.
++ *	-------   ----------------------------
++ */
++
++#define ST_IRQ_EDGE_CONF_BITS_PER_PIN	4
++#define ST_IRQ_EDGE_MASK		0xf
++#define ST_IRQ_EDGE_FALLING		BIT(0)
++#define ST_IRQ_EDGE_RISING		BIT(1)
++#define ST_IRQ_EDGE_BOTH		(BIT(0) | BIT(1))
++
++#define ST_IRQ_RISING_EDGE_CONF(pin) \
++	(ST_IRQ_EDGE_RISING << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
++
++#define ST_IRQ_FALLING_EDGE_CONF(pin) \
++	(ST_IRQ_EDGE_FALLING << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
++
++#define ST_IRQ_BOTH_EDGE_CONF(pin) \
++	(ST_IRQ_EDGE_BOTH << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
++
++#define ST_IRQ_EDGE_CONF(conf, pin) \
++	(conf >> (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN) & ST_IRQ_EDGE_MASK)
++
+ struct st_gpio_bank {
+ 	struct gpio_chip		gpio_chip;
+ 	struct pinctrl_gpio_range	range;
+ 	void __iomem			*base;
+ 	struct st_pio_control		pc;
+ 	struct	irq_domain		*domain;
++	unsigned long			irq_edge_conf;
++	spinlock_t                      lock;
+ };
+ 
+ struct st_pinctrl {
+@@ -1262,18 +1309,37 @@ static int st_gpio_irq_set_type(struct irq_data *d, unsigned type)
+ 	unsigned long flags;
+ 	int comp, pin = d->hwirq;
+ 	u32 val;
++	u32 pin_edge_conf = 0;
+ 
+ 	switch (type) {
+ 	case IRQ_TYPE_LEVEL_HIGH:
+ 		comp = 0;
+ 		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		comp = 0;
++		pin_edge_conf = ST_IRQ_FALLING_EDGE_CONF(pin);
++		break;
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		comp = 1;
+ 		break;
++	case IRQ_TYPE_EDGE_RISING:
++		comp = 1;
++		pin_edge_conf = ST_IRQ_RISING_EDGE_CONF(pin);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		comp = st_gpio_get(&bank->gpio_chip, pin);
++		pin_edge_conf = ST_IRQ_BOTH_EDGE_CONF(pin);
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+ 
++	spin_lock_irqsave(&bank->lock, flags);
++	bank->irq_edge_conf &=  ~(ST_IRQ_EDGE_MASK << (
++				pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN));
++	bank->irq_edge_conf |= pin_edge_conf;
++	spin_unlock_irqrestore(&bank->lock, flags);
++
+ 	val = readl(bank->base + REG_PIO_PCOMP);
+ 	val &= ~BIT(pin);
+ 	val |= (comp << pin);
+@@ -1282,10 +1348,39 @@ static int st_gpio_irq_set_type(struct irq_data *d, unsigned type)
+ 	return 0;
+ }
+ 
++/*
++ * As edge triggers are not supported at hardware level, it is supported by
++ * software by exploiting the level trigger support in hardware.
++ *
++ * Steps for detection raising edge interrupt in software.
++ *
++ * Step 1: CONFIGURE pin to detect level LOW interrupts.
++ *
++ * Step 2: DETECT level LOW interrupt and in irqmux/gpio bank interrupt handler,
++ * if the value of pin is low, then CONFIGURE pin for level HIGH interrupt.
++ * IGNORE calling the actual interrupt handler for the pin@this stage.
++ *
++ * Step 3: DETECT level HIGH interrupt and in irqmux/gpio-bank interrupt handler
++ * if the value of pin is HIGH, CONFIGURE pin for level LOW interrupt and then
++ * DISPATCH the interrupt to the interrupt handler of the pin.
++ *
++ *		 step-1  ________     __________
++ *				|     | step - 3
++ *			        |     |
++ *			step -2 |_____|
++ *
++ * falling edge is also detected int the same way.
++ *
++ */
+ static void __gpio_irq_handler(struct st_gpio_bank *bank)
+ {
+ 	unsigned long port_in, port_mask, port_comp, active_irqs;
+-	int n;
++	unsigned long bank_edge_mask, flags;
++	int n, val, ecfg;
++
++	spin_lock_irqsave(&bank->lock, flags);
++	bank_edge_mask = bank->irq_edge_conf;
++	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	for (;;) {
+ 		port_in = readl(bank->base + REG_PIO_PIN);
+@@ -1298,6 +1393,22 @@ static void __gpio_irq_handler(struct st_gpio_bank *bank)
+ 			break;
+ 
+ 		for_each_set_bit(n, &active_irqs, BITS_PER_LONG) {
++			/* check if we are detecting fake edges ... */
++			ecfg = ST_IRQ_EDGE_CONF(bank_edge_mask, n);
++
++			if (ecfg) {
++				/* edge detection. */
++				val = st_gpio_get(&bank->gpio_chip, n);
++
++				writel(BIT(n),
++					val ? bank->base + REG_PIO_SET_PCOMP :
++					bank->base + REG_PIO_CLR_PCOMP);
++
++				if (ecfg != ST_IRQ_EDGE_BOTH &&
++					!((ecfg & ST_IRQ_EDGE_FALLING) ^ val))
++					continue;
++			}
++
+ 			generic_handle_irq(irq_find_mapping(bank->domain, n));
+ 		}
+ 	}
+@@ -1359,7 +1470,7 @@ static int st_gpio_irq_domain_map(struct irq_domain *h,
+ 	struct st_gpio_bank *bank = h->host_data;
+ 
+ 	irq_set_chip(virq, &st_gpio_irqchip);
+-	irq_set_handler(virq, handle_level_irq);
++	irq_set_handler(virq, handle_simple_irq);
+ 	set_irq_flags(virq, IRQF_VALID);
+ 	irq_set_chip_data(virq, bank);
+ 
+@@ -1392,6 +1503,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+ 	bank->gpio_chip.base = bank_num * ST_GPIO_PINS_PER_BANK;
+ 	bank->gpio_chip.ngpio = ST_GPIO_PINS_PER_BANK;
+ 	bank->gpio_chip.of_node = np;
++	spin_lock_init(&bank->lock);
+ 
+ 	of_property_read_string(np, "st,bank-name", &range->name);
+ 	bank->gpio_chip.label = range->name;
 -- 
 1.7.6.5
