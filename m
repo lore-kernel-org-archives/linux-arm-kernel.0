@@ -1,92 +1,50 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 16 Jan 2014 10:31:42 +0800
-Subject: [PATCH v2] mmc: dw_mmc: fix dw_mci_get_cd
-Message-ID: <1389839502-13046-1-git-send-email-zhangfei.gao@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 16 Jan 2014 11:34:13 +0900
+Subject: [PATCH v6 net-next 1/4] sh_eth: Use bool as return type of
+ sh_eth_is_gether()
+In-Reply-To: <1389839656-10932-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389839656-10932-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1389839656-10932-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
-CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
-can not be checked by IS_ERR_VALUE.
-Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
-otherwise sd detect may occasionally fail.
+Return a boolean and use true and false.
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Reported-by: Kevin Hilman <khilman@linaro.org>
-Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
-Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
- .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |    2 ++
- drivers/mmc/host/dw_mmc.c                          |   12 +++++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
+Dave, please consider this for net-next.
 
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 8f3f13315358..18b0819bafe0 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -73,6 +73,8 @@ Optional properties:
+v6
+* Simplify logic as suggested by Joe Perches
+
+v5
+* No change
+
+v4
+* First post
+---
+ drivers/net/ethernet/renesas/sh_eth.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+index ba1f6c9..f12a929 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.c
++++ b/drivers/net/ethernet/renesas/sh_eth.c
+@@ -310,12 +310,9 @@ static const u16 sh_eth_offset_fast_sh3_sh2[SH_ETH_MAX_REGISTER_OFFSET] = {
+ 	[TSU_ADRL31]	= 0x01fc,
+ };
  
- * caps2-mmc-hs200-1_2v: Supports mmc HS200 SDR 1.2V mode
- 
-+* caps2-mmc-cd-active-high: cd pin is high when card present
-+
- * broken-cd: as documented in mmc core bindings.
- 
- * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index a776f24f4311..ad65b895d34c 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
- 	int present;
- 	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci_board *brd = slot->host->pdata;
--	int gpio_cd = !mmc_gpio_get_cd(mmc);
-+	struct dw_mci *host = slot->host;
-+	int gpio_cd = mmc_gpio_get_cd(mmc);
- 
- 	/* Use platform get_cd function, else try onboard card detect */
- 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
-@@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
- 	else if (brd->get_cd)
- 		present = !brd->get_cd(slot->id);
- 	else if (!IS_ERR_VALUE(gpio_cd))
--		present = !!gpio_cd;
-+		present = gpio_cd;
- 	else
- 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
- 			== 0 ? 1 : 0;
- 
-+	spin_lock_bh(&host->lock);
- 	if (present) {
- 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
- 		dev_dbg(&mmc->class_dev, "card is present\n");
-@@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
- 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
- 		dev_dbg(&mmc->class_dev, "card is not present\n");
- 	}
-+	spin_unlock_bh(&host->lock);
- 
- 	return present;
- }
-@@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
- 	return gpio;
- }
- 
--/* find the cd gpio for a given slot; or -1 if none specified */
-+/* find the cd gpio for a given slot */
- static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
- 					struct mmc_host *mmc)
+-static int sh_eth_is_gether(struct sh_eth_private *mdp)
++static bool sh_eth_is_gether(struct sh_eth_private *mdp)
  {
-@@ -2411,6 +2414,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
- 	if (of_find_property(np, "caps2-mmc-hs200-1_2v", NULL))
- 		pdata->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
- 
-+	if (of_find_property(np, "caps2-mmc-cd-active-high", NULL))
-+		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-+
- 	return pdata;
+-	if (mdp->reg_offset == sh_eth_offset_gigabit)
+-		return 1;
+-	else
+-		return 0;
++	return mdp->reg_offset == sh_eth_offset_gigabit;
  }
  
+ static void sh_eth_select_mii(struct net_device *ndev)
 -- 
-1.7.9.5
+1.8.4
