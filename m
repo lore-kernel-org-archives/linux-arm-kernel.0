@@ -1,34 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Jan 2014 18:55:39 +0000
-Subject: [GIT PULL] arm64 revert for 3.13
-Message-ID: <20140116185533.GA16442@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 16 Jan 2014 11:26:17 -0800
+Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
+In-Reply-To: <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+References: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
+ <1389735034-21430-3-git-send-email-sboyd@codeaurora.org>
+ <20140115102701.GA27314@e102568-lin.cambridge.arm.com>
+ <20140115165623.GJ14405@codeaurora.org>
+ <20140116013840.GA674@codeaurora.org>
+ <20140116113332.GC25540@e102568-lin.cambridge.arm.com>
+ <20140116180505.GA30925@codeaurora.org>
+ <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+Message-ID: <20140116192617.GA13785@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 01/16, Lorenzo Pieralisi wrote:
+> On Thu, Jan 16, 2014 at 06:05:05PM +0000, Stephen Boyd wrote:
+> > On 01/16, Lorenzo Pieralisi wrote:
+> > > Do we really want to do that ? I am not sure. A cpus node is supposed to
+> > > be a container node, we should not define this binding just because we
+> > > know the kernel creates a platform device for it then.
+> > 
+> > This is just copying more of the ePAPR spec into this document.
+> > It just so happens that having a compatible field here allows a
+> > platform device to be created. I don't see why that's a problem.
+> 
+> I do not see why you cannot define a node like pmu or arch-timer and stick
+> a compatible property in there. cpus node does not represent a device, and
+> must not be created as a platform device, that's my opinion.
+> 
 
-If there's still time for 3.13, could you please pull the one-line
-revert below? We noticed that it breaks ioremap (and earlyprintk) with
-64K page configuration. Thanks.
+I had what you're suggesting before in the original revision of
+this patch. Please take a look at the original patch series[1]. I
+suppose it could be tweaked slightly to still have a cache node
+for the L2 interrupt and the next-level-cache pointer from the
+CPUs.
 
-The following changes since commit cdc27c27843248ae7eb0df5fc261dd004eaa5670:
+> What would you do for big.LITTLE systems ? We are going to create two
+> cpus node because we need two platform devices ? I really think there
+> must be a better way to implement this, but I will let DT maintainers
+> make a decision.
 
-  arm64: ptrace: avoid using HW_BREAKPOINT_EMPTY for disabled events (2013-12-19 17:41:25 +0000)
+There is no such thing as big.LITTLE for Krait, so this is not a
+concern.
 
-are available in the git repository at:
+> 
+> > > interrupts is a cpu node property and I think it should be kept as such.
+> > > 
+> > > I know it will be duplicated and I know you can't rely on a platform
+> > > device for probing (since if I am not mistaken, removing a compatible
+> > > string from cpus prevents its platform device creation), but that's an issue
+> > > related to how the kernel works, you should not define DT bindings to solve
+> > > that IMHO.
+> > 
+> > The interrupts property is also common for all cpus so it seems
+> > fine to collapse the value down into a PPI specifier indicating
+> > that all CPUs get the interrupt, similar to how we compress the
+> > information about the compatible string.
+> 
+> I think it is nicer to create a device node (as I said, like a pmu or an
+> arch-timer) and define interrupts there along with a proper compatible
+> property. This would serve the same purpose without adding properties in
+> the cpus node.
+> 
+> cpu-edac {
+> 	compatible = "qcom,cpu-edac";
+> 	interrupts = <...>;
+> };
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+Yes, please see the original thread.
 
-for you to fetch changes up to 4ce00dfcf19c473f3dbf23d5b1372639f0c334f6:
+[1] https://lkml.org/lkml/2013/10/29/134
 
-  Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache" (2014-01-16 18:32:25 +0000)
-
-----------------------------------------------------------------
-Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache"
-
-----------------------------------------------------------------
-Catalin Marinas (1):
-      Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache"
-
- arch/arm64/include/asm/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
