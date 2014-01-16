@@ -1,60 +1,52 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Thu, 16 Jan 2014 12:53:18 -0500
-Subject: [PATCH] aarch64: always map VDSO at worst case alignment
-In-Reply-To: <20140116174344.GJ30257@mudshark.cambridge.arm.com>
-References: <20140115214144.GF18705@redacted.bos.redhat.com>
- <20140116174344.GJ30257@mudshark.cambridge.arm.com>
-Message-ID: <20140116175318.GK18705@redacted.bos.redhat.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Thu, 16 Jan 2014 23:23:22 +0530
+Subject: [PATCH] Add Xilinx AXI Video DMA Engine driver
+Message-ID: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 05:43:44PM +0000, Will Deacon wrote:
-> > +		struct vm_unmapped_area_info info =
-> > +			{
-> > +				.flags = 0,
-> > +				.length = vdso_mapping_len,
-> > +				.low_limit = mm->mmap_base,
-> > +				.high_limit = TASK_SIZE,
-> > +				.align_mask = (1 << 16) - 1,
-> > +			};
-> > +		vdso_base = vm_unmapped_area(&info);
-> > +	}
-> 
-> I don't like this fix. The kernel is perfectly alright mapping the vdso at
-> the actual page size, as opposed to the maximum. Since the vdso isn't
-> demand-paged, we can actually just tell the linker not to bother forcing 64k
-> (worst case) alignment for PT_LOAD segments. Please can you try the patch
-> below?
-> 
+Hi,
 
-Me either, tbh. ;-)
+This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+It is a soft IP core, which provides high-bandwidth direct memory
+access between memory and AXI4-Stream video type target peripherals 
+including peripherals which support AXI4-Stream Video Protocol. The
+core provides efficient two dimensional DMA operations with independent
+asynchronous read and write channel operation.
 
-I was testing out using -Wl,-z,max-page-size for the
-!CONFIG_ARM64_64K_PAGES case, and that seemed to work. A quick compile
-check shows the segment alignment being 0x10 with -Wl,-n:
+For more information on the IP, please refer to
+http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
 
-kmcmarti ~/linux $ eu-readelf -l
-arch/arm64/kernel/vdso/vdso.so
-Program Headers:
-  Type           Offset   VirtAddr           PhysAddr           FileSiz
-MemSiz   Flg Align
-  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000700
-0x000700 R E 0x10
+This patch also provides a test client, which assumes read and write channels
+of the core are configured in a back-to-back connection.  It transfers 
+data on the write channel, read and verify the data on the read channel. 
 
-so I think that should work nicely!
+Use cases:
+++++++++++
+1. Xilinx Video Targeted Reference design
+   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
+2. Common Display Framework
+   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
 
-I'll reboot a machine with this fix to test it as soon as possible.
+Regards,
+Srikanth
 
-Acked-by: Kyle McMartin <kyle@redhat.com>
+Srikanth Thokala (1):
+  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
 
-> --- a/arch/arm64/kernel/vdso/Makefile
-> +++ b/arch/arm64/kernel/vdso/Makefile
-> @@ -48,7 +48,7 @@ $(obj-vdso): %.o: %.S
->  
->  # Actual build commands
->  quiet_cmd_vdsold = VDSOL $@
-> -      cmd_vdsold = $(CC) $(c_flags) -Wl,-T $^ -o $@
-> +      cmd_vdsold = $(CC) $(c_flags) -Wl,-n -Wl,-T $^ -o $@
->  quiet_cmd_vdsoas = VDSOA $@
->        cmd_vdsoas = $(CC) $(a_flags) -c -o $@ $<
->  
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   71 +
+ .../bindings/dma/xilinx/xilinx_vdma_test.txt       |   39 +
+ drivers/dma/Kconfig                                |   23 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xilinx/Makefile                        |    2 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1497 ++++++++++++++++++++
+ drivers/dma/xilinx/xilinx_vdma_test.c              |  629 ++++++++
+ 7 files changed, 2262 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma_test.txt
+ create mode 100644 drivers/dma/xilinx/Makefile
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma_test.c
+
+-- 
+1.7.9.5
