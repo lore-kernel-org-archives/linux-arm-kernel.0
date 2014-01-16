@@ -1,115 +1,252 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 16 Jan 2014 12:45:27 +0000
-Subject: [PATCH v6 2/6] misc: sram: implement mmio-sram-reserved option
-In-Reply-To: <1669323.jqjZBfkRx4@phil>
-References: <27256277.YJ687suYy5@phil>
- <1669323.jqjZBfkRx4@phil>
-Message-ID: <20140116124527.GD19578@e106331-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 16 Jan 2014 13:45:54 +0100
+Subject: [PATCH] ARM: dts: imx6: Add DFI FS700-M60 board support
+Message-ID: <1389876354-24341-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 09:41:28PM +0000, Heiko St?bner wrote:
-> This implements support for the mmio-sram-reserved option to keep the
-> genpool from using these areas.
-> 
-> Suggested-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
-> ---
->  drivers/misc/sram.c |  118 +++++++++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 110 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index afe66571..7fb60f3 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -36,13 +36,23 @@ struct sram_dev {
->  	struct clk *clk;
->  };
->  
-> +struct sram_reserve {
-> +	unsigned long start;
-> +	unsigned long size;
-> +};
-> +
->  static int sram_probe(struct platform_device *pdev)
->  {
->  	void __iomem *virt_base;
->  	struct sram_dev *sram;
->  	struct resource *res;
-> -	unsigned long size;
-> -	int ret;
-> +	unsigned long size, cur_start, cur_size;
-> +	const __be32 *reserved_list = NULL;
-> +	int reserved_size = 0;
-> +	struct sram_reserve *rblocks;
-> +	unsigned int nblocks;
-> +	int ret = 0;
-> +	int i;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	virt_base = devm_ioremap_resource(&pdev->dev, res);
-> @@ -65,19 +75,111 @@ static int sram_probe(struct platform_device *pdev)
->  	if (!sram->pool)
->  		return -ENOMEM;
->  
-> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
-> -				res->start, size, -1);
-> -	if (ret < 0) {
-> -		if (sram->clk)
-> -			clk_disable_unprepare(sram->clk);
-> -		return ret;
-> +	if (pdev->dev.of_node) {
-> +		reserved_list = of_get_property(pdev->dev.of_node,
-> +						"mmio-sram-reserved",
-> +						&reserved_size);
-> +		if (reserved_list) {
-> +			reserved_size /= sizeof(*reserved_list);
+The DFI FS700-M60 is a q7 board with i.MX6 quad, dual, duallite or solo
+SoC. This adds support for it.
 
-As a general observation, It looks like a lot of people need to know how
-many array elements a property might hold (for datastructure
-allocation), and are open-coding element counting.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/Makefile                   |   2 +
+ arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts   |  23 +++++
+ arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts    |  23 +++++
+ arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi | 145 +++++++++++++++++++++++++++
+ 4 files changed, 193 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
 
-I think it would be nice if we had a helper function to count how many
-elements a property can hold (of_property_count_u32_elems?) that would
-centralise strict sanity checking (e.g. prop->len % elem_size == 0) and
-DTB format details (so you don't have to care about endianness, and it
-becomes possible to add DTB metadata later and get runtime type
-checking).
-
-That can all come later and shouldn't block this patch.
-
-> +			if (!reserved_size || reserved_size % 2) {
-> +				dev_warn(&pdev->dev, "wrong number of arguments in mmio-sram-reserved\n");
-> +				reserved_list = NULL;
-> +				reserved_size = 0;
-> +			}
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * We need an additional block to mark the end of the memory region
-> +	 * after the reserved blocks from the dt are processed.
-> +	 */
-> +	nblocks = reserved_size / 2 + 1;
-> +	rblocks = kmalloc((nblocks) * sizeof(*rblocks), GFP_KERNEL);
-> +	if (!rblocks) {
-> +		ret = -ENOMEM;
-> +		goto err_alloc;
-> +	}
-> +
-> +	cur_start = 0;
-> +	for (i = 0; i < nblocks - 1; i++) {
-> +		rblocks[i].start = be32_to_cpu(*reserved_list++);
-> +		rblocks[i].size = be32_to_cpu(*reserved_list++);
-
-It feels a little odd to have to have to care about the format of the
-dtb and do endianness conversion here. It would be nice to limit the
-scope of DTB format details to the of_ helper functions.
-
-Could you use of_property_read_u32_index here instead please?
-
-Otherwise this looks fine to me.
-
-Cheers,
-Mark.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index aeb8053..485ed47 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -158,6 +158,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx53-qsrb.dtb \
+ 	imx53-smd.dtb \
+ 	imx53-voipac-bsb.dtb \
++	imx6dl-dfi-fs700-m60.dtb \
+ 	imx6dl-gw51xx.dtb \
+ 	imx6dl-gw52xx.dtb \
+ 	imx6dl-gw53xx.dtb \
+@@ -170,6 +171,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6dl-wandboard.dtb \
+ 	imx6q-arm2.dtb \
+ 	imx6q-cm-fx6.dtb \
++	imx6q-dfi-fs700-m60.dtb \
+ 	imx6q-dmo-edmqmx6.dtb \
+ 	imx6q-gw51xx.dtb \
+ 	imx6q-gw52xx.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
+new file mode 100644
+index 0000000..994f96a
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
+@@ -0,0 +1,23 @@
++/*
++ * Copyright 2013 Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __DTS_V1__
++#define __DTS_V1__
++/dts-v1/;
++#endif
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-dfi-fs700-m60.dtsi"
++
++/ {
++	model = "DFI FS700-M60-6DL i.MX6dl Q7 Board";
++	compatible = "dfi,fs700-m60-6dl", "dfi,fs700e-m60", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
+new file mode 100644
+index 0000000..fd0ad9a
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
+@@ -0,0 +1,23 @@
++/*
++ * Copyright 2013 Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#ifndef __DTS_V1__
++#define __DTS_V1__
++/dts-v1/;
++#endif
++
++#include "imx6q.dtsi"
++#include "imx6qdl-dfi-fs700-m60.dtsi"
++
++/ {
++	model = "DFI FS700-M60-6QD i.MX6qd Q7 Board";
++	compatible = "dfi,fs700-m60-6qd", "dfi,fs700e-m60", "fsl,imx6q";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
+new file mode 100644
+index 0000000..ca3c748
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
+@@ -0,0 +1,145 @@
++/ {
++	regulators {
++		compatible = "simple-bus";
++
++		dummy_reg: fixed at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "dummy-supply";
++		};
++
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
++	};
++
++	chosen {
++		linux,stdout-path = &uart1;
++	};
++};
++
++&ecspi3 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 24 0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi3>;
++	status = "okay";
++
++	flash: m25p80 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "sst,sst25vf040b", "m25p80";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	status = "okay";
++	phy-mode = "rgmii";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	imx6qdl-dfi-fs700-m60 {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
++				MX6QDL_PAD_GPIO_18__GPIO7_IO13 0x80000000 /* PMIC irq */
++				MX6QDL_PAD_EIM_D26__GPIO3_IO26 0x80000000 /* MAX11801 irq */
++				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000030b0 /* Backlight enable */
++				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000 /* SD2 card detect */
++			>;
++		};
++
++		pinctrl_enet: enetgrp {
++			fsl,pins = <MX6QDL_ENET_PINGRP1>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <MX6QDL_I2C2_PINGRP1>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <MX6QDL_UART1_PINGRP1>;
++		};
++
++		pinctrl_usbotg: usbotggrp {
++			fsl,pins = <MX6QDL_USBOTG_PINGRP2>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <MX6QDL_USDHC2_PINGRP_D4>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
++		};
++
++		pinctrl_usdhc4: usdhc4grp {
++			fsl,pins = <MX6QDL_USDHC4_PINGRP_D8>;
++		};
++	};
++
++	ecspi3 {
++		pinctrl_ecspi3: ecspi3_csgrp {
++			fsl,pins = <
++				MX6QDL_ECSPI3_PINGRP1
++				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
++			>;
++		};
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	disable-over-current;
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usdhc2 { /* module slot */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	cd-gpios = <&gpio2 2 0>;
++	status = "okay";
++};
++
++&usdhc3 { /* baseboard slot */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++};
++
++&usdhc4 { /* eMMC */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
+-- 
+1.8.5.2
