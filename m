@@ -1,81 +1,77 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 Jan 2014 12:39:58 -0600
-Subject: Multiple CCR definitions (was: Re: mmc: omap_hsmmc: use the
- generic config for omap2plus devices)
-In-Reply-To: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
-References: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
-Message-ID: <CAGo_u6or57HEqRQjSjUXFpRNiFNbJyRYrsPX19Gf97J-sg4iHQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 16 Jan 2014 19:42:10 +0100
+Subject: [PATCH] ARM: orion: provide C-style interrupt handler for
+ MULTI_IRQ_HANDLER
+In-Reply-To: <20140116165347.GI29184@titan.lakedaemon.net>
+References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
+ <1389859831-9883-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140116164833.GH29184@titan.lakedaemon.net>
+ <1389891087.6697.26.camel@kazak.uk.xensource.com>
+ <20140116165347.GI29184@titan.lakedaemon.net>
+Message-ID: <52D82802.6090104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-omap as well.
+On 01/16/2014 05:53 PM, Jason Cooper wrote:
+> On Thu, Jan 16, 2014 at 04:51:27PM +0000, Ian Campbell wrote:
+>> On Thu, 2014-01-16 at 11:48 -0500, Jason Cooper wrote:
+>>> Sebastian,
+>>>
+>>> On Thu, Jan 16, 2014 at 09:10:31AM +0100, Sebastian Hesselbarth wrote:
+>>>> DT-enabled Marvell Kirkwood and Dove SoCs make use of an irqchip
+>>>> driver. As expected for irqchip drivers, it uses a C-style
+>>>> interrupt handler and therefore selects MULTI_IRQ_HANDLER.
+>>>>
+>>>> Now, compiling a kernel with both non-DT and DT support enabled,
+>>>> selecting MULTI_IRQ_HANDLER will break ASM irq handler used by
+>>>> non-DT boards.
+>>>>
+>>>> Therefore, we provide a C-style irq handler even for non-DT boards,
+>>>> if MULTI_IRQ_HANDLER is set. By installing the C-style irq handler
+>>>> in orion_irq_init this is transparent to all non-DT board files.
+>>>>
+>>>> While the regression report was filed on Marvell Kirkwood, also
+>>>> Marvell Dove non-DT boards are affected and fixed by this patch.
+>>>>
+>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>>> Tested-by: Ian Campbell <ijc@hellion.org.uk>
+>>>> Reported-by: Ian Campbell <ijc@hellion.org.uk>
+>>>> Fixes: 2326f04321a9 ("ARM: kirkwood: convert to DT irqchip and clocksource")
+>>>> Fixes: f07d73e33d0e ("ARM: dove: convert to DT irqchip and clocksource")
+>>>> ---
+>>>> Compared to the two patch version sent on Ian's regression report,
+>>>> I cooked this down to a single patch only touching plat-orion/irq.c.
+>>>> I also dropped Orion5x and MV78x00, as they not yet select MULTI_IRQ_HANDLER
+>>>> at all. Instead I added a comment about taking care of them, as soon as
+>>>> they move over to an irqchip driver themselves.
+>>>>
+>>>> I have not yet Cc'ed this patch to -stable to get some discussion and
+>>>> an Acked-by from Jason or Andrew, too.
+>>>>
+>>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Cc: Ian Campbell <ijc@hellion.org.uk>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-kernel at vger.kernel.org
+>>>> ---
+>>>>   arch/arm/plat-orion/irq.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+>>>>   1 file changed, 47 insertions(+)
+>>>
+>>> Applied to mvebu/fixes with Andrew's Ack.  It's too late for v3.13, so
+>>> it'll be the first thing sent for v3.14.
+>>
+>> Please can it also be tagged for stable backport to 3.12+3.13.
+>
+> Yes, I forgot to mention it, but that is already done. ;-)
 
-On Thu, Jan 16, 2014 at 7:07 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Tue, Sep 10, 2013 at 11:05 PM, Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org> wrote:
->>     mmc: omap_hsmmc: use the generic config for omap2plus devices
->>
->>     OMAP's hs_mmc driver is used for MMC controller operation on many
->>     omap2plus SoCs (OMAP2430, OMAP3, 4, 5 and AM335x).
->>
->>     Considering that the device tree entries are already present for these,
->>     allow the driver to be built using the config ARCH_OMAP2PLUS rather
->>     than individually adding a config for each SoC to enable the
->>     support.
->>
->>     Use COMPILE_TEST to enable the build for other platforms.
->>
->>     Signed-off-by: Amarinder Bindra <a-bindra@ti.com>
->>     Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>     Cc: Nishanth Menon <nm@ti.com>
->>     Acked-by: Felipe Balbi <balbi@ti.com>
->>     Acked-by: Balaji T K <balajitk@ti.com>
->>     Signed-off-by: Chris Ball <cjb@laptop.org>
->> ---
->>  drivers/mmc/host/Kconfig |    6 +++---
->>  1 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->> index 84102bc..b8ce939 100644
->> --- a/drivers/mmc/host/Kconfig
->> +++ b/drivers/mmc/host/Kconfig
->> @@ -284,11 +284,11 @@ config MMC_OMAP
->>
->>  config MMC_OMAP_HS
->>         tristate "TI OMAP High Speed Multimedia Card Interface support"
->> -       depends on SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4
->> +       depends on ARCH_OMAP2PLUS || COMPILE_TEST
->
-> sh-allmodconfig (http://kisskb.ellerman.id.au/kisskb/buildresult/10477672/):
-> include/linux/omap-dma.h:171:8: error: expected identifier before
-> numeric constant
-> make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
->
-> It fails because sh #defines "CCR", which is one of the enum values in
-> include/linux/omap-dma.h.
->
-> I expect a similar failure on blackfin, which also has #define CCR.
->
-> Possible solutions:
->   1. Rename CCR in sh/bfin to e.g. SH_CCR resp. BF_CCR.
->   2. Use "depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM)
->   3. Stop using include/linux/omap-dma.h, as it says:
->
->      *  Legacy OMAP DMA handling defines and functions
->      *
->      *  NOTE: Do not use these any longer.
->      *
->      *  Use the generic dmaengine functions as defined in
->      *  include/linux/dmaengine.h.
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Ok, thanks!
+
+Out of curiosity, does that adding the Cc tag to the commit queue
+it automatically as soon as it will be pulled by Linus?
+
+@Ian: Thanks for hunting this down, please keep bothering us with
+bug reports :)
+
+Sebastian
