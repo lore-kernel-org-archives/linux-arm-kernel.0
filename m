@@ -1,21 +1,77 @@
 From: b35083@freescale.com (Jingchang Lu)
-Date: Thu, 16 Jan 2014 10:29:58 +0800
-Subject: [PATCHv9 0/2] dma: Add Freescale eDMA engine driver support
-Message-ID: <1389839400-29728-1-git-send-email-b35083@freescale.com>
+Date: Thu, 16 Jan 2014 10:29:59 +0800
+Subject: [PATCHv9 1/2] ARM: dts: vf610: Add eDMA node
+In-Reply-To: <1389839400-29728-1-git-send-email-b35083@freescale.com>
+References: <1389839400-29728-1-git-send-email-b35083@freescale.com>
+Message-ID: <1389839400-29728-2-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add Freescale eDMA engine support.
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+changes in v9:
+ remove include/dt-bindings/dma/vf610-edma.h, the request source ID
+ is the same as SoC's reference manual.
 
-Jingchang Lu (2):
-	ARM: dts: vf610: Add eDMA node
-	dma: Add Freescale eDMA engine driver support
+changes in v8:
+ describe dmamux info in edma node to avoid confusion.
+ change eDMA requst source macro definitions.
 
- Documentation/devicetree/bindings/dma/fsl-edma.txt |  66 ++++
- arch/arm/boot/dts/vf610.dtsi                       |  30 ++
- drivers/dma/Kconfig                                |  10 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/fsl-edma.c                             | 957 +++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 1064 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
- create mode 100644 drivers/dma/fsl-edma.c
+ changes in v7:
+ fix dmamux2 and dmamux3 register number.
+
+ no changes in v2 ~ v6.
+
+ arch/arm/boot/dts/vf610.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 48dbfe5..8febb29f 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -88,6 +88,21 @@
+ 				arm,tag-latency = <2 2 2>;
+ 			};
+ 
++			edma0: dma-controller at 40018000 {
++				#dma-cells = <2>;
++				compatible = "fsl,vf610-edma";
++				reg = <0x40018000 0x2000>,
++					<0x40024000 0x1000>,
++					<0x40025000 0x1000>;
++				interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>,
++						<0 9 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "edma-tx", "edma-err";
++				dma-channels = <32>;
++				clock-names = "dmamux0", "dmamux1";
++				clocks = <&clks VF610_CLK_DMAMUX0>,
++					<&clks VF610_CLK_DMAMUX1>;
++			};
++
+ 			uart0: serial at 40027000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x40027000 0x1000>;
+@@ -263,6 +278,21 @@
+ 			reg = <0x40080000 0x80000>;
+ 			ranges;
+ 
++			edma1: dma-controller at 40098000 {
++				#dma-cells = <2>;
++				compatible = "fsl,vf610-edma";
++				reg = <0x40098000 0x2000>,
++					<0x400a1000 0x1000>,
++					<0x400a2000 0x1000>;
++				interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>,
++						<0 11 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names = "edma-tx", "edma-err";
++				dma-channels = <32>;
++				clock-names = "dmamux0", "dmamux1";
++				clocks = <&clks VF610_CLK_DMAMUX2>,
++					<&clks VF610_CLK_DMAMUX3>;
++			};
++
+ 			uart4: serial at 400a9000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x400a9000 0x1000>;
+-- 
+1.8.0
