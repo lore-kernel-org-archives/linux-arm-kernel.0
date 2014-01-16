@@ -1,75 +1,67 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 16 Jan 2014 13:12:32 -0500
-Subject: [PATCH v4 13/16] ARM: Add an emulate flag to the kprobes/uprobes
- instruction decode functions
-In-Reply-To: <1389863932.3530.12.camel@linaro1.home>
-References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-14-git-send-email-dave.long@linaro.org>
- <1387551482.3404.63.camel@linaro1.home> <52D6E1FE.8000303@linaro.org>
- <1389863932.3530.12.camel@linaro1.home>
-Message-ID: <52D82110.9020309@linaro.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 16 Jan 2014 12:15:28 -0600
+Subject: [PATCH 2/4] ARM: sun6i: dt: Add PLL6 and SPI module clocks
+In-Reply-To: <1389892285-11745-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1389892285-11745-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140116181528.GY8153@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/14 04:18, Jon Medhurst (Tixy) wrote:
-> On Wed, 2014-01-15 at 14:31 -0500, David Long wrote:
->> On 12/20/13 09:58, Jon Medhurst (Tixy) wrote:
->>> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
-> [...]
->>>>    {
->>>>    #ifdef CONFIG_THUMB2_KERNEL
->>>>    	if (thumb) {
->>>> @@ -253,7 +253,7 @@ set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
->>>>     * non-zero value, the corresponding nibble in pinsn is validated and modified
->>>>     * according to the type.
->>>>     */
->>>> -static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
->>>> +static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs, bool modify)
->>>>    {
->>>>    	probes_opcode_t insn = *pinsn;
->>>>    	probes_opcode_t mask = 0xf; /* Start at least significant nibble */
->>>> @@ -317,9 +317,16 @@ static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs)
->>>>    		/* Replace value of nibble with new register number... */
->>>>    		insn &= ~mask;
->>>>    		insn |= new_bits & mask;
->>>> +		if (modify) {
->>>> +			/* Replace value of nibble with new register number */
->>>> +			insn &= ~mask;
->>>> +			insn |= new_bits & mask;
->>>> +		}
->>>
->>> Huh? As is, the above addition doesn't do anything because insn has
->>> already been modified. I guess you played with the idea that you needed
->>> to avoid changing insn (you don't) and then didn't undo the experiment
->>> quite right. :-)
->>>
->>
->> The conditional modification of the instruction was part of Rabin's
->> original work for uprobes, but I messed up the merge from an earlier
->> working version of my patches.  My intention was/is to delete the old
->> unconditional code.  Sounds like maybe you disagree though.  The intent
->> is to only modify the instruction in the kprobes case.
->
-> 'insn' is the local variable containing the instruction value we're
-> processing. It doesn't matter if we change that, we just need to avoid
-> updating the instruction in memory, which the code in the next chunk
-> already correctly checks for...
->
->>>>    	}
->>>>
->>>> -	*pinsn = insn;
->>>> +	if (modify)
->>>> +		*pinsn = insn;
->>>> +
->>>>    	return true;
->>>>
->
-> So only one of these 'if (modify)' checks is required for code
-> correctness, and I suggest keeping the second one as it's more explicit
-> and defensive.
->
->
+On Thu, Jan 16, 2014 at 06:11:23PM +0100, Maxime Ripard wrote:
+> The module clocks in the A31 are still compatible with the A10 one. Add the SPI
+> module clocks and the PLL6 in the device tree to allow their use by the SPI
+> controllers.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 48 +++++++++++++++++++++++++++++++---------
+>  1 file changed, 38 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 5256ad9..ae058eb 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -73,16 +73,12 @@
+>  			clocks = <&osc24M>;
+>  		};
+>  
+> -		/*
+> -		 * This is a dummy clock, to be used as placeholder on
+> -		 * other mux clocks when a specific parent clock is not
+> -		 * yet implemented. It should be dropped when the driver
+> -		 * is complete.
+> -		 */
+> -		pll6: pll6 {
+> -			#clock-cells = <0>;
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <0>;
+> +		pll6: clk at 01c20028 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-pll6-clk";
+> +			reg = <0x01c20028 0x4>;
+> +			clocks = <&osc24M>;
+> +			clock-output-names = "pll6";
+>  		};
+>  
+>  		cpu: cpu at 01c20050 {
+> @@ -182,6 +178,38 @@
+>  					"apb2_uart1", "apb2_uart2", "apb2_uart3",
+>  					"apb2_uart4", "apb2_uart5";
+>  		};
+> +
+> +		spi0_clk: clk at 01c200a0 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-mod0-clk";
+> +			reg = <0x01c200a0 0x4>;
+> +			clocks = <&osc24M>, <&pll6>;
 
-OK, I see your point.  I shall simplify the code as you have suggested.
+This looks weird.  You've set the pll6 #clock-cells = <1>, but you
+aren't using a specifier here.  Same below, as well.  The binding
+documentation indicates that #clock-cells should be 0 for the pll6 node.
 
--dl
+  Josh
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
