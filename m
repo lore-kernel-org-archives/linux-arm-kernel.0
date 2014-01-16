@@ -1,42 +1,34 @@
-From: sarah.a.sharp@linux.intel.com (Sarah Sharp)
-Date: Thu, 16 Jan 2014 10:50:44 -0800
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <87mwix5anm.fsf@natisbad.org>
-References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
- <20140114170719.GA12126@xanatos> <87bnzekz5l.fsf@natisbad.org>
- <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
- <87mwix5anm.fsf@natisbad.org>
-Message-ID: <20140116185044.GC18392@xanatos>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Jan 2014 18:55:39 +0000
+Subject: [GIT PULL] arm64 revert for 3.13
+Message-ID: <20140116185533.GA16442@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 08:04:45PM +0100, Arnaud Ebalard wrote:
-> Hi David,
-> 
-> David Laight <David.Laight@ACULAB.COM> writes:
-> 
-> >> I tried current 3.13.0-rc8 w/ 35773dac5f86 reverted and the result is
-> >> the same:
-> >
-> > That patch only affects an error code and stops the fs code retrying
-> > for ever.
-> 
-> Are you sure? ...
-> 
-> > Does everything work if you comment out the code in xhci-ring.c that adds
-> > NOP TRBs to the ring end in order to stop the LINK TRB appearing in the middle
-> > of a TB.
-> > The ethernet code needs it, but the disk transfers are (probably) aligned
-> > such that they don't.
-> 
-> ... AFAICT, this is exactly what commit 35773dac5f86 does and reverting
-> it does not help. If I am mistaken, can you point which part you want me
-> to remove in the code to test?
-> 
-> I am slowly starting to see a bisect session coming ;-)
+Hi Linus,
 
-Try reverting commit 60e102ac73cd40069d077014c93c86dc7205cb68.  That was
-causing issues with another Fresco Logic host.  If that doesn't help,
-then yes, please git bisect.
+If there's still time for 3.13, could you please pull the one-line
+revert below? We noticed that it breaks ioremap (and earlyprintk) with
+64K page configuration. Thanks.
 
-Sarah Sharp
+The following changes since commit cdc27c27843248ae7eb0df5fc261dd004eaa5670:
+
+  arm64: ptrace: avoid using HW_BREAKPOINT_EMPTY for disabled events (2013-12-19 17:41:25 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 4ce00dfcf19c473f3dbf23d5b1372639f0c334f6:
+
+  Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache" (2014-01-16 18:32:25 +0000)
+
+----------------------------------------------------------------
+Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache"
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      Revert "arm64: Fix memory shareability attribute for ioremap_wc/cache"
+
+ arch/arm64/include/asm/io.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
