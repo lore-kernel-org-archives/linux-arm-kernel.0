@@ -1,39 +1,23 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 16 Jan 2014 11:45:23 +0100
-Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
-Message-ID: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jan 2014 11:47:12 +0100
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <4a519c52821b4ceb841cbefcf2a0432b@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+ <201401151025.34628.arnd@arndb.de>
+ <4a519c52821b4ceb841cbefcf2a0432b@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <201401161147.13522.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for unwinding using the dwarf information in compat
-mode. Using the correct user stack pointer allows perf to record
-the frames correctly in the native and compat modes.
+On Thursday 16 January 2014, Yao Yuan wrote:
+> > This part will result in a slight increase in data size even if dma
+> > support is turned off at compile time.
+> > 
+> 
+> Yes, someone also want me define a independent struct for dma and allocate the memory when dma be use.
+> But I think this way will add a more memory access time, like a->b->c and a->c. And the variable 
+> about dma is just a few bytes but used frequently. So I think I'd better define the variable about dma in lpuart_port struct.
 
-Note that although the dwarf frame unwinding works ok using
-libunwind in native mode (on ARMv7 & ARMv8), some changes are
-required to the libunwind code for the compat mode. Those changes
-are posted separately on the libunwind mailing list.
+I agree. Just leave it unconditionally in here to make the code simpler.
 
-Tested on ARMv8 platform with v8 and compat v7 binaries, the latter
-are statically built.
-
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- arch/arm64/include/asm/ptrace.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index fbb0020..86d5b54 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -133,7 +133,7 @@ struct pt_regs {
- 	(!((regs)->pstate & PSR_F_BIT))
- 
- #define user_stack_pointer(regs) \
--	((regs)->sp)
-+	(!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
- 
- /*
-  * Are the current registers suitable for user mode? (used to maintain
--- 
-1.7.11.7
+	Arnd
