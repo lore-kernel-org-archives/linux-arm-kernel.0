@@ -1,28 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jan 2014 19:32:29 +0000
-Subject: [PATCH] aarch64: always map VDSO at worst case alignment
-In-Reply-To: <20140116192841.GN18705@redacted.bos.redhat.com>
-References: <20140115214144.GF18705@redacted.bos.redhat.com>
- <20140116174344.GJ30257@mudshark.cambridge.arm.com>
- <20140116175318.GK18705@redacted.bos.redhat.com>
- <20140116192841.GN18705@redacted.bos.redhat.com>
-Message-ID: <20140116193229.GC22105@mudshark.cambridge.arm.com>
+Date: Thu, 16 Jan 2014 19:31:23 +0000
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+ <201401091204.17932.arnd@arndb.de>
+ <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+ <20140109184251.GL17838@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
+Message-ID: <20140116193123.GB22105@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 07:28:42PM +0000, Kyle McMartin wrote:
-> On Thu, Jan 16, 2014 at 12:53:18PM -0500, Kyle McMartin wrote:
-> > I'll reboot a machine with this fix to test it as soon as possible.
+Hi Stefano,
+
+On Thu, Jan 16, 2014 at 04:27:55PM +0000, Stefano Stabellini wrote:
+> On Thu, 9 Jan 2014, Will Deacon wrote:
+> > Ok, thanks for the explanation. Looking at the patch, I wonder whether it's
+> > not cleaner just to implement xchg code separately for Xen? The Linux code
+> > isn't always sufficient (due to the GENERIC_ATOMIC64 stuff) and most of the
+> > churn coming out of this patch is an attempt to provide some small code
+> > reuse at the cost of code readability.
 > > 
-> > Acked-by: Kyle McMartin <kyle@redhat.com>
-> > 
+> > What do others think?
 > 
-> Yeah, looks to work properly, although I didn't test 64K pages in the
-> simulator.
+> I am OK with that, in fact my first version of the patch did just that:
+> 
+> http://marc.info/?l=linux-arm-kernel&m=138436406724990&w=2
+> 
+> Is that what you had in mind?
 
-No problem. I did try testing 64k pages in the simulator, and found that
-earlyprintk is broken (now fixed).
-
-Cheers,
+For the xchg part, yes, that looks a lot better. I don't like the #undef
+CONFIG_CPU_V6 though, can that be rewritten to use __LINUX_ARM_ARCH__?
 
 Will
