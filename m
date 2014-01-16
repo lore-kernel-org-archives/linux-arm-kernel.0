@@ -1,123 +1,76 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 Jan 2014 17:05:46 -0600
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140116213954.4167.37071@quantum>
-References: <20140110161352.GG6665@saruman.home>
- <20140110185110.GM31323@atomide.com> <52D53084.1070105@ti.com>
- <20140114203613.GA604@saruman.home> <20140115020421.GA24195@saruman.home>
- <20140115031632.4167.2698@quantum> <20140115035011.4167.96678@quantum>
- <20140115171323.GA22739@atomide.com> <20140115192340.4167.87685@quantum>
- <20140115193547.GF7993@atomide.com> <20140116213954.4167.37071@quantum>
-Message-ID: <52D865CA.2060007@ti.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 16 Jan 2014 15:20:48 -0800
+Subject: [PATCH v2 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <1389689841.2794.8.camel@iivanov-dev.int.mm-sol.com>
+References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389659437-16406-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389689841.2794.8.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <20140116232047.GK30911@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2014 03:39 PM, Mike Turquette wrote:
-> Quoting Tony Lindgren (2014-01-15 11:35:48)
->> * Mike Turquette <mturquette@linaro.org> [140115 11:25]:
->>> Quoting Tony Lindgren (2014-01-15 09:13:23)
->>>> * Mike Turquette <mturquette@linaro.org> [140114 19:52]:
->>>>>>
->>>>>> These 40 patches apply very cleanly on top of clk-next with 2
->>>>>> exceptions:
->>>>>>
->>>>>> 1) I did not apply "[PATCH 30/42] ARM: dts: AM35xx: use DT clock data"
->>>>>> because I do not have arch/arm/boot/dts/am3517.dtsi in clk-next (based
->>>>>> on 3.13-rc1).
->>>>>>
->>>>>> 2) Minor merge conflict in arch/arm/boot/dts/omap3.dtsi which I think I
->>>>>> resolved correctly but would like verification.
->>>>>>
->>>>>> I'd prefer to simply merge these patches into clk-next, which is the
->>>>>> most straightforward route. Any ideas on how to handle the missing
->>>>>> AM35xx dtsi data? It can always go as a separate fix after this stuff
->>>>>> gets merged which, ironically, is how that file was created in the first
->>>>>> place.
->>>>
->>>> You could do something like this to take advantage of fast forward and
->>>> not have to do a merge back from mainline:
->>>>
->>>> $ git checkout -b am3517-clk v3.13-rc8 # or any other -rc with am3517.dtsi
->>>> $ git merge clk-next-omap # this fast forwards clk-next-omap to the desired -rc
->>>> $ git am am3517-clk-patch
->>>> $ git checkout clk-next
->>>> $ git merge clk-next-omap # this fast forwards clk-next to the desired -rc
->>>
->>> That makes sense, but is there anything bad about doing that for a
->>> branch you intend to send as a pull request? I don't see how any of the
->>> commits get re-written or anything... I just wonder if there is some
->>> subtlety that I am not accounting for that makes this approach bad for
->>> sending to Linus.
->>
->> No there should not be any issues. That's the preferred way to keep
->> development branches updated and pullable in long term without any need
->> to rebase.
->>
->> Note that there will be only a merge commit if there is a conflict,
->> otherwise the fast forward will be transparent. So the trick to avoiding
->> rebasing and back merges is to apply patches against what they need in a
->> local branch, then after testing merge that local branch into the development
->> branch. Then for the upsteam pull request, you just need to make it against
->> the -rc you merged in.
->>
->> AFAIK what Linus does not like is doing a back merge to a development
->> branch from mainline, probably as it adds a pointless commit. Or rebasing
->> a branch as that way it won't stay pullable.
+On Tue 14 Jan 00:57 PST 2014, Ivan T. Ivanov wrote:
+
 > 
-> Hi all,
+> Thanks Bjorn, 
 > 
-> I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
-> Tero's series. This includes the AM3517 bits now. I've pushed this
-> branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
-> final sanity test before I merge this into clk-next?
+> I have prepared second version, but never send it out :-).
+> One thing suggested by Mark was missed in this version.
 
-multi_v7_defconfig:
- 1: am335x-evm:  Boot FAIL: http://slexy.org/raw/s25jHnIctr
-mmc/regulator missing stuff
- 2:  am335x-sk:  Boot FAIL: http://slexy.org/raw/s2e9oDkTbD
-mmc/regulator missing stuff
- 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2KL4qBOM6
- 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s20jAHD1DE
- 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21vXGDma7
- 6:       beag:  Boot PASS: http://slexy.org/raw/s25ZJgkM9q
- 7:       bone:  Boot PASS: http://slexy.org/raw/s21U0U2lVW
- 8:      crane: No Image built - Missing platform support?:
- 9:       dra7:  Boot FAIL: http://slexy.org/raw/s24d4sXtTh
-CONFIG_SOC_DRA7XX not present in multi_v7
-10:        ldp: No Image built - Missing platform support?:
-11:      panda:  Boot PASS: http://slexy.org/raw/s21KrJmEWB
-12:    sdp2430: No Image built - Missing platform support?:
-13:    sdp3430:  Boot PASS: http://slexy.org/raw/s21uwA3Swz
-14:    sdp4430:  Boot PASS: http://slexy.org/raw/s21GE8FOPC
-15:       uevm:  Boot FAIL: http://slexy.org/raw/s2E3NAziyb
-mmc/regulator missing stuff
-TOTAL = 15 boards, Booted Boards = 8, No Boot boards = 7
+Yeah, Mattew told me you we're assigned to other things and asked me to send
+out an update as I had gotten it to work on our boards.
 
-omap2plus_defconfig:
- 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2euW1YeS0
- 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2nxn1i5Ea
- 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s20knQQExn
- 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s21L1hfSHF
- 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2EpSMvtnF
- 6:       beag:  Boot PASS: http://slexy.org/raw/s21Z8ytsMS
- 7:       bone:  Boot PASS: http://slexy.org/raw/s21ZpxRieJ
- 8:      crane: No Image built - Missing platform support?:
- 9:       dra7:  Boot PASS: http://slexy.org/raw/s2owXcv5DW
-10:        ldp: No Image built - Missing platform support?:
-11:      panda:  Boot PASS: http://slexy.org/raw/s215rSL4p0
-12:    sdp2430: No Image built - Missing platform support?:
-13:    sdp3430:  Boot PASS: http://slexy.org/raw/s21dxlFJn7
-14:    sdp4430:  Boot PASS: http://slexy.org/raw/s20WIfzRqi
-15:       uevm:  Boot PASS: http://slexy.org/raw/s20Ba9mBTv
-TOTAL = 15 boards, Booted Boards = 12, No Boot boards = 3
+I did modify the wording of most of these to match how it is written in the
+other Qualcomm definitions.
 
-the 3 no image built boards have pending dts patches in for-next from
-Tony and Benoit. So, linux-next should eventually be good.
+@Mark, would you rather have me change this to your suggested wording?
 
-As far as I see: the test results are equivalent to the branch that
-Tero posted.
+> 
+> 
+> On Mon, 2014-01-13 at 16:30 -0800, Bjorn Andersson wrote: 
+> > From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> > 
+[snip]
+> > + - clocks: Should contain the core clock and the AHB clock.
+> 
+> + - clocks: a list of phandle + clock-specifier pairs for each entry in
+> +           clock-names
+> 
 
-Thanks for the patience and effort :).
--- 
+This is in line with how it's written in other drivers, so if the DT
+maintainers doesn't disagree I would like to keep phandles out of the
+description. This specific line is a verbatime copy of the msm_serial
+documentation (same block, different mode)...
+
+> > + - clock-names: Should be "core" for the core clock and "iface" for the
+> > +                AHB clock.
+> > +
+> > + - #address-cells: Should be <1> Address cells for i2c device address
+> > + - #size-cells: Should be <0> as i2c addresses have no size component
+> > +
+> > +Optional properties:
+> > + - clock-frequency: Should specify the desired i2c bus clock frequency in Hz,
+> > +                    default is 100kHz if omitted.
+> > +
+> > +Child nodes should conform to i2c bus binding.
+> > +
+> > +Example:
+> > +
+> > + i2c2: i2c at f9924000 {
+> > + 	compatible = "qcom,i2c-qup";
+> > + 	reg = <0xf9924000 0x1000>;
+> > + 	interrupts = <0 96 0>;
+> > +
+> > + 	clocks = <&gcc_blsp1_qup2_i2c_apps_clk>, <&gcc_blsp1_ahb_clk>;
+> 
+> In the light of the latest patches from Stephen, this could be 
+> 
+> + 	clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+
+Yes, that's exactly what I have in my dts. However as this is just an example
+I didn't feel it was worth tainting the documentation with all those capital
+letters ;)
+So unless DT maintainers disagree I would like to just keep it as an example.
+
 Regards,
-Nishanth Menon
+Bjorn
