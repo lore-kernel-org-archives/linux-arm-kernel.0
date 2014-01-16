@@ -1,31 +1,23 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 13:44:20 +0100
-Subject: [PATCH 3/4] ARM: dts: imx6qdl: Add mmc aliases
-In-Reply-To: <1389876261-29087-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389876261-29087-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1389876261-29087-4-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 16 Jan 2014 13:44:17 +0100
+Subject: [PATCH] dts: i.MX: Add aliases
+Message-ID: <1389876261-29087-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+This adds some aliases to the i.MX5/6 dts files.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 8a86502..2dd30ec 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -26,6 +26,10 @@
- 		i2c0 = &i2c1;
- 		i2c1 = &i2c2;
- 		i2c2 = &i2c3;
-+		mmc0 = &usdhc1;
-+		mmc1 = &usdhc2;
-+		mmc2 = &usdhc3;
-+		mmc3 = &usdhc4;
- 		serial0 = &uart1;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
--- 
-1.8.5.2
+Sascha
+
+----------------------------------------------------------------
+Sascha Hauer (4):
+      ARM: dts: imx53: Add mmc aliases
+      ARM: dts: imx6q: Add spi4 alias
+      ARM: dts: imx6qdl: Add mmc aliases
+      ARM: dts: imx51: Add mmc aliases
+
+ arch/arm/boot/dts/imx51.dtsi   | 4 ++++
+ arch/arm/boot/dts/imx53.dtsi   | 4 ++++
+ arch/arm/boot/dts/imx6q.dtsi   | 4 ++++
+ arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
+ 4 files changed, 16 insertions(+)
