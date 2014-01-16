@@ -1,71 +1,105 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 15 Jan 2014 15:59:27 -0800
-Subject: [PATCH v9 2/4] Documentation: Add documentation for APM X-Gene
- SoC SATA host controller DTS binding
-In-Reply-To: <CAPw-ZTmn-aNJcLd1mZPRtog_ncq=GC94ULCJb-400oYqERYK5g@mail.gmail.com>
-References: <1389769910-15505-1-git-send-email-lho@apm.com>
- <5905127.tqJ3nFt5cj@wuerfel>
- <CAPw-ZTmVYfPLUVmtes3Gn8Z=+gyFtLoZxc-QUdHH7-ePjKAG9A@mail.gmail.com>
- <4632602.a1zUZOeMuh@wuerfel>
- <CAPw-ZTmn-aNJcLd1mZPRtog_ncq=GC94ULCJb-400oYqERYK5g@mail.gmail.com>
-Message-ID: <CAPw-ZT=QXwOVvpgJSL5qU8J2eEuAt3nnXJDfDwPXTTo7z4Fe-A@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 15 Jan 2014 16:07:58 -0800
+Subject: [RFC PATCH net-next] etherdevice: Use ether_addr_copy to copy
+ an Ethernet address
+In-Reply-To: <20140115.153951.743060257410154565.davem@davemloft.net>
+References: <1389741527.24849.68.camel@joe-AO722>
+ <20140115.153951.743060257410154565.davem@davemloft.net>
+Message-ID: <1389830878.14001.39.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2014-01-15 at 15:39 -0800, David Miller wrote:
+> From: Joe Perches <joe@perches.com>
+> Date: Tue, 14 Jan 2014 15:18:47 -0800
+> 
+> > Some systems can use the normally known u16 alignment of
+> > Ethernet addresses to save some code/text bytes and cycles.
+> > 
+> > This does not change currently emitted code on x86 by gcc 4.8.
+> > 
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> 
+> This looks fine, in fact I'll apply it.
 
->>> >> >> +- clocks             : Reference to the clock entry.
->>> >> >> +- phys                       : PHY reference with parameter 0.
->>> >> >
->>> >> > The specific value of the phy-specifier shouldn't matter to this
->>> >> > binding. What should matter is what it logically corresponds to.
->>> >>
->>> >> I not quite following this. Are you suggest that I drop the value 0.
->>> >> In the binding, one needs to specify the mode of operation - 0 is for
->>> >> SATA. Can you explain more?
->>> >
->>> > The SATA device should not care what the argument for the PHY
->>> > device is. You could connect the same device to another PHY
->>> > that has a different set of arguments, which is the whole point
->>> > of abstracting it.
->>> >
->>>
->>> I understand what you wrote here. We should not have an argument from
->>> the host controller. Then my question is how should the PHY node
->>> indicates that it needs to be configured itself as an SATA PHY?
->>
->> The "phys" property should specify whatever the configuration of
->> the phy device is supposed to be. It's just not the business of
->> the sata driver or the sata binding to know what that configuration
->> is.
->>
->
-> Here is what I have and I am trying to piece this together:
->
-> phy1 {
->    #phy-cells = <0>;  /* No parameter as suggest by Mark */
-> };
->
-> sata1 {
->     :::
->     phys = <&phy1>;
-> };
->
-> What I don't get is how does one specify the mode
-> (SATA/USB/SGMII/etc)? As another parameter in the phy1 node?
->
+OK, good.
 
-May be I misread what Mark mentioned. The binding documentation should
-not specify the requirement of 0. And the binding of the dts should be
-as is:
+There are a couple thousand memcpy(foo, bar, ETH_ALEN)
+in the kernel tree that could be converted.
 
-phy1 {
-   #phy-cells = <1>;
-};
+Some will have a small performance improvement for
+arm and powerpc.
 
-sata1 {
-   :::
-   phys = <&phy1 0>;     where 0 indicates the mode of operation?
-};
+If you want the ones for net-next net/ now (but not
+for batman-adv, that maybe could use a new function like
+ether_addr_copy_unaligned) here's a changestat.
 
--Loc
+Otherwise, I'll wait for the next cycle.
+
+(done via coccinelle)
+
+ net/8021q/vlan.c                          |  2 +-
+ net/8021q/vlan_dev.c                      |  6 ++--
+ net/appletalk/aarp.c                      | 10 +++---
+ net/atm/lec.c                             |  9 ++---
+ net/atm/mpc.c                             |  2 +-
+ net/bluetooth/bnep/core.c                 | 19 +++++-----
+ net/bluetooth/bnep/netdev.c               | 14 ++++----
+ net/bridge/br_device.c                    |  4 +--
+ net/bridge/br_fdb.c                       |  4 +--
+ net/bridge/br_multicast.c                 |  4 +--
+ net/bridge/br_netfilter.c                 |  2 +-
+ net/bridge/br_stp_if.c                    | 10 +++---
+ net/bridge/netfilter/ebt_among.c          |  2 +-
+ net/bridge/netfilter/ebt_dnat.c           |  2 +-
+ net/bridge/netfilter/ebt_redirect.c       |  6 ++--
+ net/bridge/netfilter/ebt_snat.c           |  2 +-
+ net/caif/caif_usb.c                       |  4 +--
+ net/core/netpoll.c                        |  4 +--
+ net/core/pktgen.c                         |  8 ++---
+ net/decnet/dn_dev.c                       |  2 +-
+ net/decnet/dn_neigh.c                     |  6 ++--
+ net/decnet/dn_route.c                     |  6 ++--
+ net/dsa/slave.c                           |  2 +-
+ net/ethernet/eth.c                        | 18 +++++-----
+ net/hsr/hsr_device.c                      |  8 ++---
+ net/hsr/hsr_framereg.c                    | 21 +++++------
+ net/hsr/hsr_main.c                        |  4 +--
+ net/ipv4/netfilter/ipt_CLUSTERIP.c        |  2 +-
+ net/mac80211/agg-rx.c                     | 10 +++---
+ net/mac80211/agg-tx.c                     | 18 +++++-----
+ net/mac80211/cfg.c                        | 34 +++++++++---------
+ net/mac80211/debugfs_netdev.c             | 12 +++----
+ net/mac80211/ht.c                         | 16 ++++-----
+ net/mac80211/ibss.c                       | 14 ++++----
+ net/mac80211/iface.c                      | 27 +++++++-------
+ net/mac80211/mesh.c                       | 30 ++++++++--------
+ net/mac80211/mesh_hwmp.c                  | 32 ++++++++---------
+ net/mac80211/mesh_pathtbl.c               | 20 +++++------
+ net/mac80211/mesh_plink.c                 |  6 ++--
+ net/mac80211/mesh_ps.c                    |  2 +-
+ net/mac80211/mlme.c                       | 32 ++++++++---------
+ net/mac80211/rx.c                         | 14 ++++----
+ net/mac80211/spectmgmt.c                  |  6 ++--
+ net/mac80211/sta_info.c                   |  8 ++---
+ net/mac80211/tx.c                         | 60 +++++++++++++++----------------
+ net/mac80211/util.c                       | 22 ++++++------
+ net/mac80211/wpa.c                        |  4 +--
+ net/netfilter/ipset/ip_set_bitmap_ipmac.c |  6 ++--
+ net/openvswitch/actions.c                 |  4 +--
+ net/openvswitch/flow.c                    | 16 ++++-----
+ net/openvswitch/flow_netlink.c            | 14 ++++----
+ net/tipc/eth_media.c                      |  2 +-
+ net/wireless/core.c                       |  2 +-
+ net/wireless/ibss.c                       | 11 +++---
+ net/wireless/lib80211_crypt_ccmp.c        |  4 +--
+ net/wireless/lib80211_crypt_tkip.c        | 18 +++++-----
+ net/wireless/mlme.c                       |  2 +-
+ net/wireless/nl80211.c                    |  6 ++--
+ net/wireless/scan.c                       |  6 ++--
+ net/wireless/sme.c                        | 18 +++++-----
+ net/wireless/util.c                       | 42 +++++++++++-----------
+ net/wireless/wext-compat.c                |  8 ++---
+ net/wireless/wext-sme.c                   |  5 +--
+ net/wireless/wext-spy.c                   |  8 ++---
+ 64 files changed, 365 insertions(+), 357 deletions(-)
