@@ -1,83 +1,109 @@
 From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 16 Jan 2014 13:44:13 +0100
-Subject: [PATCH 01/11] iommu/arm-smmu: Introduce driver option handling
+Date: Thu, 16 Jan 2014 13:44:14 +0100
+Subject: [PATCH 02/11] iommu/arm-smmu: Introduce bus notifier block
 In-Reply-To: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
 References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1389876263-25759-2-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce handling of driver options. Options are set based on DT
-information when probing an SMMU device. The first option introduced
-is "arm,smmu-isolate-devices". (It will be used in the bus notifier
-block.)
+At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
+isolate all master devices for an SMMU.
+
+Depending on DT information each device is put into its own protection
+domain (if possible).  For configuration with one or just a few
+masters per SMMU that is easy to achieve.
+
+In case of many devices per SMMU (e.g. MMU-500 with it's distributed
+translation support) isolation of each device might not be possible --
+depending on number of available SMR groups and/or context banks.
+
+Default is that device isolation is contolled per SMMU with SMMU node
+property "arm,smmu-isolate-devices" in a DT. If this property is set
+for an SMMU node, device isolation is performed.
+
+W/o device isolation the driver detects SMMUs but no translation is
+configured (transactions just bypass translation process).
+
+Note that for device isolation dma_base and size are fixed as 0 and
+SZ_128M at the moment. Additional patches will address this
+restriction and allow automatic growth of mapping size.
 
 Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
 Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
- drivers/iommu/arm-smmu.c |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/iommu/arm-smmu.c |   45 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e46a887..0b97d03 100644
+index 0b97d03..bc81dd0 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -47,6 +47,9 @@
+@@ -46,6 +46,7 @@
+ #include <linux/amba/bus.h>
  
  #include <asm/pgalloc.h>
++#include <asm/dma-iommu.h>
  
-+/* Driver options */
-+#define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
-+
- /* Maximum number of stream IDs assigned to a single device */
- #define MAX_MASTER_STREAMIDS		8
+ /* Driver options */
+ #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
+@@ -1964,6 +1965,48 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-@@ -348,6 +351,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
- #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
- 	u32				features;
-+	u32				options;
- 	int				version;
- 
- 	u32				num_context_banks;
-@@ -398,6 +402,29 @@ struct arm_smmu_domain {
- static DEFINE_SPINLOCK(arm_smmu_devices_lock);
- static LIST_HEAD(arm_smmu_devices);
- 
-+struct arm_smmu_option_prop {
-+	u32 opt;
-+	const char *prop;
-+};
-+
-+static struct arm_smmu_option_prop arm_smmu_options [] = {
-+	{ ARM_SMMU_OPT_ISOLATE_DEVICES, "arm,smmu-isolate-devices" },
-+	{ 0, NULL},
-+};
-+
-+static void check_driver_options(struct arm_smmu_device *smmu)
++static int arm_smmu_device_notifier(struct notifier_block *nb,
++				unsigned long action, void *data)
 +{
-+	int i = 0;
-+	do {
-+		if (of_property_read_bool(smmu->dev->of_node,
-+						arm_smmu_options[i].prop)) {
-+			smmu->options |= arm_smmu_options[i].opt;
-+			dev_dbg(smmu->dev, "option %s\n",
-+				arm_smmu_options[i].prop);
++	struct device *dev = data;
++	struct dma_iommu_mapping *mapping;
++	struct arm_smmu_device *smmu;
++	int ret;
++
++	switch (action) {
++	case BUS_NOTIFY_BIND_DRIVER:
++
++		arm_smmu_add_device(dev);
++		smmu = dev->archdata.iommu;
++		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
++			break;
++
++		mapping = arm_iommu_create_mapping(&platform_bus_type,
++						0, SZ_128M, 0);
++		if (IS_ERR(mapping)) {
++			ret = PTR_ERR(mapping);
++			dev_info(dev, "arm_iommu_create_mapping failed\n");
++			break;
 +		}
-+	} while (arm_smmu_options[++i].opt);
++
++		ret = arm_iommu_attach_device(dev, mapping);
++		if (ret < 0) {
++			dev_info(dev, "arm_iommu_attach_device failed\n");
++			arm_iommu_release_mapping(mapping);
++		}
++
++		break;
++	default:
++		break;
++	}
++
++	return 0;
 +}
 +
- static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
- 						struct device_node *dev_node)
- {
-@@ -1783,6 +1810,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
- 	smmu->dev = dev;
- 
-+	check_driver_options(smmu);
++static struct notifier_block device_nb = {
++	.notifier_call = arm_smmu_device_notifier,
++};
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	smmu->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(smmu->base))
+ #ifdef CONFIG_OF
+ static struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v1", },
+@@ -2000,6 +2043,8 @@ static int __init arm_smmu_init(void)
+ 	if (!iommu_present(&amba_bustype))
+ 		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+ 
++	bus_register_notifier(&platform_bus_type, &device_nb);
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
