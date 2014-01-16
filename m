@@ -1,48 +1,92 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Wed, 15 Jan 2014 19:17:48 -0700
-Subject: [PATCH] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to
- enforce this ACPI mode
-In-Reply-To: <15081767.3kxW799CSQ@wuerfel>
-References: <1389731822-21336-1-git-send-email-al.stone@linaro.org>
- <15081767.3kxW799CSQ@wuerfel>
-Message-ID: <52D7414C.7080206@linaro.org>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Thu, 16 Jan 2014 10:31:42 +0800
+Subject: [PATCH v2] mmc: dw_mmc: fix dw_mci_get_cd
+Message-ID: <1389839502-13046-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2014 02:26 PM, Arnd Bergmann wrote:
-> On Tuesday 14 January 2014 13:37:02 al.stone at linaro.org wrote:
->> +config ACPI_REDUCED_HARDWARE_ONLY
->> +       bool "Hardware-reduced ACPI support only"
->> +       def_bool n
->> +       depends on ACPI && EXPERT
->
-> I think this will cause a Kconfig warning if you try to select this
-> on ARM64 without turning on EXPERT as well.
->
-> It should be ok if you express it as
->
-> config ACPI_REDUCED_HARDWARE_ONLY
->         bool "Hardware-reduced ACPI support only" if EXPERT
->         def_bool n
->         depends on ACPI
->
->
-> 	Arnd
->
+Introduced from commit bf626e5550f24aec24975a0e85ad8e572ca76a6b
+CDETECT is ignored since negated return value of mmc_gpio_get_cd(mmc)
+can not be checked by IS_ERR_VALUE.
+Add spin_lock_bh(&host->lock) for atomic accessing DW_MMC_CARD_PRESENT,
+otherwise sd detect may occasionally fail.
 
-I am very puzzled.  I went back and re-did my configs from
-before, tried a few new ones, and tried with both expressions
-above, but I could not get a Kconfig warning.  Do you have an
-example .config that shows the warning?
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |    2 ++
+ drivers/mmc/host/dw_mmc.c                          |   12 +++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-Thanks.
-
+diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+index 8f3f13315358..18b0819bafe0 100644
+--- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+@@ -73,6 +73,8 @@ Optional properties:
+ 
+ * caps2-mmc-hs200-1_2v: Supports mmc HS200 SDR 1.2V mode
+ 
++* caps2-mmc-cd-active-high: cd pin is high when card present
++
+ * broken-cd: as documented in mmc core bindings.
+ 
+ * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index a776f24f4311..ad65b895d34c 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1033,7 +1033,8 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	int present;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+ 	struct dw_mci_board *brd = slot->host->pdata;
+-	int gpio_cd = !mmc_gpio_get_cd(mmc);
++	struct dw_mci *host = slot->host;
++	int gpio_cd = mmc_gpio_get_cd(mmc);
+ 
+ 	/* Use platform get_cd function, else try onboard card detect */
+ 	if (brd->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+@@ -1041,11 +1042,12 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 	else if (brd->get_cd)
+ 		present = !brd->get_cd(slot->id);
+ 	else if (!IS_ERR_VALUE(gpio_cd))
+-		present = !!gpio_cd;
++		present = gpio_cd;
+ 	else
+ 		present = (mci_readl(slot->host, CDETECT) & (1 << slot->id))
+ 			== 0 ? 1 : 0;
+ 
++	spin_lock_bh(&host->lock);
+ 	if (present) {
+ 		set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is present\n");
+@@ -1053,6 +1055,7 @@ static int dw_mci_get_cd(struct mmc_host *mmc)
+ 		clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+ 		dev_dbg(&mmc->class_dev, "card is not present\n");
+ 	}
++	spin_unlock_bh(&host->lock);
+ 
+ 	return present;
+ }
+@@ -2081,7 +2084,7 @@ static int dw_mci_of_get_wp_gpio(struct device *dev, u8 slot)
+ 	return gpio;
+ }
+ 
+-/* find the cd gpio for a given slot; or -1 if none specified */
++/* find the cd gpio for a given slot */
+ static void dw_mci_of_get_cd_gpio(struct device *dev, u8 slot,
+ 					struct mmc_host *mmc)
+ {
+@@ -2411,6 +2414,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+ 	if (of_find_property(np, "caps2-mmc-hs200-1_2v", NULL))
+ 		pdata->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
+ 
++	if (of_find_property(np, "caps2-mmc-cd-active-high", NULL))
++		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
++
+ 	return pdata;
+ }
+ 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+1.7.9.5
