@@ -1,171 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 17:03:57 +0100
-Subject: [PATCHv2 2/2] pwm: imx: support polarity inversion
-In-Reply-To: <1389859585-14006-3-git-send-email-LW@KARO-electronics.de>
-References: <1389859585-14006-1-git-send-email-LW@KARO-electronics.de>
- <1389859585-14006-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140116160356.GY16215@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 16 Jan 2014 10:04:34 -0600
+Subject: [PATCH REPOST] ARM: Fix incorrect FDT initrd parameter override
+In-Reply-To: <deeb5f$5527t1@icp-osb-irony-out2.iinet.net.au>
+References: <deeb5f$5527t1@icp-osb-irony-out2.iinet.net.au>
+Message-ID: <CAL_JsqJNPbQVKtW0amaOSc1is9oKrGapaHR=YJGJy6TrGQeKYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 09:06:25AM +0100, Lothar Wa?mann wrote:
-> The i.MX PWM controller supports inverting the polarity of the PWM
-> output. Make this feature available in the pxm-imx driver.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+On Sat, Jan 11, 2014 at 6:20 PM,  <klightspeed@killerwolves.net> wrote:
+> Commit 65939301acdb (arm: set initrd_start/initrd_end for fdt scan)
+> caused the FDT initrd_start and initrd_end to override the
+> phys_initrd_start and phys_initrd_size set by the initrd= kernel
+> parameter.  With this patch initrd_start and initrd_end will be
+> overridden if phys_initrd_start and phys_initrd_size are set by the
+> kernel initrd= parameter.
+>
+> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+
+I'd really like to see phys_initrd_* removed, but that would be more
+invasive, so:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Please submit to Russell's patch system and mark for stable. I don't
+think there is time before 3.13 is released.
+
+Rob
+
 > ---
->  Documentation/devicetree/bindings/pwm/imx-pwm.txt |    5 +-
->  drivers/pwm/pwm-imx.c                             |   42 +++++++++++++++++++++
->  2 files changed, 45 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-> index b50d7a6d..d0b04b5 100644
-> --- a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-> @@ -3,8 +3,9 @@ Freescale i.MX PWM controller
->  Required properties:
->  - compatible: should be "fsl,<soc>-pwm"
->  - reg: physical base address and length of the controller's registers
-> -- #pwm-cells: should be 2. See pwm.txt in this directory for a description of
-> -  the cells format.
-> +- #pwm-cells: may be 2 for backwards compatibility or 3 to support
-> +  switching the output polarity. See pwm.txt in this directory for a
-> +  description of the cells format.
->  - interrupts: The interrupt for the pwm controller
->  
->  Example:
-> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> index 3b00a82..05461bb 100644
-> --- a/drivers/pwm/pwm-imx.c
-> +++ b/drivers/pwm/pwm-imx.c
-> @@ -36,6 +36,7 @@
->  #define MX3_PWMCR_DOZEEN		(1 << 24)
->  #define MX3_PWMCR_WAITEN		(1 << 23)
->  #define MX3_PWMCR_DBGEN			(1 << 22)
-> +#define MX3_PWMCR_POUTC			(1 << 18)
->  #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
->  #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
->  #define MX3_PWMCR_EN			(1 << 0)
-> @@ -138,6 +139,9 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
->  	if (test_bit(PWMF_ENABLED, &pwm->flags))
->  		cr |= MX3_PWMCR_EN;
->  
-> +	if (pwm->polarity == PWM_POLARITY_INVERSED)
-> +		cr |= MX3_PWMCR_POUTC;
-> +
->  	writel(cr, imx->mmio_base + MX3_PWMCR);
->  
->  	return 0;
-> @@ -155,6 +159,11 @@ static void imx_pwm_set_enable_v2(struct pwm_chip *chip, bool enable)
->  	else
->  		val &= ~MX3_PWMCR_EN;
->  
-> +	if (chip->pwms[0].polarity == PWM_POLARITY_INVERSED)
-> +		val |= MX3_PWMCR_POUTC;
-> +	else
-> +		val &= ~MX3_PWMCR_POUTC;
-> +
->  	writel(val, imx->mmio_base + MX3_PWMCR);
->  }
->  
-> @@ -198,6 +207,17 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	clk_disable_unprepare(imx->clk_per);
->  }
->  
-> +static int imx_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				enum pwm_polarity polarity)
-> +{
-> +	struct imx_chip *imx = to_imx_chip(chip);
-> +
-> +	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n", __func__,
-> +		polarity == PWM_POLARITY_INVERSED ? "inverted" : "normal");
-> +
-> +	return 0;
-> +}
-> +
->  static struct pwm_ops imx_pwm_ops = {
->  	.enable = imx_pwm_enable,
->  	.disable = imx_pwm_disable,
-> @@ -209,6 +229,7 @@ struct imx_pwm_data {
->  	int (*config)(struct pwm_chip *chip,
->  		struct pwm_device *pwm, int duty_ns, int period_ns);
->  	void (*set_enable)(struct pwm_chip *chip, bool enable);
-> +	unsigned output_polarity:1;
->  };
->  
->  static struct imx_pwm_data imx_pwm_data_v1 = {
-> @@ -219,6 +240,7 @@ static struct imx_pwm_data imx_pwm_data_v1 = {
->  static struct imx_pwm_data imx_pwm_data_v2 = {
->  	.config = imx_pwm_config_v2,
->  	.set_enable = imx_pwm_set_enable_v2,
-> +	.output_polarity = 1,
->  };
->  
->  static const struct of_device_id imx_pwm_dt_ids[] = {
-> @@ -271,6 +293,26 @@ static int imx_pwm_probe(struct platform_device *pdev)
->  		return PTR_ERR(imx->mmio_base);
->  
->  	data = of_id->data;
-> +	if (data->output_polarity) {
-> +		const struct device_node *np = pdev->dev.of_node;
-> +		u32 num_cells;
-> +
-> +		dev_dbg(&pdev->dev, "PWM supports output inversion\n");
-> +		ret = of_property_read_u32(np, "#pwm-cells", &num_cells);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev, "missing property '#pwm-cells'\n");
-> +			return ret;
-> +		}
-> +		if (num_cells == 3) {
-> +			imx_pwm_ops.set_polarity = imx_pwm_set_polarity;
-> +			imx->chip.of_xlate = of_pwm_xlate_with_flags;
-> +		} else if (num_cells != 2) {
-> +			dev_err(&pdev->dev, "'#pwm-cells' must be <2> or <3>\n");
-> +			return -EINVAL;
-> +		}
-> +		imx->chip.of_pwm_n_cells = num_cells;
-> +	}
-
-Can't this be done in the PWM core? Right now the PWM core checks for
-of_pwm_n_cells before calling ->of_xlate. IMO this check should be done
-in the of_xlate hook. Then of_pwm_simple_xlate and
-of_pwm_xlate_with_flags can be merged into something like:
-
-static struct pwm_device *
-of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args
-*args)
-{
-	struct pwm_device *pwm;
-	int ret;
-
-	if (pc->of_pwm_n_cells < 2)
-		return ERR_PTR(-EINVAL);
-
-	if (args->args[0] >= pc->npwm)
-		return ERR_PTR(-EINVAL);
-
-	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-	if (IS_ERR(pwm))
-		return pwm;
-
-	if (pc->of_pwm_n_cells >= 3) {
-		if (args->args[2] & PWM_POLARITY_INVERTED)
-			ret = pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
-		else
-			ret = pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
-		if (ret)
-			return ret;
-	}
-
-	pwm_set_period(pwm, args->args[1]);
-
-	return pwm;
-}
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  arch/arm/mm/init.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 1f7b19a..819c539 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -345,10 +345,11 @@ void __init arm_memblock_init(struct meminfo *mi,
+>  #endif
+>  #ifdef CONFIG_BLK_DEV_INITRD
+>         /* FDT scan will populate initrd_start */
+> -       if (initrd_start) {
+> +       if (initrd_start && !phys_initrd_size) {
+>                 phys_initrd_start = __virt_to_phys(initrd_start);
+>                 phys_initrd_size = initrd_end - initrd_start;
+>         }
+> +       initrd_start = initrd_end = 0;
+>         if (phys_initrd_size &&
+>             !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+>                 pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
