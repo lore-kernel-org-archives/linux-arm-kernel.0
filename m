@@ -1,36 +1,54 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 16 Jan 2014 07:16:15 +0100
-Subject: [PATCH net-next 0/2] net: mvneta: simple cleanups
-In-Reply-To: <20140115.154122.1485420525760591929.davem@davemloft.net>
-References: <cover.1389742334.git.arno@natisbad.org>
- <20140115.154122.1485420525760591929.davem@davemloft.net>
-Message-ID: <20140116061615.GB15597@1wt.eu>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 16 Jan 2014 14:34:23 +0800
+Subject: [PATCH v2] pinctrl: sunxi: Honor GPIO output initial vaules
+Message-ID: <1389854063-31016-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Some GPIO users, such as fixed-regulator, request GPIO output with
+initial value of 1. This was ignored by sunxi driver.
 
-On Wed, Jan 15, 2014 at 03:41:22PM -0800, David Miller wrote:
-> From: Arnaud Ebalard <arno@natisbad.org>
-> Date: Wed, 15 Jan 2014 00:45:31 +0100
-> 
-> > 
-> > Those two patches are intended for net-next. They apply on top of
-> > performance improvements patches from Willy for mvneta driver.
-> > They provide some simple cleanups for unused variables, function
-> > params or return values.
-> > 
-> > Arnaud Ebalard (2):
-> >   net: mvneta: mvneta_tx_done_gbe() cleanups
-> >   net: mvneta: make mvneta_txq_done() return void
-> 
-> These patches do not apply to net-next, please respin.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-They depend on the two series I sent, I verified that they apply well
-once these two series are applied to net-next.
+Changes since v2:
 
-Would you prefer that we resend a complete series with all the patches
-at once ?
+  * Set output value before setting the pin function to avoid a glitch.
 
-Thanks,
-Willy
+
+ drivers/pinctrl/pinctrl-sunxi.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index 119d2dd..6ebf306 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -469,12 +469,6 @@ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	return val;
+ }
+ 
+-static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
+-					unsigned offset, int value)
+-{
+-	return pinctrl_gpio_direction_output(chip->base + offset);
+-}
+-
+ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
+ 				unsigned offset, int value)
+ {
+@@ -498,6 +492,13 @@ static void sunxi_pinctrl_gpio_set(struct gpio_chip *chip,
+ 	spin_unlock_irqrestore(&pctl->lock, flags);
+ }
+ 
++static int sunxi_pinctrl_gpio_direction_output(struct gpio_chip *chip,
++					unsigned offset, int value)
++{
++	sunxi_pinctrl_gpio_set(chip, offset, value);
++	return pinctrl_gpio_direction_output(chip->base + offset);
++}
++
+ static int sunxi_pinctrl_gpio_of_xlate(struct gpio_chip *gc,
+ 				const struct of_phandle_args *gpiospec,
+ 				u32 *flags)
+-- 
+1.8.5.2
