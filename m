@@ -1,184 +1,32 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 16 Jan 2014 06:02:41 +0000
-Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
-In-Reply-To: <201401151025.34628.arnd@arndb.de>
-References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
- <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
- <201401151025.34628.arnd@arndb.de>
-Message-ID: <7952cfff9892479abbf837420e519fcb@BL2PR03MB338.namprd03.prod.outlook.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 16 Jan 2014 14:16:18 +0800
+Subject: [PATCHv12] ARM: dts: Add support for the cpuimx35 board from
+ Eukrea and its baseboard.
+In-Reply-To: <1389803532-8516-1-git-send-email-denis@eukrea.com>
+References: <1389803532-8516-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140116061616.GA4049@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
-Thanks for your suggestion.
+On Wed, Jan 15, 2014 at 05:32:12PM +0100, Denis Carikli wrote:
+> The following devices/functionalities were added:
+>  * Main and secondary UARTs.
+>  * i2c and the pcf8563 device.
+>  * Ethernet.
+>  * NAND.
+>  * The BP1 button.
+>  * The LED.
+>  * Watchdog
+>  * SD.
+> 
+> Cc: Eric B?nard <eric@eukrea.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> -----Original Message-----
-> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
-> owner at vger.kernel.org] On Behalf Of Arnd Bergmann
-> Sent: Wednesday, January 15, 2014 5:26 PM
-> To: Yuan Yao-B46683
-> Cc: gregkh at linuxfoundation.org; shawn.guo at linaro.org;
-> linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-
-> serial at vger.kernel.org
-> Subject: Re: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
-> 
-> On Wednesday 15 January 2014, Yuan Yao wrote:
-> > Add dma support for lpuart. This function depend on DMA driver.
-> > You can turn on it by SERIAL_FSL_LPUART_DMA=y. And It works if dts node
-> has dma properties.
-> >
-> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> 
-> Most of the changes you did look good, but I have to say I'm not a fan of
-> the #ifdef you added. I don't think you actually need to have the
-> compile-time selection, and it would be best to just drop that part.
-> 
-> If you have a good reason to keep it, please change the code to more
-> readable "if (IS_ENABLED(CONFIG_FSL_LPUART_DMA))" constructs.
-> If you decide to do this, you will find that you need far fewer such
-> conditionals because a lot of the code will automatically get dropped by
-> the compiler.
-> 
-
-Thank you! I even not know the IS_ENABLED macro.
-At the beginning I just think this can save the size of code. 
-But now I think it's not very necessary.
-I tend to cancel it.
-
-> >  uart0: serial at 40027000 {
-> > -	       compatible = "fsl,vf610-lpuart";
-> > -	       reg = <0x40027000 0x1000>;
-> > -	       interrupts = <0 61 0x00>;
-> > -       };
-> > +		compatible = "fsl,vf610-lpuart";
-> > +		reg = <0x40027000 0x1000>;
-> > +		interrupts = <0 61 0x00>;
-> > +		clocks = <&clks VF610_CLK_UART0>;
-> > +		clock-names = "ipg";
-> > +		dma-names = "lpuart-tx","lpuart-rx";
-> > +		dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>,
-> > +			<&edma0 0 VF610_EDMA_MUXID0_UART0_RX>;
-> > +	};
-> 
-> You still haven't addressed my comment about removing the
-> VF610_EDMA_MUXID0_UART0_TX macros.
->
-
-Very sorry for forget it. At that time the VF610_EDMA_MUXID0_UART0_TX is because of eDMA driver request.
-But now it also cancel the macro. So this is my fault. I will fix it next.
-
-> >
-> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> > +#define DMA_MAXBURST		16
-> > +#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
-> > +#define FSL_UART_RX_DMA_BUFFER_SIZE	64
-> > +#endif
-> 
-> For this part there was no need for the #ifdef to start with.
-> 
-> >  #define DRIVER_NAME	"fsl-lpuart"
-> >  #define DEV_NAME	"ttyLP"
-> >  #define UART_NR		6
-> > @@ -121,6 +132,26 @@ struct lpuart_port {
-> >  	struct clk		*clk;
-> >  	unsigned int		txfifo_size;
-> >  	unsigned int		rxfifo_size;
-> > +
-> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> > +	bool			lpuart_dma_use;
-> > +	struct dma_chan		*dma_tx_chan;
-> > +	struct dma_chan		*dma_rx_chan;
-> > +	struct dma_async_tx_descriptor  *dma_tx_desc;
-> > +	struct dma_async_tx_descriptor  *dma_rx_desc;
-> > +	dma_addr_t		dma_tx_buf_bus;
-> > +	dma_addr_t		dma_rx_buf_bus;
-> > +	dma_cookie_t		dma_tx_cookie;
-> > +	dma_cookie_t		dma_rx_cookie;
-> > +	unsigned char		*dma_tx_buf_virt;
-> > +	unsigned char		*dma_rx_buf_virt;
-> > +	unsigned int		dma_tx_bytes;
-> > +	unsigned int		dma_rx_bytes;
-> > +	int			dma_tx_in_progress;
-> > +	int			dma_rx_in_progress;
-> > +	unsigned int		dma_rx_timeout;
-> > +	struct timer_list	lpuart_timer;
-> > +#endif
-> >  };
-> 
-> This part will result in a slight increase in data size even if dma
-> support is turned off at compile time.
-> 
-
-Yes, I will fix it.
-
-> >
-> >  	temp = readb(port->membase + UARTCR2);
-> >  	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
-> >
-> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> > +	if (sport->lpuart_dma_use) {
-> > +		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
-> > +			lpuart_prepare_tx(sport);
-> > +	} else {
-> > +		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
-> > +			lpuart_transmit_buffer(sport);
-> > +	}
-> > +#else
-> >  	if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
-> >  		lpuart_transmit_buffer(sport);
-> > +#endif
-> >  }
-> 
-> So this can simply become
-> 
-> +	if (IS_ENABLED(CONFIG_SERIAL_FSL_LPUART_DMA) && sport-
-> >lpuart_dma_use) {
-> +		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
-> +			lpuart_prepare_tx(sport);
-> +	} else {
-> +		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
-> +			lpuart_trans	mit_buffer(sport);
-> +	}
-> 
-> and the compiler will silently drop the lpuart_prepare_tx() function and
-> everything it calls that isn't used elsewhere.
-> 
-
-It's wonderful. 
-
-> 
-> > +
-> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> > +	struct platform_device *pdev = to_platform_device(port->dev);
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +
-> > +	if (of_get_property(np, "dmas", NULL)) {
-> > +		sport->lpuart_dma_use = true;
-> > +		lpuart_dma_tx_request(port);
-> > +		lpuart_dma_rx_request(port);
-> > +		temp = readb(port->membase + UARTCR5);
-> > +		writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
-> > +	} else
-> > +		sport->lpuart_dma_use = false;
-> > +#endif
-> 
-> Same here.
-> 
-> > @@ -854,6 +1291,10 @@ static int __init lpuart_serial_init(void)
-> >
-> >  	pr_info("serial: Freescale lpuart driver\n");
-> >
-> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
-> > +	pr_info("serial: Freescale lpuart dma support\n"); #endif
-> > +
-> 
-> This message is not helpful in the long run, I'd rather see you drop the
-> other one as well. Note that this function is called on *all* platforms
-> when the driver is enabled, not just on those that actually have the uart.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial"
-> in the body of a message to majordomo at vger.kernel.org More majordomo info
-> at  http://vger.kernel.org/majordomo-info.html
-> 
+Applied, thanks.
