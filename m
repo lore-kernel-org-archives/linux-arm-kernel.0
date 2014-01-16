@@ -1,29 +1,98 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 16 Jan 2014 09:50:29 +0900
-Subject: [PATCH] ARM: shmobile: Break out R-Car SYSC PM code
-In-Reply-To: <87txd47od8.wl%kuninori.morimoto.gx@gmail.com>
-References: <20140115074308.8471.64824.sendpatchset@w520>
- <20140115083027.GC16455@verge.net.au>
- <CANqRtoQ8sLLXQWKHaxbFpSb+3oBF2Spn_nUZx91OWsmb_+kMnA@mail.gmail.com>
- <87txd47od8.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <20140116005027.GG12550@verge.net.au>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Wed, 15 Jan 2014 17:03:09 -0800
+Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for Broadcom
+ 7445
+In-Reply-To: <61E0E2A7-F7FC-4397-8E92-06CC409912B9@gmail.com>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <1389743333-16741-8-git-send-email-marc.ceeeee@gmail.com>
+ <201401151410.39112.arnd@arndb.de>
+ <61E0E2A7-F7FC-4397-8E92-06CC409912B9@gmail.com>
+Message-ID: <52D72FCD.1030005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 04:37:58PM -0800, Kuninori Morimoto wrote:
-> 
-> Hi Magnus, Simon
-> 
-> > >> Break out the R-Car SYSC power management code from
-> > >> the r8a7779 SoC code. With this new shared R-Car SYSC
-> > >> code base it is possible to hook in Generation 2 SoCs
-> > >> as well.
-> > >
-> > > Is this also useful for the r8a7778 (the other Gen 1 SoC in mainline) ?
-> > 
-> > I don't know actually. =) What does Morimoto-san say about this?
-> 
-> Thank you for this patch.
-> it is useful, but, unfortunately r8a7778 (= M1) doesn't have SYSC
+Hello Arnd,
 
-Thanks, one less thing to worry about :)
+> And then you can add a regular device driver to drivers/reset that provides a
+> device_reset() API to other drivers, or a system-reset function to be registered as
+> arm_pm_restart. This driver would use syscon_regmap_lookup_by_phandle() to get access
+> to a regmap pointer, and then use either hardcoded offsets into the regmap, or get
+> those offsets from numbers in the devicetree, as provided in the example above.
+
+I was able to port a standalone "reboot" driver using syscon + regmap. However, for the
+SMP initialization case, it turns out that syscon is configured *after* SMP init. Do you
+have any advice for this type of situation?
+
+I'd hate to go around in circles, but without resorting to hard-coded offsets, perhaps I
+can just add the remaining "non-regmap" register offsets in the DT?
+
+Thanks,
+Marc
+
+On 01/15/2014 10:22 AM, Marc wrote:
+> Hi Arnd,
+> 
+> Thank you for the suggestion - it's exactly what we were looking for!
+> 
+> Regards,
+> Marc
+> 
+> Sent from my phone
+> 
+>> On Jan 15, 2014, at 5:10 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>>> On Wednesday 15 January 2014, Marc Carino wrote:
+>>> +       gen-ctrl {
+>>> +               compatible = "brcm,brcmstb-gen-ctrl-v1";
+>>> +               reg = <0xf0404304 0x4
+>>> +                      0xf0404308 0x4
+>>> +                      0xf03e2578 0x4
+>>> +                      0xf03e2488 0x10
+>>> +                      0xf0452000 0x20>;
+>>> +       };
+>>
+>> Sorry I didn't get back to you on this when we discussed the previous
+>> version. I'm actually less happy with this DT representation than the
+>> original. What I take from your description is that you have multiple
+>> register ranges that basically combine more-or-less random registers
+>> that belong into different Linux subsystems.
+>>
+>> I think the best way to deal with this is to have the "syscon" driver
+>> handle the multiplexing between the various drivers that need access
+>> to the registers. It would look something like (taking the numbers
+>> from your previous patch):
+>>
+>>    ahb {
+>>        ranges = <0 0xf0000000 0x1000000>; /* 16 MB remapped registers */
+>>
+>>        hif-cpubuictrl: syscon at 3e2400 {
+>>            compatible = "brcm,7445-cpubioctrl", "syscon";
+>>            reg = <0x3e2000, 0x1000>;
+>>        };
+>>
+>>        hif-continuation: syscon at 45200 {
+>>            compatible = "brcm,7445-hif-continuation", "syscon";
+>>            reg = <0x452000, 0x1000>;
+>>        };
+>>
+>>        sun-top-ctrl: ...
+>>    };
+>>
+>> This lets the syscon driver find and map the three register areas.
+>> Drivers that need access to the registers then do 
+>>
+>>    reset {
+>>        compatible = "brcm,7445-reset-ctrl";
+>>        syscon = <&sun-top-ctrl 0x300 0x100>;
+>>        #reset-cells = <1>;
+>>    };
+>>
+>> And then you can add a regular device driver to drivers/reset that provides
+>> a device_reset() API to other drivers, or a system-reset function to be
+>> registered as arm_pm_restart. This driver would use
+>> syscon_regmap_lookup_by_phandle() to get access to a regmap pointer,
+>> and then use either hardcoded offsets into the regmap, or get those
+>> offsets from numbers in the devicetree, as provided in the example
+>> above.
+>>
+>>    Arnd
