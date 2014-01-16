@@ -1,38 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 16:46:26 +0100
-Subject: [PATCH] dma: imx-sdma: remove firmare not found warning
-Message-ID: <1389887186-6146-1-git-send-email-s.hauer@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 16 Jan 2014 16:55:14 +0100
+Subject: [PATCH v4 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
+In-Reply-To: <1387545096-2334-10-git-send-email-mpa@pengutronix.de>
+References: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
+ <1387545096-2334-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140116155514.GA6464@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a firmware cannot be found for the SDMA engine then we can
-continue with the inernal ROM firmware.
+Hi Shawn,
 
-The meaning of this message is frequently asked for and the usual
-answer is that this message is of no relevance, so just make it
-dev_dbg() and do not alienate the users anymore.
+On Fri, Dec 20, 2013 at 02:11:36PM +0100, Markus Pargmann wrote:
+> imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
+> reconfiguration and needs this for correct interaction with SDMA. This
+> patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+> 
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Vinod Koul <vinod.koul@intel.com>
----
- drivers/dma/imx-sdma.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Mark Brown applied all other patches of this series. Could you please
+take this one?
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index c75679d..fe57a42 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1259,7 +1259,10 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
- 	unsigned short *ram_code;
- 
- 	if (!fw) {
--		dev_err(sdma->dev, "firmware not found\n");
-+		dev_dbg(sdma->dev, "firmware not found\n");
-+		/*
-+		 * In this case we just use the ROM firmware.
-+		 */
- 		return;
- 	}
- 
+Thanks,
+
+Markus
+
 -- 
-1.8.5.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
