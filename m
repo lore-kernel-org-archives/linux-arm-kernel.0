@@ -1,31 +1,115 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 13:44:21 +0100
-Subject: [PATCH 4/4] ARM: dts: imx51: Add mmc aliases
-In-Reply-To: <1389876261-29087-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389876261-29087-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1389876261-29087-5-git-send-email-s.hauer@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Jan 2014 12:45:27 +0000
+Subject: [PATCH v6 2/6] misc: sram: implement mmio-sram-reserved option
+In-Reply-To: <1669323.jqjZBfkRx4@phil>
+References: <27256277.YJ687suYy5@phil>
+ <1669323.jqjZBfkRx4@phil>
+Message-ID: <20140116124527.GD19578@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx51.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+On Wed, Jan 15, 2014 at 09:41:28PM +0000, Heiko St?bner wrote:
+> This implements support for the mmio-sram-reserved option to keep the
+> genpool from using these areas.
+> 
+> Suggested-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> ---
+>  drivers/misc/sram.c |  118 +++++++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 110 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index afe66571..7fb60f3 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -36,13 +36,23 @@ struct sram_dev {
+>  	struct clk *clk;
+>  };
+>  
+> +struct sram_reserve {
+> +	unsigned long start;
+> +	unsigned long size;
+> +};
+> +
+>  static int sram_probe(struct platform_device *pdev)
+>  {
+>  	void __iomem *virt_base;
+>  	struct sram_dev *sram;
+>  	struct resource *res;
+> -	unsigned long size;
+> -	int ret;
+> +	unsigned long size, cur_start, cur_size;
+> +	const __be32 *reserved_list = NULL;
+> +	int reserved_size = 0;
+> +	struct sram_reserve *rblocks;
+> +	unsigned int nblocks;
+> +	int ret = 0;
+> +	int i;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	virt_base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -65,19 +75,111 @@ static int sram_probe(struct platform_device *pdev)
+>  	if (!sram->pool)
+>  		return -ENOMEM;
+>  
+> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+> -				res->start, size, -1);
+> -	if (ret < 0) {
+> -		if (sram->clk)
+> -			clk_disable_unprepare(sram->clk);
+> -		return ret;
+> +	if (pdev->dev.of_node) {
+> +		reserved_list = of_get_property(pdev->dev.of_node,
+> +						"mmio-sram-reserved",
+> +						&reserved_size);
+> +		if (reserved_list) {
+> +			reserved_size /= sizeof(*reserved_list);
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index a462163..54e9063 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -25,6 +25,10 @@
- 		gpio3 = &gpio4;
- 		i2c0 = &i2c1;
- 		i2c1 = &i2c2;
-+		mmc0 = &esdhc1;
-+		mmc1 = &esdhc2;
-+		mmc2 = &esdhc3;
-+		mmc3 = &esdhc4;
- 		serial0 = &uart1;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
--- 
-1.8.5.2
+As a general observation, It looks like a lot of people need to know how
+many array elements a property might hold (for datastructure
+allocation), and are open-coding element counting.
+
+I think it would be nice if we had a helper function to count how many
+elements a property can hold (of_property_count_u32_elems?) that would
+centralise strict sanity checking (e.g. prop->len % elem_size == 0) and
+DTB format details (so you don't have to care about endianness, and it
+becomes possible to add DTB metadata later and get runtime type
+checking).
+
+That can all come later and shouldn't block this patch.
+
+> +			if (!reserved_size || reserved_size % 2) {
+> +				dev_warn(&pdev->dev, "wrong number of arguments in mmio-sram-reserved\n");
+> +				reserved_list = NULL;
+> +				reserved_size = 0;
+> +			}
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * We need an additional block to mark the end of the memory region
+> +	 * after the reserved blocks from the dt are processed.
+> +	 */
+> +	nblocks = reserved_size / 2 + 1;
+> +	rblocks = kmalloc((nblocks) * sizeof(*rblocks), GFP_KERNEL);
+> +	if (!rblocks) {
+> +		ret = -ENOMEM;
+> +		goto err_alloc;
+> +	}
+> +
+> +	cur_start = 0;
+> +	for (i = 0; i < nblocks - 1; i++) {
+> +		rblocks[i].start = be32_to_cpu(*reserved_list++);
+> +		rblocks[i].size = be32_to_cpu(*reserved_list++);
+
+It feels a little odd to have to have to care about the format of the
+dtb and do endianness conversion here. It would be nice to limit the
+scope of DTB format details to the of_ helper functions.
+
+Could you use of_property_read_u32_index here instead please?
+
+Otherwise this looks fine to me.
+
+Cheers,
+Mark.
