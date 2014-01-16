@@ -1,47 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jan 2014 12:19:00 +0100
-Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for
- Broadcom 7445
-In-Reply-To: <52D72FCD.1030005@gmail.com>
-References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
- <61E0E2A7-F7FC-4397-8E92-06CC409912B9@gmail.com> <52D72FCD.1030005@gmail.com>
-Message-ID: <201401161219.01038.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Jan 2014 11:25:35 +0000
+Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
+In-Reply-To: <201401161212.11246.arnd@arndb.de>
+References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
+ <15344443.B6eHZOpkXH@wuerfel> <20140115162210.GP15937@n2100.arm.linux.org.uk>
+ <201401161212.11246.arnd@arndb.de>
+Message-ID: <20140116112535.GT15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 January 2014, Marc C wrote:
-> > And then you can add a regular device driver to drivers/reset that provides a
-> > device_reset() API to other drivers, or a system-reset function to be registered as
-> > arm_pm_restart. This driver would use syscon_regmap_lookup_by_phandle() to get access
-> > to a regmap pointer, and then use either hardcoded offsets into the regmap, or get
-> > those offsets from numbers in the devicetree, as provided in the example above.
+On Thu, Jan 16, 2014 at 12:12:10PM +0100, Arnd Bergmann wrote:
+> On Wednesday 15 January 2014, Russell King - ARM Linux wrote:
+> > The issue here is that we'll potentially now end up with three
+> > inversions.  One in the GPIO layers.  One in mmc_gpio_get_cd(), and
+> > another in every driver which uses the GPIO layer inversion.  This
+> > is hardly the right approach as it leads to multiple points where
+> > confusion about the inverted status can occur.
 > 
-> I was able to port a standalone "reboot" driver using syscon + regmap. However, for the
-> SMP initialization case, it turns out that syscon is configured after SMP init. Do you
-> have any advice for this type of situation?
-> 
-> I'd hate to go around in circles, but without resorting to hard-coded offsets, perhaps I
-> can just add the remaining "non-regmap" register offsets in the DT?
+> I did not mean to suggest adding a third inversion. We already have
+> to deal with the one in the GPIO layer and the one in mmc_gpio_get_cd(),
+> which I absolutely agree is unfortunate. As was pointed out already,
+> the gpio driver used in this system does not support the inversion
+> in the DT binding, so the only proper solution is to use the
+> inversion from mmc_gpio_get_cd if MMC_CAP2_CD_ACTIVE_HIGH is set
+> in host->caps2. This flag gets set from mmc_of_parse based
+> on the presence of the "cd-inverted" flag, in the absence of the
+> gpio flags. The dw_mmc driver does not use mmc_of_parse() at the
+> moment, and while it probably should use that in the future,
+> it should definitely read the same DT properties with the
+> same semantics already and not introduce new properties.
 
-You are not the first one to stumble over this problem. There are
-two ways to get out of it, and we should probably implement both in
-the long run:
+Arnd,
 
-1. Other platforms also require the syscon driver to be active before
-the regular device driver probing starts. Michal Simek has the same
-issue in the zynq clock driver that you have for SMP initialization.
-We have talked about this with Mark Brown already, and I think we will
-find a solution for this in the end, but it's not as straightforward
-as I first hoped. We can probably use help in this area.
+The issue I'm pointing out is that _if_ you use the GPIO layer to do
+the inversion, then you end up with _three_ inversions of the signal,
+which is excessive and confusing - and makes the sense of
+mmc_gpio_get_cd() completely indeterminant without reading the DT
+files and the code.
 
-2. There is actually no reason for the SMP code to be called this early,
-and multiple platforms would like to move SMP init to a later stage.
-Stephen Boyd has recently started reworking the way we do SMP init,
-and he may have some more insight.
-
-In the meantime, I'd suggest you do the binding under the assumption
-that it will work eventually, and then work around the current limitations
-in the SMP code by looking for the device nodes you need and map them
-manually, as you did in the previous versions of your patch set.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
