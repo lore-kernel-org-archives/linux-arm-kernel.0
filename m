@@ -1,70 +1,141 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 13:52:30 +0100
-Subject: [PATCH 4/4] ARM: dts: imx6: edmqmx6: Add LED support
+Date: Thu, 16 Jan 2014 13:52:29 +0100
+Subject: [PATCH 3/4] ARM: dts: imx6: edmqmx6: add PF0100 PMIC to device tree
 In-Reply-To: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
 References: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1389876750-29880-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1389876750-29880-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The edmqmx6 has some GPIO controlled LEDs. Add support for them.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 104 ++++++++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-index bafc392..b8a1ff4 100644
+index fe990bc..bafc392 100644
 --- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
 +++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include "imx6q.dtsi"
- 
- / {
-@@ -58,6 +59,31 @@
- 			enable-active-high;
- 		};
- 	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led-blue {
-+			label = "blue";
-+			gpios = <&stmpe_gpio 8 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led-green {
-+			label = "green";
-+			gpios = <&stmpe_gpio 9 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led-pink {
-+			label = "pink";
-+			gpios = <&stmpe_gpio 10 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led-red {
-+			label = "red";
-+			gpios = <&stmpe_gpio 11 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
+@@ -65,6 +65,7 @@
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+ 	phy-reset-gpios = <&gpio3 23 0>;
++	phy-supply = <&vgen2_1v2_eth>;
+ 	status = "okay";
  };
  
- &fec {
-@@ -186,6 +212,7 @@
- 		interrupt-parent = <&gpio3>;
+@@ -75,6 +76,109 @@
+ 		     &pinctrl_stmpe>;
+ 	status = "okay";
  
- 		stmpe_gpio: stmpe_gpio {
-+			#gpio-cells = <2>;
- 			compatible = "st,stmpe-gpio";
- 		};
- 	};
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <20 8>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++				regulator-always-on;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_1v2_eth: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vdd_high_in: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++
+ 	stmpe: stmpe1601 at 40 {
+ 		compatible = "st,stmpe1601";
+ 		reg = <0x40>;
 -- 
 1.8.5.2
