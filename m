@@ -1,94 +1,98 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 16 Jan 2014 13:58:10 +0200
-Subject: [PATCH 4/5] arm: omap3: twl: use the new lookup method with usb
- phy
-In-Reply-To: <52D6972B.2030704@ti.com>
-References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
- <52AEDE43.8030005@ti.com> <20131216144314.GB22944@xps8300>
- <52CBFAC0.9040103@ti.com> <20140114143849.GB21169@xps8300>
- <52D6972B.2030704@ti.com>
-Message-ID: <20140116115810.GC11732@xps8300>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 16 Jan 2014 13:02:28 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+In-Reply-To: <52D7BCAA.30706@atmel.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com>
+ <20140115180615.GJ9558@ns203013.ovh.net>
+ <52D79E51.4030300@overkiz.com> <52D7BCAA.30706@atmel.com>
+Message-ID: <CACh+v5OOx8LgGVN0GFsa5-f=h1kasJVz4r0CfBXdXhK0F8iQAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 07:41:55PM +0530, Kishon Vijay Abraham I wrote:
-> The point I'm trying to make is that we won't 'always' know the device names in
-> advance.
+2014/1/16 Nicolas Ferre <nicolas.ferre@atmel.com>:
+> On 16/01/2014 09:54, boris brezillon :
+>> On 15/01/2014 19:06, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 11:35 Mon 13 Jan     , boris brezillon wrote:
+>>>> On 13/01/2014 11:29, Jean-Jacques Hiblot wrote:
+>>>>> Hello Nicolas, Jean-Christophe,
+>>>>>
+>>>>> As I was trying to enable the touchscreen on the at91sam9261ek with
+>>>>> device-tree support, I ran into an issue. The touchscreen driver needs
+>>>>> to know the state of the pendown gpio and also needs it as an
+>>>>> interrupt source.
+>>>>>
+>>>>> The problem is that when a gpio is used as an interrupt, it's
+>>>>> requested by the pinctrl driver during the xlate stage, marking it
+>>>>> unavaliable for the other driver.
+>>>>> It looks like the at91 pinctrl driver is the only one to use
+>>>>> gpio_request() in the xlate stage. Maybe we should remove this:
+>>>> You should only request it as a GPIO and then use gpio_to_irq to get the
+>>>> related IRQ.
+>>> This here a HUGE issue in the hole kernel
+>>>
+>>> You should NEVER known ti's a gpio in the driver at all gpio_to_irq should never
+>>> exist you need to only see the irq
+>>>
+>>>> Because what is done here, is to solve the case where only the irq
+>>>> is request, and in this specific case we need to request the pin as a
+>>>> GPIO.
+>>> this need to be handled at irq level not drivers
+>>
+>> Then propose something (or at least give us a deadline for this new
+>> interrupt
+>> model to come out), because the ADS7843E touchscreen is not working anymore
+>> (at least on at91 platforms).
+>>
+>> What this driver needs is a level IRQ (not an edge IRQ). The code in
+>> ads7846_hard_irq<http://lxr.free-electrons.com/ident?i=ads7846_hard_irq>
+>> interrupt handler is here to transform an edge IRQ into a level IRQ.
+>>
+>> Is there a way to provide a generic framework to transform edge IRQs
+>> into level IRQs
+>> (because some GPIO controllers do not support level IRQs, and this is
+>> the case for the
+>> at91sam9261 one) ?
+>>
+>>
+>> Of cource the gpio_to_irq approach is not perfect, but at least it as
+>> the benefit to quickly
+>> fix the bug, and we will still be able to improve this later, when we
+>> have enough tools
+>> (or mechanisms) to do it.
+>
+> Moreover, I do not see the rationale behind the concept of "interrupt
+> with an electrical value". An interrupt signals an event and this event
+> can be a transition or a state but an electrical value is the
+> responsibility of a GPIO line, not the other way around.
+>
+> I see a code that could give the value of an electrical line related to
+> an interrupt as a twisted interpretation of the notion of "interrupt".
+> It surprises me that it could be thought as an enhancement that an IRQ
+> coming from a GPIO could give a value!
+>
+> Isn't it why other people are also using this simple distinction to use
+> their GPIO/IRQ mechanism? Maybe this is why we are the only ones to
+> completely forbid this possibility.
+>
+> So, let's fix the bug, submit the modification to mainline, make
+> platform work and see if somebody can convince me that retrieving an
+> electrical line status from a GPIO is a "bad" thing...
+>
 
-In which cases do we not know the device names, and please note, cases
-where we would need to use the lookup? The normal cases we would use
-it are..
+I share your view on this.
 
-1) A driver creating a child device, like dwc3 when it creates the
-xhci. There the parent just delivers the phys it has to the child, so
-both the device name and the phys are known.
+Linus,
+ the root of the issue is the fact that a GPIO can't be requested
+twice. But IMO it's safe for a single device to request it more than
+once and use it for different purposes (irq and electrical signal
+value). Maybe we can rework the GPIO request to include this ownership
+information. I can post a draft implementation for this if you think
+it's worthwhile.
 
-2) Platform code. Hopefully we can get rid of the platform code one
-day, but in any case, when we use it, we always know at least how many
-users a phy has, and if there is only a singe user, we can rely con_id
-to do the matching. Though I still don't really see much risk in using
-the controller device name also there. The lookup table should in any
-case be made in the place where the phy devices are created, so the
-phy name is definitely always known.
+Jean-Jacques
 
-3) Phys part of something like mfd. This is in practice the same as
-the platform code case. For example, with twl we always know there is
-only one user for the phy, which is musb. So we can just use musb's
-con_id if it's to scary to use "musb-hdrc.0".
-
-In any other case, you get the phy from DT, and there is no need to
-use the lookup when linking the phys and the users.
-
-> Btw how are you planning to differentiate between multiple controllers of the
-> same type with con_id?
-
-You don't rely on the con_id alone in those cases. You then use the
-device name. The con_id is just one parameter you can use to do the
-matching.
-
-> Maybe I'm missing the actual intention of this patch. Do you face problem if
-> the PHY's have to know about it's consumers in ACPI?
-
-<snip>
-
-> >> I would rather leave the way it is modelled now.
-> > 
-> > Do you mean, leave it in the platform code? Why? We would reduce the
-> > platform code by moving it to the mfd driver. Or did I misunderstood
-> > something?
-> 
-> In this case, the lookup table will be used only for non-dt boot so don't see
-> much use in moving to mfd driver.
-> I meant if the new method is not solving any problem then I would prefer the
-> way it is modelled now where the PHY's know about it's consumers.
-
-OK, so that's what you meant. Things like that init_data promotes use
-of platform data in the drivers, something that we really should get
-rid of. Is that not a problem to you?
-
-The phy drivers simply should not need to care about the consumers.
-They should not need to care about anything DT, ACPI, platform
-specific if it's possible, and here there is nothing preventing it.
-Let me clarify..
-
-The plan is that ultimately the drivers (meaning all the drivers, not
-just phy) don't need to care about things like DT properties, ACPI
-properties or anything DT, ACPI, platform specific. We will have
-generic driver properties and capabilities and the upper layers will
-take care of delivering the correct values from the source at hand.
-The drivers can be made truly platform agnostic.
-
-That is the goal, and we should make everything new by keeping that in
-mind. Many existing frameworks are being converted to that direction,
-like the gpio framework and DMA Engine API. The way you force the phy
-drivers the deliver the consumers is taking a step backwards.
-
-> Btw where does device gets created in ACPI boot?
-
-drivers/acpi/acpi_platform.c
-
-Thanks,
-
--- 
-heikki
+> Bye,
+> --
+> Nicolas Ferre
