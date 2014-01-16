@@ -1,46 +1,31 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 16 Jan 2014 14:22:53 -0800
-Subject: [GIT PULL] DaVinci watchdog change for v3.14
-In-Reply-To: <52CE8B05.2040800@ti.com> (Sekhar Nori's message of "Thu, 9 Jan
- 2014 17:11:57 +0530")
-References: <52CE8B05.2040800@ti.com>
-Message-ID: <878uufo9c2.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jan 2014 23:45:12 +0100
+Subject: [PATCH] pinctrl: capri: add dependency on OF
+Message-ID: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+As this driver is using pinconf_generic_dt_node_to_map_pin() it
+needs to depend on OF so as not to cause build problems on
+archs that do not support OF.
 
-> Hi Arnd, Olof, Kevin,
->
-> Can you please pull the following patch. It has been acked by Wim.
-> There are some other davinci_wdt.c patches Wim has queued in his
-> tree, but a test merge of this patch with latest linux-next does
-> not throw any conflicts.
->
-> Thanks,
-> Sekhar
->
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
->
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.14/watchdog
->
-> for you to fetch changes up to 843748123d95ae77a489b41f2f193e8502fc7ea8:
->
->   watchdog: davinci: rename platform driver to davinci-wdt (2014-01-09 16:48:31 +0530)
->
-> ----------------------------------------------------------------
-> This patch updates the davinci watchdog
-> platform device name from generic "watchdog"
-> to something more specific.
->
-> ----------------------------------------------------------------
+Cc: Sherman Yin <syin@broadcom.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Pulled into next/drivers,
-
-Thanks,
-
-Kevin
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index f1dda4d9de13..be361b7cd30f 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -106,6 +106,7 @@ config PINCTRL_BCM2835
+ 
+ config PINCTRL_CAPRI
+ 	bool "Broadcom Capri pinctrl driver"
++	depends on OF
+ 	select PINMUX
+ 	select PINCONF
+ 	select GENERIC_PINCONF
+-- 
+1.8.4.2
