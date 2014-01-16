@@ -1,41 +1,82 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Thu, 16 Jan 2014 14:14:49 -0800
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <74872027.r5ouCtzAgs@wuerfel>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <74872027.r5ouCtzAgs@wuerfel>
-Message-ID: <6139CA16-83C6-41D8-ADD2-B9590DE0911F@holtmann.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 16 Jan 2014 17:19:27 -0500
+Subject: [PATCH] cpuidle: don't use modular platform register in non-modular
+ ARM drivers
+Message-ID: <1389910767-4040-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+These two drivers are configured with Kconfig options that are
+both declared as bool.  Hence it is not possible for the code
+to be built as modular.  However the code is currently using the
+module_platform_driver() macro for driver registration.
 
->>> b) We need to add a way to attach a device_node to an sdio_func,
->>> so that a function driver can find additional DT properties.
->>> This part should be relatively simple once (a) is done and
->>> should only need a little code but no new binding. The code
->>> would be similar to what we do for amba, i2c or spi devices.
->> 
->> This isn't actually needed for this functionality, but might be needed
->> for other things...
->> 
-> 
-> There is at least one sdio driver (cw1200) that needs to get
-> a MAC address from DT and has the same kind of hack that
-> you mention to work around it at the moment (actually worse,
-> it's not even using auxdata). The MAC address is certainly
-> a property of the device, not the host. This is of course
-> the same problem that we have on various development boards
-> with USB ethernet controllers lacking an EEPROM.
+While this currently works, we really don't want to be including
+the module.h header in non-modular code, which we'll be forced
+to do, pending some upcoming code relocation from init.h into
+module.h.  So we fix it now by using the non-modular equivalent.
 
-there are plenty of these devices. It is not just Ethernet or WiFi. You can add Bluetooth devices addresses to this as well. The Nokia N900 drivers for example. Even the Nexus 4 devices are in this boat as well.
+With some macro detangulation, and a little help from cpp, we can
+see that module_platform_driver(calxeda_cpuidle_plat_driver) gets
+roughly translated into:
 
-The addresses are either stored in some magic place or plain simple on the host filesystem. Maybe this whole magic persistent IEEE addresses thing need its own subsystem. So drivers needing an address can just request it from the subsystem and the subsystem deals with the nasty storage details on how to get the addresses into the kernel in the first place. Currently it is a big mess.
+  static int __init calxeda_cpuidle_plat_driver_init(void)
+  {
+        return platform_driver_register(&calxeda_cpuidle_plat_driver);
+  }
+  module_init(calxeda_cpuidle_plat_driver_init);
 
-I have seen nasty workaround with delayed initialization from probe or other crazy sysfs settings to just make this work.
+  static void __exit calxeda_cpuidle_plat_driver_exit(void)
+  {
+        platform_driver_unregister(&calxeda_cpuidle_plat_driver);
+  }
+  module_exit(calxeda_cpuidle_plat_driver_exit);
 
-Regards
+[and similarly for the other file, cpuidle-zynq.c]
 
-Marcel
+And since we've already established that the code is non-modular,
+we can completely drop any code relating to module_exit.  For non
+modular code, module_init beomes __initcall.  But direct use of
+__initcall is discouraged, vs. one of the priority categorized
+subgroups.  As __initcall gets mapped onto device_initcall, our
+use of device_initcall directly in this change means that the
+runtime impact is zero -- they will remain at level 6 in the
+initcall ordering.
+
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index 6e51114057d0..631e2cd9bce6 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -78,4 +78,8 @@ static struct platform_driver calxeda_cpuidle_plat_driver = {
+         .probe = calxeda_cpuidle_probe,
+ };
+ 
+-module_platform_driver(calxeda_cpuidle_plat_driver);
++static int __init calxeda_cpuidle_plat_driver_init(void)
++{
++	return platform_driver_register(&calxeda_cpuidle_plat_driver);
++}
++device_initcall(calxeda_cpuidle_plat_driver_init);
+diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+index aded75928028..a1aae519a573 100644
+--- a/drivers/cpuidle/cpuidle-zynq.c
++++ b/drivers/cpuidle/cpuidle-zynq.c
+@@ -85,4 +85,8 @@ static struct platform_driver zynq_cpuidle_driver = {
+ 	.probe = zynq_cpuidle_probe,
+ };
+ 
+-module_platform_driver(zynq_cpuidle_driver);
++static int __init zynq_cpuidle_driver_init(void)
++{
++	return platform_driver_register(&zynq_cpuidle_driver);
++}
++device_initcall(zynq_cpuidle_driver_init);
+-- 
+1.8.5.2
