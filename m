@@ -1,73 +1,33 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 16 Jan 2014 14:49:08 +0530
-Subject: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to header file
-In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189FBE8D5D6@EAPEX1MAIL1.st.com>
-References: <cover.1386752447.git.mohit.kumar@st.com>
- <201312112348.06755.arnd@arndb.de>
- <2CC2A0A4A178534D93D5159BF3BCB66189F95F669D@EAPEX1MAIL1.st.com>
- <201312142002.38423.arnd@arndb.de>
- <2CC2A0A4A178534D93D5159BF3BCB66189FBE8D5D6@EAPEX1MAIL1.st.com>
-Message-ID: <20140116091908.GC2290@pratyush-vbox>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Jan 2014 10:25:31 +0100
+Subject: [PATCH v2] pinctrl: sunxi: Honor GPIO output initial vaules
+In-Reply-To: <1389854063-31016-1-git-send-email-wens@csie.org>
+References: <1389854063-31016-1-git-send-email-wens@csie.org>
+Message-ID: <20140116092531.GC31779@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 03:25:41PM +0800, Mohit KUMAR DCG wrote:
-> Hi Arnd,
+On Thu, Jan 16, 2014 at 02:34:23PM +0800, Chen-Yu Tsai wrote:
+> Some GPIO users, such as fixed-regulator, request GPIO output with
+> initial value of 1. This was ignored by sunxi driver.
 > 
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Sunday, December 15, 2013 12:33 AM
-> > To: Mohit KUMAR DCG
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
-> > Pratyush ANAND; spear-devel; Viresh Kumar
-> > Subject: Re: [PATCH 02/12] SPEAr13xx: Move SPEAr1340 definitions to
-> > header file
-> > 
-> > On Friday 13 December 2013, Mohit KUMAR DCG wrote:
-> > > > The RST bits should probably go into a drivers/reset driver. Not
-> > > > sure what the other registers do, but I'm sure we can find a driver
-> > > > for these too, possibly they should be part of the PHY driver?
-> > >
-> > > -  Perhaps if we implement phy and reset driver then we may not
-> > > require to move these definitions and it will address most of your
-> > > comments on SPEar13xx pcie driver. I am understanding and working on
-> > > this.l
-> > >
-> 
-> Though we are almost ready with v2. But few concerns:
-> 
-> There are Spear soc common register used for misc configurations of clock, reset etc  for all ips.  Few of 
-> registers from the same area are also used for pcie/sata muxing and auxiliary clock configurations.
-> For example: sata_miphy_init in arch/arm/mach-spear/spear1340.c also uses these registers.
-> 
-> We have moved all these sata specific spear1340 configurations in a separate driver.  On the basis of spear-ahci dt 
-> Node this driver's probe is called, which further adds ahci platform driver.
-> We plan to put all spear1340/1310_pcie_miphy_init/exit functions of patch 9/12 of this series in
-> The same driver.
-> 
-> Now our concern is, what could be the best place to keep that driver, phy, reset or any other framework?
-> Or we keep this new driver in arch/arm/mach-spear only.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I think this misc configuration register block resource should be
-passed to syscon (drivers/mfd/syscon.c) driver.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-regmap_update_bits should be used to update these registers and hence
-to configure pcie/sata settings.
+Could you also send it to stable please?
 
-As far as place is concerned, that can be kept into mfd and can be
-named as spear13xx-syscon.c
+Thanks,
+Maxime
 
-Whats your opinion arnd?
-
-Regards
-Pratyush
-
-> 
-> Regards
-> Mohit
-> 
-> > 
-> > Ok, very good.
-> > 
-> > 	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140116/90959b8b/attachment.sig>
