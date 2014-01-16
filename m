@@ -1,209 +1,439 @@
 From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
-Date: Thu, 16 Jan 2014 15:37:31 +0000
-Subject: [PATCH v2 2/4] pinctrl: st: Add software edge trigger interrupt
- support.
+Date: Thu, 16 Jan 2014 15:36:53 +0000
+Subject: [PATCH v2 1/4] pinctrl: st: Add Interrupt support.
 In-Reply-To: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
 References: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1389886651-31990-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1389886613-31945-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-ST pin controller does not have hardware support for detecting edge
-triggered interrupts, It only has level triggering support.
-This patch attempts to fake up edge triggers from hw level trigger
-support in software. With this facility now the gpios can be easily used
-for keypads, otherwise it would be difficult for drivers like keypads to
-work with level trigger interrupts.
+This patch add interrupt support to the pincontroller driver.
+
+ST Pincontroller GPIO bank can have one of the two possible types of
+interrupt-wirings.
+
+First type is via irqmux, single interrupt is used by multiple gpio
+banks. This reduces number of overall interrupts numbers required. All
+these banks belong to a single pincontroller.
+		  _________
+		 |	   |----> [gpio-bank (n)    ]
+		 |	   |----> [gpio-bank (n + 1)]
+	[irqN]-- | irq-mux |----> [gpio-bank (n + 2)]
+		 |	   |----> [gpio-bank (...  )]
+		 |_________|----> [gpio-bank (n + 7)]
+
+Second type has a dedicated interrupt per gpio bank.
+
+	[irqN]----> [gpio-bank (n)]
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 ---
- drivers/pinctrl/pinctrl-st.c |  116 +++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 114 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/pinctrl/pinctrl-st.txt     |   73 ++++++-
+ drivers/pinctrl/pinctrl-st.c                       |  225 +++++++++++++++++++-
+ 2 files changed, 290 insertions(+), 8 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-st.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-st.txt
+index 05bf82a..4bd5be0 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-st.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-st.txt
+@@ -11,18 +11,68 @@ Pull Up (PU) are driven by the related PIO block.
+ ST pinctrl driver controls PIO multiplexing block and also interacts with
+ gpio driver to configure a pin.
+ 
+-Required properties: (PIO multiplexing block)
++GPIO bank can have one of the two possible types of interrupt-wirings.
++
++First type is via irqmux, single interrupt is used by multiple gpio banks. This
++reduces number of overall interrupts numbers required. All these banks belong to
++a single pincontroller.
++		  _________
++		 |	   |----> [gpio-bank (n)    ]
++		 |	   |----> [gpio-bank (n + 1)]
++	[irqN]-- | irq-mux |----> [gpio-bank (n + 2)]
++		 |	   |----> [gpio-bank (...  )]
++		 |_________|----> [gpio-bank (n + 7)]
++
++Second type has a dedicated interrupt per gpio bank.
++
++	[irqN]----> [gpio-bank (n)]
++
++
++Pin controller node:
++Required properties:
+ - compatible	: should be "st,<SOC>-<pio-block>-pinctrl"
+ 	like st,stih415-sbc-pinctrl, st,stih415-front-pinctrl and so on.
+-- gpio-controller : Indicates this device is a GPIO controller
+-- #gpio-cells	  : Should be one. The first cell is the pin number.
++- st,syscfg		: Should be a phandle of the syscfg node.
+ - st,retime-pin-mask	: Should be mask to specify which pins can be retimed.
+ 	If the property is not present, it is assumed that all the pins in the
+ 	bank are capable of retiming. Retiming is mainly used to improve the
+ 	IO timing margins of external synchronous interfaces.
+-- st,bank-name		: Should be a name string for this bank as
+-			specified in datasheet.
+-- st,syscfg		: Should be a phandle of the syscfg node.
++- ranges : defines mapping between pin controller node (parent) to gpio-bank
++  node (children).
++
++Optional properties:
++- interrupts	: Interrupt number of the irqmux. If the interrupt is shared
++  with other gpio banks via irqmux.
++  a irqline and gpio banks.
++- reg		: irqmux memory resource. If irqmux is present.
++- reg-names	: irqmux resource should be named as "irqmux".
++
++GPIO controller/bank node.
++Required properties:
++- gpio-controller : Indicates this device is a GPIO controller
++- #gpio-cells	  : Should be one. The first cell is the pin number.
++- st,bank-name	  : Should be a name string for this bank as specified in
++  datasheet.
++
++Optional properties:
++- interrupts	: Interrupt number for this gpio bank. If there is a dedicated
++  interrupt wired up for this gpio bank.
++
++- interrupt-controller : Indicates this device is a interrupt controller. GPIO
++  bank can be an interrupt controller iff one of the interrupt type either via
++irqmux or a dedicated interrupt per bank is specified.
++
++- #interrupt-cells: the value of this property should be 2.
++     - First Cell: represents the external gpio interrupt number local to the
++       gpio interrupt space of the controller.
++     - Second Cell: flags to identify the type of the interrupt
++       - 1 = rising edge triggered
++       - 2 = falling edge triggered
++       - 3 = rising and falling edge triggered
++       - 4 = high level triggered
++       - 8 = low level triggered
++for related macros look in:
++include/dt-bindings/interrupt-controller/irq.h
+ 
+ Example:
+ 	pin-controller-sbc {
+@@ -30,10 +80,17 @@ Example:
+ 		#size-cells	= <1>;
+ 		compatible	= "st,stih415-sbc-pinctrl";
+ 		st,syscfg	= <&syscfg_sbc>;
++		reg 		= <0xfe61f080 0x4>;
++		reg-names	= "irqmux";
++		interrupts 	= <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts-names = "irqmux";
+ 		ranges 		= <0 0xfe610000 0x5000>;
++
+ 		PIO0: gpio at fe610000 {
+ 			gpio-controller;
+ 			#gpio-cells	= <1>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			reg		= <0 0x100>;
+ 			st,bank-name	= "PIO0";
+ 		};
+@@ -105,6 +162,10 @@ pin-controller {
+ 
+ sdhci0:sdhci at fe810000{
+ 	...
++	interrupt-parent = <&PIO3>;
++	#interrupt-cells = <2>;
++	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>; /* Interrupt line via PIO3-3 */
++	interrupts-names = "card-detect";
+ 	pinctrl-names = "default";
+ 	pinctrl-0	= <&pinctrl_mmc>;
+ };
 diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 51e4f3a..9fb66aa 100644
+index 320c273..51e4f3a 100644
 --- a/drivers/pinctrl/pinctrl-st.c
 +++ b/drivers/pinctrl/pinctrl-st.c
-@@ -271,12 +271,59 @@ struct st_pctl_group {
- 	struct st_pinconf	*pin_conf;
- };
- 
-+/*
-+ * Edge triggers are not supported at hardware level, it is supported by
-+ * software by exploiting the level trigger support in hardware.
-+ * Software uses a virtual register (EDGE_CONF) for edge trigger configuration
-+ * of each gpio pin in a GPIO bank.
-+ *
-+ * Each bank has a 32 bit EDGE_CONF register which is divided in to 8 parts of
-+ * 4-bits. Each 4-bit space is allocated for each pin in a gpio bank.
-+ *
-+ * bit allocation per pin is:
-+ * Bits:  [0 - 3] | [4 - 7]  [8 - 11] ... ... ... ...  [ 28 - 31]
-+ *       --------------------------------------------------------
-+ *       |  pin-0  |  pin-2 | pin-3  | ... ... ... ... | pin -7 |
-+ *       --------------------------------------------------------
-+ *
-+ *  A pin can have one of following the values in its edge configuration field.
-+ *
-+ *	-------   ----------------------------
-+ *	[0-3]	- Description
-+ *	-------   ----------------------------
-+ *	0000	- No edge IRQ.
-+ *	0001	- Falling edge IRQ.
-+ *	0010	- Rising edge IRQ.
-+ *	0011	- Rising and Falling edge IRQ.
-+ *	-------   ----------------------------
-+ */
-+
-+#define ST_IRQ_EDGE_CONF_BITS_PER_PIN	4
-+#define ST_IRQ_EDGE_MASK		0xf
-+#define ST_IRQ_EDGE_FALLING		BIT(0)
-+#define ST_IRQ_EDGE_RISING		BIT(1)
-+#define ST_IRQ_EDGE_BOTH		(BIT(0) | BIT(1))
-+
-+#define ST_IRQ_RISING_EDGE_CONF(pin) \
-+	(ST_IRQ_EDGE_RISING << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
-+
-+#define ST_IRQ_FALLING_EDGE_CONF(pin) \
-+	(ST_IRQ_EDGE_FALLING << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
-+
-+#define ST_IRQ_BOTH_EDGE_CONF(pin) \
-+	(ST_IRQ_EDGE_BOTH << (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN))
-+
-+#define ST_IRQ_EDGE_CONF(conf, pin) \
-+	(conf >> (pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN) & ST_IRQ_EDGE_MASK)
-+
- struct st_gpio_bank {
- 	struct gpio_chip		gpio_chip;
+@@ -13,7 +13,12 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdesc.h>
++#include <linux/irqdomain.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/of.h>
++#include <linux/of_irq.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_address.h>
+ #include <linux/regmap.h>
+@@ -271,6 +276,7 @@ struct st_gpio_bank {
  	struct pinctrl_gpio_range	range;
  	void __iomem			*base;
  	struct st_pio_control		pc;
- 	struct	irq_domain		*domain;
-+	unsigned long			irq_edge_conf;
-+	spinlock_t                      lock;
++	struct	irq_domain		*domain;
  };
  
  struct st_pinctrl {
-@@ -1262,18 +1309,37 @@ static int st_gpio_irq_set_type(struct irq_data *d, unsigned type)
- 	unsigned long flags;
- 	int comp, pin = d->hwirq;
- 	u32 val;
-+	u32 pin_edge_conf = 0;
+@@ -284,6 +290,7 @@ struct st_pinctrl {
+ 	int				ngroups;
+ 	struct regmap			*regmap;
+ 	const struct st_pctl_data	*data;
++	void __iomem			*irqmux_base;
+ };
  
- 	switch (type) {
- 	case IRQ_TYPE_LEVEL_HIGH:
- 		comp = 0;
- 		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		comp = 0;
-+		pin_edge_conf = ST_IRQ_FALLING_EDGE_CONF(pin);
-+		break;
- 	case IRQ_TYPE_LEVEL_LOW:
- 		comp = 1;
- 		break;
-+	case IRQ_TYPE_EDGE_RISING:
-+		comp = 1;
-+		pin_edge_conf = ST_IRQ_RISING_EDGE_CONF(pin);
-+		break;
-+	case IRQ_TYPE_EDGE_BOTH:
-+		comp = st_gpio_get(&bank->gpio_chip, pin);
-+		pin_edge_conf = ST_IRQ_BOTH_EDGE_CONF(pin);
-+		break;
- 	default:
- 		return -EINVAL;
- 	}
- 
-+	spin_lock_irqsave(&bank->lock, flags);
-+	bank->irq_edge_conf &=  ~(ST_IRQ_EDGE_MASK << (
-+				pin * ST_IRQ_EDGE_CONF_BITS_PER_PIN));
-+	bank->irq_edge_conf |= pin_edge_conf;
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+
- 	val = readl(bank->base + REG_PIO_PCOMP);
- 	val &= ~BIT(pin);
- 	val |= (comp << pin);
-@@ -1282,10 +1348,39 @@ static int st_gpio_irq_set_type(struct irq_data *d, unsigned type)
+ /* SOC specific data */
+@@ -1200,6 +1207,130 @@ static int st_pctl_parse_functions(struct device_node *np,
  	return 0;
  }
  
-+/*
-+ * As edge triggers are not supported at hardware level, it is supported by
-+ * software by exploiting the level trigger support in hardware.
-+ *
-+ * Steps for detection raising edge interrupt in software.
-+ *
-+ * Step 1: CONFIGURE pin to detect level LOW interrupts.
-+ *
-+ * Step 2: DETECT level LOW interrupt and in irqmux/gpio bank interrupt handler,
-+ * if the value of pin is low, then CONFIGURE pin for level HIGH interrupt.
-+ * IGNORE calling the actual interrupt handler for the pin@this stage.
-+ *
-+ * Step 3: DETECT level HIGH interrupt and in irqmux/gpio-bank interrupt handler
-+ * if the value of pin is HIGH, CONFIGURE pin for level LOW interrupt and then
-+ * DISPATCH the interrupt to the interrupt handler of the pin.
-+ *
-+ *		 step-1  ________     __________
-+ *				|     | step - 3
-+ *			        |     |
-+ *			step -2 |_____|
-+ *
-+ * falling edge is also detected int the same way.
-+ *
-+ */
- static void __gpio_irq_handler(struct st_gpio_bank *bank)
- {
- 	unsigned long port_in, port_mask, port_comp, active_irqs;
--	int n;
-+	unsigned long bank_edge_mask, flags;
-+	int n, val, ecfg;
++static int st_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct st_gpio_bank *bank = gpio_chip_to_bank(chip);
++	int irq = -ENXIO;
 +
-+	spin_lock_irqsave(&bank->lock, flags);
-+	bank_edge_mask = bank->irq_edge_conf;
-+	spin_unlock_irqrestore(&bank->lock, flags);
++	if (offset < chip->ngpio)
++		irq = irq_find_mapping(bank->domain, offset);
++
++	dev_info(chip->dev, "%s: request IRQ for GPIO %d, return %d\n",
++				chip->label, offset + chip->base, irq);
++	return irq;
++}
++
++static void st_gpio_irq_mask(struct irq_data *d)
++{
++	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
++
++	writel(BIT(d->hwirq), bank->base + REG_PIO_CLR_PMASK);
++}
++
++static void st_gpio_irq_unmask(struct irq_data *d)
++{
++	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
++
++	writel(BIT(d->hwirq), bank->base + REG_PIO_SET_PMASK);
++}
++
++static unsigned int st_gpio_irq_startup(struct irq_data *d)
++{
++	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
++
++	if (gpio_lock_as_irq(&bank->gpio_chip, d->hwirq))
++		dev_err(bank->gpio_chip.dev,
++			"unable to lock HW IRQ %lu for IRQ\n",
++			d->hwirq);
++
++	st_gpio_irq_unmask(d);
++
++	return 0;
++}
++
++static void st_gpio_irq_shutdown(struct irq_data *d)
++{
++	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
++
++	st_gpio_irq_mask(d);
++	gpio_unlock_as_irq(&bank->gpio_chip, d->hwirq);
++}
++
++static int st_gpio_irq_set_type(struct irq_data *d, unsigned type)
++{
++	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
++	int comp, pin = d->hwirq;
++	u32 val;
++
++	switch (type) {
++	case IRQ_TYPE_LEVEL_HIGH:
++		comp = 0;
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		comp = 1;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	val = readl(bank->base + REG_PIO_PCOMP);
++	val &= ~BIT(pin);
++	val |= (comp << pin);
++	writel(val, bank->base + REG_PIO_PCOMP);
++
++	return 0;
++}
++
++static void __gpio_irq_handler(struct st_gpio_bank *bank)
++{
++	unsigned long port_in, port_mask, port_comp, active_irqs;
++	int n;
++
++	for (;;) {
++		port_in = readl(bank->base + REG_PIO_PIN);
++		port_comp = readl(bank->base + REG_PIO_PCOMP);
++		port_mask = readl(bank->base + REG_PIO_PMASK);
++
++		active_irqs = (port_in ^ port_comp) & port_mask;
++
++		if (active_irqs == 0)
++			break;
++
++		for_each_set_bit(n, &active_irqs, BITS_PER_LONG) {
++			generic_handle_irq(irq_find_mapping(bank->domain, n));
++		}
++	}
++}
++
++static void st_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
++{
++	/* interrupt dedicated per bank */
++	struct irq_chip *chip = irq_get_chip(irq);
++	struct st_gpio_bank *bank = irq_get_handler_data(irq);
++
++	chained_irq_enter(chip, desc);
++	__gpio_irq_handler(bank);
++	chained_irq_exit(chip, desc);
++}
++
++static void st_gpio_irqmux_handler(unsigned irq, struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_get_chip(irq);
++	struct st_pinctrl *info = irq_get_handler_data(irq);
++	unsigned long status;
++	int n;
++
++	chained_irq_enter(chip, desc);
++
++	status = readl(info->irqmux_base);
++
++	for_each_set_bit(n, &status, ST_GPIO_PINS_PER_BANK)
++		__gpio_irq_handler(&info->banks[n]);
++
++	chained_irq_exit(chip, desc);
++}
++
+ static struct gpio_chip st_gpio_template = {
+ 	.request		= st_gpio_request,
+ 	.free			= st_gpio_free,
+@@ -1210,6 +1341,34 @@ static struct gpio_chip st_gpio_template = {
+ 	.ngpio			= ST_GPIO_PINS_PER_BANK,
+ 	.of_gpio_n_cells	= 1,
+ 	.of_xlate		= st_gpio_xlate,
++	.to_irq			= st_gpio_to_irq,
++};
++
++static struct irq_chip st_gpio_irqchip = {
++	.name		= "GPIO",
++	.irq_mask	= st_gpio_irq_mask,
++	.irq_unmask	= st_gpio_irq_unmask,
++	.irq_set_type	= st_gpio_irq_set_type,
++	.irq_startup	= st_gpio_irq_startup,
++	.irq_shutdown	= st_gpio_irq_shutdown,
++};
++
++static int st_gpio_irq_domain_map(struct irq_domain *h,
++			unsigned int virq, irq_hw_number_t hw)
++{
++	struct st_gpio_bank *bank = h->host_data;
++
++	irq_set_chip(virq, &st_gpio_irqchip);
++	irq_set_handler(virq, handle_level_irq);
++	set_irq_flags(virq, IRQF_VALID);
++	irq_set_chip_data(virq, bank);
++
++	return 0;
++}
++
++static struct irq_domain_ops st_gpio_irq_ops = {
++	.map	= st_gpio_irq_domain_map,
++	.xlate	= irq_domain_xlate_twocell,
+ };
  
- 	for (;;) {
- 		port_in = readl(bank->base + REG_PIO_PIN);
-@@ -1298,6 +1393,22 @@ static void __gpio_irq_handler(struct st_gpio_bank *bank)
- 			break;
+ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+@@ -1219,8 +1378,8 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+ 	struct pinctrl_gpio_range *range = &bank->range;
+ 	struct device *dev = info->dev;
+ 	int bank_num = of_alias_get_id(np, "gpio");
+-	struct resource res;
+-	int err;
++	struct resource res, irq_res;
++	int gpio_irq = 0, err, i;
  
- 		for_each_set_bit(n, &active_irqs, BITS_PER_LONG) {
-+			/* check if we are detecting fake edges ... */
-+			ecfg = ST_IRQ_EDGE_CONF(bank_edge_mask, n);
-+
-+			if (ecfg) {
-+				/* edge detection. */
-+				val = st_gpio_get(&bank->gpio_chip, n);
-+
-+				writel(BIT(n),
-+					val ? bank->base + REG_PIO_SET_PCOMP :
-+					bank->base + REG_PIO_CLR_PCOMP);
-+
-+				if (ecfg != ST_IRQ_EDGE_BOTH &&
-+					!((ecfg & ST_IRQ_EDGE_FALLING) ^ val))
-+					continue;
-+			}
-+
- 			generic_handle_irq(irq_find_mapping(bank->domain, n));
- 		}
+ 	if (of_address_to_resource(np, 0, &res))
+ 		return -ENODEV;
+@@ -1248,6 +1407,51 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
  	}
-@@ -1359,7 +1470,7 @@ static int st_gpio_irq_domain_map(struct irq_domain *h,
- 	struct st_gpio_bank *bank = h->host_data;
+ 	dev_info(dev, "%s bank added.\n", range->name);
  
- 	irq_set_chip(virq, &st_gpio_irqchip);
--	irq_set_handler(virq, handle_level_irq);
-+	irq_set_handler(virq, handle_simple_irq);
- 	set_irq_flags(virq, IRQF_VALID);
- 	irq_set_chip_data(virq, bank);
++	/**
++	 * GPIO bank can have one of the two possible types of
++	 * interrupt-wirings.
++	 *
++	 * First type is via irqmux, single interrupt is used by multiple
++	 * gpio banks. This reduces number of overall interrupts numbers
++	 * required. All these banks belong to a single pincontroller.
++	 *		  _________
++	 *		 |	   |----> [gpio-bank (n)    ]
++	 *		 |	   |----> [gpio-bank (n + 1)]
++	 *	[irqN]-- | irq-mux |----> [gpio-bank (n + 2)]
++	 *		 |	   |----> [gpio-bank (...  )]
++	 *		 |_________|----> [gpio-bank (n + 7)]
++	 *
++	 * Second type has a dedicated interrupt per each gpio bank.
++	 *
++	 *	[irqN]----> [gpio-bank (n)]
++	 */
++
++	if (!of_irq_to_resource(np, 0, &irq_res)) {
++		gpio_irq = irq_res.start;
++		irq_set_chained_handler(gpio_irq, st_gpio_irq_handler);
++		irq_set_handler_data(gpio_irq, bank);
++	}
++
++	if (info->irqmux_base > 0 || gpio_irq > 0) {
++		/* Setup IRQ domain */
++		bank->domain  = irq_domain_add_linear(np,
++						ST_GPIO_PINS_PER_BANK,
++						&st_gpio_irq_ops, bank);
++		if (!bank->domain) {
++			dev_err(dev, "Failed to add irq domain for %s\n",
++				np->full_name);
++		} else  {
++			for (i = 0; i < ST_GPIO_PINS_PER_BANK; i++) {
++				if (irq_create_mapping(bank->domain, i) < 0)
++					dev_err(dev,
++						"Failed to map IRQ %i\n", i);
++			}
++		}
++
++	} else {
++		dev_info(dev, "No IRQ support for %s bank\n", np->full_name);
++	}
++
+ 	return 0;
+ }
  
-@@ -1392,6 +1503,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
- 	bank->gpio_chip.base = bank_num * ST_GPIO_PINS_PER_BANK;
- 	bank->gpio_chip.ngpio = ST_GPIO_PINS_PER_BANK;
- 	bank->gpio_chip.of_node = np;
-+	spin_lock_init(&bank->lock);
+@@ -1276,6 +1480,8 @@ static int st_pctl_probe_dt(struct platform_device *pdev,
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *child;
+ 	int grp_index = 0;
++	int irq = 0;
++	struct resource *res;
  
- 	of_property_read_string(np, "st,bank-name", &range->name);
- 	bank->gpio_chip.label = range->name;
+ 	st_pctl_dt_child_count(info, np);
+ 	if (!info->nbanks) {
+@@ -1306,6 +1512,21 @@ static int st_pctl_probe_dt(struct platform_device *pdev,
+ 	}
+ 	info->data = of_match_node(st_pctl_of_match, np)->data;
+ 
++	irq = platform_get_irq(pdev, 0);
++
++	if (irq > 0) {
++		res = platform_get_resource_byname(pdev,
++					IORESOURCE_MEM, "irqmux");
++		info->irqmux_base = devm_ioremap_resource(&pdev->dev, res);
++
++		if (IS_ERR(info->irqmux_base))
++			return PTR_ERR(info->irqmux_base);
++
++		irq_set_chained_handler(irq, st_gpio_irqmux_handler);
++		irq_set_handler_data(irq, info);
++
++	}
++
+ 	pctl_desc->npins = info->nbanks * ST_GPIO_PINS_PER_BANK;
+ 	pdesc =	devm_kzalloc(&pdev->dev,
+ 			sizeof(*pdesc) * pctl_desc->npins, GFP_KERNEL);
 -- 
 1.7.6.5
