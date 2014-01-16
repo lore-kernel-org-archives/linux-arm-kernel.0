@@ -1,67 +1,81 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Thu, 16 Jan 2014 11:35:29 -0700
-Subject: [PATCH] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to
- enforce this ACPI mode
-In-Reply-To: <201401161155.27592.arnd@arndb.de>
-References: <1389731822-21336-1-git-send-email-al.stone@linaro.org>
- <15081767.3kxW799CSQ@wuerfel> <52D7414C.7080206@linaro.org>
- <201401161155.27592.arnd@arndb.de>
-Message-ID: <52D82671.6000200@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 16 Jan 2014 12:39:58 -0600
+Subject: Multiple CCR definitions (was: Re: mmc: omap_hsmmc: use the
+ generic config for omap2plus devices)
+In-Reply-To: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
+References: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
+Message-ID: <CAGo_u6or57HEqRQjSjUXFpRNiFNbJyRYrsPX19Gf97J-sg4iHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2014 03:55 AM, Arnd Bergmann wrote:
-> On Thursday 16 January 2014, Al Stone wrote:
->> On 01/14/2014 02:26 PM, Arnd Bergmann wrote:
->>> On Tuesday 14 January 2014 13:37:02 al.stone at linaro.org wrote:
->>>> +config ACPI_REDUCED_HARDWARE_ONLY
->>>> +       bool "Hardware-reduced ACPI support only"
->>>> +       def_bool n
->>>> +       depends on ACPI && EXPERT
->>>
->>> I think this will cause a Kconfig warning if you try to select this
->>> on ARM64 without turning on EXPERT as well.
->>>
->>> It should be ok if you express it as
->>>
->>> config ACPI_REDUCED_HARDWARE_ONLY
->>>          bool "Hardware-reduced ACPI support only" if EXPERT
->>>          def_bool n
->>>          depends on ACPI
->>>
->>>
->>>        Arnd
->>>
++linux-omap as well.
+
+On Thu, Jan 16, 2014 at 7:07 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Tue, Sep 10, 2013 at 11:05 PM, Linux Kernel Mailing List
+> <linux-kernel@vger.kernel.org> wrote:
+>>     mmc: omap_hsmmc: use the generic config for omap2plus devices
 >>
->> I am very puzzled.  I went back and re-did my configs from
->> before, tried a few new ones, and tried with both expressions
->> above, but I could not get a Kconfig warning.  Do you have an
->> example .config that shows the warning?
+>>     OMAP's hs_mmc driver is used for MMC controller operation on many
+>>     omap2plus SoCs (OMAP2430, OMAP3, 4, 5 and AM335x).
 >>
+>>     Considering that the device tree entries are already present for these,
+>>     allow the driver to be built using the config ARCH_OMAP2PLUS rather
+>>     than individually adding a config for each SoC to enable the
+>>     support.
+>>
+>>     Use COMPILE_TEST to enable the build for other platforms.
+>>
+>>     Signed-off-by: Amarinder Bindra <a-bindra@ti.com>
+>>     Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>     Cc: Nishanth Menon <nm@ti.com>
+>>     Acked-by: Felipe Balbi <balbi@ti.com>
+>>     Acked-by: Balaji T K <balajitk@ti.com>
+>>     Signed-off-by: Chris Ball <cjb@laptop.org>
+>> ---
+>>  drivers/mmc/host/Kconfig |    6 +++---
+>>  1 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>> index 84102bc..b8ce939 100644
+>> --- a/drivers/mmc/host/Kconfig
+>> +++ b/drivers/mmc/host/Kconfig
+>> @@ -284,11 +284,11 @@ config MMC_OMAP
+>>
+>>  config MMC_OMAP_HS
+>>         tristate "TI OMAP High Speed Multimedia Card Interface support"
+>> -       depends on SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4
+>> +       depends on ARCH_OMAP2PLUS || COMPILE_TEST
 >
-> I don't have a source tree that allows turning on ACPI on arm64
-> to easily test this. To clarify: the warning will only happen if
-> you also add this piece to arch/arm64/Kconfig:
+> sh-allmodconfig (http://kisskb.ellerman.id.au/kisskb/buildresult/10477672/):
+> include/linux/omap-dma.h:171:8: error: expected identifier before
+> numeric constant
+> make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
 >
-> 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> It fails because sh #defines "CCR", which is one of the enum values in
+> include/linux/omap-dma.h.
 >
-> 	Arnd
+> I expect a similar failure on blackfin, which also has #define CCR.
 >
-
-Right; I assumed I had to have that SELECT.  My apologies -- I
-still cannot reproduce the warning.  I'll resubmit the patch
-incorporating the suggestion, though, since the result ends up
-being the same -- you must have ACPI and EXPERT selected in order
-to enable ACPI_REDUCED_HARDWARE_ONLY.
-
-Thanks.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+> Possible solutions:
+>   1. Rename CCR in sh/bfin to e.g. SH_CCR resp. BF_CCR.
+>   2. Use "depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM)
+>   3. Stop using include/linux/omap-dma.h, as it says:
+>
+>      *  Legacy OMAP DMA handling defines and functions
+>      *
+>      *  NOTE: Do not use these any longer.
+>      *
+>      *  Use the generic dmaengine functions as defined in
+>      *  include/linux/dmaengine.h.
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
