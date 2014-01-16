@@ -1,284 +1,493 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 16 Jan 2014 10:15:25 +0530
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <CAL_Jsq+TrRgGWT+Hd-q_A6f+4rOb_Nm3QVm04_enVToSsvuWgA@mail.gmail.com>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <CAL_Jsq+TrRgGWT+Hd-q_A6f+4rOb_Nm3QVm04_enVToSsvuWgA@mail.gmail.com>
-Message-ID: <52D763E5.4050408@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 16 Jan 2014 10:47:06 +0530
+Subject: [PATCH] ARM: sunxi: Add driver for sunxi usb phy
+In-Reply-To: <52D6ADEA.1050900@redhat.com>
+References: <1389740305-6993-1-git-send-email-hdegoede@redhat.com>
+ <52D6A27A.4090600@ti.com> <52D6ADEA.1050900@redhat.com>
+Message-ID: <52D76B52.4050008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 09:11 PM, Rob Herring wrote:
-> On Wed, Jan 15, 2014 at 7:07 AM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
->> Now arch timer is registerd using generic sched timer, delay
->> timer registration is the only part remaining in arch ports.
->> Move this part to drivers clocksource and remove arch timer
->> from arch ports.
->>
->> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
->> ---
->>   arch/arm/include/asm/arch_timer.h    |    1 -
->>   arch/arm/kernel/Makefile             |    1 -
->>   arch/arm/kernel/arch_timer.c         |   44 ----------------------------------
->>   arch/arm64/include/asm/arch_timer.h  |    5 ----
->>   arch/arm64/include/asm/delay.h       |   32 ++++++++++++++++++++++++
->>   arch/arm64/include/asm/timex.h       |    5 +--
->>   arch/arm64/kernel/time.c             |    9 -------
->>   arch/arm64/lib/delay.c               |   26 ++++++++++++++++++++
->>   drivers/clocksource/arm_arch_timer.c |   12 ++++++++-
->>   9 files changed, 71 insertions(+), 64 deletions(-)
->>   delete mode 100644 arch/arm/kernel/arch_timer.c
->>   create mode 100644 arch/arm64/include/asm/delay.h
+Hi,
 
-Thanks for the comments Rob!! I was planning to do that in later patch. 
-Is that fine?
+On Wednesday 15 January 2014 09:18 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On 01/15/2014 04:00 PM, Kishon Vijay Abraham I wrote:
+>> On Wednesday 15 January 2014 04:28 AM, Hans de Goede wrote:
+>>> The Allwinner A1x / A2x SoCs have 2 or 3 usb phys which are all accessed
+>>> through a single set of registers. Besides this there are also some other
+>>> phy related bits which need poking, which are per phy, but shared between the
+>>> ohci and ehci controllers, so these are also controlled from this new phy
+>>> driver.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>>   .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  26 ++
+>>>   drivers/phy/Kconfig                                |  11 +
+>>>   drivers/phy/Makefile                               |   1 +
+>>>   drivers/phy/phy-sun4i-usb.c                        | 318
+>>> +++++++++++++++++++++
+>>>   4 files changed, 356 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>>>   create mode 100644 drivers/phy/phy-sun4i-usb.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>>> b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>>> new file mode 100644
+>>> index 0000000..6c54b3b
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>>> @@ -0,0 +1,26 @@
+>>> +Allwinner sun4i USB PHY
+>>> +-----------------------
+>>> +
+>>> +Required properties:
+>>> +- compatible : should be one of "allwinner,sun4i-a10-usb-phy",
+>>> +  "allwinner,sun5i-a13-usb-phy" or "allwinner,sun7i-a20-usb-phy"
+>>> +- reg : 2 or 3 register offset + length pairs, 1 phy base reg pair +
+>>> +  1 pair for the pmu-irq register of each hcd
+>>> +- #phy-cells : from the generic phy bindings, must be 1
+>>> +
+>>> +Optional properties:
+>>> +- clocks : phandle + clock specifier for the phy clock
+>>> +- clock-names : "usb_phy"
+>>> +- resets : a list of phandle + reset specifier pairs
+>>> +- reset-names : "usb0_reset", "usb1_reset", and / or "usb2_reset"
+>>> +
+>>> +Example:
+>>> +    usbphy: phy at 0x01c13400 {
+>>> +        #phy-cells = <1>;
+>>> +        compatible = "allwinner,sun4i-a10-usb-phy";
+>>> +        reg = <0x01c13400 0x10 0x01c14800 0x4 0x01c1c800 0x4>;
+>>> +        clocks = <&usb_clk 8>;
+>>> +        clock-names = "usb_phy";
+>>> +        resets = <&usb_clk 1>, <&usb_clk 2>;
+>>> +        reset-names = "usb1_reset", "usb2_reset";
+>>> +    };
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index 330ef2d..dcce4cf 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -51,4 +51,15 @@ config PHY_EXYNOS_DP_VIDEO
+>>>       help
+>>>         Support for Display Port PHY found on Samsung EXYNOS SoCs.
+>>>
+>>> +config PHY_SUN4I_USB
+>>> +    tristate "Allwinner sunxi SoC USB PHY driver"
+>>> +    depends on ARCH_SUNXI
+>>> +    select GENERIC_PHY
+>>> +    help
+>>> +      Enable this to support the transceiver that is part of Allwinner
+>>> +      sunxi SoCs.
+>>> +
+>>> +      This driver controls the entire USB PHY block, both the USB OTG
+>>> +      parts, as well as the 2 regular USB 2 host PHYs.
+>>> +
+>>>   endmenu
+>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>>> index d0caae9..e9e82f0 100644
+>>> --- a/drivers/phy/Makefile
+>>> +++ b/drivers/phy/Makefile
+>>> @@ -7,3 +7,4 @@ obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)    += phy-exynos-dp-video.o
+>>>   obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)    += phy-exynos-mipi-video.o
+>>>   obj-$(CONFIG_OMAP_USB2)            += phy-omap-usb2.o
+>>>   obj-$(CONFIG_TWL4030_USB)        += phy-twl4030-usb.o
+>>> +obj-$(CONFIG_PHY_SUN4I_USB)        += phy-sun4i-usb.o
+>>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>>> new file mode 100644
+>>> index 0000000..a15ecc1
+>>> --- /dev/null
+>>> +++ b/drivers/phy/phy-sun4i-usb.c
+>>> @@ -0,0 +1,318 @@
+>>> +/*
+>>> + * Allwinner sun4i USB phy driver
+>>> + *
+>>> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
+>>> + *
+>>> + * Based on code from
+>>> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+>>> + *
+>>> + * Modelled after: Samsung S5P/EXYNOS SoC series MIPI CSIS/DSIM DPHY driver
+>>> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+>>> + * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License as published by
+>>> + * the Free Software Foundation; either version 2 of the License, or
+>>> + * (at your option) any later version.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/mutex.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/phy/phy.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/regulator/consumer.h>
+>>> +#include <linux/reset.h>
+>>> +
+>>> +#define REG_ISCR            0x00
+>>> +#define REG_PHYCTL            0x04
+>>> +#define REG_PHYBIST            0x08
+>>> +#define REG_PHYTUNE            0x0c
+>>> +
+>>> +#define SUNXI_AHB_ICHR8_EN        BIT(10)
+>>> +#define SUNXI_AHB_INCR4_BURST_EN    BIT(9)
+>>> +#define SUNXI_AHB_INCRX_ALIGN_EN    BIT(8)
+>>> +#define SUNXI_ULPI_BYPASS_EN        BIT(0)
+>>> +
+>>> +#define MAX_PHYS            3
+>>> +
+>>> +struct sun4i_usb_phy_data {
+>>> +    struct clk *clk;
+>>> +    void __iomem *base;
+>>> +    struct mutex mutex;
+>>> +    int num_phys;
+>>> +    u32 disc_thresh;
+>>> +    struct sun4i_usb_phy {
+>>> +        struct phy *phy;
+>>> +        void __iomem *pmu_irq;
+>>
+>> 'pmu_irq' is misleading. Can you think of a better name?
+> 
+> The pmu_irq name comes from android sources, but I agree it is no good,
+> how about just pmu ?
 
->> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
->> index 0704e0c..61ad692 100644
->> --- a/arch/arm/include/asm/arch_timer.h
->> +++ b/arch/arm/include/asm/arch_timer.h
->> @@ -10,7 +10,6 @@
->>   #include <clocksource/arm_arch_timer.h>
+yeah.
+> 
+>> Btw Kamil uses syscon interface to set pmu bits. Is it applicable here also?
+> 
+> Both Kamil and syscon are now to me, do you have a pointer to example sources
+> for this?
+
+Maybe have a look at Kamil's patches [1]?
+
+[1] -> https://lkml.org/lkml/2013/12/20/216
+> 
+>>> +        struct regulator *vbus;
+>>> +        struct reset_control *reset;
+>>> +        int index;
+>>> +    } phys[MAX_PHYS];
+>>> +};
+>>> +
+>>> +#define to_sun4i_usb_phy_data(phy) \
+>>> +    container_of((phy), struct sun4i_usb_phy_data, phys[(phy)->index])
+>>> +
+>>> +static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>>> +                int len)
+>>> +{
+>>> +    struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+>>> +    u32 temp, usbc_bit = BIT(phy->index * 2);
+>>> +    int i;
+>>> +
+>>> +    mutex_lock(&phy_data->mutex);
+>>> +
+>>> +    for (i = 0; i < len; i++) {
+>>> +        temp = readl(phy_data->base + REG_PHYCTL);
+>>> +
+>>> +        /* clear the address portion */
+>>> +        temp &= ~(0xff << 8);
+>>> +
+>>> +        /* set the address */
+>>> +        temp |= ((addr + i) << 8);
+>>> +        writel(temp, phy_data->base + REG_PHYCTL);
+>>> +
+>>> +        /* set the data bit and clear usbc bit*/
+>>> +        temp = readb(phy_data->base + REG_PHYCTL);
+>>> +        if (data & 0x1)
+>>> +            temp |= BIT(7);
+>>> +        else
+>>> +            temp &= ~BIT(7);
+>>> +        temp &= ~usbc_bit;
+>>> +        writeb(temp, phy_data->base + REG_PHYCTL);
+>>> +
+>>> +        /* pulse usbc_bit */
+>>> +        temp = readb(phy_data->base + REG_PHYCTL);
+>>> +        temp |= usbc_bit;
+>>> +        writeb(temp, phy_data->base + REG_PHYCTL);
+>>> +
+>>> +        temp = readb(phy_data->base + REG_PHYCTL);
+>>> +        temp &= ~usbc_bit;
+>>> +        writeb(temp, phy_data->base + REG_PHYCTL);
+>>> +
+>>> +        data >>= 1;
+>>> +    }
+>>> +    mutex_unlock(&phy_data->mutex);
+>>> +}
+>>> +
+>>> +static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+>>> +{
+>>> +    u32 bits, reg_value;
+>>> +
+>>> +    if (!phy->pmu_irq)
+>>> +        return;
+>>> +
+>>> +    bits = SUNXI_AHB_ICHR8_EN | SUNXI_AHB_INCR4_BURST_EN |
+>>> +        SUNXI_AHB_INCRX_ALIGN_EN | SUNXI_ULPI_BYPASS_EN;
+>>> +
+>>> +    reg_value = readl(phy->pmu_irq);
+>>> +
+>>> +    if (enable)
+>>> +        reg_value |= bits;
+>>> +    else
+>>> +        reg_value &= ~bits;
+>>> +
+>>> +    writel(reg_value, phy->pmu_irq);
+>>> +}
+>>> +
+>>> +static int sun4i_usb_phy_init(struct phy *_phy)
+>>> +{
+>>> +    struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>> +    struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>> +    int ret;
+>>> +
+>>> +    ret = clk_prepare_enable(data->clk);
+>>> +    if (ret)
+>>> +        return ret;
+>>> +
+>>> +    ret = reset_control_deassert(phy->reset);
+>>> +    if (ret) {
+>>> +        clk_disable_unprepare(data->clk);
+>>> +        return ret;
+>>> +    }
+>>> +
+>>> +    /* Adjust PHY's magnitude and rate */
+>>> +    sun4i_usb_phy_write(phy, 0x20, 0x14, 5);
 >>
->>   #ifdef CONFIG_ARM_ARCH_TIMER
->> -int arch_timer_arch_init(void);
+>> No magic values. Use macros instead.
+> 
+> We don't have docs, these values come from the Android code (and the comment
+> above has been translated from Chinese). I can make up some random
+> macros for this, but seems counter-productive, it seems best to just leave
+> this as magic until the day we actually have documentation and thus can use
+> defines with the proper register names, etc.
+
+Al-right.
+> 
+>>> +
+>>> +    /* Disconnect threshold adjustment */
+>>> +    sun4i_usb_phy_write(phy, 0x2a, data->disc_thresh, 2);
+>>> +
+>>> +    sun4i_usb_phy_passby(phy, 1);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static int sun4i_usb_phy_exit(struct phy *_phy)
+>>> +{
+>>> +    struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>> +    struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>> +
+>>> +    sun4i_usb_phy_passby(phy, 0);
+>>> +    reset_control_assert(phy->reset);
+>>> +    clk_disable_unprepare(data->clk);
 >>
->>   /*
->>    * These register accessors are marked inline so the compiler can
->> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
->> index a30fc9b..6b51cf9 100644
->> --- a/arch/arm/kernel/Makefile
->> +++ b/arch/arm/kernel/Makefile
->> @@ -45,7 +45,6 @@ obj-$(CONFIG_SMP)             += smp_tlb.o
->>   endif
->>   obj-$(CONFIG_HAVE_ARM_SCU)     += smp_scu.o
->>   obj-$(CONFIG_HAVE_ARM_TWD)     += smp_twd.o
->> -obj-$(CONFIG_ARM_ARCH_TIMER)   += arch_timer.o
->>   obj-$(CONFIG_DYNAMIC_FTRACE)   += ftrace.o insn.o
->>   obj-$(CONFIG_FUNCTION_GRAPH_TRACER)    += ftrace.o insn.o
->>   obj-$(CONFIG_JUMP_LABEL)       += jump_label.o insn.o patch.o
->> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
->> deleted file mode 100644
->> index 1791f12..0000000
->> --- a/arch/arm/kernel/arch_timer.c
->> +++ /dev/null
->> @@ -1,44 +0,0 @@
->> -/*
->> - *  linux/arch/arm/kernel/arch_timer.c
->> - *
->> - *  Copyright (C) 2011 ARM Ltd.
->> - *  All Rights Reserved
->> - *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License version 2 as
->> - * published by the Free Software Foundation.
->> - */
->> -#include <linux/init.h>
->> -#include <linux/types.h>
->> -#include <linux/errno.h>
->> -
->> -#include <asm/delay.h>
->> -
->> -#include <clocksource/arm_arch_timer.h>
->> -
->> -static unsigned long arch_timer_read_counter_long(void)
->> -{
->> -       return arch_timer_read_counter();
->> -}
->> -
->> -static struct delay_timer arch_delay_timer;
->> -
->> -static void __init arch_timer_delay_timer_register(void)
->> -{
->> -       /* Use the architected timer for the delay loop. */
->> -       arch_delay_timer.read_current_timer = arch_timer_read_counter_long;
->> -       arch_delay_timer.freq = arch_timer_get_rate();
->> -       register_current_timer_delay(&arch_delay_timer);
->> -}
->> -
->> -int __init arch_timer_arch_init(void)
->> -{
->> -        u32 arch_timer_rate = arch_timer_get_rate();
->> -
->> -       if (arch_timer_rate == 0)
->> -               return -ENXIO;
->> -
->> -       arch_timer_delay_timer_register();
->> -
->> -       return 0;
->> -}
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index 9400596..48e06bd 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -145,9 +145,4 @@ static inline u64 arch_counter_get_cntvct(void)
->>          return cval;
->>   }
+>> Actually PHY API's can be called in interrupt context, in that case
+>> clk_disable_unprepare can't be used.
+> 
+> Erm, phy_init and phy_exit from drivers/phy/phy-core.c use mutex_lock,
+> so they can never be called from interrupt context.
+
+damn.. sorry :-s
+> 
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static int sun4i_usb_phy_power_on(struct phy *_phy)
+>>> +{
+>>> +    struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>> +    int ret;
+>>> +
+>>> +    if (phy->vbus) {
+>>> +        ret = regulator_enable(phy->vbus);
+>>> +        if (ret)
+>>> +            return ret;
+>>> +
+>>> +    }
+>>> +
+>>> +    return 0;
+>>> +}
 >>
->> -static inline int arch_timer_arch_init(void)
->> -{
->> -       return 0;
->> -}
->> -
->>   #endif
->> diff --git a/arch/arm64/include/asm/delay.h b/arch/arm64/include/asm/delay.h
->> new file mode 100644
->> index 0000000..ea90d99
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/delay.h
->> @@ -0,0 +1,32 @@
->> +
->> +/*
->> + * Copyright (c) 2014, NVIDIA Corporation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __ASM_ARM64_DELAY_H
->> +#define __ASM_ARM64_DELAY_H
->> +
->> +#include <asm-generic/delay.h>
->> +
->> +struct delay_timer {
->> +       unsigned long (*read_current_timer)(void);
->> +       unsigned long freq;
->> +};
->> +
->> +/* Delay-loop timer registration. */
->> +#define ARCH_HAS_READ_CURRENT_TIMER
->> +extern void register_current_timer_delay(const struct delay_timer *timer);
-> Can't all but the define be moved to a common location?
->
->> +
->> +#endif /* defined(_ARM64_DELAY_H) */
->> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
->> index 81a076e..ca4bdfb 100644
->> --- a/arch/arm64/include/asm/timex.h
->> +++ b/arch/arm64/include/asm/timex.h
->> @@ -16,13 +16,12 @@
->>   #ifndef __ASM_TIMEX_H
->>   #define __ASM_TIMEX_H
+>> This can simply be
+>> int ret = 0;
+>> if (phy->vbus)
+>>     ret = regulator_enable(phy->vbus);
+>> return ret;
+> 
+> Agreed, will fix as soon as its clear what to do with the other bits.
+> 
+>>> +
+>>> +static int sun4i_usb_phy_power_off(struct phy *_phy)
+>>> +{
+>>> +    struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>> +
+>>> +    if (phy->vbus)
+>>> +        regulator_disable(phy->vbus);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static struct phy_ops sun4i_usb_phy_ops = {
+>>> +    .init        = sun4i_usb_phy_init,
+>>> +    .exit        = sun4i_usb_phy_exit,
+>>> +    .power_on    = sun4i_usb_phy_power_on,
+>>> +    .power_off    = sun4i_usb_phy_power_off,
+>>> +    .owner        = THIS_MODULE,
+>>> +};
+>>> +
+>>> +static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>>> +                    struct of_phandle_args *args)
+>>> +{
+>>> +    struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+>>> +
+>>> +    if (WARN_ON(args->args[0] == 0 || args->args[0] >= data->num_phys))
+>>> +        return ERR_PTR(-ENODEV);
+>>> +
+>>> +    return data->phys[args->args[0]].phy;
+>>> +}
+>>> +
+>>> +static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>> +{
+>>> +    struct sun4i_usb_phy_data *data;
+>>> +    struct device *dev = &pdev->dev;
+>>> +    struct device_node *np = dev->of_node;
+>>> +    void __iomem *pmu_irq = NULL;
+>>> +    struct phy_provider *phy_provider;
+>>> +    struct reset_control *reset;
+>>> +    struct regulator *vbus;
+>>> +    struct phy *phy;
+>>> +    char name[16];
+>>> +    int i;
+>>> +
+>>> +    data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>>> +    if (!data)
+>>> +        return -ENOMEM;
+>>> +
+>>> +    mutex_init(&data->mutex);
+>>> +    if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy")) {
+>>> +        data->num_phys = 3;
+>>> +        data->disc_thresh = 3;
+>>> +    } else if (of_device_is_compatible(np,
+>>> +                    "allwinner,sun5i-a13-usb-phy")) {
+>>> +        data->num_phys = 2;
+>>> +        data->disc_thresh = 2;
+>>> +    } else { /* allwinner,sun7i-a20-usb-phy */
+>>> +        data->num_phys = 3;
+>>> +        data->disc_thresh = 2;
+>>> +    }
+>>> +
+>>> +    data->clk = devm_clk_get(dev, "usb_phy");
+>>> +    if (IS_ERR(data->clk)) {
+>>> +        dev_err(dev, "could not get usb_phy clock\n");
+>>> +        return PTR_ERR(data->clk);
+>>> +    }
+>>> +
+>>> +    /* Skip 0, 0 is the phy for otg which is not yet supported. */
+>>> +    for (i = 1; i < data->num_phys; i++) {
+>>> +        snprintf(name, sizeof(name), "usb%d_vbus", i);
+>>> +        vbus = devm_regulator_get_optional(dev, name);
+>>> +        if (IS_ERR(vbus)) {
+>>> +            if (PTR_ERR(vbus) == -EPROBE_DEFER)
+>>> +                return -EPROBE_DEFER;
+>>> +            vbus = NULL;
+>>> +        }
+>>> +
+>>> +        snprintf(name, sizeof(name), "usb%d_reset", i);
+>>> +        reset = devm_reset_control_get(dev, name);
+>>> +        if (IS_ERR(phy)) {
+>>> +            dev_err(dev, "failed to get reset %s\n", name);
+>>> +            return PTR_ERR(phy);
+>>> +        }
+>>> +
+>>> +        if (i) { /* No pmu_irq for usbc0 */
+>>> +            pmu_irq = devm_ioremap_resource(dev,
+>>> +                  platform_get_resource(pdev, IORESOURCE_MEM, i));
+>>> +            if (IS_ERR(pmu_irq))
+>>> +                return PTR_ERR(pmu_irq);
+>>> +        }
+>>> +
+>>> +        phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
+>>> +        if (IS_ERR(phy)) {
+>>> +            dev_err(dev, "failed to create PHY %d\n", i);
+>>> +            return PTR_ERR(phy);
+>>> +        }
+>>> +
+>>> +        data->phys[i].phy = phy;
+>>> +        data->phys[i].pmu_irq = pmu_irq;
+>>> +        data->phys[i].vbus = vbus;
+>>> +        data->phys[i].reset = reset;
+>>> +        data->phys[i].index = i;
+>>> +        phy_set_drvdata(phy, &data->phys[i]);
+>>> +    }
+>>> +
+>>> +    data->base = devm_ioremap_resource(dev,
+>>> +            platform_get_resource(pdev, IORESOURCE_MEM, 0));
+>>> +    if (IS_ERR(data->base))
+>>> +        return PTR_ERR(data->base);
+>>> +
+>>> +    dev_set_drvdata(dev, data);
+>>> +    phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
+>>> +    if (IS_ERR(phy_provider))
+>>> +        return PTR_ERR(phy_provider);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>>> +    { .compatible = "allwinner,sun4i-a10-usb-phy" },
+>>> +    { .compatible = "allwinner,sun5i-a13-usb-phy" },
+>>> +    { .compatible = "allwinner,sun7i-a20-usb-phy" },
+>>> +    { },
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+>>> +
+>>> +static struct platform_driver sun4i_usb_phy_driver = {
+>>> +    .probe    = sun4i_usb_phy_probe,
+>>> +    .driver = {
+>>> +        .of_match_table    = sun4i_usb_phy_of_match,
+>>> +        .name  = "sun4i-usb-phy",
+>>> +        .owner = THIS_MODULE,
+>>> +    }
+>>> +};
+>>> +module_platform_driver(sun4i_usb_phy_driver);
+>>> +
+>>> +MODULE_DESCRIPTION("Allwinner sun4i USB phy driver");
+>>> +MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
+>>> +MODULE_LICENSE("GPL");
 >>
->> -#include <asm/arch_timer.h>
->> -
->>   /*
->>    * Use the current timer as a cycle counter since this is what we use for
->>    * the delay loop.
->>    */
->> -#define get_cycles()   arch_counter_get_cntvct()
->> +typedef unsigned long cycles_t;
->> +#define get_cycles()   ({ cycles_t c; read_current_timer(&c) ? 0 : c; })
-> Could be in a common location conditional on ARCH_HAS_READ_CURRENT_TIMER.
->
->>   #include <asm-generic/timex.h>
->>
->> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->> index 29c39d5..213d1a3 100644
->> --- a/arch/arm64/kernel/time.c
->> +++ b/arch/arm64/kernel/time.c
->> @@ -63,14 +63,5 @@ EXPORT_SYMBOL(profile_pc);
->>
->>   void __init time_init(void)
->>   {
->> -       u32 arch_timer_rate;
->> -
->>          clocksource_of_init();
->> -
->> -       arch_timer_rate = arch_timer_get_rate();
->> -       if (!arch_timer_rate)
->> -               panic("Unable to initialise architected timer.\n");
->> -
->> -       /* Calibrate the delay loop directly */
->> -       lpj_fine = arch_timer_rate / HZ;
->>   }
->> diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
->> index dad4ec9..cde0a28 100644
->> --- a/arch/arm64/lib/delay.c
->> +++ b/arch/arm64/lib/delay.c
->> @@ -24,6 +24,19 @@
->>   #include <linux/module.h>
->>   #include <linux/timex.h>
->>
->> +static const struct delay_timer *delay_timer;
->> +static bool delay_calibrated;
->> +
->> +int read_current_timer(unsigned long *timer_val)
->> +{
->> +       if (!delay_timer)
->> +               return -ENXIO;
->> +
->> +       *timer_val = delay_timer->read_current_timer();
->> +       return 0;
->> +}
->> +EXPORT_SYMBOL(read_current_timer);
->> +
-> This too could be common.
->
->>   void __delay(unsigned long cycles)
->>   {
->>          cycles_t start = get_cycles();
->> @@ -53,3 +66,16 @@ void __ndelay(unsigned long nsecs)
->>          __const_udelay(nsecs * 0x5UL); /* 2**32 / 1000000000 (rounded up) */
->>   }
->>   EXPORT_SYMBOL(__ndelay);
->> +
->> +void register_current_timer_delay(const struct delay_timer *timer)
->> +{
->> +       if (!delay_calibrated) {
->> +               pr_info("Switching to timer-based delay loop\n");
->> +               delay_timer                     = timer;
->> +               lpj_fine                        = timer->freq / HZ;
->> +
->> +               delay_calibrated                = true;
->> +       } else {
->> +               pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
->> +       }
->> +}
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 57e823c..8ee9918 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -422,6 +422,16 @@ struct timecounter *arch_timer_get_timecounter(void)
->>          return &timecounter;
->>   }
->>
->> +static struct delay_timer arch_delay_timer;
->> +
->> +static void __init arch_delay_timer_register(void)
->> +{
->> +       /* Use the architected timer for the delay loop. */
->> +       arch_delay_timer.read_current_timer = arch_timer_read_counter();
->> +       arch_delay_timer.freq = arch_timer_rate;
->> +       register_current_timer_delay(&arch_delay_timer);
->> +}
->> +
->>   static void __init arch_counter_register(unsigned type)
->>   {
->>          u64 start_count;
->> @@ -630,7 +640,7 @@ static void __init arch_timer_common_init(void)
->>
->>          arch_timer_banner(arch_timers_present);
->>          arch_counter_register(arch_timers_present);
->> -       arch_timer_arch_init();
->> +       arch_delay_timer_register();
->>   }
->>
->>   static void __init arch_timer_init(struct device_node *np)
->> --
->> 1.7.4.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> GPL v2?
+> 
+> It is GPL v2 or later, and using just "GPL" is the norm indeed
+> lately I've seen some driver use "GPL xxxxx" but the vast majority
+> of the drivers in the kernel has just "GPL".
+
+The header of this file states 'either version 2 of the License, or
+(at your option) any later version', so it's better to add GPL v2.
+> 
+> Thanks for the review!
+> 
+> Regards,
+> 
+> Hans
+> 
+> 
+> p.s.
+> 
+> A question about my 2 phy-core patches, as well as this one once the
+> review comments are addressed. How do I get phy patches upstream, will
+> you take care of this, or should I send them somewhere else ?
+
+Yeah, I'll pick them up once -rc1 is tagged.
+
+Cheers
+Kishon
