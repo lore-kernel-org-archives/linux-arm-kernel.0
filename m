@@ -1,105 +1,74 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 15 Jan 2014 16:07:58 -0800
-Subject: [RFC PATCH net-next] etherdevice: Use ether_addr_copy to copy
- an Ethernet address
-In-Reply-To: <20140115.153951.743060257410154565.davem@davemloft.net>
-References: <1389741527.24849.68.camel@joe-AO722>
- <20140115.153951.743060257410154565.davem@davemloft.net>
-Message-ID: <1389830878.14001.39.camel@joe-AO722>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 15 Jan 2014 16:11:03 -0800
+Subject: [PATCH v7 2/2] ehci-platform: Add support for clks and phy passed
+ through devicetree
+In-Reply-To: <1389813883-567-3-git-send-email-hdegoede@redhat.com>
+References: <1389813883-567-1-git-send-email-hdegoede@redhat.com>
+ <1389813883-567-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGVrzcY1koEX=9pJHMOZ4rvKn49aAEzFvvqvsS74N+nDRW2L+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-01-15 at 15:39 -0800, David Miller wrote:
-> From: Joe Perches <joe@perches.com>
-> Date: Tue, 14 Jan 2014 15:18:47 -0800
-> 
-> > Some systems can use the normally known u16 alignment of
-> > Ethernet addresses to save some code/text bytes and cycles.
-> > 
-> > This does not change currently emitted code on x86 by gcc 4.8.
-> > 
-> > Signed-off-by: Joe Perches <joe@perches.com>
-> 
-> This looks fine, in fact I'll apply it.
+2014/1/15 Hans de Goede <hdegoede@redhat.com>:
+> Currently ehci-platform is only used in combination with devicetree when used
+> with some Via socs. By extending it to (optionally) get clks and a phy from
+> devicetree, and enabling / disabling those on power_on / off, it can be used
+> more generically. Specifically after this commit it can be used for the
+> ehci controller on Allwinner sunxi SoCs.
+>
+> Since ehci-platform is intended to handle any generic enough non pci ehci
+> device, add a "usb-ehci" compatibility string.
+>
+> There already is a usb-ehci device-tree bindings document, update this
+> with clks and phy bindings info.
+>
+> Although actually quite generic so far the via,vt8500 compatibilty string
+> had its own bindings document. Somehow we even ended up with 2 of them. Since
+> these provide no extra information over the generic usb-ehci documentation,
+> this patch removes them.
+>
+> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
+> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
+> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
+> 2 drivers claiming the same compatibility string getting build on ppc.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  25 +++-
+>  .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
+>  .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
+>  drivers/usb/host/Kconfig                           |   1 +
+>  drivers/usb/host/ehci-platform.c                   | 149 +++++++++++++++++----
+>  5 files changed, 142 insertions(+), 60 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>  delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> index fa18612..fad10f3 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> @@ -7,13 +7,14 @@ Required properties:
+>      (debug-port or other) can be also specified here, but only after
+>      definition of standard EHCI registers.
+>    - interrupts : one EHCI interrupt should be described here.
+> -If device registers are implemented in big endian mode, the device
+> -node should have "big-endian-regs" property.
+> -If controller implementation operates with big endian descriptors,
+> -"big-endian-desc" property should be specified.
+> -If both big endian registers and descriptors are used by the controller
+> -implementation, "big-endian" property can be specified instead of having
+> -both "big-endian-regs" and "big-endian-desc".
+> +
+> +Optional properties:
+> + - big-endian-regs : boolean, set this for hcds with big-endian registers
+> + - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+> + - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
 
-OK, good.
-
-There are a couple thousand memcpy(foo, bar, ETH_ALEN)
-in the kernel tree that could be converted.
-
-Some will have a small performance improvement for
-arm and powerpc.
-
-If you want the ones for net-next net/ now (but not
-for batman-adv, that maybe could use a new function like
-ether_addr_copy_unaligned) here's a changestat.
-
-Otherwise, I'll wait for the next cycle.
-
-(done via coccinelle)
-
- net/8021q/vlan.c                          |  2 +-
- net/8021q/vlan_dev.c                      |  6 ++--
- net/appletalk/aarp.c                      | 10 +++---
- net/atm/lec.c                             |  9 ++---
- net/atm/mpc.c                             |  2 +-
- net/bluetooth/bnep/core.c                 | 19 +++++-----
- net/bluetooth/bnep/netdev.c               | 14 ++++----
- net/bridge/br_device.c                    |  4 +--
- net/bridge/br_fdb.c                       |  4 +--
- net/bridge/br_multicast.c                 |  4 +--
- net/bridge/br_netfilter.c                 |  2 +-
- net/bridge/br_stp_if.c                    | 10 +++---
- net/bridge/netfilter/ebt_among.c          |  2 +-
- net/bridge/netfilter/ebt_dnat.c           |  2 +-
- net/bridge/netfilter/ebt_redirect.c       |  6 ++--
- net/bridge/netfilter/ebt_snat.c           |  2 +-
- net/caif/caif_usb.c                       |  4 +--
- net/core/netpoll.c                        |  4 +--
- net/core/pktgen.c                         |  8 ++---
- net/decnet/dn_dev.c                       |  2 +-
- net/decnet/dn_neigh.c                     |  6 ++--
- net/decnet/dn_route.c                     |  6 ++--
- net/dsa/slave.c                           |  2 +-
- net/ethernet/eth.c                        | 18 +++++-----
- net/hsr/hsr_device.c                      |  8 ++---
- net/hsr/hsr_framereg.c                    | 21 +++++------
- net/hsr/hsr_main.c                        |  4 +--
- net/ipv4/netfilter/ipt_CLUSTERIP.c        |  2 +-
- net/mac80211/agg-rx.c                     | 10 +++---
- net/mac80211/agg-tx.c                     | 18 +++++-----
- net/mac80211/cfg.c                        | 34 +++++++++---------
- net/mac80211/debugfs_netdev.c             | 12 +++----
- net/mac80211/ht.c                         | 16 ++++-----
- net/mac80211/ibss.c                       | 14 ++++----
- net/mac80211/iface.c                      | 27 +++++++-------
- net/mac80211/mesh.c                       | 30 ++++++++--------
- net/mac80211/mesh_hwmp.c                  | 32 ++++++++---------
- net/mac80211/mesh_pathtbl.c               | 20 +++++------
- net/mac80211/mesh_plink.c                 |  6 ++--
- net/mac80211/mesh_ps.c                    |  2 +-
- net/mac80211/mlme.c                       | 32 ++++++++---------
- net/mac80211/rx.c                         | 14 ++++----
- net/mac80211/spectmgmt.c                  |  6 ++--
- net/mac80211/sta_info.c                   |  8 ++---
- net/mac80211/tx.c                         | 60 +++++++++++++++----------------
- net/mac80211/util.c                       | 22 ++++++------
- net/mac80211/wpa.c                        |  4 +--
- net/netfilter/ipset/ip_set_bitmap_ipmac.c |  6 ++--
- net/openvswitch/actions.c                 |  4 +--
- net/openvswitch/flow.c                    | 16 ++++-----
- net/openvswitch/flow_netlink.c            | 14 ++++----
- net/tipc/eth_media.c                      |  2 +-
- net/wireless/core.c                       |  2 +-
- net/wireless/ibss.c                       | 11 +++---
- net/wireless/lib80211_crypt_ccmp.c        |  4 +--
- net/wireless/lib80211_crypt_tkip.c        | 18 +++++-----
- net/wireless/mlme.c                       |  2 +-
- net/wireless/nl80211.c                    |  6 ++--
- net/wireless/scan.c                       |  6 ++--
- net/wireless/sme.c                        | 18 +++++-----
- net/wireless/util.c                       | 42 +++++++++++-----------
- net/wireless/wext-compat.c                |  8 ++---
- net/wireless/wext-sme.c                   |  5 +--
- net/wireless/wext-spy.c                   |  8 ++---
- 64 files changed, 365 insertions(+), 357 deletions(-)
+These properties are specified here in the documentation binding, but
+they are not handled by the ehci-platform driver, is that intentional?
+Fairly quickly people will start adopting the ehci-platform driver on
+DT-aware platforms, so it would be nice to support those 2 (3)
+properties right away?
+-- 
+Florian
