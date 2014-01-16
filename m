@@ -1,231 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 16:39:42 +0100
-Subject: [PATCH] ARM i.MX: remove PWM platform support
-Message-ID: <1389886782-11140-1-git-send-email-s.hauer@pengutronix.de>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Thu, 16 Jan 2014 15:35:45 +0000
+Subject: [PATCH v2 0/4] pinctrl: st: Add interrupt controller support.
+In-Reply-To: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1389711077-20949-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the i.MX pwm driver is devicetree only, remove the platform
-support for this device.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx21.c                |  1 -
- arch/arm/mach-imx/clk-imx25.c                |  8 ----
- arch/arm/mach-imx/clk-imx27.c                |  1 -
- arch/arm/mach-imx/clk-imx51-imx53.c          |  2 -
- arch/arm/mach-imx/devices-imx25.h            |  4 --
- arch/arm/mach-imx/devices-imx51.h            |  4 --
- arch/arm/mach-imx/devices/Kconfig            |  3 --
- arch/arm/mach-imx/devices/Makefile           |  1 -
- arch/arm/mach-imx/devices/devices-common.h   |  9 ----
- arch/arm/mach-imx/devices/platform-mxc_pwm.c | 69 ----------------------------
- 10 files changed, 102 deletions(-)
- delete mode 100644 arch/arm/mach-imx/devices/platform-mxc_pwm.c
+Hi Linus W, 
 
-diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
-index d7ed660..bdc2e46 100644
---- a/arch/arm/mach-imx/clk-imx21.c
-+++ b/arch/arm/mach-imx/clk-imx21.c
-@@ -149,7 +149,6 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_register_clkdev(clk[per1], "per", "imx-gpt.1");
- 	clk_register_clkdev(clk[gpt3_ipg_gate], "ipg", "imx-gpt.2");
- 	clk_register_clkdev(clk[per1], "per", "imx-gpt.2");
--	clk_register_clkdev(clk[pwm_ipg_gate], "pwm", "mxc_pwm.0");
- 	clk_register_clkdev(clk[per2], "per", "imx21-cspi.0");
- 	clk_register_clkdev(clk[cspi1_ipg_gate], "ipg", "imx21-cspi.0");
- 	clk_register_clkdev(clk[per2], "per", "imx21-cspi.1");
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 69858c7..dc36e6c 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -265,14 +265,6 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
- 	clk_register_clkdev(clk[cspi2_ipg], NULL, "imx35-cspi.1");
- 	clk_register_clkdev(clk[cspi3_ipg], NULL, "imx35-cspi.2");
--	clk_register_clkdev(clk[pwm1_ipg], "ipg", "mxc_pwm.0");
--	clk_register_clkdev(clk[per10], "per", "mxc_pwm.0");
--	clk_register_clkdev(clk[pwm1_ipg], "ipg", "mxc_pwm.1");
--	clk_register_clkdev(clk[per10], "per", "mxc_pwm.1");
--	clk_register_clkdev(clk[pwm1_ipg], "ipg", "mxc_pwm.2");
--	clk_register_clkdev(clk[per10], "per", "mxc_pwm.2");
--	clk_register_clkdev(clk[pwm1_ipg], "ipg", "mxc_pwm.3");
--	clk_register_clkdev(clk[per10], "per", "mxc_pwm.3");
- 	clk_register_clkdev(clk[kpp_ipg], NULL, "imx-keypad");
- 	clk_register_clkdev(clk[tsc_ipg], NULL, "mx25-adc");
- 	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.0");
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index c6b40f3..d2da890 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -231,7 +231,6 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.4");
- 	clk_register_clkdev(clk[gpt6_ipg_gate], "ipg", "imx-gpt.5");
- 	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.5");
--	clk_register_clkdev(clk[pwm_ipg_gate], NULL, "mxc_pwm.0");
- 	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.0");
- 	clk_register_clkdev(clk[sdhc1_ipg_gate], "ipg", "imx21-mmc.0");
- 	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.1");
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index ce37af2..c015e27 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -309,8 +309,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[ecspi2_per_gate], "per", "imx51-ecspi.1");
- 	clk_register_clkdev(clk[ecspi2_ipg_gate], "ipg", "imx51-ecspi.1");
- 	clk_register_clkdev(clk[cspi_ipg_gate], NULL, "imx35-cspi.2");
--	clk_register_clkdev(clk[pwm1_ipg_gate], "pwm", "mxc_pwm.0");
--	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
- 	clk_register_clkdev(clk[i2c1_gate], NULL, "imx21-i2c.0");
- 	clk_register_clkdev(clk[i2c2_gate], NULL, "imx21-i2c.1");
- 	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.0");
-diff --git a/arch/arm/mach-imx/devices-imx25.h b/arch/arm/mach-imx/devices-imx25.h
-index 769563f..61a114c 100644
---- a/arch/arm/mach-imx/devices-imx25.h
-+++ b/arch/arm/mach-imx/devices-imx25.h
-@@ -83,7 +83,3 @@ extern const struct imx_spi_imx_data imx25_cspi_data[];
- #define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
- #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
- #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
--
--extern struct imx_mxc_pwm_data imx25_mxc_pwm_data[];
--#define imx25_add_mxc_pwm(id)	\
--	imx_add_mxc_pwm(&imx25_mxc_pwm_data[id])
-diff --git a/arch/arm/mach-imx/devices-imx51.h b/arch/arm/mach-imx/devices-imx51.h
-index deee5ba..26389f3 100644
---- a/arch/arm/mach-imx/devices-imx51.h
-+++ b/arch/arm/mach-imx/devices-imx51.h
-@@ -57,10 +57,6 @@ extern const struct imx_imx2_wdt_data imx51_imx2_wdt_data[];
- #define imx51_add_imx2_wdt(id)	\
- 	imx_add_imx2_wdt(&imx51_imx2_wdt_data[id])
- 
--extern const struct imx_mxc_pwm_data imx51_mxc_pwm_data[];
--#define imx51_add_mxc_pwm(id)	\
--	imx_add_mxc_pwm(&imx51_mxc_pwm_data[id])
--
- extern const struct imx_imx_keypad_data imx51_imx_keypad_data;
- #define imx51_add_imx_keypad(pdata)	\
- 	imx_add_imx_keypad(&imx51_imx_keypad_data, pdata)
-diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-index 68c74fb..2d260a5 100644
---- a/arch/arm/mach-imx/devices/Kconfig
-+++ b/arch/arm/mach-imx/devices/Kconfig
-@@ -67,9 +67,6 @@ config IMX_HAVE_PLATFORM_MXC_MMC
- config IMX_HAVE_PLATFORM_MXC_NAND
- 	bool
- 
--config IMX_HAVE_PLATFORM_MXC_PWM
--	bool
--
- config IMX_HAVE_PLATFORM_MXC_RNGA
- 	bool
- 	select ARCH_HAS_RNGA
-diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
-index 67416fb..1cbc14c 100644
---- a/arch/arm/mach-imx/devices/Makefile
-+++ b/arch/arm/mach-imx/devices/Makefile
-@@ -23,7 +23,6 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_CAMERA) += platform-mx2-camera.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_EHCI) += platform-mxc-ehci.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_MMC) += platform-mxc-mmc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
--obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_PWM) += platform-mxc_pwm.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RTC) += platform-mxc_rtc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index c13b76b..61352a8 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -290,15 +290,6 @@ struct imx_pata_imx_data {
- struct platform_device *__init imx_add_pata_imx(
- 		const struct imx_pata_imx_data *data);
- 
--struct imx_mxc_pwm_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irq;
--};
--struct platform_device *__init imx_add_mxc_pwm(
--		const struct imx_mxc_pwm_data *data);
--
- /* mxc_rtc */
- struct imx_mxc_rtc_data {
- 	const char *devid;
-diff --git a/arch/arm/mach-imx/devices/platform-mxc_pwm.c b/arch/arm/mach-imx/devices/platform-mxc_pwm.c
-deleted file mode 100644
-index dcd2897..0000000
---- a/arch/arm/mach-imx/devices/platform-mxc_pwm.c
-+++ /dev/null
-@@ -1,69 +0,0 @@
--/*
-- * Copyright (C) 2009-2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include "../hardware.h"
--#include "devices-common.h"
--
--#define imx_mxc_pwm_data_entry_single(soc, _id, _hwid, _size)		\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _PWM ## _hwid ## _BASE_ADDR,		\
--		.iosize = _size,					\
--		.irq = soc ## _INT_PWM ## _hwid,			\
--	}
--#define imx_mxc_pwm_data_entry(soc, _id, _hwid, _size)			\
--	[_id] = imx_mxc_pwm_data_entry_single(soc, _id, _hwid, _size)
--
--#ifdef CONFIG_SOC_IMX21
--const struct imx_mxc_pwm_data imx21_mxc_pwm_data __initconst =
--	imx_mxc_pwm_data_entry_single(MX21, 0, , SZ_4K);
--#endif /* ifdef CONFIG_SOC_IMX21 */
--
--#ifdef CONFIG_SOC_IMX25
--const struct imx_mxc_pwm_data imx25_mxc_pwm_data[] __initconst = {
--#define imx25_mxc_pwm_data_entry(_id, _hwid)				\
--	imx_mxc_pwm_data_entry(MX25, _id, _hwid, SZ_16K)
--	imx25_mxc_pwm_data_entry(0, 1),
--	imx25_mxc_pwm_data_entry(1, 2),
--	imx25_mxc_pwm_data_entry(2, 3),
--	imx25_mxc_pwm_data_entry(3, 4),
--};
--#endif /* ifdef CONFIG_SOC_IMX25 */
--
--#ifdef CONFIG_SOC_IMX27
--const struct imx_mxc_pwm_data imx27_mxc_pwm_data __initconst =
--	imx_mxc_pwm_data_entry_single(MX27, 0, , SZ_4K);
--#endif /* ifdef CONFIG_SOC_IMX27 */
--
--#ifdef CONFIG_SOC_IMX51
--const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
--#define imx51_mxc_pwm_data_entry(_id, _hwid)				\
--	imx_mxc_pwm_data_entry(MX51, _id, _hwid, SZ_16K)
--	imx51_mxc_pwm_data_entry(0, 1),
--	imx51_mxc_pwm_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX51 */
--
--struct platform_device *__init imx_add_mxc_pwm(
--		const struct imx_mxc_pwm_data *data)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + data->iosize - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return imx_add_platform_device("mxc_pwm", data->id,
--			res, ARRAY_SIZE(res), NULL, 0);
--}
+Thankyou for reviewing v1 of the patch-set the comments were very useful.
+
+This series of v2 patches add interrupt controller support to ST pinctrl
+driver incorporating all the review comments.
+
+ST pin controller GPIO bank can have one of the two possible types of
+interrupt-wirings.
+
+First type is via irqmux, single interrupt is used by multiple gpio
+banks. This reduces number of interrupts numbers required by pin controller.
+All these gpio banks belong to a single pin controller.
+
+Second type has a dedicated interrupt per gpio bank. Interrupt number usage is
+very high in this case.
+
+This patch adds support to both these wirings.
+
+Also, ST pin controller hardware only supports level triggered interrupts.
+However for drivers like gpio keypad requires edge trigger interrupt support,
+so one of the patch adds edge trigger interrupt support in software by using
+the existing level trigger support in hardware.
+
+Patch 01: Adds level interrupt support to pin controller.
+Patch 02 Adds software edge trigger support.
+Patch 03,04 : Updates STiH415, STiH416 dts files for interrupt support.
+
+
+Changes since v1:
+	Updated below changes suggest by Linus W.
+	- Added updated example in binding document.
+	- removed un-necessary varibles in st_gpio_bank and st_pinctrl struct.
+	- renamed irq disabled/enabled functions with masked/unmasked
+	  functions.
+	- Fixed a issue in interrupt handler which could miss interrupts.
+	- Added new hooks startup and shutdown which can mark gpio lines.
+	- create irq mapping at probe stage instead of doing it in to_irq.
+	- removed driver specfic irq_domain xlate function with generic one.
+	- Added extra documention for software edge trigger support.
+	- reformated few debug messages.
+
+I did skip the first patch from my last v1 patchset as you have already
+applied it.
+
+Thanks,
+srini
+
+
+Srinivas Kandagatla (4):
+  pinctrl: st: Add Interrupt support.
+  pinctrl: st: Add software edge trigger interrupt support.
+  ARM:STi: STiH416: Add interrupt support for pin controller
+  ARM:STi: STiH415: Add interrupt support for pin controller
+
+ .../devicetree/bindings/pinctrl/pinctrl-st.txt     |   73 ++++-
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |   75 +++++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |   81 +++++
+ drivers/pinctrl/pinctrl-st.c                       |  337 +++++++++++++++++++-
+ 4 files changed, 558 insertions(+), 8 deletions(-)
+
 -- 
-1.8.5.2
+1.7.6.5
