@@ -1,76 +1,164 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 16 Jan 2014 18:22:49 +0000
-Subject: [PATCH 1/2] ARM: move flexcan1 configuration to hummingboard
+Date: Thu, 16 Jan 2014 18:22:54 +0000
+Subject: [PATCH 2/2] ARM: add DT support for cubox-i platforms
 In-Reply-To: <20140116182211.GX15937@n2100.arm.linux.org.uk>
 References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
-Message-ID: <E1W3rab-00009u-5I@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1W3rag-00009y-8V@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flexcan1 is not used on the cubox-i, so move it out of the microsom.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6dl-hummingboard.dts | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/Makefile             |  2 +
+ arch/arm/boot/dts/imx6dl-cubox-i.dts   | 12 ++++++
+ arch/arm/boot/dts/imx6q-cubox-i.dts    | 16 +++++++
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 78 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-cubox-i.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-cubox-i.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-index 6184b0366926..e22f3d855c02 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-@@ -36,6 +36,12 @@
- 	};
- };
- 
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hummingboard_flexcan1>;
-+	status = "okay";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 875af333c6dc..1eeae00d9d09 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -136,11 +136,13 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx53-mba53.dtb \
+ 	imx53-qsb.dtb \
+ 	imx53-smd.dtb \
++	imx6dl-cubox-i.dtb \
+ 	imx6dl-hummingboard.dtb \
+ 	imx6dl-sabreauto.dtb \
+ 	imx6dl-sabresd.dtb \
+ 	imx6dl-wandboard.dtb \
+ 	imx6q-arm2.dtb \
++	imx6q-cubox-i.dtb \
+ 	imx6q-phytec-pbab01.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+new file mode 100644
+index 000000000000..58aa8f2b0f26
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+@@ -0,0 +1,12 @@
++/*
++ * Copyright (C) 2014 Russell King
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-cubox-i.dtsi"
++
++/ {
++	model = "SolidRun Cubox-i Solo/DualLite";
++	compatible = "solidrun,cubox-i/dl", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+new file mode 100644
+index 000000000000..bc5f31e3e892
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+@@ -0,0 +1,16 @@
++/*
++ * Copyright (C) 2014 Russell King
++ */
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-cubox-i.dtsi"
++
++/ {
++	model = "SolidRun Cubox-i Dual/Quad";
++	compatible = "solidrun,cubox-i/q", "fsl,imx6q";
 +};
 +
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c1_1>;
-@@ -53,6 +59,13 @@
- 
- &iomuxc {
- 	hummingboard {
-+		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
++&sata {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+new file mode 100644
+index 000000000000..6fbca9063b10
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2014 Russell King
++ */
++#include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-ar8035.dtsi"
++
++/ {
++	ir_recv: ir-receiver {
++		compatible = "gpio-ir-receiver";
++		gpios = <&gpio3 9 1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_ir>;
++	};
++
++	codec: spdif-transmitter {
++		compatible = "linux,spdif-dit";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_spdif>;
++	};
++
++	sound-spdif {
++		compatible = "fsl,imx-audio-spdif";
++		model = "imx-spdif";
++		/* IMX6 doesn't implement this yet */
++		spdif-controller = <&spdif>;
++		spdif-out;
++	};
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3_1>;
++
++	status = "okay";
++
++	rtc: pcf8523 at 68 {
++		compatible = "nxp,pcf8523";
++		reg = <0x68>;
++	};
++};
++
++&iomuxc {
++	cubox_i {
++		pinctrl_cubox_i_ir: cubox_i-ir {
 +			fsl,pins = <
-+				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
-+				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
++				MX6QDL_PAD_EIM_DA9__GPIO3_IO09 0x80000000
 +			>;
 +		};
 +
- 		pinctrl_hummingboard_gpio1_2: hummingboard-gpio1_2 {
- 			fsl,pins = <
- 				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index 8aa31a842236..965ac4c1f509 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -36,21 +36,8 @@
- 	};
- };
- 
--&can1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_microsom_flexcan1>;
--	status = "okay";
--};
--
- &iomuxc {
- 	microsom {
--		pinctrl_microsom_flexcan1: microsom-flexcan1 {
--			fsl,pins = <
--				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
--				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
--			>;
--		};
--
- 		pinctrl_microsom_usbotg: microsom-usbotg {
- 			/*
- 			 * Similar to pinctrl_usbotg_2, but we want it
++		pinctrl_cubox_i_spdif: cubox_i-spdif {
++			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0>;
++		};
++
++		pinctrl_cubox_i_usdhc2: cubox_i-usdhc2 {
++			fsl,pins = <
++				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
++				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
++				MX6QDL_PAD_GPIO_4__SD2_CD_B    0x1f071
++			>;
++		};
++	};
++};
++
++&spdif {
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_cubox_i_usdhc2>;
++	vmmc-supply = <&reg_3p3v>;
++	fsl,cd-controller;
++	status = "okay";
++};
 -- 
 1.8.3.1
