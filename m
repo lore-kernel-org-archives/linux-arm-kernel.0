@@ -1,52 +1,121 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 16 Jan 2014 09:33:20 +0800
-Subject: [PATCH 3/3] Binding: atmel-wm8904: add option to choose clock
-In-Reply-To: <20140115115417.GA9558@ns203013.ovh.net>
-References: <1389669956-2304-1-git-send-email-voice.shen@atmel.com>
- <1389669956-2304-4-git-send-email-voice.shen@atmel.com>
- <20140115115417.GA9558@ns203013.ovh.net>
-Message-ID: <52D736E0.90207@atmel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jan 2014 17:38:40 -0800
+Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
+In-Reply-To: <20140115165623.GJ14405@codeaurora.org>
+References: <1389735034-21430-1-git-send-email-sboyd@codeaurora.org>
+ <1389735034-21430-3-git-send-email-sboyd@codeaurora.org>
+ <20140115102701.GA27314@e102568-lin.cambridge.arm.com>
+ <20140115165623.GJ14405@codeaurora.org>
+Message-ID: <20140116013840.GA674@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J,
+On 01/15, Stephen Boyd wrote:
+> 
+> Ah sorry, I forgot to put the compatible property here like in
+> the dts change. I'll do that in the next revision. Yes we need a
+> compatible property here to match the platform driver.
+> 
 
-On 01/15/2014 07:54 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:25 Tue 14 Jan     , Bo Shen wrote:
->> Add the option to choose clock output on which pin connect to SSC.
->> Default is on TK pin to SSC, add clk_from_rk_pin option, the clock
->> is on RK pin to SSC.
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->> ---
->>
->>   Documentation/devicetree/bindings/sound/atmel-wm8904.txt | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
->> index 8bbe50c..68a5c1a 100644
->> --- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
->> +++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
->> @@ -33,6 +33,8 @@ Required properties:
->>
->>   Optional properties:
->>     - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
->> +  - clk_from_rk_pin: according to hardware design, clk privide on rk pin
-> 							  provide
->
-> 	?? no example?
+This is the replacement patch
 
-If this patch set is acceptable. The sama5 audio will use it (I will 
-send patch after this patch set). Do I still need to put the example in 
-the binding document?
+-----8<------
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH v9] devicetree: bindings: Document Krait CPU/L1 EDAC
 
->> +    to ssc device
->>
->>   Example:
->>   sound {
->> --
->> 1.8.5.2
->>
+The Krait CPU/L1 error reporting device is made up a per-CPU
+interrupt. While we're here, document the next-level-cache
+property that's used by the Krait EDAC driver.
 
-Best Regards,
-Bo Shen
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 58 ++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 91304353eea4..03a529e791c4 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -62,6 +62,20 @@ nodes to be present and contain the properties described below.
+ 		Value type: <u32>
+ 		Definition: must be set to 0
+ 
++	- compatible
++		Usage: optional
++		Value type: <string>
++		Definition: should be one of the compatible strings listed
++			    in the cpu node compatible property. This property
++			    shall only be present if all the cpu nodes have the
++			    same compatible property.
++
++	- interrupts
++		Usage: required when node contains cpus with compatible
++		       string "qcom,krait".
++		Value type: <prop-encoded-array>
++		Definition: L1/CPU error interrupt
++
+ - cpu node
+ 
+ 	Description: Describes a CPU in an ARM based system
+@@ -191,6 +205,11 @@ nodes to be present and contain the properties described below.
+ 			  property identifying a 64-bit zero-initialised
+ 			  memory location.
+ 
++	- next-level-cache
++		Usage: optional
++		Value type: <phandle>
++		Definition: phandle pointing to the next level cache
++
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
+ 	cpus {
+@@ -382,3 +401,42 @@ cpus {
+ 		cpu-release-addr = <0 0x20000000>;
+ 	};
+ };
++
++
++Example 5 (Krait 32-bit system):
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	interrupts = <1 9 0xf04>;
++	compatible = "qcom,krait";
++
++	cpu at 0 {
++		device_type = "cpu";
++		reg = <0>;
++		next-level-cache = <&L2>;
++	};
++
++	cpu at 1 {
++		device_type = "cpu";
++		reg = <1>;
++		next-level-cache = <&L2>;
++	};
++
++	cpu at 2 {
++		device_type = "cpu";
++		reg = <2>;
++		next-level-cache = <&L2>;
++	};
++
++	cpu at 3 {
++		device_type = "cpu";
++		reg = <3>;
++		next-level-cache = <&L2>;
++	};
++
++	L2: l2-cache {
++		compatible = "cache";
++		interrupts = <0 2 0x4>;
++	};
++};
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
