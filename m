@@ -1,145 +1,59 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 Jan 2014 08:30:26 -0600
-Subject: [PATCH 09/11] ARM: dts: Add nodes for SMMUs on Calxeda ECX-2000
-In-Reply-To: <1389876263-25759-10-git-send-email-andreas.herrmann@calxeda.com>
+Date: Thu, 16 Jan 2014 08:31:25 -0600
+Subject: [PATCH 06/11] documentation/iommu: Update description of ARM
+ System MMU binding
+In-Reply-To: <1389876263-25759-7-git-send-email-andreas.herrmann@calxeda.com>
 References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-10-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <CAL_JsqK2JUBEvCb-=eHFE_T=2AD0K_+V=NAeijzK2DrCwkaCOA@mail.gmail.com>
+ <1389876263-25759-7-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <CAL_JsqLY6eSbTfjMX-Et1U6Ah=XG+7ZGphvXwNyE1bmMj4aLhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jan 16, 2014 at 6:44 AM, Andreas Herrmann
 <andreas.herrmann@calxeda.com> wrote:
-> Cc: Rob Herring <robh+dt@kernel.org>
+> This patch adds descriptions fore new properties of device tree
+> binding for the ARM SMMU architecture. These properties control
+> arm-smmu driver options.
+>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 > Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
 > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-
-One minor comment, but otherwise:
 
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  arch/arm/boot/dts/ecx-2000.dts    |   44 +++++++++++++++++++++++++++++++++++--
->  arch/arm/boot/dts/ecx-common.dtsi |    9 +++++---
->  2 files changed, 48 insertions(+), 5 deletions(-)
+>  .../devicetree/bindings/iommu/arm,smmu.txt         |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
-> index 2ccbb57f..722de49 100644
-> --- a/arch/arm/boot/dts/ecx-2000.dts
-> +++ b/arch/arm/boot/dts/ecx-2000.dts
-> @@ -76,10 +76,11 @@
->         };
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index e34c6cd..7ad8ff0 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -48,6 +48,16 @@ conditions.
+>                    from the mmu-masters towards memory) node for this
+>                    SMMU.
 >
->         soc {
-> -               ranges = <0x00000000 0x00000000 0x00000000 0xffffffff>;
-> +               ranges = <0x0 0x0 0x0 0xffffffff>;
->
->                 timer {
-> -                       compatible = "arm,cortex-a15-timer", "arm,armv7-timer";                         interrupts = <1 13 0xf08>,
-> +                       compatible = "arm,cortex-a15-timer", "arm,armv7-timer";
-> +                       interrupts = <1 13 0xf08>,
->                                 <1 14 0xf08>,
->                                 <1 11 0xf08>,
->                                 <1 10 0xf08>;
-> @@ -109,6 +110,45 @@
->                         interrupts = <0 76 4  0 75 4  0 74 4  0 73 4>;
->                 };
->         };
+> +- arm,smmu-isolate-devices : Enable device isolation for all masters
+> +                   of this SMMU. Ie. each master will be attached to
+> +                   its own iommu domain.
 > +
-> +       soc at 920000000 {
-
-I believe this and the other > 32-bit addresses below should be
-"soc at 9,20000000".
-
-> +               ranges = <0x9 0x20000000 0x9 0x20000000 0x290000>;
-> +               #address-cells = <2>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               interrupt-parent = <&intc>;
+> +- calxeda,smmu-secure-config-access : Enable proper handling of buggy
+> +                   implementations that always use secure access to
+> +                   SMMU configuration registers. In this case
+> +                   non-secure aliases of secure registers have to be
+> +                   used during SMMU configuration.
 > +
-> +               smmu_mac0: smmu at 920000000 {
-> +                       compatible = "arm,mmu-400";
-> +                       reg = <0x9 0x20000000 0x10000>;
-> +                       #global-interrupts = <1>;
-> +                       interrupts = <0 106 4 0 106 4>;
-> +                       mmu-masters = <&mac0 0 1>;
-> +                       calxeda,smmu-secure-config-access;
-> +                       arm,smmu-isolate-devices;
-> +               };
-> +
-> +               smmu_mac1: smmu at 920080000 {
-> +                       compatible = "arm,mmu-400";
-> +                       reg = <0x9 0x20080000 0x10000>;
-> +                       #global-interrupts = <1>;
-> +                       interrupts = <0 108 4 0 108 4>;
-> +                       mmu-masters = <&mac1 0 1>;
-> +                       calxeda,smmu-secure-config-access;
-> +                       arm,smmu-isolate-devices;
-> +               };
-> +
-> +               smmu_sata: smmu at 920180000 {
-> +                       compatible = "arm,mmu-400";
-> +                       reg = <0x00000009 0x20180000 0x10000>;
-> +                       mmu-masters = <&sata 0 1 2 3 4 5 6 7 8 9>;
-> +                       #global-interrupts = <1>;
-> +                       interrupts = <0 114 4 0 114 4>;
-> +                       calxeda,smmu-secure-config-access;
-> +                       arm,smmu-isolate-devices;
-> +               };
-> +       };
-> +
->  };
+>  Example:
 >
->  /include/ "ecx-common.dtsi"
-> diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
-> index b90045a..ad9b2fd 100644
-> --- a/arch/arm/boot/dts/ecx-common.dtsi
-> +++ b/arch/arm/boot/dts/ecx-common.dtsi
-> @@ -33,7 +33,7 @@
->                 compatible = "simple-bus";
->                 interrupt-parent = <&intc>;
->
-> -               sata at ffe08000 {
-> +               sata: sata at ffe08000 {
->                         compatible = "calxeda,hb-ahci";
->                         reg = <0xffe08000 0x10000>;
->                         interrupts = <0 83 4>;
-> @@ -43,6 +43,7 @@
->                                              &combophy0 3>;
->                         calxeda,sgpio-gpio =<&gpioh 5 1 &gpioh 6 1 &gpioh 7 1>;
->                         calxeda,led-order = <4 0 1 2 3>;
-> +                       #stream-id-cells = <10>;
->                 };
->
->                 sdhci at ffe0e000 {
-> @@ -210,18 +211,20 @@
->                         clock-names = "apb_pclk";
->                 };
->
-> -               ethernet at fff50000 {
-> +               mac0: ethernet at fff50000 {
->                         compatible = "calxeda,hb-xgmac";
->                         reg = <0xfff50000 0x1000>;
->                         interrupts = <0 77 4  0 78 4  0 79 4>;
->                         dma-coherent;
-> +                       #stream-id-cells = <2>;
->                 };
->
-> -               ethernet at fff51000 {
-> +               mac1: ethernet at fff51000 {
->                         compatible = "calxeda,hb-xgmac";
->                         reg = <0xfff51000 0x1000>;
->                         interrupts = <0 80 4  0 81 4  0 82 4>;
->                         dma-coherent;
-> +                       #stream-id-cells = <2>;
->                 };
->
->                 combophy0: combo-phy at fff58000 {
+>          smmu {
+> @@ -67,4 +77,5 @@ Example:
+>                   */
+>                  mmu-masters = <&dma0 0xd01d 0xd01e>,
+>                                <&dma1 0xd11c>;
+> +                arm,smmu-isolate-devices;
+>          };
 > --
 > 1.7.9.5
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
