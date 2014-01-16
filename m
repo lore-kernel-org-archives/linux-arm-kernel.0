@@ -1,37 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jan 2014 18:22:12 +0000
-Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
-Message-ID: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 16 Jan 2014 18:22:49 +0000
+Subject: [PATCH 1/2] ARM: move flexcan1 configuration to hummingboard
+In-Reply-To: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+Message-ID: <E1W3rab-00009u-5I@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Cubox-i has been released, and I have one, I've been able to
-update things a little.  Out of the following two patches, the first one
-I think is critical to be merged before the microsom support hits
-mainline, since it drops the flexcan support from the microsom level,
-moving it to the Hummingboard level.
+Flexcan1 is not used on the cubox-i, so move it out of the microsom.
 
-That doesn't have _too_ much visible effect, but it's something which
-should not be there (since as far as the microsom is concerned, there's
-nothing special about these pads.)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/imx6dl-hummingboard.dts | 13 +++++++++++++
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-The second adds basic support for the Cubox-i - as I have only the i4,
-this is the platform which this has been tested against, but I've
-generated the solo/dual-lite version as well since the only difference
-at this basic level is the eSATA.
-
- arch/arm/boot/dts/Makefile                |  2 +
- arch/arm/boot/dts/imx6dl-cubox-i.dts      | 12 +++++
- arch/arm/boot/dts/imx6dl-hummingboard.dts | 13 ++++++
- arch/arm/boot/dts/imx6q-cubox-i.dts       | 16 +++++++
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 78 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 ------
- 6 files changed, 121 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-cubox-i.dts
- create mode 100644 arch/arm/boot/dts/imx6q-cubox-i.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+index 6184b0366926..e22f3d855c02 100644
+--- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+@@ -36,6 +36,12 @@
+ 	};
+ };
+ 
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard_flexcan1>;
++	status = "okay";
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c1_1>;
+@@ -53,6 +59,13 @@
+ 
+ &iomuxc {
+ 	hummingboard {
++		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
++				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
++			>;
++		};
++
+ 		pinctrl_hummingboard_gpio1_2: hummingboard-gpio1_2 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index 8aa31a842236..965ac4c1f509 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -36,21 +36,8 @@
+ 	};
+ };
+ 
+-&can1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_microsom_flexcan1>;
+-	status = "okay";
+-};
+-
+ &iomuxc {
+ 	microsom {
+-		pinctrl_microsom_flexcan1: microsom-flexcan1 {
+-			fsl,pins = <
+-				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
+-				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
+-			>;
+-		};
+-
+ 		pinctrl_microsom_usbotg: microsom-usbotg {
+ 			/*
+ 			 * Similar to pinctrl_usbotg_2, but we want it
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.3.1
