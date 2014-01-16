@@ -1,52 +1,41 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 16 Jan 2014 10:10:05 +0800
-Subject: [PATCH] mmc: dw_mmc: fix dw_mci_get_cd
-In-Reply-To: <20140115162210.GP15937@n2100.arm.linux.org.uk>
-References: <1389770159-21125-1-git-send-email-zhangfei.gao@linaro.org>
- <3154671.7LPLgq8X4K@wuerfel> <20140115160146.GO15937@n2100.arm.linux.org.uk>
- <15344443.B6eHZOpkXH@wuerfel> <20140115162210.GP15937@n2100.arm.linux.org.uk>
-Message-ID: <52D73F7D.60302@linaro.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 15 Jan 2014 21:13:04 -0500
+Subject: [PATCH v3 4/6] arm: add early_ioremap support
+In-Reply-To: <52D72883.3020500@codeaurora.org>
+References: <1389325833-16535-1-git-send-email-msalter@redhat.com>
+ <1389325833-16535-5-git-send-email-msalter@redhat.com>
+ <52D72883.3020500@codeaurora.org>
+Message-ID: <1389838384.1923.41.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2014-01-15 at 16:32 -0800, Laura Abbott wrote:
+> On 1/9/2014 7:50 PM, Mark Salter wrote:
+> ....
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 987a7f5..038fb75 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -36,6 +36,7 @@
+> >   #include <asm/cpu.h>
+> >   #include <asm/cputype.h>
+> >   #include <asm/elf.h>
+> > +#include <asm/io.h>
+> >   #include <asm/procinfo.h>
+> >   #include <asm/psci.h>
+> >   #include <asm/sections.h>
+> > @@ -887,6 +888,8 @@ void __init setup_arch(char **cmdline_p)
+> >
+> >   	parse_early_param();
+> >
+> > +	early_ioremap_init();
+> > +
+> >   	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
+> >
+> >   	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+> 
+> Any chance we could do this even earlier, say right after 
+> setup_processor? It would be nice to be able to do this while FDT 
+> scanning (I have a use case in mind, potential patches are in the works)
 
-
-On 01/16/2014 12:22 AM, Russell King - ARM Linux wrote:
-
-> Well, having this in the gpio level as well as in subsystems like MMC
-> is going to create confusion - and from the results of this patch _IS_
-> causing confusion.  You've just encouraged one implementation to have
-> things setup such that mmc_gpio_get_cd() returns false when a card is
-> inserted, rather than it correctly returning true.
->
-> The issue here is that we'll potentially now end up with _three_
-> inversions.  One in the GPIO layers.  One in mmc_gpio_get_cd(), and
-> another in every driver which uses the GPIO layer inversion.  This
-> is hardly the right approach as it leads to multiple points where
-> confusion about the inverted status can occur.
->
-
-Thanks Russell, make sense.
-
-Double checked with the hardware guy, cd pin is high when card inserted 
-on the board.
-The cd pin is originally connected to vout via a resister, and 
-internally short to gound, which is broken when card inserted.
-
-Then Optional properties "caps2-mmc-cd-active-high" has to be added.
-
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-
-+* caps2-mmc-cd-active-high: cd pin is high when card present
-
-@@ -2411,6 +2414,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct 
-dw_mci *host)
-         if (of_find_property(np, "caps2-mmc-hs200-1_2v", NULL))
-                 pdata->caps2 |= MMC_CAP2_HS200_1_2V_SDR;
-
-+       if (of_find_property(np, "caps2-mmc-cd-active-high", NULL))
-+               pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-+
-
-Thanks
+It looks like that would work...
