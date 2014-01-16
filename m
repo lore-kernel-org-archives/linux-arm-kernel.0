@@ -1,190 +1,121 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 13:48:19 +0100
-Subject: [PATCH] ARM: dts: imx6q: Add support for Zealz GK802
-Message-ID: <1389876499-24247-1-git-send-email-s.hauer@pengutronix.de>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 16 Jan 2014 13:44:22 +0100
+Subject: [PATCH 10/11] arm: dma-mapping: Add additional parameters to
+ arm_iommu_create_mapping
+In-Reply-To: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <1389876263-25759-11-git-send-email-andreas.herrmann@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the GK802 'QUAD CORE Mini PC', which seems to be loosely
-based on the Freescale i.MX6Q HDMI dongle reference design.
-It is supposedly identical to the Hiapad Hi802.
+The new parameters are
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+  dma_addr_t grow_size
+
+         Specifies the size by which the mapping will be extended in
+         case that no sufficient space is left in the mapping to
+         handle an iova allocation request. If a grow_size of 0 is
+         specified the mapping is not extended.
+
+  dma_addr_t max_size
+
+         Specifies the maximum size for the entire mapping --
+         including all extensions made over time. The mapping can only
+         be extended if the entire size is less than or equal to
+         max_size.
+
+Adapt existing calls to arm_iommu_create_mapping in exynos_drm_iommu.c
+and shmobile-iommu.c such that they do not make use of the extension
+feature.
+
+Adapt existing call to arm_iommu_create_mapping in arm-smmu.c such
+that the extension feature will be used.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
- arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/imx6q-gk802.dts | 151 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 152 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-gk802.dts
+ arch/arm/include/asm/dma-iommu.h          |    4 ++--
+ arch/arm/mm/dma-mapping.c                 |    2 +-
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c |    4 ++--
+ drivers/iommu/arm-smmu.c                  |    2 +-
+ drivers/iommu/shmobile-iommu.c            |    2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index aeb8053..9ed00a0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -171,6 +171,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-arm2.dtb \
- 	imx6q-cm-fx6.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
-+	imx6q-gk802.dtb \
- 	imx6q-gw51xx.dtb \
- 	imx6q-gw52xx.dtb \
- 	imx6q-gw53xx.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-gk802.dts b/arch/arm/boot/dts/imx6q-gk802.dts
-new file mode 100644
-index 0000000..0d010df
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-gk802.dts
-@@ -0,0 +1,151 @@
-+/*
-+ * Copyright (C) 2013 Philipp Zabel
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+
-+/ {
-+	model = "Zealz GK802";
-+	compatible = "zealz,imx6q-gk802", "fsl,imx6q";
-+
-+	chosen {
-+		linux,stdout-path = &uart4;
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_3p3v: 3p3v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		recovery-button {
-+			label = "recovery";
-+			gpios = <&gpio3 16 1>;
-+			linux,code = <0x198>; /* KEY_RESTART */
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
-+
-+/* Internal I2C */
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2_gk802>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	/* SDMC DM2016 1024 bit EEPROM + 128 bit OTP */
-+	eeprom: dm2016 at 51 {
-+		compatible = "sdmc,dm2016";
-+		reg = <0x51>;
-+	};
-+};
-+
-+/* External I2C via HDMI */
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3_gk802>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	hog {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				/* Recovery button, active-low */
-+				MX6QDL_PAD_EIM_D16__GPIO3_IO16  0x100b1
-+				/* RTL8192CU enable GPIO, active-low */
-+				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x1b0b0
-+			>;
-+		};
-+	};
-+
-+	i2c {
-+		pinctrl_i2c2_gk802: i2c2grp-1 {
-+			fsl,pins = <MX6QDL_I2C2_PINGRP2>;
-+		};
-+
-+		pinctrl_i2c3_gk802: i2c3grp-1 {
-+			fsl,pins = <MX6QDL_I2C3_PINGRP3>;
-+		};
-+	};
-+
-+	uart {
-+		pinctrl_uart4: uart4grp {
-+			fsl,pins = <MX6QDL_UART4_PINGRP1>;
-+		};
-+	};
-+
-+	usdhc {
-+		pinctrl_usdhc3: usdhc3grp {
-+			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
-+		};
-+
-+		pinctrl_usdhc4: usdhc4grp {
-+			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
-+		};
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+/* External USB-A port (USBOTG) */
-+&usbotg {
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+/* Internal USB port (USBH1), connected to RTL8192CU */
-+&usbh1 {
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+/* External microSD */
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio6 11 0>;
-+	vmmc-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
-+
-+/* Internal microSD */
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
+diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+index a8c56ac..50edacd 100644
+--- a/arch/arm/include/asm/dma-iommu.h
++++ b/arch/arm/include/asm/dma-iommu.h
+@@ -23,8 +23,8 @@ struct dma_iommu_mapping {
+ };
+ 
+ struct dma_iommu_mapping *
+-arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+-			 int order);
++arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base,  size_t size,
++			int order, dma_addr_t grow_size, dma_addr_t max_size);
+ 
+ void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+ 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index f61a570..ccea46a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1887,7 +1887,7 @@ struct dma_map_ops iommu_coherent_ops = {
+  */
+ struct dma_iommu_mapping *
+ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+-			 int order)
++			int order, dma_addr_t grow_size, dma_addr_t max_size)
+ {
+ 	unsigned int count = size >> (PAGE_SHIFT + order);
+ 	unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.c b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+index fb8db03..c1cd18b 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_iommu.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+@@ -40,8 +40,8 @@ int drm_create_iommu_mapping(struct drm_device *drm_dev)
+ 		priv->da_space_order = EXYNOS_DEV_ADDR_ORDER;
+ 
+ 	mapping = arm_iommu_create_mapping(&platform_bus_type, priv->da_start,
+-						priv->da_space_size,
+-						priv->da_space_order);
++					priv->da_space_size,
++					priv->da_space_order, 0, 0);
+ 	if (IS_ERR(mapping))
+ 		return PTR_ERR(mapping);
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 68bbe45..31414e5 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2124,7 +2124,7 @@ static int arm_smmu_device_notifier(struct notifier_block *nb,
+ 			break;
+ 
+ 		mapping = arm_iommu_create_mapping(&platform_bus_type,
+-						0, SZ_128M, 0);
++						0, SZ_128M, 0, SZ_128M, SZ_2G);
+ 		if (IS_ERR(mapping)) {
+ 			ret = PTR_ERR(mapping);
+ 			dev_info(dev, "arm_iommu_create_mapping failed\n");
+diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
+index d572863..1ba3a01 100644
+--- a/drivers/iommu/shmobile-iommu.c
++++ b/drivers/iommu/shmobile-iommu.c
+@@ -343,7 +343,7 @@ static int shmobile_iommu_add_device(struct device *dev)
+ 	mapping = archdata->iommu_mapping;
+ 	if (!mapping) {
+ 		mapping = arm_iommu_create_mapping(&platform_bus_type, 0,
+-						   L1_LEN << 20, 0);
++						L1_LEN << 20, 0, 0, 0);
+ 		if (IS_ERR(mapping))
+ 			return PTR_ERR(mapping);
+ 		archdata->iommu_mapping = mapping;
 -- 
-1.8.5.2
+1.7.9.5
