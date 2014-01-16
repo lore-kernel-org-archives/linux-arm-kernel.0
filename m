@@ -1,27 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jan 2014 19:58:20 +0000
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 16 Jan 2014 12:00:47 -0800
 Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+In-Reply-To: <20140116195819.GY15937@n2100.arm.linux.org.uk>
 References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
  <3215037.8HVCjAeS8g@wuerfel>
  <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
-Message-ID: <20140116195819.GY15937@n2100.arm.linux.org.uk>
+ <20140116195819.GY15937@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 09:15:17AM -0800, Olof Johansson wrote:
-> We've dealt with it with local code in our tree for Chrome OS, and I
-> suspect everyone else has too. It's definitely time to solve
-> generically.
+On Thu, Jan 16, 2014 at 11:58 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 16, 2014 at 09:15:17AM -0800, Olof Johansson wrote:
+>> We've dealt with it with local code in our tree for Chrome OS, and I
+>> suspect everyone else has too. It's definitely time to solve
+>> generically.
+>
+> As there's no code for any Cubox-i or Hummingboard (they're both purely
+> DT), what this means is that the answer to Wifi/BT support in mainline is
+> that this is "impossible at the moment"...
+>
+> I guess this is becoming a higher priority issue which really needs to be
+> solved somehow. :)
 
-As there's no code for any Cubox-i or Hummingboard (they're both purely
-DT), what this means is that the answer to Wifi/BT support in mainline is
-that this is "impossible at the moment"...
+I'm looking at it right now actually, might as well sort it out while
+people are paying attention. Patches a little later today unless I get
+distrac^Winterrupted. :)
 
-I guess this is becoming a higher priority issue which really needs to be
-solved somehow. :)
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+-Olof
