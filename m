@@ -1,24 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jan 2014 15:02:11 +0100
+From: alexandre.belloni@piout.net (Alexandre Belloni)
+Date: Thu, 16 Jan 2014 15:08:58 +0100
 Subject: How to support SDIO wifi/bt in DT
 In-Reply-To: <20140116133649.GV15937@n2100.arm.linux.org.uk>
 References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
-Message-ID: <3215037.8HVCjAeS8g@wuerfel>
+Message-ID: <20140116140858.GD27282@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 January 2014 13:36:49 Russell King - ARM Linux wrote:
-
+On Thu, Jan 16, 2014 at 01:36:49PM +0000, Russell King - ARM Linux wrote :
+> Okay, I'm hitting something of a dead end with trying to work out how to
+> support this in DT.
+> 
+> The Wifi/BT (bcrmfmac) device has multiple connections to the host device
+> - it has a SDIO connection, a UART connection, and an audio connection.
+> In addition, a series of GPIOs are wired to control this device:
+> 
+> - Reset for bluetooth plus two additional GPIOs (unused I think)
+> - Reset for Wifi plus two additional GPIOs (again, I think unused)
+> - GPIO to control regulator supplying power to the Wifi/BT chip
+> - GPIO to control regulator supplying power to the oscillator for
+>   the Wifi/BT chip.
 > 
 > The Wifi/BT chip can only be detected via probing the SDIO connection, and
 > only when the device has been powered up and released from reset - so we
 > have to power up and reset the bcrm device before we probe via the SDIO
 > bus.
-
-This is indeed a common problem, and while we've talked about solving
-it in the past, nothing has happened code-wise. It indeed needs an
-implementation in the sdio framework.
-
+> 
 > While it's possible to attach the power supply for the Wifi/BT chip to the
 > vmmc-supply property of the host, it's not possible to do that with the
 > oscillator supply.  Neither is there any provision for manipulating the
@@ -27,9 +34,7 @@ implementation in the sdio framework.
 > I can't find any examples of anything similar in our existing set of DT
 > files, so I suspect either this is a device which no one supports on any
 > DT platform, or there's some clever way to handle this.
-
-The former.
-
+> 
 > How do other people support this in DT?  Do they hack up some platform
 > specific code (which isn't nice)?  What other solutions are there to get
 > around this problem?  How does this kind of thing get represented in DT?
@@ -40,23 +45,14 @@ The former.
 > undetectable.  The kernel needs to power it up and release the reset
 > so it becomes detectable.)
 
-The problem is two-fold:
+I hit exactly the same issue trying to support a TiWi chip on SDIO. On
+my side, I used vmmc-supply to drive the reset GPIO with a fixed
+regulator. The other thing needed was the clock. That one, I put it in
+the board file. I guess we need a way to describe children of the SDIO
+host and the host driver would be responsible to manage power supplies,
+resets and clocks...
 
-a) we need to add a generic mechanism to the SDIO probe code to
-allow specifying clocks, regulators and resets (possibly more)
-for an SDIO endpoint that get enabled before the probe starts.
-This parts needs a DT binding for SDIO slots as well as code.
-
-b) We need to add a way to attach a device_node to an sdio_func,
-so that a function driver can find additional DT properties.
-This part should be relatively simple once (a) is done and
-should only need a little code but no new binding. The code
-would be similar to what we do for amba, i2c or spi devices.
-
-Note that the same problem exists for a number of other discoverable
-buses that get used in nondiscoverable ways, e.g. USB, PCI, 
-or even SCSI. It's normally a spec violation if those devices
-are wired up like this, but of course we still want to support
-the hardware.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
