@@ -1,57 +1,184 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 16 Jan 2014 10:49:04 +0530
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <20140115154526.GC3571@mudshark.cambridge.arm.com>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <20140115154526.GC3571@mudshark.cambridge.arm.com>
-Message-ID: <52D76BC8.6080405@nvidia.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 16 Jan 2014 06:02:41 +0000
+Subject: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+In-Reply-To: <201401151025.34628.arnd@arndb.de>
+References: <1389763265-27300-2-git-send-email-yao.yuan@freescale.com>
+ <1389763265-27300-3-git-send-email-yao.yuan@freescale.com>
+ <201401151025.34628.arnd@arndb.de>
+Message-ID: <7952cfff9892479abbf837420e519fcb@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 January 2014 09:15 PM, Will Deacon wrote:
-> Hello,
+Hi, Arnd
+Thanks for your suggestion.
+
+> -----Original Message-----
+> From: linux-serial-owner at vger.kernel.org [mailto:linux-serial-
+> owner at vger.kernel.org] On Behalf Of Arnd Bergmann
+> Sent: Wednesday, January 15, 2014 5:26 PM
+> To: Yuan Yao-B46683
+> Cc: gregkh at linuxfoundation.org; shawn.guo at linaro.org;
+> linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-
+> serial at vger.kernel.org
+> Subject: Re: [PATCH v3 2/2] serial: fsl_lpuart: add DMA support
+> 
+> On Wednesday 15 January 2014, Yuan Yao wrote:
+> > Add dma support for lpuart. This function depend on DMA driver.
+> > You can turn on it by SERIAL_FSL_LPUART_DMA=y. And It works if dts node
+> has dma properties.
+> >
+> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> 
+> Most of the changes you did look good, but I have to say I'm not a fan of
+> the #ifdef you added. I don't think you actually need to have the
+> compile-time selection, and it would be best to just drop that part.
+> 
+> If you have a good reason to keep it, please change the code to more
+> readable "if (IS_ENABLED(CONFIG_FSL_LPUART_DMA))" constructs.
+> If you decide to do this, you will find that you need far fewer such
+> conditionals because a lot of the code will automatically get dropped by
+> the compiler.
+> 
+
+Thank you! I even not know the IS_ENABLED macro.
+At the beginning I just think this can save the size of code. 
+But now I think it's not very necessary.
+I tend to cancel it.
+
+> >  uart0: serial at 40027000 {
+> > -	       compatible = "fsl,vf610-lpuart";
+> > -	       reg = <0x40027000 0x1000>;
+> > -	       interrupts = <0 61 0x00>;
+> > -       };
+> > +		compatible = "fsl,vf610-lpuart";
+> > +		reg = <0x40027000 0x1000>;
+> > +		interrupts = <0 61 0x00>;
+> > +		clocks = <&clks VF610_CLK_UART0>;
+> > +		clock-names = "ipg";
+> > +		dma-names = "lpuart-tx","lpuart-rx";
+> > +		dmas = <&edma0 0 VF610_EDMA_MUXID0_UART0_TX>,
+> > +			<&edma0 0 VF610_EDMA_MUXID0_UART0_RX>;
+> > +	};
+> 
+> You still haven't addressed my comment about removing the
+> VF610_EDMA_MUXID0_UART0_TX macros.
 >
-> On Wed, Jan 15, 2014 at 01:07:07PM +0000, Prashant Gaikwad wrote:
->> Now arch timer is registerd using generic sched timer, delay
->> timer registration is the only part remaining in arch ports.
->> Move this part to drivers clocksource and remove arch timer
->> from arch ports.
-> What's the advantage in doing this? I'd have thought consolidation, but...
 
-Primary objective of doing this to use other timers on SoC instead of 
-arch timers. It is observed that on ARM implementations of ARMv8 
-architecture context of per CPU logic of arch timer is not preserved 
-when CPU is powered down and reset is held during powerdown.
+Very sorry for forget it. At that time the VF610_EDMA_MUXID0_UART0_TX is because of eDMA driver request.
+But now it also cancel the macro. So this is my fault. I will fix it next.
 
-This makes arch timers unusable as wake events for some CPU idle states 
-where CPU core is powered down.
+> >
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +#define DMA_MAXBURST		16
+> > +#define DMA_MAXBURST_MASK	(DMA_MAXBURST - 1)
+> > +#define FSL_UART_RX_DMA_BUFFER_SIZE	64
+> > +#endif
+> 
+> For this part there was no need for the #ifdef to start with.
+> 
+> >  #define DRIVER_NAME	"fsl-lpuart"
+> >  #define DEV_NAME	"ttyLP"
+> >  #define UART_NR		6
+> > @@ -121,6 +132,26 @@ struct lpuart_port {
+> >  	struct clk		*clk;
+> >  	unsigned int		txfifo_size;
+> >  	unsigned int		rxfifo_size;
+> > +
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +	bool			lpuart_dma_use;
+> > +	struct dma_chan		*dma_tx_chan;
+> > +	struct dma_chan		*dma_rx_chan;
+> > +	struct dma_async_tx_descriptor  *dma_tx_desc;
+> > +	struct dma_async_tx_descriptor  *dma_rx_desc;
+> > +	dma_addr_t		dma_tx_buf_bus;
+> > +	dma_addr_t		dma_rx_buf_bus;
+> > +	dma_cookie_t		dma_tx_cookie;
+> > +	dma_cookie_t		dma_rx_cookie;
+> > +	unsigned char		*dma_tx_buf_virt;
+> > +	unsigned char		*dma_rx_buf_virt;
+> > +	unsigned int		dma_tx_bytes;
+> > +	unsigned int		dma_rx_bytes;
+> > +	int			dma_tx_in_progress;
+> > +	int			dma_rx_in_progress;
+> > +	unsigned int		dma_rx_timeout;
+> > +	struct timer_list	lpuart_timer;
+> > +#endif
+> >  };
+> 
+> This part will result in a slight increase in data size even if dma
+> support is turned off at compile time.
+> 
 
-So we have two options:
-1. Use system timers as broadcast timers and save/restore arch timers 
-context actross these CPU idle states.
-2. Disable arch timer and use system timers.
+Yes, I will fix it.
 
-This patch will help to implement 2nd option.
+> >
+> >  	temp = readb(port->membase + UARTCR2);
+> >  	writeb(temp | UARTCR2_TIE, port->membase + UARTCR2);
+> >
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +	if (sport->lpuart_dma_use) {
+> > +		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
+> > +			lpuart_prepare_tx(sport);
+> > +	} else {
+> > +		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
+> > +			lpuart_transmit_buffer(sport);
+> > +	}
+> > +#else
+> >  	if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
+> >  		lpuart_transmit_buffer(sport);
+> > +#endif
+> >  }
+> 
+> So this can simply become
+> 
+> +	if (IS_ENABLED(CONFIG_SERIAL_FSL_LPUART_DMA) && sport-
+> >lpuart_dma_use) {
+> +		if (!uart_circ_empty(xmit) && !sport->dma_tx_in_progress)
+> +			lpuart_prepare_tx(sport);
+> +	} else {
+> +		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
+> +			lpuart_trans	mit_buffer(sport);
+> +	}
+> 
+> and the compiler will silently drop the lpuart_prepare_tx() function and
+> everything it calls that isn't used elsewhere.
+> 
 
->> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
->> ---
->>   arch/arm/include/asm/arch_timer.h    |    1 -
->>   arch/arm/kernel/Makefile             |    1 -
->>   arch/arm/kernel/arch_timer.c         |   44 ----------------------------------
->>   arch/arm64/include/asm/arch_timer.h  |    5 ----
->>   arch/arm64/include/asm/delay.h       |   32 ++++++++++++++++++++++++
->>   arch/arm64/include/asm/timex.h       |    5 +--
->>   arch/arm64/kernel/time.c             |    9 -------
->>   arch/arm64/lib/delay.c               |   26 ++++++++++++++++++++
->>   drivers/clocksource/arm_arch_timer.c |   12 ++++++++-
->>   9 files changed, 71 insertions(+), 64 deletions(-)
-> ... that's a positive diffstat! I also think that delaying the delay loop
-> initialisation for arm64 could be problematic, since we don't have anything
-> to fall back on (like the busy-loop on ARM) in case of early *delay calls.
->
-> What happens if I call udelay on arm64 before the counter has registered?
+It's wonderful. 
 
-I will fix this in next patch. Do you have plan to add busy-loop for 
-arm64? Or I will have to initialize read counter function early.
-
-> Will
+> 
+> > +
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +	struct platform_device *pdev = to_platform_device(port->dev);
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +
+> > +	if (of_get_property(np, "dmas", NULL)) {
+> > +		sport->lpuart_dma_use = true;
+> > +		lpuart_dma_tx_request(port);
+> > +		lpuart_dma_rx_request(port);
+> > +		temp = readb(port->membase + UARTCR5);
+> > +		writeb(temp | UARTCR5_TDMAS, port->membase + UARTCR5);
+> > +	} else
+> > +		sport->lpuart_dma_use = false;
+> > +#endif
+> 
+> Same here.
+> 
+> > @@ -854,6 +1291,10 @@ static int __init lpuart_serial_init(void)
+> >
+> >  	pr_info("serial: Freescale lpuart driver\n");
+> >
+> > +#ifdef CONFIG_SERIAL_FSL_LPUART_DMA
+> > +	pr_info("serial: Freescale lpuart dma support\n"); #endif
+> > +
+> 
+> This message is not helpful in the long run, I'd rather see you drop the
+> other one as well. Note that this function is called on *all* platforms
+> when the driver is enabled, not just on those that actually have the uart.
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial"
+> in the body of a message to majordomo at vger.kernel.org More majordomo info
+> at  http://vger.kernel.org/majordomo-info.html
+> 
