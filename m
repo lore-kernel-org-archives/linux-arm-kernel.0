@@ -1,57 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jan 2014 12:16:49 +0000
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D76BC8.6080405@nvidia.com>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <20140115154526.GC3571@mudshark.cambridge.arm.com>
- <52D76BC8.6080405@nvidia.com>
-Message-ID: <20140116121649.GG30257@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 Jan 2014 07:26:29 -0500
+Subject: linux-next: manual merge of the libata tree with the arm-soc tree
+In-Reply-To: <20140116114831.50261e22b6fb25aac2004b43@canb.auug.org.au>
+References: <20140116114831.50261e22b6fb25aac2004b43@canb.auug.org.au>
+Message-ID: <20140116122629.GG29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 05:19:04AM +0000, Prashant Gaikwad wrote:
-> On Wednesday 15 January 2014 09:15 PM, Will Deacon wrote:
-> > On Wed, Jan 15, 2014 at 01:07:07PM +0000, Prashant Gaikwad wrote:
-> >> Now arch timer is registerd using generic sched timer, delay
-> >> timer registration is the only part remaining in arch ports.
-> >> Move this part to drivers clocksource and remove arch timer
-> >> from arch ports.
-> > What's the advantage in doing this? I'd have thought consolidation, but...
+Stephen,
+
+Thanks, this looks good.
+
+Arnd, Olof, Kevin,
+
+This patch is in Tejun's tree because it is part of a patch series
+fixing SATA hotplug.  That series is marked for stable.
+
+thx,
+
+Jason.
+
+On Thu, Jan 16, 2014 at 11:48:31AM +1100, Stephen Rothwell wrote:
+> Hi Tejun,
 > 
-> Primary objective of doing this to use other timers on SoC instead of 
-> arch timers. It is observed that on ARM implementations of ARMv8 
-> architecture context of per CPU logic of arch timer is not preserved 
-> when CPU is powered down and reset is held during powerdown.
+> Today's linux-next merge of the libata tree got a conflict in
+> arch/arm/boot/dts/armada-370-xp.dtsi between commit a095b1c78a35 ("ARM:
+> mvebu: sort DT nodes by address") from the arm-soc tree and commit
+> a96cc303e42a ("ARM: mvebu: update the SATA compatible string for Armada
+> 370/XP") from the libata tree.
 > 
-> This makes arch timers unusable as wake events for some CPU idle states 
-> where CPU core is powered down.
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 > 
-> So we have two options:
-> 1. Use system timers as broadcast timers and save/restore arch timers 
-> context actross these CPU idle states.
-> 2. Disable arch timer and use system timers.
-
-Why can't you use the C3STOP feature so that the arch-timer isn't used when
-you go idle?
-
-There are several good reasons to use the architected timers when you can:
-
-  - KVM requires them, as they have hardware support for virtualisation
-  - The VDSO can make use of them to implement efficient gtod in userspace
-  - They are per-cpu, so no need to broadcasting in software
-  - They can generate events and allow userspace to implement efficient
-    polling loops
-
-> > What happens if I call udelay on arm64 before the counter has registered?
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
 > 
-> I will fix this in next patch. Do you have plan to add busy-loop for 
-> arm64? Or I will have to initialize read counter function early.
-
-Well, I assume the virtual counter (cntvct) still ticks on your system? If
-so, I would suggest having that as the default delay implementation and
-allowing it to be over-ridden later on.
-
-The part I don't understand is why being `unusable as wake events' affects
-the delay loop. All we need for that is the counter, the timers are irrelevant.
-
-Will
+> diff --cc arch/arm/boot/dts/armada-370-xp.dtsi
+> index b6b253924893,df141a1d6448..000000000000
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@@ -236,12 -183,13 +236,12 @@@
+>   				status = "disabled";
+>   			};
+>   
+>  -			i2c0: i2c at 11000 {
+>  -				compatible = "marvell,mv64xxx-i2c";
+>  -				#address-cells = <1>;
+>  -				#size-cells = <0>;
+>  -				interrupts = <31>;
+>  -				timeout-ms = <1000>;
+>  -				clocks = <&coreclk 0>;
+>  +			sata at a0000 {
+> - 				compatible = "marvell,orion-sata";
+> ++				compatible = "marvell,armada-370-sata";
+>  +				reg = <0xa0000 0x5000>;
+>  +				interrupts = <55>;
+>  +				clocks = <&gateclk 15>, <&gateclk 30>;
+>  +				clock-names = "0", "1";
+>   				status = "disabled";
+>   			};
+>   
