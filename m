@@ -1,44 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Jan 2014 13:52:27 +0100
-Subject: [PATCH 1/4] ARM: dts: imx6: edmqmx6: Add usdhc4 (emmc) support
-In-Reply-To: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1389876750-29880-2-git-send-email-s.hauer@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Jan 2014 12:57:27 +0000
+Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
+In-Reply-To: <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
+References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
+ <20140116115634.GE30257@mudshark.cambridge.arm.com>
+ <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
+Message-ID: <20140116125727.GI30257@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+On Thu, Jan 16, 2014 at 12:26:53PM +0000, Jean Pihet wrote:
+> On 16 January 2014 12:56, Will Deacon <will.deacon@arm.com> wrote:
+> > In your previous series, compat backtracing is actually split out into a
+> > separate function (compat_user_backtrace), so it would be more consistent to
+> > have a compat_user_stack_pointer macro, rather than add this check here.
+> 
+> Do you mean this change instead?
 
-diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-index 84f5143..7ce2038 100644
---- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-+++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-@@ -141,6 +141,10 @@
- 		pinctrl_usdhc3: usdhc3grp {
- 			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
- 		};
-+
-+		pinctrl_usdhc4: usdhc4grp {
-+			fsl,pins = <MX6QDL_USDHC4_PINGRP_D8>;
-+		};
- 	};
- };
- 
-@@ -176,3 +180,12 @@
- 	vmmc-supply = <&reg_3p3v>;
- 	status = "okay";
- };
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	vmmc-supply = <&reg_3p3v>;
-+	non-removable;
-+	bus-width = <8>;
-+	status = "okay";
-+};
--- 
-1.8.5.2
+I don't think so...
+
+> diff --git a/kernel/events/internal.h b/kernel/events/internal.h
+> index 569b2187..9b88d2e 100644
+> --- a/kernel/events/internal.h
+> +++ b/kernel/events/internal.h
+> @@ -185,7 +185,8 @@ static inline bool arch_perf_have_user_stack_dump(void)
+>         return true;
+>  }
+> 
+> -#define perf_user_stack_pointer(regs) user_stack_pointer(regs)
+> +#define perf_user_stack_pointer(regs) \
+> +       (!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
+
+This doesn't belong in core code; compat_user_mode and the fields of regs
+are arm64-specific. So I suppose you need to rework your original patch to
+call compat_user_stack_pointer (which we already define in compat.h for
+arm64) if compat_user_mode(regs)).
+
+The problem there is the inconsistency with respect to the regs argument:
+
+  user_stack_pointer(regs)	// Returns user stack pointer for regs
+  current_user_stack_pointer()	// Returns current user stack pointer
+  compat_user_stack_pointer()	// Doesn't take a regs argument!
+
+On top of that, x86 treats those last two functions differently when current
+is a compat task.
+
+So the simplest thing would be to make compat_user_stack_pointer expand to
+user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
+original patch fixing user_stack_pointer.
+
+Will
