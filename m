@@ -1,48 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jan 2014 11:56:34 +0000
-Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
-In-Reply-To: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
-References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140116115634.GE30257@mudshark.cambridge.arm.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 16 Jan 2014 13:58:10 +0200
+Subject: [PATCH 4/5] arm: omap3: twl: use the new lookup method with usb
+ phy
+In-Reply-To: <52D6972B.2030704@ti.com>
+References: <1386601737-8735-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1386601737-8735-5-git-send-email-heikki.krogerus@linux.intel.com>
+ <52AEDE43.8030005@ti.com> <20131216144314.GB22944@xps8300>
+ <52CBFAC0.9040103@ti.com> <20140114143849.GB21169@xps8300>
+ <52D6972B.2030704@ti.com>
+Message-ID: <20140116115810.GC11732@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On Wed, Jan 15, 2014 at 07:41:55PM +0530, Kishon Vijay Abraham I wrote:
+> The point I'm trying to make is that we won't 'always' know the device names in
+> advance.
 
-On Thu, Jan 16, 2014 at 10:45:23AM +0000, Jean Pihet wrote:
-> Add support for unwinding using the dwarf information in compat
-> mode. Using the correct user stack pointer allows perf to record
-> the frames correctly in the native and compat modes.
+In which cases do we not know the device names, and please note, cases
+where we would need to use the lookup? The normal cases we would use
+it are..
+
+1) A driver creating a child device, like dwc3 when it creates the
+xhci. There the parent just delivers the phys it has to the child, so
+both the device name and the phys are known.
+
+2) Platform code. Hopefully we can get rid of the platform code one
+day, but in any case, when we use it, we always know at least how many
+users a phy has, and if there is only a singe user, we can rely con_id
+to do the matching. Though I still don't really see much risk in using
+the controller device name also there. The lookup table should in any
+case be made in the place where the phy devices are created, so the
+phy name is definitely always known.
+
+3) Phys part of something like mfd. This is in practice the same as
+the platform code case. For example, with twl we always know there is
+only one user for the phy, which is musb. So we can just use musb's
+con_id if it's to scary to use "musb-hdrc.0".
+
+In any other case, you get the phy from DT, and there is no need to
+use the lookup when linking the phys and the users.
+
+> Btw how are you planning to differentiate between multiple controllers of the
+> same type with con_id?
+
+You don't rely on the con_id alone in those cases. You then use the
+device name. The con_id is just one parameter you can use to do the
+matching.
+
+> Maybe I'm missing the actual intention of this patch. Do you face problem if
+> the PHY's have to know about it's consumers in ACPI?
+
+<snip>
+
+> >> I would rather leave the way it is modelled now.
+> > 
+> > Do you mean, leave it in the platform code? Why? We would reduce the
+> > platform code by moving it to the mfd driver. Or did I misunderstood
+> > something?
 > 
-> Note that although the dwarf frame unwinding works ok using
-> libunwind in native mode (on ARMv7 & ARMv8), some changes are
-> required to the libunwind code for the compat mode. Those changes
-> are posted separately on the libunwind mailing list.
-> 
-> Tested on ARMv8 platform with v8 and compat v7 binaries, the latter
-> are statically built.
+> In this case, the lookup table will be used only for non-dt boot so don't see
+> much use in moving to mfd driver.
+> I meant if the new method is not solving any problem then I would prefer the
+> way it is modelled now where the PHY's know about it's consumers.
 
-I guess it makes sense to include this with your earlier series adding
-support for compat backtracing?
+OK, so that's what you meant. Things like that init_data promotes use
+of platform data in the drivers, something that we really should get
+rid of. Is that not a problem to you?
 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> ---
->  arch/arm64/include/asm/ptrace.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index fbb0020..86d5b54 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -133,7 +133,7 @@ struct pt_regs {
->  	(!((regs)->pstate & PSR_F_BIT))
->  
->  #define user_stack_pointer(regs) \
-> -	((regs)->sp)
-> +	(!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
+The phy drivers simply should not need to care about the consumers.
+They should not need to care about anything DT, ACPI, platform
+specific if it's possible, and here there is nothing preventing it.
+Let me clarify..
 
-In your previous series, compat backtracing is actually split out into a
-separate function (compat_user_backtrace), so it would be more consistent to
-have a compat_user_stack_pointer macro, rather than add this check here.
+The plan is that ultimately the drivers (meaning all the drivers, not
+just phy) don't need to care about things like DT properties, ACPI
+properties or anything DT, ACPI, platform specific. We will have
+generic driver properties and capabilities and the upper layers will
+take care of delivering the correct values from the source at hand.
+The drivers can be made truly platform agnostic.
 
-Will
+That is the goal, and we should make everything new by keeping that in
+mind. Many existing frameworks are being converted to that direction,
+like the gpio framework and DMA Engine API. The way you force the phy
+drivers the deliver the consumers is taking a step backwards.
+
+> Btw where does device gets created in ACPI boot?
+
+drivers/acpi/acpi_platform.c
+
+Thanks,
+
+-- 
+heikki
