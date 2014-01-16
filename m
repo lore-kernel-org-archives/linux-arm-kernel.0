@@ -1,137 +1,130 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Thu, 16 Jan 2014 17:35:07 +0800
-Subject: [PATCH V7 3/3] ARM: imx: add suspend in ocram support for i.mx6sl
-In-Reply-To: <1389864907-4040-1-git-send-email-b20788@freescale.com>
-References: <1389864907-4040-1-git-send-email-b20788@freescale.com>
-Message-ID: <1389864907-4040-3-git-send-email-b20788@freescale.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Thu, 16 Jan 2014 15:09:13 +0530
+Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <52D7A237.8@freescale.com>
+References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
+ <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
+ <52D7A237.8@freescale.com>
+Message-ID: <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SL's suspend in ocram function is derived from i.MX6Q,
-it can lower the DDR IO power from ~10mA at 1.2V to ~1mA at 1.2V,
-measured on i.MX6SL EVK board, SH5.
+Hi Huang Shijie,
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/Makefile       |    2 +-
- arch/arm/mach-imx/pm-imx6q.c     |   20 +++++++++++++++++++-
- arch/arm/mach-imx/suspend-imx6.S |   28 ++++++++++++++++++++++++++--
- 3 files changed, 46 insertions(+), 4 deletions(-)
+Thanks for your response, please see below.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 3d96a45..f2df89f 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -105,7 +105,7 @@ ifeq ($(CONFIG_PM),y)
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o suspend-imx6.o
- # i.MX6SL reuses i.MX6Q code
--obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
-+obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o suspend-imx6.o
- endif
- 
- # i.MX5 based machines
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index fc57340..0db9456 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -121,6 +121,14 @@ static const u32 imx6dl_mmdc_io_offset[] = {
- 	0x74c,			    /* GPR_ADDS */
- };
- 
-+static const u32 imx6sl_mmdc_io_offset[] = {
-+	0x30c, 0x310, 0x314, 0x318, /* DQM0 ~ DQM3 */
-+	0x5c4, 0x5cc, 0x5d4, 0x5d8, /* GPR_B0DS ~ GPR_B3DS */
-+	0x300, 0x31c, 0x338, 0x5ac, /* CAS, RAS, SDCLK_0, GPR_ADDS */
-+	0x33c, 0x340, 0x5b0, 0x5c0, /* SODT0, SODT1, MODE_CTL, MODE */
-+	0x330, 0x334, 0x320,        /* SDCKE0, SDCKE1, RESET */
-+};
-+
- static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
- 	.cpu_type = MXC_CPU_IMX6Q,
- 	.mmdc_compat = "fsl,imx6q-mmdc",
-@@ -141,6 +149,16 @@ static const struct imx6_pm_socdata imx6dl_pm_data __initconst = {
- 	.mmdc_io_offset = imx6dl_mmdc_io_offset,
- };
- 
-+static const struct imx6_pm_socdata imx6sl_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6SL,
-+	.mmdc_compat = "fsl,imx6sl-mmdc",
-+	.src_compat = "fsl,imx6sl-src",
-+	.iomuxc_compat = "fsl,imx6sl-iomuxc",
-+	.gpc_compat = "fsl,imx6sl-gpc",
-+	.mmdc_io_num = ARRAY_SIZE(imx6sl_mmdc_io_offset),
-+	.mmdc_io_offset = imx6sl_mmdc_io_offset,
-+};
-+
- /*
-  * This structure is for passing necessary data for low level ocram
-  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
-@@ -532,5 +550,5 @@ void __init imx6dl_pm_init(void)
- 
- void __init imx6sl_pm_init(void)
- {
--	imx6_pm_common_init(NULL);
-+	imx6_pm_common_init(&imx6sl_pm_data);
- }
-diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
-index d273ee7..f9694d5 100644
---- a/arch/arm/mach-imx/suspend-imx6.S
-+++ b/arch/arm/mach-imx/suspend-imx6.S
-@@ -63,6 +63,7 @@
- #define MX6Q_SRC_GPR1	0x20
- #define MX6Q_SRC_GPR2	0x24
- #define MX6Q_MMDC_MAPSR	0x404
-+#define MX6Q_MMDC_MPDGCTRL0	0x83c
- #define MX6Q_GPC_IMR1	0x08
- #define MX6Q_GPC_IMR2	0x0c
- #define MX6Q_GPC_IMR3	0x10
-@@ -107,14 +108,36 @@
- 	ldreq	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
- 	ldrne	r11, [r0, #PM_INFO_MX6Q_MMDC_P_OFFSET]
- 
-+	cmp 	r3, #MXC_CPU_IMX6SL
-+	bne	4f
-+
-+	/* reset read FIFO, RST_RD_FIFO */
-+	ldr	r7, =MX6Q_MMDC_MPDGCTRL0
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+2:
-+	ldr	r6, [r11, r7]
-+	ands	r6, r6, #(1 << 31)
-+	bne	2b
-+
-+	/* reset FIFO a second time */
-+	ldr	r6, [r11, r7]
-+	orr     r6, r6, #(1 << 31)
-+	str	r6, [r11, r7]
-+3:
-+	ldr	r6, [r11, r7]
-+	ands	r6, r6, #(1 << 31)
-+	bne	3b
-+4:
- 	/* let DDR out of self-refresh */
- 	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
- 	bic	r7, r7, #(1 << 21)
- 	str	r7, [r11, #MX6Q_MMDC_MAPSR]
--2:
-+5:
- 	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
- 	ands	r7, r7, #(1 << 25)
--	bne	2b
-+	bne	5b
- 
- 	/* enable DDR auto power saving */
- 	ldr	r7, [r11, #MX6Q_MMDC_MAPSR]
-@@ -282,6 +305,7 @@ resume:
- 	str	r7, [r11, #MX6Q_SRC_GPR1]
- 	str	r7, [r11, #MX6Q_SRC_GPR2]
- 
-+	ldr	r3, [r0, #PM_INFO_CPU_TYPE_OFFSET]
- 	mov	r5, #0x1
- 	resume_mmdc
- 
+On Thu, Jan 16, 2014 at 2:41 PM, Huang Shijie <b32955@freescale.com> wrote:
+> ? 2014?01?16? 03:15, Jagan Teki ??:
+>
+>> Hi,
+>>
+>> On Wed, Dec 25, 2013 at 11:20 AM, Huang Shijie<b32955@freescale.com>
+>> wrote:
+>>>
+>>> 1.) Why add a new framework for SPI NOR?
+>>>    The SPI-NOR controller such as Freescale's Quadspi controller is
+>>> working
+>>>    in a different way from the SPI bus. It should knows the NOR commands
+>>> to
+>>>    find the right LUT sequence. Unfortunately, the current code can not
+>>> meet
+>>>    this requirement.
+>>>
+>>> 2.) How does this patch set do?
+>>>     This patch set adds a new spi-nor layer.
+>>>     Before this patch, the layer is like:
+>>>
+>>>                     MTD
+>>>           ------------------------
+>>>                    m25p80
+>>>           ------------------------
+>>>                 spi bus driver
+>>>           ------------------------
+>>>                  SPI NOR chip
+>>>
+>>>     After this patch, the layer is like:
+>>>                     MTD
+>>>           ------------------------
+>>>                    spi-nor
+>>>           ------------------------
+>>>                    m25p80
+>>>           ------------------------
+>>>                 spi bus driver
+>>>           ------------------------
+>>>                 SPI NOR chip
+
+Just for looking on your new framework, is that above link correct.
+I guess it should be MTD -- m25p80 -- spi-nor -- spi bus driver -- SPI NOR chip
+
+Because m25p80 will register to mtd core on top and will call spi core
+data transfer.
+
+Correct me if am wrong.
+
+>>>
+>>>    With the spi-nor controller driver(Freescale Quadspi), it looks like:
+>>>                     MTD
+>>>           ------------------------
+>>>                    spi-nor
+>>>           ------------------------
+>>>                  fsl-quadspi
+>>>           ------------------------
+>>>                 SPI NOR chip
+>>
+>> I'm new to this thread, may be I'll ask basic questions.
+>> 1) what does m25p80 contains with your new framework - will excludes
+>> quad stuff if they add
+>
+> sorry, i do not understand your meaning.
+>
+> do you think the m25p80 can not support the quad read after this patch set?
+>
+>
+>
+>> 2) I didn't understand why the controller driver fsl-quadspi will be
+>> in mtd becuase as it's (q)spi driver
+>> may does flash or non-flash functionalities if ie, the case should be
+>> part of drivers/spi/*
+>
+> Please read this thread, Mark though it should be spi nor driver:
+>
+> http://marc.info/?l=linux-arm-kernel&m=137782885415953&w=2
+>
+>> 3) Can you explain your framework precisely take an example of like
+>> spi_controller_A with spi_flash_A
+>> and qspi_controller_B and qspi_flash_B - how will this new framework
+>> operates.
+>>
+> The framework is just cloned from the m25p80.c, and extract the common code,
+> and provides more
+> hooks such as
+>
+> @prepare/unpreare: used to do some work before or after the
+>              read/write/erase/lock/unlock.
+>     @read_xfer/write_xfer: We can use these two hooks to code all
+>              the following hooks if the driver tries to implement them
+>              by itself.
+>     @read_reg: used to read the registers, such as read status register,
+>              read configure register.
+>     @write_reg: used to write the registers, such as write enable,
+>              erase sector.
+>     @read_id: read out the ID info.
+>     @wait_till_ready: wait till the NOR becomes ready.
+>     @read: read out the data from the NOR.
+>     @write: write data to the NOR.
+>     @erase: erase a sector of the NOR.
+>
+
+My basic question is like I have a qspi spi controller in my SOC and I
+designed two boards B1 and B2
+B1 with quad spi controller connected with non-flash as a slave and B2
+with quad spi controller connected
+with quad flash as a slave.
+
+Now please tell me how your framework works in this case? how many
+drivers do I need to right
+and call traces.
+
 -- 
-1.7.9.5
+Thanks,
+Jagan.
