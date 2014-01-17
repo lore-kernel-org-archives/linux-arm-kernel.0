@@ -1,27 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 Jan 2014 13:32:25 +0800
-Subject: [PATCH v4 9/9] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <20140116155514.GA6464@pengutronix.de>
-References: <1387545096-2334-1-git-send-email-mpa@pengutronix.de>
- <1387545096-2334-10-git-send-email-mpa@pengutronix.de>
- <20140116155514.GA6464@pengutronix.de>
-Message-ID: <20140117053223.GC1565@shlinux1.ap.freescale.net>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 17 Jan 2014 07:25:08 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <20140116185044.GC18392@xanatos> (Sarah Sharp's message of "Thu,
+ 16 Jan 2014 10:50:44 -0800")
+References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
+ <20140114170719.GA12126@xanatos> <87bnzekz5l.fsf@natisbad.org>
+ <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
+ <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
+Message-ID: <87fvon2khn.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 04:55:14PM +0100, Markus Pargmann wrote:
-> Hi Shawn,
-> 
-> On Fri, Dec 20, 2013 at 02:11:36PM +0100, Markus Pargmann wrote:
-> > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> > reconfiguration and needs this for correct interaction with SDMA. This
-> > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> > 
-> 
-> Mark Brown applied all other patches of this series. Could you please
-> take this one?
+Hi,
 
-Can you please regenerate the patch against my for-next branch to get
-imx50 SSI nodes covered as well?
+Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
 
-Shawn
+>> ... AFAICT, this is exactly what commit 35773dac5f86 does and reverting
+>> it does not help. If I am mistaken, can you point which part you want me
+>> to remove in the code to test?
+>> 
+>> I am slowly starting to see a bisect session coming ;-)
+>
+> Try reverting commit 60e102ac73cd40069d077014c93c86dc7205cb68.
+
+AFAICT, this commit does not exist in master (Linus tree), i.e. it is
+not in 3.13.0-rc8.
+
+> That was causing issues with another Fresco Logic host.  If that
+> doesn't help, then yes, please git bisect.
+
+I have started a bisect session yesterday. I will try and finish it this
+evening.
+
+Cheers,
+
+a+
