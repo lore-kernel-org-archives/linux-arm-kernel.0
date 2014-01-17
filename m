@@ -1,91 +1,68 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 17 Jan 2014 11:42:14 -0600
-Subject: [PATCH v2] of: add functions to count number of elements in a
- property
-In-Reply-To: <1434798.oSb68sYmYT@phil>
-References: <27256277.YJ687suYy5@phil> <3781679.27UF2dWtKL@phil>
- <20140117144456.GG19578@e106331-lin.cambridge.arm.com>
- <1434798.oSb68sYmYT@phil>
-Message-ID: <CAL_JsqJ_St=OegpexzrTGXwmOYCz4YeWk_1S+R_q6NajmmPqSA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 18 Jan 2014 01:43:31 +0800
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <201401171747.46332.arnd@arndb.de>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <1389941251-32692-5-git-send-email-wens@csie.org>
+ <201401171747.46332.arnd@arndb.de>
+Message-ID: <CAGb2v67UKiyfJbKZ_Frk3OwZupMPoA2Ck3Hj2zsRFXBQPztavg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 9:44 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> The need to know the number of array elements in a property is
-> a common pattern. To prevent duplication of open-coded implementations
-> add a helper static function that also centralises strict sanity
-> checking and DTB format details, as well as a set of wrapper functions
-> for u8, u16, u32 and u64.
+On Sat, Jan 18, 2014 at 12:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 17 January 2014, Chen-Yu Tsai wrote:
+>> diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+>> new file mode 100644
+>> index 0000000..8a07ea4
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+>> @@ -0,0 +1,26 @@
+>> +GPIO controlled RFKILL devices
+>> +
+>> +Required properties:
+>> +- compatible   : Must be "rfkill-gpio".
+>> +- rfkill-name  : Name of RFKILL device
+>> +- rfkill-type  : Type of RFKILL device: 1 for WiFi, 2 for BlueTooth
+>> +- NAME_shutdown-gpios  : GPIO phandle to shutdown control
+>> +                         (phandle must be the second)
+>> +- NAME_reset-gpios     : GPIO phandle to reset control
+>> +
+>> +NAME must match the rfkill-name property. NAME_shutdown-gpios or
+>> +NAME_reset-gpios, or both, must be defined.
+>> +
 >
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> changes since v1:
-> address comments from Rob Herring and Mark Rutland:
-> - provide a helper and a set of wrappers for u8-u64
-> - get rid of extra len variable, prop->length is enough
-> - include node name in error message
+> I don't understand this part. Why do you include the name in the
+> gpios property, rather than just hardcoding the property strings
+> to "shutdown-gpios" and "reset-gpios"?
+
+This quirk is a result of how gpiod_get_index implements device tree
+lookup. You'll also notice that the shutdown GPIO must be the second
+phandle, as the driver uses indexed lookup to support ACPI cases.
+If con_id is given, it is prepended to "gpios" as the property string.
+con_id is also used as the label passed to gpiod_request, which is
+then shown in /sys/kernel/debug/gpio.
+
+I can do a seperate lookup for the device tree case, with or without
+fallback to platform lookup tables. Then the names can be "reset-gpio"
+and "shutdown-gpio". Need to promote gpiod_request to non-static so
+we can register usage of the gpio, to match non-dt code path.
+
+Personally I prefer adding a "label" parameter to gpiod_get_index, so
+we can use a different name than con_id. con_id isn't used in the ACPI
+case, and is optional in platform lookup case. However device tree
+lookup is dependent on this. What I see is non-uniform behavior
+between the three. In my opinion this is undesirable, but I haven't
+come up with a good solution yet.
+
+About the property string, is the plural form required, even though we
+only want one?
+
+Thanks!
+
+ChenYu
+
+> The description of hte "rfkill-name" property seems to suggest
+> that you can only have one logical RFKILL device per device node,
+> so he names would not be ambiguous.
 >
->  drivers/of/base.c  |   98 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h |   32 +++++++++++++++++
->  2 files changed, 130 insertions(+)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index f807d0e..b6e6d4a 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -862,6 +862,104 @@ struct device_node *of_find_node_by_phandle(phandle handle)
->  EXPORT_SYMBOL(of_find_node_by_phandle);
->
->  /**
-> + * of_count_property_elems_of_size - Count the number of elements in a property
-> + *
-> + * @np:                device node from which the property value is to be read.
-> + * @propname:  name of the property to be searched.
-> + * @elem_size: size of the individual element
-> + */
-> +static int of_count_property_elems_of_size(const struct device_node *np,
-> +                               const char *propname, int elem_size)
-> +{
-> +       struct property *prop = of_find_property(np, propname, NULL);
-> +
-> +       if (!prop)
-> +               return -EINVAL;
-> +       if (!prop->value)
-> +               return -ENODATA;
-> +
-> +       if (prop->length % elem_size != 0) {
-> +               pr_err("size of %s in node %s is not a multiple of %d\n",
-> +                      propname, np->name, elem_size);
-> +               return -EINVAL;
-> +       }
-> +
-> +       return prop->length / elem_size;
-> +}
-
-Export this one.
-
-> +
-> +/**
-> + * of_property_count_u8_elems - Count the number of u8 elements in a property
-> + *
-> + * @np:                device node from which the property value is to be read.
-> + * @propname:  name of the property to be searched.
-> + *
-> + * Search for a property in a device node and count the number of u8 elements
-> + * in it. Returns number of elements on sucess, -EINVAL if the property does
-> + * not exist or its length does not match a multiple of u8 and -ENODATA if the
-> + * property does not have a value.
-> + */
-> +int of_property_count_u8_elems(const struct device_node *np,
-> +                               const char *propname)
-> +{
-> +       return of_count_property_elems_of_size(np, propname, sizeof(u8));
-> +}
-> +EXPORT_SYMBOL_GPL(of_property_count_u8_elems);
-
-And make all these static inline.
-
-Then you only need a single empty function for !OF.
-
-Rob
+>         Arnd
