@@ -1,72 +1,46 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Jan 2014 10:03:27 +0800
-Subject: [PATCH 3/3] ACPI: Introduce map_gic_id() to get apic id from MADT or
- _MAT method
-In-Reply-To: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
-References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1389924207-7360-4-git-send-email-hanjun.guo@linaro.org>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Fri, 17 Jan 2014 02:22:26 +0000
+Subject: [PATCHv9 2/2] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <201401161202.49333.arnd@arndb.de>
+References: <1389839400-29728-1-git-send-email-b35083@freescale.com>
+ <1389839400-29728-3-git-send-email-b35083@freescale.com>
+ <201401161202.49333.arnd@arndb.de>
+Message-ID: <8e515b3695ea4c33a61f354b77be0b6b@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get apic id from MADT or _MAT method is not implemented on arm/arm64,
-and ACPI 5.0 introduces GIC Structure for it, so this patch introduces
-map_gic_id() to get apic id followed the ACPI 5.0 spec.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/processor_core.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
 
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index cd7b5fe..165eac7 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -90,6 +90,27 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
- 	return 1;
- }
- 
-+static int map_gic_id(struct acpi_subtable_header *entry,
-+		int device_declaration, u32 acpi_id, int *apic_id)
-+{
-+	struct acpi_madt_generic_interrupt *gic =
-+		(struct acpi_madt_generic_interrupt *)entry;
-+
-+	if (!(gic->flags & ACPI_MADT_ENABLED))
-+		return 0;
-+
-+	/* In the GIC interrupt model, logical processors are
-+	 * required to have a Processor Device object in the DSDT,
-+	 * so we should check device_declaration here
-+	 */
-+	if (device_declaration && (gic->uid == acpi_id)) {
-+		*apic_id = gic->gic_id;
-+		return 1;
-+	}
-+
-+	return 0;
-+}
-+
- static int map_madt_entry(int type, u32 acpi_id)
- {
- 	unsigned long madt_end, entry;
-@@ -125,6 +146,9 @@ static int map_madt_entry(int type, u32 acpi_id)
- 		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
- 			if (map_lsapic_id(header, type, acpi_id, &apic_id))
- 				break;
-+		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
-+			if (map_gic_id(header, type, acpi_id, &apic_id))
-+				break;
- 		}
- 		entry += header->length;
- 	}
-@@ -155,6 +179,8 @@ static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
- 		map_lapic_id(header, acpi_id, &apic_id);
- 	} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
- 		map_lsapic_id(header, type, acpi_id, &apic_id);
-+	} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
-+		map_gic_id(header, type, acpi_id, &apic_id);
- 	}
- 
- exit:
--- 
-1.8.2.2
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, January 16, 2014 7:03 PM
+> To: Lu Jingchang-B35083
+> Cc: vinod.koul at intel.com; dan.j.williams at intel.com; shawn.guo at linaro.org;
+> pawel.moll at arm.com; mark.rutland at arm.com; swarren at wwwdotorg.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Wang Huan-B18965
+> Subject: Re: [PATCHv9 2/2] dma: Add Freescale eDMA engine driver support
+> 
+> On Thursday 16 January 2014, Jingchang Lu wrote:
+> > Add Freescale enhanced direct memory(eDMA) controller support.
+> > This module can be found on Vybrid and LS-1 SoCs.
+> >
+> > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> 
+> Very nice! All my previous comments have been addressed, so
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> One small comment still:
+> 
+> > +
+> > +static DEFINE_MUTEX(fsl_edma_mutex);
+> > +
+> 
+> I think this mutex should be part of struct fsl_edma_engine, not global.
+Yes, it should be for each edma controller, I will define it in struct fsl_edma_engine. Thanks.
+
+
+Best Regards,
+Jingchang
