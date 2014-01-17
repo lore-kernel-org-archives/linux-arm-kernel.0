@@ -1,133 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 23:49:27 +0100
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <1389380874-22753-2-git-send-email-agross@codeaurora.org>
-Message-ID: <201401172349.28229.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jan 2014 23:43:27 +0100
+Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
+In-Reply-To: <20140117205346.GH15937@n2100.arm.linux.org.uk>
+References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
+ <52D98712.3070103@wwwdotorg.org>
+ <20140117202405.GF15937@n2100.arm.linux.org.uk>
+ <52D995C4.80104@wwwdotorg.org>
+ <20140117205346.GH15937@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaRQRD85-0wUmip=j1SHzti6Nb69JEUXznYTkrxGvky=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 January 2014, Andy Gross wrote:
+On Fri, Jan 17, 2014 at 9:53 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 17, 2014 at 01:42:44PM -0700, Stephen Warren wrote:
 
-> +static bool bam_dma_filter(struct dma_chan *chan, void *data)
-> +{
-> +	struct bam_filter_args *args = data;
-> +	struct bam_chan *bchan = to_bam_chan(chan);
-> +
-> +	if (args->dev == chan->device &&
-> +		args->id == bchan->id) {
-> +
-> +		/* we found the channel, so lets set the EE and dir */
-> +		bchan->ee = args->ee;
-> +		bchan->slave.direction = args->dir ?
-> +				DMA_DEV_TO_MEM : DMA_MEM_TO_DEV;
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
+>> I believe you want gpio_get_value() to return either the driven or
+>> actual pin value where it can on the current HW, but just e.g. hard-code
+>> 0 on other HW. That would introduce a core feature that works some
+>> places but not others, and hence make drivers that relied on the feature
+>> less portable between HW with different actual features.
+>
+> I can buy that argument, but there's an issue which stands squarely in
+> its way, and that is open-drain GPIOs.
+>
+> These are modelled just as any other GPIO, mainly so that both
+> gpio_set_value(gpio, 1) and gpio_direction_input(gpio) both result in
+> the signal being high.  The only combination which results in the
+> signal being driven low is outputting zero - and the state of the signal
+> can aways be read back.
+>
+> The problem here is that such gpios are implemented in things like the
+> I2C driver such that they're _always_ outputs, and gpio_set_value() is
+> used to pull the signal down.  gpio_get_value() is used to read its
+> current state.
+>
+> So, if we say that gpio_get_value() is undefined, we force such
+> subsystems to always jump through the non-open-drain paths (using
+> gpio_direction_input() to set the line high and
+> gpio_direction_output(gpio, 0) to drive it low.)
 
-A filter function should no longer be needed.
+Incidentally that is what gpiolib is doing internally in
+gpiod_direction_output().
 
-> +static struct dma_chan *bam_dma_xlate(struct of_phandle_args *dma_spec,
-> +		struct of_dma *of)
-> +{
-> +	struct bam_filter_args args;
-> +	dma_cap_mask_t cap;
-> +
-> +	if (dma_spec->args_count != 3)
-> +		return NULL;
-> +
-> +	args.dev = of->of_dma_data;
-> +	args.id = dma_spec->args[0];
-> +	args.ee = dma_spec->args[1];
-> +	args.dir = dma_spec->args[2];
-> +
-> +	dma_cap_zero(cap);
-> +	dma_cap_set(DMA_SLAVE, cap);
-> +
-> +	return dma_request_channel(cap, bam_dma_filter, &args);
-> +}
+You're absolutely right that it makes no sense to have open
+drain (or open source) unless the signal can be read back from
+the hardware.
 
-Instead, call dma_get_slave_channel() with the right channel that you already know
-here.
+I'm thinking something like if the driver manages to obtain a
+GPIO with
 
-> +	if (pdev->dev.of_node) {
-> +		ret = of_dma_controller_register(pdev->dev.of_node,
-> +				bam_dma_xlate, &bdev->common);
-> +
-> +		if (ret) {
-> +			dev_err(bdev->dev, "failed to register of_dma\n");
-> +			goto err_unregister_dma;
-> +		}
-> +	}
+gpio_request_one(gpio, GPIOF_OPEN_DRAIN |
+                     GPIOF_OUT_INIT_HIGH);
 
-No need to check for pdev->dev.of_node when that is the only mode of probing.
+As the I2C core does, and then when that call succeeds, it can
+expect that whatever comes back from gpio_get_value() is
+always what is actually on the line. If the driver cannot determine
+this it should not have allowed that flag to succeed in the first
+place, so this might be something we want to enforce.
 
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id bam_of_match[] = {
-> +	{ .compatible = "qcom,bam-v1.4.0", },
-> +	{ .compatible = "qcom,bam-v1.4.1", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, bam_of_match);
-> +#endif
+There are two white spots on the map here:
 
-Also, you can remove the #ifdef here and the of_match_ptr() below.
+1. Today this OPEN_DRAIN flag is not even passed down to
+the driver so how could it say anything about it :-( it's a pure gpiolib
+internal flag. We don't know if the hardware can actually even
+do open drain, we just assume it can.
 
-> +
-> +static struct platform_driver bam_dma_driver = {
-> +	.probe = bam_dma_probe,
-> +	.remove = bam_dma_remove,
-> +	.driver = {
-> +		.name = "bam-dma-engine",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(bam_of_match),
-> +	},
-> +};
-> +
-> +static int __init bam_dma_init(void)
-> +{
-> +	return platform_driver_register(&bam_dma_driver);
-> +}
-> +
-> +static void __exit bam_dma_exit(void)
-> +{
-> +	return platform_driver_unregister(&bam_dma_driver);
-> +}
-> +
+What it should really do - in the best of worlds - is to check if
+it can cross-reference the GPIO line to a pin in the pin control
+subsystem, and if that is possible, then ask the pin if it
+is supporting open drain and set it. It currently has no such
+cross-calls, it is just assumed that the configuration is consistent,
+and the actual pin is set up as open drain. But it would make
+sense to add more cross-calls here, since GPIO is accepting
+these flags (OPEN_DRAIN/OPEN_SOURCE).
 
-module_platform_driver()
+Like:
+int pinctrl_gpio_set_flags(unsigned gpio, unsigned long flags);
 
-> diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
-> new file mode 100644
-> index 0000000..2cb3b5f
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.h
-> @@ -0,0 +1,268 @@
-> +#ifndef __QCOM_BAM_DMA_H__
-> +#define __QCOM_BAM_DMA_H__
-> +
-> +#include <linux/dmaengine.h>
-> +#include "virt-dma.h"
-> +
-> +enum bam_channel_dir {
-> +	BAM_PIPE_CONSUMER = 0,	/* channel reads from data-fifo or memory */
-> +	BAM_PIPE_PRODUCER,	/* channel writes to data-fifo or memory */
-> +};
+Where the pinctrl subsystem would attempt to cross reference
+and set the flag, and the pin controller backend will then have
+the option to return an error code.
 
-Since the header does not serve as an interface, just move all the contents
-into the driver directly.
+We could atleast support that for the select pin controllers
+that use generic pin config. i.MX is another story, but I'm open
+to compromises.
 
-> +struct bam_desc_hw {
-> +	u32 addr;		/* Buffer physical address */
-> +	u16 size;		/* Buffer size in bytes */
-> +	u16 flags;
-> +} __packed;
+2. In the new descriptor API this open drain setting would
+be set from the lookup table and be a property on the line,
+meaning this flag is not requested explicitly by the consumer,
+and the consumer needs to inspect the obtained descriptor
+to figure out if it is set to open drain.
 
-Remove __packed here, it only makes the access less efficient but does not change
-the layout, which is already packed.
+Alexandre: do you have plans for how to handle a dynamic
+consumer passing flags to its gpio request in the gpiod API?
+I noticed that API missing now, there is exactly one user in the
+entire kernel, in drivers/i2c/i2c-core.c but a very important one.
 
-	Arnd
+I guess to switch the I2C core over to descriptors I could
+think of an API like this:
+
+int gpiod_get_flags(const struct gpio_desc *desc);
+
+If the OPEN_DRAIN flag is set on that descriptor we should
+always be able to read the input. But as this is not really what the
+I2C core wants to know (it really would prefer not to bother with
+such GPIO flag details) so is it better if we add a special call to
+figure out if the input can be read? Like:
+
+bool gpiod_input_always_valid(const struct gpio_desc *desc);
+
+And leave it up to the core to look at flags, driver characteristics
+etc and determine whether the input can be trusted?
+
+Yours,
+Linus Walleij
