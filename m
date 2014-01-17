@@ -1,90 +1,161 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 21:24:39 +0800
-Subject: [PATCH net-next v3 0/8] net: stmmac: Add Allwinner A20 GMAC ethernet
-Message-ID: <1389965087-21971-1-git-send-email-wens@csie.org>
+Date: Fri, 17 Jan 2014 21:24:41 +0800
+Subject: [PATCH net-next v3 2/8] net: stmmac: Add support for optional reset
+ control
+In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
+References: <1389965087-21971-1-git-send-email-wens@csie.org>
+Message-ID: <1389965087-21971-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The DWMAC has a reset assert line, which is used on some SoCs. Add an
+optional reset control to stmmac driver core.
 
-This is v3 of the  Allwinner A20 GMAC glue layer for stmmac.
-I have split the series into stmmac driver changes for net-next,
-and clock and DT patches for their respective trees.
+To support reset control deferred probing, this patch changes the driver
+probe function to return the actual error, instead of just -EINVAL.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/net/stmmac.txt      |  3 +++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig           |  1 +
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h          |  2 ++
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c     | 19 ++++++++++++++++++-
+ drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c      |  4 ++--
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c |  4 ++--
+ 6 files changed, 28 insertions(+), 5 deletions(-)
 
-The Allwinner A20 SoC integrates an early version of dwmac
-IP from Synopsys. On top of that is a hardware glue layer.
-This layer needs to be configured before the dwmac can be
-used.
-
-Part of the glue layer is a clock mux, which controls the
-source and direction of the TX clock used by GMAC.
-
-The glue layer is implemented with existing feature flags 
-and callbacks found in stmmac driver core. A new stmmac_of_data
-structure, which is a subset of the original platform data,
-has been added to tie these values with compatible strings.
-The purpose of this is to avoid future glue layers assuming
-they can pass other data or directly modify values used by
-the driver core. This is found in patch #7.
-
-The callbacks have also been extended to pass board specific
-data. This is found in patch #3.
-
-This version of dwmac IP requires store and forward DMA mode.
-The relevant device tree property was documented, but not
-implemented. Patch #6 adds this to stmmac platform driver.
-
-Changes since v2:
-
-  * Dropped non CONFIG_RESET_CONTROLLER routines, make stmmac
-    select CONFIG_RESET_CONTROLLER
-  * Split out "Deprecate snps,phy-addr and auto-detect PHY address"
-    from "Use driver data and callbacks tied with compatible strings"
-  * Added comments on how sunxi glue layer uses GMAC clock
-  * Rebased onto net-next
-  * Corrected typo in blackfin commit message
-
-Changes since v1:
-
-  * Added optional reset control to stmmac driver core
-  * Added non CONFIG_RESET_CONROLLER routines for the above change
-  * Extended callback API, as discussed with Srinivas
-  * Used new stmmac_of_data to pass features and callbacks,
-    instead of platform data, as discussed
-  * Seperated clock module glue layer into clock driver
-
-
-Cheers,
-ChenYu
-
-
-Chen-Yu Tsai (8):
-  net: stmmac: Enable stmmac main clock when probing hardware
-  net: stmmac: Add support for optional reset control
-  net: stmmac: Allocate and pass soc/board specific data to callbacks
-  blackfin: Update stmmac callback signatures
-  net: stmmac: Honor DT parameter to force DMA store and forward mode
-  net: stmmac: Deprecate snps,phy-addr and auto-detect PHY address
-  net: stmmac: Use driver data and callbacks tied with compatible
-    strings
-  net: stmmac: sunxi platform extensions for GMAC in Allwinner A20 SoC's
-
- .../bindings/net/allwinner,sun7i-a20-gmac.txt      |  27 ++++
- Documentation/devicetree/bindings/net/stmmac.txt   |   4 +-
- Documentation/networking/stmmac.txt                |  12 +-
- arch/blackfin/mach-bf609/boards/ezkit.c            |   2 +-
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 141 +++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       |   5 +
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  45 +++++--
- drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   |   4 +-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  80 +++++++++---
- include/linux/stmmac.h                             |  24 +++-
- 12 files changed, 316 insertions(+), 41 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-
+diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+index eba0e5e..d132513 100644
+--- a/Documentation/devicetree/bindings/net/stmmac.txt
++++ b/Documentation/devicetree/bindings/net/stmmac.txt
+@@ -30,6 +30,9 @@ Required properties:
+ 
+ Optional properties:
+ - mac-address: 6 bytes, mac address
++- resets: Should contain a phandle to the STMMAC reset signal, if any
++- reset-names: Should contain the reset signal name "stmmaceth", if a
++	reset phandle is given
+ 
+ Examples:
+ 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index 6e52c0f..b59d1ef 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -5,6 +5,7 @@ config STMMAC_ETH
+ 	select PHYLIB
+ 	select CRC32
+ 	select PTP_1588_CLOCK
++	select RESET_CONTROLLER
+ 	---help---
+ 	  This is the driver for the Ethernet IPs are built around a
+ 	  Synopsys IP Core and only tested on the STMicroelectronics
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac.h b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+index 73709e9..c1c141f 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+@@ -32,6 +32,7 @@
+ #include <linux/pci.h>
+ #include "common.h"
+ #include <linux/ptp_clock_kernel.h>
++#include <linux/reset.h>
+ 
+ struct stmmac_priv {
+ 	/* Frequently used values are kept adjacent for cache effect */
+@@ -91,6 +92,7 @@ struct stmmac_priv {
+ 	int wolopts;
+ 	int wol_irq;
+ 	struct clk *stmmac_clk;
++	struct reset_control *stmmac_rst;
+ 	int clk_csr;
+ 	struct timer_list eee_ctrl_timer;
+ 	int lpi_irq;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 0d2c4cb..0c5c120 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -51,6 +51,7 @@
+ #include <linux/net_tstamp.h>
+ #include "stmmac_ptp.h"
+ #include "stmmac.h"
++#include <linux/reset.h>
+ 
+ #define STMMAC_ALIGN(x)	L1_CACHE_ALIGN(x)
+ #define JUMBO_LEN	9000
+@@ -2728,10 +2729,24 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	if (IS_ERR(priv->stmmac_clk)) {
+ 		dev_warn(priv->device, "%s: warning: cannot get CSR clock\n",
+ 			 __func__);
++		ret = PTR_ERR(priv->stmmac_clk);
+ 		goto error_clk_get;
+ 	}
+ 	clk_prepare_enable(priv->stmmac_clk);
+ 
++	priv->stmmac_rst = devm_reset_control_get(priv->device,
++						  STMMAC_RESOURCE_NAME);
++	if (IS_ERR(priv->stmmac_rst)) {
++		if (PTR_ERR(priv->stmmac_rst) == -EPROBE_DEFER) {
++			ret = -EPROBE_DEFER;
++			goto error_hw_init;
++		}
++		dev_info(priv->device, "no reset control found\n");
++		priv->stmmac_rst = NULL;
++	}
++	if (priv->stmmac_rst)
++		reset_control_deassert(priv->stmmac_rst);
++
+ 	/* Init MAC and get the capabilities */
+ 	ret = stmmac_hw_init(priv);
+ 	if (ret)
+@@ -2808,7 +2823,7 @@ error_hw_init:
+ error_clk_get:
+ 	free_netdev(ndev);
+ 
+-	return NULL;
++	return ERR_PTR(ret);
+ }
+ 
+ /**
+@@ -2832,6 +2847,8 @@ int stmmac_dvr_remove(struct net_device *ndev)
+ 		stmmac_mdio_unregister(ndev);
+ 	netif_carrier_off(ndev);
+ 	unregister_netdev(ndev);
++	if (priv->stmmac_rst)
++		reset_control_assert(priv->stmmac_rst);
+ 	clk_disable_unprepare(priv->stmmac_clk);
+ 	free_netdev(ndev);
+ 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
+index 37ba2e0..2916089 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
+@@ -100,9 +100,9 @@ static int stmmac_pci_probe(struct pci_dev *pdev,
+ 	stmmac_default_data();
+ 
+ 	priv = stmmac_dvr_probe(&(pdev->dev), &plat_dat, addr);
+-	if (!priv) {
++	if (IS_ERR(priv)) {
+ 		pr_err("%s: main driver probe failed", __func__);
+-		ret = -ENODEV;
++		ret = PTR_ERR(priv);
+ 		goto err_out;
+ 	}
+ 	priv->dev->irq = pdev->irq;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 6d0bf22..cc6b89a7 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -152,9 +152,9 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	priv = stmmac_dvr_probe(&(pdev->dev), plat_dat, addr);
+-	if (!priv) {
++	if (IS_ERR(priv)) {
+ 		pr_err("%s: main driver probe failed", __func__);
+-		return -ENODEV;
++		return PTR_ERR(priv);
+ 	}
+ 
+ 	/* Get MAC address if available (DT) */
 -- 
 1.8.5.2
