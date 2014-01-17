@@ -1,55 +1,45 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 17 Jan 2014 20:57:41 +0100
-Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
-In-Reply-To: <20140117184731.GE15937@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 17 Jan 2014 18:47:31 +0000")
-References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
-Message-ID: <87ioti2xfu.fsf@lebrac.rtp-net.org>
+From: syin@broadcom.com (Sherman Yin)
+Date: Fri, 17 Jan 2014 11:59:21 -0800
+Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>	<1387592016-13740-1-git-send-email-syin@broadcom.com>	<1387592016-13740-4-git-send-email-syin@broadcom.com>
+ <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
+Message-ID: <52D98B99.5050604@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
-> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
-> hides stuff.  It's really wonderful, because you don't have to care
-> about how the GPIOs are actually accessed in drivers anymore.
+On 14-01-16 05:19 AM, Linus Walleij wrote:
+> On Sat, Dec 21, 2013 at 3:13 AM, Sherman Yin <syin@broadcom.com> wrote:
 >
-> However, what about the behaviour of GPIOs?
+> '> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
+>>
+>> Signed-off-by: Sherman Yin <syin@broadcom.com>
+>> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>> v4: - PINCTRL selected in Kconfig, PINCTRL_CAPRI selected in bcm_defconfig
+>>      - make use of regmap
+>>      - change CAPRI_PIN_UPDATE from macro to inline function.
+>>      - Handle pull-up strength arg in Ohm instead of enum
 >
-> What about... for example... this sequence:
+> Patch applied. It is really good now! It's late before the merge
+> window, but you've done a tremendous work on this driver and
+> I don't want to delay its deployment further.
+
+Great, thanks for the support and reviews!
+
+> But note:
 >
-> 	gpio_direction_output(gpio, 1);
-> 	val = gpio_get_value(gpio);
+>>   arch/arm/configs/bcm_defconfig  |    1 +
+>>   arch/arm/mach-bcm/Kconfig       |    1 +
 >
-> What value is "val"?  More importantly, what value is reflected in
-> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
+> I've optimistically applied these two hunks of the patch as well,
+> but if there is any conflict with the ARM SoC tree I will just rebase
+> the patch and pull these *out*.
 >
-> Now, while you can make reasonable assumptions, such as "it'll return
-> that the output is being driven to the requested state" or "it'll
-> return the actual state of the pin", what about this instead, which
-> happens on iMX hardware - "it'll _always_ return zero".
->
+> ARM SoC maintainers: be warned if something collides.
 
-this is "expected". gpio layer docs are saying that in output case, the
-value may be wrong. Not intuitive but documented.
+Ok, will keep an eye on this and fix accordingly.  Should be simple fixes.
 
-> Yes, iMX6 at least has this behaviour.  For any output, val as above
-> will always be zero, and /proc/sys/kernel/debug/gpio will always
-> report that an output is zero... unless the SION bit has been set for
-> that GPIO signal.
-
-afaik at least imx51/53 have some behaviour.
-
->
-> The reason is that on hardware such as iMX6, reading the GPIO is done
-> by reading the pad state register, and this register is _only_ supplied
-> the state of the pad when the input path is enabled.  The input path
-> is only enabled when the output is disabled, or the SION bit is set
-> to force the GPIO input path.
-
-I sent mails about this same issue for imx51 in Dec 2010 and answer were
-that the SION bit should not be set for all gpios:
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/100875
-
-
-Arnaud
+Regards,
+Sherman
