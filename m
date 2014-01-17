@@ -1,71 +1,166 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 17 Jan 2014 09:44:59 +0200
-Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
-In-Reply-To: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 17 Jan 2014 17:03:15 +0900
+Subject: [PATCH v3] audit: Add generic compat syscall support
+In-Reply-To: <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1389945795-4255-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap2_dpll_round_rate() doesn't actually round the given rate, even if
-the name and the description so hints. Instead it only tries to find an
-exact rate match, or if that fails, return ~0 as an error.
+lib/audit.c provides a generic definition for auditing system calls.
+This patch extends it for compat syscall support on bi-architectures
+(32/64-bit) by adding lib/compat_audit.c when CONFIG_COMPAT enabled.
 
-What this basically means is that the user of the clock needs to know
-what rates the dpll can support, which obviously isn't right.
+Each architecture that wants to use this must define audit_is_compat()
+in asm/audit.h.
 
-This patch adds a simple method of rounding: during the iteration, the
-code keeps track of the closest rate match. If no exact match is found,
-the closest is returned.
-
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm/mach-omap2/clkt_dpll.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ include/linux/audit.h |    9 +++++++++
+ lib/Makefile          |    3 +++
+ lib/audit.c           |   17 +++++++++++++++++
+ lib/compat_audit.c    |   51 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 80 insertions(+)
+ create mode 100644 lib/compat_audit.c
 
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index 1f1708ef77bb..1b4e68dfb713 100644
---- a/arch/arm/mach-omap2/clkt_dpll.c
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -298,6 +298,7 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- 	struct dpll_data *dd;
- 	unsigned long ref_rate;
- 	const char *clk_name;
-+	unsigned long diff, closest_diff = ~0;
- 
- 	if (!clk || !clk->dpll_data)
- 		return ~0;
-@@ -345,20 +346,26 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- 		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
- 			 clk_name, m, n, new_rate);
- 
--		if (target_rate == new_rate) {
-+		diff = max(target_rate, new_rate) - min(target_rate, new_rate);
+diff --git a/include/linux/audit.h b/include/linux/audit.h
+index bf1ef22..3d71949 100644
+--- a/include/linux/audit.h
++++ b/include/linux/audit.h
+@@ -78,6 +78,15 @@ extern int is_audit_feature_set(int which);
+ extern int __init audit_register_class(int class, unsigned *list);
+ extern int audit_classify_syscall(int abi, unsigned syscall);
+ extern int audit_classify_arch(int arch);
++#if defined(CONFIG_AUDIT_GENERIC) && defined(CONFIG_COMPAT)
++extern unsigned compat_write_class[];
++extern unsigned compat_read_class[];
++extern unsigned compat_dir_class[];
++extern unsigned compat_chattr_class[];
++extern unsigned compat_signal_class[];
 +
-+		if (diff < closest_diff) {
-+			closest_diff = diff;
-+
- 			dd->last_rounded_m = m;
- 			dd->last_rounded_n = n;
--			dd->last_rounded_rate = target_rate;
--			break;
-+			dd->last_rounded_rate = new_rate;
-+
-+			if (diff == 0)
-+				break;
- 		}
- 	}
++extern int audit_classify_compat_syscall(int abi, unsigned syscall);
++#endif
  
--	if (target_rate != new_rate) {
-+	if (closest_diff == ~0) {
- 		pr_debug("clock: %s: cannot round to rate %lu\n",
- 			 clk_name, target_rate);
- 		return ~0;
- 	}
+ /* audit_names->type values */
+ #define	AUDIT_TYPE_UNKNOWN	0	/* we don't know yet */
+diff --git a/lib/Makefile b/lib/Makefile
+index a459c31..73ea908 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -93,6 +93,9 @@ obj-$(CONFIG_TEXTSEARCH_BM) += ts_bm.o
+ obj-$(CONFIG_TEXTSEARCH_FSM) += ts_fsm.o
+ obj-$(CONFIG_SMP) += percpu_counter.o
+ obj-$(CONFIG_AUDIT_GENERIC) += audit.o
++ifeq ($(CONFIG_COMPAT),y)
++obj-$(CONFIG_AUDIT_GENERIC) += compat_audit.o
++endif
  
--	return target_rate;
-+	return dd->last_rounded_rate;
+ obj-$(CONFIG_SWIOTLB) += swiotlb.o
+ obj-$(CONFIG_IOMMU_HELPER) += iommu-helper.o
+diff --git a/lib/audit.c b/lib/audit.c
+index 76bbed4..e29ba82 100644
+--- a/lib/audit.c
++++ b/lib/audit.c
+@@ -1,6 +1,7 @@
+ #include <linux/init.h>
+ #include <linux/types.h>
+ #include <linux/audit.h>
++#include <asm/audit.h>
+ #include <asm/unistd.h>
+ 
+ static unsigned dir_class[] = {
+@@ -30,11 +31,20 @@ static unsigned signal_class[] = {
+ 
+ int audit_classify_arch(int arch)
+ {
++#ifdef CONFIG_COMPAT
++	if (audit_is_compat(arch))
++		return 1;
++#endif
+ 	return 0;
  }
  
+ int audit_classify_syscall(int abi, unsigned syscall)
+ {
++#ifdef CONFIG_COMPAT
++	if (audit_is_compat(abi))
++		return audit_classify_compat_syscall(abi, syscall);
++#endif
++
+ 	switch(syscall) {
+ #ifdef __NR_open
+ 	case __NR_open:
+@@ -57,6 +67,13 @@ int audit_classify_syscall(int abi, unsigned syscall)
+ 
+ static int __init audit_classes_init(void)
+ {
++#ifdef CONFIG_COMPAT
++	audit_register_class(AUDIT_CLASS_WRITE_32, compat_write_class);
++	audit_register_class(AUDIT_CLASS_READ_32, compat_read_class);
++	audit_register_class(AUDIT_CLASS_DIR_WRITE_32, compat_dir_class);
++	audit_register_class(AUDIT_CLASS_CHATTR_32, compat_chattr_class);
++	audit_register_class(AUDIT_CLASS_SIGNAL_32, compat_signal_class);
++#endif
+ 	audit_register_class(AUDIT_CLASS_WRITE, write_class);
+ 	audit_register_class(AUDIT_CLASS_READ, read_class);
+ 	audit_register_class(AUDIT_CLASS_DIR_WRITE, dir_class);
+diff --git a/lib/compat_audit.c b/lib/compat_audit.c
+new file mode 100644
+index 0000000..94f6480
+--- /dev/null
++++ b/lib/compat_audit.c
+@@ -0,0 +1,51 @@
++#include <linux/init.h>
++#include <linux/types.h>
++/* FIXME: this might be architecture dependent */
++#include <asm/unistd_32.h>
++
++unsigned compat_dir_class[] = {
++#include <asm-generic/audit_dir_write.h>
++~0U
++};
++
++unsigned compat_read_class[] = {
++#include <asm-generic/audit_read.h>
++~0U
++};
++
++unsigned compat_write_class[] = {
++#include <asm-generic/audit_write.h>
++~0U
++};
++
++unsigned compat_chattr_class[] = {
++#include <asm-generic/audit_change_attr.h>
++~0U
++};
++
++unsigned compat_signal_class[] = {
++#include <asm-generic/audit_signal.h>
++~0U
++};
++
++int audit_classify_compat_syscall(int abi, unsigned syscall)
++{
++	switch (syscall) {
++#ifdef __NR_open
++	case __NR_open:
++		return 2;
++#endif
++#ifdef __NR_openat
++	case __NR_openat:
++		return 3;
++#endif
++#ifdef __NR_socketcall
++	case __NR_socketcall:
++		return 4;
++#endif
++	case __NR_execve:
++		return 5;
++	default:
++		return 1;
++	}
++}
 -- 
-1.8.3.2
+1.7.9.5
