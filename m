@@ -1,89 +1,150 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Jan 2014 20:25:09 +0800
-Subject: [PATCH 15/20] ACPI / ARM64: Update acpi_register_gsi to register with
- the core IRQ subsystem
+Date: Fri, 17 Jan 2014 20:25:11 +0800
+Subject: [PATCH 17/20] clocksource / arch_timer: Use ACPI GTDT table to
+ initialize arch timer
 In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
 References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1389961514-13562-16-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1389961514-13562-18-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This API is similar to DT based irq_of_parse_and_map but does link
-parent/child IRQ controllers. This is tested for primary GIC PPI and GIC SPI
-interrupts and not for secondary child irq controllers.
+ACPI GTDT (Generic Timer Description Table) contains information for
+arch timer initialization, this patch use this table to probe arm timer.
+
+GTDT table is used for ARM/ARM64 only, please refer to chapter 5.2.24
+of ACPI 5.0 spec for detailed inforamtion
 
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- drivers/acpi/plat/arm-core.c |   48 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 2 deletions(-)
+ drivers/clocksource/arm_arch_timer.c |  100 +++++++++++++++++++++++++++++-----
+ 1 file changed, 85 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-index 2ff00b0..22c8235 100644
---- a/drivers/acpi/plat/arm-core.c
-+++ b/drivers/acpi/plat/arm-core.c
-@@ -84,7 +84,7 @@ enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 95fb944..1fa5f67 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -21,6 +21,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/sched_clock.h>
++#include <linux/acpi.h>
  
- static unsigned int gsi_to_irq(unsigned int gsi)
- {
--	int irq = irq_create_mapping(NULL, gsi);
-+	int irq = irq_find_mapping(NULL, gsi);
- 
- 	return irq;
+ #include <asm/arch_timer.h>
+ #include <asm/virt.h>
+@@ -632,20 +633,8 @@ static void __init arch_timer_common_init(void)
+ 	arch_timer_arch_init();
  }
-@@ -350,7 +350,51 @@ EXPORT_SYMBOL(acpi_unregister_ioapic);
-  */
- int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
- {
--	return -1;
-+	unsigned int irq;
-+	unsigned int irq_type;
-+
-+	/*
-+	 * ACPI have no bindings to indicate SPI or PPI, so we
-+	 * use different mappings from DT in ACPI.
-+	 *
-+	 * For FDT
-+	 * PPI interrupt: in the range [0, 15];
-+	 * SPI interrupt: in the range [0, 987];
-+	 *
-+	 * For ACPI, GSI should be unique so using
-+	 * identity mapping for hwirq:
-+	 * PPI interrupt: in the range [16, 31];
-+	 * SPI interrupt: in the range [32, 1019];
-+	 */
-+
-+	if (trigger == ACPI_EDGE_SENSITIVE &&
-+				polarity == ACPI_ACTIVE_LOW)
-+		irq_type = IRQ_TYPE_EDGE_FALLING;
-+	else if (trigger == ACPI_EDGE_SENSITIVE &&
-+				polarity == ACPI_ACTIVE_HIGH)
-+		irq_type = IRQ_TYPE_EDGE_RISING;
-+	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-+				polarity == ACPI_ACTIVE_LOW)
-+		irq_type = IRQ_TYPE_LEVEL_LOW;
-+	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-+				polarity == ACPI_ACTIVE_HIGH)
-+		irq_type = IRQ_TYPE_LEVEL_HIGH;
-+	else
-+		irq_type = IRQ_TYPE_NONE;
-+
-+	/*
-+	 * Since only one GIC is supported in ACPI 5.0, we can
-+	 * create mapping refer to the default domain
-+	 */
-+	irq = irq_create_mapping(NULL, gsi);
-+	if (!irq)
-+		return irq;
-+
-+	/* Set irq type if specified and different than the current one */
-+	if (irq_type != IRQ_TYPE_NONE &&
-+		irq_type != irq_get_trigger_type(irq))
-+		irq_set_irq_type(irq, irq_type);
-+	return irq;
- }
- EXPORT_SYMBOL_GPL(acpi_register_gsi);
  
+-static void __init arch_timer_init(struct device_node *np)
++static void __init arch_timer_init(void)
+ {
+-	int i;
+-
+-	if (arch_timers_present & ARCH_CP15_TIMER) {
+-		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
+-		return;
+-	}
+-
+-	arch_timers_present |= ARCH_CP15_TIMER;
+-	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
+-		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+-	arch_timer_detect_rate(NULL, np);
+-
+ 	/*
+ 	 * If HYP mode is available, we know that the physical timer
+ 	 * has been configured to be accessible from PL1. Use it, so
+@@ -667,8 +656,89 @@ static void __init arch_timer_init(struct device_node *np)
+ 	arch_timer_register();
+ 	arch_timer_common_init();
+ }
+-CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_init);
+-CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_init);
++
++static void __init arch_timer_of_init(struct device_node *np)
++{
++	int i;
++
++	if (arch_timers_present & ARCH_CP15_TIMER) {
++		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
++		return;
++	}
++
++	arch_timers_present |= ARCH_CP15_TIMER;
++	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
++		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
++	arch_timer_detect_rate(NULL, np);
++
++	arch_timer_init();
++}
++CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
++CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
++
++#ifdef CONFIG_ACPI
++static void __init register_arch_interrupt(u32 interrupt, u32 flags,
++					int *arch_timer_ppi)
++{
++	int trigger, polarity;
++
++	if (!interrupt || !arch_timer_ppi)
++		return;
++
++	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
++			: ACPI_LEVEL_SENSITIVE;
++
++	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
++			: ACPI_ACTIVE_HIGH;
++
++	*arch_timer_ppi = acpi_register_gsi(NULL, interrupt, trigger,
++						polarity);
++}
++
++static int __init acpi_parse_gtdt(struct acpi_table_header *table)
++{
++	struct acpi_table_gtdt *gtdt;
++
++	gtdt = (struct acpi_table_gtdt *)table;
++	if (!gtdt)
++		return -EINVAL;
++
++	arch_timer_rate = arch_timer_get_cntfrq();
++
++	if (!arch_timer_rate) {
++		pr_warn("arch_timer: Could not get frequency from CNTFREG\n");
++		return -EINVAL;
++	}
++
++	register_arch_interrupt(gtdt->secure_pl1_interrupt,
++		gtdt->secure_pl1_flags, &arch_timer_ppi[PHYS_SECURE_PPI]);
++
++	register_arch_interrupt(gtdt->non_secure_pl1_interrupt,
++		gtdt->non_secure_pl1_flags, &arch_timer_ppi[PHYS_NONSECURE_PPI]);
++
++	register_arch_interrupt(gtdt->virtual_timer_interrupt,
++		gtdt->virtual_timer_flags, &arch_timer_ppi[VIRT_PPI]);
++
++	register_arch_interrupt(gtdt->non_secure_pl2_interrupt,
++		gtdt->non_secure_pl2_flags, &arch_timer_ppi[HYP_PPI]);
++
++	return 0;
++}
++
++void __init arch_timer_acpi_init(struct acpi_table_header *table)
++{
++	if (arch_timers_present & ARCH_CP15_TIMER) {
++		pr_warn("arch_timer: already initialized, skipping\n");
++		return;
++	}
++
++	if (acpi_parse_gtdt(table))
++		return;
++
++	arch_timers_present |= ARCH_CP15_TIMER;
++	arch_timer_init();
++}
++#endif
+ 
+ static void __init arch_timer_mem_init(struct device_node *np)
+ {
 -- 
 1.7.9.5
