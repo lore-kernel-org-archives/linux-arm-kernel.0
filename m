@@ -1,72 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 17 Jan 2014 09:22:30 +0900
-Subject: [PATCH v7 4/4] ARM: shmobile: genmai: Enable r7s72100-ether
-In-Reply-To: <1389918150-19058-1-git-send-email-horms+renesas@verge.net.au>
-References: <1389918150-19058-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1389918150-19058-5-git-send-email-horms+renesas@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 16 Jan 2014 16:33:14 -0800
+Subject: [PATCH v2 2/2] i2c: New bus driver for the QUP I2C controller
+In-Reply-To: <20140117001833.GL30911@sonymobile.com>
+References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140115164604.GI14405@codeaurora.org>
+ <20140117001833.GL30911@sonymobile.com>
+Message-ID: <20140117003314.GB13785@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms@verge.net.au>
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 01/16, Bjorn Andersson wrote:
+> On Wed 15 Jan 08:46 PST 2014, Stephen Boyd wrote:
+> 
+> > On 01/13, Bjorn Andersson wrote:
+> > > +
+> > > +static int
+> > > +qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
+> > > +{
+> > > +	int retries = 0;
+> > > +	u32 state;
+> > > +
+> > > +	do {
+> > > +		state = readl(qup->base + QUP_STATE);
+> > > +
+> > > +		/*
+> > > +		 * If only valid bit needs to be checked, requested state is
+> > > +		 * 'don't care'
+> > > +		 */
+> > 
+> > It looks like req_state == 0 means only_valid == true. Can we
+> > drop the only_valid argument to this function?
+> > 
+> 
+> In all cases but the reset in the beginning of qup_i2c_xfer, so it seems that
+> it has to stay.
 
----
-Dave, I am planning to take this change through my tree.
+Oh that's because QUP_RESET_STATE is equal to 0? It looks like
+bits 0 and 1 are the state field and bit 2 is a flag indicating
+that bits 0 and 1 are valid. Why not OR in the QUP_STATE_VALID
+flag into the macros that are passed to this function? Then the
+logic would simply be looping looking for a match of the
+req_state (which is really a mask now).
 
-v3 - v7
-* No change
-
-v2
-* As suggested by Magnus Damm and Sergei Shtylyov
-  - r7s72100 ethernet is not gigabit so do not refer to it as such
-
-* As suggested by Sergei Shtylyov
-  - set no_ether_link as there is no LINK signal documented
-    in the manual
----
- arch/arm/mach-shmobile/board-genmai.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index 3e92e3c..a1f6fe1 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -20,15 +20,36 @@
- 
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/sh_eth.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r7s72100.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/* Ether */
-+static const struct sh_eth_plat_data ether_pdata __initconst = {
-+	.phy			= 0x00, /* PD60610 */
-+	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-+	.phy_interface		= PHY_INTERFACE_MODE_MII,
-+	.no_ether_link		= 1
-+};
-+
-+static const struct resource ether_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe8203000, 0x800),
-+	DEFINE_RES_MEM(0xe8204800, 0x200),
-+	DEFINE_RES_IRQ(gic_iid(359)),
-+};
-+
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
- 	r7s72100_add_dt_devices();
-+
-+	platform_device_register_resndata(&platform_bus, "r7s72100-ether", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  &ether_pdata, sizeof(ether_pdata));
- }
- 
- static const char * const genmai_boards_compat_dt[] __initconst = {
 -- 
-1.8.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
