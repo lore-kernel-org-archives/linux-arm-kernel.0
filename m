@@ -1,48 +1,92 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Jan 2014 16:33:14 -0800
-Subject: [PATCH v2 2/2] i2c: New bus driver for the QUP I2C controller
-In-Reply-To: <20140117001833.GL30911@sonymobile.com>
-References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20140115164604.GI14405@codeaurora.org>
- <20140117001833.GL30911@sonymobile.com>
-Message-ID: <20140117003314.GB13785@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 17 Jan 2014 02:18:38 +0100
+Subject: [PATCH] cpuidle: don't use modular platform register in
+ non-modular ARM drivers
+In-Reply-To: <1389910767-4040-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1389910767-4040-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <3872763.be1TKi9G4j@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16, Bjorn Andersson wrote:
-> On Wed 15 Jan 08:46 PST 2014, Stephen Boyd wrote:
+On Thursday, January 16, 2014 05:19:27 PM Paul Gortmaker wrote:
+> These two drivers are configured with Kconfig options that are
+> both declared as bool.  Hence it is not possible for the code
+> to be built as modular.  However the code is currently using the
+> module_platform_driver() macro for driver registration.
 > 
-> > On 01/13, Bjorn Andersson wrote:
-> > > +
-> > > +static int
-> > > +qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
-> > > +{
-> > > +	int retries = 0;
-> > > +	u32 state;
-> > > +
-> > > +	do {
-> > > +		state = readl(qup->base + QUP_STATE);
-> > > +
-> > > +		/*
-> > > +		 * If only valid bit needs to be checked, requested state is
-> > > +		 * 'don't care'
-> > > +		 */
-> > 
-> > It looks like req_state == 0 means only_valid == true. Can we
-> > drop the only_valid argument to this function?
-> > 
+> While this currently works, we really don't want to be including
+> the module.h header in non-modular code, which we'll be forced
+> to do, pending some upcoming code relocation from init.h into
+> module.h.  So we fix it now by using the non-modular equivalent.
 > 
-> In all cases but the reset in the beginning of qup_i2c_xfer, so it seems that
-> it has to stay.
+> With some macro detangulation, and a little help from cpp, we can
+> see that module_platform_driver(calxeda_cpuidle_plat_driver) gets
+> roughly translated into:
+> 
+>   static int __init calxeda_cpuidle_plat_driver_init(void)
+>   {
+>         return platform_driver_register(&calxeda_cpuidle_plat_driver);
+>   }
+>   module_init(calxeda_cpuidle_plat_driver_init);
+> 
+>   static void __exit calxeda_cpuidle_plat_driver_exit(void)
+>   {
+>         platform_driver_unregister(&calxeda_cpuidle_plat_driver);
+>   }
+>   module_exit(calxeda_cpuidle_plat_driver_exit);
+> 
+> [and similarly for the other file, cpuidle-zynq.c]
+> 
+> And since we've already established that the code is non-modular,
+> we can completely drop any code relating to module_exit.  For non
+> modular code, module_init beomes __initcall.  But direct use of
+> __initcall is discouraged, vs. one of the priority categorized
+> subgroups.  As __initcall gets mapped onto device_initcall, our
+> use of device_initcall directly in this change means that the
+> runtime impact is zero -- they will remain at level 6 in the
+> initcall ordering.
+> 
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Oh that's because QUP_RESET_STATE is equal to 0? It looks like
-bits 0 and 1 are the state field and bit 2 is a flag indicating
-that bits 0 and 1 are valid. Why not OR in the QUP_STATE_VALID
-flag into the macros that are passed to this function? Then the
-logic would simply be looping looking for a match of the
-req_state (which is really a mask now).
+I'd appreciate some ACKs from the ARM people.
+
+Thanks!
+
+> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+> index 6e51114057d0..631e2cd9bce6 100644
+> --- a/drivers/cpuidle/cpuidle-calxeda.c
+> +++ b/drivers/cpuidle/cpuidle-calxeda.c
+> @@ -78,4 +78,8 @@ static struct platform_driver calxeda_cpuidle_plat_driver = {
+>          .probe = calxeda_cpuidle_probe,
+>  };
+>  
+> -module_platform_driver(calxeda_cpuidle_plat_driver);
+> +static int __init calxeda_cpuidle_plat_driver_init(void)
+> +{
+> +	return platform_driver_register(&calxeda_cpuidle_plat_driver);
+> +}
+> +device_initcall(calxeda_cpuidle_plat_driver_init);
+> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+> index aded75928028..a1aae519a573 100644
+> --- a/drivers/cpuidle/cpuidle-zynq.c
+> +++ b/drivers/cpuidle/cpuidle-zynq.c
+> @@ -85,4 +85,8 @@ static struct platform_driver zynq_cpuidle_driver = {
+>  	.probe = zynq_cpuidle_probe,
+>  };
+>  
+> -module_platform_driver(zynq_cpuidle_driver);
+> +static int __init zynq_cpuidle_driver_init(void)
+> +{
+> +	return platform_driver_register(&zynq_cpuidle_driver);
+> +}
+> +device_initcall(zynq_cpuidle_driver_init);
+> 
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
