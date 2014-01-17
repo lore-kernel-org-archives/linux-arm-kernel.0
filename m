@@ -1,105 +1,219 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Jan 2014 15:03:11 +0000
-Subject: [RFC PATCH 1/3] arm64: KVM: force cache clean on page fault when
- caches are off
-In-Reply-To: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
-References: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1389970993-19371-2-git-send-email-marc.zyngier@arm.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 17 Jan 2014 16:03:55 +0100
+Subject: [PATCH v9] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1386602163-28479-1-git-send-email-jonas.jensen@gmail.com>
+References: <1386602163-28479-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the guest with caches off to observe data written
-contained in a given page, we need to make sure that page is
-committed to memory, and not just hanging in the cache (as
-guest accesses are completely bypassing the cache until it
-decides to enable it).
+This patch adds MOXA ART SoCs clock driver support.
 
-For this purpose, hook into the coherent_icache_guest_page
-function and flush the region if the guest SCTLR_EL1
-register doesn't show the MMU  and caches as being enabled.
-The function also get renamed to coherent_cache_guest_page.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  4 ++--
- arch/arm/kvm/mmu.c               |  4 ++--
- arch/arm64/include/asm/kvm_mmu.h | 11 +++++++----
- 3 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 77de4a4..f997b9e 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
- {
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5809069..415fd63 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -713,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pmd_writable(&new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
-+		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-@@ -721,7 +721,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
-+		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
- 	}
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 680f74e..2232dd0 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- 	return true;
- }
- 
--static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
-@@ -124,9 +123,14 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+Notes:
+    Changes since v8:
+    
+    1. rebase drivers/clk/Makefile to next-20140117
+    
+    DT bindings document:
+    
+    2. use two separate sections describing PLL/APB
+    3. update example
+    
+    Applies to next-20140117
+
+ .../bindings/clock/moxa,moxart-clock.txt           |  48 +++++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-moxart.c                           | 112 +++++++++++++++++++++
+ 3 files changed, 161 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+ create mode 100644 drivers/clk/clk-moxart.c
+
+diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+new file mode 100644
+index 0000000..242e3fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+@@ -0,0 +1,48 @@
++Device Tree Clock bindings for arch-moxart
 +
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
- {
-+	if ((vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) != 0b101)
-+		kvm_flush_dcache_to_poc((void *)hva, size);
++This binding uses the common clock binding[1].
 +
- 	if (!icache_is_aliasing()) {		/* PIPT */
- 		flush_icache_range(hva, hva + size);
- 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
-@@ -135,7 +139,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
- 	}
- }
- 
--#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
- 
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++MOXA ART SoCs allow to determine PLL output and APB frequencies
++by reading registers holding multiplier and divisor information.
++
++
++PLL:
++
++Required properties:
++- compatible : Must be "moxa,moxart-pll-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle to parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++APB:
++
++Required properties:
++- compatible : Must be "moxa,moxart-apb-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle to parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++For example:
++
++	clk_pll: clk_pll at 98100000 {
++		compatible = "moxa,moxart-pll-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++	};
++
++	clk_apb: clk_apb at 98100000 {
++		compatible = "moxa,moxart-apb-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++		clocks = <&clk_pll>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 0c16e9c..ed5d58d 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
++obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+new file mode 100644
+index 0000000..f0436a3
+--- /dev/null
++++ b/drivers/clk/clk-moxart.c
+@@ -0,0 +1,112 @@
++/*
++ * MOXA ART SoCs clock driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
++
++void __init moxart_of_pll_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *ref_clk;
++	unsigned long rate;
++	unsigned int mul;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	mul = readl(base + 0x30) >> 3 & 0x3f;
++	iounmap(base);
++
++	ref_clk = of_clk_get(node, 0);
++	if (IS_ERR(ref_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = mul * clk_get_rate(ref_clk);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
++	       moxart_of_pll_clk_init);
++
++void __init moxart_of_apb_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *pll_clk;
++	unsigned long rate;
++	unsigned int div, val;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	val = readl(base + 0xc) >> 4 & 0x7;
++	iounmap(base);
++
++	switch (val) {
++	case 1:
++		div = 3;
++		break;
++	case 2:
++		div = 4;
++		break;
++	case 3:
++		div = 6;
++		break;
++	case 4:
++		div = 8;
++		break;
++	default:
++		div = 2;
++		break;
++	}
++
++	pll_clk = of_clk_get(node, 0);
++	if (IS_ERR(pll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = clk_get_rate(pll_clk) / (div * 2);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
++	       moxart_of_apb_clk_init);
 -- 
-1.8.3.4
+1.8.2.1
