@@ -1,62 +1,108 @@
-From: grygorii.strashko@ti.com (Strashko, Grygorii)
-Date: Fri, 17 Jan 2014 18:08:13 +0000
-Subject: [PATCH V3 2/2] mm/memblock: Add support for excluded memory areas
-In-Reply-To: <20140114195225.078f810a@lilie>
-References: <1389618217-48166-1-git-send-email-phacht@linux.vnet.ibm.com>
- <1389618217-48166-3-git-send-email-phacht@linux.vnet.ibm.com>
- <52D538FD.8010907@ti.com>,<20140114195225.078f810a@lilie>
-Message-ID: <902E09E6452B0E43903E4F2D568737AB0B9852BA@DFRE01.ent.ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Jan 2014 20:11:06 +0200
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140117175312.GH7993@atomide.com>
+References: <52D53084.1070105@ti.com> <20140114203613.GA604@saruman.home>
+ <20140115020421.GA24195@saruman.home> <20140115031632.4167.2698@quantum>
+ <20140115035011.4167.96678@quantum> <20140115171323.GA22739@atomide.com>
+ <20140115192340.4167.87685@quantum> <20140115193547.GF7993@atomide.com>
+ <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
+ <20140117175312.GH7993@atomide.com>
+Message-ID: <52D9723A.6000700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 01/17/2014 07:53 PM, Tony Lindgren wrote:
+> * Kevin Hilman <khilman@linaro.org> [140117 09:48]:
+>> Mike Turquette <mturquette@linaro.org> writes:
+>>
+>> [...]
+>>
+>>> I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
+>>> Tero's series. This includes the AM3517 bits now. I've pushed this
+>>> branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
+>>> final sanity test before I merge this into clk-next?
 
-On 01/14/2014 08:52 PM, Philipp Hachtmann wrote:
-> Hello Grygorii,
-> 
-> thank you for your comments.
-> 
-> To clarify we have the following requirements for memblock:
-> 
-> (1) Reserved areas can be declared before memory is added.
-> (2) The physical memory is detected once only.
-> (3) The free memory (i.e. not reserved) memory can be iterated to add
-> it to the buddy allocator.
-> (4) Memory designated to be mapped into the kernel address space can be
-> iterated.
-> (5) Kdump on s390 requires knowledge about the full system memory
-> layout.
-> 
-> The s390 kdump implementation works a bit different from the
-> implementation on other architectures: The layout is not taken from the
-> production system and saved for the kdump kernel. Instead the kdump
-> kernel needs to gather information about the whole memory without
-> respect to locked out areas (like mem= and OLDMEM etc.).
-> 
-> Without kdump's requirement it would of course be suitable and easy
-> just to remove memory from memblock.memory. But then this information
-> is lost for later use by kdump.
-> 
-> The patch does not change any behaviour of the current API - whether it
-> is enabled or not.
+I think you accidentally merged wrong branch to clk-next-omap with the 
+latest refresh. This is one is missing the build-fixes now, when it 
+earlier had those in.
 
-Sorry, for the delayed reply.
+The correct branch to merge was 3.13-rc7-dt-clks-v13-build-fixes.
 
-My main concern here was that you are introducing new *generic* API,
-but in fact it is not generic, because it can't be re-used without huge rework
-of existing code.
-(at least as of wide usage of for_each_memblock(memory,...),
-because (if ARCH_MEMBLOCK_NOMAP=y) the meaning of "memory"
-ranges will be changed form "mapped memory" to "real phys memory").
+This also causes the build failure below for omap1.
 
-And therefore, I've proposed to keep things as is and introduce phys_memory
-ranges instead, to store real phys memory configuration.
+-Tero
 
-> 
-> The current patch seems to be overly complicated.
-> The following patch contains only the nomap functionality without any
-> cleanup and refactoring. I will post a V4 patch set which will contain
-> this patch.
-
-Regards,
--grygorii
+>>
+>> I merged clk-next-omap into next-20140117 and build/boot tested
+>> omap2plus_defconfig, multi_v7_defconfig and
+>> multi_v7_defconfig+CONFIG_LPAE=y and all passed a basic boot test for
+>> omap5uevm.
+>>
+>> I'll add OMAP5 to the automated boot testing starting with the next
+>> linux-next.
+>
+> OK that's good news. Looks like omap1_defconfig build has now started
+> failing though:
+>
+> vers/built-in.o: In function `omap5xxx_dt_clk_init':
+> :(.init.text+0x846c): undefined reference to `omap2_clk_disable_autoidle_all'
+> drivers/built-in.o: In function `am43xx_dt_clk_init':
+> :(.init.text+0x856c): undefined reference to `omap2_clk_disable_autoidle_all'
+> drivers/built-in.o:(.rodata+0xc3c4): undefined reference to `omap3_clkoutx2_recalc'
+> drivers/built-in.o:(.rodata+0xc40c): undefined reference to `omap3_noncore_dpll_enable'
+> drivers/built-in.o:(.rodata+0xc410): undefined reference to `omap3_noncore_dpll_disable'
+> drivers/built-in.o:(.rodata+0xc41c): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc420): undefined reference to `omap2_dpll_round_rate'
+> drivers/built-in.o:(.rodata+0xc42c): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc430): undefined reference to `omap3_noncore_dpll_set_rate'
+> drivers/built-in.o:(.rodata+0xc470): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc474): undefined reference to `omap2_dpll_round_rate'
+> drivers/built-in.o:(.rodata+0xc480): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc4a0): undefined reference to `omap3_noncore_dpll_enable'
+> drivers/built-in.o:(.rodata+0xc4a4): undefined reference to `omap3_noncore_dpll_disable'
+> drivers/built-in.o:(.rodata+0xc4b0): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc4b4): undefined reference to `omap2_dpll_round_rate'
+> drivers/built-in.o:(.rodata+0xc4c0): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc4c4): undefined reference to `omap3_dpll4_set_rate'
+> drivers/built-in.o:(.rodata+0xc4e0): undefined reference to `omap3_noncore_dpll_enable'
+> drivers/built-in.o:(.rodata+0xc4e4): undefined reference to `omap3_noncore_dpll_disable'
+> drivers/built-in.o:(.rodata+0xc4f0): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc4f4): undefined reference to `omap2_dpll_round_rate'
+> drivers/built-in.o:(.rodata+0xc500): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc504): undefined reference to `omap3_noncore_dpll_set_rate'
+> drivers/built-in.o:(.rodata+0xc530): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc540): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc560): undefined reference to `omap3_noncore_dpll_enable'
+> drivers/built-in.o:(.rodata+0xc564): undefined reference to `omap3_noncore_dpll_disable'
+> drivers/built-in.o:(.rodata+0xc570): undefined reference to `omap4_dpll_regm4xen_recalc'
+> drivers/built-in.o:(.rodata+0xc574): undefined reference to `omap4_dpll_regm4xen_round_rate'
+> drivers/built-in.o:(.rodata+0xc580): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc584): undefined reference to `omap3_noncore_dpll_set_rate'
+> drivers/built-in.o:(.rodata+0xc5b0): undefined reference to `omap3_dpll_recalc'
+> drivers/built-in.o:(.rodata+0xc5b4): undefined reference to `omap2_dpll_round_rate'
+> drivers/built-in.o:(.rodata+0xc5c0): undefined reference to `omap2_init_dpll_parent'
+> drivers/built-in.o:(.rodata+0xc5c4): undefined reference to `omap3_noncore_dpll_set_rate'
+> drivers/built-in.o:(.rodata+0xc63c): undefined reference to `omap2_dflt_clk_enable'
+> drivers/built-in.o:(.rodata+0xc640): undefined reference to `omap2_dflt_clk_disable'
+> drivers/built-in.o:(.rodata+0xc644): undefined reference to `omap2_dflt_clk_is_enabled'
+> drivers/built-in.o:(.rodata+0xc728): undefined reference to `omap2_clkops_enable_clkdm'
+> drivers/built-in.o:(.rodata+0xc72c): undefined reference to `omap2_clkops_disable_clkdm'
+> drivers/built-in.o:(.rodata+0xc754): undefined reference to `omap2_init_clk_clkdm'
+> drivers/built-in.o:(.rodata+0xc784): undefined reference to `omap2_dflt_clk_disable'
+> drivers/built-in.o:(.rodata+0xc788): undefined reference to `omap2_dflt_clk_is_enabled'
+> drivers/built-in.o:(.rodata+0xc7ac): undefined reference to `omap2_init_clk_clkdm'
+> drivers/built-in.o:(.rodata+0xc7c0): undefined reference to `omap2_dflt_clk_enable'
+> drivers/built-in.o:(.rodata+0xc7c4): undefined reference to `omap2_dflt_clk_disable'
+> drivers/built-in.o:(.rodata+0xc7c8): undefined reference to `omap2_dflt_clk_is_enabled'
+> drivers/built-in.o:(.rodata+0xc7ec): undefined reference to `omap2_init_clk_clkdm'
+> drivers/built-in.o:(.rodata+0xc838): undefined reference to `__clk_mux_determine_rate'
+> drivers/built-in.o:(.rodata+0xc904): undefined reference to `omap2_dflt_clk_enable'
+> drivers/built-in.o:(.rodata+0xc908): undefined reference to `omap2_dflt_clk_disable'
+> drivers/built-in.o:(.rodata+0xc90c): undefined reference to `omap2_dflt_clk_is_enabled'
+> drivers/built-in.o:(.rodata+0xc930): undefined reference to `omap2_init_clk_clkdm'
+>
+> Regards,
+>
+> Tony
+>
