@@ -1,188 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 Jan 2014 14:39:31 +0800
-Subject: [PATCH] ARM: dts: imx6: Add DFI FS700-M60 board support
-In-Reply-To: <1389876354-24341-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389876354-24341-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140117063929.GF1565@shlinux1.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 17 Jan 2014 14:54:03 +0800
+Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
+References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
+ <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
+ <52D7A237.8@freescale.com>
+ <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
+ <20140117020226.GB27652@shlinux2.ap.freescale.net>
+ <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
+Message-ID: <20140117065401.GA6140@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 01:45:54PM +0100, Sascha Hauer wrote:
-> diff --git a/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
-> new file mode 100644
-> index 0000000..ca3c748
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
-> @@ -0,0 +1,145 @@
-> +/ {
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		dummy_reg: fixed at 0 {
-
-regulator at 0
-
-> +			compatible = "regulator-fixed";
-
-reg = <0>;
-
-> +			regulator-name = "dummy-supply";
-> +		};
-> +
-> +		reg_usb_otg_vbus: usb_otg_vbus {
-
-regulator at 1
-
-> +			compatible = "regulator-fixed";
-
-reg = <1>;
-
-> +			regulator-name = "usb_otg_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 22 0>;
-> +			enable-active-high;
-> +		};
-> +	};
-> +
-> +	chosen {
-> +		linux,stdout-path = &uart1;
-> +	};
-> +};
-> +
-> +&ecspi3 {
-> +	fsl,spi-num-chipselects = <1>;
-> +	cs-gpios = <&gpio4 24 0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi3>;
-> +	status = "okay";
-> +
-> +	flash: m25p80 at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "sst,sst25vf040b", "m25p80";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	status = "okay";
-> +	phy-mode = "rgmii";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	imx6qdl-dfi-fs700-m60 {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13 0x80000000 /* PMIC irq */
-> +				MX6QDL_PAD_EIM_D26__GPIO3_IO26 0x80000000 /* MAX11801 irq */
-> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000030b0 /* Backlight enable */
-> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000 /* SD2 card detect */
-
-Can we minimize the pins in hog group by moving the client device's pins
-into device's pin entry, just like what you do for
-MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24?
-
-> +			>;
-> +		};
-> +
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <MX6QDL_ENET_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <MX6QDL_I2C2_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <MX6QDL_UART1_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_usbotg: usbotggrp {
-> +			fsl,pins = <MX6QDL_USBOTG_PINGRP2>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <MX6QDL_USDHC2_PINGRP_D4>;
-> +		};
-> +
-> +		pinctrl_usdhc3: usdhc3grp {
-> +			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
-> +		};
-> +
-> +		pinctrl_usdhc4: usdhc4grp {
-> +			fsl,pins = <MX6QDL_USDHC4_PINGRP_D8>;
-> +		};
-> +	};
-> +
-> +	ecspi3 {
-> +		pinctrl_ecspi3: ecspi3_csgrp {
-
-s/ecspi3_csgrp/ecspi3grp
-
-And just move the node into imx6qdl-dfi-fs700-m60?
-
-Shawn
-
-> +			fsl,pins = <
-> +				MX6QDL_ECSPI3_PINGRP1
-> +				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	disable-over-current;
-> +	dr_mode = "host";
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 { /* module slot */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	cd-gpios = <&gpio2 2 0>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 { /* baseboard slot */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +};
-> +
-> +&usdhc4 { /* eMMC */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc4>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> -- 
-> 1.8.5.2
+On Fri, Jan 17, 2014 at 12:36:08PM +0530, Jagan Teki wrote:
+> >> My basic question is like I have a qspi spi controller in my SOC and I
+> >> designed two boards B1 and B2
+> >
+> > okay.
+> >
+> >> B1 with quad spi controller connected with non-flash as a slave and B2
+> >> with quad spi controller connected
+> >> with quad flash as a slave.
+> > You can use the framework for B2. But for B1, you should not use the framework,
+> > since this framework is just for the SPI-NOR. If you do not connected with
+> > a NOR, i think it's better to code another driver for your controller.
 > 
+> Means we have two separate controller drivers for same controller one
+> with spi-nor and
+> another with spi is it?
+Take drivers/spi/spi-imx.c for example, if you connect a NOR to it, you only
+need to add a NOR device node in the device tree. In the probe, it will call
+the m25p80.c to probe the NOR device.
+
+But if we connect other device to it. you should set another device node for it.
+
+I am not sure if your controller driver can works as the spi-imx.c
+
+thanks
+Huang Shijie
+
+
+
+ 
