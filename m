@@ -1,118 +1,82 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 17 Jan 2014 10:22:35 +0100
-Subject: [PATCH v4 1/2] usb: musb: dsps, debugfs files
-In-Reply-To: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
-References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 17 Jan 2014 10:23:11 +0100
+Subject: [PATCH v2 resend 5/5] arm64: advertise ARMv8 extensions to 32-bit
+ compat ELF binaries
+In-Reply-To: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1389950591-4212-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-debugfs files to show the contents of important dsps registers.
+This adds support for advertising the presence of ARMv8 Crypto
+Extensions in the Aarch32 execution state to 32-bit ELF binaries
+running in 32-bit compat mode under the arm64 kernel.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/usb/musb/musb_dsps.c | 54 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ arch/arm64/include/asm/hwcap.h |  6 ++++++
+ arch/arm64/kernel/setup.c      | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-index 593d3c9..d0a97d6 100644
---- a/drivers/usb/musb/musb_dsps.c
-+++ b/drivers/usb/musb/musb_dsps.c
-@@ -46,6 +46,8 @@
- #include <linux/of_irq.h>
- #include <linux/usb/of.h>
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 9a4cbd60c88e..024c46183c3c 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -32,6 +32,12 @@
+ #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
+ #define COMPAT_HWCAP_EVTSTRM	(1 << 21)
  
-+#include <linux/debugfs.h>
++#define COMPAT_HWCAP2_AES	(1 << 0)
++#define COMPAT_HWCAP2_PMULL	(1 << 1)
++#define COMPAT_HWCAP2_SHA1	(1 << 2)
++#define COMPAT_HWCAP2_SHA2	(1 << 3)
++#define COMPAT_HWCAP2_CRC32	(1 << 4)
 +
- #include "musb_core.h"
- 
- static const struct of_device_id musb_dsps_of_match[];
-@@ -137,6 +139,26 @@ struct dsps_glue {
- 	unsigned long last_timer;    /* last timer data for each instance */
- 
- 	struct dsps_context context;
-+	struct debugfs_regset32 regset;
-+	struct dentry *dbgfs_root;
-+};
+ #ifndef __ASSEMBLY__
+ /*
+  * This yields a mask that user programs can use to figure out what
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 15f3bd207981..c36cab831932 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -174,6 +174,38 @@ static void __init setup_processor(void)
+ 	block = (features >> 16) & 0xf;
+ 	if (block && !(block & 0x8))
+ 		elf_hwcap |= HWCAP_CRC32;
 +
-+static const struct debugfs_reg32 dsps_musb_regs[] = {
-+	{ "revision",		0x00 },
-+	{ "control",		0x14 },
-+	{ "status",		0x18 },
-+	{ "eoi",		0x24 },
-+	{ "intr0_stat",		0x30 },
-+	{ "intr1_stat",		0x34 },
-+	{ "intr0_set",		0x38 },
-+	{ "intr1_set",		0x3c },
-+	{ "txmode",		0x70 },
-+	{ "rxmode",		0x74 },
-+	{ "autoreq",		0xd0 },
-+	{ "srpfixtime",		0xd4 },
-+	{ "tdown",		0xd8 },
-+	{ "phy_utmi",		0xe0 },
-+	{ "mode",		0xe8 },
- };
- 
- static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
-@@ -369,6 +391,30 @@ out:
- 	return ret;
- }
- 
-+static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
-+{
-+	struct dentry *root;
-+	struct dentry *file;
-+	char buf[128];
-+
-+	sprintf(buf, "%s.dsps", dev_name(musb->controller));
-+	root = debugfs_create_dir(buf, NULL);
-+	if (!root)
-+		return -ENOMEM;
-+	glue->dbgfs_root = root;
-+
-+	glue->regset.regs = dsps_musb_regs;
-+	glue->regset.nregs = ARRAY_SIZE(dsps_musb_regs);
-+	glue->regset.base = musb->ctrl_base;
-+
-+	file = debugfs_create_regset32("regdump", S_IRUGO, root, &glue->regset);
-+	if (!file) {
-+		debugfs_remove_recursive(root);
-+		return -ENOMEM;
++#ifdef CONFIG_COMPAT
++	/*
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the Aarch32 32-bit execution state.
++	 */
++	features = read_cpuid(ID_ISAR5_EL1);
++	block = (features >> 4) & 0xf;
++	if (!(block & 0x8)) {
++		switch (block) {
++		default:
++		case 2:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
++		case 1:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
++		case 0:
++			break;
++		}
 +	}
-+	return 0;
-+}
 +
- static int dsps_musb_init(struct musb *musb)
- {
- 	struct device *dev = musb->controller;
-@@ -378,6 +424,7 @@ static int dsps_musb_init(struct musb *musb)
- 	void __iomem *reg_base;
- 	struct resource *r;
- 	u32 rev, val;
-+	int ret;
- 
- 	r = platform_get_resource_byname(parent, IORESOURCE_MEM, "control");
- 	if (!r)
-@@ -411,6 +458,10 @@ static int dsps_musb_init(struct musb *musb)
- 	val &= ~(1 << wrp->otg_disable);
- 	dsps_writel(musb->ctrl_base, wrp->phy_utmi, val);
- 
-+	ret = dsps_musb_dbg_init(musb, glue);
-+	if (ret)
-+		return ret;
++	block = (features >> 8) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
 +
- 	return 0;
++	block = (features >> 12) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
++
++	block = (features >> 16) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
++#endif
  }
  
-@@ -659,6 +710,9 @@ static int dsps_remove(struct platform_device *pdev)
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	kfree(glue);
-+
-+	debugfs_remove_recursive(glue->dbgfs_root);
-+
- 	return 0;
- }
- 
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 -- 
-1.8.5.2
+1.8.3.2
