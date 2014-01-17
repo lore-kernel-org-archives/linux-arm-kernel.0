@@ -1,37 +1,38 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 17 Jan 2014 07:25:08 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <20140116185044.GC18392@xanatos> (Sarah Sharp's message of "Thu,
- 16 Jan 2014 10:50:44 -0800")
-References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
- <20140114170719.GA12126@xanatos> <87bnzekz5l.fsf@natisbad.org>
- <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
- <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
-Message-ID: <87fvon2khn.fsf@natisbad.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 Jan 2014 13:44:41 +0800
+Subject: [PATCH] ARM: imx: clk-imx6sl: Suppress duplicate const sparse
+ warning
+In-Reply-To: <87bnzb6dl8.fsf@nbsps.com>
+References: <1389766774-16661-1-git-send-email-Ying.Liu@freescale.com>
+ <20140115065851.GC1914@S2101-09.ap.freescale.net>
+ <87fvon6elf.fsf@nbsps.com> <87bnzb6dl8.fsf@nbsps.com>
+Message-ID: <20140117054438.GD1565@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 16, 2014 at 12:28:19PM -0500, Bill Pringlemeir wrote:
+> On 16 Jan 2014, bpringlemeir at nbsps.com wrote:
+> 
+> >> It was added into checkpatch.pl by commit cb710ec (scripts/checkpatch.pl:
+> >> add warnings for static char that could be static const char).  I'm not
+> >> sure which warning we should ignore, the sparse or the checkpatch one.
+> 
+> > I think both scripts/programs are right.  There is a difference.
+> 
+> > static const char const * step_sels[] = { "osc", "pll2_pfd2", }; /* dup */
+> > static const char * const step_sels[] = { "osc", "pll2_pfd2", }; /* ok */
+> > static char const * const step_sels[] = { "osc", "pll2_pfd2", }; /* ok */
+> 
+> > I think that 'type const * const' is a const pointer to const data, but
+> > 'const type const *' is just a const pointer (with duplicate).  The
+> > patches have made the data non-const?
+> 
+> Sorry, that patch is correct.  It just removed the duplicate 'const',
+> but checkpatch is right to recommend the 'const * const' as the strings
+> could be put in a read-only section.
 
-Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
+Thanks for the comment, Bill.  To fix the checkpatch warning, we will
+need to change a lot of function declaration.  That's why we ignore it
+for now.
 
->> ... AFAICT, this is exactly what commit 35773dac5f86 does and reverting
->> it does not help. If I am mistaken, can you point which part you want me
->> to remove in the code to test?
->> 
->> I am slowly starting to see a bisect session coming ;-)
->
-> Try reverting commit 60e102ac73cd40069d077014c93c86dc7205cb68.
-
-AFAICT, this commit does not exist in master (Linus tree), i.e. it is
-not in 3.13.0-rc8.
-
-> That was causing issues with another Fresco Logic host.  If that
-> doesn't help, then yes, please git bisect.
-
-I have started a bisect session yesterday. I will try and finish it this
-evening.
-
-Cheers,
-
-a+
+Shawn
