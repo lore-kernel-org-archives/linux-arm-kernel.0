@@ -1,39 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 21:06:55 +0100
-Subject: [PATCH v4 8/8] ARM: brcmstb: dts: add a reference DTS for
- Broadcom 7445
-In-Reply-To: <1389986367-4010-9-git-send-email-marc.ceeeee@gmail.com>
-References: <1389986367-4010-1-git-send-email-marc.ceeeee@gmail.com>
- <1389986367-4010-9-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <201401172106.55668.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Jan 2014 12:09:40 -0800
+Subject: [PATCH] clk: qcom: Fix modular build
+In-Reply-To: <52d8dde8.Mqtb7njO7G6foYTt%fengguang.wu@intel.com>
+References: <52d8dde8.Mqtb7njO7G6foYTt%fengguang.wu@intel.com>
+Message-ID: <1389989380-17441-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 January 2014, Marc Carino wrote:
-> +       serial at f0406b00 {
-> +               compatible = "ns16550a";
-> +               reg = <0x00 0xf0406b00 0x00 0x20>;
-> +               reg-shift = <2>;
-> +               reg-io-width = <4>;
-> +               interrupts = <0 75 0x4>;
-> +               clock-frequency = <0x4d3f640>;
-> +       };
-> +
-> +       rdb {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               ranges = <0 0x00 0xf0000000 0x1000000>;
-> +
-> +               sun_top_ctrl: syscon at 404000 {
-> +                       compatible = "brcm,bcm7445-sun-top-ctrl",
-> +                                    "syscon";
-> +                       reg = <0x404000 0x51c>;
-> +               };
-> +
+According to Documentation/kbuild/makefiles.txt these symbols
+should be clk-qcom-y. Otherwise the build will fail if
+CONFIG_COMMON_CLK_QCOM=m. Fix it.
 
-Yes, this looks better, but as a minor comment, the serial device above
-should really be part of the rdb bus now, since that encompasses the
-0xf0000000 device range.
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/Makefile | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-	Arnd
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index 190d38433202..f60db2ef1aee 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -1,11 +1,11 @@
+ obj-$(CONFIG_COMMON_CLK_QCOM) += clk-qcom.o
+ 
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-regmap.o
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-pll.o
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg.o
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-rcg2.o
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += clk-branch.o
+-clk-qcom-$(CONFIG_COMMON_CLK_QCOM) += reset.o
++clk-qcom-y += clk-regmap.o
++clk-qcom-y += clk-pll.o
++clk-qcom-y += clk-rcg.o
++clk-qcom-y += clk-rcg2.o
++clk-qcom-y += clk-branch.o
++clk-qcom-y += reset.o
+ 
+ obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
+ obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
