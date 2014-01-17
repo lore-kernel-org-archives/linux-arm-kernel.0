@@ -1,85 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Jan 2014 13:07:45 +0100
-Subject: [PATCH 2/4] ARM: sun6i: dt: Add PLL6 and SPI module clocks
-In-Reply-To: <20140116181528.GY8153@joshc.qualcomm.com>
-References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389892285-11745-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140116181528.GY8153@joshc.qualcomm.com>
-Message-ID: <20140117120745.GB3867@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 12:24:00 +0000
+Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
+In-Reply-To: <CAKv+Gu8nnv-ePTyDGv0RiuFcJW7rWhOe0G1JFx439AjA28+wig@mail.gmail.com>
+References: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
+ <CAKv+Gu8nnv-ePTyDGv0RiuFcJW7rWhOe0G1JFx439AjA28+wig@mail.gmail.com>
+Message-ID: <20140117122359.GF16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-On Thu, Jan 16, 2014 at 12:15:28PM -0600, Josh Cartwright wrote:
-> On Thu, Jan 16, 2014 at 06:11:23PM +0100, Maxime Ripard wrote:
-> > The module clocks in the A31 are still compatible with the A10 one. Add the SPI
-> > module clocks and the PLL6 in the device tree to allow their use by the SPI
-> > controllers.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Fri, Jan 17, 2014 at 11:22:27AM +0000, Ard Biesheuvel wrote:
+> On 17 January 2014 09:04, Jingoo Han <jg1.han@samsung.com> wrote:
+> > Use 'ubfm' for the bitfield move instruction; thus, single
+> > instruction can be used instead of two instructions, when
+> > getting the minimum D-cache line size from CTR_EL0 register.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 > > ---
-> >  arch/arm/boot/dts/sun6i-a31.dtsi | 48 +++++++++++++++++++++++++++++++---------
-> >  1 file changed, 38 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> > index 5256ad9..ae058eb 100644
-> > --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> > +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> > @@ -73,16 +73,12 @@
-> >  			clocks = <&osc24M>;
-> >  		};
-> >  
-> > -		/*
-> > -		 * This is a dummy clock, to be used as placeholder on
-> > -		 * other mux clocks when a specific parent clock is not
-> > -		 * yet implemented. It should be dropped when the driver
-> > -		 * is complete.
-> > -		 */
-> > -		pll6: pll6 {
-> > -			#clock-cells = <0>;
-> > -			compatible = "fixed-clock";
-> > -			clock-frequency = <0>;
-> > +		pll6: clk at 01c20028 {
-> > +			#clock-cells = <1>;
-> > +			compatible = "allwinner,sun6i-a31-pll6-clk";
-> > +			reg = <0x01c20028 0x4>;
-> > +			clocks = <&osc24M>;
-> > +			clock-output-names = "pll6";
-> >  		};
-> >  
-> >  		cpu: cpu at 01c20050 {
-> > @@ -182,6 +178,38 @@
-> >  					"apb2_uart1", "apb2_uart2", "apb2_uart3",
-> >  					"apb2_uart4", "apb2_uart5";
-> >  		};
-> > +
-> > +		spi0_clk: clk at 01c200a0 {
-> > +			#clock-cells = <0>;
-> > +			compatible = "allwinner,sun4i-mod0-clk";
-> > +			reg = <0x01c200a0 0x4>;
-> > +			clocks = <&osc24M>, <&pll6>;
+> >  arch/arm64/mm/proc-macros.S |    3 +--
+> >  1 file changed, 1 insertion(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+> > index 8957b82..c31f41e 100644
+> > --- a/arch/arm64/mm/proc-macros.S
+> > +++ b/arch/arm64/mm/proc-macros.S
+> > @@ -38,8 +38,7 @@
+> >   */
+> >         .macro  dcache_line_size, reg, tmp
+> >         mrs     \tmp, ctr_el0                   // read CTR
+> > -       lsr     \tmp, \tmp, #16
+> > -       and     \tmp, \tmp, #0xf                // cache line size encoding
+> > +       ubfm    \tmp, \tmp, #0x16, 0x19         // cache line size encoding
 > 
-> This looks weird.  You've set the pll6 #clock-cells = <1>, but you
-> aren't using a specifier here.  Same below, as well.  The binding
-> documentation indicates that #clock-cells should be 0 for the pll6 node.
+> Even if the # is optional for immediates these days, perhaps it is
+> better to adhere to a single style in one line?
 
-Ah, right, it's a dumb copy/paste mistake.
+In ARM assembler syntax, the preferred prefix for decimal immediates is '#'
+not 0x ;)
 
-I'd expect dtc to output a warning/error in such case, but apparently
-it doesn't.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/10c9df26/attachment.sig>
+Will
