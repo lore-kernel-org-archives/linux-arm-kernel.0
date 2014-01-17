@@ -1,28 +1,52 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 17 Jan 2014 11:44:23 +0100
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <20140117093909.GB2348@piout.net>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <20140116195819.GY15937@n2100.arm.linux.org.uk>
- <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
- <20140117093909.GB2348@piout.net>
-Message-ID: <20140117104423.GR17530@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 10:51:07 +0000
+Subject: [PATCH] arm64: fix strnlen_user when count <= strlen
+In-Reply-To: <20140116234817.GP18705@redacted.bos.redhat.com>
+References: <20140116234817.GP18705@redacted.bos.redhat.com>
+Message-ID: <20140117105107.GC16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The TI wilink chips (TiWi, wl12xx, wl18xx) have wifi on SDIO and BT on
-> UART but they share the same clock. So, the next question would be what
-> if I just want to enable one or the other (and take that decision at
-> runtime) ?
+Hi Kyle,
 
-At least for the clock is it not an issue. The generic clock framework
-does "reference" counting. It will only turn the clock off when all
-users have said to turn it off. So put a phandle to the clock in all
-nodes which use it.
+On Thu, Jan 16, 2014 at 11:48:17PM +0000, Kyle McMartin wrote:
+> I received a bug report about the ruby test-suite failing on AArch64 when
+> attempting to pass MAX_ARG_STRLEN sized args to execv[1]. It was
+> expecting an E2BIG returned, but instead was receiving ENOMEM, and
+> concatenating the argument strings in funky ways.
+> 
+> The problem appeared to be in __strnlen_user on arm64, as when
+> instrumenting fs/exec.c to compare the results of the asm-generic
+> strnlen_user, I noticed an off-by-one on the result:
+> long-param-test: optimized strnlen_user (131072) and naive (131073) disagree!
+> 
+> As a result, fix strnlen_user to match expected behaviour as documented
+> in lib/strnlen_user.c, and return count+1 when count would be exceeded.
+> 
+> I didn't feel comfortable prodding the assembler, so I just worked
+> around it in the wrapper.
 
-I've not looked at regulators, but i would hope it also does reference
-counting of a regulators users.
+Actually, I have removed strnlen_user for 3.14. Could you try your test case
+with our for-next branch please?
 
-	 Andrew
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+
+As for the issue you spotted, we probably need a fix for that to go into
+stable kernels. Does the following (smaller patch) work for you?
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/lib/strnlen_user.S b/arch/arm64/lib/strnlen_user.S
+index 7f7b176a5646..73f3335a2a45 100644
+--- a/arch/arm64/lib/strnlen_user.S
++++ b/arch/arm64/lib/strnlen_user.S
+@@ -37,6 +37,7 @@ ENTRY(__strnlen_user)
+ USER(9f, ldrb	w3, [x0], #1	)
+ 	cbnz	w3, 1b
+ 2:	sub	x0, x0, x2
++	cinc	x0, x0, mi
+ 	ret
+ ENDPROC(__strnlen_user)
+ 
