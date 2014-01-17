@@ -1,99 +1,34 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 17 Jan 2014 16:56:49 +0000
-Subject: [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c and its related
- head file
-In-Reply-To: <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <52D960D1.3090700@arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 17 Jan 2014 11:58:52 -0500 (EST)
+Subject: How to support SDIO wifi/bt in DT
+In-Reply-To: <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
+References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
+ <3215037.8HVCjAeS8g@wuerfel>
+ <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+ <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
+ <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.10.1401171157340.28907@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/14 12:24, Hanjun Guo wrote:
-> Introduce arm_core.c and its related head file, after this patch,
-> we can get ACPI tables from firmware on ARM64 now.
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |   57 +++++++++++
->  arch/arm64/kernel/setup.c     |    6 ++
->  drivers/acpi/Makefile         |    2 +
->  drivers/acpi/plat/Makefile    |    1 +
->  drivers/acpi/plat/arm-core.c  |  209 +++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 275 insertions(+)
->  create mode 100644 drivers/acpi/plat/Makefile
->  create mode 100644 drivers/acpi/plat/arm-core.c
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index cf19dc6..908d71b 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -19,6 +19,43 @@
->  #ifndef _ASM_ARM64_ACPI_H
->  #define _ASM_ARM64_ACPI_H
->  
-> +#include <asm/cacheflush.h>
-> +
-> +#include <linux/init.h>
-> +
-> +#define COMPILER_DEPENDENT_INT64	s64
-> +#define COMPILER_DEPENDENT_UINT64	u64
-> +
-> +/*
-> + * Calling conventions:
-> + *
-> + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
-> + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
-> + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
-> + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
-> + */
-> +#define ACPI_SYSTEM_XFACE
-> +#define ACPI_EXTERNAL_XFACE
-> +#define ACPI_INTERNAL_XFACE
-> +#define ACPI_INTERNAL_VAR_XFACE
-> +
-> +/* Asm macros */
-> +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
-> +
-> +/* Basic configuration for ACPI */
-> +#ifdef	CONFIG_ACPI
-> +extern int acpi_disabled;
-> +extern int acpi_noirq;
-> +extern int acpi_pci_disabled;
-> +extern int acpi_strict;
-> +
-> +static inline void disable_acpi(void)
-> +{
-> +	acpi_disabled = 1;
-> +	acpi_pci_disabled = 1;
-> +	acpi_noirq = 1;
-> +}
-> +
->  static inline bool arch_has_acpi_pdc(void)
->  {
->  	return false;	/* always false for now */
-> @@ -29,4 +66,24 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
->  	return;
->  }
->  
-> +static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
-> +static inline void acpi_disable_pci(void)
-> +{
-> +	acpi_pci_disabled = 1;
-> +	acpi_noirq_set();
-> +}
-> +
-> +/* FIXME: this function should be moved to topology.h when it's ready */
-> +void arch_fix_phys_package_id(int num, u32 slot);
-> +
-> +/* temperally define -1 to make acpi core compilerable */
-> +#define cpu_physical_id(cpu) -1
-> +
+On Fri, 17 Jan 2014, Rob Herring wrote:
 
-I assume `cpu` here is logical cpu id in which case you can define it to be same
-as cpu_logical_map ?
+> On Thu, Jan 16, 2014 at 9:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Thu, 16 Jan 2014, Olof Johansson wrote:
+> >
+> >> "for SDIO slots" is somewhat misleading; nearly all controllers only
+> >> do one slot/device per controller. The designware controller can do
+> >> multiple slots, and that adds a bit of driver and binding complexity
+> >> for something that seemingly not a single vendor has actually
+> >> implemented.
+> >
+> > The Marvell 8688, just to name one, does both WIFI and BlueTooth over
+> > the same SDIO controller using separate functions/slots.
+> 
+> But that is logical functions within a chip, not multiple discrete
+> chips (i.e. slots) with their own reset, regulators, etc.
 
-Regards,
-Sudeep
+OK.  If that's the definition of a slot in this context then I agree.
+
+
+Nicolas
