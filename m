@@ -1,36 +1,23 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Jan 2014 10:02:14 +0100
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
-Message-ID: <20140117090214.GA2348@piout.net>
+From: ananaza@iki.fi (Antti Miettinen)
+Date: Fri, 17 Jan 2014 11:07:36 +0200
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <20140116121649.GG30257@mudshark.cambridge.arm.com> (Will
+ Deacon's message of "Thu, 16 Jan 2014 12:16:49 +0000")
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
+ <20140115154526.GC3571@mudshark.cambridge.arm.com>
+ <52D76BC8.6080405@nvidia.com>
+ <20140116121649.GG30257@mudshark.cambridge.arm.com>
+Message-ID: <878uufyo13.fsf@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 09:15:17AM -0800, Olof Johansson wrote :
-> "for SDIO slots" is somewhat misleading; nearly all controllers only
-> do one slot/device per controller. The designware controller can do
-> multiple slots, and that adds a bit of driver and binding complexity
-> for something that seemingly not a single vendor has actually
-> implemented.
-> 
-> So we can likely assume to keep these reset/power/clock lines per host
-> controller, no need to add a slot construct.
-> 
+Will Deacon <will.deacon@arm.com> writes:
+> Why can't you use the C3STOP feature so that the arch-timer isn't used when
+> you go idle?
 
-Actually, the atmel chips have two slots per controller so it would
-probably be better to think about that now.
+That would mean falling back to broadcast timer, right? That's not
+necessarily on the local CPU so wakeups would often wake two CPUs. Does
+anyone have patches for using a CPU local timer as a fallback for
+C3STOP timers?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/7e539c1a/attachment.sig>
+	--Antti
