@@ -1,113 +1,120 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Fri, 17 Jan 2014 15:02:14 -0700
-Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
-In-Reply-To: <87eh462vrf.fsf@lebrac.rtp-net.org>
-References: <20140117184731.GE15937@n2100.arm.linux.org.uk>	<87ioti2xfu.fsf@lebrac.rtp-net.org>	<52D98E94.6000609@boundarydevices.com>
- <87eh462vrf.fsf@lebrac.rtp-net.org>
-Message-ID: <52D9A866.5070803@boundarydevices.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 17 Jan 2014 14:14:02 -0800
+Subject: [PATCH 1/4] clk: sunxi: Add support for PLL6 on the A31
+In-Reply-To: <1389892285-11745-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1389892285-11745-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140117221402.4167.78251@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 01:33 PM, Arnaud Patard (Rtp) wrote:
-> Eric Nelson <eric.nelson@boundarydevices.com> writes:
->
->> On 01/17/2014 12:57 PM, Arnaud Patard (Rtp) wrote:
->>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->>>
->>>> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
->>>> hides stuff.  It's really wonderful, because you don't have to care
->>>> about how the GPIOs are actually accessed in drivers anymore.
->>>>
->>>> However, what about the behaviour of GPIOs?
->>>>
->>>> What about... for example... this sequence:
->>>>
->>>> 	gpio_direction_output(gpio, 1);
->>>> 	val = gpio_get_value(gpio);
->>>>
->>>> What value is "val"?  More importantly, what value is reflected in
->>>> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
->>>>
->>>> Now, while you can make reasonable assumptions, such as "it'll return
->>>> that the output is being driven to the requested state" or "it'll
->>>> return the actual state of the pin", what about this instead, which
->>>> happens on iMX hardware - "it'll _always_ return zero".
->>>>
->>>
->>> this is "expected". gpio layer docs are saying that in output case, the
->>> value may be wrong. Not intuitive but documented.
->>>
->>>> Yes, iMX6 at least has this behaviour.  For any output, val as above
->>>> will always be zero, and /proc/sys/kernel/debug/gpio will always
->>>> report that an output is zero... unless the SION bit has been set for
->>>> that GPIO signal.
->>>
->>> afaik at least imx51/53 have some behaviour.
->>>
->>>>
->>>> The reason is that on hardware such as iMX6, reading the GPIO is done
->>>> by reading the pad state register, and this register is _only_ supplied
->>>> the state of the pad when the input path is enabled.  The input path
->>>> is only enabled when the output is disabled, or the SION bit is set
->>>> to force the GPIO input path.
->>>
->>> I sent mails about this same issue for imx51 in Dec 2010 and answer were
->>> that the SION bit should not be set for all gpios:
->>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/100875
->>>
->>
->> Thanks Arnaud,
->>
->> This bit from the 2010 chain really needs some explanation:
->>
->>>> Arnaud Patard (Rtp) writes:
->>>>
->>>> <snip>
->>>>
->>>> I had done the same, but had some trouble with this.
->>>> E.g. on our board GPIO1_7 is used as a generic GPIO to enable an
->>>> external clock oscillator for the USBH1 ULPI PHY. When the SION bit
->>>> for this pad was set, I got strange errors on the USBH1 port
->>>> (disconnecting low speed devices behind a hub would stall the
->>>> bus). When I removed the SION bit for that pin everything worked
->>>> well.
->>>>
->>
->> Did you ever chase down the symptom here? Was the GPIO output not
->> holding a constant value such that the oscillator wasn't functioning?
->>
->
-> It was not me who got this issue. The issue I had was not being able to
-> read GPIO value if set as output. This link may be clearer:
-> http://archive.arm.linux.org.uk/lurker/message/20101215.151016.ea731aa7.en.html
->
-Thanks Arnaud. That link is quite a bit easier to follow.
+Quoting Maxime Ripard (2014-01-16 09:11:22)
+> The A31 has a slightly different PLL6 clock. Add support for this new clock in
+> our driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I'm looping in Lothar and Dinh.
-
-Dinh's comment in this thread makes no sense:
-
-	>>
-	>> The SION bit is a "Software Input On" bit. Basically, if
-	>> you set the GPIO as an output, you cannot set the SION bit.
-	>>
-
-If that were the case, there's no point to either the bit or the PSR
-registers. Dinh, can you or another Freescaler give a definitive
-explanation here?
-
-We also had some discussion about this on the U-Boot list regarding
-
-Patch:      http://lists.denx.de/pipermail/u-boot/2013-September/163805.html
-Discussion: 
-http://lists.denx.de/pipermail/u-boot/2013-October/thread.html#163916
-
-In the U-Boot case, we decided to flag those pins used as both
-input and output specfically with the SION flag, which has the
-benefit of pointing out to a reader that there's something unusual
-going on.
+This looks good to me. I guess it will be going in for 3.15 based on the
+comments in the coverletter.
 
 Regards,
+Mike
 
-
-Eric
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 45 +++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index c2cb762..954845c 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -11,6 +11,7 @@ Required properties:
+>         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>         "allwinner,sun4i-pll5-clk" - for the PLL5 clock
+>         "allwinner,sun4i-pll6-clk" - for the PLL6 clock
+> +       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+>         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+>         "allwinner,sun4i-axi-clk" - for the AXI clock
+>         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 659e4ea..990ad5d 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -249,7 +249,38 @@ static void sun4i_get_pll5_factors(u32 *freq, u32 parent_rate,
+>         *n = DIV_ROUND_UP(div, (*k+1));
+>  }
+>  
+> +/**
+> + * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6
+> + * PLL6 rate is calculated as follows
+> + * rate = parent_rate * n * (k + 1) / 2
+> + * parent_rate is always 24Mhz
+> + */
+> +
+> +static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
+> +                                      u8 *n, u8 *k, u8 *m, u8 *p)
+> +{
+> +       u8 div;
+> +
+> +       /*
+> +        * We always have 24MHz / 2, so we can just say that our
+> +        * parent clock is 12MHz.
+> +        */
+> +       parent_rate = parent_rate / 2;
+> +
+> +       /* Normalize value to a parent_rate multiple (24M / 2) */
+> +       div = *freq / parent_rate;
+> +       *freq = parent_rate * div;
+> +
+> +       /* we were called to round the frequency, we can now return */
+> +       if (n == NULL)
+> +               return;
+> +
+> +       *k = div / 32;
+> +       if (*k > 3)
+> +               *k = 3;
+>  
+> +       *n = DIV_ROUND_UP(div, (*k+1));
+> +}
+>  
+>  /**
+>   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+> @@ -416,6 +447,13 @@ static struct clk_factors_config sun4i_pll5_config = {
+>         .kwidth = 2,
+>  };
+>  
+> +static struct clk_factors_config sun6i_a31_pll6_config = {
+> +       .nshift = 8,
+> +       .nwidth = 5,
+> +       .kshift = 4,
+> +       .kwidth = 2,
+> +};
+> +
+>  static struct clk_factors_config sun4i_apb1_config = {
+>         .mshift = 0,
+>         .mwidth = 5,
+> @@ -457,6 +495,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+>         .getter = sun4i_get_pll5_factors,
+>  };
+>  
+> +static const struct factors_data sun6i_a31_pll6_data __initconst = {
+> +       .enable = 31,
+> +       .table = &sun6i_a31_pll6_config,
+> +       .getter = sun6i_a31_get_pll6_factors,
+> +};
+> +
+>  static const struct factors_data sun4i_apb1_data __initconst = {
+>         .table = &sun4i_apb1_config,
+>         .getter = sun4i_get_apb1_factors,
+> @@ -972,6 +1016,7 @@ free_clkdata:
+>  static const struct of_device_id clk_factors_match[] __initconst = {
+>         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
+>         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
+> +       {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
+>         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
+>         {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
+>         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+> -- 
+> 1.8.4.2
+> 
