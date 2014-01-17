@@ -1,39 +1,55 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Fri, 17 Jan 2014 11:51:30 -0800
-Subject: [PATCH] pinctrl: capri: add dependency on OF
-In-Reply-To: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
-References: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <52D989C2.6030603@broadcom.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 17 Jan 2014 20:57:41 +0100
+Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
+In-Reply-To: <20140117184731.GE15937@n2100.arm.linux.org.uk> (Russell King's
+ message of "Fri, 17 Jan 2014 18:47:31 +0000")
+References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
+Message-ID: <87ioti2xfu.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-01-16 02:45 PM, Linus Walleij wrote:
-> As this driver is using pinconf_generic_dt_node_to_map_pin() it
-> needs to depend on OF so as not to cause build problems on
-> archs that do not support OF.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+
+> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
+> hides stuff.  It's really wonderful, because you don't have to care
+> about how the GPIOs are actually accessed in drivers anymore.
 >
-> Cc: Sherman Yin <syin@broadcom.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->   drivers/pinctrl/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
+> However, what about the behaviour of GPIOs?
 >
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index f1dda4d9de13..be361b7cd30f 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -106,6 +106,7 @@ config PINCTRL_BCM2835
+> What about... for example... this sequence:
 >
->   config PINCTRL_CAPRI
->   	bool "Broadcom Capri pinctrl driver"
-> +	depends on OF
->   	select PINMUX
->   	select PINCONF
->   	select GENERIC_PINCONF
+> 	gpio_direction_output(gpio, 1);
+> 	val = gpio_get_value(gpio);
+>
+> What value is "val"?  More importantly, what value is reflected in
+> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
+>
+> Now, while you can make reasonable assumptions, such as "it'll return
+> that the output is being driven to the requested state" or "it'll
+> return the actual state of the pin", what about this instead, which
+> happens on iMX hardware - "it'll _always_ return zero".
 >
 
-Thanks for the fix, Linus.  While we're visiting this config, should we 
-add "depends on MACH_BCM_MOBILE" as well?
+this is "expected". gpio layer docs are saying that in output case, the
+value may be wrong. Not intuitive but documented.
 
-Thanks,
-Sherman
+> Yes, iMX6 at least has this behaviour.  For any output, val as above
+> will always be zero, and /proc/sys/kernel/debug/gpio will always
+> report that an output is zero... unless the SION bit has been set for
+> that GPIO signal.
+
+afaik at least imx51/53 have some behaviour.
+
+>
+> The reason is that on hardware such as iMX6, reading the GPIO is done
+> by reading the pad state register, and this register is _only_ supplied
+> the state of the pad when the input path is enabled.  The input path
+> is only enabled when the output is disabled, or the SION bit is set
+> to force the GPIO input path.
+
+I sent mails about this same issue for imx51 in Dec 2010 and answer were
+that the SION bit should not be set for all gpios:
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/100875
+
+
+Arnaud
