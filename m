@@ -1,71 +1,178 @@
 From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Fri, 17 Jan 2014 11:19:19 -0800
-Subject: [PATCH v4 0/8] ARM: brcmstb: Add Broadcom STB SoC support
-Message-ID: <1389986367-4010-1-git-send-email-marc.ceeeee@gmail.com>
+Date: Fri, 17 Jan 2014 11:19:21 -0800
+Subject: [PATCH v4 2/8] power: reset: Add reboot driver for brcmstb
+In-Reply-To: <1389986367-4010-1-git-send-email-marc.ceeeee@gmail.com>
+References: <1389986367-4010-1-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <1389986367-4010-3-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the board support package for the
-Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
-minimal set of code needed for a BCM7445-based board to boot
-the Linux kernel.
+Add support for reboot functionality on boards with ARM-based
+Broadcom STB chipsets.
 
-These changes heavily leverage the OF/devicetree framework.
-
-v4:
-- make a reboot driver and put it in the drivers folder
-- rework DT bindings to leverage 'syscon'
-- rework BSP code to use 'syscon' for all register mappings
-- misc. tweaks per suggestions from v3
-
-v3:
-- rebased to v3.13-rc8
-- switched to using 'multi_v7_defconfig'
-- eliminated dependence on compile-time peripheral register access
-- moved DT node iomap out from 'init_early'
-- misc. minor cleanups from mailing-list discussion for v2
-
-v2:
-- rebased to v3.13-rc1
-- moved implementation to 'mach-bcm' folder
-- added CPU init for B15
-
-v1:
-- initial submission
-
-[1] http://www.broadcom.com/products/Cable/Cable-Set-Top-Box-Solutions/BCM7445
-
-Marc Carino (8):
-  ARM: brcmstb: add infrastructure for ARM-based Broadcom STB SoCs
-  power: reset: Add reboot driver for brcmstb
-  ARM: brcmstb: add debug UART for earlyprintk support
-  ARM: do CPU-specific init for Broadcom Brahma15 cores
-  ARM: brcmstb: add CPU binding for Broadcom Brahma15
-  ARM: brcmstb: add misc. DT bindings for brcmstb
-  ARM: brcmstb: gic: add compatible string for Broadcom Brahma15
-  ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
-
- .../devicetree/bindings/arm/brcm-brcmstb.txt       |   95 ++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |    1 +
- Documentation/devicetree/bindings/arm/gic.txt      |    1 +
- arch/arm/Kconfig.debug                             |   16 +-
- arch/arm/boot/dts/bcm7445.dts                      |  111 +++++++
- arch/arm/configs/multi_v7_defconfig                |    1 +
- arch/arm/mach-bcm/Kconfig                          |   14 +
- arch/arm/mach-bcm/Makefile                         |    4 +
- arch/arm/mach-bcm/brcmstb.c                        |  110 +++++++
- arch/arm/mach-bcm/brcmstb.h                        |   38 +++
- arch/arm/mach-bcm/headsmp-brcmstb.S                |   34 ++
- arch/arm/mach-bcm/hotplug-brcmstb.c                |  334 ++++++++++++++++++++
- arch/arm/mm/proc-v7.S                              |   11 +
- drivers/power/reset/Kconfig                        |   10 +
- drivers/power/reset/Makefile                       |    1 +
- drivers/power/reset/brcmstb-reboot.c               |  120 +++++++
- 16 files changed, 900 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
- create mode 100644 arch/arm/boot/dts/bcm7445.dts
- create mode 100644 arch/arm/mach-bcm/brcmstb.c
- create mode 100644 arch/arm/mach-bcm/brcmstb.h
- create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
- create mode 100644 arch/arm/mach-bcm/hotplug-brcmstb.c
+Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+---
+ drivers/power/reset/Kconfig          |   10 +++
+ drivers/power/reset/Makefile         |    1 +
+ drivers/power/reset/brcmstb-reboot.c |  120 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 131 insertions(+), 0 deletions(-)
  create mode 100644 drivers/power/reset/brcmstb-reboot.c
+
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 9b3ea53..31b468b 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -6,6 +6,16 @@ menuconfig POWER_RESET
+ 
+ 	  Say Y here to enable board reset and power off
+ 
++config POWER_RESET_BRCMSTB
++	bool "Broadcom STB reset driver"
++	depends on POWER_RESET && ARCH_BRCMSTB
++	help
++	  This driver provides restart support for ARM-based Broadcom STB
++	  boards.
++
++	  Say Y here if you have an ARM-based Broadcom STB board and you wish
++	  to have restart support.
++
+ config POWER_RESET_GPIO
+ 	bool "GPIO power-off driver"
+ 	depends on OF_GPIO && POWER_RESET
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 3e6ed88..806d056 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+ obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+ obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
++obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
+diff --git a/drivers/power/reset/brcmstb-reboot.c b/drivers/power/reset/brcmstb-reboot.c
+new file mode 100644
+index 0000000..3f23692
+--- /dev/null
++++ b/drivers/power/reset/brcmstb-reboot.c
+@@ -0,0 +1,120 @@
++/*
++ * Copyright (C) 2013 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/jiffies.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++#include <linux/smp.h>
++#include <linux/mfd/syscon.h>
++
++#include <asm/system_misc.h>
++
++#define RESET_SOURCE_ENABLE_REG 1
++#define SW_MASTER_RESET_REG 2
++
++static struct regmap *regmap;
++static u32 rst_src_en;
++static u32 sw_mstr_rst;
++
++static void brcmstb_reboot(enum reboot_mode mode, const char *cmd)
++{
++	int rc;
++	u32 tmp;
++
++	rc = regmap_write(regmap, rst_src_en, 1);
++	if (rc) {
++		pr_err("failed to write rst_src_en (%d)\n", rc);
++		return;
++	}
++
++	rc = regmap_read(regmap, rst_src_en, &tmp);
++	if (rc) {
++		pr_err("failed to read rst_src_en (%d)\n", rc);
++		return;
++	}
++
++	rc = regmap_write(regmap, sw_mstr_rst, 1);
++	if (rc) {
++		pr_err("failed to write sw_mstr_rst (%d)\n", rc);
++		return;
++	}
++
++	rc = regmap_read(regmap, sw_mstr_rst, &tmp);
++	if (rc) {
++		pr_err("failed to read sw_mstr_rst (%d)\n", rc);
++		return;
++	}
++
++	while (1)
++		;
++}
++
++static int brcmstb_reboot_probe(struct platform_device *pdev)
++{
++	int rc;
++	struct device_node *np = pdev->dev.of_node;
++
++	regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
++	if (IS_ERR(regmap)) {
++		pr_err("failed to get syscon phandle\n");
++		return -EINVAL;
++	}
++
++	rc = of_property_read_u32_index(np, "syscon", RESET_SOURCE_ENABLE_REG,
++					&rst_src_en);
++	if (rc) {
++		pr_err("can't get rst_src_en offset (%d)\n", rc);
++		return -EINVAL;
++	}
++
++	rc = of_property_read_u32_index(np, "syscon", SW_MASTER_RESET_REG,
++					&sw_mstr_rst);
++	if (rc) {
++		pr_err("can't get sw_mstr_rst offset (%d)\n", rc);
++		return -EINVAL;
++	}
++
++	arm_pm_restart = brcmstb_reboot;
++
++	return 0;
++}
++
++static const struct of_device_id of_match[] = {
++	{ .compatible = "brcm,brcmstb-reboot", },
++	{},
++};
++
++static struct platform_driver brcmstb_reboot_driver = {
++	.probe = brcmstb_reboot_probe,
++	.driver = {
++		.name = "brcmstb-reboot",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match,
++	},
++};
++
++static int __init brcmstb_reboot_init(void)
++{
++	return platform_driver_probe(&brcmstb_reboot_driver,
++					brcmstb_reboot_probe);
++}
++subsys_initcall(brcmstb_reboot_init);
+-- 
+1.7.1
