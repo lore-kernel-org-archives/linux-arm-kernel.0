@@ -1,37 +1,71 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Jan 2014 17:03:14 +0900
-Subject: [PATCH v3] audit: generic compat system call support
-In-Reply-To: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri, 17 Jan 2014 17:13:13 +0900
+Subject: [PATCH v2 0/6] arm64: Add audit support
+In-Reply-To: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm64 supports 32-bit mode(AArch32) and 64-bit mode(AArch64).
-To enable audit on arm64, we want to use lib/audit.c and re-work it
-to support compat system calls as well without copying it under
-arch sub-directory.
+This patchset adds system call audit support on arm64.
+Both 32-bit (AUIDT_ARCH_ARM[EB]) and 64-bit tasks (AUDIT_ARCH_AARCH64[EB])
+are supported, but presuming 32-LE on 64-LE or 32-BE on 64-BE.
 
-So this patch is mandatory for my "system call audit support for arm64"
-patch. Please review it as well for better understandings.
+There are some prerequisites for this patch to work correctly:
+* "generic compat system call audit support" patch
+* "correct a type mismatch in audit_syscall_exit()" patch
+   (already accepted and queued in 3.14)
+* "Modify a set of system calls in audit class" patch
+* userspace audit tool (v2.3.2 + my patch for arm64)
 
-This code was tested on armv8 fast model with 64-bit and 32-bit userland
-by using modified audit-test-code.
+All those were already or will be soon posted separately.
+Please review them as well for better understandings.
+
+This code was tested on both 32-bit and 64-bit LE userland 
+in the following two ways:
+1) basic operations with auditctl/autrace
+  # auditctl -a exit,always -S openat -F path=/etc/inittab
+  # auditctl -a exit,always -F dir=/tmp -F perm=rw
+  # auditctl -a task,always
+  # autrace /bin/ls
+    by comparing output from autrace with one from strace
+
+2) audit-test-code (+ my workarounds for arm/arm64)
+  by running "audit-tool", "filter" and "syscalls" test categories.
 
 Changes v1 -> v2:
-* Specify AUDIT_CLASS_XYZ_32 instead of AUDIT_CLASS_XYZ when registering
-  compat syscalls (bug fix)
+* Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+  Please note that a required header, unistd_32.h, is automatically
+  generated from unistd32.h.
+* Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+  system call in audit_syscall_entry() [6/6]
+* Include "Add regs_return_value() in syscall.h" patch [2/6],
+  which was not intentionally included in v1 because it could be added
+  by "kprobes support".
 
 
-AKASHI Takahiro (1):
-  audit: Add generic compat syscall support
+AKASHI Takahiro (6):
+  audit: Enable arm64 support
+  arm64: Add regs_return_value() in syscall.h
+  arm64: Add audit support
+  arm64: audit: Add 32-bit (compat) syscall support
+  arm64: audit: Add makefile rule to create unistd_32.h for compat
+    syscalls
+  arm64: audit: Add audit hook in ptrace/syscall_trace
 
- include/linux/audit.h |    9 +++++++++
- lib/Makefile          |    3 +++
- lib/audit.c           |   17 +++++++++++++++++
- lib/compat_audit.c    |   51 +++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 80 insertions(+)
- create mode 100644 lib/compat_audit.c
+ arch/arm64/Makefile                  |    4 ++++
+ arch/arm64/include/asm/audit.h       |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/ptrace.h      |    5 +++++
+ arch/arm64/include/asm/syscall.h     |   22 ++++++++++++++++++++++
+ arch/arm64/include/asm/thread_info.h |    1 +
+ arch/arm64/kernel/entry.S            |    3 +++
+ arch/arm64/kernel/ptrace.c           |   12 ++++++++++++
+ arch/arm64/kernel/syscalls/Makefile  |   20 ++++++++++++++++++++
+ include/uapi/linux/audit.h           |    2 ++
+ init/Kconfig                         |    2 +-
+ 10 files changed, 90 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/audit.h
+ create mode 100644 arch/arm64/kernel/syscalls/Makefile
 
 -- 
 1.7.9.5
