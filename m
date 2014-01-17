@@ -1,78 +1,31 @@
-From: ddegraff@licor.com (Darryl)
-Date: Fri, 17 Jan 2014 07:41:21 -0600
-Subject: debugging head.S
-Message-ID: <52D93301.2080609@licor.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Jan 2014 13:46:46 +0000
+Subject: Deadlock in do_page_fault() on ARM (old kernel)
+In-Reply-To: <52D73220.3030108@signal11.us>
+References: <52D73220.3030108@signal11.us>
+Message-ID: <20140117134646.GL27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am trying to build 3.12.6 for an OMAP3-based board (debug console on 
-UART 3)
+On Wed, Jan 15, 2014 at 08:13:04PM -0500, Alan Ott wrote:
+> So my questions are:
+> 1. Why don't I see a full backtrace beyond the exception stack? It's the  
+> same when dump_stack() is called manually.
 
-Enabling DEBUG in
+No idea - it looks like you're not using frame pointers, but are using
+the unwinder.  Full backtraces can always be created with frame pointers,
+it's just that unwinding seems unreliable.
 
-     arch/arm/boot/compressed/head.S
+I think we do need to see the full backtrace here - from looking at the
+full state dump, I don't see any sign of the mmap_sem being held except
+by an attempt to process a fault, and two threads trying to do a
+sys_mmap_pgoff().
 
-and with
+My suspicion therefore is that some other thread must have died while
+holding the mmap_sem, so there's probably a kernel oops earlier...
+that's my best guess at the moment without seeing the full backtrace.
 
-     CONFIG_DEBUG_LL_INCLUDE="debug/omap2plus.S"
-
-compiling (well, actually, assembling) gives the following (slightly 
-reformatted):
-
-     arch/arm/boot/compressed/head.S: Assembler messages:
-     arch/arm/boot/compressed/head.S:1237: Error: ARM register expected 
--- `sub ,r3,r1'
-     arch/arm/boot/compressed/head.S:1237: Error: ARM register expected 
--- `ldr r3,[,#0]'
-     arch/arm/boot/compressed/head.S:1237: Error: ARM register expected 
--- `ldr r1,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#0]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#0]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `ldr ,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: shift expression 
-expected -- `add r3,r3,'
-     arch/arm/include/debug/omap2plus.S:138: Error: shift expression 
-expected -- `add r1,r1,'
-     arch/arm/boot/compressed/head.S:1255: Error: ARM register expected 
--- `sub ,r3,r1'
-     arch/arm/boot/compressed/head.S:1255: Error: ARM register expected 
--- `ldr r3,[,#0]'
-     arch/arm/boot/compressed/head.S:1255: Error: ARM register expected 
--- `ldr r1,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#0]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#0]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#4]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `str r3,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: ARM register 
-expected -- `ldr ,[,#8]'
-     arch/arm/include/debug/omap2plus.S:138: Error: shift expression 
-expected -- `add r3,r3,'
-     arch/arm/include/debug/omap2plus.S:138: Error: shift expression 
-expected -- `add r1,r1,'
-
-It looks like the 'addruart' macro in in omap2plus.S is shorted a 
-parameter from the macro 'loadsp' macro in head.S, called in 'puts' and 
-'putc'.
-
-Am I misusing this in some way?  Any suggestions?
-
-Darryl
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
