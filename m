@@ -1,26 +1,146 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Fri, 17 Jan 2014 22:45:02 +1000
-Subject: [PATCH REPOST] ARM: Fix incorrect FDT initrd parameter override
-In-Reply-To: <CAL_JsqJNPbQVKtW0amaOSc1is9oKrGapaHR=YJGJy6TrGQeKYw@mail.gmail.com>
-References: <deeb5f$5527t1@icp-osb-irony-out2.iinet.net.au>
- <CAL_JsqJNPbQVKtW0amaOSc1is9oKrGapaHR=YJGJy6TrGQeKYw@mail.gmail.com>
-Message-ID: <52D925CE.8050204@killerwolves.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 17 Jan 2014 20:25:06 +0800
+Subject: [PATCH 12/20] ARM64 / ACPI: Use Parked Address in GIC structure for
+ spin table SMP initialisation
+In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1389961514-13562-13-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 10:04 AM -0600, Rob Herring wrote:
->> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
-> 
-> I'd really like to see phys_initrd_* removed, but that would be more
-> invasive, so:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> Please submit to Russell's patch system and mark for stable. I don't
-> think there is time before 3.13 is released.
+Parked Address in GIC structure can be used as cpu release address
+for spin table SMP initialisation.
 
-This patch (7941/2) was submitted on 14 Jan after being acked by Jason Cooper.
+This patch gets parked address from MADT and use it for SMP
+initialisation when DT is not available.
 
-<http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/225272.html>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/include/asm/acpi.h      |    7 +++++++
+ arch/arm64/kernel/smp_spin_table.c |   12 ++++++++----
+ drivers/acpi/plat/arm-core.c       |   24 +++++++++++++++++++++++-
+ 3 files changed, 38 insertions(+), 5 deletions(-)
 
-I apologise for the duplicate patch post.
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 097394c..856a2e7 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -89,6 +89,8 @@ extern int arm_cpu_to_apicid[NR_CPUS];
+ 
+ extern const char *acpi_get_enable_method(int cpu);
+ 
++extern int acpi_get_cpu_release_address(int cpu, u64 *release_address);
++
+ #else	/* !CONFIG_ACPI */
+ #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
+ #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
+@@ -100,6 +102,11 @@ static inline const char *acpi_get_enable_method(int cpu)
+ 	return NULL;
+ }
+ 
++static inline int acpi_get_cpu_release_address(int cpu, u64 *release_address)
++{
++	return -ENODEV;
++}
++
+ #endif
+ 
+ #endif /*_ASM_ARM64_ACPI_H*/
+diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+index 44c2280..ce86189 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -25,6 +25,7 @@
+ #include <asm/cpu_ops.h>
+ #include <asm/cputype.h>
+ #include <asm/smp_plat.h>
++#include <asm/acpi.h>
+ 
+ extern void secondary_holding_pen(void);
+ volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+@@ -47,7 +48,6 @@ static void write_pen_release(u64 val)
+ 	__flush_dcache_area(start, size);
+ }
+ 
+-
+ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+ {
+ 	/*
+@@ -55,10 +55,14 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
+ 	 */
+ 	if (of_property_read_u64(dn, "cpu-release-addr",
+ 				 &cpu_release_addr[cpu])) {
+-		pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
+-		       cpu);
+ 
+-		return -1;
++		/* try ACPI way */
++		if (acpi_get_cpu_release_address(cpu, &cpu_release_addr[cpu])) {
++			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
++				cpu);
++
++			return -1;
++		}
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
+index 2704633..7f1d709 100644
+--- a/drivers/acpi/plat/arm-core.c
++++ b/drivers/acpi/plat/arm-core.c
+@@ -60,6 +60,9 @@ static int available_cpus;
+ int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
+ static int boot_cpu_apic_id = -1;
+ 
++/* Parked Address in ACPI GIC structure */
++static u64 parked_address[NR_CPUS];
++
+ #define BAD_MADT_ENTRY(entry, end) (					\
+ 	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
+ 	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
+@@ -193,6 +196,7 @@ static int __init
+ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+ {
+ 	struct acpi_madt_generic_interrupt *processor = NULL;
++	int cpu;
+ 
+ 	processor = (struct acpi_madt_generic_interrupt *)header;
+ 
+@@ -208,9 +212,16 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+ 	 * to not preallocating memory for all NR_CPUS
+ 	 * when we use CPU hotplug.
+ 	 */
+-	acpi_register_gic_cpu_interface(processor->gic_id,
++	cpu = acpi_register_gic_cpu_interface(processor->gic_id,
+ 			processor->flags & ACPI_MADT_ENABLED);
+ 
++	/*
++	 * We need the parked address for SMP initialization with
++	 * spin-table enable method
++	 */
++	if (cpu >= 0 && processor->parked_address)
++		parked_address[cpu] = processor->parked_address;
++
+ 	return 0;
+ }
+ 
+@@ -269,6 +280,17 @@ static int __init acpi_parse_madt_gic_entries(void)
+ 	return 0;
+ }
+ 
++/* Parked Address in ACPI GIC structure can be used as cpu release addr */
++int acpi_get_cpu_release_address(int cpu, u64 *release_address)
++{
++	if (!release_address || !parked_address[cpu])
++		return -EINVAL;
++
++	*release_address = parked_address[cpu];
++
++	return 0;
++}
++
+ /*
+  * Parse GIC distributor related entries in MADT
+  * returns 0 on success, < 0 on error
+-- 
+1.7.9.5
