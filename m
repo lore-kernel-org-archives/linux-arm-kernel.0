@@ -1,70 +1,58 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Jan 2014 22:25:39 +0200
-Subject: [PATCH 2/3] ARM: DRA7XX: Add support for DRA7XX only build
+Date: Fri, 17 Jan 2014 22:25:40 +0200
+Subject: [PATCH 3/3] clk: ti: OMAP build fixes
 In-Reply-To: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
 References: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1389990340-23358-3-git-send-email-t-kristo@ti.com>
+Message-ID: <1389990340-23358-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SOC_DRA7XX was under wrong menu within Kconfig file, which prevented
-DRA7XX only build. Fixed the kconfig options for this SoC as we are
-there. voltage.c needs to be added to the DRA7XX build also, otherwise
-DRA7XX only build will fail.
+Improper merge of TI clock driver resulted in build breakage for OMAP1 build,
+and various other TI single SoC builds. This patch fixes those by adding the
+missed Makefile tweaks.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Kconfig  |   18 ++++++++++--------
- arch/arm/mach-omap2/Makefile |    1 +
- 2 files changed, 11 insertions(+), 8 deletions(-)
+ drivers/clk/Makefile    |    2 +-
+ drivers/clk/ti/Makefile |   17 +++++++++--------
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index dc21df1..e65948a 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -76,6 +76,16 @@ config SOC_AM43XX
- 	select ARM_GIC
- 	select MACH_OMAP_GENERIC
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 1f3143f..13c1e91 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -38,7 +38,7 @@ obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_COMMON_CLK_XGENE)  += clk-xgene.o
+ obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= shmobile/
+-obj-$(CONFIG_ARCH_OMAP)		+= ti/
++obj-$(CONFIG_ARCH_OMAP2PLUS)	+= ti/
  
-+config SOC_DRA7XX
-+	bool "TI DRA7XX"
-+	depends on ARCH_MULTI_V7
-+	select ARCH_OMAP2PLUS
-+	select ARM_CPU_SUSPEND if PM
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_SMP
-+	select HAVE_ARM_ARCH_TIMER
-+
- config ARCH_OMAP2PLUS
- 	bool
- 	select ARCH_HAS_BANDGAP
-@@ -128,14 +138,6 @@ config SOC_HAS_REALTIME_COUNTER
- 	depends on SOC_OMAP5 || SOC_DRA7XX
- 	default y
+ obj-$(CONFIG_X86)		+= x86/
  
--config SOC_DRA7XX
--	bool "TI DRA7XX"
--	select ARM_ARCH_TIMER
--	select CPU_V7
--	select ARM_GIC
--	select HAVE_SMP
--	select COMMON_CLK
--
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
- 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 96a990f..8ebe9f3 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -132,6 +132,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(voltagedomain-common)
- obj-$(CONFIG_SOC_AM43XX)		+= $(voltagedomain-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(voltagedomain-common)
- obj-$(CONFIG_SOC_OMAP5)                += voltagedomains54xx_data.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(voltagedomain-common)
- 
- # OMAP powerdomain framework
- powerdomain-common			+= powerdomain.o powerdomain-common.o
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+index 007c3c2..4319d40 100644
+--- a/drivers/clk/ti/Makefile
++++ b/drivers/clk/ti/Makefile
+@@ -1,10 +1,11 @@
+ ifneq ($(CONFIG_OF),)
+-obj-y					+= clk.o dpll.o autoidle.o divider.o \
+-					   fixed-factor.o gate.o clockdomain.o \
+-					   composite.o mux.o apll.o clk-43xx.o
+-obj-$(CONFIG_SOC_AM33XX)		+= clk-33xx.o
+-obj-$(CONFIG_ARCH_OMAP3)		+= interface.o clk-3xxx.o
+-obj-$(CONFIG_ARCH_OMAP4)		+= clk-44xx.o
+-obj-$(CONFIG_SOC_OMAP5)			+= clk-54xx.o
+-obj-$(CONFIG_SOC_DRA7XX)		+= clk-7xx.o
++obj-y					+= clk.o autoidle.o clockdomain.o
++clk-common				= dpll.o composite.o divider.o gate.o \
++					  fixed-factor.o mux.o apll.o
++obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
++obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o clk-3xxx.o
++obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
++obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
++obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o
++obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
+ endif
 -- 
 1.7.9.5
