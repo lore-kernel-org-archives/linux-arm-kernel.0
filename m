@@ -1,99 +1,90 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 21:24:40 +0800
-Subject: [PATCH net-next v3 1/8] net: stmmac: Enable stmmac main clock when
- probing hardware
-In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
-References: <1389965087-21971-1-git-send-email-wens@csie.org>
-Message-ID: <1389965087-21971-2-git-send-email-wens@csie.org>
+Date: Fri, 17 Jan 2014 21:24:39 +0800
+Subject: [PATCH net-next v3 0/8] net: stmmac: Add Allwinner A20 GMAC ethernet
+Message-ID: <1389965087-21971-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stmmac driver does not enable the main clock during the probe phase.
-If the clock was not enabled by the boot loader or was disabled by the
-kernel, hardware features and the MDIO bus would not be probed properly.
+Hi,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 26 +++++++++++------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+This is v3 of the  Allwinner A20 GMAC glue layer for stmmac.
+I have split the series into stmmac driver changes for net-next,
+and clock and DT patches for their respective trees.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index cddcf76..0d2c4cb 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -1680,8 +1680,6 @@ static int stmmac_open(struct net_device *dev)
- 	struct stmmac_priv *priv = netdev_priv(dev);
- 	int ret;
- 
--	clk_prepare_enable(priv->stmmac_clk);
--
- 	stmmac_check_ether_addr(priv);
- 
- 	if (priv->pcs != STMMAC_PCS_RGMII && priv->pcs != STMMAC_PCS_TBI &&
-@@ -1819,7 +1817,6 @@ static int stmmac_release(struct net_device *dev)
- #ifdef CONFIG_STMMAC_DEBUG_FS
- 	stmmac_exit_fs();
- #endif
--	clk_disable_unprepare(priv->stmmac_clk);
- 
- 	stmmac_release_ptp(priv);
- 
-@@ -2727,10 +2724,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 	if ((phyaddr >= 0) && (phyaddr <= 31))
- 		priv->plat->phy_addr = phyaddr;
- 
-+	priv->stmmac_clk = devm_clk_get(priv->device, STMMAC_RESOURCE_NAME);
-+	if (IS_ERR(priv->stmmac_clk)) {
-+		dev_warn(priv->device, "%s: warning: cannot get CSR clock\n",
-+			 __func__);
-+		goto error_clk_get;
-+	}
-+	clk_prepare_enable(priv->stmmac_clk);
-+
- 	/* Init MAC and get the capabilities */
- 	ret = stmmac_hw_init(priv);
- 	if (ret)
--		goto error_free_netdev;
-+		goto error_hw_init;
- 
- 	ndev->netdev_ops = &stmmac_netdev_ops;
- 
-@@ -2768,12 +2773,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 		goto error_netdev_register;
- 	}
- 
--	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
--	if (IS_ERR(priv->stmmac_clk)) {
--		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
--		goto error_clk_get;
--	}
--
- 	/* If a specific clk_csr value is passed from the platform
- 	 * this means that the CSR Clock Range selection cannot be
- 	 * changed at run-time and it is fixed. Viceversa the driver'll try to
-@@ -2801,12 +2800,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
- 	return priv;
- 
- error_mdio_register:
--	clk_put(priv->stmmac_clk);
--error_clk_get:
- 	unregister_netdev(ndev);
- error_netdev_register:
- 	netif_napi_del(&priv->napi);
--error_free_netdev:
-+error_hw_init:
-+	clk_disable_unprepare(priv->stmmac_clk);
-+error_clk_get:
- 	free_netdev(ndev);
- 
- 	return NULL;
-@@ -2833,6 +2832,7 @@ int stmmac_dvr_remove(struct net_device *ndev)
- 		stmmac_mdio_unregister(ndev);
- 	netif_carrier_off(ndev);
- 	unregister_netdev(ndev);
-+	clk_disable_unprepare(priv->stmmac_clk);
- 	free_netdev(ndev);
- 
- 	return 0;
+
+The Allwinner A20 SoC integrates an early version of dwmac
+IP from Synopsys. On top of that is a hardware glue layer.
+This layer needs to be configured before the dwmac can be
+used.
+
+Part of the glue layer is a clock mux, which controls the
+source and direction of the TX clock used by GMAC.
+
+The glue layer is implemented with existing feature flags 
+and callbacks found in stmmac driver core. A new stmmac_of_data
+structure, which is a subset of the original platform data,
+has been added to tie these values with compatible strings.
+The purpose of this is to avoid future glue layers assuming
+they can pass other data or directly modify values used by
+the driver core. This is found in patch #7.
+
+The callbacks have also been extended to pass board specific
+data. This is found in patch #3.
+
+This version of dwmac IP requires store and forward DMA mode.
+The relevant device tree property was documented, but not
+implemented. Patch #6 adds this to stmmac platform driver.
+
+Changes since v2:
+
+  * Dropped non CONFIG_RESET_CONTROLLER routines, make stmmac
+    select CONFIG_RESET_CONTROLLER
+  * Split out "Deprecate snps,phy-addr and auto-detect PHY address"
+    from "Use driver data and callbacks tied with compatible strings"
+  * Added comments on how sunxi glue layer uses GMAC clock
+  * Rebased onto net-next
+  * Corrected typo in blackfin commit message
+
+Changes since v1:
+
+  * Added optional reset control to stmmac driver core
+  * Added non CONFIG_RESET_CONROLLER routines for the above change
+  * Extended callback API, as discussed with Srinivas
+  * Used new stmmac_of_data to pass features and callbacks,
+    instead of platform data, as discussed
+  * Seperated clock module glue layer into clock driver
+
+
+Cheers,
+ChenYu
+
+
+Chen-Yu Tsai (8):
+  net: stmmac: Enable stmmac main clock when probing hardware
+  net: stmmac: Add support for optional reset control
+  net: stmmac: Allocate and pass soc/board specific data to callbacks
+  blackfin: Update stmmac callback signatures
+  net: stmmac: Honor DT parameter to force DMA store and forward mode
+  net: stmmac: Deprecate snps,phy-addr and auto-detect PHY address
+  net: stmmac: Use driver data and callbacks tied with compatible
+    strings
+  net: stmmac: sunxi platform extensions for GMAC in Allwinner A20 SoC's
+
+ .../bindings/net/allwinner,sun7i-a20-gmac.txt      |  27 ++++
+ Documentation/devicetree/bindings/net/stmmac.txt   |   4 +-
+ Documentation/networking/stmmac.txt                |  12 +-
+ arch/blackfin/mach-bf609/boards/ezkit.c            |   2 +-
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 141 +++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |   5 +
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  45 +++++--
+ drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   |   4 +-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  80 +++++++++---
+ include/linux/stmmac.h                             |  24 +++-
+ 12 files changed, 316 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
+
 -- 
 1.8.5.2
