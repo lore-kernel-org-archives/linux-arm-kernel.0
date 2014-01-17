@@ -1,112 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 14:47:29 +0800
-Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
-In-Reply-To: <1389941251-32692-1-git-send-email-wens@csie.org>
-References: <1389941251-32692-1-git-send-email-wens@csie.org>
-Message-ID: <1389941251-32692-5-git-send-email-wens@csie.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 Jan 2014 14:10:24 +0800
+Subject: [PATCH] dma: imx-sdma: remove firmare not found warning
+In-Reply-To: <1389887186-6146-1-git-send-email-s.hauer@pengutronix.de>
+References: <1389887186-6146-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140117061022.GE1565@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../devicetree/bindings/rfkill/rfkill-gpio.txt     | 26 ++++++++++++++++++++++
- net/rfkill/rfkill-gpio.c                           | 23 +++++++++++++++++++
- 2 files changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+On Thu, Jan 16, 2014 at 04:46:26PM +0100, Sascha Hauer wrote:
+> When a firmware cannot be found for the SDMA engine then we can
+> continue with the inernal ROM firmware.
+> 
+> The meaning of this message is frequently asked for and the usual
+> answer is that this message is of no relevance, so just make it
+> dev_dbg() and do not alienate the users anymore.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Vinod Koul <vinod.koul@intel.com>
 
-diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-new file mode 100644
-index 0000000..8a07ea4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-@@ -0,0 +1,26 @@
-+GPIO controlled RFKILL devices
-+
-+Required properties:
-+- compatible	: Must be "rfkill-gpio".
-+- rfkill-name	: Name of RFKILL device
-+- rfkill-type	: Type of RFKILL device: 1 for WiFi, 2 for BlueTooth
-+- NAME_shutdown-gpios	: GPIO phandle to shutdown control
-+			  (phandle must be the second)
-+- NAME_reset-gpios	: GPIO phandle to reset control
-+
-+NAME must match the rfkill-name property. NAME_shutdown-gpios or
-+NAME_reset-gpios, or both, must be defined.
-+
-+Optional properties:
-+- clocks		: phandle to clock to enable/disable
-+
-+Example:
-+
-+	rfkill_bt: rfkill at 0 {
-+		compatible = "rfkill-gpio";
-+		rfkill-name = "bluetooth";
-+		rfkill-type = <2>;
-+		bluetooth_shutdown-gpios = <0>, <&pio 7 18 0>;
-+		bluetooth_reset-gpios = <&pio 7 24 0>;
-+		clocks = <&clk_out_a>;
-+	};
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index 3084fa3..48381a8 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/of_gpio.h>
- 
- #include <linux/rfkill-gpio.h>
- 
-@@ -83,6 +84,18 @@ static int rfkill_gpio_acpi_probe(struct device *dev,
- 	return 0;
- }
- 
-+static int rfkill_gpio_dt_probe(struct device *dev,
-+				struct rfkill_gpio_data *rfkill)
-+{
-+	struct device_node * np = dev->of_node;
-+
-+	rfkill->name = np->name;
-+	of_property_read_string(np, "rfkill-name", &rfkill->name);
-+	of_property_read_u32(np, "rfkill-type", &rfkill->type);
-+
-+	return 0;
-+}
-+
- static int rfkill_gpio_probe(struct platform_device *pdev)
- {
- 	struct rfkill_gpio_platform_data *pdata = pdev->dev.platform_data;
-@@ -100,6 +113,10 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 		ret = rfkill_gpio_acpi_probe(&pdev->dev, rfkill);
- 		if (ret)
- 			return ret;
-+	} else if (&pdev->dev.of_node) {
-+		ret = rfkill_gpio_dt_probe(&pdev->dev, rfkill);
-+		if (ret)
-+			return ret;
- 	} else if (pdata) {
- 		clk_name = pdata->power_clk_name;
- 		rfkill->name = pdata->name;
-@@ -189,6 +206,11 @@ static const struct acpi_device_id rfkill_acpi_match[] = {
- 	{ },
- };
- 
-+static const struct of_device_id rfkill_of_match[] = {
-+	{ .compatible = "rfkill-gpio", },
-+	{},
-+};
-+
- static struct platform_driver rfkill_gpio_driver = {
- 	.probe = rfkill_gpio_probe,
- 	.remove = rfkill_gpio_remove,
-@@ -196,6 +218,7 @@ static struct platform_driver rfkill_gpio_driver = {
- 		.name = "rfkill_gpio",
- 		.owner = THIS_MODULE,
- 		.acpi_match_table = ACPI_PTR(rfkill_acpi_match),
-+		.of_match_table = of_match_ptr(rfkill_of_match),
- 	},
- };
- 
--- 
-1.8.5.2
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> ---
+>  drivers/dma/imx-sdma.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index c75679d..fe57a42 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -1259,7 +1259,10 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
+>  	unsigned short *ram_code;
+>  
+>  	if (!fw) {
+> -		dev_err(sdma->dev, "firmware not found\n");
+> +		dev_dbg(sdma->dev, "firmware not found\n");
+> +		/*
+> +		 * In this case we just use the ROM firmware.
+> +		 */
+>  		return;
+>  	}
+>  
+> -- 
+> 1.8.5.2
+> 
