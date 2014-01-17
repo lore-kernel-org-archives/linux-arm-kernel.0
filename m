@@ -1,276 +1,99 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 21:24:47 +0800
-Subject: [PATCH net-next v3 8/8] net: stmmac: sunxi platform extensions for
- GMAC in Allwinner A20 SoC's
-In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
-References: <1389965087-21971-1-git-send-email-wens@csie.org>
-Message-ID: <1389965087-21971-9-git-send-email-wens@csie.org>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 17 Jan 2014 19:10:05 +0530
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D91D3A.80800@linaro.org>
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
+ <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
+Message-ID: <52D932B5.7020909@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20 has an ethernet controller that seems to be
-an early version of Synopsys DesignWare MAC 10/100/1000 Universal,
-which is supported by the stmmac driver.
+On Friday 17 January 2014 05:38 PM, Daniel Lezcano wrote:
+> On 01/17/2014 12:37 PM, Prashant Gaikwad wrote:
+>> On Friday 17 January 2014 03:45 PM, Daniel Lezcano wrote:
+>>> On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
+>>>> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
+>>>>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
+>>>>>> Will Deacon <will.deacon@arm.com> writes:
+>>>>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
+>>>>>>> used when
+>>>>>>> you go idle?
+>>>>>> That would mean falling back to broadcast timer, right? That's not
+>>>>>> necessarily on the local CPU so wakeups would often wake two CPUs.
+>>>>> You can prevent that if the hardware supports it with the
+>>>>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
+>>>> Instead of falling back on broadcast timer, is it possible to fall back
+>>>> on other per-CPU timer which is preserved across idle state?
+>>> Is it what you are looking for ?
+>>>
+>>> http://lwn.net/Articles/580568/
+>>>
+>> If I understand correctly these patches enables us to use per-CPU timers
+>> as broadcast timers. I do not want to use broadcast timer.
+> Why ?
+>
 
-Allwinner's GMAC requires setting additional registers in the SoC's
-clock control unit.
+For some idle states it may be required to change the timer when 
+entering idle state to adjust the exit latency.
 
-The exact version of the DWMAC IP that Allwinner uses is unknown,
-thus the exact feature set is unknown.
+It can be done for broadcast timer too but following scenario will not work
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../bindings/net/allwinner,sun7i-a20-gmac.txt      |  27 ++++
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 141 +++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       |   3 +
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   3 +
- 6 files changed, 186 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
+1. CPU1 enters in idle state:
+         Broadcast timer next event is in 2ms, CPU latency is 50us. So 
+we change the broadcast timer to send event after (2ms - 50us).
 
-diff --git a/Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt b/Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
-new file mode 100644
-index 0000000..ea4d752
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/allwinner,sun7i-a20-gmac.txt
-@@ -0,0 +1,27 @@
-+* Allwinner GMAC ethernet controller
-+
-+This device is a platform glue layer for stmmac.
-+Please see stmmac.txt for the other unchanged properties.
-+
-+Required properties:
-+ - compatible:  Should be "allwinner,sun7i-a20-gmac"
-+ - clocks: Should contain the GMAC main clock, and tx clock
-+   The tx clock type should be "allwinner,sun7i-a20-gmac-clk"
-+ - clock-names: Should contain the clock names "stmmaceth",
-+   and "allwinner_gmac_tx"
-+
-+Optional properties:
-+- phy-supply: phandle to a regulator if the PHY needs one
-+
-+Examples:
-+
-+	gmac: ethernet at 01c50000 {
-+		compatible = "allwinner,sun7i-a20-gmac";
-+		reg = <0x01c50000 0x10000>,
-+		      <0x01c20164 0x4>;
-+		interrupts = <0 85 1>;
-+		interrupt-names = "macirq";
-+		clocks = <&ahb_gates 49>, <&gmac_tx>;
-+		clock-names = "stmmaceth", "allwinner_gmac_tx";
-+		phy-mode = "mii";
-+	};
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index b59d1ef..e2f202e 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-+++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -26,6 +26,17 @@ config STMMAC_PLATFORM
- 
- 	  If unsure, say N.
- 
-+config DWMAC_SUNXI
-+	bool "Allwinner GMAC support"
-+	depends on STMMAC_PLATFORM && ARCH_SUNXI
-+	default y
-+	---help---
-+	  Support for Allwinner A20/A31 GMAC ethernet controllers.
-+
-+	  This selects Allwinner SoC glue layer support for the
-+	  stmmac device driver. This driver is used for A20/A31
-+	  GMAC 	  ethernet controller.
-+
- config STMMAC_PCI
- 	bool "STMMAC PCI bus support"
- 	depends on STMMAC_ETH && PCI
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 356a9dd..ecadece 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-+++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_STMMAC_ETH) += stmmac.o
- stmmac-$(CONFIG_STMMAC_PLATFORM) += stmmac_platform.o
- stmmac-$(CONFIG_STMMAC_PCI) += stmmac_pci.o
-+stmmac-$(CONFIG_DWMAC_SUNXI) += dwmac-sunxi.o
- stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
- 	      chain_mode.o dwmac_lib.o dwmac1000_core.o  dwmac1000_dma.o \
- 	      dwmac100_core.o dwmac100_dma.o enh_desc.o  norm_desc.o \
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-new file mode 100644
-index 0000000..dc4f8ae
---- /dev/null
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-@@ -0,0 +1,141 @@
-+/**
-+ * dwmac-sunxi.c - Allwinner sunxi DWMAC specific glue layer
-+ *
-+ * Copyright (C) 2013 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai  <wens@csie.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/stmmac.h>
-+#include <linux/clk.h>
-+#include <linux/phy.h>
-+#include <linux/of_net.h>
-+#include <linux/regulator/consumer.h>
-+
-+struct sunxi_priv_data {
-+	int interface;
-+	int clk_enabled;
-+	struct clk *tx_clk;
-+	struct regulator *regulator;
-+};
-+
-+static void *sun7i_gmac_setup(struct platform_device *pdev)
-+{
-+	struct sunxi_priv_data *gmac;
-+	struct device *dev = &pdev->dev;
-+
-+	gmac = devm_kzalloc(dev, sizeof(*gmac), GFP_KERNEL);
-+	if (!gmac)
-+		return ERR_PTR(-ENOMEM);
-+
-+	gmac->interface = of_get_phy_mode(dev->of_node);
-+
-+	gmac->tx_clk = devm_clk_get(dev, "allwinner_gmac_tx");
-+	if (IS_ERR(gmac->tx_clk)) {
-+		dev_err(dev, "could not get tx clock\n");
-+		return gmac->tx_clk;
-+	}
-+
-+	/* Optional regulator for PHY */
-+	gmac->regulator = devm_regulator_get_optional(dev, "phy");
-+	if (IS_ERR(gmac->regulator)) {
-+		if (PTR_ERR(gmac->regulator) == -EPROBE_DEFER)
-+			return ERR_PTR(-EPROBE_DEFER);
-+		dev_info(dev, "no regulator found\n");
-+		gmac->regulator = NULL;
-+	}
-+
-+	return gmac;
-+}
-+
-+#define SUN7I_GMAC_GMII_RGMII_RATE	125000000
-+#define SUN7I_GMAC_MII_RATE		25000000
-+
-+static int sun7i_gmac_init(struct platform_device *pdev, void *priv)
-+{
-+	struct sunxi_priv_data *gmac = priv;
-+	int ret;
-+
-+	if (gmac->regulator) {
-+		ret = regulator_enable(gmac->regulator);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Set GMAC interface port mode
-+	 *
-+	 * The GMAC TX clock lines are configured by setting the clock
-+	 * rate, which then uses the auto-reparenting feature of the
-+	 * clock driver, and enabling/disabling the clock.
-+	 */
-+	if (gmac->interface == PHY_INTERFACE_MODE_RGMII) {
-+		clk_set_rate(gmac->tx_clk, SUN7I_GMAC_GMII_RGMII_RATE);
-+		clk_prepare_enable(gmac->tx_clk);
-+		gmac->clk_enabled = 1;
-+	} else {
-+		clk_set_rate(gmac->tx_clk, SUN7I_GMAC_MII_RATE);
-+		clk_prepare(gmac->tx_clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static void sun7i_gmac_exit(struct platform_device *pdev, void *priv)
-+{
-+	struct sunxi_priv_data *gmac = priv;
-+
-+	if (gmac->clk_enabled) {
-+		clk_disable(gmac->tx_clk);
-+		gmac->clk_enabled = 0;
-+	}
-+	clk_unprepare(gmac->tx_clk);
-+
-+	if (gmac->regulator)
-+		regulator_disable(gmac->regulator);
-+}
-+
-+static void sun7i_fix_speed(void *priv, unsigned int speed)
-+{
-+	struct sunxi_priv_data *gmac = priv;
-+
-+	/* only GMII mode requires us to reconfigure the clock lines */
-+	if (gmac->interface != PHY_INTERFACE_MODE_GMII)
-+		return;
-+
-+	if (gmac->clk_enabled) {
-+		clk_disable(gmac->tx_clk);
-+		gmac->clk_enabled = 0;
-+	}
-+	clk_unprepare(gmac->tx_clk);
-+
-+	if (speed == 1000) {
-+		clk_set_rate(gmac->tx_clk, SUN7I_GMAC_GMII_RGMII_RATE);
-+		clk_prepare_enable(gmac->tx_clk);
-+		gmac->clk_enabled = 1;
-+	} else {
-+		clk_set_rate(gmac->tx_clk, SUN7I_GMAC_MII_RATE);
-+		clk_prepare(gmac->tx_clk);
-+	}
-+}
-+
-+/* of_data specifying hardware features and callbacks.
-+ * hardware features were copied from Allwinner drivers. */
-+const struct stmmac_of_data sun7i_gmac_data = {
-+	.has_gmac = 1,
-+	.tx_coe = 1,
-+	.fix_mac_speed = sun7i_fix_speed,
-+	.setup = sun7i_gmac_setup,
-+	.init = sun7i_gmac_init,
-+	.exit = sun7i_gmac_exit,
-+};
-+
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac.h b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
-index c1c141f..d9af26e 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac.h
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
-@@ -130,6 +130,9 @@ void stmmac_disable_eee_mode(struct stmmac_priv *priv);
- bool stmmac_eee_init(struct stmmac_priv *priv);
- 
- #ifdef CONFIG_STMMAC_PLATFORM
-+#ifdef CONFIG_DWMAC_SUNXI
-+extern const struct stmmac_of_data sun7i_gmac_data;
-+#endif
- extern struct platform_driver stmmac_pltfr_driver;
- static inline int stmmac_register_platform(void)
- {
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index bf119db..9d4baa8 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -30,6 +30,9 @@
- #include "stmmac.h"
- 
- static const struct of_device_id stmmac_dt_ids[] = {
-+#ifdef CONFIG_DWMAC_SUNXI
-+	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
-+#endif
- 	/* SoC specific glue layers should come before generic bindings */
- 	{ .compatible = "st,spear600-gmac"},
- 	{ .compatible = "snps,dwmac-3.610"},
--- 
-1.8.5.2
+2. After 1ms CPU2 enters in idle state:
+         Next event is 5ms. Broadcast timer is already programmed to < 
+(5ms -50us) so we do nothing.
+
+3. CPU1 exits from idle state because of timer interrupt
+
+4. Broadcast event handler:
+     - Timer event is handled and CPU1 is switched back to local timer.
+     - Next CPU is CPU2 and next event for it is 4ms. So brodcast timer 
+is programmed to 4ms.
+
+We can not change brodcast timer here to adjust delay caused by CPU exit 
+latency.
+
+CPU idle governors does help to solve the latency issue. I was thinking 
+this from sub-states perspective which are not exposed to CPU idle governor.
+
+Solution for this could be to expose those states to CPU idle governor 
+but just wanted to know if we can use timers this way?
+
+Another requirement:
+
+We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1, 
+C2, C3 respectively.
+
+Rating of T2 is better than T3. If I register T2 and T3 both as 
+broadcast timers then T3 will not be used. But ...
+     - T2 is not preserved in C3 idle state.
+     - T3 resolution is very poor (ms) and can not be used as wake event 
+for C2.
+
+Possible solution, register only T3 as broadcast device and use T2 as 
+per-CPU fallback timer.
+
+>> If I have 2 per-CPU timers T1 and T2, T1 is not preserved across idle
+>> state and T2 is preserved. And I want to use T1 as scheduler timer.
+>> Can I do following for idle state?
+>>
+>> Idle entry:
+>>       clockevents_shutdown(T1);
+>>       clockevents_set_mode(T2, ONESHOT);
+>>       clockevents_program_event(T2, next_event);
+>>
+>> Idle exit:
+>>       clockevents_shutdown(T2);
+>>       clockevents_set_mode(T1, ONESHOT);
+>
+>
+>
+>>>>>> Does
+>>>>>> anyone have patches for using a CPU local timer as a fallback for
+>>>>>> C3STOP timers?
+>
