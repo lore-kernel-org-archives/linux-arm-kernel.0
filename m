@@ -1,62 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Jan 2014 11:14:56 +0100
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <CAGb2v640Qeb60dMq2kH6M6NqkVbdUh1JcCus3a7D7icQeDdKNg@mail.gmail.com>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <20140116195819.GY15937@n2100.arm.linux.org.uk>
- <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
- <20140117093909.GB2348@piout.net>
- <CAGb2v640Qeb60dMq2kH6M6NqkVbdUh1JcCus3a7D7icQeDdKNg@mail.gmail.com>
-Message-ID: <20140117101456.GD2348@piout.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 17 Jan 2014 11:15:50 +0100
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D901B6.1070800@nvidia.com>
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com>
+Message-ID: <52D902D6.3090208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 06:06:41PM +0800, Chen-Yu Tsai wrote :
-> On Fri, Jan 17, 2014 at 5:39 PM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > Maybe it is not completely related but I think it needs to be thought
-> > about while you are it:
-> >
-> > The TI wilink chips (TiWi, wl12xx, wl18xx) have wifi on SDIO and BT on
-> > UART but they share the same clock. So, the next question would be what
-> > if I just want to enable one or the other (and take that decision at
-> > runtime) ?
-> 
-> Some Broadcom chips (BCM4329/4330) and the AP6210 found on CubieTruck
-> are like this as well. In our case, the SD/MMC host driver hasn't been
-> mainlined yet. But BT on UART is independent and usable.
-> 
-> > Where do I put the pinctrl/clocks/regulators in the DT ? I guess it can
-> > become an issue to enable both WiFi and BT at the same time if both SDIO
-> > and UART are trying to handle the same pinctrl and regulators.
-> 
-> Shouldn't the clocks and regulators be registered in the DT _AS_ clocks
-> and regulators? fixed-regulator already accepts GPIO lines. fixed-rate-clock
-> mentions GPIOs in DT bindings, but doesn't seem to use them in the code.
-> We'd still need a device to tie them to, especially in the UART use case.
-> 
+On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
+> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
+>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
+>>> Will Deacon <will.deacon@arm.com> writes:
+>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
+>>>> used when
+>>>> you go idle?
+>>> That would mean falling back to broadcast timer, right? That's not
+>>> necessarily on the local CPU so wakeups would often wake two CPUs.
+>> You can prevent that if the hardware supports it with the
+>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
+>
+> Instead of falling back on broadcast timer, is it possible to fall back
+> on other per-CPU timer which is preserved across idle state?
 
-Yeah, I meant if you tie your clock/pinctrl/reset/regulator to both the
-BT and the WiFI nodes because it is shared, you'll at least get a
-warning or one of the two won't be working.
+Is it what you are looking for ?
 
-> Or we could try rfkill devices. Not saying it's the correct way, but it is
-> a solution.
-> 
+http://lwn.net/Articles/580568/
 
-You'll get the same issue there. Two rfkill devices sharing the same
-clock or reset for example.
+
+>>> Does
+>>> anyone have patches for using a CPU local timer as a fallback for
+>>> C3STOP timers?
+>>
+>>
+>
+
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/d440c2f6/attachment.sig>
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
