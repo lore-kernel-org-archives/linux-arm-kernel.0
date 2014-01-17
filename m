@@ -1,146 +1,64 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Jan 2014 20:25:06 +0800
-Subject: [PATCH 12/20] ARM64 / ACPI: Use Parked Address in GIC structure for
- spin table SMP initialisation
+Date: Fri, 17 Jan 2014 20:25:07 +0800
+Subject: [PATCH 13/20] ARM64 / ACPI: Define ACPI_IRQ_MODEL_GIC needed for arm
 In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
 References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1389961514-13562-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1389961514-13562-14-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parked Address in GIC structure can be used as cpu release address
-for spin table SMP initialisation.
+Needed because arm uses GIC which is defined in ACPI 5.0 spec.
 
-This patch gets parked address from MADT and use it for SMP
-initialisation when DT is not available.
-
+Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/acpi.h      |    7 +++++++
- arch/arm64/kernel/smp_spin_table.c |   12 ++++++++----
- drivers/acpi/plat/arm-core.c       |   24 +++++++++++++++++++++++-
- 3 files changed, 38 insertions(+), 5 deletions(-)
+ drivers/acpi/bus.c           |    3 +++
+ drivers/acpi/plat/arm-core.c |    6 +++++-
+ include/linux/acpi.h         |    1 +
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 097394c..856a2e7 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -89,6 +89,8 @@ extern int arm_cpu_to_apicid[NR_CPUS];
- 
- extern const char *acpi_get_enable_method(int cpu);
- 
-+extern int acpi_get_cpu_release_address(int cpu, u64 *release_address);
-+
- #else	/* !CONFIG_ACPI */
- #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
- #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
-@@ -100,6 +102,11 @@ static inline const char *acpi_get_enable_method(int cpu)
- 	return NULL;
- }
- 
-+static inline int acpi_get_cpu_release_address(int cpu, u64 *release_address)
-+{
-+	return -ENODEV;
-+}
-+
- #endif
- 
- #endif /*_ASM_ARM64_ACPI_H*/
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 44c2280..ce86189 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -25,6 +25,7 @@
- #include <asm/cpu_ops.h>
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
-+#include <asm/acpi.h>
- 
- extern void secondary_holding_pen(void);
- volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-@@ -47,7 +48,6 @@ static void write_pen_release(u64 val)
- 	__flush_dcache_area(start, size);
- }
- 
--
- static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
- {
- 	/*
-@@ -55,10 +55,14 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
- 	 */
- 	if (of_property_read_u64(dn, "cpu-release-addr",
- 				 &cpu_release_addr[cpu])) {
--		pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
--		       cpu);
- 
--		return -1;
-+		/* try ACPI way */
-+		if (acpi_get_cpu_release_address(cpu, &cpu_release_addr[cpu])) {
-+			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
-+				cpu);
-+
-+			return -1;
-+		}
- 	}
- 
- 	return 0;
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index 0710004..246b40c 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -487,6 +487,9 @@ static int __init acpi_bus_init_irq(void)
+ 	case ACPI_IRQ_MODEL_IOSAPIC:
+ 		message = "IOSAPIC";
+ 		break;
++	case ACPI_IRQ_MODEL_GIC:
++		message = "GIC";
++		break;
+ 	case ACPI_IRQ_MODEL_PLATFORM:
+ 		message = "platform specific model";
+ 		break;
 diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-index 2704633..7f1d709 100644
+index 7f1d709..2ff00b0 100644
 --- a/drivers/acpi/plat/arm-core.c
 +++ b/drivers/acpi/plat/arm-core.c
-@@ -60,6 +60,9 @@ static int available_cpus;
- int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
- static int boot_cpu_apic_id = -1;
+@@ -76,7 +76,11 @@ void arch_fix_phys_package_id(int num, u32 slot)
+ }
+ EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
  
-+/* Parked Address in ACPI GIC structure */
-+static u64 parked_address[NR_CPUS];
-+
- #define BAD_MADT_ENTRY(entry, end) (					\
- 	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
- 	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
-@@ -193,6 +196,7 @@ static int __init
- acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+-enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_PLATFORM;
++/*
++ * Since we're on ARM, the default interrupt routing model
++ * clearly has to be GIC.
++ */
++enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+ 
+ static unsigned int gsi_to_irq(unsigned int gsi)
  {
- 	struct acpi_madt_generic_interrupt *processor = NULL;
-+	int cpu;
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index d9099b1..da55da2 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -63,6 +63,7 @@ enum acpi_irq_model_id {
+ 	ACPI_IRQ_MODEL_IOAPIC,
+ 	ACPI_IRQ_MODEL_IOSAPIC,
+ 	ACPI_IRQ_MODEL_PLATFORM,
++	ACPI_IRQ_MODEL_GIC,
+ 	ACPI_IRQ_MODEL_COUNT
+ };
  
- 	processor = (struct acpi_madt_generic_interrupt *)header;
- 
-@@ -208,9 +212,16 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
- 	 * to not preallocating memory for all NR_CPUS
- 	 * when we use CPU hotplug.
- 	 */
--	acpi_register_gic_cpu_interface(processor->gic_id,
-+	cpu = acpi_register_gic_cpu_interface(processor->gic_id,
- 			processor->flags & ACPI_MADT_ENABLED);
- 
-+	/*
-+	 * We need the parked address for SMP initialization with
-+	 * spin-table enable method
-+	 */
-+	if (cpu >= 0 && processor->parked_address)
-+		parked_address[cpu] = processor->parked_address;
-+
- 	return 0;
- }
- 
-@@ -269,6 +280,17 @@ static int __init acpi_parse_madt_gic_entries(void)
- 	return 0;
- }
- 
-+/* Parked Address in ACPI GIC structure can be used as cpu release addr */
-+int acpi_get_cpu_release_address(int cpu, u64 *release_address)
-+{
-+	if (!release_address || !parked_address[cpu])
-+		return -EINVAL;
-+
-+	*release_address = parked_address[cpu];
-+
-+	return 0;
-+}
-+
- /*
-  * Parse GIC distributor related entries in MADT
-  * returns 0 on success, < 0 on error
 -- 
 1.7.9.5
