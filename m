@@ -1,156 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Jan 2014 15:03:12 +0000
-Subject: [RFC PATCH 2/3] arm64: KVM: trap VM system registers until MMU and
- caches are ON
+Date: Fri, 17 Jan 2014 15:03:11 +0000
+Subject: [RFC PATCH 1/3] arm64: KVM: force cache clean on page fault when
+ caches are off
 In-Reply-To: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
 References: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1389970993-19371-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1389970993-19371-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to detect the point where the guest enables
-its MMU and caches, trap all the VM related system registers.
+In order for the guest with caches off to observe data written
+contained in a given page, we need to make sure that page is
+committed to memory, and not just hanging in the cache (as
+guest accesses are completely bypassing the cache until it
+decides to enable it).
 
-Once we see the guest enabling both the MMU and the caches, we
-can go back to a saner mode of operation, which is to leave these
-registers in complete control of the guest.
+For this purpose, hook into the coherent_icache_guest_page
+function and flush the region if the guest SCTLR_EL1
+register doesn't show the MMU  and caches as being enabled.
+The function also get renamed to coherent_cache_guest_page.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  3 ++-
- arch/arm64/kvm/sys_regs.c        | 58 ++++++++++++++++++++++++++++++++--------
- 2 files changed, 49 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  4 ++--
+ arch/arm/kvm/mmu.c               |  4 ++--
+ arch/arm64/include/asm/kvm_mmu.h | 11 +++++++----
+ 3 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index c98ef47..fd0a651 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -62,6 +62,7 @@
-  * RW:		64bit by default, can be overriden for 32bit VMs
-  * TAC:		Trap ACTLR
-  * TSC:		Trap SMC
-+ * TVM:		Trap VM ops (until M+C set in SCTLR_EL1)
-  * TSW:		Trap cache operations by set/way
-  * TWE:		Trap WFE
-  * TWI:		Trap WFI
-@@ -74,7 +75,7 @@
-  * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-  */
- #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
--			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
-+			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
- 			 HCR_AMO | HCR_IMO | HCR_FMO | \
- 			 HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 02e9d09..5e92b9e 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -121,6 +121,42 @@ done:
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 77de4a4..f997b9e 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 
+ struct kvm;
+ 
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
+ {
+ 	/*
+ 	 * If we are going to insert an instruction page and the icache is
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 5809069..415fd63 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -713,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pmd_writable(&new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
++		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+@@ -721,7 +721,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
++		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+ 	}
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 680f74e..2232dd0 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+ 	return true;
  }
  
- /*
-+ * Generic accessor for VM registers. Only called as long as HCR_TVM
-+ * is set.
-+ */
-+static bool access_vm_reg(struct kvm_vcpu *vcpu,
-+			  const struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
-+{
-+	BUG_ON(!p->is_write);
-+
-+	vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
-+	return true;
-+}
-+
-+/*
-+ * SCTLR_EL1 accessor. Only called as long as HCR_TVM is set.  If the
-+ * guest enables the MMU, we stop trapping the VM sys_regs and leave
-+ * it in complete control of the caches.
-+ */
-+static bool access_sctlr_el1(struct kvm_vcpu *vcpu,
-+			     const struct sys_reg_params *p,
-+			     const struct sys_reg_desc *r)
-+{
-+	unsigned long val;
-+
-+	BUG_ON(!p->is_write);
-+
-+	val = *vcpu_reg(vcpu, p->Rt);
-+	vcpu_sys_reg(vcpu, r->reg) = val;
-+
-+	if ((val & (0b101)) == 0b101)	/* MMU+Caches enabled? */
-+		vcpu->arch.hcr_el2 &= ~HCR_TVM;
-+
-+	return true;
-+}
-+
-+/*
-  * We could trap ID_DFR0 and tell the guest we don't support performance
-  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-  * NAKed, so it will read the PMCR anyway.
-@@ -185,32 +221,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  NULL, reset_mpidr, MPIDR_EL1 },
- 	/* SCTLR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, SCTLR_EL1, 0x00C50078 },
-+	  access_sctlr_el1, reset_val, SCTLR_EL1, 0x00C50078 },
- 	/* CPACR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
- 	  NULL, reset_val, CPACR_EL1, 0 },
- 	/* TTBR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, TTBR0_EL1 },
-+	  access_vm_reg, reset_unknown, TTBR0_EL1 },
- 	/* TTBR1_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
--	  NULL, reset_unknown, TTBR1_EL1 },
-+	  access_vm_reg, reset_unknown, TTBR1_EL1 },
- 	/* TCR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
--	  NULL, reset_val, TCR_EL1, 0 },
-+	  access_vm_reg, reset_val, TCR_EL1, 0 },
+-static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
+@@ -124,9 +123,14 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
  
- 	/* AFSR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
--	  NULL, reset_unknown, AFSR0_EL1 },
-+	  access_vm_reg, reset_unknown, AFSR0_EL1 },
- 	/* AFSR1_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
--	  NULL, reset_unknown, AFSR1_EL1 },
-+	  access_vm_reg, reset_unknown, AFSR1_EL1 },
- 	/* ESR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
--	  NULL, reset_unknown, ESR_EL1 },
-+	  access_vm_reg, reset_unknown, ESR_EL1 },
- 	/* FAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, FAR_EL1 },
-+	  access_vm_reg, reset_unknown, FAR_EL1 },
- 	/* PAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
- 	  NULL, reset_unknown, PAR_EL1 },
-@@ -224,17 +260,17 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ struct kvm;
  
- 	/* MAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
--	  NULL, reset_unknown, MAIR_EL1 },
-+	  access_vm_reg, reset_unknown, MAIR_EL1 },
- 	/* AMAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
--	  NULL, reset_amair_el1, AMAIR_EL1 },
-+	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
+ {
++	if ((vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) != 0b101)
++		kvm_flush_dcache_to_poc((void *)hva, size);
++
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+ 		flush_icache_range(hva, hva + size);
+ 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+@@ -135,7 +139,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+ 	}
+ }
  
- 	/* VBAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
- 	  NULL, reset_val, VBAR_EL1, 0 },
- 	/* CONTEXTIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
--	  NULL, reset_val, CONTEXTIDR_EL1, 0 },
-+	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
- 	/* TPIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
- 	  NULL, reset_unknown, TPIDR_EL1 },
+-#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
 -- 
 1.8.3.4
