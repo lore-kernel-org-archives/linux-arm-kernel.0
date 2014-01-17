@@ -1,65 +1,85 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Jan 2014 17:13:18 +0900
-Subject: [PATCH v2 5/6] arm64: audit: Add makefile rule to create unistd_32.h
- for compat syscalls
+Date: Fri, 17 Jan 2014 17:13:19 +0900
+Subject: [PATCH v2 6/6] arm64: audit: Add audit hook in ptrace/syscall_trace
 In-Reply-To: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
  <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1389946399-4525-6-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1389946399-4525-7-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-generic compat sycall audit (lib/compat_audit.c) requires unistd_32.h
-for __NR_xyx compat syscall numbers. This is a different file from unistd32.h
-on arm64 and so it must be generated from unistd32.h.
+This patch adds auditing functions on entry to or exit from
+every system call invocation.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/Makefile                 |    4 ++++
- arch/arm64/kernel/syscalls/Makefile |   20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
- create mode 100644 arch/arm64/kernel/syscalls/Makefile
+ arch/arm64/include/asm/thread_info.h |    1 +
+ arch/arm64/kernel/entry.S            |    3 +++
+ arch/arm64/kernel/ptrace.c           |   12 ++++++++++++
+ 3 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2fceb71..6d24f92 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -72,6 +72,10 @@ PHONY += vdso_install
- vdso_install:
- 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 720e70b..7468388 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -101,6 +101,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+ #define TIF_SYSCALL_TRACE	8
++#define TIF_SYSCALL_AUDIT	9
+ #define TIF_POLLING_NRFLAG	16
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_FREEZE		19
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 4d2c6f3..5bb2c26 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -631,6 +631,9 @@ el0_svc_naked:					// compat entry point
+ 	get_thread_info tsk
+ 	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+ 	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
++#ifdef CONFIG_AUDITSYSCALL
++	tbnz	x16, #TIF_SYSCALL_AUDIT, __sys_trace // auditing syscalls?
++#endif
+ 	adr	lr, ret_fast_syscall		// return address
+ 	cmp     scno, sc_nr                     // check upper syscall limit
+ 	b.hs	ni_sys
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6777a21..2ca169b 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
-+# Compat syscall header generation
-+archheaders:
-+	$(Q)$(MAKE) $(build)=arch/arm64/kernel/syscalls $@
++#include <linux/audit.h>
+ #include <linux/kernel.h>
+ #include <linux/sched.h>
+ #include <linux/mm.h>
+@@ -38,6 +39,7 @@
+ #include <asm/compat.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/pgtable.h>
++#include <asm/syscall.h>
+ #include <asm/traps.h>
+ #include <asm/system_misc.h>
+ 
+@@ -1064,6 +1066,16 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+ {
+ 	unsigned long saved_reg;
+ 
++#ifdef CONFIG_AUDITSYSCALL
++	if (dir)
++		audit_syscall_exit(regs);
++	else
++		audit_syscall_entry(syscall_get_arch(current, regs),
++			(int)regs->syscallno,
++			regs->orig_x0, regs->regs[1],
++			regs->regs[2], regs->regs[3]);
++#endif /* CONFIG_AUDITSYSCALL */
 +
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
- 	$(Q)$(MAKE) $(clean)=$(boot)
-diff --git a/arch/arm64/kernel/syscalls/Makefile b/arch/arm64/kernel/syscalls/Makefile
-new file mode 100644
-index 0000000..7661113
---- /dev/null
-+++ b/arch/arm64/kernel/syscalls/Makefile
-@@ -0,0 +1,20 @@
-+out := $(obj)/../../include/generated/asm
-+
-+# Create output directory if not already present
-+_dummy := $(shell [ -d '$(out)' ] || mkdir -p '$(out)')
-+
-+syshdr-$(CONFIG_COMPAT)		+= unistd_32.h
-+
-+targets	+= $(syshdr-y)
-+
-+quiet_cmd_syshdr = SYSHDR $@
-+	cmd_syshdr = cat $< | sed -r \
-+	-e 's/compat_//' \
-+	-e 's/_wrapper//' \
-+	-e 's/^__SYSCALL\((.*),[ ]*sys_([^)].*)\).*/\#define __NR_\2 \1/p;d' \
-+	| grep -v __NR_ni_syscall > $@
-+
-+archheaders: $(addprefix $(out)/,$(syshdr-y))
-+
-+$(out)/unistd_32.h: $(src)/../../include/asm/unistd32.h
-+	$(call if_changed,syshdr)
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+ 		return regs->syscallno;
+ 
 -- 
 1.7.9.5
