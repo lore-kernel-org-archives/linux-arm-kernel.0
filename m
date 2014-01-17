@@ -1,19 +1,70 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Jan 2014 22:25:37 +0200
-Subject: [PATCH 0/3] ARM: OMAP: clk-next-omap emergency fixes
-Message-ID: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 17 Jan 2014 22:25:39 +0200
+Subject: [PATCH 2/3] ARM: DRA7XX: Add support for DRA7XX only build
+In-Reply-To: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
+References: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1389990340-23358-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+SOC_DRA7XX was under wrong menu within Kconfig file, which prevented
+DRA7XX only build. Fixed the kconfig options for this SoC as we are
+there. voltage.c needs to be added to the DRA7XX build also, otherwise
+DRA7XX only build will fail.
 
-Quick emergency band-aid for the build breakages introduced in clk-next
-by Mike. I didn't have time to test this out (Nishanth will provide some
-logs) and I will leave the decision whether/how to use these patches or not
-to Tony + Mike.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/Kconfig  |   18 ++++++++++--------
+ arch/arm/mach-omap2/Makefile |    1 +
+ 2 files changed, 11 insertions(+), 8 deletions(-)
 
-I also pushed a test branch based on top of clk-next here:
-tree: https://github.com/t-kristo/linux-pm.git
-branch: clk-next-omap-fixes
-
--Tero
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index dc21df1..e65948a 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -76,6 +76,16 @@ config SOC_AM43XX
+ 	select ARM_GIC
+ 	select MACH_OMAP_GENERIC
+ 
++config SOC_DRA7XX
++	bool "TI DRA7XX"
++	depends on ARCH_MULTI_V7
++	select ARCH_OMAP2PLUS
++	select ARM_CPU_SUSPEND if PM
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_SMP
++	select HAVE_ARM_ARCH_TIMER
++
+ config ARCH_OMAP2PLUS
+ 	bool
+ 	select ARCH_HAS_BANDGAP
+@@ -128,14 +138,6 @@ config SOC_HAS_REALTIME_COUNTER
+ 	depends on SOC_OMAP5 || SOC_DRA7XX
+ 	default y
+ 
+-config SOC_DRA7XX
+-	bool "TI DRA7XX"
+-	select ARM_ARCH_TIMER
+-	select CPU_V7
+-	select ARM_GIC
+-	select HAVE_SMP
+-	select COMMON_CLK
+-
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+ 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 96a990f..8ebe9f3 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -132,6 +132,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_AM43XX)		+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_OMAP5)			+= $(voltagedomain-common)
+ obj-$(CONFIG_SOC_OMAP5)                += voltagedomains54xx_data.o
++obj-$(CONFIG_SOC_DRA7XX)		+= $(voltagedomain-common)
+ 
+ # OMAP powerdomain framework
+ powerdomain-common			+= powerdomain.o powerdomain-common.o
+-- 
+1.7.9.5
