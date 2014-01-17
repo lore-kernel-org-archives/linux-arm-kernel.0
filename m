@@ -1,199 +1,133 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 17 Jan 2014 18:27:17 +0100
-Subject: [PATCH v3] of: add functions to count number of elements in a property
-In-Reply-To: <20140117165333.GH19578@e106331-lin.cambridge.arm.com>
-References: <27256277.YJ687suYy5@phil> <1434798.oSb68sYmYT@phil>
- <20140117165333.GH19578@e106331-lin.cambridge.arm.com>
-Message-ID: <5702891.uim5yy9QFM@phil>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 17 Jan 2014 11:26:20 -0600
+Subject: [PATCH] usb: phy: msm: fix compilation errors when !CONFIG_PM_SLEEP
+In-Reply-To: <20140117132232.GC15937@n2100.arm.linux.org.uk>
+References: <20140117132232.GC15937@n2100.arm.linux.org.uk>
+Message-ID: <1389979580-14812-1-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The need to know the number of array elements in a property is
-a common pattern. To prevent duplication of open-coded implementations
-add a helper static function that also centralises strict sanity
-checking and DTB format details, as well as a set of wrapper functions
-for u8, u16, u32 and u64.
+Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
+msm_otg_{suspend,resume} routines, however these routines are only being
+built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
+depends on msm_hsusb_config_vddcx(), which is only built when
+CONFIG_PM_SLEEP.
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
+preprocessor conditional, and moving msm_hsusb_config_vddcx().
+
+While we're here, eliminate the CONFIG_PM conditional for setting
+up the dev_pm_ops.
+
+This address the following errors Russell King has hit doing randconfig
+builds:
+
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
+drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
+drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
+
+Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
-changes since v2:
-address more comments from Mark Rutland
-- switch to of_property_count_elems_of_size
-- use full_name instead of name in error message
-changes since v1:
-address comments from Rob Herring and Mark Rutland:
-- provide a helper and a set of wrappers for u8-u64
-- get rid of extra len variable, prop->length is enough
-- include node name in error message
+ drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
+ 1 file changed, 26 insertions(+), 31 deletions(-)
 
-Posted for completenes sake. If nobody complains,
-I'll simply make it part of my Rockchip-SMP series.
-
- drivers/of/base.c  |   99 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of.h |   32 +++++++++++++++++
- 2 files changed, 131 insertions(+)
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index f807d0e..1cd6dc9 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -862,6 +862,105 @@ struct device_node *of_find_node_by_phandle(phandle handle)
- EXPORT_SYMBOL(of_find_node_by_phandle);
- 
- /**
-+ * of_property_count_elems_of_size - Count the number of elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ * @elem_size:	size of the individual element
-+ */
-+static int of_property_count_elems_of_size(const struct device_node *np,
-+				const char *propname, int elem_size)
-+{
-+	struct property *prop = of_find_property(np, propname, NULL);
-+
-+	if (!prop)
-+		return -EINVAL;
-+	if (!prop->value)
-+		return -ENODATA;
-+
-+pr_err("size of %s in node %s is not a multiple of %d\n", propname, np->full_name, elem_size);
-+	if (prop->length % elem_size != 0) {
-+		pr_err("size of %s in node %s is not a multiple of %d\n",
-+		       propname, np->full_name, elem_size);
-+		return -EINVAL;
-+	}
-+
-+	return prop->length / elem_size;
-+}
-+
-+/**
-+ * of_property_count_u8_elems - Count the number of u8 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u8 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u8 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+int of_property_count_u8_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u8));
-+}
-+EXPORT_SYMBOL_GPL(of_property_count_u8_elems);
-+
-+/**
-+ * of_property_count_u16_elems - Count the number of u16 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u16 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u16 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+int of_property_count_u16_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u16));
-+}
-+EXPORT_SYMBOL_GPL(of_property_count_u16_elems);
-+
-+/**
-+ * of_property_count_u32_elems - Count the number of u32 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u32 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u32 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+int of_property_count_u32_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u32));
-+}
-+EXPORT_SYMBOL_GPL(of_property_count_u32_elems);
-+
-+/**
-+ * of_property_count_u64_elems - Count the number of u64 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u64 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u64 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+int of_property_count_u64_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u64));
-+}
-+EXPORT_SYMBOL_GPL(of_property_count_u64_elems);
-+
-+/**
-  * of_find_property_value_of_size
-  *
-  * @np:		device node from which the property value is to be read.
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 276c546..06fe898 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -250,6 +250,14 @@ extern struct device_node *of_find_node_with_property(
- extern struct property *of_find_property(const struct device_node *np,
- 					 const char *name,
- 					 int *lenp);
-+extern int of_property_count_u8_elems(const struct device_node *np,
-+				       const char *propname);
-+extern int of_property_count_u16_elems(const struct device_node *np,
-+				       const char *propname);
-+extern int of_property_count_u32_elems(const struct device_node *np,
-+				       const char *propname);
-+extern int of_property_count_u64_elems(const struct device_node *np,
-+				       const char *propname);
- extern int of_property_read_u32_index(const struct device_node *np,
- 				       const char *propname,
- 				       u32 index, u32 *out_value);
-@@ -426,6 +434,30 @@ static inline struct device_node *of_find_compatible_node(
- 	return NULL;
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index 8546c8d..7c7384f 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -159,32 +159,6 @@ put_3p3:
+ 	return rc;
  }
  
-+static inline int of_property_count_u8_elems(const struct device_node *np,
-+			const char *propname)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int of_property_count_u16_elems(const struct device_node *np,
-+			const char *propname)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int of_property_count_u32_elems(const struct device_node *np,
-+			const char *propname)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int of_property_count_u64_elems(const struct device_node *np,
-+			const char *propname)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_property_read_u32_index(const struct device_node *np,
- 			const char *propname, u32 index, u32 *out_value)
+-#ifdef CONFIG_PM_SLEEP
+-#define USB_PHY_SUSP_DIG_VOL  500000
+-static int msm_hsusb_config_vddcx(int high)
+-{
+-	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
+-	int min_vol;
+-	int ret;
+-
+-	if (high)
+-		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
+-	else
+-		min_vol = USB_PHY_SUSP_DIG_VOL;
+-
+-	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
+-	if (ret) {
+-		pr_err("%s: unable to set the voltage for regulator "
+-			"HSUSB_VDDCX\n", __func__);
+-		return ret;
+-	}
+-
+-	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
+-
+-	return ret;
+-}
+-#endif
+-
+ static int msm_hsusb_ldo_set_mode(int on)
  {
+ 	int ret = 0;
+@@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
+ #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
+ #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
+ 
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_RUNTIME)
++
++#define USB_PHY_SUSP_DIG_VOL  500000
++static int msm_hsusb_config_vddcx(int high)
++{
++	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
++	int min_vol;
++	int ret;
++
++	if (high)
++		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
++	else
++		min_vol = USB_PHY_SUSP_DIG_VOL;
++
++	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
++	if (ret) {
++		pr_err("%s: unable to set the voltage for regulator "
++			"HSUSB_VDDCX\n", __func__);
++		return ret;
++	}
++
++	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
++
++	return ret;
++}
++
+ static int msm_otg_suspend(struct msm_otg *motg)
+ {
+ 	struct usb_phy *phy = &motg->phy;
+@@ -1733,22 +1732,18 @@ static int msm_otg_pm_resume(struct device *dev)
+ }
+ #endif
+ 
+-#ifdef CONFIG_PM
+ static const struct dev_pm_ops msm_otg_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(msm_otg_pm_suspend, msm_otg_pm_resume)
+ 	SET_RUNTIME_PM_OPS(msm_otg_runtime_suspend, msm_otg_runtime_resume,
+ 				msm_otg_runtime_idle)
+ };
+-#endif
+ 
+ static struct platform_driver msm_otg_driver = {
+ 	.remove = msm_otg_remove,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+ 		.owner = THIS_MODULE,
+-#ifdef CONFIG_PM
+ 		.pm = &msm_otg_dev_pm_ops,
+-#endif
+ 	},
+ };
+ 
 -- 
-1.7.10.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
