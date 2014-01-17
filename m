@@ -1,29 +1,28 @@
-From: ananaza@iki.fi (Antti Miettinen)
-Date: Fri, 17 Jan 2014 12:30:48 +0200
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D8F403.9070602@linaro.org> (Daniel Lezcano's message of "Fri,
- 17 Jan 2014 10:12:35 +0100")
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <20140115154526.GC3571@mudshark.cambridge.arm.com>
- <52D76BC8.6080405@nvidia.com>
- <20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
-Message-ID: <874n52zyqv.fsf@iki.fi>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 17 Jan 2014 11:44:23 +0100
+Subject: How to support SDIO wifi/bt in DT
+In-Reply-To: <20140117093909.GB2348@piout.net>
+References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
+ <3215037.8HVCjAeS8g@wuerfel>
+ <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+ <20140116195819.GY15937@n2100.arm.linux.org.uk>
+ <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
+ <20140117093909.GB2348@piout.net>
+Message-ID: <20140117104423.GR17530@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
-> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
->> Will Deacon <will.deacon@arm.com> writes:
->>> Why can't you use the C3STOP feature so that the arch-timer isn't used when
->>> you go idle?
->>
->> That would mean falling back to broadcast timer, right? That's not
->> necessarily on the local CPU so wakeups would often wake two CPUs.
->
-> You can prevent that if the hardware supports it with the
-> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
+> The TI wilink chips (TiWi, wl12xx, wl18xx) have wifi on SDIO and BT on
+> UART but they share the same clock. So, the next question would be what
+> if I just want to enable one or the other (and take that decision at
+> runtime) ?
 
-CLOCK_EVT_FEAT_DYNIRQ seems to be the flag. Cool, thanks.
+At least for the clock is it not an issue. The generic clock framework
+does "reference" counting. It will only turn the clock off when all
+users have said to turn it off. So put a phandle to the clock in all
+nodes which use it.
 
-	--Antti
+I've not looked at regulators, but i would hope it also does reference
+counting of a regulators users.
+
+	 Andrew
