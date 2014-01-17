@@ -1,58 +1,39 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Fri, 17 Jan 2014 11:22:52 -0500
-Subject: [PATCH] arm64: fix strnlen_user when count <= strlen
-In-Reply-To: <20140117105107.GC16003@mudshark.cambridge.arm.com>
-References: <20140116234817.GP18705@redacted.bos.redhat.com>
- <20140117105107.GC16003@mudshark.cambridge.arm.com>
-Message-ID: <20140117162252.GR18705@redacted.bos.redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 16:46:11 +0000
+Subject: [PATCH v2 4/6] arm64: audit: Add 32-bit (compat) syscall support
+In-Reply-To: <1389946399-4525-5-git-send-email-takahiro.akashi@linaro.org>
+References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140117164610.GQ16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 10:51:07AM +0000, Will Deacon wrote:
-> Actually, I have removed strnlen_user for 3.14. Could you try your test case
-> with our for-next branch please?
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-> 
+Hi Akashi,
 
-This will work fine, I believe (I can't easily test on HW since we're
-dependent on $vendor drivers that aren't upstream yet) but in my testing
-yesterday I parroted the x86 word-at-a-time.h and lib/strnlen_user.c and
-that seemed to work.
+On Fri, Jan 17, 2014 at 08:13:17AM +0000, AKASHI Takahiro wrote:
+> Generic audit code also support compat system calls now.
+> This patch adds a small piece of architecture dependent code.
 
-> As for the issue you spotted, we probably need a fix for that to go into
-> stable kernels. Does the following (smaller patch) work for you?
-> 
+[...]
 
-This gets the count == 0 case wrong still, I believe.
+>  static inline int syscall_get_nr(struct task_struct *task,
+> @@ -109,6 +110,15 @@ static inline void syscall_set_arguments(struct task_struct *task,
+>  static inline int syscall_get_arch(struct task_struct *task,
+>  				   struct pt_regs *regs)
+>  {
+> +#ifdef CONFIG_COMPAT
+> +	if (is_compat_thread(task_thread_info(task)))
 
-=== count = 0 ===
-strnlen_user = 0
-__strnlen_user = 1
+You can call is_compat_thread even when !CONFIG_COMPAT, so you don't need
+that #ifdef.
 
-(Where strnlen_user is the lib/strnlen_user.c implementation.)
+> +#ifdef __AARCH64EB__
+> +		return AUDIT_ARCH_ARMEB; /* only BE on BE */
 
-Testing if (n <= 0) return 0; before __strnlen_user fixes it though.
+Well, actually, we only support userspace to be the same endianness as the
+kernel, so you that comment is slightly misleading. You could probably avoid
+these repeated ifdefs by defining things like ARM64_AUDIT_ARCH and
+ARM64_COMPAT_AUDIT_ARCH once depending on endianness.
 
-Given this is called in, I think, only two places in the kernel, maybe
-we should just backport the switch to generic for stable? I can't
-imagine it conflicting with anything.
-
-regards, Kyle
-
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm64/lib/strnlen_user.S b/arch/arm64/lib/strnlen_user.S
-> index 7f7b176a5646..73f3335a2a45 100644
-> --- a/arch/arm64/lib/strnlen_user.S
-> +++ b/arch/arm64/lib/strnlen_user.S
-> @@ -37,6 +37,7 @@ ENTRY(__strnlen_user)
->  USER(9f, ldrb	w3, [x0], #1	)
->  	cbnz	w3, 1b
->  2:	sub	x0, x0, x2
-> +	cinc	x0, x0, mi
->  	ret
->  ENDPROC(__strnlen_user)
->  
+Will
