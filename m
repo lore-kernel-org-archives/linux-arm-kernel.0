@@ -1,55 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 17:13:07 +0100
-Subject: [PATCH] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <1389894803-4147-2-git-send-email-sthokal@xilinx.com>
-References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
- <1389894803-4147-2-git-send-email-sthokal@xilinx.com>
-Message-ID: <201401171713.08550.arnd@arndb.de>
+From: kyle@redhat.com (Kyle McMartin)
+Date: Fri, 17 Jan 2014 11:22:52 -0500
+Subject: [PATCH] arm64: fix strnlen_user when count <= strlen
+In-Reply-To: <20140117105107.GC16003@mudshark.cambridge.arm.com>
+References: <20140116234817.GP18705@redacted.bos.redhat.com>
+ <20140117105107.GC16003@mudshark.cambridge.arm.com>
+Message-ID: <20140117162252.GR18705@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 January 2014, Srikanth Thokala wrote:
-> @@ -0,0 +1,71 @@
-> +Xilinx AXI VDMA engine, it does transfers between memory and video devices.
-> +It can be configured to have one channel or two channels. If configured
-> +as two channels, one is to transmit to the video device and another is
-> +to receive from the video device.
-> +
-> +Required properties:
-> +- compatible: Should be "xlnx,axi-vdma-1.00.a"
-> +- #dma-cells: Should be <1>, see "dmas" property below
-> +- reg: Should contain VDMA registers location and length.
-> +- interrupts: Should contain per channel VDMA interrupts.
-> +- compatible (child node): It should be either "xlnx,axi-vdma-mm2s-channel" or
-> +       "xlnx,axi-vdma-s2mm-channel". It depends on the hardware design and it
-> +       can also have both channels.
-> +- xlnx,device-id: Should contain device number in each channel. It should be
-> +       {0,1,2...so on} to the number of VDMA devices configured in hardware.
-> +- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-> +- xlnx,data-width: Should contain the stream data width, takes {32,64...so on}.
-> +- xlnx,flush-fsync: (Optional) Tells whether which channel to Flush on Fsync.
-> +       It takes following values:
-> +       {1}, flush both channels
-> +       {2}, flush mm2s channel
-> +       {3}, flush s2mm channel
-> +- xlnx,include-sg: (Optional) Tells whether configured for Scatter-mode in
-> +       the hardware.
-> +- xlnx,include-dre: (Optional) Tells whether hardware is configured for Data
-> +       Realignment Engine.
-> +- xlnx,genlock-mode: (Optional) Tells whether Genlock synchornisation is
-> +       enabled/disabled in hardware.
+On Fri, Jan 17, 2014 at 10:51:07AM +0000, Will Deacon wrote:
+> Actually, I have removed strnlen_user for 3.14. Could you try your test case
+> with our for-next branch please?
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+> 
 
-The documentation doesn't seem to match the example, since you don't mention
-the fact that the channels have separate nodes here, or which properties
-are meant for the parent or the child node. Also, some of the "required"
-properties are absent in the example, which makes no sense.
+This will work fine, I believe (I can't easily test on HW since we're
+dependent on $vendor drivers that aren't upstream yet) but in my testing
+yesterday I parroted the x86 word-at-a-time.h and lib/strnlen_user.c and
+that seemed to work.
 
-I also assume that some of the properties should just go away:
+> As for the issue you spotted, we probably need a fix for that to go into
+> stable kernels. Does the following (smaller patch) work for you?
+> 
 
-* xlnx,device-id should be the argument in the handle from the slave device
-* data width should be a property of the slave driver that is configured
-  through dma_slave_config(), unless you can have dma engines that only
-  support certain a width.
+This gets the count == 0 case wrong still, I believe.
 
-	Arnd
+=== count = 0 ===
+strnlen_user = 0
+__strnlen_user = 1
+
+(Where strnlen_user is the lib/strnlen_user.c implementation.)
+
+Testing if (n <= 0) return 0; before __strnlen_user fixes it though.
+
+Given this is called in, I think, only two places in the kernel, maybe
+we should just backport the switch to generic for stable? I can't
+imagine it conflicting with anything.
+
+regards, Kyle
+
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm64/lib/strnlen_user.S b/arch/arm64/lib/strnlen_user.S
+> index 7f7b176a5646..73f3335a2a45 100644
+> --- a/arch/arm64/lib/strnlen_user.S
+> +++ b/arch/arm64/lib/strnlen_user.S
+> @@ -37,6 +37,7 @@ ENTRY(__strnlen_user)
+>  USER(9f, ldrb	w3, [x0], #1	)
+>  	cbnz	w3, 1b
+>  2:	sub	x0, x0, x2
+> +	cinc	x0, x0, mi
+>  	ret
+>  ENDPROC(__strnlen_user)
+>  
