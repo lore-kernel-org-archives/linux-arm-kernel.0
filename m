@@ -1,50 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Jan 2014 13:06:41 +0100
-Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
-In-Reply-To: <3612364.BZBltgonI0@wuerfel>
-References: <20140109153404.GA21055@kvmhost> <20140115091006.GF3377@lukather>
- <3612364.BZBltgonI0@wuerfel>
-Message-ID: <20140117120641.GA3867@lukather>
+Date: Fri, 17 Jan 2014 13:07:45 +0100
+Subject: [PATCH 2/4] ARM: sun6i: dt: Add PLL6 and SPI module clocks
+In-Reply-To: <20140116181528.GY8153@joshc.qualcomm.com>
+References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1389892285-11745-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140116181528.GY8153@joshc.qualcomm.com>
+Message-ID: <20140117120745.GB3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Josh,
 
-On Wed, Jan 15, 2014 at 10:40:56AM +0100, Arnd Bergmann wrote:
-> On Wednesday 15 January 2014 10:10:06 Maxime Ripard wrote:
-> > On Thu, Jan 09, 2014 at 04:34:04PM +0100, Gerardo Di Iorio wrote:
-> > > Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
-> > > 
-> > > Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
-> > > ---
-> > >  arch/arm/mach-sunxi/Kconfig | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> > > index 547004c..adb2574 100644
-> > > --- a/arch/arm/mach-sunxi/Kconfig
-> > > +++ b/arch/arm/mach-sunxi/Kconfig
-> > > @@ -1,5 +1,5 @@
-> > >  config ARCH_SUNXI
-> > > -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
-> > > +       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
+On Thu, Jan 16, 2014 at 12:15:28PM -0600, Josh Cartwright wrote:
+> On Thu, Jan 16, 2014 at 06:11:23PM +0100, Maxime Ripard wrote:
+> > The module clocks in the A31 are still compatible with the A10 one. Add the SPI
+> > module clocks and the PLL6 in the device tree to allow their use by the SPI
+> > controllers.
 > > 
-> > I wonder if the sunxi (apart the weird letter case) is actually
-> > needed. Maybe we can just put "Allwinner SoCs" (it would be great if
-> > you could fix the SoCs case too).
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun6i-a31.dtsi | 48 +++++++++++++++++++++++++++++++---------
+> >  1 file changed, 38 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > index 5256ad9..ae058eb 100644
+> > --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> > +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> > @@ -73,16 +73,12 @@
+> >  			clocks = <&osc24M>;
+> >  		};
+> >  
+> > -		/*
+> > -		 * This is a dummy clock, to be used as placeholder on
+> > -		 * other mux clocks when a specific parent clock is not
+> > -		 * yet implemented. It should be dropped when the driver
+> > -		 * is complete.
+> > -		 */
+> > -		pll6: pll6 {
+> > -			#clock-cells = <0>;
+> > -			compatible = "fixed-clock";
+> > -			clock-frequency = <0>;
+> > +		pll6: clk at 01c20028 {
+> > +			#clock-cells = <1>;
+> > +			compatible = "allwinner,sun6i-a31-pll6-clk";
+> > +			reg = <0x01c20028 0x4>;
+> > +			clocks = <&osc24M>;
+> > +			clock-output-names = "pll6";
+> >  		};
+> >  
+> >  		cpu: cpu at 01c20050 {
+> > @@ -182,6 +178,38 @@
+> >  					"apb2_uart1", "apb2_uart2", "apb2_uart3",
+> >  					"apb2_uart4", "apb2_uart5";
+> >  		};
+> > +
+> > +		spi0_clk: clk at 01c200a0 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "allwinner,sun4i-mod0-clk";
+> > +			reg = <0x01c200a0 0x4>;
+> > +			clocks = <&osc24M>, <&pll6>;
 > 
-> If you want to have exact naming, try to find something that excludes the
-> old Sun3i (F20) and earlier chips (unless someone is already planning
-> to work on them). Maybe also mention the "Boxchip" name, although that
-> seems to be falling out of use these days.
+> This looks weird.  You've set the pll6 #clock-cells = <1>, but you
+> aren't using a specifier here.  Same below, as well.  The binding
+> documentation indicates that #clock-cells should be 0 for the pll6 node.
 
-I'm not sure that's good to exclude chips. We have a number of SoCs we
-don't support even on later families (A31s, A23, mostly). I'm not sure
-we want to have an ever growing list of SoCs supported (or
-not-supported).
+Ah, right, it's a dumb copy/paste mistake.
 
-"sunXi" would be fine I guess, or "A-series" like suggested on IRC.
+I'd expect dtc to output a warning/error in such case, but apparently
+it doesn't.
 
+Thanks!
 Maxime
 
 -- 
@@ -57,4 +82,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/adfff9d0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/10c9df26/attachment.sig>
