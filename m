@@ -1,93 +1,113 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Jan 2014 22:53:31 +0100
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Fri, 17 Jan 2014 15:02:14 -0700
 Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
-In-Reply-To: <20140117204342.GG15937@n2100.arm.linux.org.uk>
-References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
- <52D98712.3070103@wwwdotorg.org>
- <20140117202015.GE25911@pengutronix.de>
- <20140117204342.GG15937@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYvZaXL6OWUXB2a3=rstsWRe4btvuXx9hzgnXZttaYezw@mail.gmail.com>
+In-Reply-To: <87eh462vrf.fsf@lebrac.rtp-net.org>
+References: <20140117184731.GE15937@n2100.arm.linux.org.uk>	<87ioti2xfu.fsf@lebrac.rtp-net.org>	<52D98E94.6000609@boundarydevices.com>
+ <87eh462vrf.fsf@lebrac.rtp-net.org>
+Message-ID: <52D9A866.5070803@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC:ing the comaintainer and linux-gpio for generic questions...]
-
-On Fri, Jan 17, 2014 at 9:43 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 17, 2014 at 09:20:15PM +0100, Uwe Kleine-K?nig wrote:
-
->>  e) add a flag to all gpio-chips signalling which case gpio_get_value
->>     implements (i.e: return
->>       - the actual value on the pad; or
->>       - zero.
->>     ). This is not orthogonal to b) - d)
+On 01/17/2014 01:33 PM, Arnaud Patard (Rtp) wrote:
+> Eric Nelson <eric.nelson@boundarydevices.com> writes:
+>
+>> On 01/17/2014 12:57 PM, Arnaud Patard (Rtp) wrote:
+>>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>>>
+>>>> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
+>>>> hides stuff.  It's really wonderful, because you don't have to care
+>>>> about how the GPIOs are actually accessed in drivers anymore.
+>>>>
+>>>> However, what about the behaviour of GPIOs?
+>>>>
+>>>> What about... for example... this sequence:
+>>>>
+>>>> 	gpio_direction_output(gpio, 1);
+>>>> 	val = gpio_get_value(gpio);
+>>>>
+>>>> What value is "val"?  More importantly, what value is reflected in
+>>>> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
+>>>>
+>>>> Now, while you can make reasonable assumptions, such as "it'll return
+>>>> that the output is being driven to the requested state" or "it'll
+>>>> return the actual state of the pin", what about this instead, which
+>>>> happens on iMX hardware - "it'll _always_ return zero".
+>>>>
+>>>
+>>> this is "expected". gpio layer docs are saying that in output case, the
+>>> value may be wrong. Not intuitive but documented.
+>>>
+>>>> Yes, iMX6 at least has this behaviour.  For any output, val as above
+>>>> will always be zero, and /proc/sys/kernel/debug/gpio will always
+>>>> report that an output is zero... unless the SION bit has been set for
+>>>> that GPIO signal.
+>>>
+>>> afaik at least imx51/53 have some behaviour.
+>>>
+>>>>
+>>>> The reason is that on hardware such as iMX6, reading the GPIO is done
+>>>> by reading the pad state register, and this register is _only_ supplied
+>>>> the state of the pad when the input path is enabled.  The input path
+>>>> is only enabled when the output is disabled, or the SION bit is set
+>>>> to force the GPIO input path.
+>>>
+>>> I sent mails about this same issue for imx51 in Dec 2010 and answer were
+>>> that the SION bit should not be set for all gpios:
+>>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/100875
+>>>
 >>
->> > > 2. What should be reported in /sys/kernel/debug/gpio for an output?
->> It should report the same thing as gpio_get_value in 1.
+>> Thanks Arnaud,
+>>
+>> This bit from the 2010 chain really needs some explanation:
+>>
+>>>> Arnaud Patard (Rtp) writes:
+>>>>
+>>>> <snip>
+>>>>
+>>>> I had done the same, but had some trouble with this.
+>>>> E.g. on our board GPIO1_7 is used as a generic GPIO to enable an
+>>>> external clock oscillator for the USBH1 ULPI PHY. When the SION bit
+>>>> for this pad was set, I got strange errors on the USBH1 port
+>>>> (disconnecting low speed devices behind a hub would stall the
+>>>> bus). When I removed the SION bit for that pin everything worked
+>>>> well.
+>>>>
+>>
+>> Did you ever chase down the symptom here? Was the GPIO output not
+>> holding a constant value such that the oscillator wasn't functioning?
+>>
 >
-> There's another solution here.  /sys/kernel/debug/gpio is there to allow
-> us to see the state of the GPIOs, right?  Well, if the asked-for output
-> value can be different from the read-back output value, how about fixing
-> this so that the _debug_ can report back what the desired output state
-> as well as the current input state.
+> It was not me who got this issue. The issue I had was not being able to
+> read GPIO value if set as output. This link may be clearer:
+> http://archive.arm.linux.org.uk/lurker/message/20101215.151016.ea731aa7.en.html
 >
-> This would mean that this file becomes something like:
->
->  gpio-86  (usb_otg_vbus        ) dir:out out:hi in:lo
->
-> which makes it clear that either the pad is being asked to output a high
-> level, but for some reason reading the input side is returning low state.
-> It also lets you see what was asked of the output, and what was (in
-> theory) written to the output.
+Thanks Arnaud. That link is quite a bit easier to follow.
 
-I really like the looks of this. That kind of helpful stuff is exactly
-what the debugfs files shall be used for.
+I'm looping in Lothar and Dinh.
 
-> It may _also_ be a good idea to do (e) - have a per-gpiochip flag which
-> indicates the behaviour here, and omit the "out:" or "in:" as appropriate.
+Dinh's comment in this thread makes no sense:
 
-That also seems like a good idea.
+	>>
+	>> The SION bit is a "Software Input On" bit. Basically, if
+	>> you set the GPIO as an output, you cannot set the SION bit.
+	>>
 
-> Finally, consider that some drivers should be provided this information.
-> For example, the bitbanging I2C driver needs this for:
->
->         scllo(adap);
->         sda = getsda(adap);
->         scl = (adap->getscl == NULL) ? 0 : getscl(adap);
->         if (scl) {
->                 printk(KERN_WARNING "%s: SCL stuck high!\n", name);
->                 goto bailout;
->         }
->         if (!sda) {
->                 printk(KERN_WARNING "%s: SDA unexpected low "
->                        "while pulling SCL low!\n", name);
->                 goto bailout;
->         }
->
->         sclhi(adap);
->         sda = getsda(adap);
->         scl = (adap->getscl == NULL) ? 1 : getscl(adap);
->         if (!scl) {
->                 printk(KERN_WARNING "%s: SCL stuck low!\n", name);
->                 goto bailout;
->         }
->         if (!sda) {
->                 printk(KERN_WARNING "%s: SDA unexpected low "
->                        "while pulling SCL high!\n", name);
->                 goto bailout;
->         }
->
-> Now, if getscl() always returns zero when scllo() is called (because the
-> pin is set as an output) the test is pretty useless - it turns into a
-> verification that yes, the hardware does return zero from the pad register
-> when the pin is set as an output.
+If that were the case, there's no point to either the bit or the PSR
+registers. Dinh, can you or another Freescaler give a definitive
+explanation here?
 
-If we can come up with a good API for it this seems useful as
-well. The bit-banged I2C is a perfectly valid usecase.
+We also had some discussion about this on the U-Boot list regarding
 
-I guess we could discuss adding that to the new gpiod API so
-we get some traction around that and start to clean things up properly.
-I'd really prefer not to see it in the legacy API.
+Patch:      http://lists.denx.de/pipermail/u-boot/2013-September/163805.html
+Discussion: 
+http://lists.denx.de/pipermail/u-boot/2013-October/thread.html#163916
 
-Yours,
-Linus Walleij
+In the U-Boot case, we decided to flag those pins used as both
+input and output specfically with the SION flag, which has the
+benefit of pointing out to a reader that there's something unusual
+going on.
+
+Regards,
+
+
+Eric
