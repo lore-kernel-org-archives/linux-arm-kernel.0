@@ -1,69 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 14:47:30 +0800
-Subject: [PATCH RFC 5/6] net: rfkill: gpio: add clock-frequency device tree
- property
+Date: Fri, 17 Jan 2014 14:47:31 +0800
+Subject: [PATCH RFC 6/6] ARM: sun7i: cubietruck: enable bluetooth module
 In-Reply-To: <1389941251-32692-1-git-send-email-wens@csie.org>
 References: <1389941251-32692-1-git-send-email-wens@csie.org>
-Message-ID: <1389941251-32692-6-git-send-email-wens@csie.org>
+Message-ID: <1389941251-32692-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices, such as Broadcom Bluetooth devices, require a specific
-clock rate for the clock tied to the rfkill device. Add clock-frequency
-property so we can specify this from the device tree.
+The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The
+Bluetooth part is a BCM20710 device connected to UART2 in the
+A20 SoC.
+
+The IC also requires a 32.768 KHz low power clock input for
+proper auto-detection of the main clock, and power enable and
+wake signals via GPIO.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt | 2 ++
- net/rfkill/rfkill-gpio.c                                 | 4 ++++
- 2 files changed, 6 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 37 ++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-index 8a07ea4..8b8db0a 100644
---- a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-+++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-@@ -13,6 +13,7 @@ NAME_reset-gpios, or both, must be defined.
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index c8b3ea9..f172a8f 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -78,6 +78,20 @@
+ 					allwinner,drive = <0>;
+ 					allwinner,pull = <2>;
+ 			};
++
++			bt_pwr_pin: bt_pwr_pin at 0 {
++				allwinner,pins = "PH18";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			bt_wake_pin: bt_wake_pin at 0 {
++				allwinner,pins = "PH24";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
  
- Optional properties:
- - clocks		: phandle to clock to enable/disable
-+- clock-frequency	: clock rate to set for the given clock
+ 		uart0: serial at 01c28000 {
+@@ -86,6 +100,12 @@
+ 			status = "okay";
+ 		};
  
- Example:
- 
-@@ -23,4 +24,5 @@ Example:
- 		bluetooth_shutdown-gpios = <0>, <&pio 7 18 0>;
- 		bluetooth_reset-gpios = <&pio 7 24 0>;
- 		clocks = <&clk_out_a>;
-+		clock-frequency = <32678>;
++		uart2: serial at 01c28800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pins_a>;
++			status = "okay";
++		};
++
+ 		gmac: ethernet at 01c50000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&gmac_pins_rgmii>;
+@@ -157,4 +177,21 @@
+ 			gpio = <&pio 7 3 0>;
+ 		};
  	};
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index 48381a8..3092681 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -40,6 +40,7 @@ struct rfkill_gpio_data {
- 	char			*reset_name;
- 	char			*shutdown_name;
- 	struct clk		*clk;
-+	int			clk_frequency;
- 
- 	bool			clk_enabled;
++
++	rfkill-switches {
++		compatible = "simple-bus";
++		pinctrl-names = "default";
++
++		rfkill_bt {
++			compatible = "rfkill-gpio";
++			pinctrl-names = "default";
++			pinctrl-0 = <&bt_pwr_pin>, <&clk_out_a_pins>;
++			rfkill-name = "bt";
++			rfkill-type = <2>;
++			bt_shutdown-gpios = <0>, <&pio 7 18 0>; /* PH18 */
++			bt_reset-gpios = <&pio 7 24 0>; /* PH24 */
++			clocks = <&clk_out_a>;
++			clock-frequency = <32768>;
++		};
++	};
  };
-@@ -92,6 +93,7 @@ static int rfkill_gpio_dt_probe(struct device *dev,
- 	rfkill->name = np->name;
- 	of_property_read_string(np, "rfkill-name", &rfkill->name);
- 	of_property_read_u32(np, "rfkill-type", &rfkill->type);
-+	of_property_read_u32(np, "clock-frequency", &rfkill->clk_frequency);
- 
- 	return 0;
- }
-@@ -138,6 +140,8 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 	snprintf(rfkill->shutdown_name, len + 10, "%s_shutdown", rfkill->name);
- 
- 	rfkill->clk = devm_clk_get(&pdev->dev, clk_name);
-+	if (!IS_ERR(rfkill->clk) && rfkill->clk_frequency > 0)
-+		clk_set_rate(rfkill->clk, rfkill->clk_frequency);
- 
- 	gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
- 	if (!IS_ERR(gpio)) {
 -- 
 1.8.5.2
