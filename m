@@ -1,60 +1,85 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 17 Jan 2014 12:48:22 -0300
-Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
-In-Reply-To: <52D92E93.8050804@epfl.ch>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
- <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
- <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
- <52D92E93.8050804@epfl.ch>
-Message-ID: <CABxcv=nLpKjX8zVdDDUrfwfyOh2C+Gt4O6Sj7xhtudT5LJXr-Q@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 17 Jan 2014 09:00:54 -0700
+Subject: [PATCH 01/20] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <1389961514-13562-2-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAErSpo6tsZtqFfgBp9mwU9Ln7yDmKLWJFKK8eW9_m4Sgb=E3eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Florian,
+[+cc Jens, James, Ben, Fujita (authors of PCI_DMA_BUS_IS_PHYS usage)]
 
-On Fri, Jan 17, 2014 at 10:22 AM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
-> Hello Javier
+On Fri, Jan 17, 2014 at 5:24 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Not all the ARM64 targets that are using ACPI have PCI, so introduce
+> some stub functions to make PCI optional for ACPI, and make ACPI core
+> run without CONFIG_PCI on ARM64.
 >
-> On 01/09/2014 09:43 PM, Javier Martinez Canillas wrote:
->> [adding Enric Balletbo to cc]
->>
->> Hello Florian,
->>
->> On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
->> <florian.vaussard@epfl.ch> wrote:
->>> MMC2 is used by the on-board WiFi module populated on some boards
->>> (based on Marvell Libertas 8688 SDIO).
->>>
->>> Note: currently WiFi only works on cold boot, as the module is not
->>> properly reset (missing binding for the GPIO reset).
->>>
->>
->> Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
->> for LBEE1USJYC WiFi connected to SDIO") ?
->>
->> If I remember correctly the LBEE1USJYC Wifi/BT combo module is
->> basically a Marvell Libertas 8688 Wlan and Enric got soft reset
->> working too by adding a GPIO property to the regulator for the reset
->> GPIO.
->>
->> Hope it helps,
+> pcibios_penalize_isa_irq() is arch dependent, introduce asm/pci.h to
+> include it.
 >
-> Thank you, I got it working. It is a bit messy, as I have 3 GPIOs
-> (poweron, wifi-reset and bt-reset). As a regulator can control only one
-> GPIO, I had to define 3 regulators, and assigning them to the vmmc,
-> vqmmc, and vmmc_aux. I hope that a better solution will pop-up in this
-> thread [1]. It is a pity that the previous version of the GPIO-reset
-> controller was not merged.
+> Since ACPI on X86 and IA64 depends on PCI, it will not break X86 and
+> IA64 with this patch.
 >
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/pci.h |   20 ++++++++++++++++++++
+>  drivers/acpi/Makefile        |    2 +-
+>  drivers/acpi/internal.h      |    7 +++++++
+>  drivers/acpi/osl.c           |    3 ++-
+>  include/linux/pci.h          |   33 ++++++++++++++++++++++++---------
+>  5 files changed, 54 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pci.h
+>
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> new file mode 100644
+> index 0000000..455909d
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -0,0 +1,20 @@
+> +#ifndef __ASMARM64_PCI_H
+> +#define __ASMARM64_PCI_H
+> +
+> +#ifdef __KERNEL__
+> +
+> +static inline void pcibios_penalize_isa_irq(int irq, int active)
+> +{
+> +       /* We don't do dynamic PCI IRQ allocation */
+> +}
+> +
+> +/*
+> + * The PCI address space does equal the physical memory address space.
+> + * The networking and block device layers use this boolean for bounce
+> + * buffer decisions.
+> + */
+> +#define PCI_DMA_BUS_IS_PHYS     (1)
 
-Glad to know that you got it working and yes it is a bit messy so
-let's hope that a cleaner solution will be the result of the current
-discussion on that thread.
+I'm not sure this is accurate.  The arm code uses
+pci_add_resource_offset() with non-zero offsets, which means a
+physical memory address is not the same as a PCI bus address.  I don't
+know what arm64 does for PCI, but I suspect it is similar.
 
-> Florian
->
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/294907
+I think PCI_DMA_BUS_IS_PHYS is due for some overhaul.  I'm dubious
+that it is working as intended anymore.  At the very least, it seems
+like something that is dependent on the device in question.
 
-Best regards,
-Javier
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index a13d682..726cf2a 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> ...
+> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+> +               unsigned int devfn, int reg, int len, u32 *val)
+> +{ return -EINVAL; }
+> +
+> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+> +               unsigned int devfn, int reg, int len, u32 val)
+> +{return -EINVAL; }
+
+Fix the spacing here (missing a space before "return").
+
+With that, this include/linux/pci.h change is:
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
