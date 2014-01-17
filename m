@@ -1,47 +1,37 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 17 Jan 2014 12:08:30 +0100
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20140117110830.GW3471@alberich>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 11:13:07 +0000
+Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
+In-Reply-To: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
+References: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
+Message-ID: <20140117111307.GE16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 17, 2014 at 08:04:32AM +0000, Jingoo Han wrote:
+> Use 'ubfm' for the bitfield move instruction; thus, single
+> instruction can be used instead of two instructions, when
+> getting the minimum D-cache line size from CTR_EL0 register.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  arch/arm64/mm/proc-macros.S |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+> index 8957b82..c31f41e 100644
+> --- a/arch/arm64/mm/proc-macros.S
+> +++ b/arch/arm64/mm/proc-macros.S
+> @@ -38,8 +38,7 @@
+>   */
+>  	.macro	dcache_line_size, reg, tmp
+>  	mrs	\tmp, ctr_el0			// read CTR
+> -	lsr	\tmp, \tmp, #16
+> -	and	\tmp, \tmp, #0xf		// cache line size encoding
+> +	ubfm	\tmp, \tmp, #0x16, 0x19		// cache line size encoding
 
-arm-smmu driver uses of_parse_phandle_with_args when parsing DT
-information to determine stream IDs for a master device.
-Thus the number of stream IDs per master device is bound by
-MAX_PHANDLE_ARGS.
+0x16 and 0x19. Are you sure?
 
-To support Calxeda ECX-2000 hardware arm-smmu driver requires a
-slightly higher value for MAX_PHANDLE_ARGS as this hardware has 10
-stream IDs for one master device.
+You can also grep for other occurences of this pattern and change those too
+(pgtable stuff in head.S, clidr in cache.S).
 
-Increasing it to 16 seems a reasonable choice.
-
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- include/linux/of.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 276c546..24e1b28 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -67,7 +67,7 @@ struct device_node {
- #endif
- };
- 
--#define MAX_PHANDLE_ARGS 8
-+#define MAX_PHANDLE_ARGS 16
- struct of_phandle_args {
- 	struct device_node *np;
- 	int args_count;
--- 
-1.7.9.5
+Will
