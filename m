@@ -1,120 +1,56 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 17 Jan 2014 14:14:02 -0800
-Subject: [PATCH 1/4] clk: sunxi: Add support for PLL6 on the A31
-In-Reply-To: <1389892285-11745-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389892285-11745-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140117221402.4167.78251@quantum>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 17 Jan 2014 14:19:39 -0800
+Subject: [PATCH v2 2/2] i2c: New bus driver for the QUP I2C controller
+In-Reply-To: <20140117003314.GB13785@codeaurora.org>
+References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140115164604.GI14405@codeaurora.org>
+ <20140117001833.GL30911@sonymobile.com>
+ <20140117003314.GB13785@codeaurora.org>
+Message-ID: <20140117221938.GA14212@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-01-16 09:11:22)
-> The A31 has a slightly different PLL6 clock. Add support for this new clock in
-> our driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu 16 Jan 16:33 PST 2014, Stephen Boyd wrote:
 
-This looks good to me. I guess it will be going in for 3.15 based on the
-comments in the coverletter.
-
-Regards,
-Mike
-
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/clk-sunxi.c                     | 45 +++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
+> On 01/16, Bjorn Andersson wrote:
+> > On Wed 15 Jan 08:46 PST 2014, Stephen Boyd wrote:
+> > 
+> > > On 01/13, Bjorn Andersson wrote:
+> > > > +
+> > > > +static int
+> > > > +qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
+> > > > +{
+> > > > +	int retries = 0;
+> > > > +	u32 state;
+> > > > +
+> > > > +	do {
+> > > > +		state = readl(qup->base + QUP_STATE);
+> > > > +
+> > > > +		/*
+> > > > +		 * If only valid bit needs to be checked, requested state is
+> > > > +		 * 'don't care'
+> > > > +		 */
+> > > 
+> > > It looks like req_state == 0 means only_valid == true. Can we
+> > > drop the only_valid argument to this function?
+> > > 
+> > 
+> > In all cases but the reset in the beginning of qup_i2c_xfer, so it seems that
+> > it has to stay.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index c2cb762..954845c 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -11,6 +11,7 @@ Required properties:
->         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->         "allwinner,sun4i-pll5-clk" - for the PLL5 clock
->         "allwinner,sun4i-pll6-clk" - for the PLL6 clock
-> +       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
->         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
->         "allwinner,sun4i-axi-clk" - for the AXI clock
->         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 659e4ea..990ad5d 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -249,7 +249,38 @@ static void sun4i_get_pll5_factors(u32 *freq, u32 parent_rate,
->         *n = DIV_ROUND_UP(div, (*k+1));
->  }
->  
-> +/**
-> + * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6
-> + * PLL6 rate is calculated as follows
-> + * rate = parent_rate * n * (k + 1) / 2
-> + * parent_rate is always 24Mhz
-> + */
-> +
-> +static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
-> +                                      u8 *n, u8 *k, u8 *m, u8 *p)
-> +{
-> +       u8 div;
-> +
-> +       /*
-> +        * We always have 24MHz / 2, so we can just say that our
-> +        * parent clock is 12MHz.
-> +        */
-> +       parent_rate = parent_rate / 2;
-> +
-> +       /* Normalize value to a parent_rate multiple (24M / 2) */
-> +       div = *freq / parent_rate;
-> +       *freq = parent_rate * div;
-> +
-> +       /* we were called to round the frequency, we can now return */
-> +       if (n == NULL)
-> +               return;
-> +
-> +       *k = div / 32;
-> +       if (*k > 3)
-> +               *k = 3;
->  
-> +       *n = DIV_ROUND_UP(div, (*k+1));
-> +}
->  
->  /**
->   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-> @@ -416,6 +447,13 @@ static struct clk_factors_config sun4i_pll5_config = {
->         .kwidth = 2,
->  };
->  
-> +static struct clk_factors_config sun6i_a31_pll6_config = {
-> +       .nshift = 8,
-> +       .nwidth = 5,
-> +       .kshift = 4,
-> +       .kwidth = 2,
-> +};
-> +
->  static struct clk_factors_config sun4i_apb1_config = {
->         .mshift = 0,
->         .mwidth = 5,
-> @@ -457,6 +495,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
->         .getter = sun4i_get_pll5_factors,
->  };
->  
-> +static const struct factors_data sun6i_a31_pll6_data __initconst = {
-> +       .enable = 31,
-> +       .table = &sun6i_a31_pll6_config,
-> +       .getter = sun6i_a31_get_pll6_factors,
-> +};
-> +
->  static const struct factors_data sun4i_apb1_data __initconst = {
->         .table = &sun4i_apb1_config,
->         .getter = sun4i_get_apb1_factors,
-> @@ -972,6 +1016,7 @@ free_clkdata:
->  static const struct of_device_id clk_factors_match[] __initconst = {
->         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
->         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
-> +       {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
->         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
->         {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
->         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
-> -- 
-> 1.8.4.2
-> 
+> Oh that's because QUP_RESET_STATE is equal to 0? It looks like
+> bits 0 and 1 are the state field and bit 2 is a flag indicating
+> that bits 0 and 1 are valid. Why not OR in the QUP_STATE_VALID
+> flag into the macros that are passed to this function? Then the
+> logic would simply be looping looking for a match of the
+> req_state (which is really a mask now).
+
+While it's true that req_state == 0 means only_valid, it is not true that
+only_valid means req_state == 0. So there would be no way to differentiate
+between "valid and reset" and "valid and don't care about run/pause/reset".
+
+So I could move the logic around, but I don't see how we could reduce the
+number of parameters to the function.
+
+// Bjorn
