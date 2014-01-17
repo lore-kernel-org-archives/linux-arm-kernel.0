@@ -1,44 +1,72 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 17 Jan 2014 14:23:50 +1100
-Subject: linux-next: manual merge of the dt-rh tree with the arm-soc tree
-Message-ID: <20140117142350.dc957c59116a9d0885e4724a@canb.auug.org.au>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 17 Jan 2014 11:39:06 +0800
+Subject: [PATCH V8 2/3] ARM: imx: add suspend in ocram support for i.mx6dl
+In-Reply-To: <1389929947-25707-1-git-send-email-b20788@freescale.com>
+References: <1389929947-25707-1-git-send-email-b20788@freescale.com>
+Message-ID: <1389929947-25707-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+i.MX6DL's suspend in ocram function is derived from i.MX6Q,
+it can lower the DDR IO power from ~26mA at 1.5V to ~15mA at 1.5V,
+measured on i.MX6DL SabreSD board, R25.
 
-Today's linux-next merge of the dt-rh tree got a conflict in
-Documentation/devicetree/bindings/vendor-prefixes.txt between commits
-70e123373c05 ("rtc: Add support for Intersil ISL12057 I2C RTC chip") from
-the arm-soc tree and 53d6b36020c7 ("of: Add vendor prefix for LG
-Corporation") from Linus' tree and commit 7e73700ce785 ("of: add vendor
-prefix for Ka-Ro electronics GmbH") from the dt-rh tree.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+Changes since V7:
+    Add __initconst to imx6dl_mmdc_io_offset[].
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+ arch/arm/mach-imx/pm-imx6q.c |   24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index 626819d..c1cbc3b 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -109,6 +109,18 @@ static const u32 imx6q_mmdc_io_offset[] __initconst = {
+ 	0x74c,			    /* GPR_ADDS */
+ };
+ 
++static const u32 imx6dl_mmdc_io_offset[] __initconst = {
++	0x470, 0x474, 0x478, 0x47c, /* DQM0 ~ DQM3 */
++	0x480, 0x484, 0x488, 0x48c, /* DQM4 ~ DQM7 */
++	0x464, 0x490, 0x4ac, 0x4b0, /* CAS, RAS, SDCLK_0, SDCLK_1 */
++	0x4bc, 0x4c0, 0x4c4, 0x4c8, /* DRAM_SDQS0 ~ DRAM_SDQS3 */
++	0x4cc, 0x4d0, 0x4d4, 0x4d8, /* DRAM_SDQS4 ~ DRAM_SDQS7 */
++	0x764, 0x770, 0x778, 0x77c, /* GPR_B0DS ~ GPR_B3DS */
++	0x780, 0x784, 0x78c, 0x748, /* GPR_B4DS ~ GPR_B7DS */
++	0x4b4, 0x4b8, 0x750, 0x760, /* SODT0, SODT1, MODE_CTL, MODE */
++	0x74c,			    /* GPR_ADDS */
++};
++
+ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
+ 	.cpu_type = MXC_CPU_IMX6Q,
+ 	.mmdc_compat = "fsl,imx6q-mmdc",
+@@ -119,6 +131,16 @@ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
+ 	.mmdc_io_offset = imx6q_mmdc_io_offset,
+ };
+ 
++static const struct imx6_pm_socdata imx6dl_pm_data __initconst = {
++	.cpu_type = MXC_CPU_IMX6DL,
++	.mmdc_compat = "fsl,imx6q-mmdc",
++	.src_compat = "fsl,imx6q-src",
++	.iomuxc_compat = "fsl,imx6dl-iomuxc",
++	.gpc_compat = "fsl,imx6q-gpc",
++	.mmdc_io_num = ARRAY_SIZE(imx6dl_mmdc_io_offset),
++	.mmdc_io_offset = imx6dl_mmdc_io_offset,
++};
++
+ /*
+  * This structure is for passing necessary data for low level ocram
+  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
+@@ -505,7 +527,7 @@ void __init imx6q_pm_init(void)
+ 
+ void __init imx6dl_pm_init(void)
+ {
+-	imx6_pm_common_init(NULL);
++	imx6_pm_common_init(&imx6dl_pm_data);
+ }
+ 
+ void __init imx6sl_pm_init(void)
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc Documentation/devicetree/bindings/vendor-prefixes.txt
-index d92c88f551f9,d98fa9a6279c..000000000000
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@@ -42,8 -38,7 +42,9 @@@ ibm	International Business Machines (IB
-  idt	Integrated Device Technologies, Inc.
-  img	Imagination Technologies Ltd.
-  intercontrol	Inter Control Group
- +isl	Intersil
-+ karo	Ka-Ro electronics GmbH
- +lg	LG Corporation
-  linux	Linux-specific binding
-  lsi	LSI Corp. (LSI Logic)
-  marvell	Marvell Technology Group Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/e533e2e7/attachment-0001.sig>
+1.7.9.5
