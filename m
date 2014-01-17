@@ -1,36 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 17 Jan 2014 12:22:27 +0100
-Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
-In-Reply-To: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
-References: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
-Message-ID: <CAKv+Gu8nnv-ePTyDGv0RiuFcJW7rWhOe0G1JFx439AjA28+wig@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 17 Jan 2014 17:07:23 +0530
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D902D6.3090208@linaro.org>
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
+Message-ID: <52D915F3.3030500@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2014 09:04, Jingoo Han <jg1.han@samsung.com> wrote:
-> Use 'ubfm' for the bitfield move instruction; thus, single
-> instruction can be used instead of two instructions, when
-> getting the minimum D-cache line size from CTR_EL0 register.
+On Friday 17 January 2014 03:45 PM, Daniel Lezcano wrote:
+> On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
+>> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
+>>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
+>>>> Will Deacon <will.deacon@arm.com> writes:
+>>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
+>>>>> used when
+>>>>> you go idle?
+>>>> That would mean falling back to broadcast timer, right? That's not
+>>>> necessarily on the local CPU so wakeups would often wake two CPUs.
+>>> You can prevent that if the hardware supports it with the
+>>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
+>> Instead of falling back on broadcast timer, is it possible to fall back
+>> on other per-CPU timer which is preserved across idle state?
+> Is it what you are looking for ?
 >
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> ---
->  arch/arm64/mm/proc-macros.S |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> http://lwn.net/Articles/580568/
 >
-> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> index 8957b82..c31f41e 100644
-> --- a/arch/arm64/mm/proc-macros.S
-> +++ b/arch/arm64/mm/proc-macros.S
-> @@ -38,8 +38,7 @@
->   */
->         .macro  dcache_line_size, reg, tmp
->         mrs     \tmp, ctr_el0                   // read CTR
-> -       lsr     \tmp, \tmp, #16
-> -       and     \tmp, \tmp, #0xf                // cache line size encoding
-> +       ubfm    \tmp, \tmp, #0x16, 0x19         // cache line size encoding
 
-Even if the # is optional for immediates these days, perhaps it is
-better to adhere to a single style in one line?
+If I understand correctly these patches enables us to use per-CPU timers 
+as broadcast timers. I do not want to use broadcast timer.
 
--- 
-Ard.
+If I have 2 per-CPU timers T1 and T2, T1 is not preserved across idle 
+state and T2 is preserved. And I want to use T1 as scheduler timer.
+
+Can I do following for idle state?
+
+Idle entry:
+     clockevents_shutdown(T1);
+     clockevents_set_mode(T2, ONESHOT);
+     clockevents_program_event(T2, next_event);
+
+Idle exit:
+     clockevents_shutdown(T2);
+     clockevents_set_mode(T1, ONESHOT);
+
+>>>> Does
+>>>> anyone have patches for using a CPU local timer as a fallback for
+>>>> C3STOP timers?
+>>>
+>
