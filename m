@@ -1,23 +1,92 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 17 Jan 2014 15:35:43 +0100
-Subject: [PATCH 12/20] ARM64 / ACPI: Use Parked Address in GIC structure
- for spin table SMP initialisation
-In-Reply-To: <201401171515.21250.arnd@arndb.de>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-13-git-send-email-hanjun.guo@linaro.org>
- <201401171515.21250.arnd@arndb.de>
-Message-ID: <52D93FBF.2010609@linaro.org>
+From: balajitk@ti.com (Balaji T K)
+Date: Fri, 17 Jan 2014 20:05:54 +0530
+Subject: Multiple CCR definitions
+In-Reply-To: <CAGo_u6or57HEqRQjSjUXFpRNiFNbJyRYrsPX19Gf97J-sg4iHQ@mail.gmail.com>
+References: <CAMuHMdVLat9-EMnCX=usthZLrP2YhCCT7-a3nhSQmgLvn_ftBg@mail.gmail.com>
+ <CAGo_u6or57HEqRQjSjUXFpRNiFNbJyRYrsPX19Gf97J-sg4iHQ@mail.gmail.com>
+Message-ID: <52D93FCA.1090202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/14 15:15, Arnd Bergmann wrote:
-> On Friday 17 January 2014, Hanjun Guo wrote:
->> +/* Parked Address in ACPI GIC structure */
->> +static u64 parked_address[NR_CPUS];
+On Friday 17 January 2014 12:09 AM, Nishanth Menon wrote:
+> +linux-omap as well.
 >
-> Please use the per_cpu infrastructure rather than NR_CPUS long arrays.
-Actually, per_cpu areas are initialized a bit later. If we really want 
-to use here per_cpu, then we need to implement early_per_cpu 
-Frankenstein like x86 does.
+> On Thu, Jan 16, 2014 at 7:07 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Tue, Sep 10, 2013 at 11:05 PM, Linux Kernel Mailing List
+>> <linux-kernel@vger.kernel.org> wrote:
+>>>      mmc: omap_hsmmc: use the generic config for omap2plus devices
+>>>
+>>>      OMAP's hs_mmc driver is used for MMC controller operation on many
+>>>      omap2plus SoCs (OMAP2430, OMAP3, 4, 5 and AM335x).
+>>>
+>>>      Considering that the device tree entries are already present for these,
+>>>      allow the driver to be built using the config ARCH_OMAP2PLUS rather
+>>>      than individually adding a config for each SoC to enable the
+>>>      support.
+>>>
+>>>      Use COMPILE_TEST to enable the build for other platforms.
+>>>
+>>>      Signed-off-by: Amarinder Bindra <a-bindra@ti.com>
+>>>      Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>>      Cc: Nishanth Menon <nm@ti.com>
+>>>      Acked-by: Felipe Balbi <balbi@ti.com>
+>>>      Acked-by: Balaji T K <balajitk@ti.com>
+>>>      Signed-off-by: Chris Ball <cjb@laptop.org>
+>>> ---
+>>>   drivers/mmc/host/Kconfig |    6 +++---
+>>>   1 files changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>>> index 84102bc..b8ce939 100644
+>>> --- a/drivers/mmc/host/Kconfig
+>>> +++ b/drivers/mmc/host/Kconfig
+>>> @@ -284,11 +284,11 @@ config MMC_OMAP
+>>>
+>>>   config MMC_OMAP_HS
+>>>          tristate "TI OMAP High Speed Multimedia Card Interface support"
+>>> -       depends on SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4
+>>> +       depends on ARCH_OMAP2PLUS || COMPILE_TEST
+>>
+>> sh-allmodconfig (http://kisskb.ellerman.id.au/kisskb/buildresult/10477672/):
+>> include/linux/omap-dma.h:171:8: error: expected identifier before
+>> numeric constant
+>> make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
+>>
+>> It fails because sh #defines "CCR", which is one of the enum values in
+>> include/linux/omap-dma.h.
+>>
+>> I expect a similar failure on blackfin, which also has #define CCR.
+>>
+>> Possible solutions:
+>>    1. Rename CCR in sh/bfin to e.g. SH_CCR resp. BF_CCR.
+>>    2. Use "depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM)
 
-Tomasz
+omap-dma.h will be needed until all OMAPs are converted to DT only boot.
+So depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM) looks good to me
+
+>>    3. Stop using include/linux/omap-dma.h, as it says:
+>>
+>>       *  Legacy OMAP DMA handling defines and functions
+>>       *
+>>       *  NOTE: Do not use these any longer.
+>>       *
+>>       *  Use the generic dmaengine functions as defined in
+>>       *  include/linux/dmaengine.h.
+>>
+
+>> Gr{oetje,eeting}s,
+>>
+>>                          Geert
+>>
+>> --
+>> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>>
+>> In personal conversations with technical people, I call myself a hacker. But
+>> when I'm talking to journalists I just say "programmer" or something like that.
+>>                                  -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
