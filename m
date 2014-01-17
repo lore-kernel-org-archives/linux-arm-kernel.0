@@ -1,40 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 15:12:42 +0100
-Subject: [PATCH 09/20] ARM64 / ACPI: Implement core functions for parsing
- MADT table
-In-Reply-To: <1389961514-13562-10-git-send-email-hanjun.guo@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 14:12:41 +0000
+Subject: [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c and its related
+ head file
+In-Reply-To: <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
 References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-10-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <201401171512.42850.arnd@arndb.de>
+ <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140117141241.GH16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 January 2014, Hanjun Guo wrote:
+On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
+> Introduce arm_core.c and its related head file, after this patch,
+> we can get ACPI tables from firmware on ARM64 now.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+[...]
+
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index bd9bbd0..2210353 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -41,6 +41,7 @@
+>  #include <linux/memblock.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/acpi.h>
 >  
-> +/*
-> + * Local interrupt controller address,
-> + * GIC cpu interface base address on ARM/ARM64
-> + */
-> +static u64 acpi_lapic_addr __initdata;
+>  #include <asm/cputype.h>
+>  #include <asm/elf.h>
+> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	arm64_memblock_init();
+>  
+> +	/* Parse the ACPI tables for possible boot-time configuration */
+> +	acpi_boot_table_init();
+> +	early_acpi_boot_init();
+> +	acpi_boot_init();
 
-If it's cpu local, don't you need more than one address to support SMP?
-Also, the variable appears to be write-only.
+Do we really need *three* back-to-back calls for ACPI to initialise?
 
-> +#define BAD_MADT_ENTRY(entry, end) (					\
-> +	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
-> +	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
-> +
-
-Better make this an inline function.
-
-> +static int __init
-> +acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *processor = NULL;
-> +
-> +	processor = (struct acpi_madt_generic_interrupt *)header;
-
-You don't need the initialization in the first line when you write to the
-variable before reading it. Same in the other functions.
-
-	Arnd
+Will
