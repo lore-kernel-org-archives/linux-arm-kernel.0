@@ -1,77 +1,71 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Fri, 17 Jan 2014 12:13:12 -0700
-Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
-In-Reply-To: <20140117184731.GE15937@n2100.arm.linux.org.uk>
-References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
-Message-ID: <52D980C8.9020809@boundarydevices.com>
+From: marc.ceeeee@gmail.com (Marc Carino)
+Date: Fri, 17 Jan 2014 11:19:19 -0800
+Subject: [PATCH v4 0/8] ARM: brcmstb: Add Broadcom STB SoC support
+Message-ID: <1389986367-4010-1-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+This patchset contains the board support package for the
+Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
+minimal set of code needed for a BCM7445-based board to boot
+the Linux kernel.
 
-On 01/17/2014 11:47 AM, Russell King - ARM Linux wrote:
-> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
-> hides stuff.  It's really wonderful, because you don't have to care
-> about how the GPIOs are actually accessed in drivers anymore.
->
-> However, what about the behaviour of GPIOs?
->
-> What about... for example... this sequence:
->
-> 	gpio_direction_output(gpio, 1);
-> 	val = gpio_get_value(gpio);
->
-> What value is "val"?  More importantly, what value is reflected in
-> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
->
-> Now, while you can make reasonable assumptions, such as "it'll return
-> that the output is being driven to the requested state" or "it'll
-> return the actual state of the pin", what about this instead, which
-> happens on iMX hardware - "it'll _always_ return zero".
->
-> Yes, iMX6 at least has this behaviour.  For any output, val as above
-> will always be zero, and /proc/sys/kernel/debug/gpio will always
-> report that an output is zero... unless the SION bit has been set for
-> that GPIO signal.
->
-> The reason is that on hardware such as iMX6, reading the GPIO is done
-> by reading the pad state register, and this register is _only_ supplied
-> the state of the pad when the input path is enabled.  The input path
-> is only enabled when the output is disabled, or the SION bit is set
-> to force the GPIO input path.
->
-> So, this brings up three obvious questions:
->
-> 1. What should gpio_get_value() return for an output?
+These changes heavily leverage the OF/devicetree framework.
 
-It seems that this is pretty well specified.
+v4:
+- make a reboot driver and put it in the drivers folder
+- rework DT bindings to leverage 'syscon'
+- rework BSP code to use 'syscon' for all register mappings
+- misc. tweaks per suggestions from v3
 
-To quote Documentation/gpio/gpio-legacy.txt:
-	>> When reading the value of an output pin, the value
-	>> returned should be what's seen on the pin ... that
-	>> won't always match the specified output value, because
-	>> of issues including open-drain signaling and output
-	>> latencies.
+v3:
+- rebased to v3.13-rc8
+- switched to using 'multi_v7_defconfig'
+- eliminated dependence on compile-time peripheral register access
+- moved DT node iomap out from 'init_early'
+- misc. minor cleanups from mailing-list discussion for v2
 
-Documentation/gpio/gpio.txt is a little less clear, but implies
-the same:
-	>> If you are "driving" the signal high but
-	>> gpiod_get_value(gpio) reports a low value (after
-	>> the appropriate rise time passes), you know some other
-	>> component is driving the shared signal low
+v2:
+- rebased to v3.13-rc1
+- moved implementation to 'mach-bcm' folder
+- added CPU init for B15
 
-> 2. What should be reported in /sys/kernel/debug/gpio for an output?
-> 3. Should iMX6 (and similar) GPIOs always have the SION bit set in
->     their DT descriptions?
->
-> Discuss.
->
+v1:
+- initial submission
 
-Each signal accessed using the GPIO subsystem **must** have
-the SION bit set and the values returned should be the value
-from the PSR registers.
+[1] http://www.broadcom.com/products/Cable/Cable-Set-Top-Box-Solutions/BCM7445
 
-Regards,
+Marc Carino (8):
+  ARM: brcmstb: add infrastructure for ARM-based Broadcom STB SoCs
+  power: reset: Add reboot driver for brcmstb
+  ARM: brcmstb: add debug UART for earlyprintk support
+  ARM: do CPU-specific init for Broadcom Brahma15 cores
+  ARM: brcmstb: add CPU binding for Broadcom Brahma15
+  ARM: brcmstb: add misc. DT bindings for brcmstb
+  ARM: brcmstb: gic: add compatible string for Broadcom Brahma15
+  ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
 
-
-Eric
+ .../devicetree/bindings/arm/brcm-brcmstb.txt       |   95 ++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |    1 +
+ Documentation/devicetree/bindings/arm/gic.txt      |    1 +
+ arch/arm/Kconfig.debug                             |   16 +-
+ arch/arm/boot/dts/bcm7445.dts                      |  111 +++++++
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm/mach-bcm/Kconfig                          |   14 +
+ arch/arm/mach-bcm/Makefile                         |    4 +
+ arch/arm/mach-bcm/brcmstb.c                        |  110 +++++++
+ arch/arm/mach-bcm/brcmstb.h                        |   38 +++
+ arch/arm/mach-bcm/headsmp-brcmstb.S                |   34 ++
+ arch/arm/mach-bcm/hotplug-brcmstb.c                |  334 ++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                              |   11 +
+ drivers/power/reset/Kconfig                        |   10 +
+ drivers/power/reset/Makefile                       |    1 +
+ drivers/power/reset/brcmstb-reboot.c               |  120 +++++++
+ 16 files changed, 900 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+ create mode 100644 arch/arm/boot/dts/bcm7445.dts
+ create mode 100644 arch/arm/mach-bcm/brcmstb.c
+ create mode 100644 arch/arm/mach-bcm/brcmstb.h
+ create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
+ create mode 100644 arch/arm/mach-bcm/hotplug-brcmstb.c
+ create mode 100644 drivers/power/reset/brcmstb-reboot.c
