@@ -1,187 +1,38 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 17 Jan 2014 12:26:50 -0600
-Subject: [PATCH v2] usb: phy: msm: fix compilation errors when
- !CONFIG_PM_SLEEP
-In-Reply-To: <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
-References: <87lhyemr3y.fsf@linaro.org>
- <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <20140117182650.GZ8153@joshc.qualcomm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Jan 2014 10:36:33 -0800
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D932B5.7020909@nvidia.com>
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
+ <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
+ <52D932B5.7020909@nvidia.com>
+Message-ID: <52D97831.6030700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 11:58:51AM -0600, Josh Cartwright wrote:
-> Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-> msm_otg_{suspend,resume} routines, however these routines are only being
-> built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-> depends on msm_hsusb_config_vddcx(), which is only built when
-> CONFIG_PM_SLEEP.
-> 
-> Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-> preprocessor conditional, and moving msm_hsusb_config_vddcx().
-> 
-> While we're here, eliminate the CONFIG_PM conditional for setting
-> up the dev_pm_ops.
-> 
-> This address the following errors Russell King has hit doing randconfig
-> builds:
-> 
-> drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-> drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-> drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-> drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
-> 
-> Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
-> v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
-> 
->  drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
->  1 file changed, 26 insertions(+), 31 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-> index 8546c8d..5b169a7 100644
-> --- a/drivers/usb/phy/phy-msm-usb.c
-> +++ b/drivers/usb/phy/phy-msm-usb.c
-[..]
-> @@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
->  #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
->  #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
->  
-> -#ifdef CONFIG_PM_SLEEP
-> +#if CONFIG_PM
+On 01/17/14 05:40, Prashant Gaikwad wrote:
+>
+> Another requirement:
+>
+> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
+> C2, C3 respectively.
+>
+> Rating of T2 is better than T3. If I register T2 and T3 both as
+> broadcast timers then T3 will not be used. But ...
+>     - T2 is not preserved in C3 idle state.
+>     - T3 resolution is very poor (ms) and can not be used as wake
+> event for C2.
+>
+> Possible solution, register only T3 as broadcast device and use T2 as
+> per-CPU fallback timer.
 
-*sigh*.  This, of course, should have been #ifdef CONFIG_PM.  Fixed
-v3 below.
+We have the same situation on MSM. I've been thinking about proposing we
+allow multiple broadcast timers to exist in the system and then have the
+clockevents_notify() caller indicate which C state is being entered. The
+broadcast timers would need to indicate which C state they don't work in
+though.
 
-Thanks,
-
-  Josh
-
--- 8< --
-Subject: [PATCH v3] usb: phy: msm: fix compilation errors when !CONFIG_PM_SLEEP
-
-Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-msm_otg_{suspend,resume} routines, however these routines are only being
-built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-depends on msm_hsusb_config_vddcx(), which is only built when
-CONFIG_PM_SLEEP.
-
-Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-preprocessor conditional, and moving msm_hsusb_config_vddcx().
-
-While we're here, eliminate the CONFIG_PM conditional for setting
-up the dev_pm_ops.
-
-This address the following errors Russell King has hit doing randconfig
-builds:
-
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
-
-Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 31 deletions(-)
-
-diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index 8546c8d..d204f74 100644
---- a/drivers/usb/phy/phy-msm-usb.c
-+++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -159,32 +159,6 @@ put_3p3:
- 	return rc;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--#define USB_PHY_SUSP_DIG_VOL  500000
--static int msm_hsusb_config_vddcx(int high)
--{
--	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
--	int min_vol;
--	int ret;
--
--	if (high)
--		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
--	else
--		min_vol = USB_PHY_SUSP_DIG_VOL;
--
--	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
--	if (ret) {
--		pr_err("%s: unable to set the voltage for regulator "
--			"HSUSB_VDDCX\n", __func__);
--		return ret;
--	}
--
--	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
--
--	return ret;
--}
--#endif
--
- static int msm_hsusb_ldo_set_mode(int on)
- {
- 	int ret = 0;
-@@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
- #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
- #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
- 
--#ifdef CONFIG_PM_SLEEP
-+#ifdef CONFIG_PM
-+
-+#define USB_PHY_SUSP_DIG_VOL  500000
-+static int msm_hsusb_config_vddcx(int high)
-+{
-+	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
-+	int min_vol;
-+	int ret;
-+
-+	if (high)
-+		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
-+	else
-+		min_vol = USB_PHY_SUSP_DIG_VOL;
-+
-+	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
-+	if (ret) {
-+		pr_err("%s: unable to set the voltage for regulator "
-+			"HSUSB_VDDCX\n", __func__);
-+		return ret;
-+	}
-+
-+	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
-+
-+	return ret;
-+}
-+
- static int msm_otg_suspend(struct msm_otg *motg)
- {
- 	struct usb_phy *phy = &motg->phy;
-@@ -1733,22 +1732,18 @@ static int msm_otg_pm_resume(struct device *dev)
- }
- #endif
- 
--#ifdef CONFIG_PM
- static const struct dev_pm_ops msm_otg_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(msm_otg_pm_suspend, msm_otg_pm_resume)
- 	SET_RUNTIME_PM_OPS(msm_otg_runtime_suspend, msm_otg_runtime_resume,
- 				msm_otg_runtime_idle)
- };
--#endif
- 
- static struct platform_driver msm_otg_driver = {
- 	.remove = msm_otg_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
--#ifdef CONFIG_PM
- 		.pm = &msm_otg_dev_pm_ops,
--#endif
- 	},
- };
- 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
