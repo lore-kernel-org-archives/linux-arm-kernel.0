@@ -1,41 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 17:59:30 +0800
-Subject: [PATCH RFC 1/6] net: rfkill: gpio: fix gpio name buffer size off
- by 1
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D45EA9D@AcuExch.aculab.com>
-References: <1389941251-32692-1-git-send-email-wens@csie.org>
- <1389941251-32692-2-git-send-email-wens@csie.org>
- <063D6719AE5E284EB5DD2968C1650D6D45EA9D@AcuExch.aculab.com>
-Message-ID: <CAGb2v67L__kusyfSxSc1Rmb6mtJ_VQQF+rCfr1AiUxCemaXMqA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 17 Jan 2014 11:05:20 +0100
+Subject: [PATCH] clocksource: timer-sun5i: Switch to sched_clock_register()
+In-Reply-To: <1389922686-6249-1-git-send-email-sboyd@codeaurora.org>
+References: <1389922686-6249-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52D90060.5020104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 5:46 PM, David Laight <David.Laight@aculab.com> wrote:
-> From: Chen-Yu Tsai
->> snprintf should be passed the complete size of the buffer, including
->> the space for '\0'. The previous code resulted in the *_reset and
->> *_shutdown strings being truncated.
-> ...
->> diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-> ...
->> -     snprintf(rfkill->reset_name, len + 6 , "%s_reset", rfkill->name);
->> -     snprintf(rfkill->shutdown_name, len + 9, "%s_shutdown", rfkill->name);
->> +     snprintf(rfkill->reset_name, len + 7 , "%s_reset", rfkill->name);
->> +     snprintf(rfkill->shutdown_name, len + 10, "%s_shutdown", rfkill->name);
+On 01/17/2014 02:38 AM, Stephen Boyd wrote:
+> The 32 bit sched_clock interface supports 64 bits since 3.13-rc1.
+> Upgrade to the 64 bit function to allow us to remove the 32 bit
+> registration interface.
 >
-> I can't find the context for the above, but they look very dubious.
-> I'd expect: snprintf(foo, sizeof foo, ...).
-> If you are trying to truncate rfkill->name you need to use %.*s.
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Cc'in Ingo because this is simple enough to probably just apply to timers/core
 
-The driver allocates these buffers on the fly, a few lines above:
+Hi Stephen,
 
-        len = strlen(rfkill->name);
-        rfkill->reset_name = devm_kzalloc(&pdev->dev, len + 7, GFP_KERNEL);
-        rfkill->shutdown_name = devm_kzalloc(&pdev->dev, len + 10, GFP_KERNEL);
+I applied your patch in my tree for 3.15.
 
-I am not trying to truncate rfkill->name. Rather, the buffer length passed
-to snprintf was wrong, so the resulting name was truncated by one character.
+Thanks
+   -- Daniel
+
+>   drivers/clocksource/timer-sun5i.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+> index bddc52233d2a..deebcd6469fc 100644
+> --- a/drivers/clocksource/timer-sun5i.c
+> +++ b/drivers/clocksource/timer-sun5i.c
+> @@ -136,7 +136,7 @@ static struct irqaction sun5i_timer_irq = {
+>   	.dev_id = &sun5i_clockevent,
+>   };
+>
+> -static u32 sun5i_timer_sched_read(void)
+> +static u64 sun5i_timer_sched_read(void)
+>   {
+>   	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
+>   }
+> @@ -166,7 +166,7 @@ static void __init sun5i_timer_init(struct device_node *node)
+>   	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+>   	       timer_base + TIMER_CTL_REG(1));
+>
+> -	setup_sched_clock(sun5i_timer_sched_read, 32, rate);
+> +	sched_clock_register(sun5i_timer_sched_read, 32, rate);
+>   	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
+>   			      rate, 340, 32, clocksource_mmio_readl_down);
+>
+>
 
 
-Thanks,
-ChenYu
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
