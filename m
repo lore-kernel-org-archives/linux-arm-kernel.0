@@ -1,135 +1,42 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 17 Jan 2014 11:58:51 -0600
-Subject: [PATCH v2] usb: phy: msm: fix compilation errors when !CONFIG_PM_SLEEP
-In-Reply-To: <87lhyemr3y.fsf@linaro.org>
-References: <87lhyemr3y.fsf@linaro.org>
-Message-ID: <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 17 Jan 2014 19:04:14 +0100
+Subject: [PATCH] clocksource: timer-sun5i: Switch to sched_clock_register()
+In-Reply-To: <52D96ED6.20508@codeaurora.org>
+References: <1389922686-6249-1-git-send-email-sboyd@codeaurora.org>
+ <52D90060.5020104@linaro.org> <52D96ED6.20508@codeaurora.org>
+Message-ID: <52D9709E.4000804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-msm_otg_{suspend,resume} routines, however these routines are only being
-built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-depends on msm_hsusb_config_vddcx(), which is only built when
-CONFIG_PM_SLEEP.
+On 01/17/2014 06:56 PM, Stephen Boyd wrote:
+> On 01/17/14 02:05, Daniel Lezcano wrote:
+>> On 01/17/2014 02:38 AM, Stephen Boyd wrote:
+>>> The 32 bit sched_clock interface supports 64 bits since 3.13-rc1.
+>>> Upgrade to the 64 bit function to allow us to remove the 32 bit
+>>> registration interface.
+>>>
+>>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> ---
+>>>
+>>> Cc'in Ingo because this is simple enough to probably just apply to
+>>> timers/core
+>>
+>> Hi Stephen,
+>>
+>> I applied your patch in my tree for 3.15.
+>>
+>
+> I was hoping we could remove setup_sched_clock() in 3.14-rc1 timeline,
+> but if we delay this until 3.15 we'll have to wait another 3 months. Is
+> there any chance we can get this in for 3.14?
 
-Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-preprocessor conditional, and moving msm_hsusb_config_vddcx().
+I am ok with that. It is up to Ingo.
 
-While we're here, eliminate the CONFIG_PM conditional for setting
-up the dev_pm_ops.
 
-This address the following errors Russell King has hit doing randconfig
-builds:
-
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
-
-Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
-v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
-
- drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 31 deletions(-)
-
-diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index 8546c8d..5b169a7 100644
---- a/drivers/usb/phy/phy-msm-usb.c
-+++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -159,32 +159,6 @@ put_3p3:
- 	return rc;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--#define USB_PHY_SUSP_DIG_VOL  500000
--static int msm_hsusb_config_vddcx(int high)
--{
--	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
--	int min_vol;
--	int ret;
--
--	if (high)
--		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
--	else
--		min_vol = USB_PHY_SUSP_DIG_VOL;
--
--	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
--	if (ret) {
--		pr_err("%s: unable to set the voltage for regulator "
--			"HSUSB_VDDCX\n", __func__);
--		return ret;
--	}
--
--	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
--
--	return ret;
--}
--#endif
--
- static int msm_hsusb_ldo_set_mode(int on)
- {
- 	int ret = 0;
-@@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
- #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
- #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
- 
--#ifdef CONFIG_PM_SLEEP
-+#if CONFIG_PM
-+
-+#define USB_PHY_SUSP_DIG_VOL  500000
-+static int msm_hsusb_config_vddcx(int high)
-+{
-+	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
-+	int min_vol;
-+	int ret;
-+
-+	if (high)
-+		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
-+	else
-+		min_vol = USB_PHY_SUSP_DIG_VOL;
-+
-+	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
-+	if (ret) {
-+		pr_err("%s: unable to set the voltage for regulator "
-+			"HSUSB_VDDCX\n", __func__);
-+		return ret;
-+	}
-+
-+	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
-+
-+	return ret;
-+}
-+
- static int msm_otg_suspend(struct msm_otg *motg)
- {
- 	struct usb_phy *phy = &motg->phy;
-@@ -1733,22 +1732,18 @@ static int msm_otg_pm_resume(struct device *dev)
- }
- #endif
- 
--#ifdef CONFIG_PM
- static const struct dev_pm_ops msm_otg_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(msm_otg_pm_suspend, msm_otg_pm_resume)
- 	SET_RUNTIME_PM_OPS(msm_otg_runtime_suspend, msm_otg_runtime_resume,
- 				msm_otg_runtime_idle)
- };
--#endif
- 
- static struct platform_driver msm_otg_driver = {
- 	.remove = msm_otg_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
--#ifdef CONFIG_PM
- 		.pm = &msm_otg_dev_pm_ops,
--#endif
- 	},
- };
- 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
