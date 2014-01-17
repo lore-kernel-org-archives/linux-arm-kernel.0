@@ -1,164 +1,144 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 17 Jan 2014 10:07:42 +0100
-Subject: [PATCH v5] ARM: DTS: imx5* imx6*, use imx51-ssi
-Message-ID: <1389949662-11172-1-git-send-email-mpa@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 17 Jan 2014 10:08:35 +0100
+Subject: [PATCH] ARM: dts: imx6: Add DFI FS700-M60 board support
+In-Reply-To: <20140117063929.GF1565@shlinux1.ap.freescale.net>
+References: <1389876354-24341-1-git-send-email-s.hauer@pengutronix.de>
+ <20140117063929.GF1565@shlinux1.ap.freescale.net>
+Message-ID: <20140117090835.GA16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-reconfiguration and needs this for correct interaction with SDMA. This
-patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+On Fri, Jan 17, 2014 at 02:39:31PM +0800, Shawn Guo wrote:
+> On Thu, Jan 16, 2014 at 01:45:54PM +0100, Sascha Hauer wrote:
+> > diff --git a/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
+> > new file mode 100644
+> > index 0000000..ca3c748
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi
+> > @@ -0,0 +1,145 @@
+> > +/ {
+> > +	regulators {
+> > +		compatible = "simple-bus";
+> > +
+> > +		dummy_reg: fixed at 0 {
+> 
+> regulator at 0
+> 
+> > +			compatible = "regulator-fixed";
+> 
+> reg = <0>;
+> 
+> > +			regulator-name = "dummy-supply";
+> > +		};
+> > +
+> > +		reg_usb_otg_vbus: usb_otg_vbus {
+> 
+> regulator at 1
+> 
+> > +			compatible = "regulator-fixed";
+> 
+> reg = <1>;
+> 
+> > +			regulator-name = "usb_otg_vbus";
+> > +			regulator-min-microvolt = <5000000>;
+> > +			regulator-max-microvolt = <5000000>;
+> > +			gpio = <&gpio3 22 0>;
+> > +			enable-active-high;
+> > +		};
+> > +	};
+> > +
+> > +	chosen {
+> > +		linux,stdout-path = &uart1;
+> > +	};
+> > +};
+> > +
+> > +&ecspi3 {
+> > +	fsl,spi-num-chipselects = <1>;
+> > +	cs-gpios = <&gpio4 24 0>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_ecspi3>;
+> > +	status = "okay";
+> > +
+> > +	flash: m25p80 at 0 {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "sst,sst25vf040b", "m25p80";
+> > +		spi-max-frequency = <20000000>;
+> > +		reg = <0>;
+> > +	};
+> > +};
+> > +
+> > +&fec {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_enet>;
+> > +	status = "okay";
+> > +	phy-mode = "rgmii";
+> > +};
+> > +
+> > +&iomuxc {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_hog>;
+> > +
+> > +	imx6qdl-dfi-fs700-m60 {
+> > +		pinctrl_hog: hoggrp {
+> > +			fsl,pins = <
+> > +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
+> > +				MX6QDL_PAD_GPIO_18__GPIO7_IO13 0x80000000 /* PMIC irq */
+> > +				MX6QDL_PAD_EIM_D26__GPIO3_IO26 0x80000000 /* MAX11801 irq */
+> > +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05 0x000030b0 /* Backlight enable */
+> > +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000 /* SD2 card detect */
+> 
+> Can we minimize the pins in hog group by moving the client device's pins
+> into device's pin entry, just like what you do for
+> MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24?
+> 
+> > +			>;
+> > +		};
+> > +
+> > +		pinctrl_enet: enetgrp {
+> > +			fsl,pins = <MX6QDL_ENET_PINGRP1>;
+> > +		};
+> > +
+> > +		pinctrl_i2c2: i2c2grp {
+> > +			fsl,pins = <MX6QDL_I2C2_PINGRP1>;
+> > +		};
+> > +
+> > +		pinctrl_uart1: uart1grp {
+> > +			fsl,pins = <MX6QDL_UART1_PINGRP1>;
+> > +		};
+> > +
+> > +		pinctrl_usbotg: usbotggrp {
+> > +			fsl,pins = <MX6QDL_USBOTG_PINGRP2>;
+> > +		};
+> > +
+> > +		pinctrl_usdhc2: usdhc2grp {
+> > +			fsl,pins = <MX6QDL_USDHC2_PINGRP_D4>;
+> > +		};
+> > +
+> > +		pinctrl_usdhc3: usdhc3grp {
+> > +			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+> > +		};
+> > +
+> > +		pinctrl_usdhc4: usdhc4grp {
+> > +			fsl,pins = <MX6QDL_USDHC4_PINGRP_D8>;
+> > +		};
+> > +	};
+> > +
+> > +	ecspi3 {
+> > +		pinctrl_ecspi3: ecspi3_csgrp {
+> 
+> s/ecspi3_csgrp/ecspi3grp
+> 
+> And just move the node into imx6qdl-dfi-fs700-m60?
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
-Hi Shawn,
+Makes sense. Addressed all comments in v2.
 
-This is the patch including the two added compatibles in imx50.dtsi for
-fsl,imx51-ssi. That is the only change in v5.
+Thanks for reviewing.
 
-Regards,
+Sascha
 
-Markus
-
-
- arch/arm/boot/dts/imx50.dtsi   |  6 +++++-
- arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
- arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
- arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
- 4 files changed, 30 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-index 01c0499..47df15f 100644
---- a/arch/arm/boot/dts/imx50.dtsi
-+++ b/arch/arm/boot/dts/imx50.dtsi
-@@ -140,7 +140,9 @@
- 				};
- 
- 				ssi2: ssi at 50014000 {
--					compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx50-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
-@@ -446,6 +448,8 @@
- 
- 			ssi1: ssi at 63fcc000 {
- 				compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx50-ssi", "fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 4dbde25..73e103b 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -171,7 +171,9 @@
- 				};
- 
- 				ssi2: ssi at 50014000 {
--					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+					compatible = "fsl,imx53-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
-@@ -590,7 +592,8 @@
- 			};
- 
- 			ssi1: ssi at 63fcc000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fcc000 0x4000>;
- 				interrupts = <29>;
- 				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
-@@ -617,7 +620,8 @@
- 			};
- 
- 			ssi3: ssi at 63fe8000 {
--				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-+				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-+						"fsl,imx21-ssi";
- 				reg = <0x63fe8000 0x4000>;
- 				interrupts = <96>;
- 				clocks = <&clks IMX5_CLK_SSI3_IPG_GATE>;
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 8a86502..cf7956e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -247,7 +247,9 @@
- 				};
- 
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 178>;
-@@ -260,7 +262,9 @@
- 				};
- 
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 179>;
-@@ -273,7 +277,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6q-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks 180>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index a449c4f..95bb37b 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -226,7 +226,9 @@
- 				};
- 
- 				ssi1: ssi at 02028000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks IMX6SL_CLK_SSI1>;
-@@ -238,7 +240,9 @@
- 				};
- 
- 				ssi2: ssi at 0202c000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks IMX6SL_CLK_SSI2>;
-@@ -250,7 +254,9 @@
- 				};
- 
- 				ssi3: ssi at 02030000 {
--					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-+					compatible = "fsl,imx6sl-ssi",
-+							"fsl,imx51-ssi",
-+							"fsl,imx21-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks IMX6SL_CLK_SSI3>;
 -- 
-1.8.5.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
