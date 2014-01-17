@@ -1,46 +1,32 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 17 Jan 2014 14:22:27 +0100
-Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
-In-Reply-To: <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
-References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>	<1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
- <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
-Message-ID: <52D92E93.8050804@epfl.ch>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 17 Jan 2014 21:24:43 +0800
+Subject: [PATCH net-next v3 4/8] blackfin: Update stmmac callback signatures
+In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
+References: <1389965087-21971-1-git-send-email-wens@csie.org>
+Message-ID: <1389965087-21971-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Javier
+stmmac callbacks have been extended for better separation.
+Update them to avoid breakage.
 
-On 01/09/2014 09:43 PM, Javier Martinez Canillas wrote:
-> [adding Enric Balletbo to cc]
-> 
-> Hello Florian,
-> 
-> On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
-> <florian.vaussard@epfl.ch> wrote:
->> MMC2 is used by the on-board WiFi module populated on some boards
->> (based on Marvell Libertas 8688 SDIO).
->>
->> Note: currently WiFi only works on cold boot, as the module is not
->> properly reset (missing binding for the GPIO reset).
->>
-> 
-> Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
-> for LBEE1USJYC WiFi connected to SDIO") ?
-> 
-> If I remember correctly the LBEE1USJYC Wifi/BT combo module is
-> basically a Marvell Libertas 8688 Wlan and Enric got soft reset
-> working too by adding a GPIO property to the regulator for the reset
-> GPIO.
-> 
-> Hope it helps,
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/blackfin/mach-bf609/boards/ezkit.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you, I got it working. It is a bit messy, as I have 3 GPIOs
-(poweron, wifi-reset and bt-reset). As a regulator can control only one
-GPIO, I had to define 3 regulators, and assigning them to the vmmc,
-vqmmc, and vmmc_aux. I hope that a better solution will pop-up in this
-thread [1]. It is a pity that the previous version of the GPIO-reset
-controller was not merged.
-
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/294907
+diff --git a/arch/blackfin/mach-bf609/boards/ezkit.c b/arch/blackfin/mach-bf609/boards/ezkit.c
+index 82beedd..05194e9 100644
+--- a/arch/blackfin/mach-bf609/boards/ezkit.c
++++ b/arch/blackfin/mach-bf609/boards/ezkit.c
+@@ -117,7 +117,7 @@ static struct stmmac_dma_cfg eth_dma_cfg = {
+ 	.pbl	= 2,
+ };
+ 
+-int stmmac_ptp_clk_init(struct platform_device *pdev)
++int stmmac_ptp_clk_init(struct platform_device *pdev, void *priv)
+ {
+ 	bfin_write32(PADS0_EMAC_PTP_CLKSEL, 0);
+ 	return 0;
+-- 
+1.8.5.2
