@@ -1,36 +1,52 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Jan 2014 17:13:15 +0900
-Subject: [PATCH v2 2/6] arm64: Add regs_return_value() in syscall.h
+Date: Fri, 17 Jan 2014 17:13:16 +0900
+Subject: [PATCH v2 3/6] arm64: Add audit support
 In-Reply-To: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
  <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1389946399-4525-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1389946399-4525-4-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro is used mainly for audit to record system call's results, but
-may also be used in test_kprobes.c.
+On AArch64, audit can be enabled with CONFIG_AUDIT_GENERIC.
+Most of audit features are implemented in generic way. This patch
+adds a small piece of architecture dependent code.
+syscall_get_arch(), which is used in seccomp, should just return
+AUDIT_ARCH_*.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/ptrace.h |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/syscall.h |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 0e7fa49..5800ec1 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -134,6 +134,11 @@ struct pt_regs {
- #define user_stack_pointer(regs) \
- 	((regs)->sp)
+diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+index 70ba9d4..3361fec 100644
+--- a/arch/arm64/include/asm/syscall.h
++++ b/arch/arm64/include/asm/syscall.h
+@@ -16,7 +16,9 @@
+ #ifndef __ASM_SYSCALL_H
+ #define __ASM_SYSCALL_H
  
-+static inline unsigned long regs_return_value(struct pt_regs *regs)
++#include <linux/audit.h>
+ #include <linux/err.h>
++#include <linux/sched.h>
+ 
+ 
+ static inline int syscall_get_nr(struct task_struct *task,
+@@ -104,4 +106,14 @@ static inline void syscall_set_arguments(struct task_struct *task,
+ 	memcpy(&regs->regs[i], args, n * sizeof(args[0]));
+ }
+ 
++static inline int syscall_get_arch(struct task_struct *task,
++				   struct pt_regs *regs)
 +{
-+	return regs->regs[0];
++#ifdef __AARCH64EB__
++	return AUDIT_ARCH_AARCH64EB;
++#else
++	return AUDIT_ARCH_AARCH64;
++#endif
 +}
 +
- /*
-  * Are the current registers suitable for user mode? (used to maintain
-  * security in signal handlers)
+ #endif	/* __ASM_SYSCALL_H */
 -- 
 1.7.9.5
