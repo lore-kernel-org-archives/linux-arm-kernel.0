@@ -1,68 +1,60 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 17 Jan 2014 13:08:26 +0100
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D915F3.3030500@nvidia.com>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com>
-Message-ID: <52D91D3A.80800@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 17 Jan 2014 13:06:41 +0100
+Subject: [PATCH] ARM: sunxi: change the AllWinner A1X to sunxi
+In-Reply-To: <3612364.BZBltgonI0@wuerfel>
+References: <20140109153404.GA21055@kvmhost> <20140115091006.GF3377@lukather>
+ <3612364.BZBltgonI0@wuerfel>
+Message-ID: <20140117120641.GA3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 12:37 PM, Prashant Gaikwad wrote:
-> On Friday 17 January 2014 03:45 PM, Daniel Lezcano wrote:
->> On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
->>> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
->>>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
->>>>> Will Deacon <will.deacon@arm.com> writes:
->>>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
->>>>>> used when
->>>>>> you go idle?
->>>>> That would mean falling back to broadcast timer, right? That's not
->>>>> necessarily on the local CPU so wakeups would often wake two CPUs.
->>>> You can prevent that if the hardware supports it with the
->>>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
->>> Instead of falling back on broadcast timer, is it possible to fall back
->>> on other per-CPU timer which is preserved across idle state?
->> Is it what you are looking for ?
->>
->> http://lwn.net/Articles/580568/
->>
->
-> If I understand correctly these patches enables us to use per-CPU timers
-> as broadcast timers. I do not want to use broadcast timer.
+Hi Arnd,
 
-Why ?
+On Wed, Jan 15, 2014 at 10:40:56AM +0100, Arnd Bergmann wrote:
+> On Wednesday 15 January 2014 10:10:06 Maxime Ripard wrote:
+> > On Thu, Jan 09, 2014 at 04:34:04PM +0100, Gerardo Di Iorio wrote:
+> > > Change the AllWinner A1X SOCs to Allwinner Sunxi SOCs
+> > > 
+> > > Signed-off-by: Gerardo Di Iorio <arete74@gmail.com>
+> > > ---
+> > >  arch/arm/mach-sunxi/Kconfig | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> > > index 547004c..adb2574 100644
+> > > --- a/arch/arm/mach-sunxi/Kconfig
+> > > +++ b/arch/arm/mach-sunxi/Kconfig
+> > > @@ -1,5 +1,5 @@
+> > >  config ARCH_SUNXI
+> > > -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+> > > +       bool "Allwinner Sunxi SOCs" if ARCH_MULTI_V7
+> > 
+> > I wonder if the sunxi (apart the weird letter case) is actually
+> > needed. Maybe we can just put "Allwinner SoCs" (it would be great if
+> > you could fix the SoCs case too).
+> 
+> If you want to have exact naming, try to find something that excludes the
+> old Sun3i (F20) and earlier chips (unless someone is already planning
+> to work on them). Maybe also mention the "Boxchip" name, although that
+> seems to be falling out of use these days.
 
+I'm not sure that's good to exclude chips. We have a number of SoCs we
+don't support even on later families (A31s, A23, mostly). I'm not sure
+we want to have an ever growing list of SoCs supported (or
+not-supported).
 
-> If I have 2 per-CPU timers T1 and T2, T1 is not preserved across idle
-> state and T2 is preserved. And I want to use T1 as scheduler timer.
-> Can I do following for idle state?
->
-> Idle entry:
->      clockevents_shutdown(T1);
->      clockevents_set_mode(T2, ONESHOT);
->      clockevents_program_event(T2, next_event);
->
-> Idle exit:
->      clockevents_shutdown(T2);
->      clockevents_set_mode(T1, ONESHOT);
+"sunXi" would be fine I guess, or "A-series" like suggested on IRC.
 
-
-
-
->>>>> Does
->>>>> anyone have patches for using a CPU local timer as a fallback for
->>>>> C3STOP timers?
->>>>
->>
->
-
+Maxime
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/adfff9d0/attachment.sig>
