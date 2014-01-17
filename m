@@ -1,86 +1,39 @@
-From: rgb@redhat.com (Richard Guy Briggs)
-Date: Fri, 17 Jan 2014 14:44:08 -0500
-Subject: [PATCH v2 0/6] arm64: Add audit support
-In-Reply-To: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
- <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140117194408.GC7084@madcap2.tricolour.ca>
+From: syin@broadcom.com (Sherman Yin)
+Date: Fri, 17 Jan 2014 11:51:30 -0800
+Subject: [PATCH] pinctrl: capri: add dependency on OF
+In-Reply-To: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
+References: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <52D989C2.6030603@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/17, AKASHI Takahiro wrote:
-> This patchset adds system call audit support on arm64.
-> Both 32-bit (AUIDT_ARCH_ARM[EB]) and 64-bit tasks (AUDIT_ARCH_AARCH64[EB])
-> are supported, but presuming 32-LE on 64-LE or 32-BE on 64-BE.
-> 
-> There are some prerequisites for this patch to work correctly:
-> * "generic compat system call audit support" patch
-> * "correct a type mismatch in audit_syscall_exit()" patch
->    (already accepted and queued in 3.14)
-> * "Modify a set of system calls in audit class" patch
-> * userspace audit tool (v2.3.2 + my patch for arm64)
-> 
-> All those were already or will be soon posted separately.
-> Please review them as well for better understandings.
-> 
-> This code was tested on both 32-bit and 64-bit LE userland 
-> in the following two ways:
-> 1) basic operations with auditctl/autrace
->   # auditctl -a exit,always -S openat -F path=/etc/inittab
->   # auditctl -a exit,always -F dir=/tmp -F perm=rw
->   # auditctl -a task,always
->   # autrace /bin/ls
->     by comparing output from autrace with one from strace
-> 
-> 2) audit-test-code (+ my workarounds for arm/arm64)
->   by running "audit-tool", "filter" and "syscalls" test categories.
-> 
-> Changes v1 -> v2:
-> * Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
->   Please note that a required header, unistd_32.h, is automatically
->   generated from unistd32.h.
-> * Refer to regs->orig_x0 instead of regs->x0 as the first argument of
->   system call in audit_syscall_entry() [6/6]
-> * Include "Add regs_return_value() in syscall.h" patch [2/6],
->   which was not intentionally included in v1 because it could be added
->   by "kprobes support".
-> 
-> 
-> AKASHI Takahiro (6):
->   audit: Enable arm64 support
->   arm64: Add regs_return_value() in syscall.h
->   arm64: Add audit support
->   arm64: audit: Add 32-bit (compat) syscall support
->   arm64: audit: Add makefile rule to create unistd_32.h for compat
->     syscalls
->   arm64: audit: Add audit hook in ptrace/syscall_trace
-> 
->  arch/arm64/Makefile                  |    4 ++++
->  arch/arm64/include/asm/audit.h       |   20 ++++++++++++++++++++
->  arch/arm64/include/asm/ptrace.h      |    5 +++++
->  arch/arm64/include/asm/syscall.h     |   22 ++++++++++++++++++++++
->  arch/arm64/include/asm/thread_info.h |    1 +
->  arch/arm64/kernel/entry.S            |    3 +++
->  arch/arm64/kernel/ptrace.c           |   12 ++++++++++++
->  arch/arm64/kernel/syscalls/Makefile  |   20 ++++++++++++++++++++
->  include/uapi/linux/audit.h           |    2 ++
->  init/Kconfig                         |    2 +-
->  10 files changed, 90 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/include/asm/audit.h
->  create mode 100644 arch/arm64/kernel/syscalls/Makefile
-> 
-> -- 
-> 1.7.9.5
+On 14-01-16 02:45 PM, Linus Walleij wrote:
+> As this driver is using pinconf_generic_dt_node_to_map_pin() it
+> needs to depend on OF so as not to cause build problems on
+> archs that do not support OF.
+>
+> Cc: Sherman Yin <syin@broadcom.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>   drivers/pinctrl/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index f1dda4d9de13..be361b7cd30f 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -106,6 +106,7 @@ config PINCTRL_BCM2835
+>
+>   config PINCTRL_CAPRI
+>   	bool "Broadcom Capri pinctrl driver"
+> +	depends on OF
+>   	select PINMUX
+>   	select PINCONF
+>   	select GENERIC_PINCONF
+>
 
-Set:
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
+Thanks for the fix, Linus.  While we're visiting this config, should we 
+add "depends on MACH_BCM_MOBILE" as well?
 
-> 
-
-- RGB
-
---
-Richard Guy Briggs <rbriggs@redhat.com>
-Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
-Remote, Ottawa, Canada
-Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+Thanks,
+Sherman
