@@ -1,37 +1,46 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 17 Jan 2014 10:23:08 +0100
-Subject: [PATCH v2 resend 2/5] binfmt_elf: add ELF_HWCAP2 to compat auxv
- entries
+Date: Fri, 17 Jan 2014 10:23:09 +0100
+Subject: [PATCH v2 resend 3/5] arm64: add AT_HWCAP2 support for 32-bit compat
 In-Reply-To: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1389950591-4212-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1389950591-4212-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ELF_HWCAP2 to the set of auxv entries that is passed to
-a 32-bit ELF program running in 32-bit compat mode under a
-64-bit kernel.
+Add support for the ELF auxv entry AT_HWCAP2 when running 32-bit
+ELF binaries in compat mode.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- fs/compat_binfmt_elf.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/hwcap.h | 3 ++-
+ arch/arm64/kernel/setup.c      | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/fs/compat_binfmt_elf.c b/fs/compat_binfmt_elf.c
-index a81147e2e4ef..4d24d17bcfc1 100644
---- a/fs/compat_binfmt_elf.c
-+++ b/fs/compat_binfmt_elf.c
-@@ -88,6 +88,11 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
- #define	ELF_HWCAP		COMPAT_ELF_HWCAP
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 6cddbb0c9f54..9a4cbd60c88e 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -41,7 +41,8 @@
+ 
+ #ifdef CONFIG_COMPAT
+ #define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
+-extern unsigned int compat_elf_hwcap;
++#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
++extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
  #endif
  
-+#ifdef	COMPAT_ELF_HWCAP2
-+#undef	ELF_HWCAP2
-+#define	ELF_HWCAP2		COMPAT_ELF_HWCAP2
-+#endif
-+
- #ifdef	COMPAT_ARCH_DLINFO
- #undef	ARCH_DLINFO
- #define	ARCH_DLINFO		COMPAT_ARCH_DLINFO
+ extern unsigned long elf_hwcap;
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index bb33fff09ba2..15f3bd207981 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -69,6 +69,7 @@ EXPORT_SYMBOL_GPL(elf_hwcap);
+ 				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
+ 				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
+ unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
++unsigned int compat_elf_hwcap2 __read_mostly;
+ #endif
+ 
+ static const char *cpu_name;
 -- 
 1.8.3.2
