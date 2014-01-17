@@ -1,36 +1,41 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Jan 2014 20:25:14 +0800
-Subject: [PATCH 20/20] ARM64 / clocksource: Use clocksource_acpi_init()
-In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1389961514-13562-21-git-send-email-hanjun.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Jan 2014 13:12:58 +0000
+Subject: New randconfig build failure: rx51 asoc / gpiolib
+Message-ID: <20140117131257.GB15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clocksource_acpi_init() on ARM64 to initialise timers
-in ACPI way when DT is not available.
+Last night's omap randconfig found this.  This has only appeared in the
+builds in the last few days, so it's a new regression for the changes
+queued up for merge window:
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/kernel/time.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+sound/soc/omap/rx51.c:220:33: error: array type has incomplete element type
+sound/soc/omap/rx51.c:222:3: error: field name not in record or union initializer
+sound/soc/omap/rx51.c:222:3: error: (near initialization for 'rx51_av_jack_gpios')
+sound/soc/omap/rx51.c:223:3: error: field name not in record or union initializer
+sound/soc/omap/rx51.c:223:3: error: (near initialization for 'rx51_av_jack_gpios')
+sound/soc/omap/rx51.c:224:3: error: field name not in record or union initializer
+...
+sound/soc/omap/rx51.c: In function 'rx51_aic34_init':
+sound/soc/omap/rx51.c:325:2: error: implicit declaration of function 'snd_soc_jack_add_gpios'
+sound/soc/omap/rx51.c:326:89: error: type defaults to 'int' in type name
+sound/soc/omap/rx51.c:326:89: error: type defaults to 'int' in type name
+sound/soc/omap/rx51.c:326:89: error: negative width in bit-field '<anonymous>'
+sound/soc/omap/rx51.c: In function 'rx51_soc_exit':
+sound/soc/omap/rx51.c:437:2: error: implicit declaration of function 'snd_soc_jack_free_gpios'
+sound/soc/omap/rx51.c:437:120: error: type defaults to 'int' in type name
+sound/soc/omap/rx51.c:437:120: error: type defaults to 'int' in type name
+sound/soc/omap/rx51.c:437:120: error: negative width in bit-field '<anonymous>'
 
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 29c39d5..6e453ac 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -67,6 +67,12 @@ void __init time_init(void)
- 
- 	clocksource_of_init();
- 
-+	/*
-+	 * Since ACPI or FDT will only one be available in the system,
-+	 * we can use clocksource_acpi_init() here safely
-+	 */
-+	clocksource_acpi_init();
-+
- 	arch_timer_rate = arch_timer_get_rate();
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
+which is caused by "struct snd_soc_jack_gpio" not being defined.  For
+some reason, this structure is defined in sound/soc.h, but is
+conditionalised upon CONFIG_GPIOLIB.
+
+This means either the dependencies on SND_OMAP_SOC_RX51 are incorrect
+(they don't include a dependency on GPIOLIB) or ASoC is wrong to make
+the definitions conditional upon GPIOLIB.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
