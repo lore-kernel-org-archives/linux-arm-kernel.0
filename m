@@ -1,82 +1,84 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 17 Jan 2014 10:23:11 +0100
-Subject: [PATCH v2 resend 5/5] arm64: advertise ARMv8 extensions to 32-bit
- compat ELF binaries
+Date: Fri, 17 Jan 2014 10:23:07 +0100
+Subject: [PATCH v2 resend 1/5] ARM: add support for AT_HWCAP2 ELF auxv entry
 In-Reply-To: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1389950591-4212-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1389950591-4212-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for advertising the presence of ARMv8 Crypto
-Extensions in the Aarch32 execution state to 32-bit ELF binaries
-running in 32-bit compat mode under the arm64 kernel.
+This enables AT_HWCAP2 for ARM. The generic support for this
+new ELF auxv entry was added in commit 2171364d1a9 (powerpc:
+Add HWCAP2 aux entry)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/hwcap.h |  6 ++++++
- arch/arm64/kernel/setup.c      | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/include/asm/hwcap.h      |  3 ++-
+ arch/arm/include/uapi/asm/hwcap.h |  4 ++++
+ arch/arm/kernel/setup.c           | 11 +++++++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 9a4cbd60c88e..024c46183c3c 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -32,6 +32,12 @@
- #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
- #define COMPAT_HWCAP_EVTSTRM	(1 << 21)
+diff --git a/arch/arm/include/asm/hwcap.h b/arch/arm/include/asm/hwcap.h
+index 6ff56eca3f1f..6e183fd269fb 100644
+--- a/arch/arm/include/asm/hwcap.h
++++ b/arch/arm/include/asm/hwcap.h
+@@ -9,6 +9,7 @@
+  * instruction set this cpu supports.
+  */
+ #define ELF_HWCAP	(elf_hwcap)
+-extern unsigned int elf_hwcap;
++#define ELF_HWCAP2	(elf_hwcap2)
++extern unsigned int elf_hwcap, elf_hwcap2;
+ #endif
+ #endif
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 7dcc10d67253..87768b5cffd1 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -28,4 +28,8 @@
+ #define HWCAP_LPAE	(1 << 20)
+ #define HWCAP_EVTSTRM	(1 << 21)
  
-+#define COMPAT_HWCAP2_AES	(1 << 0)
-+#define COMPAT_HWCAP2_PMULL	(1 << 1)
-+#define COMPAT_HWCAP2_SHA1	(1 << 2)
-+#define COMPAT_HWCAP2_SHA2	(1 << 3)
-+#define COMPAT_HWCAP2_CRC32	(1 << 4)
++/*
++ * HWCAP2 flags - for elf_hwcap2 (in kernel) and AT_HWCAP2
++ */
 +
- #ifndef __ASSEMBLY__
- /*
-  * This yields a mask that user programs can use to figure out what
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 15f3bd207981..c36cab831932 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -174,6 +174,38 @@ static void __init setup_processor(void)
- 	block = (features >> 16) & 0xf;
- 	if (block && !(block & 0x8))
- 		elf_hwcap |= HWCAP_CRC32;
-+
-+#ifdef CONFIG_COMPAT
-+	/*
-+	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
-+	 * the Aarch32 32-bit execution state.
-+	 */
-+	features = read_cpuid(ID_ISAR5_EL1);
-+	block = (features >> 4) & 0xf;
-+	if (!(block & 0x8)) {
-+		switch (block) {
-+		default:
-+		case 2:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
-+		case 1:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
-+		case 0:
-+			break;
-+		}
-+	}
-+
-+	block = (features >> 8) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
-+
-+	block = (features >> 12) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
-+
-+	block = (features >> 16) & 0xf;
-+	if (block && !(block & 0x8))
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
-+#endif
- }
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 987a7f5bce5f..ce3049c89c18 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -100,6 +100,9 @@ EXPORT_SYMBOL(system_serial_high);
+ unsigned int elf_hwcap __read_mostly;
+ EXPORT_SYMBOL(elf_hwcap);
  
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
++unsigned int elf_hwcap2 __read_mostly;
++EXPORT_SYMBOL(elf_hwcap2);
++
+ 
+ #ifdef MULTI_CPU
+ struct processor processor __read_mostly;
+@@ -992,6 +995,10 @@ static const char *hwcap_str[] = {
+ 	NULL
+ };
+ 
++static const char *hwcap2_str[] = {
++	NULL
++};
++
+ static int c_show(struct seq_file *m, void *v)
+ {
+ 	int i, j;
+@@ -1015,6 +1022,10 @@ static int c_show(struct seq_file *m, void *v)
+ 			if (elf_hwcap & (1 << j))
+ 				seq_printf(m, "%s ", hwcap_str[j]);
+ 
++		for (j = 0; hwcap2_str[j]; j++)
++			if (elf_hwcap2 & (1 << j))
++				seq_printf(m, "%s ", hwcap2_str[j]);
++
+ 		seq_printf(m, "\nCPU implementer\t: 0x%02x\n", cpuid >> 24);
+ 		seq_printf(m, "CPU architecture: %s\n",
+ 			   proc_arch[cpu_architecture()]);
 -- 
 1.8.3.2
