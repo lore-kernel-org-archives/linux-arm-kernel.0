@@ -1,63 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 18:06:41 +0800
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <20140117093909.GB2348@piout.net>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <20140116195819.GY15937@n2100.arm.linux.org.uk>
- <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
- <20140117093909.GB2348@piout.net>
-Message-ID: <CAGb2v640Qeb60dMq2kH6M6NqkVbdUh1JcCus3a7D7icQeDdKNg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 10:07:23 +0000
+Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
+In-Reply-To: <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
+References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
+ <20140116115634.GE30257@mudshark.cambridge.arm.com>
+ <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
+ <20140116125727.GI30257@mudshark.cambridge.arm.com>
+ <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
+ <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
+Message-ID: <20140117100723.GB16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 5:39 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On Thu, Jan 16, 2014 at 12:00:47PM -0800, Olof Johansson wrote :
->> On Thu, Jan 16, 2014 at 11:58 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Jan 16, 2014 at 09:15:17AM -0800, Olof Johansson wrote:
->> >> We've dealt with it with local code in our tree for Chrome OS, and I
->> >> suspect everyone else has too. It's definitely time to solve
->> >> generically.
->> >
->> > As there's no code for any Cubox-i or Hummingboard (they're both purely
->> > DT), what this means is that the answer to Wifi/BT support in mainline is
->> > that this is "impossible at the moment"...
->> >
->> > I guess this is becoming a higher priority issue which really needs to be
->> > solved somehow. :)
->>
->> I'm looking at it right now actually, might as well sort it out while
->> people are paying attention. Patches a little later today unless I get
->> distrac^Winterrupted. :)
->>
->
-> Maybe it is not completely related but I think it needs to be thought
-> about while you are it:
->
-> The TI wilink chips (TiWi, wl12xx, wl18xx) have wifi on SDIO and BT on
-> UART but they share the same clock. So, the next question would be what
-> if I just want to enable one or the other (and take that decision at
-> runtime) ?
+On Fri, Jan 17, 2014 at 09:00:09AM +0000, Jean Pihet wrote:
+> On 16 January 2014 14:47, Jean Pihet <jean.pihet@linaro.org> wrote:
+> >> So the simplest thing would be to make compat_user_stack_pointer expand to
+> >> user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
+> >> original patch fixing user_stack_pointer.
+> 
+> I see 2 issues in your proposal:
+> 
+> 1) user_stack_pointer(regs) calls compat_user_stack_pointer if
+> compat_user_mode(regs)) and compat_user_stack_pointer expands to
+> user_stack_pointer. I see a circular dependency in the macros.
 
-Some Broadcom chips (BCM4329/4330) and the AP6210 found on CubieTruck
-are like this as well. In our case, the SD/MMC host driver hasn't been
-mainlined yet. But BT on UART is independent and usable.
+Not today it doesn't, so you just need to avoid writing the circular
+dependency and instead make user_stack_pointer access (regs)->compat_sp
+instead.
 
-> Where do I put the pinctrl/clocks/regulators in the DT ? I guess it can
-> become an issue to enable both WiFi and BT at the same time if both SDIO
-> and UART are trying to handle the same pinctrl and regulators.
+> 2) current_pt_regs() returns the current task regs although perf
+> passes a regs struct that had been recorded previously.
 
-Shouldn't the clocks and regulators be registered in the DT _AS_ clocks
-and regulators? fixed-regulator already accepts GPIO lines. fixed-rate-clock
-mentions GPIOs in DT bindings, but doesn't seem to use them in the code.
-We'd still need a device to tie them to, especially in the UART use case.
+Yes, but compat_user_stack_pointer doesn't take a regs paramater anyway, so
+there's no change in behaviour here.
 
-Or we could try rfkill devices. Not saying it's the correct way, but it is
-a solution.
-
-
-Cheers,
-ChenYu
+Will
