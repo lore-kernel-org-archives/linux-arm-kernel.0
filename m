@@ -1,23 +1,164 @@
-From: ananaza@iki.fi (Antti Miettinen)
-Date: Fri, 17 Jan 2014 11:07:36 +0200
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <20140116121649.GG30257@mudshark.cambridge.arm.com> (Will
- Deacon's message of "Thu, 16 Jan 2014 12:16:49 +0000")
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <20140115154526.GC3571@mudshark.cambridge.arm.com>
- <52D76BC8.6080405@nvidia.com>
- <20140116121649.GG30257@mudshark.cambridge.arm.com>
-Message-ID: <878uufyo13.fsf@iki.fi>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 17 Jan 2014 10:07:42 +0100
+Subject: [PATCH v5] ARM: DTS: imx5* imx6*, use imx51-ssi
+Message-ID: <1389949662-11172-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
-> Why can't you use the C3STOP feature so that the arch-timer isn't used when
-> you go idle?
+imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
+reconfiguration and needs this for correct interaction with SDMA. This
+patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
 
-That would mean falling back to broadcast timer, right? That's not
-necessarily on the local CPU so wakeups would often wake two CPUs. Does
-anyone have patches for using a CPU local timer as a fallback for
-C3STOP timers?
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+Hi Shawn,
 
-	--Antti
+This is the patch including the two added compatibles in imx50.dtsi for
+fsl,imx51-ssi. That is the only change in v5.
+
+Regards,
+
+Markus
+
+
+ arch/arm/boot/dts/imx50.dtsi   |  6 +++++-
+ arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
+ arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
+ arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
+ 4 files changed, 30 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index 01c0499..47df15f 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -140,7 +140,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
+-					compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx50-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
+@@ -446,6 +448,8 @@
+ 
+ 			ssi1: ssi at 63fcc000 {
+ 				compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx50-ssi", "fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 4dbde25..73e103b 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -171,7 +171,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
+-					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++					compatible = "fsl,imx53-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x50014000 0x4000>;
+ 					interrupts = <30>;
+ 					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
+@@ -590,7 +592,8 @@
+ 			};
+ 
+ 			ssi1: ssi at 63fcc000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+ 				interrupts = <29>;
+ 				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
+@@ -617,7 +620,8 @@
+ 			};
+ 
+ 			ssi3: ssi at 63fe8000 {
+-				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
++				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
++						"fsl,imx21-ssi";
+ 				reg = <0x63fe8000 0x4000>;
+ 				interrupts = <96>;
+ 				clocks = <&clks IMX5_CLK_SSI3_IPG_GATE>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 8a86502..cf7956e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -247,7 +247,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 178>;
+@@ -260,7 +262,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 179>;
+@@ -273,7 +277,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6q-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks 180>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index a449c4f..95bb37b 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -226,7 +226,9 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_SSI1>;
+@@ -238,7 +240,9 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_SSI2>;
+@@ -250,7 +254,9 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
+-					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
++					compatible = "fsl,imx6sl-ssi",
++							"fsl,imx51-ssi",
++							"fsl,imx21-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SL_CLK_SSI3>;
+-- 
+1.8.5.2
