@@ -1,97 +1,54 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 17 Jan 2014 10:00:09 +0100
-Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
-In-Reply-To: <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
-References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
- <20140116115634.GE30257@mudshark.cambridge.arm.com>
- <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
- <20140116125727.GI30257@mudshark.cambridge.arm.com>
- <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
-Message-ID: <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 17 Jan 2014 11:00:58 +0200
+Subject: [PATCH 13/15] fbdev: sh-mobile-lcdcfb: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <52CD0CBB.3070801@ti.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1542726.dq1lpTml5f@avalon> <1917257.yB7aZMXWdP@avalon>
+ <52CD0CBB.3070801@ti.com>
+Message-ID: <52D8F14A.7030100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi,
 
-Some more thoughts below
-
-On 16 January 2014 14:47, Jean Pihet <jean.pihet@linaro.org> wrote:
-> Will,
->
-> On 16 January 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
->> On Thu, Jan 16, 2014 at 12:26:53PM +0000, Jean Pihet wrote:
->>> On 16 January 2014 12:56, Will Deacon <will.deacon@arm.com> wrote:
->>> > In your previous series, compat backtracing is actually split out into a
->>> > separate function (compat_user_backtrace), so it would be more consistent to
->>> > have a compat_user_stack_pointer macro, rather than add this check here.
-> The compat_user_backtrace function is used to unwind using the frame
-> pointer, it is not used to unwind using the dwarf info (which uses the
-> user stack pointer).
->
+On 2014-01-08 10:30, Tomi Valkeinen wrote:
+> On 2014-01-07 17:15, Laurent Pinchart wrote:
+>> On Wednesday 11 December 2013 13:51:18 Laurent Pinchart wrote:
+>>> Hi Jean-Christophe and Tomi,
 >>>
->>> Do you mean this change instead?
+>>> Could you please pick this patch up for v3.14 ?
 >>
->> I don't think so...
->>
->>> diff --git a/kernel/events/internal.h b/kernel/events/internal.h
->>> index 569b2187..9b88d2e 100644
->>> --- a/kernel/events/internal.h
->>> +++ b/kernel/events/internal.h
->>> @@ -185,7 +185,8 @@ static inline bool arch_perf_have_user_stack_dump(void)
->>>         return true;
->>>  }
->>>
->>> -#define perf_user_stack_pointer(regs) user_stack_pointer(regs)
->>> +#define perf_user_stack_pointer(regs) \
->>> +       (!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
->>
->> This doesn't belong in core code; compat_user_mode and the fields of regs
->> are arm64-specific.
-> Right.
->
->> So I suppose you need to rework your original patch to
->> call compat_user_stack_pointer (which we already define in compat.h for
->> arm64) if compat_user_mode(regs)).
-> The perf core code calls perf_user_stack_pointer(regs) to retrieve the
-> stack pointer, with perf_user_stack_pointer(regs) defined as
-> user_stack_pointer(regs).
-> The problem is that perf is not aware of the compat mode, so every
-> arch has to implement user_stack_pointer(regs) correctly.
->
-> For this reason I think the first patch proposal is the right one
-> unless the perf core code is redesigned to handle different ABIs. Do
-> you see a better implementation?
->
->>
->> The problem there is the inconsistency with respect to the regs argument:
->>
->>   user_stack_pointer(regs)      // Returns user stack pointer for regs
->>   current_user_stack_pointer()  // Returns current user stack pointer
->>   compat_user_stack_pointer()   // Doesn't take a regs argument!
->>
->> On top of that, x86 treats those last two functions differently when current
->> is a compat task.
->>
->> So the simplest thing would be to make compat_user_stack_pointer expand to
->> user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
->> original patch fixing user_stack_pointer.
+>> Ping ?
+> 
+> Queued for 3.14.
 
-I see 2 issues in your proposal:
+I'll drop this patch, as it causes compile break (from kbuild test robot):
 
-1) user_stack_pointer(regs) calls compat_user_stack_pointer if
-compat_user_mode(regs)) and compat_user_stack_pointer expands to
-user_stack_pointer. I see a circular dependency in the macros.
+All error/warnings:
 
-2) current_pt_regs() returns the current task regs although perf
-passes a regs struct that had been recorded previously.
+   drivers/built-in.o: In function `sh_mobile_lcdc_pan':
+>> sh_mobile_lcdcfb.c:(.text+0x77373): undefined reference to
+`sh_mobile_meram_cache_update'
+   drivers/built-in.o: In function `sh_mobile_lcdc_start':
+>> sh_mobile_lcdcfb.c:(.text+0x79320): undefined reference to
+`sh_mobile_meram_cache_free'
+>> sh_mobile_lcdcfb.c:(.text+0x79394): undefined reference to
+`sh_mobile_meram_cache_alloc'
+>> sh_mobile_lcdcfb.c:(.text+0x793d4): undefined reference to
+`sh_mobile_meram_cache_update'
+   drivers/built-in.o: In function `sh_mobile_lcdc_stop':
+>> sh_mobile_lcdcfb.c:(.text+0x79616): undefined reference to
+`sh_mobile_meram_cache_free'
 
-Am I missing something?
+ Tomi
 
-Thx,
-Jean
 
->>
->> Will
->
-> Thx!
-> Jean
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/cb1f7878/attachment.sig>
