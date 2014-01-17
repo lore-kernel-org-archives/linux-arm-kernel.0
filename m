@@ -1,35 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 17 Jan 2014 16:26:50 +0100
-Subject: [PATCH v2 resend 1/5] ARM: add support for AT_HWCAP2 ELF auxv
- entry
-In-Reply-To: <20140117150725.GK16003@mudshark.cambridge.arm.com>
-References: <1389950591-4212-1-git-send-email-ard.biesheuvel@linaro.org>
- <1389950591-4212-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140117150725.GK16003@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu-dZZ4yzkDoHoHVRgW1KQ7H3PLy-OV731Es8BNmpkYqLQ@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 17 Jan 2014 17:32:17 +0200
+Subject: [PATCH] Add Xilinx AXI Video DMA Engine driver
+In-Reply-To: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <1389972737.7619.14.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2014 16:07, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Fri, Jan 17, 2014 at 09:23:07AM +0000, Ard Biesheuvel wrote:
->> This enables AT_HWCAP2 for ARM. The generic support for this
->> new ELF auxv entry was added in commit 2171364d1a9 (powerpc:
->> Add HWCAP2 aux entry)
->
-> Does this require a corresponding change in libc so that the entry is
-> actually used by the dynamic linker?
->
+On Thu, 2014-01-16 at 23:23 +0530, Srikanth Thokala wrote:
+> Hi,
+> 
+> This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+> It is a soft IP core, which provides high-bandwidth direct memory
+> access between memory and AXI4-Stream video type target peripherals 
+> including peripherals which support AXI4-Stream Video Protocol. The
+> core provides efficient two dimensional DMA operations with independent
+> asynchronous read and write channel operation.
+> 
+> For more information on the IP, please refer to
+> http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
+> 
+> This patch also provides a test client, which assumes read and write channels
+> of the core are configured in a back-to-back connection.  It transfers 
+> data on the write channel, read and verify the data on the read channel. 
+> 
+>  drivers/dma/xilinx/xilinx_vdma_test.c              |  629 ++++++++
 
-The auxv entry itself is already wired up [this includes getauxval()]
-
-https://sourceware.org/git/?p=glibc.git;a=commit;h=1ae8bfe07c1a
-
-The only thing that is lacking is a way to hook up ifunc relocation,
-as the current prototype passes a single 32-bit quantity.
-So either we change the prototype to (hwcap, hwcap2) or we need to
-rely on getauxval() in ifunc selectors if they need to inspect hwcap2
+What about to modify dmatest.c accordingly to your needs?
+I see no much sense to have another copy of that in the tree.
 
 -- 
-Ard.
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
