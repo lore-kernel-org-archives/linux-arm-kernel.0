@@ -1,69 +1,55 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 17 Jan 2014 10:02:28 +0800
-Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
-References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
- <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
- <52D7A237.8@freescale.com>
- <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
-Message-ID: <20140117020226.GB27652@shlinux2.ap.freescale.net>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Thu, 16 Jan 2014 23:55:45 -0300
+Subject: [PATCH v3 2/8] clk: sunxi: update clock-output-names dt binding
+ documentation
+In-Reply-To: <1389257565-19797-3-git-send-email-wens@csie.org>
+References: <1389257565-19797-1-git-send-email-wens@csie.org>
+ <1389257565-19797-3-git-send-email-wens@csie.org>
+Message-ID: <52D89BB1.3030206@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 03:09:13PM +0530, Jagan Teki wrote:
-> >>>     After this patch, the layer is like:
-> >>>                     MTD
-> >>>           ------------------------
-> >>>                    spi-nor
-> >>>           ------------------------
-> >>>                    m25p80
-> >>>           ------------------------
-> >>>                 spi bus driver
-> >>>           ------------------------
-> >>>                 SPI NOR chip
-> 
-> Just for looking on your new framework, is that above link correct.
-> I guess it should be MTD -- m25p80 -- spi-nor -- spi bus driver -- SPI NOR chip
+Hi,
 
-I do not think so.
-The spi-nor layer does not contact with the spi bus driver directly.
+El 09/01/14 05:52, Chen-Yu Tsai escribi?:
+> clock-output-names is now required for most of sunxi clock nodes, to
+> provide the name of the corresponding clock. Add the new requirements,
+> exceptions, as well as examples.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>   Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++++++++++++++----
+>   1 file changed, 31 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 0c127cd..8a9147d 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -44,10 +44,18 @@ Required properties for all clocks:
+>   	multiplexed clocks, the list order must match the hardware
+>   	programming order.
+>   - #clock-cells : from common clock binding; shall be set to 0 except for
+> -	"allwinner,*-gates-clk" where it shall be set to 1
+> +	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk" and
+> +	"allwinner,sun4i-pll6-clk" where it shall be set to 1
+>
+> -Additionally, "allwinner,*-gates-clk" clocks require:
+> -- clock-output-names : the corresponding gate names that the clock controls
+> +Additionally, most clocks require "clock-output-names":
+> +- "allwinner,*-gates-clk" : the corresponding gate names that the clock controls
+> +- "allwinner,sun4i-pll5-clk" : "pll5_ddr", "pll5_mbus"
+> +- "allwinner,sun4i-pll6-clk" : "pll6_sata", "pll6_other"
+> +- "allwinner,sun4i-cpu-clk", "allwinner,sun4i-axi-clk",
+> +  "allwinner,sun4i-ahb-clk", "allwinner,sun4i-ahb-clk",
+> +  "allwinner,sun4i-apb1-mux-clk", "allwinner,sun4i-apb1-clk"
+> +  do not need "clock-output-names"
+> +- all others clocks : the corresponding module name of that clock
 
-> >> 3) Can you explain your framework precisely take an example of like
-> >> spi_controller_A with spi_flash_A
-> >> and qspi_controller_B and qspi_flash_B - how will this new framework
-> >> operates.
-> >>
-> > The framework is just cloned from the m25p80.c, and extract the common code,
-> > and provides more
-> > hooks such as
-> >
-> > @prepare/unpreare: used to do some work before or after the
-> >              read/write/erase/lock/unlock.
-> >     @read_xfer/write_xfer: We can use these two hooks to code all
-> >              the following hooks if the driver tries to implement them
-> >              by itself.
-> >     @read_reg: used to read the registers, such as read status register,
-> >              read configure register.
-> >     @write_reg: used to write the registers, such as write enable,
-> >              erase sector.
-> >     @read_id: read out the ID info.
-> >     @wait_till_ready: wait till the NOR becomes ready.
-> >     @read: read out the data from the NOR.
-> >     @write: write data to the NOR.
-> >     @erase: erase a sector of the NOR.
-> >
-> 
-> My basic question is like I have a qspi spi controller in my SOC and I
-> designed two boards B1 and B2
+As we discussed on IRC, I wonder if such verbosity is actually needed. 
+Maybe we should dictate that all clocks must list their corresponding 
+outputs on clock-output-names (with it being the module name if it only 
+has one output).
 
-okay.
+Cheers,
 
-> B1 with quad spi controller connected with non-flash as a slave and B2
-> with quad spi controller connected
-> with quad flash as a slave.
-You can use the framework for B2. But for B1, you should not use the framework,
-since this framework is just for the SPI-NOR. If you do not connected with
-a NOR, i think it's better to code another driver for your controller.
-
-thanks
-Huang Shijie
+Emilio
