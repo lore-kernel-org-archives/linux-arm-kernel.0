@@ -1,85 +1,37 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Jan 2014 17:13:19 +0900
-Subject: [PATCH v2 6/6] arm64: audit: Add audit hook in ptrace/syscall_trace
-In-Reply-To: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
- <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1389946399-4525-7-git-send-email-takahiro.akashi@linaro.org>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 17 Jan 2014 16:23:24 +0800
+Subject: [PATCH -trivial 4/4] thermal: rcar: Spelling s/delaye/delay/g
+In-Reply-To: <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
+References: <1389121036-3555-1-git-send-email-geert@linux-m68k.org>
+ <1389121036-3555-5-git-send-email-geert@linux-m68k.org>
+Message-ID: <1389947004.5918.47.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds auditing functions on entry to or exit from
-every system call invocation.
+On Tue, 2014-01-07 at 19:57 +0100, Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> Cc: Jiri Kosina <trivial@kernel.org>
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/thread_info.h |    1 +
- arch/arm64/kernel/entry.S            |    3 +++
- arch/arm64/kernel/ptrace.c           |   12 ++++++++++++
- 3 files changed, 16 insertions(+)
+applied.
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 720e70b..7468388 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -101,6 +101,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
- #define TIF_SYSCALL_TRACE	8
-+#define TIF_SYSCALL_AUDIT	9
- #define TIF_POLLING_NRFLAG	16
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_FREEZE		19
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 4d2c6f3..5bb2c26 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -631,6 +631,9 @@ el0_svc_naked:					// compat entry point
- 	get_thread_info tsk
- 	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
- 	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
-+#ifdef CONFIG_AUDITSYSCALL
-+	tbnz	x16, #TIF_SYSCALL_AUDIT, __sys_trace // auditing syscalls?
-+#endif
- 	adr	lr, ret_fast_syscall		// return address
- 	cmp     scno, sc_nr                     // check upper syscall limit
- 	b.hs	ni_sys
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6777a21..2ca169b 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/audit.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
-@@ -38,6 +39,7 @@
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
- 
-@@ -1064,6 +1066,16 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
- {
- 	unsigned long saved_reg;
- 
-+#ifdef CONFIG_AUDITSYSCALL
-+	if (dir)
-+		audit_syscall_exit(regs);
-+	else
-+		audit_syscall_entry(syscall_get_arch(current, regs),
-+			(int)regs->syscallno,
-+			regs->orig_x0, regs->regs[1],
-+			regs->regs[2], regs->regs[3]);
-+#endif /* CONFIG_AUDITSYSCALL */
-+
- 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
- 		return regs->syscallno;
- 
--- 
-1.7.9.5
+thanks,
+rui
+> ---
+>  drivers/thermal/rcar_thermal.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/rcar_thermal.c b/drivers/thermal/rcar_thermal.c
+> index a5629500723a..32d591087307 100644
+> --- a/drivers/thermal/rcar_thermal.c
+> +++ b/drivers/thermal/rcar_thermal.c
+> @@ -427,7 +427,7 @@ static int rcar_thermal_probe(struct platform_device *pdev)
+>  		/* enable temperature comparation */
+>  		rcar_thermal_common_write(common, ENR, 0x00030303);
+>  
+> -		idle = 0; /* polling delaye is not needed */
+> +		idle = 0; /* polling delay is not needed */
+>  	}
+>  
+>  	for (i = 0;; i++) {
