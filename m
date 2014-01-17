@@ -1,85 +1,33 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 17 Jan 2014 09:00:54 -0700
-Subject: [PATCH 01/20] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <1389961514-13562-2-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CAErSpo6tsZtqFfgBp9mwU9Ln7yDmKLWJFKK8eW9_m4Sgb=E3eg@mail.gmail.com>
+From: essuuj@gmail.com (Seungwon Jeon)
+Date: Sat, 18 Jan 2014 01:10:23 +0900
+Subject: [PATCH 2/2] mmc: dw_mmc: k3: remove clk_table
+In-Reply-To: <86sism7iuz.fsf@void.printf.net>
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-3-git-send-email-zhangfei.gao@linaro.org>
+ <002b01cf1115$4cdfe240$e69fa6c0$%jun@samsung.com>
+ <86sism7iuz.fsf@void.printf.net>
+Message-ID: <CAFt19AB2Yk4U06-R9rMqFgEHFjN_L-pnc1wR35SQUjX28j7tZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Jens, James, Ben, Fujita (authors of PCI_DMA_BUS_IS_PHYS usage)]
-
-On Fri, Jan 17, 2014 at 5:24 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> Not all the ARM64 targets that are using ACPI have PCI, so introduce
-> some stub functions to make PCI optional for ACPI, and make ACPI core
-> run without CONFIG_PCI on ARM64.
+On Sat, Jan 18, 2014 at 12:01 AM, Chris Ball <chris@printf.net> wrote:
 >
-> pcibios_penalize_isa_irq() is arch dependent, introduce asm/pci.h to
-> include it.
+> Hi,
 >
-> Since ACPI on X86 and IA64 depends on PCI, it will not break X86 and
-> IA64 with this patch.
+> On Tue, Jan 14 2014, Seungwon Jeon wrote:
+> > On Monday, January 13, 2014, Zhangfei Gao wrote:
+> >> Remove clk_table and directly use ios->clock as clock source rate.
+> >> Abstract init clock rate and max clock limitation in clk.c
+> >>
+> >> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >
+> > Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 >
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/pci.h |   20 ++++++++++++++++++++
->  drivers/acpi/Makefile        |    2 +-
->  drivers/acpi/internal.h      |    7 +++++++
->  drivers/acpi/osl.c           |    3 ++-
->  include/linux/pci.h          |   33 ++++++++++++++++++++++++---------
->  5 files changed, 54 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/include/asm/pci.h
->
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> new file mode 100644
-> index 0000000..455909d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -0,0 +1,20 @@
-> +#ifndef __ASMARM64_PCI_H
-> +#define __ASMARM64_PCI_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +static inline void pcibios_penalize_isa_irq(int irq, int active)
-> +{
-> +       /* We don't do dynamic PCI IRQ allocation */
-> +}
-> +
-> +/*
-> + * The PCI address space does equal the physical memory address space.
-> + * The networking and block device layers use this boolean for bounce
-> + * buffer decisions.
-> + */
-> +#define PCI_DMA_BUS_IS_PHYS     (1)
+> It looks like patch 1/2 did not make 3.14.  Do you want me to take
+> this patch for 3.14 anyway?  (Why?)
+Yes, I hope that it would be merged this time.
+I think that this change should have been applied to (036f29: mmc:
+dw_mmc: add dw_mmc-k3 for k3 platform) originally.
 
-I'm not sure this is accurate.  The arm code uses
-pci_add_resource_offset() with non-zero offsets, which means a
-physical memory address is not the same as a PCI bus address.  I don't
-know what arm64 does for PCI, but I suspect it is similar.
-
-I think PCI_DMA_BUS_IS_PHYS is due for some overhaul.  I'm dubious
-that it is working as intended anymore.  At the very least, it seems
-like something that is dependent on the device in question.
-
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index a13d682..726cf2a 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> ...
-> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
-> +               unsigned int devfn, int reg, int len, u32 *val)
-> +{ return -EINVAL; }
-> +
-> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
-> +               unsigned int devfn, int reg, int len, u32 val)
-> +{return -EINVAL; }
-
-Fix the spacing here (missing a space before "return").
-
-With that, this include/linux/pci.h change is:
-
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Thanks,
+sw-j
