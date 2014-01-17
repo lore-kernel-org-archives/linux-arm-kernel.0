@@ -1,84 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 15:04:23 +0100
-Subject: [PATCH 06/20] ARM64 / ACPI: Introduce some PCI functions when PCI
- is enabled
-In-Reply-To: <1389961514-13562-7-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <201401171504.24525.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 17 Jan 2014 18:05:12 +0400
+Subject: [PATCH v4 net-next 2/4] sh_eth: Add support for r7s72100
+In-Reply-To: <20140117061301.GD16455@verge.net.au>
+References: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
+ <1389168152-9434-3-git-send-email-horms+renesas@verge.net.au>
+ <52CDBBE1.1010301@cogentembedded.com> <20140109050351.GE2132@verge.net.au>
+ <52D70F12.9080800@cogentembedded.com> <20140116004943.GF12550@verge.net.au>
+ <52D7FC8D.7000800@cogentembedded.com> <20140117061301.GD16455@verge.net.au>
+Message-ID: <52D93898.5040500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 January 2014, Hanjun Guo wrote:
-> +++ b/arch/arm64/pci/Makefile
-> @@ -0,0 +1 @@
-> +obj-y                 += pci.o
-> diff --git a/arch/arm64/pci/pci.c b/arch/arm64/pci/pci.c
-> new file mode 100644
-> index 0000000..4e46790
-> --- /dev/null
-> +++ b/arch/arm64/pci/pci.c
-> @@ -0,0 +1,33 @@
-> +#include <linux/acpi.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/pci.h>
-> +
-> +/**
-> + * raw_pci_read - Platform-specific PCI config space access.
-> + *
-> + * Default empty implementation.  Replace with an architecture-specific setup
-> + * routine, if necessary.
-> + */
-> +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 *val)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 val)
-> +{
-> +	return -EINVAL;
-> +}
+Hello.
 
-I'd rather not see __weak functions here. Just provide them unconditionally
-so that we can add a proper implementation when needed. You could also
-define these as 'static inline' in a header file to keep them from consuming
-space in the object code.
+On 17-01-2014 10:13, Simon Horman wrote:
 
-> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-> index 3c8521d..1835b21 100644
-> --- a/drivers/acpi/plat/arm-core.c
-> +++ b/drivers/acpi/plat/arm-core.c
-> @@ -100,6 +100,25 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
->  }
->  EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->  
-> +int acpi_isa_irq_to_gsi(unsigned isa_irq, u32 *gsi)
-> +{
-> +	return -1;
-> +}
-> +
-> +int acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base)
-> +{
-> +	/* TBD */
-> +	return -EINVAL;
-> +}
-> +EXPORT_SYMBOL(acpi_register_ioapic);
-> +
-> +int acpi_unregister_ioapic(acpi_handle handle, u32 gsi_base)
-> +{
-> +	/* TBD */
-> +	return -EINVAL;
-> +}
-> +EXPORT_SYMBOL(acpi_unregister_ioapic);
-> +
+>>>>>>> This is a fast ethernet controller.
 
-My feeling is that these are better handled in the ACPI code by not
-calling them on architectures that have no ISA or no IOAPIC support.
+>>>>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-We have configuration symbols for both, so you don't have to make
-it depend on CONFIG_ARM64 or CONFIG_X86.
+>>>>>> [...]
 
-	Arnd
+>>>>>>> diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+>>>>>>> index 4b38533..cc6d4af 100644
+>>>>>>> --- a/drivers/net/ethernet/renesas/sh_eth.c
+>>>>>>> +++ b/drivers/net/ethernet/renesas/sh_eth.c
+>>>>>>> @@ -190,6 +190,59 @@ static const u16 sh_eth_offset_fast_rcar[SH_ETH_MAX_REGISTER_OFFSET] = {
+>>>> [...]
+>>>>>>> @@ -701,6 +762,35 @@ static struct sh_eth_cpu_data r8a7740_data = {
+>>>>>>>   	.shift_rd0	= 1,
+>>>>>>>   };
+>>>>>>>
+>>>>>>> +/* R7S72100 */
+>>>>>>> +static struct sh_eth_cpu_data r7s72100_data = {
+>>>>>>> +	.chip_reset	= sh_eth_chip_reset,
+>>>>>>> +	.set_duplex	= sh_eth_set_duplex,
+>>>>>>> +
+>>>>>>> +	.register_type	= SH_ETH_REG_FAST_RZ,
+>>>>>>> +
+>>>>>>> +	.ecsr_value	= ECSR_ICD,
+>>>>>>> +	.ecsipr_value	= ECSIPR_ICDIP,
+>>>>>>> +	.eesipr_value	= 0xff7f009f,
+>>>>>>> +
+>>>>>>> +	.tx_check	= EESR_TC1 | EESR_FTC,
+>>>>>>> +	.eesr_err_check	= EESR_TWB1 | EESR_TWB | EESR_TABT | EESR_RABT |
+>>>>>>> +			  EESR_RFE | EESR_RDE | EESR_RFRMER | EESR_TFE |
+>>>>>>> +			  EESR_TDE | EESR_ECI,
+>>>>>>> +	.fdr_value	= 0x0000070f,
+>>>>>>> +	.rmcr_value	= RMCR_RNC,
+>>>>>>> +
+>>>>>>> +	.apr		= 1,
+>>>>>>> +	.mpr		= 1,
+>>>>>>> +	.tpauser	= 1,
+>>>>>>> +	.hw_swap	= 1,
+>>>>>>> +	.rpadir		= 1,
+>>>>>>> +	.rpadir_value   = 2 << 16,
+>>>>>>> +	.no_trimd	= 1,
+>>>>>>> +	.tsu		= 1,
+>>>>>>> +	.shift_rd0	= 1,
+
+>>>>>>     Perhaps this field should be renamed to something talking about
+>>>>>> check summing support (since bits 0..15 of RD0 contain a frame check
+>>>>>> sum for those SoCs). Or maybe it should be just merged with the
+>>>>>> 'hw_crc' field...
+
+>>>>> I have no feelings about that one way or another.
+
+>>>>     Do you happen to have R8A7740 manual by chance? If so, does it
+>>>> talk about RX check summing support and using RD0 for that?
+
+>>> Yes and yes.
+
+>>> I have taken a quick look and the documentation for RX checksumming on the
+>>> R8A7740 appears to be very similar if not the same as that of the R7S72100.
+
+>>> In particular both refer to using the bottom 16 bits of RD0 as
+>>> containing the packet checksum.
+
+>>     OK, now if you had SH7734 manual to completely confirm that check
+>> sum is stored in the same place there... most probably it is, of
+>> course, and we should merge 'hw_crc' and 'shift_rd0' into a single
+>> field.
+
+> Unfortunately I don't have access to that manual.
+
+    Anyway, we also need Gen2 manuals accepting the fact that checksumming is 
+also supported (they also set 'shift_rd0' field) and giving the mapping of CSMR...
+
+WBR, Sergei
