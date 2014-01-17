@@ -1,58 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 Jan 2014 19:05:16 +0000
-Subject: [PATCH 3/4] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140116211201.GC3351@lukather>
-References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389892285-11745-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140116194003.GN17314@sirena.org.uk>
- <20140116211201.GC3351@lukather>
-Message-ID: <20140117190516.GJ17314@sirena.org.uk>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Fri, 17 Jan 2014 12:13:12 -0700
+Subject: More GPIO madness on iMX6 - and the crappy ARM port of Linux
+In-Reply-To: <20140117184731.GE15937@n2100.arm.linux.org.uk>
+References: <20140117184731.GE15937@n2100.arm.linux.org.uk>
+Message-ID: <52D980C8.9020809@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 10:12:01PM +0100, Maxime Ripard wrote:
-> On Thu, Jan 16, 2014 at 07:40:03PM +0000, Mark Brown wrote:
+Hi Russell,
 
-> > > +	if (status & SUN6I_INT_CTL_RF_OVF) {
-> > > +		sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
-> > > +		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_RF_OVF);
-> > > +		return IRQ_HANDLED;
-> > > +	}
+On 01/17/2014 11:47 AM, Russell King - ARM Linux wrote:
+> So, we have this wonderful GPIO layer which abstracts GPIO stuff and
+> hides stuff.  It's really wonderful, because you don't have to care
+> about how the GPIOs are actually accessed in drivers anymore.
+>
+> However, what about the behaviour of GPIOs?
+>
+> What about... for example... this sequence:
+>
+> 	gpio_direction_output(gpio, 1);
+> 	val = gpio_get_value(gpio);
+>
+> What value is "val"?  More importantly, what value is reflected in
+> /sys/kernel/debug/gpio ?  Would it indicate that it's high or low?
+>
+> Now, while you can make reasonable assumptions, such as "it'll return
+> that the output is being driven to the requested state" or "it'll
+> return the actual state of the pin", what about this instead, which
+> happens on iMX hardware - "it'll _always_ return zero".
+>
+> Yes, iMX6 at least has this behaviour.  For any output, val as above
+> will always be zero, and /proc/sys/kernel/debug/gpio will always
+> report that an output is zero... unless the SION bit has been set for
+> that GPIO signal.
+>
+> The reason is that on hardware such as iMX6, reading the GPIO is done
+> by reading the pad state register, and this register is _only_ supplied
+> the state of the pad when the input path is enabled.  The input path
+> is only enabled when the output is disabled, or the SION bit is set
+> to force the GPIO input path.
+>
+> So, this brings up three obvious questions:
+>
+> 1. What should gpio_get_value() return for an output?
 
-> > This looks like an overflow - a log message would be helpful for users
-> > and you should possibly be flagging an error on the current transfer.
+It seems that this is pretty well specified.
 
-> Hmmm, that was an attempt at receiving more bytes than the FIFO can
-> handle, but I guess the FIFO full interrupt would be more appropriate
-> for this.
+To quote Documentation/gpio/gpio-legacy.txt:
+	>> When reading the value of an output pin, the value
+	>> returned should be what's seen on the pin ... that
+	>> won't always match the specified output value, because
+	>> of issues including open-drain signaling and output
+	>> latencies.
 
-If you've got an overflow interrupt that suggests that the data is
-already corrupted, assuming the interrupt isn't misnamed.
+Documentation/gpio/gpio.txt is a little less clear, but implies
+the same:
+	>> If you are "driving" the signal high but
+	>> gpiod_get_value(gpio) reports a low value (after
+	>> the appropriate rise time passes), you know some other
+	>> component is driving the shared signal low
 
-> > > +	ret = clk_set_rate(sspi->mclk, 100000000);
-> > > +	if (ret) {
-> > > +		dev_err(&pdev->dev, "Couldn't change module clock rate\n");
-> > > +		goto err2;
-> > > +	}
+> 2. What should be reported in /sys/kernel/debug/gpio for an output?
+> 3. Should iMX6 (and similar) GPIOs always have the SION bit set in
+>     their DT descriptions?
+>
+> Discuss.
+>
 
-> > Does this really need to be fatal (or done at all)?  There seems to be
-> > another reasonably flexible divider in the IP and it's more common to
-> > either set this per transfer to something that rounds nicely or just use
-> > the default and rely on the dividers.
+Each signal accessed using the GPIO subsystem **must** have
+the SION bit set and the values returned should be the value
+from the PSR registers.
 
-> The default parent of the module clock runs at 24MHz, that means that
-> we won't be able to reach a spi clock higher than 12MHz, which seems
-> quite low. We can always change the rate in the transfer setup code
-> though, if needs be.
+Regards,
 
-12MHz is actually quite a common limit for SPI interfaces (half of a
-24MHz master clock like the IP itself has) but yeah, you want to go
-higher if you can.  Doing it on transfer setup is going to mean that
-you save a little power when you don't need the extra speed too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140117/4bb27fa4/attachment.sig>
+
+Eric
