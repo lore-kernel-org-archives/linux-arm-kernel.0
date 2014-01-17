@@ -1,90 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 17 Jan 2014 18:05:12 +0400
-Subject: [PATCH v4 net-next 2/4] sh_eth: Add support for r7s72100
-In-Reply-To: <20140117061301.GD16455@verge.net.au>
-References: <1389168152-9434-1-git-send-email-horms+renesas@verge.net.au>
- <1389168152-9434-3-git-send-email-horms+renesas@verge.net.au>
- <52CDBBE1.1010301@cogentembedded.com> <20140109050351.GE2132@verge.net.au>
- <52D70F12.9080800@cogentembedded.com> <20140116004943.GF12550@verge.net.au>
- <52D7FC8D.7000800@cogentembedded.com> <20140117061301.GD16455@verge.net.au>
-Message-ID: <52D93898.5040500@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jan 2014 15:12:42 +0100
+Subject: [PATCH 09/20] ARM64 / ACPI: Implement core functions for parsing
+ MADT table
+In-Reply-To: <1389961514-13562-10-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <201401171512.42850.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 17 January 2014, Hanjun Guo wrote:
+>  
+> +/*
+> + * Local interrupt controller address,
+> + * GIC cpu interface base address on ARM/ARM64
+> + */
+> +static u64 acpi_lapic_addr __initdata;
 
-On 17-01-2014 10:13, Simon Horman wrote:
+If it's cpu local, don't you need more than one address to support SMP?
+Also, the variable appears to be write-only.
 
->>>>>>> This is a fast ethernet controller.
+> +#define BAD_MADT_ENTRY(entry, end) (					\
+> +	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
+> +	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
+> +
 
->>>>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Better make this an inline function.
 
->>>>>> [...]
+> +static int __init
+> +acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *processor = NULL;
+> +
+> +	processor = (struct acpi_madt_generic_interrupt *)header;
 
->>>>>>> diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
->>>>>>> index 4b38533..cc6d4af 100644
->>>>>>> --- a/drivers/net/ethernet/renesas/sh_eth.c
->>>>>>> +++ b/drivers/net/ethernet/renesas/sh_eth.c
->>>>>>> @@ -190,6 +190,59 @@ static const u16 sh_eth_offset_fast_rcar[SH_ETH_MAX_REGISTER_OFFSET] = {
->>>> [...]
->>>>>>> @@ -701,6 +762,35 @@ static struct sh_eth_cpu_data r8a7740_data = {
->>>>>>>   	.shift_rd0	= 1,
->>>>>>>   };
->>>>>>>
->>>>>>> +/* R7S72100 */
->>>>>>> +static struct sh_eth_cpu_data r7s72100_data = {
->>>>>>> +	.chip_reset	= sh_eth_chip_reset,
->>>>>>> +	.set_duplex	= sh_eth_set_duplex,
->>>>>>> +
->>>>>>> +	.register_type	= SH_ETH_REG_FAST_RZ,
->>>>>>> +
->>>>>>> +	.ecsr_value	= ECSR_ICD,
->>>>>>> +	.ecsipr_value	= ECSIPR_ICDIP,
->>>>>>> +	.eesipr_value	= 0xff7f009f,
->>>>>>> +
->>>>>>> +	.tx_check	= EESR_TC1 | EESR_FTC,
->>>>>>> +	.eesr_err_check	= EESR_TWB1 | EESR_TWB | EESR_TABT | EESR_RABT |
->>>>>>> +			  EESR_RFE | EESR_RDE | EESR_RFRMER | EESR_TFE |
->>>>>>> +			  EESR_TDE | EESR_ECI,
->>>>>>> +	.fdr_value	= 0x0000070f,
->>>>>>> +	.rmcr_value	= RMCR_RNC,
->>>>>>> +
->>>>>>> +	.apr		= 1,
->>>>>>> +	.mpr		= 1,
->>>>>>> +	.tpauser	= 1,
->>>>>>> +	.hw_swap	= 1,
->>>>>>> +	.rpadir		= 1,
->>>>>>> +	.rpadir_value   = 2 << 16,
->>>>>>> +	.no_trimd	= 1,
->>>>>>> +	.tsu		= 1,
->>>>>>> +	.shift_rd0	= 1,
+You don't need the initialization in the first line when you write to the
+variable before reading it. Same in the other functions.
 
->>>>>>     Perhaps this field should be renamed to something talking about
->>>>>> check summing support (since bits 0..15 of RD0 contain a frame check
->>>>>> sum for those SoCs). Or maybe it should be just merged with the
->>>>>> 'hw_crc' field...
-
->>>>> I have no feelings about that one way or another.
-
->>>>     Do you happen to have R8A7740 manual by chance? If so, does it
->>>> talk about RX check summing support and using RD0 for that?
-
->>> Yes and yes.
-
->>> I have taken a quick look and the documentation for RX checksumming on the
->>> R8A7740 appears to be very similar if not the same as that of the R7S72100.
-
->>> In particular both refer to using the bottom 16 bits of RD0 as
->>> containing the packet checksum.
-
->>     OK, now if you had SH7734 manual to completely confirm that check
->> sum is stored in the same place there... most probably it is, of
->> course, and we should merge 'hw_crc' and 'shift_rd0' into a single
->> field.
-
-> Unfortunately I don't have access to that manual.
-
-    Anyway, we also need Gen2 manuals accepting the fact that checksumming is 
-also supported (they also set 'shift_rd0' field) and giving the mapping of CSMR...
-
-WBR, Sergei
+	Arnd
