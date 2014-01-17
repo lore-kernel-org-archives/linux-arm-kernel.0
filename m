@@ -1,58 +1,27 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Jan 2014 22:25:40 +0200
-Subject: [PATCH 3/3] clk: ti: OMAP build fixes
-In-Reply-To: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
-References: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1389990340-23358-4-git-send-email-t-kristo@ti.com>
+From: johannes@sipsolutions.net (Johannes Berg)
+Date: Fri, 17 Jan 2014 21:26:32 +0100
+Subject: [PATCH RFC 0/6] net: rfkill: gpio: Add device tree support
+In-Reply-To: <1389941251-32692-1-git-send-email-wens@csie.org>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+Message-ID: <1389990392.10404.10.camel@jlt4.sipsolutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improper merge of TI clock driver resulted in build breakage for OMAP1 build,
-and various other TI single SoC builds. This patch fixes those by adding the
-missed Makefile tweaks.
+On Fri, 2014-01-17 at 14:47 +0800, Chen-Yu Tsai wrote:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/clk/Makefile    |    2 +-
- drivers/clk/ti/Makefile |   17 +++++++++--------
- 2 files changed, 10 insertions(+), 9 deletions(-)
+> This patch series adds device tree support to rfkill-gpio, and
+> fixes some issues I ran into. This is so we can define and control
+> RF devices through the device tree, such as the Broadcom BCM20710
+> UART-based Bluetooth device found on the CubieTruck,
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 1f3143f..13c1e91 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -38,7 +38,7 @@ obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
- obj-$(CONFIG_COMMON_CLK_XGENE)  += clk-xgene.o
- obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
- obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= shmobile/
--obj-$(CONFIG_ARCH_OMAP)		+= ti/
-+obj-$(CONFIG_ARCH_OMAP2PLUS)	+= ti/
- 
- obj-$(CONFIG_X86)		+= x86/
- 
-diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 007c3c2..4319d40 100644
---- a/drivers/clk/ti/Makefile
-+++ b/drivers/clk/ti/Makefile
-@@ -1,10 +1,11 @@
- ifneq ($(CONFIG_OF),)
--obj-y					+= clk.o dpll.o autoidle.o divider.o \
--					   fixed-factor.o gate.o clockdomain.o \
--					   composite.o mux.o apll.o clk-43xx.o
--obj-$(CONFIG_SOC_AM33XX)		+= clk-33xx.o
--obj-$(CONFIG_ARCH_OMAP3)		+= interface.o clk-3xxx.o
--obj-$(CONFIG_ARCH_OMAP4)		+= clk-44xx.o
--obj-$(CONFIG_SOC_OMAP5)			+= clk-54xx.o
--obj-$(CONFIG_SOC_DRA7XX)		+= clk-7xx.o
-+obj-y					+= clk.o autoidle.o clockdomain.o
-+clk-common				= dpll.o composite.o divider.o gate.o \
-+					  fixed-factor.o mux.o apll.o
-+obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o clk-3xxx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
-+obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o
-+obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
- endif
--- 
-1.7.9.5
+> Comments, please?
+
+Does anyone else want to maintain rfkill-gpio? :)
+
+I'm not up to par on all the DT, ACPI and even GPIO stuff it does, and
+the rfkill bits in it are really small ...
+
+I'll happily apply the patches if everyone else is happy with them, but
+please don't expect me to actually be able to say anything about them.
+
+johannes
