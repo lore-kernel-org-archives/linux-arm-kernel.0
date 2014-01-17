@@ -1,33 +1,60 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 17 Jan 2014 12:48:03 -0300
-Subject: [PATCH 01/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-In-Reply-To: <20131001115538.GO31178@titan.lakedaemon.net>
-References: <20130827151136.GA10084@localhost>
- <20130827152535.GG19598@titan.lakedaemon.net>
- <20130827191337.GA2339@localhost> <521D063F.4040404@gmail.com>
- <20130827210248.GA19625@obsidianresearch.com>
- <20130827221729.GA25413@localhost>
- <20130827222532.GA1632@obsidianresearch.com>
- <20130828120801.GC2348@localhost>
- <20130828163334.GB31381@obsidianresearch.com>
- <20131001115538.GO31178@titan.lakedaemon.net>
-Message-ID: <20140117154802.GA3843@localhost>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 17 Jan 2014 12:48:22 -0300
+Subject: [PATCH 06/18] ARM: dts: omap3-overo: Enable MMC2
+In-Reply-To: <52D92E93.8050804@epfl.ch>
+References: <1389286092-27087-1-git-send-email-florian.vaussard@epfl.ch>
+ <1389286092-27087-7-git-send-email-florian.vaussard@epfl.ch>
+ <CABxcv=nO1ZtC7wjVSq+Qw9AmFGahpDUSjOZOO1+tYHhqo9P0Pw@mail.gmail.com>
+ <52D92E93.8050804@epfl.ch>
+Message-ID: <CABxcv=nLpKjX8zVdDDUrfwfyOh2C+Gt4O6Sj7xhtudT5LJXr-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hello Florian,
 
-On Tue, Oct 01, 2013 at 07:55:38AM -0400, Jason Cooper wrote:
-[..]
-> 
-> Have you made any progress on this?  I know you've been working on other
-> stuff lately, I just saw this series sitting on my stack and thought I'd
-> poke you.
-> 
+On Fri, Jan 17, 2014 at 10:22 AM, Florian Vaussard
+<florian.vaussard@epfl.ch> wrote:
+> Hello Javier
+>
+> On 01/09/2014 09:43 PM, Javier Martinez Canillas wrote:
+>> [adding Enric Balletbo to cc]
+>>
+>> Hello Florian,
+>>
+>> On Thu, Jan 9, 2014 at 1:48 PM, Florian Vaussard
+>> <florian.vaussard@epfl.ch> wrote:
+>>> MMC2 is used by the on-board WiFi module populated on some boards
+>>> (based on Marvell Libertas 8688 SDIO).
+>>>
+>>> Note: currently WiFi only works on cold boot, as the module is not
+>>> properly reset (missing binding for the GPIO reset).
+>>>
+>>
+>> Have you looked at commit 0e9fd777 ("ARM: dts: omap3-igep: Add support
+>> for LBEE1USJYC WiFi connected to SDIO") ?
+>>
+>> If I remember correctly the LBEE1USJYC Wifi/BT combo module is
+>> basically a Marvell Libertas 8688 Wlan and Enric got soft reset
+>> working too by adding a GPIO property to the regulator for the reset
+>> GPIO.
+>>
+>> Hope it helps,
+>
+> Thank you, I got it working. It is a bit messy, as I have 3 GPIOs
+> (poweron, wifi-reset and bt-reset). As a regulator can control only one
+> GPIO, I had to define 3 regulators, and assigning them to the vmmc,
+> vqmmc, and vmmc_aux. I hope that a better solution will pop-up in this
+> thread [1]. It is a pity that the previous version of the GPIO-reset
+> controller was not merged.
+>
 
-Thanks for the ping! I think it's time to resurrect this... let me try
-a few things and see if we can come up with something to solve this.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Glad to know that you got it working and yes it is a bit messy so
+let's hope that a cleaner solution will be the result of the current
+discussion on that thread.
+
+> Florian
+>
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/294907
+
+Best regards,
+Javier
