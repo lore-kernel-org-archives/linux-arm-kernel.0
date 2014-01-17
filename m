@@ -1,21 +1,50 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 17 Jan 2014 13:07:13 +0530
-Subject: Kconfig errors
-Message-ID: <CA+V-a8vcvTRpP-cE6SKd1KgWgzSbOXvSNW+5Jh8wqOfr1za4SQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 17 Jan 2014 09:44:57 +0200
+Subject: [PATCH 0/2] ARM: OMAP2+: Fix dpll rounding
+Message-ID: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Linux-next branch I see following errors for davinci_all_defconfig
-& da8xx_omapl_defconfig configs,
+We had a problem with beaglebone black's HDMI output, where setting some clock
+rates to the display PLL failed oddly. The main issue was that the dpll code
+doesn't actually try to round the given rate, it only finds exact matches. That
+is what these patches fix (well, the second patch).
 
-arch/arm/Kconfig:1966:error: recursive dependency detected!
-arch/arm/Kconfig:1966:    symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-arch/arm/Kconfig:2154:    symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
-#
-# configuration written to .config
-#
+However, there is another issue, which made finding and debugging this a bit
+difficult. When the dpll round_rate failed, it returned ~0 as a rate. However,
+drivers/clk/clk-divider.c, which called the round_rate, didn't realize that is
+an error value, and so didn't fail but proceeded, which didn't lead to anything
+good.
 
-Regards,
---Prabhakar Lad
+This series doesn't try to fix that other issue.
+
+There's also a third issue that I think happens more easily after this series
+is applied: there are no checks for maximum rate for the DPLLs. I think the
+maximum rate is generally 2GHz, but at least my BeagleBone Black refused to
+lock the display PLL with anything over 1.3GHz-1.4GHz.
+
+High PLL clock rates happen quite easily with a setup where there's a DPLL and
+an additional divider, handled by clk-divider.c. When the clk-divider.c is
+asked to provide a clock rate (that could be quite low), it'll try to find a
+good clock from its parent, the DPLL, that it can divide down to the requested
+clock. As the DPLL driver is only limited by its multiplier and divider
+register widths, it'll gladly offer 2GHz+ clocks, which eventually will fail as
+they can't be locked.
+
+So this series is only a partial fix for the clock issues. Also, while the
+board debugged was BB Black, I think the same code is used and thus the same
+issues are present on all (or most) omap2+ SoCs.
+
+ Tomi
+
+Tomi Valkeinen (2):
+  ARM: OMAP2+: fix rate prints
+  ARM: OMAP2+: fix dpll round_rate() to actually round
+
+ arch/arm/mach-omap2/clkt_dpll.c | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+-- 
+1.8.3.2
