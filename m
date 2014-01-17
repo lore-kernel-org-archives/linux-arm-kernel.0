@@ -1,53 +1,28 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 17 Jan 2014 14:22:34 +0000
-Subject: [PATCH 02/20] ARM64 : Add dummy asm/cpu.h
-In-Reply-To: <1389961514-13562-3-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <52D93CAA.1080604@arm.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 17 Jan 2014 19:53:26 +0530
+Subject: [PATCH RFC 00/26] Migrate more OMAP DMA code to DMA engine
+In-Reply-To: <20140113141713.GC27282@n2100.arm.linux.org.uk>
+References: <20140102150621.GJ16456@n2100.arm.linux.org.uk>
+ <52CFE494.4010702@ti.com> <20140113141713.GC27282@n2100.arm.linux.org.uk>
+Message-ID: <52D93CDE.4010101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/14 12:24, Hanjun Guo wrote:
-> ACPI requires a cpu.h, add a dummy one copied from arm. This will need
-> updated or replaced as ACPI based cpu hotplug or cpu topology for armv8
-> is worked out.
+On Monday 13 January 2014 07:47 PM, Russell King - ARM Linux wrote:
+> On Fri, Jan 10, 2014 at 05:46:20PM +0530, Sricharan R wrote:
+>> I tested this series on DRA7 with mmc peripheral dma and it looked
+>> fine. Some how dmaengine test cases were not fine. But that may not
+>> have anything to do with this series. I will check more on that and
+>> will come back with that results as well.
 > 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/cpu.h |   25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 arch/arm64/include/asm/cpu.h
+> Not fine in what sense?
 > 
-> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> new file mode 100644
-> index 0000000..8625eb1
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/cpu.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + *  Copyright (C) 2004-2005 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __ASM_ARM_CPU_H
-> +#define __ASM_ARM_CPU_H
-> +
-> +#include <linux/percpu.h>
-> +#include <linux/cpu.h>
-> +#include <linux/topology.h>
-> +
-> +struct cpuinfo_arm {
-> +	struct cpu	cpu;
-> +	u64		cpuid;
-> +#ifdef CONFIG_SMP
-> +	unsigned int	loops_per_jiffy;
+Sorry for delayed response.
 
-IIUC we don't have loop-based delay support in ARM64.
-It's always timer based and in which case we don't need loops_per_jiffy
+So in the case of dmaengine test case, it looks for channels
+with DMA_MEMCPY, DMA_XOR, DMA_PQ capabilities. But the omap-dma
+ device is not registered with MEMCPY capabilities, hence the
+testcase fails as no channels are available.
 
 Regards,
-Sudeep
+ Sricharan
