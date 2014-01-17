@@ -1,53 +1,31 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Jan 2014 20:24:56 +0800
-Subject: [PATCH 02/20] ARM64 : Add dummy asm/cpu.h
-In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1389961514-13562-3-git-send-email-hanjun.guo@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jan 2014 12:28:40 +0000
+Subject: [PATCH] audit: Modify a set of system calls in audit class
+ definitions
+In-Reply-To: <1389945903-4326-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1389945903-4326-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140117122840.GG16003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI requires a cpu.h, add a dummy one copied from arm. This will need
-updated or replaced as ACPI based cpu hotplug or cpu topology for armv8
-is worked out.
+On Fri, Jan 17, 2014 at 08:05:03AM +0000, AKASHI Takahiro wrote:
+> Each asm-generic/audit_xx.h defines a set of system calls for respective
+> audit permssion class (read, write, change attribute or exec).
 
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/include/asm/cpu.h |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 arch/arm64/include/asm/cpu.h
+permission
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-new file mode 100644
-index 0000000..8625eb1
---- /dev/null
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -0,0 +1,25 @@
-+/*
-+ *  Copyright (C) 2004-2005 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __ASM_ARM_CPU_H
-+#define __ASM_ARM_CPU_H
-+
-+#include <linux/percpu.h>
-+#include <linux/cpu.h>
-+#include <linux/topology.h>
-+
-+struct cpuinfo_arm {
-+	struct cpu	cpu;
-+	u64		cpuid;
-+#ifdef CONFIG_SMP
-+	unsigned int	loops_per_jiffy;
-+#endif
-+};
-+
-+DECLARE_PER_CPU(struct cpuinfo_arm, cpu_data);
-+
-+#endif
--- 
-1.7.9.5
+> This patch changes two entries:
+> 
+> 1) fchown in audit_change_attr.h
+>   Make fchown included by its own because in asm-generic/unistd.h, for example,
+>   fchown always exists while chown is optional. This change is necessary at
+>   least for arm64.
+> 
+> 2) truncate64 in audit_write.h
+>   Add missing truncate64/ftruncate64 as well as truncate/ftruncate
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
