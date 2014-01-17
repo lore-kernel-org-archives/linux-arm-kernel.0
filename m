@@ -1,30 +1,208 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 17 Jan 2014 09:14:47 -0600
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
-Message-ID: <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 17 Jan 2014 15:17:58 +0000
+Subject: [PATCH v9] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
+References: <1386602163-28479-1-git-send-email-jonas.jensen@gmail.com>
+ <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <52D949A6.9060607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 9:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Thu, 16 Jan 2014, Olof Johansson wrote:
->
->> "for SDIO slots" is somewhat misleading; nearly all controllers only
->> do one slot/device per controller. The designware controller can do
->> multiple slots, and that adds a bit of driver and binding complexity
->> for something that seemingly not a single vendor has actually
->> implemented.
->
-> The Marvell 8688, just to name one, does both WIFI and BlueTooth over
-> the same SDIO controller using separate functions/slots.
+On 17/01/14 15:03, Jonas Jensen wrote:
+> This patch adds MOXA ART SoCs clock driver support.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     Changes since v8:
+>     
+>     1. rebase drivers/clk/Makefile to next-20140117
+>     
+>     DT bindings document:
+>     
+>     2. use two separate sections describing PLL/APB
+>     3. update example
+>     
+>     Applies to next-20140117
+> 
+>  .../bindings/clock/moxa,moxart-clock.txt           |  48 +++++++++
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-moxart.c                           | 112 +++++++++++++++++++++
+>  3 files changed, 161 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+>  create mode 100644 drivers/clk/clk-moxart.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+> new file mode 100644
+> index 0000000..242e3fc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+> @@ -0,0 +1,48 @@
+> +Device Tree Clock bindings for arch-moxart
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +MOXA ART SoCs allow to determine PLL output and APB frequencies
+> +by reading registers holding multiplier and divisor information.
+> +
+> +
+> +PLL:
+> +
+> +Required properties:
+> +- compatible : Must be "moxa,moxart-pll-clock"
+> +- #clock-cells : Should be 0
+> +- reg : Should contain registers location and length
+> +- clocks : Should contain phandle to parent clock
+> +
+> +Optional properties:
+> +- clock-output-names : Should contain clock name
+> +
+> +
+> +APB:
+> +
+> +Required properties:
+> +- compatible : Must be "moxa,moxart-apb-clock"
+> +- #clock-cells : Should be 0
+> +- reg : Should contain registers location and length
+> +- clocks : Should contain phandle to parent clock
+> +
+> +Optional properties:
+> +- clock-output-names : Should contain clock name
+> +
+> +
+> +For example:
+> +
+> +	clk_pll: clk_pll at 98100000 {
+> +		compatible = "moxa,moxart-pll-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x98100000 0x34>;
+> +	};
+> +
+> +	clk_apb: clk_apb at 98100000 {
+> +		compatible = "moxa,moxart-apb-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x98100000 0x34>;
+> +		clocks = <&clk_pll>;
+> +	};
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 0c16e9c..ed5d58d 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+>  # SoCs specific
+>  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+>  obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
+> +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+>  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+>  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+>  obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
+> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+> new file mode 100644
+> index 0000000..f0436a3
+> --- /dev/null
+> +++ b/drivers/clk/clk-moxart.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * MOXA ART SoCs clock driver.
+> + *
+> + * Copyright (C) 2013 Jonas Jensen
+> + *
+> + * Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clkdev.h>
+> +
+> +void __init moxart_of_pll_clk_init(struct device_node *node)
+> +{
+> +	static void __iomem *base;
+> +	struct clk *clk, *ref_clk;
+> +	unsigned long rate;
+> +	unsigned int mul;
+> +	const char *name = node->name;
+> +
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	mul = readl(base + 0x30) >> 3 & 0x3f;
+> +	iounmap(base);
+> +
+> +	ref_clk = of_clk_get(node, 0);
+> +	if (IS_ERR(ref_clk)) {
+> +		pr_err("%s: of_clk_get failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	rate = mul * clk_get_rate(ref_clk);
+> +
+> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	clk_register_clkdev(clk, NULL, name);
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
+> +	       moxart_of_pll_clk_init);
+> +
+> +void __init moxart_of_apb_clk_init(struct device_node *node)
+> +{
+> +	static void __iomem *base;
+> +	struct clk *clk, *pll_clk;
+> +	unsigned long rate;
+> +	unsigned int div, val;
+> +	const char *name = node->name;
+> +
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	val = readl(base + 0xc) >> 4 & 0x7;
+> +	iounmap(base);
+> +
+> +	switch (val) {
+> +	case 1:
+> +		div = 3;
+> +		break;
+> +	case 2:
+> +		div = 4;
+> +		break;
+> +	case 3:
+> +		div = 6;
+> +		break;
+> +	case 4:
+> +		div = 8;
+> +		break;
+> +	default:
+> +		div = 2;
+> +		break;
+> +	}
 
-But that is logical functions within a chip, not multiple discrete
-chips (i.e. slots) with their own reset, regulators, etc. There would
-still be a single set of external controls per host controller I
-think.
+How about something like this to avoid unnecessary switch:
+	int div_idx[] = { 2, 3, 4, 6, 8};
+	if (val > 4)
+		val = 0;
+	div = div_idx[val];
 
-Rob
+Regards,
+Sudeep
