@@ -1,33 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 15:47:54 +0100
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
-Message-ID: <201401171547.55384.arnd@arndb.de>
+From: chris@printf.net (Chris Ball)
+Date: Fri, 17 Jan 2014 15:01:24 +0000
+Subject: [PATCH 2/2] mmc: dw_mmc: k3: remove clk_table
+In-Reply-To: <002b01cf1115$4cdfe240$e69fa6c0$%jun@samsung.com> (Seungwon
+ Jeon's message of "Tue, 14 Jan 2014 19:42:19 +0900")
+References: <1389604469-8064-1-git-send-email-zhangfei.gao@linaro.org>
+ <1389604469-8064-3-git-send-email-zhangfei.gao@linaro.org>
+ <002b01cf1115$4cdfe240$e69fa6c0$%jun@samsung.com>
+Message-ID: <86sism7iuz.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 January 2014, Nicolas Pitre wrote:
-> On Thu, 16 Jan 2014, Olof Johansson wrote:
-> 
-> > "for SDIO slots" is somewhat misleading; nearly all controllers only
-> > do one slot/device per controller. The designware controller can do
-> > multiple slots, and that adds a bit of driver and binding complexity
-> > for something that seemingly not a single vendor has actually
-> > implemented.
-> 
-> The Marvell 8688, just to name one, does both WIFI and BlueTooth over 
-> the same SDIO controller using separate functions/slots.
-> 
-> Or maybe I'm misunderstanding you?
-> 
+Hi,
 
-I wasn't aware of this but I just checked (in mmc_attach_sdio) that
-there can be multiple functions on a slot. I assume the sd8688 has
-a single slot with two functions, so that potentially extends the
-problem space if we need to supply clocks and regulators per
-function rather than just per slot.
+On Tue, Jan 14 2014, Seungwon Jeon wrote:
+> On Monday, January 13, 2014, Zhangfei Gao wrote:
+>> Remove clk_table and directly use ios->clock as clock source rate.
+>> Abstract init clock rate and max clock limitation in clk.c
+>> 
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>
+> Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 
-	Arnd
+It looks like patch 1/2 did not make 3.14.  Do you want me to take
+this patch for 3.14 anyway?  (Why?)
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <chris@printf.net>   <http://printf.net/>
