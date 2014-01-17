@@ -1,32 +1,61 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 17 Jan 2014 17:04:32 +0900
-Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
-Message-ID: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 17 Jan 2014 17:05:03 +0900
+Subject: [PATCH] audit: Modify a set of system calls in audit class definitions
+Message-ID: <1389945903-4326-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 'ubfm' for the bitfield move instruction; thus, single
-instruction can be used instead of two instructions, when
-getting the minimum D-cache line size from CTR_EL0 register.
+Each asm-generic/audit_xx.h defines a set of system calls for respective
+audit permssion class (read, write, change attribute or exec).
+This patch changes two entries:
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+1) fchown in audit_change_attr.h
+  Make fchown included by its own because in asm-generic/unistd.h, for example,
+  fchown always exists while chown is optional. This change is necessary at
+  least for arm64.
+
+2) truncate64 in audit_write.h
+  Add missing truncate64/ftruncate64 as well as truncate/ftruncate
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/mm/proc-macros.S |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ include/asm-generic/audit_change_attr.h |    4 +++-
+ include/asm-generic/audit_write.h       |    6 ++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-index 8957b82..c31f41e 100644
---- a/arch/arm64/mm/proc-macros.S
-+++ b/arch/arm64/mm/proc-macros.S
-@@ -38,8 +38,7 @@
-  */
- 	.macro	dcache_line_size, reg, tmp
- 	mrs	\tmp, ctr_el0			// read CTR
--	lsr	\tmp, \tmp, #16
--	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	ubfm	\tmp, \tmp, #0x16, 0x19		// cache line size encoding
- 	mov	\reg, #4			// bytes per word
- 	lsl	\reg, \reg, \tmp		// actual cache line size
- 	.endm
+diff --git a/include/asm-generic/audit_change_attr.h b/include/asm-generic/audit_change_attr.h
+index 89b73e5..a186553 100644
+--- a/include/asm-generic/audit_change_attr.h
++++ b/include/asm-generic/audit_change_attr.h
+@@ -4,9 +4,11 @@ __NR_chmod,
+ __NR_fchmod,
+ #ifdef __NR_chown
+ __NR_chown,
+-__NR_fchown,
+ __NR_lchown,
+ #endif
++#ifdef __NR_fchown
++__NR_fchown,
++#endif
+ __NR_setxattr,
+ __NR_lsetxattr,
+ __NR_fsetxattr,
+diff --git a/include/asm-generic/audit_write.h b/include/asm-generic/audit_write.h
+index e7020c5..274575d 100644
+--- a/include/asm-generic/audit_write.h
++++ b/include/asm-generic/audit_write.h
+@@ -10,6 +10,12 @@ __NR_truncate,
+ #ifdef __NR_truncate64
+ __NR_truncate64,
+ #endif
++#ifdef __NR_ftruncate
++__NR_ftruncate,
++#endif
++#ifdef __NR_ftruncate64
++__NR_ftruncate64,
++#endif
+ #ifdef __NR_bind
+ __NR_bind,		/* bind can affect fs object only in one way... */
+ #endif
 -- 
-1.7.10.4
+1.7.9.5
