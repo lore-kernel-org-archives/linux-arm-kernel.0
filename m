@@ -1,56 +1,54 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 17 Jan 2014 14:19:39 -0800
-Subject: [PATCH v2 2/2] i2c: New bus driver for the QUP I2C controller
-In-Reply-To: <20140117003314.GB13785@codeaurora.org>
-References: <1389659437-16406-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389659437-16406-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20140115164604.GI14405@codeaurora.org>
- <20140117001833.GL30911@sonymobile.com>
- <20140117003314.GB13785@codeaurora.org>
-Message-ID: <20140117221938.GA14212@sonymobile.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 17 Jan 2014 23:18:09 +0100
+Subject: [PATCH] ARM: kirkwood: kirkwood_pm_init() should return void
+In-Reply-To: <1389984731-20220-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1389984731-20220-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140117221809.GW17530@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 16 Jan 16:33 PST 2014, Stephen Boyd wrote:
-
-> On 01/16, Bjorn Andersson wrote:
-> > On Wed 15 Jan 08:46 PST 2014, Stephen Boyd wrote:
-> > 
-> > > On 01/13, Bjorn Andersson wrote:
-> > > > +
-> > > > +static int
-> > > > +qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
-> > > > +{
-> > > > +	int retries = 0;
-> > > > +	u32 state;
-> > > > +
-> > > > +	do {
-> > > > +		state = readl(qup->base + QUP_STATE);
-> > > > +
-> > > > +		/*
-> > > > +		 * If only valid bit needs to be checked, requested state is
-> > > > +		 * 'don't care'
-> > > > +		 */
-> > > 
-> > > It looks like req_state == 0 means only_valid == true. Can we
-> > > drop the only_valid argument to this function?
-> > > 
-> > 
-> > In all cases but the reset in the beginning of qup_i2c_xfer, so it seems that
-> > it has to stay.
+On Fri, Jan 17, 2014 at 03:52:11PM -0300, Ezequiel Garcia wrote:
+> This function was originally meant to return void as declared in the
+> common.h header. Fix it and include the header to catch these errors
+> in the future.
 > 
-> Oh that's because QUP_RESET_STATE is equal to 0? It looks like
-> bits 0 and 1 are the state field and bit 2 is a flag indicating
-> that bits 0 and 1 are valid. Why not OR in the QUP_STATE_VALID
-> flag into the macros that are passed to this function? Then the
-> logic would simply be looping looking for a match of the
-> req_state (which is really a mask now).
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-While it's true that req_state == 0 means only_valid, it is not true that
-only_valid means req_state == 0. So there would be no way to differentiate
-between "valid and reset" and "valid and don't care about run/pause/reset".
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-So I could move the logic around, but I don't see how we could reduce the
-number of parameters to the function.
+	  Andrew
 
-// Bjorn
+> ---
+>  arch/arm/mach-kirkwood/pm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
+> index 8783a71..c11f7f5 100644
+> --- a/arch/arm/mach-kirkwood/pm.c
+> +++ b/arch/arm/mach-kirkwood/pm.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/suspend.h>
+>  #include <linux/io.h>
+>  #include <mach/bridge-regs.h>
+> +#include "common.h"
+>  
+>  static void __iomem *ddr_operation_base;
+>  
+> @@ -65,7 +66,7 @@ static const struct platform_suspend_ops kirkwood_suspend_ops = {
+>  	.valid = kirkwood_pm_valid_standby,
+>  };
+>  
+> -int __init kirkwood_pm_init(void)
+> +void __init kirkwood_pm_init(void)
+>  {
+>  	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
+>  	suspend_set_ops(&kirkwood_suspend_ops);
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
