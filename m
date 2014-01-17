@@ -1,108 +1,187 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Jan 2014 20:11:06 +0200
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <20140117175312.GH7993@atomide.com>
-References: <52D53084.1070105@ti.com> <20140114203613.GA604@saruman.home>
- <20140115020421.GA24195@saruman.home> <20140115031632.4167.2698@quantum>
- <20140115035011.4167.96678@quantum> <20140115171323.GA22739@atomide.com>
- <20140115192340.4167.87685@quantum> <20140115193547.GF7993@atomide.com>
- <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
- <20140117175312.GH7993@atomide.com>
-Message-ID: <52D9723A.6000700@ti.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 17 Jan 2014 12:26:50 -0600
+Subject: [PATCH v2] usb: phy: msm: fix compilation errors when
+ !CONFIG_PM_SLEEP
+In-Reply-To: <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
+References: <87lhyemr3y.fsf@linaro.org>
+ <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
+Message-ID: <20140117182650.GZ8153@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 07:53 PM, Tony Lindgren wrote:
-> * Kevin Hilman <khilman@linaro.org> [140117 09:48]:
->> Mike Turquette <mturquette@linaro.org> writes:
->>
->> [...]
->>
->>> I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
->>> Tero's series. This includes the AM3517 bits now. I've pushed this
->>> branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
->>> final sanity test before I merge this into clk-next?
+On Fri, Jan 17, 2014 at 11:58:51AM -0600, Josh Cartwright wrote:
+> Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
+> msm_otg_{suspend,resume} routines, however these routines are only being
+> built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
+> depends on msm_hsusb_config_vddcx(), which is only built when
+> CONFIG_PM_SLEEP.
+> 
+> Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
+> preprocessor conditional, and moving msm_hsusb_config_vddcx().
+> 
+> While we're here, eliminate the CONFIG_PM conditional for setting
+> up the dev_pm_ops.
+> 
+> This address the following errors Russell King has hit doing randconfig
+> builds:
+> 
+> drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
+> drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
+> drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
+> drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
+> 
+> Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+> v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
+> 
+>  drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
+>  1 file changed, 26 insertions(+), 31 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+> index 8546c8d..5b169a7 100644
+> --- a/drivers/usb/phy/phy-msm-usb.c
+> +++ b/drivers/usb/phy/phy-msm-usb.c
+[..]
+> @@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
+>  #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
+>  #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
+>  
+> -#ifdef CONFIG_PM_SLEEP
+> +#if CONFIG_PM
 
-I think you accidentally merged wrong branch to clk-next-omap with the 
-latest refresh. This is one is missing the build-fixes now, when it 
-earlier had those in.
+*sigh*.  This, of course, should have been #ifdef CONFIG_PM.  Fixed
+v3 below.
 
-The correct branch to merge was 3.13-rc7-dt-clks-v13-build-fixes.
+Thanks,
 
-This also causes the build failure below for omap1.
+  Josh
 
--Tero
+-- 8< --
+Subject: [PATCH v3] usb: phy: msm: fix compilation errors when !CONFIG_PM_SLEEP
 
->>
->> I merged clk-next-omap into next-20140117 and build/boot tested
->> omap2plus_defconfig, multi_v7_defconfig and
->> multi_v7_defconfig+CONFIG_LPAE=y and all passed a basic boot test for
->> omap5uevm.
->>
->> I'll add OMAP5 to the automated boot testing starting with the next
->> linux-next.
->
-> OK that's good news. Looks like omap1_defconfig build has now started
-> failing though:
->
-> vers/built-in.o: In function `omap5xxx_dt_clk_init':
-> :(.init.text+0x846c): undefined reference to `omap2_clk_disable_autoidle_all'
-> drivers/built-in.o: In function `am43xx_dt_clk_init':
-> :(.init.text+0x856c): undefined reference to `omap2_clk_disable_autoidle_all'
-> drivers/built-in.o:(.rodata+0xc3c4): undefined reference to `omap3_clkoutx2_recalc'
-> drivers/built-in.o:(.rodata+0xc40c): undefined reference to `omap3_noncore_dpll_enable'
-> drivers/built-in.o:(.rodata+0xc410): undefined reference to `omap3_noncore_dpll_disable'
-> drivers/built-in.o:(.rodata+0xc41c): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc420): undefined reference to `omap2_dpll_round_rate'
-> drivers/built-in.o:(.rodata+0xc42c): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc430): undefined reference to `omap3_noncore_dpll_set_rate'
-> drivers/built-in.o:(.rodata+0xc470): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc474): undefined reference to `omap2_dpll_round_rate'
-> drivers/built-in.o:(.rodata+0xc480): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc4a0): undefined reference to `omap3_noncore_dpll_enable'
-> drivers/built-in.o:(.rodata+0xc4a4): undefined reference to `omap3_noncore_dpll_disable'
-> drivers/built-in.o:(.rodata+0xc4b0): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc4b4): undefined reference to `omap2_dpll_round_rate'
-> drivers/built-in.o:(.rodata+0xc4c0): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc4c4): undefined reference to `omap3_dpll4_set_rate'
-> drivers/built-in.o:(.rodata+0xc4e0): undefined reference to `omap3_noncore_dpll_enable'
-> drivers/built-in.o:(.rodata+0xc4e4): undefined reference to `omap3_noncore_dpll_disable'
-> drivers/built-in.o:(.rodata+0xc4f0): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc4f4): undefined reference to `omap2_dpll_round_rate'
-> drivers/built-in.o:(.rodata+0xc500): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc504): undefined reference to `omap3_noncore_dpll_set_rate'
-> drivers/built-in.o:(.rodata+0xc530): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc540): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc560): undefined reference to `omap3_noncore_dpll_enable'
-> drivers/built-in.o:(.rodata+0xc564): undefined reference to `omap3_noncore_dpll_disable'
-> drivers/built-in.o:(.rodata+0xc570): undefined reference to `omap4_dpll_regm4xen_recalc'
-> drivers/built-in.o:(.rodata+0xc574): undefined reference to `omap4_dpll_regm4xen_round_rate'
-> drivers/built-in.o:(.rodata+0xc580): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc584): undefined reference to `omap3_noncore_dpll_set_rate'
-> drivers/built-in.o:(.rodata+0xc5b0): undefined reference to `omap3_dpll_recalc'
-> drivers/built-in.o:(.rodata+0xc5b4): undefined reference to `omap2_dpll_round_rate'
-> drivers/built-in.o:(.rodata+0xc5c0): undefined reference to `omap2_init_dpll_parent'
-> drivers/built-in.o:(.rodata+0xc5c4): undefined reference to `omap3_noncore_dpll_set_rate'
-> drivers/built-in.o:(.rodata+0xc63c): undefined reference to `omap2_dflt_clk_enable'
-> drivers/built-in.o:(.rodata+0xc640): undefined reference to `omap2_dflt_clk_disable'
-> drivers/built-in.o:(.rodata+0xc644): undefined reference to `omap2_dflt_clk_is_enabled'
-> drivers/built-in.o:(.rodata+0xc728): undefined reference to `omap2_clkops_enable_clkdm'
-> drivers/built-in.o:(.rodata+0xc72c): undefined reference to `omap2_clkops_disable_clkdm'
-> drivers/built-in.o:(.rodata+0xc754): undefined reference to `omap2_init_clk_clkdm'
-> drivers/built-in.o:(.rodata+0xc784): undefined reference to `omap2_dflt_clk_disable'
-> drivers/built-in.o:(.rodata+0xc788): undefined reference to `omap2_dflt_clk_is_enabled'
-> drivers/built-in.o:(.rodata+0xc7ac): undefined reference to `omap2_init_clk_clkdm'
-> drivers/built-in.o:(.rodata+0xc7c0): undefined reference to `omap2_dflt_clk_enable'
-> drivers/built-in.o:(.rodata+0xc7c4): undefined reference to `omap2_dflt_clk_disable'
-> drivers/built-in.o:(.rodata+0xc7c8): undefined reference to `omap2_dflt_clk_is_enabled'
-> drivers/built-in.o:(.rodata+0xc7ec): undefined reference to `omap2_init_clk_clkdm'
-> drivers/built-in.o:(.rodata+0xc838): undefined reference to `__clk_mux_determine_rate'
-> drivers/built-in.o:(.rodata+0xc904): undefined reference to `omap2_dflt_clk_enable'
-> drivers/built-in.o:(.rodata+0xc908): undefined reference to `omap2_dflt_clk_disable'
-> drivers/built-in.o:(.rodata+0xc90c): undefined reference to `omap2_dflt_clk_is_enabled'
-> drivers/built-in.o:(.rodata+0xc930): undefined reference to `omap2_init_clk_clkdm'
->
-> Regards,
->
-> Tony
->
+Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
+msm_otg_{suspend,resume} routines, however these routines are only being
+built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
+depends on msm_hsusb_config_vddcx(), which is only built when
+CONFIG_PM_SLEEP.
+
+Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
+preprocessor conditional, and moving msm_hsusb_config_vddcx().
+
+While we're here, eliminate the CONFIG_PM conditional for setting
+up the dev_pm_ops.
+
+This address the following errors Russell King has hit doing randconfig
+builds:
+
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
+drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
+drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
+
+Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
+ 1 file changed, 26 insertions(+), 31 deletions(-)
+
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index 8546c8d..d204f74 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -159,32 +159,6 @@ put_3p3:
+ 	return rc;
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-#define USB_PHY_SUSP_DIG_VOL  500000
+-static int msm_hsusb_config_vddcx(int high)
+-{
+-	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
+-	int min_vol;
+-	int ret;
+-
+-	if (high)
+-		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
+-	else
+-		min_vol = USB_PHY_SUSP_DIG_VOL;
+-
+-	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
+-	if (ret) {
+-		pr_err("%s: unable to set the voltage for regulator "
+-			"HSUSB_VDDCX\n", __func__);
+-		return ret;
+-	}
+-
+-	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
+-
+-	return ret;
+-}
+-#endif
+-
+ static int msm_hsusb_ldo_set_mode(int on)
+ {
+ 	int ret = 0;
+@@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
+ #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
+ #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
+ 
+-#ifdef CONFIG_PM_SLEEP
++#ifdef CONFIG_PM
++
++#define USB_PHY_SUSP_DIG_VOL  500000
++static int msm_hsusb_config_vddcx(int high)
++{
++	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
++	int min_vol;
++	int ret;
++
++	if (high)
++		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
++	else
++		min_vol = USB_PHY_SUSP_DIG_VOL;
++
++	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
++	if (ret) {
++		pr_err("%s: unable to set the voltage for regulator "
++			"HSUSB_VDDCX\n", __func__);
++		return ret;
++	}
++
++	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
++
++	return ret;
++}
++
+ static int msm_otg_suspend(struct msm_otg *motg)
+ {
+ 	struct usb_phy *phy = &motg->phy;
+@@ -1733,22 +1732,18 @@ static int msm_otg_pm_resume(struct device *dev)
+ }
+ #endif
+ 
+-#ifdef CONFIG_PM
+ static const struct dev_pm_ops msm_otg_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(msm_otg_pm_suspend, msm_otg_pm_resume)
+ 	SET_RUNTIME_PM_OPS(msm_otg_runtime_suspend, msm_otg_runtime_resume,
+ 				msm_otg_runtime_idle)
+ };
+-#endif
+ 
+ static struct platform_driver msm_otg_driver = {
+ 	.remove = msm_otg_remove,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+ 		.owner = THIS_MODULE,
+-#ifdef CONFIG_PM
+ 		.pm = &msm_otg_dev_pm_ops,
+-#endif
+ 	},
+ };
+ 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
