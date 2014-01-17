@@ -1,34 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 17 Jan 2014 11:58:52 -0500 (EST)
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
- <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.10.1401171157340.28907@knanqh.ubzr>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 17 Jan 2014 20:59:43 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCBWMyAzLzNdIHBvd2VyOiByZXNldDogdXNlIHN5c2NvbiBk?=
+ =?UTF-8?B?cml2ZXIgdG8gcGFyc2UgcmVib290IHJlZ2lzdGVyIGZyb20gc2N1?=
+In-Reply-To: <201401171752.47393.arnd@arndb.de>
+References: <1389748055-23534-1-git-send-email-fkan@apm.com>
+ <1389748055-23534-4-git-send-email-fkan@apm.com>
+ <201401171752.47393.arnd@arndb.de>
+Message-ID: <1389977983.940533034@f47.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jan 2014, Rob Herring wrote:
-
-> On Thu, Jan 16, 2014 at 9:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Thu, 16 Jan 2014, Olof Johansson wrote:
-> >
-> >> "for SDIO slots" is somewhat misleading; nearly all controllers only
-> >> do one slot/device per controller. The designware controller can do
-> >> multiple slots, and that adds a bit of driver and binding complexity
-> >> for something that seemingly not a single vendor has actually
-> >> implemented.
-> >
-> > The Marvell 8688, just to name one, does both WIFI and BlueTooth over
-> > the same SDIO controller using separate functions/slots.
+???????, 17 ?????? 2014, 17:52 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 15 January 2014, Feng Kan wrote:
+> > +static int __init xgene_reboot_init(void)
+> >  {
+> >         arm_pm_restart = xgene_restart;
+> >         return 0;
+> >  }
+> >  device_initcall(xgene_reboot_init);
 > 
-> But that is logical functions within a chip, not multiple discrete
-> chips (i.e. slots) with their own reset, regulators, etc.
+> This won't work on a generic kernel, since you unconditionally set the
+> pm_restart function to your own, which is broken for everything else.
+> 
+> Please keep the platform_driver to attach to the reboot device
+> as you had before. It might be good to turn this into a generic
+> "syscon-reset" driver that gets both the register number and
+> the contents to write from the device node.
 
-OK.  If that's the definition of a slot in this context then I agree.
+I am not sure but think the new driver for SYSCON GPIOs can be
+reused for such purpose:
+http://www.spinics.net/lists/devicetree/msg18221.html
 
-
-Nicolas
+---
