@@ -1,76 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Jan 2014 16:53:34 +0000
-Subject: [PATCH v2] of: add functions to count number of elements in a
- property
-In-Reply-To: <1434798.oSb68sYmYT@phil>
-References: <27256277.YJ687suYy5@phil> <3781679.27UF2dWtKL@phil>
- <20140117144456.GG19578@e106331-lin.cambridge.arm.com>
- <1434798.oSb68sYmYT@phil>
-Message-ID: <20140117165333.GH19578@e106331-lin.cambridge.arm.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 17 Jan 2014 16:56:49 +0000
+Subject: [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c and its related
+ head file
+In-Reply-To: <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <52D960D1.3090700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 03:44:14PM +0000, Heiko St?bner wrote:
-> The need to know the number of array elements in a property is
-> a common pattern. To prevent duplication of open-coded implementations
-> add a helper static function that also centralises strict sanity
-> checking and DTB format details, as well as a set of wrapper functions
-> for u8, u16, u32 and u64.
+On 17/01/14 12:24, Hanjun Guo wrote:
+> Introduce arm_core.c and its related head file, after this patch,
+> we can get ACPI tables from firmware on ARM64 now.
 > 
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
-> changes since v1:
-> address comments from Rob Herring and Mark Rutland:
-> - provide a helper and a set of wrappers for u8-u64
-> - get rid of extra len variable, prop->length is enough
-> - include node name in error message
+>  arch/arm64/include/asm/acpi.h |   57 +++++++++++
+>  arch/arm64/kernel/setup.c     |    6 ++
+>  drivers/acpi/Makefile         |    2 +
+>  drivers/acpi/plat/Makefile    |    1 +
+>  drivers/acpi/plat/arm-core.c  |  209 +++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 275 insertions(+)
+>  create mode 100644 drivers/acpi/plat/Makefile
+>  create mode 100644 drivers/acpi/plat/arm-core.c
 > 
->  drivers/of/base.c  |   98 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h |   32 +++++++++++++++++
->  2 files changed, 130 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index f807d0e..b6e6d4a 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -862,6 +862,104 @@ struct device_node *of_find_node_by_phandle(phandle handle)
->  EXPORT_SYMBOL(of_find_node_by_phandle);
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index cf19dc6..908d71b 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -19,6 +19,43 @@
+>  #ifndef _ASM_ARM64_ACPI_H
+>  #define _ASM_ARM64_ACPI_H
 >  
->  /**
-> + * of_count_property_elems_of_size - Count the number of elements in a property
+> +#include <asm/cacheflush.h>
+> +
+> +#include <linux/init.h>
+> +
+> +#define COMPILER_DEPENDENT_INT64	s64
+> +#define COMPILER_DEPENDENT_UINT64	u64
+> +
+> +/*
+> + * Calling conventions:
 > + *
-> + * @np:		device node from which the property value is to be read.
-> + * @propname:	name of the property to be searched.
-> + * @elem_size:	size of the individual element
+> + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+> + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+> + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+> + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
 > + */
-> +static int of_count_property_elems_of_size(const struct device_node *np,
-> +				const char *propname, int elem_size)
-
-As a minor nit, it would be nicer to have 'count' and 'property' switch
-places in the name (i.e. call this of_property_count_elems_of_size).
-That way it's concistent with the naming of the wrappers.
-
+> +#define ACPI_SYSTEM_XFACE
+> +#define ACPI_EXTERNAL_XFACE
+> +#define ACPI_INTERNAL_XFACE
+> +#define ACPI_INTERNAL_VAR_XFACE
+> +
+> +/* Asm macros */
+> +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
+> +
+> +/* Basic configuration for ACPI */
+> +#ifdef	CONFIG_ACPI
+> +extern int acpi_disabled;
+> +extern int acpi_noirq;
+> +extern int acpi_pci_disabled;
+> +extern int acpi_strict;
+> +
+> +static inline void disable_acpi(void)
 > +{
-> +	struct property *prop = of_find_property(np, propname, NULL);
+> +	acpi_disabled = 1;
+> +	acpi_pci_disabled = 1;
+> +	acpi_noirq = 1;
+> +}
 > +
-> +	if (!prop)
-> +		return -EINVAL;
-> +	if (!prop->value)
-> +		return -ENODATA;
+>  static inline bool arch_has_acpi_pdc(void)
+>  {
+>  	return false;	/* always false for now */
+> @@ -29,4 +66,24 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
+>  	return;
+>  }
+>  
+> +static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
+> +static inline void acpi_disable_pci(void)
+> +{
+> +	acpi_pci_disabled = 1;
+> +	acpi_noirq_set();
+> +}
 > +
-> +	if (prop->length % elem_size != 0) {
-> +		pr_err("size of %s in node %s is not a multiple of %d\n",
-> +		       propname, np->name, elem_size);
+> +/* FIXME: this function should be moved to topology.h when it's ready */
+> +void arch_fix_phys_package_id(int num, u32 slot);
+> +
+> +/* temperally define -1 to make acpi core compilerable */
+> +#define cpu_physical_id(cpu) -1
+> +
 
-It would be nice to use np->full_name so you get the absolute path of
-the node -- it makes finding them easier later.
+I assume `cpu` here is logical cpu id in which case you can define it to be same
+as cpu_logical_map ?
 
-Otherwise, the patch looks good to me, thanks for implementing it!
-
-With those changes:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Cheers,
-Mark.
+Regards,
+Sudeep
