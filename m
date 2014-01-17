@@ -1,55 +1,26 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Thu, 16 Jan 2014 23:55:45 -0300
-Subject: [PATCH v3 2/8] clk: sunxi: update clock-output-names dt binding
- documentation
-In-Reply-To: <1389257565-19797-3-git-send-email-wens@csie.org>
-References: <1389257565-19797-1-git-send-email-wens@csie.org>
- <1389257565-19797-3-git-send-email-wens@csie.org>
-Message-ID: <52D89BB1.3030206@elopez.com.ar>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 Jan 2014 10:13:22 +0800
+Subject: [PATCH V7 1/3] ARM: imx: add suspend in ocram support for i.mx6q
+In-Reply-To: <1389864907-4040-1-git-send-email-b20788@freescale.com>
+References: <1389864907-4040-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140117021320.GA1565@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 16, 2014 at 05:35:05PM +0800, Anson Huang wrote:
+> +static const u32 imx6q_mmdc_io_offset[] = {
 
-El 09/01/14 05:52, Chen-Yu Tsai escribi?:
-> clock-output-names is now required for most of sunxi clock nodes, to
-> provide the name of the corresponding clock. Add the new requirements,
-> exceptions, as well as examples.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->   Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++++++++++++++----
->   1 file changed, 31 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 0c127cd..8a9147d 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -44,10 +44,18 @@ Required properties for all clocks:
->   	multiplexed clocks, the list order must match the hardware
->   	programming order.
->   - #clock-cells : from common clock binding; shall be set to 0 except for
-> -	"allwinner,*-gates-clk" where it shall be set to 1
-> +	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk" and
-> +	"allwinner,sun4i-pll6-clk" where it shall be set to 1
->
-> -Additionally, "allwinner,*-gates-clk" clocks require:
-> -- clock-output-names : the corresponding gate names that the clock controls
-> +Additionally, most clocks require "clock-output-names":
-> +- "allwinner,*-gates-clk" : the corresponding gate names that the clock controls
-> +- "allwinner,sun4i-pll5-clk" : "pll5_ddr", "pll5_mbus"
-> +- "allwinner,sun4i-pll6-clk" : "pll6_sata", "pll6_other"
-> +- "allwinner,sun4i-cpu-clk", "allwinner,sun4i-axi-clk",
-> +  "allwinner,sun4i-ahb-clk", "allwinner,sun4i-ahb-clk",
-> +  "allwinner,sun4i-apb1-mux-clk", "allwinner,sun4i-apb1-clk"
-> +  do not need "clock-output-names"
-> +- all others clocks : the corresponding module name of that clock
+This can be __initconst?
 
-As we discussed on IRC, I wonder if such verbosity is actually needed. 
-Maybe we should dictate that all clocks must list their corresponding 
-outputs on clock-output-names (with it being the module name if it only 
-has one output).
+Shawn
 
-Cheers,
-
-Emilio
+> +	0x5ac, 0x5b4, 0x528, 0x520, /* DQM0 ~ DQM3 */
+> +	0x514, 0x510, 0x5bc, 0x5c4, /* DQM4 ~ DQM7 */
+> +	0x56c, 0x578, 0x588, 0x594, /* CAS, RAS, SDCLK_0, SDCLK_1 */
+> +	0x5a8, 0x5b0, 0x524, 0x51c, /* SDQS0 ~ SDQS3 */
+> +	0x518, 0x50c, 0x5b8, 0x5c0, /* SDQS4 ~ SDQS7 */
+> +	0x784, 0x788, 0x794, 0x79c, /* GPR_B0DS ~ GPR_B3DS */
+> +	0x7a0, 0x7a4, 0x7a8, 0x748, /* GPR_B4DS ~ GPR_B7DS */
+> +	0x59c, 0x5a0, 0x750, 0x774, /* SODT0, SODT1, MODE_CTL, MODE */
+> +	0x74c,			    /* GPR_ADDS */
+> +};
