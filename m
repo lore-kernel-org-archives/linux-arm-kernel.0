@@ -1,44 +1,91 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Fri, 17 Jan 2014 17:40:09 +0000
-Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <CAD6G_RT1m+7BWZyYqU7Pb2+bhki-Wqs6f96=GhMyF1nHyy2wuw@mail.gmail.com>
-References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
- <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
- <52D7A237.8@freescale.com>
- <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
- <20140117020226.GB27652@shlinux2.ap.freescale.net>
- <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
- <20140117065401.GA6140@shlinux2.ap.freescale.net>
- <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
- <CAD6G_RT1m+7BWZyYqU7Pb2+bhki-Wqs6f96=GhMyF1nHyy2wuw@mail.gmail.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA664C6@DBDE04.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 17 Jan 2014 11:42:14 -0600
+Subject: [PATCH v2] of: add functions to count number of elements in a
+ property
+In-Reply-To: <1434798.oSb68sYmYT@phil>
+References: <27256277.YJ687suYy5@phil> <3781679.27UF2dWtKL@phil>
+ <20140117144456.GG19578@e106331-lin.cambridge.arm.com>
+ <1434798.oSb68sYmYT@phil>
+Message-ID: <CAL_JsqJ_St=OegpexzrTGXwmOYCz4YeWk_1S+R_q6NajmmPqSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shijie,
-
->From: Jagan Teki [mailto:jagannadh.teki at gmail.com]
-[...]
+On Fri, Jan 17, 2014 at 9:44 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> The need to know the number of array elements in a property is
+> a common pattern. To prevent duplication of open-coded implementations
+> add a helper static function that also centralises strict sanity
+> checking and DTB format details, as well as a set of wrapper functions
+> for u8, u16, u32 and u64.
 >
->I feel these are good points to discuss all.
->1. With new framework seems like we need two separate controller drivers
->    one for non spi-nor and one for spi-nor with single controller hw
->2. With spi-nor implementation though the hw is spi complaint but the sw is
->   completely ignoring the Linux SPI core interaction.
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v1:
+> address comments from Rob Herring and Mark Rutland:
+> - provide a helper and a set of wrappers for u8-u64
+> - get rid of extra len variable, prop->length is enough
+> - include node name in error message
 >
->I feel above two points are technically wrong - Please correct me if am wrong
->but need all developers will join..thanks!
+>  drivers/of/base.c  |   98 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h |   32 +++++++++++++++++
+>  2 files changed, 130 insertions(+)
 >
-I have been following this patch-set from sometime, And I think point (2)
-has been discussed back and forth in multiple times in earlier discussions.
-So, Is it possible for you to summarize point (2) with all pros-n-cons ?
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index f807d0e..b6e6d4a 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -862,6 +862,104 @@ struct device_node *of_find_node_by_phandle(phandle handle)
+>  EXPORT_SYMBOL(of_find_node_by_phandle);
+>
+>  /**
+> + * of_count_property_elems_of_size - Count the number of elements in a property
+> + *
+> + * @np:                device node from which the property value is to be read.
+> + * @propname:  name of the property to be searched.
+> + * @elem_size: size of the individual element
+> + */
+> +static int of_count_property_elems_of_size(const struct device_node *np,
+> +                               const char *propname, int elem_size)
+> +{
+> +       struct property *prop = of_find_property(np, propname, NULL);
+> +
+> +       if (!prop)
+> +               return -EINVAL;
+> +       if (!prop->value)
+> +               return -ENODATA;
+> +
+> +       if (prop->length % elem_size != 0) {
+> +               pr_err("size of %s in node %s is not a multiple of %d\n",
+> +                      propname, np->name, elem_size);
+> +               return -EINVAL;
+> +       }
+> +
+> +       return prop->length / elem_size;
+> +}
 
-- A README will helpful to clear all doubts and will ease your implementation
-  as well.
-- It will also help in reducing turn-around time to get this framework in
-   acceptable state and still keep it generic enough.
+Export this one.
 
-You can submit the README as Documentation/mtd/spi-nor.txt
+> +
+> +/**
+> + * of_property_count_u8_elems - Count the number of u8 elements in a property
+> + *
+> + * @np:                device node from which the property value is to be read.
+> + * @propname:  name of the property to be searched.
+> + *
+> + * Search for a property in a device node and count the number of u8 elements
+> + * in it. Returns number of elements on sucess, -EINVAL if the property does
+> + * not exist or its length does not match a multiple of u8 and -ENODATA if the
+> + * property does not have a value.
+> + */
+> +int of_property_count_u8_elems(const struct device_node *np,
+> +                               const char *propname)
+> +{
+> +       return of_count_property_elems_of_size(np, propname, sizeof(u8));
+> +}
+> +EXPORT_SYMBOL_GPL(of_property_count_u8_elems);
 
+And make all these static inline.
 
-with regards, pekon
+Then you only need a single empty function for !OF.
+
+Rob
