@@ -1,24 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jan 2014 16:10:02 +0100
-Subject: [PATCH] ACPI: introduce CONFIG_ACPI_REDUCED_HARDWARE_ONLY to
- enforce this ACPI mode
-In-Reply-To: <52D82671.6000200@linaro.org>
-References: <1389731822-21336-1-git-send-email-al.stone@linaro.org>
- <201401161155.27592.arnd@arndb.de> <52D82671.6000200@linaro.org>
-Message-ID: <201401171610.02887.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 17 Jan 2014 09:14:47 -0600
+Subject: How to support SDIO wifi/bt in DT
+In-Reply-To: <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
+References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
+ <3215037.8HVCjAeS8g@wuerfel>
+ <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+ <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
+Message-ID: <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 January 2014, Al Stone wrote:
-> Right; I assumed I had to have that SELECT.  My apologies -- I
-> still cannot reproduce the warning.  I'll resubmit the patch
-> incorporating the suggestion, though, since the result ends up
-> being the same -- you must have ACPI and EXPERT selected in order
-> to enable ACPI_REDUCED_HARDWARE_ONLY.
-> 
+On Thu, Jan 16, 2014 at 9:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Thu, 16 Jan 2014, Olof Johansson wrote:
+>
+>> "for SDIO slots" is somewhat misleading; nearly all controllers only
+>> do one slot/device per controller. The designware controller can do
+>> multiple slots, and that adds a bit of driver and binding complexity
+>> for something that seemingly not a single vendor has actually
+>> implemented.
+>
+> The Marvell 8688, just to name one, does both WIFI and BlueTooth over
+> the same SDIO controller using separate functions/slots.
 
-You should never 'select' CONFIG_EXPERT from architecture code, that
-is supposed to be a user-settable option. If you also select CONFIG_EXPERT
-or have that enabled in the configuration, you will not get a warning.
+But that is logical functions within a chip, not multiple discrete
+chips (i.e. slots) with their own reset, regulators, etc. There would
+still be a single set of external controls per host controller I
+think.
 
-	Arnd
+Rob
