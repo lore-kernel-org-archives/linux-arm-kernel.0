@@ -1,133 +1,72 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 17 Jan 2014 11:26:20 -0600
-Subject: [PATCH] usb: phy: msm: fix compilation errors when !CONFIG_PM_SLEEP
-In-Reply-To: <20140117132232.GC15937@n2100.arm.linux.org.uk>
-References: <20140117132232.GC15937@n2100.arm.linux.org.uk>
-Message-ID: <1389979580-14812-1-git-send-email-joshc@codeaurora.org>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 17 Jan 2014 17:37:37 +0000
+Subject: [PATCH 10/20] ARM64 / ACPI: Enumerate possible/present CPU set
+ and map logical cpu id to APIC id
+In-Reply-To: <1389961514-13562-11-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <52D96A61.9080505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-msm_otg_{suspend,resume} routines, however these routines are only being
-built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-depends on msm_hsusb_config_vddcx(), which is only built when
-CONFIG_PM_SLEEP.
+On 17/01/14 12:25, Hanjun Guo wrote:
+> When boot the kernel with MADT, the cpu possible and present sets should
+> be enumerated for later smp initialization.
+> 
+> The logic cpu id maps to APIC id (GIC id) is also implemented, it is
+> needed for acpi processor drivers.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |    7 ++--
+>  drivers/acpi/plat/arm-core.c  |   83 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 87 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index c335c6d..7edd39e 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -76,9 +76,6 @@ static inline void acpi_disable_pci(void)
+>  /* FIXME: this function should be moved to topology.h when it's ready */
+>  void arch_fix_phys_package_id(int num, u32 slot);
+>  
+> -/* temperally define -1 to make acpi core compilerable */
+> -#define cpu_physical_id(cpu) -1
+> -
+>  /* Low-level suspend routine. */
+>  extern int (*acpi_suspend_lowlevel)(void);
+>  #define acpi_wakeup_address (0)
+> @@ -86,6 +83,10 @@ extern int (*acpi_suspend_lowlevel)(void);
+>  #define MAX_GIC_CPU_INTERFACE 256
+>  #define MAX_GIC_DISTRIBUTOR   1		/* should be the same as MAX_GIC_NR */
+>  
+> +/* map logic cpu id to physical GIC id */
+> +extern int arm_cpu_to_apicid[NR_CPUS];
+> +#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
+> +
 
-Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-preprocessor conditional, and moving msm_hsusb_config_vddcx().
+You refer arm_cpu_to_apicid as a mapping from logical cpu id to GIC id,
+then why is it assigned to cpu_physical_id. cpu_physical_id must be same as
+cpu_logical_map which is from logical cpu id to MPIDRs.
 
-While we're here, eliminate the CONFIG_PM conditional for setting
-up the dev_pm_ops.
+[...]
 
-This address the following errors Russell King has hit doing randconfig
-builds:
+> @@ -321,6 +401,9 @@ int __init early_acpi_boot_init(void)
+>  	if (acpi_disabled)
+>  		return -ENODEV;
+>  
+> +	/* Get the boot CPU's GIC cpu interface id before MADT parsing */
+> +	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+> +
 
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
+Code contradicts your comment. You need GIC cpu interface ID(referred as GIC ID
+in the MADT), but you are assigning the MPIDR(physical CPU ID on ARM) to
+boot_cpu_apic_id. I think you are assuming GIC ID and MPIDR to be same which is
+wrong.
 
-Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 31 deletions(-)
+With ACPI5.0, IIUC the only possible way to manage mapping from GIC CPU
+interface to MPIDR is to assume(in a way enforce on ARM) ACPI Processor UID in
+MADT and CPU Device definition match MPIDR.
 
-diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index 8546c8d..7c7384f 100644
---- a/drivers/usb/phy/phy-msm-usb.c
-+++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -159,32 +159,6 @@ put_3p3:
- 	return rc;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--#define USB_PHY_SUSP_DIG_VOL  500000
--static int msm_hsusb_config_vddcx(int high)
--{
--	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
--	int min_vol;
--	int ret;
--
--	if (high)
--		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
--	else
--		min_vol = USB_PHY_SUSP_DIG_VOL;
--
--	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
--	if (ret) {
--		pr_err("%s: unable to set the voltage for regulator "
--			"HSUSB_VDDCX\n", __func__);
--		return ret;
--	}
--
--	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
--
--	return ret;
--}
--#endif
--
- static int msm_hsusb_ldo_set_mode(int on)
- {
- 	int ret = 0;
-@@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
- #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
- #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
- 
--#ifdef CONFIG_PM_SLEEP
-+#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_RUNTIME)
-+
-+#define USB_PHY_SUSP_DIG_VOL  500000
-+static int msm_hsusb_config_vddcx(int high)
-+{
-+	int max_vol = USB_PHY_VDD_DIG_VOL_MAX;
-+	int min_vol;
-+	int ret;
-+
-+	if (high)
-+		min_vol = USB_PHY_VDD_DIG_VOL_MIN;
-+	else
-+		min_vol = USB_PHY_SUSP_DIG_VOL;
-+
-+	ret = regulator_set_voltage(hsusb_vddcx, min_vol, max_vol);
-+	if (ret) {
-+		pr_err("%s: unable to set the voltage for regulator "
-+			"HSUSB_VDDCX\n", __func__);
-+		return ret;
-+	}
-+
-+	pr_debug("%s: min_vol:%d max_vol:%d\n", __func__, min_vol, max_vol);
-+
-+	return ret;
-+}
-+
- static int msm_otg_suspend(struct msm_otg *motg)
- {
- 	struct usb_phy *phy = &motg->phy;
-@@ -1733,22 +1732,18 @@ static int msm_otg_pm_resume(struct device *dev)
- }
- #endif
- 
--#ifdef CONFIG_PM
- static const struct dev_pm_ops msm_otg_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(msm_otg_pm_suspend, msm_otg_pm_resume)
- 	SET_RUNTIME_PM_OPS(msm_otg_runtime_suspend, msm_otg_runtime_resume,
- 				msm_otg_runtime_idle)
- };
--#endif
- 
- static struct platform_driver msm_otg_driver = {
- 	.remove = msm_otg_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
--#ifdef CONFIG_PM
- 		.pm = &msm_otg_dev_pm_ops,
--#endif
- 	},
- };
- 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Sudeep
