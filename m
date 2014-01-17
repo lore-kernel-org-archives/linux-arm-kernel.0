@@ -1,58 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Jan 2014 18:08:26 +0000
-Subject: [PATCH v2 1/7] ARM: perf_event: Support percpu irqs for the CPU
- PMU
-In-Reply-To: <52D96E5C.4040506@codeaurora.org>
-References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
- <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
- <20140115205427.GB26193@codeaurora.org>
- <20140117150411.GI16003@mudshark.cambridge.arm.com>
- <52D96E5C.4040506@codeaurora.org>
-Message-ID: <20140117180825.GV16003@mudshark.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Strashko, Grygorii)
+Date: Fri, 17 Jan 2014 18:08:13 +0000
+Subject: [PATCH V3 2/2] mm/memblock: Add support for excluded memory areas
+In-Reply-To: <20140114195225.078f810a@lilie>
+References: <1389618217-48166-1-git-send-email-phacht@linux.vnet.ibm.com>
+ <1389618217-48166-3-git-send-email-phacht@linux.vnet.ibm.com>
+ <52D538FD.8010907@ti.com>,<20140114195225.078f810a@lilie>
+Message-ID: <902E09E6452B0E43903E4F2D568737AB0B9852BA@DFRE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 05:54:36PM +0000, Stephen Boyd wrote:
-> On 01/17/14 07:04, Will Deacon wrote:
-> > Hi Stephen,
-> >
-> > On Wed, Jan 15, 2014 at 08:54:27PM +0000, Stephen Boyd wrote:
-> >> On 01/15, Stephen Boyd wrote:
-> >>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> >>> index 789d846a9184..e76750980b38 100644
-> >>> --- a/arch/arm/kernel/perf_event.c
-> >>> +++ b/arch/arm/kernel/perf_event.c
-> >>> @@ -295,9 +297,15 @@ validate_group(struct perf_event *event)
-> >>>  
-> >>>  static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
-> >>>  {
-> >>> -	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
-> >>> -	struct platform_device *plat_device = armpmu->plat_device;
-> >>> -	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
-> >>> +	struct arm_pmu *armpmu;
-> >>> +	struct platform_device *plat_device;
-> >>> +	struct arm_pmu_platdata *plat;
-> >>> +
-> >>> +	if (irq_is_percpu(irq))
-> >>> +		dev = *(struct arm_pmu_cpu **)dev;
-> >> Oh. I just realized that struct arm_pmu_cpu doesn't even exist. This
-> >> still compiles though because we're dealing with a void pointer.
-> >>
-> >> Perhaps its better to just do
-> >>
-> >> 	dev = *(void **)dev;
-> >>
-> >> here. Can you fix that up when applying? Otherwise I'll do it on
-> >> the next send if there are more comments.
-> > Shouldn't that actually be some per_cpu accessor like this_cpu_ptr?
-> >
+Hi Philipp,
+
+On 01/14/2014 08:52 PM, Philipp Hachtmann wrote:
+> Hello Grygorii,
 > 
-> Nope. The genirq layer unwraps the per_cpu pointer and passes it to the
-> handler.
+> thank you for your comments.
+> 
+> To clarify we have the following requirements for memblock:
+> 
+> (1) Reserved areas can be declared before memory is added.
+> (2) The physical memory is detected once only.
+> (3) The free memory (i.e. not reserved) memory can be iterated to add
+> it to the buddy allocator.
+> (4) Memory designated to be mapped into the kernel address space can be
+> iterated.
+> (5) Kdump on s390 requires knowledge about the full system memory
+> layout.
+> 
+> The s390 kdump implementation works a bit different from the
+> implementation on other architectures: The layout is not taken from the
+> production system and saved for the kdump kernel. Instead the kdump
+> kernel needs to gather information about the whole memory without
+> respect to locked out areas (like mem= and OLDMEM etc.).
+> 
+> Without kdump's requirement it would of course be suitable and easy
+> just to remove memory from memblock.memory. But then this information
+> is lost for later use by kdump.
+> 
+> The patch does not change any behaviour of the current API - whether it
+> is enabled or not.
 
-Ah yeah, I forget the dispatcher is what genirq sees as the handler. In
-which case your idea looks right.
+Sorry, for the delayed reply.
 
-Sorry for the noise.
+My main concern here was that you are introducing new *generic* API,
+but in fact it is not generic, because it can't be re-used without huge rework
+of existing code.
+(at least as of wide usage of for_each_memblock(memory,...),
+because (if ARCH_MEMBLOCK_NOMAP=y) the meaning of "memory"
+ranges will be changed form "mapped memory" to "real phys memory").
 
-Will
+And therefore, I've proposed to keep things as is and introduce phys_memory
+ranges instead, to store real phys memory configuration.
+
+> 
+> The current patch seems to be overly complicated.
+> The following patch contains only the nomap functionality without any
+> cleanup and refactoring. I will post a V4 patch set which will contain
+> this patch.
+
+Regards,
+-grygorii
