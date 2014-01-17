@@ -1,72 +1,44 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 17 Jan 2014 17:37:37 +0000
-Subject: [PATCH 10/20] ARM64 / ACPI: Enumerate possible/present CPU set
- and map logical cpu id to APIC id
-In-Reply-To: <1389961514-13562-11-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <52D96A61.9080505@arm.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Fri, 17 Jan 2014 17:40:09 +0000
+Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <CAD6G_RT1m+7BWZyYqU7Pb2+bhki-Wqs6f96=GhMyF1nHyy2wuw@mail.gmail.com>
+References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
+ <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
+ <52D7A237.8@freescale.com>
+ <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
+ <20140117020226.GB27652@shlinux2.ap.freescale.net>
+ <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
+ <20140117065401.GA6140@shlinux2.ap.freescale.net>
+ <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
+ <CAD6G_RT1m+7BWZyYqU7Pb2+bhki-Wqs6f96=GhMyF1nHyy2wuw@mail.gmail.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EA664C6@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/14 12:25, Hanjun Guo wrote:
-> When boot the kernel with MADT, the cpu possible and present sets should
-> be enumerated for later smp initialization.
-> 
-> The logic cpu id maps to APIC id (GIC id) is also implemented, it is
-> needed for acpi processor drivers.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |    7 ++--
->  drivers/acpi/plat/arm-core.c  |   83 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 87 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index c335c6d..7edd39e 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -76,9 +76,6 @@ static inline void acpi_disable_pci(void)
->  /* FIXME: this function should be moved to topology.h when it's ready */
->  void arch_fix_phys_package_id(int num, u32 slot);
->  
-> -/* temperally define -1 to make acpi core compilerable */
-> -#define cpu_physical_id(cpu) -1
-> -
->  /* Low-level suspend routine. */
->  extern int (*acpi_suspend_lowlevel)(void);
->  #define acpi_wakeup_address (0)
-> @@ -86,6 +83,10 @@ extern int (*acpi_suspend_lowlevel)(void);
->  #define MAX_GIC_CPU_INTERFACE 256
->  #define MAX_GIC_DISTRIBUTOR   1		/* should be the same as MAX_GIC_NR */
->  
-> +/* map logic cpu id to physical GIC id */
-> +extern int arm_cpu_to_apicid[NR_CPUS];
-> +#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
-> +
+Hi Shijie,
 
-You refer arm_cpu_to_apicid as a mapping from logical cpu id to GIC id,
-then why is it assigned to cpu_physical_id. cpu_physical_id must be same as
-cpu_logical_map which is from logical cpu id to MPIDRs.
-
+>From: Jagan Teki [mailto:jagannadh.teki at gmail.com]
 [...]
+>
+>I feel these are good points to discuss all.
+>1. With new framework seems like we need two separate controller drivers
+>    one for non spi-nor and one for spi-nor with single controller hw
+>2. With spi-nor implementation though the hw is spi complaint but the sw is
+>   completely ignoring the Linux SPI core interaction.
+>
+>I feel above two points are technically wrong - Please correct me if am wrong
+>but need all developers will join..thanks!
+>
+I have been following this patch-set from sometime, And I think point (2)
+has been discussed back and forth in multiple times in earlier discussions.
+So, Is it possible for you to summarize point (2) with all pros-n-cons ?
 
-> @@ -321,6 +401,9 @@ int __init early_acpi_boot_init(void)
->  	if (acpi_disabled)
->  		return -ENODEV;
->  
-> +	/* Get the boot CPU's GIC cpu interface id before MADT parsing */
-> +	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-> +
+- A README will helpful to clear all doubts and will ease your implementation
+  as well.
+- It will also help in reducing turn-around time to get this framework in
+   acceptable state and still keep it generic enough.
 
-Code contradicts your comment. You need GIC cpu interface ID(referred as GIC ID
-in the MADT), but you are assigning the MPIDR(physical CPU ID on ARM) to
-boot_cpu_apic_id. I think you are assuming GIC ID and MPIDR to be same which is
-wrong.
+You can submit the README as Documentation/mtd/spi-nor.txt
 
-With ACPI5.0, IIUC the only possible way to manage mapping from GIC CPU
-interface to MPIDR is to assume(in a way enforce on ARM) ACPI Processor UID in
-MADT and CPU Device definition match MPIDR.
 
-Regards,
-Sudeep
+with regards, pekon
