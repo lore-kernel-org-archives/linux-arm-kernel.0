@@ -1,34 +1,29 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 17 Jan 2014 20:59:43 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCBWMyAzLzNdIHBvd2VyOiByZXNldDogdXNlIHN5c2NvbiBk?=
- =?UTF-8?B?cml2ZXIgdG8gcGFyc2UgcmVib290IHJlZ2lzdGVyIGZyb20gc2N1?=
-In-Reply-To: <201401171752.47393.arnd@arndb.de>
-References: <1389748055-23534-1-git-send-email-fkan@apm.com>
- <1389748055-23534-4-git-send-email-fkan@apm.com>
- <201401171752.47393.arnd@arndb.de>
-Message-ID: <1389977983.940533034@f47.i.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jan 2014 18:04:29 +0100
+Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for
+ Broadcom 7445
+In-Reply-To: <20140116134732.GB17314@sirena.org.uk>
+References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
+ <201401161219.01038.arnd@arndb.de> <20140116134732.GB17314@sirena.org.uk>
+Message-ID: <201401171804.30572.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-???????, 17 ?????? 2014, 17:52 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 15 January 2014, Feng Kan wrote:
-> > +static int __init xgene_reboot_init(void)
-> >  {
-> >         arm_pm_restart = xgene_restart;
-> >         return 0;
-> >  }
-> >  device_initcall(xgene_reboot_init);
+On Thursday 16 January 2014, Mark Brown wrote:
+> On Thu, Jan 16, 2014 at 12:19:00PM +0100, Arnd Bergmann wrote:
 > 
-> This won't work on a generic kernel, since you unconditionally set the
-> pm_restart function to your own, which is broken for everything else.
+> > 1. Other platforms also require the syscon driver to be active before
+> > the regular device driver probing starts. Michal Simek has the same
+> > issue in the zynq clock driver that you have for SMP initialization.
+> > We have talked about this with Mark Brown already, and I think we will
+> > find a solution for this in the end, but it's not as straightforward
+> > as I first hoped. We can probably use help in this area.
 > 
-> Please keep the platform_driver to attach to the reboot device
-> as you had before. It might be good to turn this into a generic
-> "syscon-reset" driver that gets both the register number and
-> the contents to write from the device node.
+> I thought the solution with deferring registration of the resource for
+> dev_get_regmap() until a proper device materialised seemed simple and
+> enough, did you folks run into any problems with that?  I had assumed a
+> patch was likely to materialise so wasn't worrying about it myself.
 
-I am not sure but think the new driver for SYSCON GPIOs can be
-reused for such purpose:
-http://www.spinics.net/lists/devicetree/msg18221.html
+I'm still hoping that Michal will do that patch.
 
----
+	Arnd
