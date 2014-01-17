@@ -1,61 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 17 Jan 2014 11:05:20 +0100
-Subject: [PATCH] clocksource: timer-sun5i: Switch to sched_clock_register()
-In-Reply-To: <1389922686-6249-1-git-send-email-sboyd@codeaurora.org>
-References: <1389922686-6249-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52D90060.5020104@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 17 Jan 2014 18:06:41 +0800
+Subject: How to support SDIO wifi/bt in DT
+In-Reply-To: <20140117093909.GB2348@piout.net>
+References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
+ <3215037.8HVCjAeS8g@wuerfel>
+ <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
+ <20140116195819.GY15937@n2100.arm.linux.org.uk>
+ <CAOesGMjZzwuOvt3iV+CDXZr5-hWvay_xaO-RH5syB1D-zGVu+A@mail.gmail.com>
+ <20140117093909.GB2348@piout.net>
+Message-ID: <CAGb2v640Qeb60dMq2kH6M6NqkVbdUh1JcCus3a7D7icQeDdKNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 02:38 AM, Stephen Boyd wrote:
-> The 32 bit sched_clock interface supports 64 bits since 3.13-rc1.
-> Upgrade to the 64 bit function to allow us to remove the 32 bit
-> registration interface.
+On Fri, Jan 17, 2014 at 5:39 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On Thu, Jan 16, 2014 at 12:00:47PM -0800, Olof Johansson wrote :
+>> On Thu, Jan 16, 2014 at 11:58 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Jan 16, 2014 at 09:15:17AM -0800, Olof Johansson wrote:
+>> >> We've dealt with it with local code in our tree for Chrome OS, and I
+>> >> suspect everyone else has too. It's definitely time to solve
+>> >> generically.
+>> >
+>> > As there's no code for any Cubox-i or Hummingboard (they're both purely
+>> > DT), what this means is that the answer to Wifi/BT support in mainline is
+>> > that this is "impossible at the moment"...
+>> >
+>> > I guess this is becoming a higher priority issue which really needs to be
+>> > solved somehow. :)
+>>
+>> I'm looking at it right now actually, might as well sort it out while
+>> people are paying attention. Patches a little later today unless I get
+>> distrac^Winterrupted. :)
+>>
 >
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> Maybe it is not completely related but I think it needs to be thought
+> about while you are it:
 >
-> Cc'in Ingo because this is simple enough to probably just apply to timers/core
+> The TI wilink chips (TiWi, wl12xx, wl18xx) have wifi on SDIO and BT on
+> UART but they share the same clock. So, the next question would be what
+> if I just want to enable one or the other (and take that decision at
+> runtime) ?
 
-Hi Stephen,
+Some Broadcom chips (BCM4329/4330) and the AP6210 found on CubieTruck
+are like this as well. In our case, the SD/MMC host driver hasn't been
+mainlined yet. But BT on UART is independent and usable.
 
-I applied your patch in my tree for 3.15.
+> Where do I put the pinctrl/clocks/regulators in the DT ? I guess it can
+> become an issue to enable both WiFi and BT at the same time if both SDIO
+> and UART are trying to handle the same pinctrl and regulators.
 
-Thanks
-   -- Daniel
+Shouldn't the clocks and regulators be registered in the DT _AS_ clocks
+and regulators? fixed-regulator already accepts GPIO lines. fixed-rate-clock
+mentions GPIOs in DT bindings, but doesn't seem to use them in the code.
+We'd still need a device to tie them to, especially in the UART use case.
 
->   drivers/clocksource/timer-sun5i.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-> index bddc52233d2a..deebcd6469fc 100644
-> --- a/drivers/clocksource/timer-sun5i.c
-> +++ b/drivers/clocksource/timer-sun5i.c
-> @@ -136,7 +136,7 @@ static struct irqaction sun5i_timer_irq = {
->   	.dev_id = &sun5i_clockevent,
->   };
->
-> -static u32 sun5i_timer_sched_read(void)
-> +static u64 sun5i_timer_sched_read(void)
->   {
->   	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
->   }
-> @@ -166,7 +166,7 @@ static void __init sun5i_timer_init(struct device_node *node)
->   	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
->   	       timer_base + TIMER_CTL_REG(1));
->
-> -	setup_sched_clock(sun5i_timer_sched_read, 32, rate);
-> +	sched_clock_register(sun5i_timer_sched_read, 32, rate);
->   	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
->   			      rate, 340, 32, clocksource_mmio_readl_down);
->
->
+Or we could try rfkill devices. Not saying it's the correct way, but it is
+a solution.
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Cheers,
+ChenYu
