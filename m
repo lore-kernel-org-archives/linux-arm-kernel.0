@@ -1,40 +1,165 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Jan 2014 12:24:00 +0000
-Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
-In-Reply-To: <CAKv+Gu8nnv-ePTyDGv0RiuFcJW7rWhOe0G1JFx439AjA28+wig@mail.gmail.com>
-References: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
- <CAKv+Gu8nnv-ePTyDGv0RiuFcJW7rWhOe0G1JFx439AjA28+wig@mail.gmail.com>
-Message-ID: <20140117122359.GF16003@mudshark.cambridge.arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 17 Jan 2014 20:24:55 +0800
+Subject: [PATCH 01/20] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+In-Reply-To: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1389961514-13562-2-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 11:22:27AM +0000, Ard Biesheuvel wrote:
-> On 17 January 2014 09:04, Jingoo Han <jg1.han@samsung.com> wrote:
-> > Use 'ubfm' for the bitfield move instruction; thus, single
-> > instruction can be used instead of two instructions, when
-> > getting the minimum D-cache line size from CTR_EL0 register.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  arch/arm64/mm/proc-macros.S |    3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> > index 8957b82..c31f41e 100644
-> > --- a/arch/arm64/mm/proc-macros.S
-> > +++ b/arch/arm64/mm/proc-macros.S
-> > @@ -38,8 +38,7 @@
-> >   */
-> >         .macro  dcache_line_size, reg, tmp
-> >         mrs     \tmp, ctr_el0                   // read CTR
-> > -       lsr     \tmp, \tmp, #16
-> > -       and     \tmp, \tmp, #0xf                // cache line size encoding
-> > +       ubfm    \tmp, \tmp, #0x16, 0x19         // cache line size encoding
-> 
-> Even if the # is optional for immediates these days, perhaps it is
-> better to adhere to a single style in one line?
+Not all the ARM64 targets that are using ACPI have PCI, so introduce
+some stub functions to make PCI optional for ACPI, and make ACPI core
+run without CONFIG_PCI on ARM64.
 
-In ARM assembler syntax, the preferred prefix for decimal immediates is '#'
-not 0x ;)
+pcibios_penalize_isa_irq() is arch dependent, introduce asm/pci.h to
+include it.
 
-Will
+Since ACPI on X86 and IA64 depends on PCI, it will not break X86 and
+IA64 with this patch.
+
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/include/asm/pci.h |   20 ++++++++++++++++++++
+ drivers/acpi/Makefile        |    2 +-
+ drivers/acpi/internal.h      |    7 +++++++
+ drivers/acpi/osl.c           |    3 ++-
+ include/linux/pci.h          |   33 ++++++++++++++++++++++++---------
+ 5 files changed, 54 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
+
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+new file mode 100644
+index 0000000..455909d
+--- /dev/null
++++ b/arch/arm64/include/asm/pci.h
+@@ -0,0 +1,20 @@
++#ifndef __ASMARM64_PCI_H
++#define __ASMARM64_PCI_H
++
++#ifdef __KERNEL__
++
++static inline void pcibios_penalize_isa_irq(int irq, int active)
++{
++	/* We don't do dynamic PCI IRQ allocation */
++}
++
++/*
++ * The PCI address space does equal the physical memory address space.
++ * The networking and block device layers use this boolean for bounce
++ * buffer decisions.
++ */
++#define PCI_DMA_BUS_IS_PHYS     (1)
++
++#endif /* __KERNEL__ */
++
++#endif /* __ASMARM64_PCI_H */
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 0331f91..d8cebe3 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -38,7 +38,7 @@ acpi-y				+= acpi_processor.o
+ acpi-y				+= processor_core.o
+ acpi-y				+= ec.o
+ acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+-acpi-y				+= pci_root.o pci_link.o pci_irq.o
++acpi-$(CONFIG_PCI)		+= pci_root.o pci_link.o pci_irq.o
+ acpi-$(CONFIG_X86_INTEL_LPSS)	+= acpi_lpss.o
+ acpi-y				+= acpi_platform.o
+ acpi-y				+= power.o
+diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+index a29739c..52dff47 100644
+--- a/drivers/acpi/internal.h
++++ b/drivers/acpi/internal.h
+@@ -26,9 +26,16 @@
+ acpi_status acpi_os_initialize1(void);
+ int init_acpi_device_notify(void);
+ int acpi_scan_init(void);
++#ifdef CONFIG_PCI
+ void acpi_pci_root_init(void);
+ void acpi_pci_link_init(void);
+ void acpi_pci_root_hp_init(void);
++#else
++static inline void acpi_pci_root_init(void) {}
++static inline void acpi_pci_link_init(void) {}
++static inline void acpi_pci_root_hp_init(void) {}
++#endif /* CONFIG_PCI */
++
+ void acpi_processor_init(void);
+ void acpi_platform_init(void);
+ int acpi_sysfs_init(void);
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index 54a20ff..14ee6fc 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -1050,7 +1050,8 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
+ 	result = raw_pci_read(pci_id->segment, pci_id->bus,
+ 				PCI_DEVFN(pci_id->device, pci_id->function),
+ 				reg, size, &value32);
+-	*value = value32;
++	if (!result)
++		*value = value32;
+ 
+ 	return (result ? AE_ERROR : AE_OK);
+ }
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index a13d682..726cf2a 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -541,15 +541,6 @@ struct pci_ops {
+ 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
+ };
+ 
+-/*
+- * ACPI needs to be able to access PCI config space before we've done a
+- * PCI bus scan and created pci_bus structures.
+- */
+-int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+-		 int reg, int len, u32 *val);
+-int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+-		  int reg, int len, u32 val);
+-
+ struct pci_bus_region {
+ 	resource_size_t start;
+ 	resource_size_t end;
+@@ -1281,6 +1272,15 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+ 		      unsigned int command_bits, u32 flags);
+ void pci_register_set_vga_state(arch_set_vga_state_t func);
+ 
++/*
++ * ACPI needs to be able to access PCI config space before we've done a
++ * PCI bus scan and created pci_bus structures.
++ */
++int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
++		 int reg, int len, u32 *val);
++int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
++		  int reg, int len, u32 val);
++
+ #else /* CONFIG_PCI is not enabled */
+ 
+ /*
+@@ -1477,6 +1477,21 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+ static inline struct pci_dev *pci_dev_get(struct pci_dev *dev)
+ { return NULL; }
+ 
++static inline struct pci_bus *pci_find_bus(int domain, int busnr)
++{ return NULL; }
++
++static inline int pci_bus_write_config_byte(struct pci_bus *bus,
++			unsigned int devfn, int where, u8 val)
++{ return -ENODEV; }
++
++static inline int raw_pci_read(unsigned int domain, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 *val)
++{ return -EINVAL; }
++
++static inline int raw_pci_write(unsigned int domain, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
++{return -EINVAL; }
++
+ #define dev_is_pci(d) (false)
+ #define dev_is_pf(d) (false)
+ #define dev_num_vf(d) (0)
+-- 
+1.7.9.5
