@@ -1,52 +1,29 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 17 Jan 2014 17:07:23 +0530
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D902D6.3090208@linaro.org>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
-Message-ID: <52D915F3.3030500@nvidia.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 17 Jan 2014 17:05:52 +0530
+Subject: [PATCH 1/1] clk: samsung: Remove unneeded semicolon
+Message-ID: <1389958552-15889-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 January 2014 03:45 PM, Daniel Lezcano wrote:
-> On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
->> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
->>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
->>>> Will Deacon <will.deacon@arm.com> writes:
->>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
->>>>> used when
->>>>> you go idle?
->>>> That would mean falling back to broadcast timer, right? That's not
->>>> necessarily on the local CPU so wakeups would often wake two CPUs.
->>> You can prevent that if the hardware supports it with the
->>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
->> Instead of falling back on broadcast timer, is it possible to fall back
->> on other per-CPU timer which is preserved across idle state?
-> Is it what you are looking for ?
->
-> http://lwn.net/Articles/580568/
->
+Semicolon not needed after switch statement.
 
-If I understand correctly these patches enables us to use per-CPU timers 
-as broadcast timers. I do not want to use broadcast timer.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/samsung/clk-pll.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If I have 2 per-CPU timers T1 and T2, T1 is not preserved across idle 
-state and T2 is preserved. And I want to use T1 as scheduler timer.
-
-Can I do following for idle state?
-
-Idle entry:
-     clockevents_shutdown(T1);
-     clockevents_set_mode(T2, ONESHOT);
-     clockevents_program_event(T2, next_event);
-
-Idle exit:
-     clockevents_shutdown(T2);
-     clockevents_set_mode(T1, ONESHOT);
-
->>>> Does
->>>> anyone have patches for using a CPU local timer as a fallback for
->>>> C3STOP timers?
->>>
->
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index f2372fca0136..8538ffe042ce 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -375,7 +375,7 @@ static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long drate,
+ 		break;
+ 	default:
+ 		break;
+-	};
++	}
+ 
+ 	/* Set new configuration. */
+ 	__raw_writel(con1, pll->con_reg + 0x4);
+-- 
+1.7.9.5
