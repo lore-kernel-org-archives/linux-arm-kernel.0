@@ -1,37 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Jan 2014 10:07:23 +0000
-Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
-In-Reply-To: <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
-References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
- <20140116115634.GE30257@mudshark.cambridge.arm.com>
- <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
- <20140116125727.GI30257@mudshark.cambridge.arm.com>
- <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
- <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
-Message-ID: <20140117100723.GB16003@mudshark.cambridge.arm.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 17 Jan 2014 15:41:02 +0530
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D8F403.9070602@linaro.org>
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+Message-ID: <52D901B6.1070800@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 09:00:09AM +0000, Jean Pihet wrote:
-> On 16 January 2014 14:47, Jean Pihet <jean.pihet@linaro.org> wrote:
-> >> So the simplest thing would be to make compat_user_stack_pointer expand to
-> >> user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
-> >> original patch fixing user_stack_pointer.
-> 
-> I see 2 issues in your proposal:
-> 
-> 1) user_stack_pointer(regs) calls compat_user_stack_pointer if
-> compat_user_mode(regs)) and compat_user_stack_pointer expands to
-> user_stack_pointer. I see a circular dependency in the macros.
+On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
+> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
+>> Will Deacon <will.deacon@arm.com> writes:
+>>> Why can't you use the C3STOP feature so that the arch-timer isn't used when
+>>> you go idle?
+>> That would mean falling back to broadcast timer, right? That's not
+>> necessarily on the local CPU so wakeups would often wake two CPUs.
+> You can prevent that if the hardware supports it with the
+> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
 
-Not today it doesn't, so you just need to avoid writing the circular
-dependency and instead make user_stack_pointer access (regs)->compat_sp
-instead.
+Instead of falling back on broadcast timer, is it possible to fall back 
+on other per-CPU timer which is preserved across idle state?
 
-> 2) current_pt_regs() returns the current task regs although perf
-> passes a regs struct that had been recorded previously.
-
-Yes, but compat_user_stack_pointer doesn't take a regs paramater anyway, so
-there's no change in behaviour here.
-
-Will
+>> Does
+>> anyone have patches for using a CPU local timer as a fallback for
+>> C3STOP timers?
+>
+>
