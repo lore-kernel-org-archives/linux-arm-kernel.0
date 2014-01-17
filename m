@@ -1,32 +1,99 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jan 2014 21:24:43 +0800
-Subject: [PATCH net-next v3 4/8] blackfin: Update stmmac callback signatures
+Date: Fri, 17 Jan 2014 21:24:40 +0800
+Subject: [PATCH net-next v3 1/8] net: stmmac: Enable stmmac main clock when
+ probing hardware
 In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
 References: <1389965087-21971-1-git-send-email-wens@csie.org>
-Message-ID: <1389965087-21971-5-git-send-email-wens@csie.org>
+Message-ID: <1389965087-21971-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stmmac callbacks have been extended for better separation.
-Update them to avoid breakage.
+The stmmac driver does not enable the main clock during the probe phase.
+If the clock was not enabled by the boot loader or was disabled by the
+kernel, hardware features and the MDIO bus would not be probed properly.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/blackfin/mach-bf609/boards/ezkit.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 26 +++++++++++------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/blackfin/mach-bf609/boards/ezkit.c b/arch/blackfin/mach-bf609/boards/ezkit.c
-index 82beedd..05194e9 100644
---- a/arch/blackfin/mach-bf609/boards/ezkit.c
-+++ b/arch/blackfin/mach-bf609/boards/ezkit.c
-@@ -117,7 +117,7 @@ static struct stmmac_dma_cfg eth_dma_cfg = {
- 	.pbl	= 2,
- };
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index cddcf76..0d2c4cb 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -1680,8 +1680,6 @@ static int stmmac_open(struct net_device *dev)
+ 	struct stmmac_priv *priv = netdev_priv(dev);
+ 	int ret;
  
--int stmmac_ptp_clk_init(struct platform_device *pdev)
-+int stmmac_ptp_clk_init(struct platform_device *pdev, void *priv)
- {
- 	bfin_write32(PADS0_EMAC_PTP_CLKSEL, 0);
+-	clk_prepare_enable(priv->stmmac_clk);
+-
+ 	stmmac_check_ether_addr(priv);
+ 
+ 	if (priv->pcs != STMMAC_PCS_RGMII && priv->pcs != STMMAC_PCS_TBI &&
+@@ -1819,7 +1817,6 @@ static int stmmac_release(struct net_device *dev)
+ #ifdef CONFIG_STMMAC_DEBUG_FS
+ 	stmmac_exit_fs();
+ #endif
+-	clk_disable_unprepare(priv->stmmac_clk);
+ 
+ 	stmmac_release_ptp(priv);
+ 
+@@ -2727,10 +2724,18 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	if ((phyaddr >= 0) && (phyaddr <= 31))
+ 		priv->plat->phy_addr = phyaddr;
+ 
++	priv->stmmac_clk = devm_clk_get(priv->device, STMMAC_RESOURCE_NAME);
++	if (IS_ERR(priv->stmmac_clk)) {
++		dev_warn(priv->device, "%s: warning: cannot get CSR clock\n",
++			 __func__);
++		goto error_clk_get;
++	}
++	clk_prepare_enable(priv->stmmac_clk);
++
+ 	/* Init MAC and get the capabilities */
+ 	ret = stmmac_hw_init(priv);
+ 	if (ret)
+-		goto error_free_netdev;
++		goto error_hw_init;
+ 
+ 	ndev->netdev_ops = &stmmac_netdev_ops;
+ 
+@@ -2768,12 +2773,6 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 		goto error_netdev_register;
+ 	}
+ 
+-	priv->stmmac_clk = clk_get(priv->device, STMMAC_RESOURCE_NAME);
+-	if (IS_ERR(priv->stmmac_clk)) {
+-		pr_warn("%s: warning: cannot get CSR clock\n", __func__);
+-		goto error_clk_get;
+-	}
+-
+ 	/* If a specific clk_csr value is passed from the platform
+ 	 * this means that the CSR Clock Range selection cannot be
+ 	 * changed at run-time and it is fixed. Viceversa the driver'll try to
+@@ -2801,12 +2800,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	return priv;
+ 
+ error_mdio_register:
+-	clk_put(priv->stmmac_clk);
+-error_clk_get:
+ 	unregister_netdev(ndev);
+ error_netdev_register:
+ 	netif_napi_del(&priv->napi);
+-error_free_netdev:
++error_hw_init:
++	clk_disable_unprepare(priv->stmmac_clk);
++error_clk_get:
+ 	free_netdev(ndev);
+ 
+ 	return NULL;
+@@ -2833,6 +2832,7 @@ int stmmac_dvr_remove(struct net_device *ndev)
+ 		stmmac_mdio_unregister(ndev);
+ 	netif_carrier_off(ndev);
+ 	unregister_netdev(ndev);
++	clk_disable_unprepare(priv->stmmac_clk);
+ 	free_netdev(ndev);
+ 
  	return 0;
 -- 
 1.8.5.2
