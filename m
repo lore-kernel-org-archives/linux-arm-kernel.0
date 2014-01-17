@@ -1,39 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Jan 2014 13:12:58 +0000
-Subject: New randconfig build failure: rx51 asoc / gpiolib
-Message-ID: <20140117131257.GB15937@n2100.arm.linux.org.uk>
+Date: Fri, 17 Jan 2014 13:22:32 +0000
+Subject: Randconfig build failure: screwed dependencies for phy-msm-usb.c
+Message-ID: <20140117132232.GC15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last night's omap randconfig found this.  This has only appeared in the
-builds in the last few days, so it's a new regression for the changes
-queued up for merge window:
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
+drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
+drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
+drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
 
-sound/soc/omap/rx51.c:220:33: error: array type has incomplete element type
-sound/soc/omap/rx51.c:222:3: error: field name not in record or union initializer
-sound/soc/omap/rx51.c:222:3: error: (near initialization for 'rx51_av_jack_gpios')
-sound/soc/omap/rx51.c:223:3: error: field name not in record or union initializer
-sound/soc/omap/rx51.c:223:3: error: (near initialization for 'rx51_av_jack_gpios')
-sound/soc/omap/rx51.c:224:3: error: field name not in record or union initializer
+#ifdef CONFIG_PM_SLEEP
+static int msm_otg_suspend(struct msm_otg *motg)
+{
 ...
-sound/soc/omap/rx51.c: In function 'rx51_aic34_init':
-sound/soc/omap/rx51.c:325:2: error: implicit declaration of function 'snd_soc_jack_add_gpios'
-sound/soc/omap/rx51.c:326:89: error: type defaults to 'int' in type name
-sound/soc/omap/rx51.c:326:89: error: type defaults to 'int' in type name
-sound/soc/omap/rx51.c:326:89: error: negative width in bit-field '<anonymous>'
-sound/soc/omap/rx51.c: In function 'rx51_soc_exit':
-sound/soc/omap/rx51.c:437:2: error: implicit declaration of function 'snd_soc_jack_free_gpios'
-sound/soc/omap/rx51.c:437:120: error: type defaults to 'int' in type name
-sound/soc/omap/rx51.c:437:120: error: type defaults to 'int' in type name
-sound/soc/omap/rx51.c:437:120: error: negative width in bit-field '<anonymous>'
+}
 
-which is caused by "struct snd_soc_jack_gpio" not being defined.  For
-some reason, this structure is defined in sound/soc.h, but is
-conditionalised upon CONFIG_GPIOLIB.
+static int msm_otg_resume(struct msm_otg *motg)
+{
+...
+}
+#endif
+...
+#ifdef CONFIG_PM_RUNTIME
+...
+static int msm_otg_runtime_suspend(struct device *dev)
+{
+        struct msm_otg *motg = dev_get_drvdata(dev);
 
-This means either the dependencies on SND_OMAP_SOC_RX51 are incorrect
-(they don't include a dependency on GPIOLIB) or ASoC is wrong to make
-the definitions conditional upon GPIOLIB.
+        dev_dbg(dev, "OTG runtime suspend\n");
+        return msm_otg_suspend(motg);
+}
+
+static int msm_otg_runtime_resume(struct device *dev)
+{
+        struct msm_otg *motg = dev_get_drvdata(dev);
+
+        dev_dbg(dev, "OTG runtime resume\n");
+        return msm_otg_resume(motg);
+}
+#endif
+
+So, if runtime PM is enabled, but PM sleep isn't, this fails as above.
+If the msm_otg_* functions are required for runtime PM, they shouldn't
+be conditional on CONfIG_PM_SLEEP.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
