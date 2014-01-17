@@ -1,43 +1,40 @@
-From: silvio@port1024.net (Silvio F.)
-Date: Fri, 17 Jan 2014 10:27:24 +0100
-Subject: [PATCH] ARM: imx6: dmo edmqmx6 updates
-In-Reply-To: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140117092724.GB28973@sfrouter>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Jan 2014 10:29:03 +0100
+Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
+In-Reply-To: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <52D8F7DF.5030406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> This series adds some additional features to the recently introduced
-> DataModul edmqmx6 board.
+On 17/01/2014 03:59, Bo Shen :
+> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
+> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
 > 
-> Sascha
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
 > 
-> ----------------------------------------------------------------
-> Philipp Zabel (1):
->       ARM: dts: imx6: edmqmx6: add PF0100 PMIC to device tree
+>  drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Sascha Hauer (3):
->       ARM: dts: imx6: edmqmx6: Add usdhc4 (emmc) support
->       ARM: dts: imx6: edmqmx6: Add sata support
->       ARM: dts: imx6: edmqmx6: Add LED support
-> 
->  arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 148 ++++++++++++++++++++++++++++++++
->  1 file changed, 148 insertions(+)
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> index 2cb52e0..7e67a81 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>  	if (ep_status) {
+>  		int i;
+>  
+> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
+> +		for (i = 0; i < udc->num_ep; i++)
+>  			if (ep_status & (1 << i)) {
+>  				if (ep_is_control(&udc->usba_ep[i]))
+>  					usba_control_irq(udc, &udc->usba_ep[i]);
 > 
 
-For the complete patchset:
-
-Tested-by: Silvio F. <silvio@port1024.net>
-Acked-by: Silvio F. <silvio@port1024.net>
-
-
-Cheers,
-    Silvio
 
 -- 
--- S. Fricke ---------------------------------------- silvio at port1024.net --
-   Diplom-Informatiker (FH)
-   Linux-Entwicklung             JABBER: silvio at conversation.port1024.net   
-----------------------------------------------------------------------------
+Nicolas Ferre
