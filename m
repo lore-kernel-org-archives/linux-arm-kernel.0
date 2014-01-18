@@ -1,184 +1,123 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 18 Jan 2014 13:02:08 +0100
-Subject: [PATCH v4] of: add functions to count number of elements in a property
-In-Reply-To: <CAL_JsqJ_St=OegpexzrTGXwmOYCz4YeWk_1S+R_q6NajmmPqSA@mail.gmail.com>
-References: <27256277.YJ687suYy5@phil> <1434798.oSb68sYmYT@phil>
- <CAL_JsqJ_St=OegpexzrTGXwmOYCz4YeWk_1S+R_q6NajmmPqSA@mail.gmail.com>
-Message-ID: <5115255.DrcMbtXc1P@phil>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Sat, 18 Jan 2014 17:40:50 +0530
+Subject: [PATCH v2 0/7] cpufreq: use cpufreq-cpu0 driver for exynos based
+ platforms
+Message-ID: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The need to know the number of array elements in a property is
-a common pattern. To prevent duplication of open-coded implementations
-add a helper static function that also centralises strict sanity
-checking and DTB format details, as well as a set of wrapper functions
-for u8, u16, u32 and u64.
+Changes since v1:
+- Removes Exynos4x12 and Exynos5250 cpufreq driver also.
+- Device tree based clock configuration lookup as suggested by Lukasz
+  Majewski and Tomasz Figa.
+- safe operating point binding reworked as suggested by Shawn Guo.
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v3:
-address more comments from Rob Herring
-- export the base function and inline the type-specific wrappers
-changes since v2:
-address more comments from Mark Rutland
-- switch to of_property_count_elems_of_size
-- use full_name instead of name in error message
-changes since v1:
-address comments from Rob Herring and Mark Rutland:
-- provide a helper and a set of wrappers for u8-u64
-- get rid of extra len variable, prop->length is enough
-- include node name in error message
+The patch series removes the use of Exynos specific cpufreq driver and enables
+the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
+platforms. This is being done for few reasons.
 
-Mark, does your Reviewed-by holds for this variant too?
+(a) The Exynos cpufreq driver reads/writes clock controller registers
+    bypassing the Exynos CCF driver which is sort of problematic.
+(b) Removes the need for having clock controller register definitions
+    in the cpufreq driver and also removes the need for statically
+    io-remapping clock controller address space (helps in moving towards
+    multiplatform kernel).
 
- drivers/of/base.c  |   32 ++++++++++++++++++++++
- include/linux/of.h |   76 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
+In order to use cpufreq-cpu0 driver and provide fast cpu clock switching
+during dvfs operations, the following apporach has been used.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index f807d0e..21646c0 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -862,6 +862,38 @@ struct device_node *of_find_node_by_phandle(phandle handle)
- EXPORT_SYMBOL(of_find_node_by_phandle);
- 
- /**
-+ * of_property_count_elems_of_size - Count the number of elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ * @elem_size:	size of the individual element
-+ *
-+ * Search for a property in a device node and count the number of elements of
-+ * size elem_size in it. Returns number of elements on sucess, -EINVAL if the
-+ * property does not exist or its length does not match a multiple of u16 and
-+ * -ENODATA if the property does not have a value.
-+ */
-+int of_property_count_elems_of_size(const struct device_node *np,
-+				const char *propname, int elem_size)
-+{
-+	struct property *prop = of_find_property(np, propname, NULL);
-+
-+	if (!prop)
-+		return -EINVAL;
-+	if (!prop->value)
-+		return -ENODATA;
-+
-+	if (prop->length % elem_size != 0) {
-+		pr_err("size of %s in node %s is not a multiple of %d\n",
-+		       propname, np->full_name, elem_size);
-+		return -EINVAL;
-+	}
-+
-+	return prop->length / elem_size;
-+}
-+EXPORT_SYMBOL_GPL(of_property_count_elems_of_size);
-+
-+/**
-  * of_find_property_value_of_size
-  *
-  * @np:		device node from which the property value is to be read.
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 276c546..293920d 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -250,6 +250,8 @@ extern struct device_node *of_find_node_with_property(
- extern struct property *of_find_property(const struct device_node *np,
- 					 const char *name,
- 					 int *lenp);
-+extern int of_property_count_elems_of_size(const struct device_node *np,
-+				const char *propname, int elem_size);
- extern int of_property_read_u32_index(const struct device_node *np,
- 				       const char *propname,
- 				       u32 index, u32 *out_value);
-@@ -426,6 +428,12 @@ static inline struct device_node *of_find_compatible_node(
- 	return NULL;
- }
- 
-+static inline int of_property_count_elems_of_size(const struct device_node *np,
-+			const char *propname, int elem_size)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_property_read_u32_index(const struct device_node *np,
- 			const char *propname, u32 index, u32 *out_value)
- {
-@@ -565,6 +573,74 @@ static inline int of_node_to_nid(struct device_node *device) { return 0; }
- #endif
- 
- /**
-+ * of_property_count_u8_elems - Count the number of u8 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u8 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u8 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+static inline int of_property_count_u8_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u8));
-+}
-+
-+/**
-+ * of_property_count_u16_elems - Count the number of u16 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u16 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u16 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+static inline int of_property_count_u16_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u16));
-+}
-+
-+/**
-+ * of_property_count_u32_elems - Count the number of u32 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u32 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u32 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+static inline int of_property_count_u32_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u32));
-+}
-+
-+/**
-+ * of_property_count_u64_elems - Count the number of u64 elements in a property
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node and count the number of u64 elements
-+ * in it. Returns number of elements on sucess, -EINVAL if the property does
-+ * not exist or its length does not match a multiple of u64 and -ENODATA if the
-+ * property does not have a value.
-+ */
-+static inline int of_property_count_u64_elems(const struct device_node *np,
-+				const char *propname)
-+{
-+	return of_property_count_elems_of_size(np, propname, sizeof(u64));
-+}
-+
-+/**
-  * of_property_read_bool - Findfrom a property
-  * @np:		device node from which the property value is to be read.
-  * @propname:	name of the property to be searched.
--- 
-1.7.10.4
+(a) A new CPU clock provider type has been introduced in Samsung's CCF
+    support. This clock provider type can be a compostion of multiple
+    clock blocks such as mux, dividers and gates. Typically, in Exynos
+    platforms, there are multiple clock blocks in between the output
+    of the APLL and the CPU clock domain output. Representing these
+    mutiple clock blocks within a opaque CPU clock provider type helps
+    in reducing the time taken to perform a CPU clock frequency change
+    operation, which is generally required during DVFS operations.
+    This approach was suggested by Arnd Bergmann <arnd@arndb.de> during
+    LCE-2013.
+
+(b) A new optional safe operating point property has been introduced
+    in the cpufreq-cpu0 driver binding. On some platforms such as the
+    Samsung Exynos, a change in CPU frequency requires a change in the
+    PLL output that drives the CPU clock. A change in PLL output
+    requires the PLL output be turned off, which implies that the CPU
+    (and other components in the CPU clock domain) be supplied with
+    an alternate clock source during the time the PLL output is changed.
+
+    The clock speed of this alternate clock source could be higher
+    than the clock speed of the PLL at the time of switching over to
+    the alternate clock source. This temporary increase in clock speed
+    of the CPU clock domain implies that the blocks within the CPU
+    clock domain should also be supplied with an appropriate voltage
+    supply level as required to drive the CPU clock domain components
+    at the speed of the alternative clock source. This temporary
+    voltage level required during switching of CPU clock speed is
+    called safe voltage level. And the cpufreq-cpu0 driver has been
+    modified to setup the safe voltage levels during the changes
+    in CPU clock speed.
+
+(c) The CPU clock supply as been restructured as
+    [ Output of APLL -> Opaque CPU clock provider -> CPU clock output ]
+    And with the changes in (a) and (b) above, the cpufreq-cpu0 driver
+    can now be used and can remove the use of Exynos specific
+    cpufreq driver.
+
+This patch series is tested on the following platforms.
+  - Exynos4210 based Insignal Origen board.
+  - Exynos4412 based Insignal Origen Quad board.
+  - Exynos5250 based Samsung SMDK board.
+
+This patch series is based on linux-next master branch.
+
+Thomas Abraham (7):
+  cpufreq: cpufreq-cpu0: allow optional safe voltage during frequency transitions
+  clk: samsung: add infrastructure to register cpu clocks
+  devicetree: bindings: add cpu clock configuration data binding for Exynos4/5
+  ARM: dts: Exynos: add cpu nodes, opp and cpu clock frequency table
+  clk: exynos: use cpu-clock provider type to represent arm clock
+  ARM: Exynos: switch to using generic cpufreq-cpu0 driver
+  cpufreq: exynos: remove all exynos specific cpufreq driver support
+
+ .../devicetree/bindings/clock/exynos4-clock.txt    |   30 ++
+ .../devicetree/bindings/clock/exynos5250-clock.txt |   22 ++
+ .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    7 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
+ arch/arm/boot/dts/exynos4212.dtsi                  |   17 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
+ arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |   30 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   35 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   43 +++-
+ arch/arm/mach-exynos/common.c                      |    5 -
+ arch/arm/mach-exynos/common.h                      |    1 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    2 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
+ drivers/clk/samsung/Makefile                       |    2 +-
+ drivers/clk/samsung/clk-cpu.c                      |  345 ++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos4.c                  |   11 +-
+ drivers/clk/samsung/clk-exynos5250.c               |    8 +-
+ drivers/clk/samsung/clk.h                          |    3 +
+ drivers/cpufreq/Kconfig.arm                        |   36 --
+ drivers/cpufreq/Makefile                           |    4 -
+ drivers/cpufreq/cpufreq-cpu0.c                     |   37 ++-
+ drivers/cpufreq/exynos-cpufreq.c                   |  292 -----------------
+ drivers/cpufreq/exynos-cpufreq.h                   |   91 -----
+ drivers/cpufreq/exynos4210-cpufreq.c               |  157 ---------
+ drivers/cpufreq/exynos4x12-cpufreq.c               |  211 ------------
+ drivers/cpufreq/exynos5250-cpufreq.c               |  183 -----------
+ include/dt-bindings/clock/exynos5250.h             |    1 +
+ 35 files changed, 666 insertions(+), 998 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-cpu.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
