@@ -1,54 +1,75 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jan 2014 00:48:42 +0100
-Subject: [RFC v3 00/13] ahci: add sunxi driver and cleanup imx driver
-Message-ID: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 18 Jan 2014 18:54:11 -0500
+Subject: [PATCH] ARM: kirkwood: kirkwood_pm_init() should return void
+In-Reply-To: <1389984731-20220-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1389984731-20220-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140118235411.GN29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Fri, Jan 17, 2014 at 03:52:11PM -0300, Ezequiel Garcia wrote:
+> This function was originally meant to return void as declared in the
+> common.h header. Fix it and include the header to catch these errors
+> in the future.
+> 
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-kirkwood/pm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Here is v3 of my patchset for adding ahci-sunxi support. It has grown quite
-a bit since I've been going for a more generic approach this time and I've
-also cleaned up the ahci-imx driver to use the same generic approach.
+merf.  I get the following warning when building kirkwood_defconfig:
 
-History:
+arch/arm/mach-kirkwood/pm.c: In function 'kirkwood_pm_init':
+arch/arm/mach-kirkwood/pm.c:73:2: warning: 'return' with a value, in function returning void [enabled by default]
 
-v1, by Olliver Schinagl:
-This was using the approach of having a platform device which probe method
-creates a new child platform device which gets driven by ahci_platform.c,
-as done by ahci_imx.c .
+I've amended the patch as below and pushed it to mvebu/fixes
 
-v2, by Hans de Goede:
-Stand-alone platform driver based on Olliver's work
+thx,
 
-v3, by Hans de Goede:
-patch-series, with 4 different parts
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) New ahci-sunxi code only populating ahci_platform_data, passed to
-   ahci_platform.c to of_device_id matching.
-c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
-   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
-   arrive so that I can actually test this.
-d) dts bindings for the sunxi ahci parts
+Jason.
 
-Parts a-c are intended for merging through the ata tree, the dts bindings
-will be merged to Maxime Ripard's sunxi-dts tree.
+--------->8--------------------
+commit 77dfdeb41125b6468790fa4c620da262c910cbc9
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Fri Jan 17 15:52:11 2014 -0300
 
-I hope people like the new approach for dealing with of drivers which need
-to provide ahci_platform_data. An alternate approach would be to export
-ahci_probe (renamed to ahci_platform_probe) from ahci_platform.c, then
-ahci_sunxi.c could have a probe function like this:
+    ARM: kirkwood: kirkwood_pm_init() should return void
+    
+    This function was originally meant to return void as declared in the
+    common.h header. Fix it and include the header to catch these errors
+    in the future.
+    
+    [jac] removed 'return 0;' to clear this warning:
+    
+      arch/arm/mach-kirkwood/pm.c: In function 'kirkwood_pm_init':
+      arch/arm/mach-kirkwood/pm.c:73:2: warning: 'return' with a value, in function returning void [enabled by default]
+    
+    Reported-by: Andrew Lunn <andrew@lunn.ch>
+    Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+    Acked-by: Andrew Lunn <andrew@lunn.ch>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-int ahci_sunxi_probe(struct platform_device *pdev) {
-    pdev->dev.platform_data = &ahci_sunxi_pdata;
-    return ahci_platform_probe(pdev);
-}
-
-And then each of ahci_platform, ahci_sunxi and ahci_imx could be its own
-module (if build as module) rather then all of them being build into one
-module.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
+index 8783a7184e73..c6ab8d9303a5 100644
+--- a/arch/arm/mach-kirkwood/pm.c
++++ b/arch/arm/mach-kirkwood/pm.c
+@@ -18,6 +18,7 @@
+ #include <linux/suspend.h>
+ #include <linux/io.h>
+ #include <mach/bridge-regs.h>
++#include "common.h"
+ 
+ static void __iomem *ddr_operation_base;
+ 
+@@ -65,9 +66,8 @@ static const struct platform_suspend_ops kirkwood_suspend_ops = {
+ 	.valid = kirkwood_pm_valid_standby,
+ };
+ 
+-int __init kirkwood_pm_init(void)
++void __init kirkwood_pm_init(void)
+ {
+ 	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
+ 	suspend_set_ops(&kirkwood_suspend_ops);
+-	return 0;
+ }
