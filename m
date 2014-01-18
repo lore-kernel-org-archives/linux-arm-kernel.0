@@ -1,93 +1,51 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Sat, 18 Jan 2014 19:11:49 +0100
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <52D9D6C6.2000700@ti.com>
-References: <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
- <20140117175312.GH7993@atomide.com> <52D9723A.6000700@ti.com>
- <20140117205832.4167.95162@quantum> <52D9C484.6000404@ti.com>
- <CAOesGMiniMi9xG6ByL0pQE7wzpM82JB40cPvfJcSYkXPs3PrDw@mail.gmail.com>
- <52D9C88C.3020508@ti.com>
- <CAOesGMjB-Np1hkHfAPWeCxGK20OzWBt5zumFzDp5WLKTrntUAQ@mail.gmail.com>
- <52D9D6C6.2000700@ti.com>
-Message-ID: <20140118181148.GA10339@earth.universe>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Jan 2014 18:44:27 +0000
+Subject: imx6 eSATA
+Message-ID: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 07:20:06PM -0600, Nishanth Menon wrote:
-> On 01/17/2014 06:23 PM, Olof Johansson wrote:
-> > On Fri, Jan 17, 2014 at 4:19 PM, Nishanth Menon <nm@ti.com> wrote:
-> >> On 01/17/2014 06:12 PM, Olof Johansson wrote:
-> >>> On Fri, Jan 17, 2014 at 4:02 PM, Nishanth Menon <nm@ti.com> wrote:
-> >>>
-> >>>> clk-next-6a0cad9 + next-20140117 multi_v7_defconfig + CONFIG_LPAE=y:
-> >>>>  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s21GRhEOj4
-> >>>>  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s20zcNsD8h
-> >>>>  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s27U9IfRKR
-> >>>>  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2zYyeonec
-> >>>>  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21iCRjTHK
-> >>>>  6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s20bPGL3Sz
-> >>>>  7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s21AhFmkCk
-> >>>>  8:      crane: No Image built - Missing platform support?:
-> >>>>  9:       dra7:  Boot FAIL: http://slexy.org/raw/s21Qh3sQRu
-> >>>> * DRA7 not enabled?
-> >>>> 10:        ldp:  Boot PASS: http://slexy.org/raw/s21fvBfBgs
-> >>>> 11:   panda-es:  Boot FAIL: http://slexy.org/raw/s20RsgVUZJ
-> >>>> * known issue (https://patchwork.kernel.org/patch/3084521/)
-> >>>> 12:    sdp2430:  Boot FAIL: v6 platform - wont boot with multi_v7
-> >>>> 13:    sdp3430:  Boot PASS: http://slexy.org/raw/s20rhjjBwe
-> >>>> 14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2My0UfNPm
-> >>>> 15:       uevm:  Boot PASS: http://slexy.org/raw/s21aqF6eMN
-> >>>> TOTAL = 15 boards, Booted Boards = 11, No Boot boards = 4
-> >>>
-> >>>
-> >>> I have a hard time believing the above; A8/A9 boards are not bootable
-> >>> with CONFIG_LPAE=y...
-> >>
-> >> You are right! Drat!! I had CONFIG_LPAE=y in my script, not
-> >> CONFIG_ARM_LPAE=y! Grrr...
-> >>
-> >> Retest in a around 30 mins..
-> > 
-> > It's not a huge concern though; it's unlikely that LPAE makes a
-> > functional difference on this patch series. It's still useful to catch
-> > warnings, etc (most likely printk formats and the like).
-> > 
-> I suppose, as expected:
-> clk-next-6a0cad9 + next-20140117 multi_v7_defconfig + CONFIG_ARM_LPAE=y
-> * .config = http://slexy.org/view/s208uSeQS8
-> * Build warnings: http://slexy.org/raw/s20n7YwbwN
->  1: am335x-evm:  Boot FAIL: http://slexy.org/raw/s20tF2eUZG
->  2:  am335x-sk:  Boot FAIL: http://slexy.org/raw/s2uP65lOMQ
->  3: am3517-evm:  Boot FAIL: http://slexy.org/raw/s2Lx13gsFZ
->  4:  am37x-evm:  Boot FAIL: http://slexy.org/raw/s2eOLXxvsT
->  5: am43xx-epos:  Boot FAIL: http://slexy.org/raw/s24coJzGvR
->  6: BeagleBoard-XM:  Boot FAIL: http://slexy.org/raw/s240WznuPd
->  7: BeagleBone-Black:  Boot FAIL: http://slexy.org/raw/s20NG2UVTU
->  8:      crane: No Image built - Missing platform support?:
->  9:       dra7:  Boot FAIL: http://slexy.org/raw/s21T3RpHx2
-> ^^ might probably boot if we enable CONFIG_SOC_DRA7XX in multi_v7
-> (this is another A15 target)
-> 10:        ldp:  Boot FAIL: http://slexy.org/raw/s2F4VO9hDM
-> 11: PandaBoard-ES:  Boot FAIL: http://slexy.org/raw/s20HpzT1jW
-> 12:    sdp2430:  Boot FAIL: http://slexy.org/raw/s21snV1EvL
-> 13:    sdp3430:  Boot FAIL: http://slexy.org/raw/s2FwkVfG5R
-> 14:    sdp4430:  Boot FAIL: http://slexy.org/raw/s2xiWxlpTj
-> 15:       uevm:  Boot PASS: http://slexy.org/raw/s2LWUOmfiG
-> TOTAL = 15 boards, Booted Boards = 1, No Boot boards = 14
-> 
-> I am running a defconfig set check on next-20140117 and will do one
-> with next-20140118 once that is ready for comparison results
+So, I see we have AHCI support for SATA on the iMX6.  Great... but it
+doesn't work on the cubox-i, because the phy settings are wrong.
 
-Just for reference: I tried booting Nokia N900 using mike's
-clk-next-omap branch (HEAD = 3e04915):
+The Cubox-i requires GPR13 set to 0x0593A044 - I haven't decoded what
+this means yet, but it's different from the 0x0593E4A4 which is
+currently hard-coded into the driver (and I've independently tested
+that this is indeed required.)
 
-n900:  Boot PASS: http://paste.debian.net/77085/
+So, there's presently no DT properties for this - given that these
+parameters would be board specific, it surprises me that this has not
+been thought about, and properties already generated, because now it
+means that we need to _add_ new properties to this driver.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140118/d024c5da/attachment.sig>
+Also, this PDDQ mode thing, which can't be recovered except by reset.
+This is another illustration why Linux is unfriendly - the thing can
+silently go into this power down mode which is irrecoverable without
+any messages being generated nor any hints how to avoid it - maybe
+this should also be a DT property, not just a command line option.
+
+More importantly, maybe we should print a message when we discover
+that there's nothing connected and we're going to enter this mode -
+maybe something like this:
+
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 3e23e9941dad..0a1ae7213992 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -77,6 +77,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
+ 			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+ 	clk_disable_unprepare(imxpriv->sata_ref_clk);
+ 	imxpriv->no_device = true;
++
++	dev_info(ap->dev, "no device, link disabled until next reset.\n");
++	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
++		 ".hotplug=1 to enable link hotplug support\n");
+ }
+ 
+ static struct ata_port_operations ahci_imx_ops = {
+
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
