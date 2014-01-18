@@ -1,16 +1,19 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 Jan 2014 16:42:34 +0800
-Subject: [PATCH v2] ARM: dts: imx6: Add DFI FS700-M60 board support
-In-Reply-To: <1389949752-9617-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389949752-9617-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140118084232.GE3430@S2101-09.ap.freescale.net>
+Date: Sat, 18 Jan 2014 16:45:53 +0800
+Subject: [PATCH] ARM: imx6: dmo edmqmx6 updates
+In-Reply-To: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
+References: <1389876750-29880-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140118084550.GF3430@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 10:09:12AM +0100, Sascha Hauer wrote:
-> The DFI FS700-M60 is a q7 board with i.MX6 quad, dual, duallite or solo
-> SoC. This adds support for it.
+On Thu, Jan 16, 2014 at 01:52:26PM +0100, Sascha Hauer wrote:
+> Philipp Zabel (1):
+>       ARM: dts: imx6: edmqmx6: add PF0100 PMIC to device tree
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Sascha Hauer (3):
+>       ARM: dts: imx6: edmqmx6: Add usdhc4 (emmc) support
+>       ARM: dts: imx6: edmqmx6: Add sata support
+>       ARM: dts: imx6: edmqmx6: Add LED support
 
-Applied, thanks.
+Applied all 4, thanks.
