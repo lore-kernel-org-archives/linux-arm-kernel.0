@@ -1,29 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 18 Jan 2014 09:50:21 -0800
-Subject: [PATCH 0/3] ARM: OMAP: clk-next-omap emergency fixes
-In-Reply-To: <20140117213729.4167.55693@quantum>
-References: <1389990340-23358-1-git-send-email-t-kristo@ti.com>
- <20140117213729.4167.55693@quantum>
-Message-ID: <20140118175020.GF7235@atomide.com>
+Date: Sat, 18 Jan 2014 10:07:21 -0800
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140117205832.4167.95162@quantum>
+References: <20140115031632.4167.2698@quantum>
+ <20140115035011.4167.96678@quantum>
+ <20140115171323.GA22739@atomide.com>
+ <20140115192340.4167.87685@quantum>
+ <20140115193547.GF7993@atomide.com>
+ <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
+ <20140117175312.GH7993@atomide.com> <52D9723A.6000700@ti.com>
+ <20140117205832.4167.95162@quantum>
+Message-ID: <20140118180721.GG7235@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [140117 13:39]:
-> Quoting Tero Kristo (2014-01-17 12:25:37)
-> > Hi,
+* Mike Turquette <mturquette@linaro.org> [140117 13:00]:
+> Quoting Tero Kristo (2014-01-17 10:11:06)
+> > On 01/17/2014 07:53 PM, Tony Lindgren wrote:
+> > > * Kevin Hilman <khilman@linaro.org> [140117 09:48]:
+> > >> Mike Turquette <mturquette@linaro.org> writes:
+> > >>
+> > >> [...]
+> > >>
+> > >>> I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
+> > >>> Tero's series. This includes the AM3517 bits now. I've pushed this
+> > >>> branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
+> > >>> final sanity test before I merge this into clk-next?
 > > 
-> > Quick emergency band-aid for the build breakages introduced in clk-next
-> > by Mike. I didn't have time to test this out (Nishanth will provide some
-> > logs) and I will leave the decision whether/how to use these patches or not
-> > to Tony + Mike.
+> > I think you accidentally merged wrong branch to clk-next-omap with the 
+> > latest refresh. This is one is missing the build-fixes now, when it 
+> > earlier had those in.
 > > 
-> > I also pushed a test branch based on top of clk-next here:
-> > tree: https://github.com/t-kristo/linux-pm.git
-> > branch: clk-next-omap-fixes
+> > The correct branch to merge was 3.13-rc7-dt-clks-v13-build-fixes.
+> > 
+> > This also causes the build failure below for omap1.
 > 
-> Thanks Tero. I force updated the clk tree with the right branch, so
-> these should not be necessary now.
+> You are right. I broke the OMAPs. I force updated clk-next-omap (and
+> clk-next) with the correct branch this time.
 
-Great, and just for reference if I did not do it yet for these:
+OK works for me now, thanks.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Tony
