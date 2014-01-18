@@ -1,225 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 18 Jan 2014 16:28:51 +0100
-Subject: [PATCH v4] of: add functions to count number of elements in a
- property
-In-Reply-To: <CAL_JsqJord1OOjwcKk1jqF5o+XO3uw+Lc4ATtQacgwZWAoQq1g@mail.gmail.com>
-References: <27256277.YJ687suYy5@phil> <5115255.DrcMbtXc1P@phil>
- <CAL_JsqJord1OOjwcKk1jqF5o+XO3uw+Lc4ATtQacgwZWAoQq1g@mail.gmail.com>
-Message-ID: <1812408.EavpSnUyy3@phil>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 18 Jan 2014 17:21:08 +0100
+Subject: [PATCH v7 0/2] ohci and ehci-platform clks, phy and dt support
+In-Reply-To: <Pine.LNX.4.44L0.1401171053180.1162-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1401171053180.1162-100000@iolanthe.rowland.org>
+Message-ID: <52DAA9F4.2090601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 18. Januar 2014, 09:07:30 schrieb Rob Herring:
-> On Sat, Jan 18, 2014 at 6:02 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > The need to know the number of array elements in a property is
-> > a common pattern. To prevent duplication of open-coded implementations
-> > add a helper static function that also centralises strict sanity
-> > checking and DTB format details, as well as a set of wrapper functions
-> > for u8, u16, u32 and u64.
-> > 
-> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> 
-> Looks good. Do you plan to convert some users to use this?
+Hi,
 
-My plan at the moment was to "just" use it for my mmio-sram-reserve stuff - 
-just wanted to make sure that this change is sane, before having to sent the 
-whole thing for each iteration.
+On 01/17/2014 06:12 PM, Alan Stern wrote:
+> On Thu, 16 Jan 2014, Florian Fainelli wrote:
+>
+>> Le mercredi 15 janvier 2014, 15:26:21 Alan Stern a ?crit :
+>>> On Wed, 15 Jan 2014, Hans de Goede wrote:
+>>>> Hi All,
+>>>>
+>>>> This version of my ohci and ehci-platform clks, phy and dt support
+>>>> patch-set, really fixes the 2 small bugs Alan found.
+>>>
+>>> All okay -- this time I can't find anything to complain about.  :-)
+>>
+>> There is one minor issue; which is that the ehci binding claims the driver
+>> supports the following optional boolean properties:
+>>
+>> - big-endian-regs : boolean, set this for hcds with big-endian registers
+>> - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+>> - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
+>>
+>> while it does not (yet) so this is misleading. Can we at get that fixed before
+>> merging? Copy pasting the PPC ehci driver should do the job.
+>
+> I agree it needs to be fixed.  This can be done in a follow-up patch,
+> though.  It doesn't have to be in this one because nobody is using
+> ehci-platform with DT yet.
+>
+> A simple copy from the PPC driver isn't quite enough, because the
+> platform data settings would override the DT values.
+> ehci_platform_reset has to be changed so that it sets
+> ehci->big_endian_desc and _mmio if the pdata flags are set, but
+> otherwise leaves them alone.
+>
+> Hans, would you like to write another patch to take care of this?
 
-I haven't yet looked where the other users, that Mark mentioned, are at :-)
+I already took a quick look at this, setting the ehci->big_endian* flags is easy,
+the problem is that they won't work unless we also define
+CONFIG_USB_EHCI_BIG_ENDIAN_DESC and CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
 
+I would like to avoid doing something like the ugliness we've with
+USB_OHCI_HCD_PPC_OF_BE and USB_OHCI_HCD_PPC_OF_LE, which means just selecting these
+2 config options whenever USB_EHCI_HCD_PLATFORM is enabled, but I'm not sure if that
+is acceptable.
 
-Heiko
+The same goes for the ohci code btw.
 
+Regards,
 
-> > changes since v3:
-> > address more comments from Rob Herring
-> > - export the base function and inline the type-specific wrappers
-> > changes since v2:
-> > address more comments from Mark Rutland
-> > - switch to of_property_count_elems_of_size
-> > - use full_name instead of name in error message
-> > changes since v1:
-> > address comments from Rob Herring and Mark Rutland:
-> > - provide a helper and a set of wrappers for u8-u64
-> > - get rid of extra len variable, prop->length is enough
-> > - include node name in error message
-> > 
-> > Mark, does your Reviewed-by holds for this variant too?
-> > 
-> >  drivers/of/base.c  |   32 ++++++++++++++++++++++
-> >  include/linux/of.h |   76
-> >  ++++++++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed,
-> >  108 insertions(+)
-> > 
-> > diff --git a/drivers/of/base.c b/drivers/of/base.c
-> > index f807d0e..21646c0 100644
-> > --- a/drivers/of/base.c
-> > +++ b/drivers/of/base.c
-> > @@ -862,6 +862,38 @@ struct device_node *of_find_node_by_phandle(phandle
-> > handle)> 
-> >  EXPORT_SYMBOL(of_find_node_by_phandle);
-> >  
-> >  /**
-> > 
-> > + * of_property_count_elems_of_size - Count the number of elements in a
-> > property + *
-> > + * @np:                device node from which the property value is to be
-> > read. + * @propname:  name of the property to be searched.
-> > + * @elem_size: size of the individual element
-> > + *
-> > + * Search for a property in a device node and count the number of
-> > elements of + * size elem_size in it. Returns number of elements on
-> > sucess, -EINVAL if the + * property does not exist or its length does not
-> > match a multiple of u16 and + * -ENODATA if the property does not have a
-> > value.
-> > + */
-> > +int of_property_count_elems_of_size(const struct device_node *np,
-> > +                               const char *propname, int elem_size)
-> > +{
-> > +       struct property *prop = of_find_property(np, propname, NULL);
-> > +
-> > +       if (!prop)
-> > +               return -EINVAL;
-> > +       if (!prop->value)
-> > +               return -ENODATA;
-> > +
-> > +       if (prop->length % elem_size != 0) {
-> > +               pr_err("size of %s in node %s is not a multiple of %d\n",
-> > +                      propname, np->full_name, elem_size);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       return prop->length / elem_size;
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_property_count_elems_of_size);
-> > +
-> > +/**
-> > 
-> >   * of_find_property_value_of_size
-> >   *
-> >   * @np:                device node from which the property value is to be
-> >   read.> 
-> > diff --git a/include/linux/of.h b/include/linux/of.h
-> > index 276c546..293920d 100644
-> > --- a/include/linux/of.h
-> > +++ b/include/linux/of.h
-> > @@ -250,6 +250,8 @@ extern struct device_node *of_find_node_with_property(
-> > 
-> >  extern struct property *of_find_property(const struct device_node *np,
-> >  
-> >                                          const char *name,
-> >                                          int *lenp);
-> > 
-> > +extern int of_property_count_elems_of_size(const struct device_node *np,
-> > +                               const char *propname, int elem_size);
-> > 
-> >  extern int of_property_read_u32_index(const struct device_node *np,
-> >  
-> >                                        const char *propname,
-> >                                        u32 index, u32 *out_value);
-> > 
-> > @@ -426,6 +428,12 @@ static inline struct device_node
-> > *of_find_compatible_node(> 
-> >         return NULL;
-> >  
-> >  }
-> > 
-> > +static inline int of_property_count_elems_of_size(const struct
-> > device_node *np, +                       const char *propname, int
-> > elem_size)
-> > +{
-> > +       return -ENOSYS;
-> > +}
-> > +
-> > 
-> >  static inline int of_property_read_u32_index(const struct device_node
-> >  *np,
-> >  
-> >                         const char *propname, u32 index, u32 *out_value)
-> >  
-> >  {
-> > 
-> > @@ -565,6 +573,74 @@ static inline int of_node_to_nid(struct device_node
-> > *device) { return 0; }> 
-> >  #endif
-> >  
-> >  /**
-> > 
-> > + * of_property_count_u8_elems - Count the number of u8 elements in a
-> > property + *
-> > + * @np:                device node from which the property value is to be
-> > read. + * @propname:  name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node and count the number of u8
-> > elements + * in it. Returns number of elements on sucess, -EINVAL if the
-> > property does + * not exist or its length does not match a multiple of u8
-> > and -ENODATA if the + * property does not have a value.
-> > + */
-> > +static inline int of_property_count_u8_elems(const struct device_node
-> > *np,
-> > +                               const char *propname)
-> > +{
-> > +       return of_property_count_elems_of_size(np, propname, sizeof(u8));
-> > +}
-> > +
-> > +/**
-> > + * of_property_count_u16_elems - Count the number of u16 elements in a
-> > property + *
-> > + * @np:                device node from which the property value is to be
-> > read. + * @propname:  name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node and count the number of u16
-> > elements + * in it. Returns number of elements on sucess, -EINVAL if the
-> > property does + * not exist or its length does not match a multiple of
-> > u16 and -ENODATA if the + * property does not have a value.
-> > + */
-> > +static inline int of_property_count_u16_elems(const struct device_node
-> > *np, +                               const char *propname)
-> > +{
-> > +       return of_property_count_elems_of_size(np, propname, sizeof(u16));
-> > +}
-> > +
-> > +/**
-> > + * of_property_count_u32_elems - Count the number of u32 elements in a
-> > property + *
-> > + * @np:                device node from which the property value is to be
-> > read. + * @propname:  name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node and count the number of u32
-> > elements + * in it. Returns number of elements on sucess, -EINVAL if the
-> > property does + * not exist or its length does not match a multiple of
-> > u32 and -ENODATA if the + * property does not have a value.
-> > + */
-> > +static inline int of_property_count_u32_elems(const struct device_node
-> > *np, +                               const char *propname)
-> > +{
-> > +       return of_property_count_elems_of_size(np, propname, sizeof(u32));
-> > +}
-> > +
-> > +/**
-> > + * of_property_count_u64_elems - Count the number of u64 elements in a
-> > property + *
-> > + * @np:                device node from which the property value is to be
-> > read. + * @propname:  name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node and count the number of u64
-> > elements + * in it. Returns number of elements on sucess, -EINVAL if the
-> > property does + * not exist or its length does not match a multiple of
-> > u64 and -ENODATA if the + * property does not have a value.
-> > + */
-> > +static inline int of_property_count_u64_elems(const struct device_node
-> > *np, +                               const char *propname)
-> > +{
-> > +       return of_property_count_elems_of_size(np, propname, sizeof(u64));
-> > +}
-> > +
-> > +/**
-> > 
-> >   * of_property_read_bool - Findfrom a property
-> >   * @np:                device node from which the property value is to be
-> >   read. * @propname:  name of the property to be searched.
-> > 
-> > --
-> > 1.7.10.4
+Hans
