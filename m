@@ -1,57 +1,71 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jan 2014 16:23:07 -0800
-Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
-In-Reply-To: <52D9C88C.3020508@ti.com>
-References: <52D53084.1070105@ti.com> <20140115031632.4167.2698@quantum>
- <20140115035011.4167.96678@quantum>
- <20140115171323.GA22739@atomide.com>
- <20140115192340.4167.87685@quantum>
- <20140115193547.GF7993@atomide.com>
- <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
- <20140117175312.GH7993@atomide.com> <52D9723A.6000700@ti.com>
- <20140117205832.4167.95162@quantum> <52D9C484.6000404@ti.com>
- <CAOesGMiniMi9xG6ByL0pQE7wzpM82JB40cPvfJcSYkXPs3PrDw@mail.gmail.com>
- <52D9C88C.3020508@ti.com>
-Message-ID: <CAOesGMjB-Np1hkHfAPWeCxGK20OzWBt5zumFzDp5WLKTrntUAQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 17 Jan 2014 16:23:39 -0800
+Subject: [PATCH v3 0/8] ARM: sunxi: rename DT clock node names to clk@N
+In-Reply-To: <52D89E27.6060204@elopez.com.ar>
+References: <1389257565-19797-1-git-send-email-wens@csie.org>
+ <52D89E27.6060204@elopez.com.ar>
+Message-ID: <20140118002339.4167.12605@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 4:19 PM, Nishanth Menon <nm@ti.com> wrote:
-> On 01/17/2014 06:12 PM, Olof Johansson wrote:
->> On Fri, Jan 17, 2014 at 4:02 PM, Nishanth Menon <nm@ti.com> wrote:
->>
->>> clk-next-6a0cad9 + next-20140117 multi_v7_defconfig + CONFIG_LPAE=y:
->>>  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s21GRhEOj4
->>>  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s20zcNsD8h
->>>  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s27U9IfRKR
->>>  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2zYyeonec
->>>  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21iCRjTHK
->>>  6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s20bPGL3Sz
->>>  7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s21AhFmkCk
->>>  8:      crane: No Image built - Missing platform support?:
->>>  9:       dra7:  Boot FAIL: http://slexy.org/raw/s21Qh3sQRu
->>> * DRA7 not enabled?
->>> 10:        ldp:  Boot PASS: http://slexy.org/raw/s21fvBfBgs
->>> 11:   panda-es:  Boot FAIL: http://slexy.org/raw/s20RsgVUZJ
->>> * known issue (https://patchwork.kernel.org/patch/3084521/)
->>> 12:    sdp2430:  Boot FAIL: v6 platform - wont boot with multi_v7
->>> 13:    sdp3430:  Boot PASS: http://slexy.org/raw/s20rhjjBwe
->>> 14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2My0UfNPm
->>> 15:       uevm:  Boot PASS: http://slexy.org/raw/s21aqF6eMN
->>> TOTAL = 15 boards, Booted Boards = 11, No Boot boards = 4
->>
->>
->> I have a hard time believing the above; A8/A9 boards are not bootable
->> with CONFIG_LPAE=y...
->
-> You are right! Drat!! I had CONFIG_LPAE=y in my script, not
-> CONFIG_ARM_LPAE=y! Grrr...
->
-> Retest in a around 30 mins..
+Quoting Emilio L?pez (2014-01-16 19:06:15)
+> Hi,
+> 
+> El 09/01/14 05:52, Chen-Yu Tsai escribi?:
+> > This is v3 of the clock node renaming patch series, which renames
+> > the clock nodes in sunxi dts to conform to device tree naming
+> > conventions, i.e. clk at N. Dummy clocks that will be renamed/removed
+> > later, or clocks sharing registers are not renamed.
+> >
+> > Renamed clock nodes have clock-output-names properties added to
+> > desginate their names. Support for this is added in the first
+> > patch.
+> >
+> > Changes since v2:
+> >
+> >    * Dropped Cubietruck dts i2c controller patch. Maxime has taken it.
+> >    * Changed ARM in commit messages to uppercase.
+> >    * Add pll5, pll6 clock names to factors_data tied to compatible strings.
+> >    * Dropped pll5 output name in dts due to the previous change.
+> >    * Added dts binding documentation for "clock-output-names", as well as
+> >      examples.
+> >
+> > Changes since v1:
+> >
+> >    * Fixed pll5, pll6 divs clock name handling
+> >
+> > Cheers
+> > ChenYu
+> >
+> > Chen-Yu Tsai (8):
+> >    clk: sunxi: add clock-output-names dt property support
+> >    clk: sunxi: update clock-output-names dt binding documentation
+> >    clk: sunxi: add names for pll5, pll6 parent clocks to factors_data
+> >    clk: sunxi: get divs parent clock name from parent factor clock
+> >    ARM: dts: sun4i: rename clock node names to clk at N
+> >    ARM: dts: sun5i: rename clock node names to clk at N
+> >    ARM: dts: sun6i: rename clock node names to clk at N
+> >    ARM: dts: sun7i: rename clock node names to clk at N
+> >
+> >   Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++++++++++++++----
+> >   arch/arm/boot/dts/sun4i-a10.dtsi                  | 24 ++++++++-------
+> >   arch/arm/boot/dts/sun5i-a10s.dtsi                 | 24 ++++++++-------
+> >   arch/arm/boot/dts/sun5i-a13.dtsi                  | 24 ++++++++-------
+> >   arch/arm/boot/dts/sun6i-a31.dtsi                  | 12 ++++----
+> >   arch/arm/boot/dts/sun7i-a20.dtsi                  | 19 +++++++-----
+> >   drivers/clk/sunxi/clk-sunxi.c                     | 36 ++++++++++++++++-------
+> >   7 files changed, 117 insertions(+), 58 deletions(-)
+> 
+> The series looks good to me, other than the comment I made. Once that's 
+> settled, and if Mike, Maxime or anyone else have no further comments, 
+> I'll queue 1-4 for 3.15.
 
-It's not a huge concern though; it's unlikely that LPAE makes a
-functional difference on this patch series. It's still useful to catch
-warnings, etc (most likely printk formats and the like).
+Ack for patches 1-4.
 
+Regards,
+Mike
 
--Olof
+> 
+> Cheers, and thanks for working on this!
+> 
+> Emilio
