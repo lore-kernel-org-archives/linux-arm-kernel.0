@@ -1,54 +1,138 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 17 Jan 2014 21:56:00 -0500
-Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <52D98B99.5050604@broadcom.com>
-References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-4-git-send-email-syin@broadcom.com>
- <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
- <52D98B99.5050604@broadcom.com>
-Message-ID: <20140118025600.GS31049@beef>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sat, 18 Jan 2014 11:45:44 +0800
+Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
+ directory
+In-Reply-To: <52D91CE2.3050704@arm.com>
+References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
+ <1389924207-7360-2-git-send-email-hanjun.guo@linaro.org>
+ <52D91CE2.3050704@arm.com>
+Message-ID: <52D9F8E8.8030602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 11:59:21AM -0800, Sherman Yin wrote:
-> On 14-01-16 05:19 AM, Linus Walleij wrote:
-> >On Sat, Dec 21, 2013 at 3:13 AM, Sherman Yin <syin@broadcom.com> wrote:
-> >
-> >'> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
-> >>
-> >>Signed-off-by: Sherman Yin <syin@broadcom.com>
-> >>Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-> >>Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> >>---
-> >>v4: - PINCTRL selected in Kconfig, PINCTRL_CAPRI selected in bcm_defconfig
-> >>     - make use of regmap
-> >>     - change CAPRI_PIN_UPDATE from macro to inline function.
-> >>     - Handle pull-up strength arg in Ohm instead of enum
-> >
-> >Patch applied. It is really good now! It's late before the merge
-> >window, but you've done a tremendous work on this driver and
-> >I don't want to delay its deployment further.
+On 2014-1-17 20:06, Sudeep Holla wrote:
+> On 17/01/14 02:03, Hanjun Guo wrote:
+>> Move idle_boot_override out of the arch directory to be a single enum
+>> including both platforms values, this will make it rather easier to
+>> avoid ifdefs around which definitions are for which processor in
+>> generally used ACPI code.
+>>
+>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
+>>
+>> No functional change in this patch.
+>>
+>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/ia64/include/asm/processor.h    | 3 ---
+>>  arch/powerpc/include/asm/processor.h | 1 -
+>>  arch/x86/include/asm/processor.h     | 3 ---
+>>  arch/x86/kernel/process.c            | 1 +
+>>  include/linux/cpu.h                  | 8 ++++++++
+>>  5 files changed, 9 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/ia64/include/asm/processor.h b/arch/ia64/include/asm/processor.h
+>> index 5a84b3a..ccd63a0 100644
+>> --- a/arch/ia64/include/asm/processor.h
+>> +++ b/arch/ia64/include/asm/processor.h
+>> @@ -698,9 +698,6 @@ prefetchw (const void *x)
+>>  
+>>  extern unsigned long boot_option_idle_override;
+>>  
+>> -enum idle_boot_override {IDLE_NO_OVERRIDE=0, IDLE_HALT, IDLE_FORCE_MWAIT,
+>> -			 IDLE_NOMWAIT, IDLE_POLL};
+>> -
+>>  void default_idle(void);
+>>  
+>>  #define ia64_platform_is(x) (strcmp(x, ia64_platform_name) == 0)
+>> diff --git a/arch/powerpc/include/asm/processor.h b/arch/powerpc/include/asm/processor.h
+>> index fc14a38..06689c0 100644
+>> --- a/arch/powerpc/include/asm/processor.h
+>> +++ b/arch/powerpc/include/asm/processor.h
+>> @@ -440,7 +440,6 @@ static inline unsigned long get_clean_sp(unsigned long sp, int is_32)
+>>  #endif
+>>  
+>>  extern unsigned long cpuidle_disable;
+>> -enum idle_boot_override {IDLE_NO_OVERRIDE = 0, IDLE_POWERSAVE_OFF};
+>>  
 > 
-> Great, thanks for the support and reviews!
+> I don't think it is used in the context of ACPI. Though it's same variable name,
+> it looks like it just used as boot to override the cpuidle option.
+> Does it still make any sense to combine this ?
 
-Very nice! Now after having completely missing something fundamental on
-my reviews, I feel compelled to bring it up at the 11^H^H12th hour.
+Yes, it is not related to ACPI on powerpc, I will investigate it will cause
+compile warning or not if I don't combine this.
 
-That is, this is the *only* BCM281xx driver to be named Capri, both in
-the filename and driver code, but also in the binding compatible. We
-didn't do that on anything else that's gone upstream to date. This
-really introduces an unfortunate inconsistency as it obscures which
-SoC family this binding and driver belong with.
+> 
+>>  extern int powersave_nap;	/* set if nap mode can be used in idle loop */
+>>  extern void power7_nap(void);
+>> diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
+>> index 7b034a4..4bee51a 100644
+>> --- a/arch/x86/include/asm/processor.h
+>> +++ b/arch/x86/include/asm/processor.h
+>> @@ -729,9 +729,6 @@ extern void init_amd_e400_c1e_mask(void);
+>>  extern unsigned long		boot_option_idle_override;
+>>  extern bool			amd_e400_c1e_detected;
+>>  
+>> -enum idle_boot_override {IDLE_NO_OVERRIDE=0, IDLE_HALT, IDLE_NOMWAIT,
+>> -			 IDLE_POLL};
+>> -
+>>  extern void enable_sep_cpu(void);
+>>  extern int sysenter_setup(void);
+>>  
+>> diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
+>> index 3fb8d95..62764ff 100644
+>> --- a/arch/x86/kernel/process.c
+>> +++ b/arch/x86/kernel/process.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/stackprotector.h>
+>>  #include <linux/tick.h>
+>>  #include <linux/cpuidle.h>
+>> +#include <linux/cpu.h>
+>>  #include <trace/events/power.h>
+>>  #include <linux/hw_breakpoint.h>
+>>  #include <asm/cpu.h>
+>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+>> index 03e235ad..e324561 100644
+>> --- a/include/linux/cpu.h
+>> +++ b/include/linux/cpu.h
+>> @@ -220,6 +220,14 @@ void cpu_idle(void);
+>>  
+>>  void cpu_idle_poll_ctrl(bool enable);
+>>  
+>> +enum idle_boot_override {
+>> +	IDLE_NO_OVERRIDE = 0,
+>> +	IDLE_HALT,
+>> +	IDLE_NOMWAIT,
+>> +	IDLE_POLL,
+>> +	IDLE_POWERSAVE_OFF
+>> +};
+>> +
+> 
+> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
+> specific and may not make sense for other architectures.
 
-I wonder if Linus would accept a rename at this point (too late for 3.14
-presumably, but for 3.15) of s/capri/bcm281xx throughout, bcm11351 for
-the compatible string, as we have for the machine compatible, and also
-BCM281XX for the Kconfig option. If not, I'll survive, but it pains me
-to see one thing completely different out of this entire family. If
-nothing else, it would be great to address the compatible string before
-this hits the 3.14 release.
+yes, this is the strange part, the value is arch-dependent.
 
-Linus?
+> 
+> It will also require every architecture using ACPI to export
+> boot_option_idle_override which may not be really required.
 
--Matt
+so, how about forget this patch and move boot_option_idle_override
+related code into arch directory such as arch/x86/acpi/boot.c for
+x86?
+
+> 
+> Further the only users of boot_option_idle_override(outside x86) are:
+> 
+> 1. drivers/acpi/processor_core.c
+>    Your second patch is moving this to x86 specific code anyway
+> 
+> 2. drivers/acpi/processor_idle.c
+>    Currently idle driver is bit x86 specific and needs modifications to get it
+>    working on ARM
+
+Yes, That's why I did not enable acpi idle driver on ARM64 for now.
+
+Thanks
+Hanjun
