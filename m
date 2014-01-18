@@ -1,68 +1,46 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 18 Jan 2014 14:47:43 +0100
-Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
- directory
-In-Reply-To: <52D9FA72.5020505@linaro.org>
-References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
- <52D9F8E8.8030602@linaro.org> <52D9FA72.5020505@linaro.org>
-Message-ID: <5375666.26CZK1LlZA@vostro.rjw.lan>
+From: kasimling@gmail.com (Alex Ling)
+Date: Sat, 18 Jan 2014 22:24:42 +0800
+Subject: [PATCH 1/2] ARM: dts: Add dwmmc host for TINY4412
+Message-ID: <1390055084-27483-1-git-send-email-kasimling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, January 18, 2014 11:52:18 AM Hanjun Guo wrote:
-> On 2014-1-18 11:45, Hanjun Guo wrote:
-> > On 2014-1-17 20:06, Sudeep Holla wrote:
-> >> On 17/01/14 02:03, Hanjun Guo wrote:
-> >>> Move idle_boot_override out of the arch directory to be a single enum
-> >>> including both platforms values, this will make it rather easier to
-> >>> avoid ifdefs around which definitions are for which processor in
-> >>> generally used ACPI code.
-> >>>
-> >>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
-> >>>
-> >>> No functional change in this patch.
-> >>>
-> >>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
-> >>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>> ---
-> [...]
-> >>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-> >>> index 03e235ad..e324561 100644
-> >>> --- a/include/linux/cpu.h
-> >>> +++ b/include/linux/cpu.h
-> >>> @@ -220,6 +220,14 @@ void cpu_idle(void);
-> >>>  
-> >>>  void cpu_idle_poll_ctrl(bool enable);
-> >>>  
-> >>> +enum idle_boot_override {
-> >>> +	IDLE_NO_OVERRIDE = 0,
-> >>> +	IDLE_HALT,
-> >>> +	IDLE_NOMWAIT,
-> >>> +	IDLE_POLL,
-> >>> +	IDLE_POWERSAVE_OFF
-> >>> +};
-> >>> +
-> >>
-> >> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
-> >> specific and may not make sense for other architectures.
-> > 
-> > yes, this is the strange part, the value is arch-dependent.
-> > 
-> >>
-> >> It will also require every architecture using ACPI to export
-> >> boot_option_idle_override which may not be really required.
-> > 
-> > so, how about forget this patch and move boot_option_idle_override
-> > related code into arch directory such as arch/x86/acpi/boot.c for
-> > x86?
-> 
-> The general idea is that we can move all the arch-dependent codes
-> in ACPI driver to arch directory, then make codes in drivers/acpi/
-> arch independent.
+Add dwmmc host node for to support eMMC on TINY4412 board.
 
-Well, MWAIT is arch-dependent, so I'm not sure how IDLE_NOMWAIT fits into
-include/linux/cpu.h?
+Signed-off-by: Alex Ling <kasimling@gmail.com>
+---
+ arch/arm/boot/dts/exynos4412-tiny4412.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+index 0a98312..2c6bfe3 100644
+--- a/arch/arm/boot/dts/exynos4412-tiny4412.dts
++++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+@@ -63,6 +63,25 @@
+ 		status = "okay";
+ 	};
+ 
++	mmc at 12550000 {
++		num-slots = <1>;
++		supports-highspeed;
++		broken-cd;
++		non-removable;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
++		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <8>;
++		};
++	};
++
+ 	serial at 13800000 {
+ 		status = "okay";
+ 	};
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.9.5
