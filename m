@@ -1,70 +1,176 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Fri, 17 Jan 2014 23:53:17 +0000
-Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6sl
-In-Reply-To: <CACUGKYOgJDMO-xF9GC4Xh7+t6FDk6DwJ0iYX17Hh6LvqSjVa4Q@mail.gmail.com>
-References: <CACUGKYOgJDMO-xF9GC4Xh7+t6FDk6DwJ0iYX17Hh6LvqSjVa4Q@mail.gmail.com>
-Message-ID: <30BEA0EF-C7F3-48FB-9B07-2C244788DD38@freescale.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 Jan 2014 18:02:12 -0600
+Subject: [PATCHv13 00/40] ARM: TI SoC clock DT conversion
+In-Reply-To: <20140117205832.4167.95162@quantum>
+References: <52D53084.1070105@ti.com> <20140115031632.4167.2698@quantum>
+ <20140115035011.4167.96678@quantum> <20140115171323.GA22739@atomide.com>
+ <20140115192340.4167.87685@quantum> <20140115193547.GF7993@atomide.com>
+ <20140116213954.4167.37071@quantum> <87r486mrh5.fsf@linaro.org>
+ <20140117175312.GH7993@atomide.com> <52D9723A.6000700@ti.com>
+ <20140117205832.4167.95162@quantum>
+Message-ID: <52D9C484.6000404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Tobias
-        I will debug it next week and feedback to you. Thanks.
+On 01/17/2014 02:58 PM, Mike Turquette wrote:
+> Quoting Tero Kristo (2014-01-17 10:11:06)
+>> On 01/17/2014 07:53 PM, Tony Lindgren wrote:
+>>> * Kevin Hilman <khilman@linaro.org> [140117 09:48]:
+>>>> Mike Turquette <mturquette@linaro.org> writes:
+>>>>
+>>>> [...]
+>>>>
+>>>>> I took Tony's advice and fast-forwarded clk-next to -rc7 and applied
+>>>>> Tero's series. This includes the AM3517 bits now. I've pushed this
+>>>>> branch to clk-next-omap (force update) on my Linaro mirror. Can you do a
+>>>>> final sanity test before I merge this into clk-next?
+>>
+>> I think you accidentally merged wrong branch to clk-next-omap with the 
+>> latest refresh. This is one is missing the build-fixes now, when it 
+>> earlier had those in.
+>>
+>> The correct branch to merge was 3.13-rc7-dt-clks-v13-build-fixes.
+>>
+>> This also causes the build failure below for omap1.
+> 
+> You are right. I broke the OMAPs. I force updated clk-next-omap (and
+> clk-next) with the correct branch this time.
 
-Sent from Anson's iPhone
+Build tests: omap1_defconfig:
+clk-next-6a0cad9: builds fine
+clk-next-6a0cad9 + next-20140117: http://slexy.org/view/s2HgtvUtAl
+	disabling CONFIG_BT, builds fine
 
-> ? 2014?1?18??7:42?"John Tobias" <john.tobias.ph@gmail.com> ???
-> 
-> Hi Anson,
-> 
-> My kernel for iMX6SL has a imx6q-cpufreq and I used your patch.
-> Unfortunately, the kernel crashes if the imx6sl_set_wait_clk being
-> called in imx6sl_enter_wait.
-> 
-> [  288.166905] [<80044b80>] (dequeue_task+0x0/0xc8) from [<80045650>]
-> (deactivate_task+0x30/0x34)
-> [  288.176403] [<80045620>] (deactivate_task+0x0/0x34) from
-> [<8050ac88>] (__schedule+0x318/0x58c)
-> [  288.185848] [<8050a970>] (__schedule+0x0/0x58c) from [<8050af34>]
-> (schedule+0x38/0x88)
-> [  288.194758] [<8050aefc>] (schedule+0x0/0x88) from [<8050b1c8>]
-> (schedule_preempt_disabled+0x10/0x14)
-> [  288.204858] [<8050b1b8>] (schedule_preempt_disabled+0x0/0x14) from
-> [<8050bcd4>] (mutex_lock_nested+0x16c/0x334)
-> [  288.215850] [<8050bb68>] (mutex_lock_nested+0x0/0x334) from
-> [<8034763c>] (clk_prepare_lock+0x90/0x104)
-> [  288.226041] [<803475ac>] (clk_prepare_lock+0x0/0x104) from
-> [<80349254>] (clk_set_rate+0x1c/0xbc)
-> [  288.235535]  r6:806fd360 r5:00000000 r4:bf817f80 r3:80713d80
-> [  288.242679] [<80349238>] (clk_set_rate+0x0/0xbc) from [<8001e574>]
-> (imx6sl_set_wait_clk+0x28/0x70)
-> [  288.252354]  r5:00000043 r4:00000001
-> [  288.256585] [<8001e54c>] (imx6sl_set_wait_clk+0x0/0x70) from
-> [<8001def4>] (imx6sl_enter_wait+0x24/0x2c)
-> [  288.266684]  r5:00000043 r4:00000001
-> [  288.270949] [<8001ded0>] (imx6sl_enter_wait+0x0/0x2c) from
-> [<80317608>] (cpuidle_enter_state+0x44/0xfc)
-> [  288.281051]  r4:13bf2645 r3:8001ded0
-> [  288.285682] [<803175c4>] (cpuidle_enter_state+0x0/0xfc) from
-> [<803177bc>] (cpuidle_idle_call+0xfc/0x150)
-> [  288.295871]  r8:806e00d8 r7:00000001 r6:00000000 r5:80c58034 r4:806fd360
-> [  288.304428] [<803176c0>] (cpuidle_idle_call+0x0/0x150) from
-> [<8000fa68>] (arch_cpu_idle+0x10/0x44)
-> [  288.314108]  r9:8070970a r8:8070970a r7:806d2000 r6:806da0dc r5:806d2000
-> r4:806d2000
-> [  288.323611] [<8000fa58>] (arch_cpu_idle+0x0/0x44) from [<800590f4>]
-> (cpu_startup_entry+0xe0/0x120)
-> [  288.333460] [<80059014>] (cpu_startup_entry+0x0/0x120) from
-> [<80503c8c>] (rest_init+0xcc/0xdc)
-> [  288.342810]  r7:ffffffff r3:00000000
-> [  288.347115] [<80503bc0>] (rest_init+0x0/0xdc) from [<806a2b00>]
-> (start_kernel+0x348/0x354)
-> [  288.356099]  r6:806da040 r5:806da040 r4:806da150
-> [  288.361972] [<806a27b8>] (start_kernel+0x0/0x354) from [<80008070>]
-> (0x80008070)
-> 
-> 
-> Regards,
-> 
-> john
-> 
-> 
+Boot tests: clk-next-6a0cad9, clk-next-6a0cad9 + next-20140117 : No
+regressions seen
+
+Detailed Boot logs:
+
+clk-next-6a0cad9 omap2plus_defconfig:
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s21idEk2IZ
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s21Q4w8gWT
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s21dT7y2CA
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2VFaOtuDP
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s20L0DBt1d
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s20gKsdH3A
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2ZXTJswqY
+ 8:      crane: No Image built - Missing platform support?:
+ 9:       dra7:  Boot PASS: http://slexy.org/raw/s2XZfjQz67
+10:        ldp: No Image built - Missing platform support?:
+11:   panda-es:  Boot PASS: http://slexy.org/raw/s2ESRQgBbc
+12:    sdp2430: No Image built - Missing platform support?:
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s2YsAO3ZPJ
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2MxxggHkh
+15:       uevm:  Boot PASS: http://slexy.org/raw/s2wJT0B7wf
+TOTAL = 15 boards, Booted Boards = 12, No Boot boards = 3
+
+clk-next-6a0cad9 multi_v7_defconfig:
+ 1: am335x-evm:  Boot FAIL: http://slexy.org/raw/s21AXBDbM9
+* regulator/mmc missing here
+ 2:  am335x-sk:  Boot FAIL: http://slexy.org/raw/s21pQPhupJ
+* regulator/mmc missing here
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s21iM7TEiQ
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2pBD6nplU
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2X9mnCKhT
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s21CjzZtZ6
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2vCfnss8N
+ 8:      crane: No Image built - Missing platform support?:
+ 9:       dra7:  Boot FAIL: http://slexy.org/raw/s21Xn4t22A
+* DRA7 not enabled?
+10:        ldp: No Image built - Missing platform support?:
+11:   panda-es:  Boot PASS: http://slexy.org/raw/s21ZoijL9i
+12:    sdp2430: No Image built - Missing platform support?:
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s21rdIfh7S
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s21HXFj9cw
+15:       uevm:  Boot FAIL: http://slexy.org/raw/s21m26VdbI
+* regulator/mmc missing here
+TOTAL = 15 boards, Booted Boards = 8, No Boot boards = 7
+
+clk-next-6a0cad9 multi_v7_defconfig+CONFIG_LPAE=y:
+ 1: am335x-evm:  Boot FAIL: http://slexy.org/raw/s21GIuprIx
+* regulator/mmc missing here
+ 2:  am335x-sk:  Boot FAIL: http://slexy.org/raw/s20Vy6K9Rg
+* regulator/mmc missing here
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s20jXaoTYq
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s20bk4uHcb
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2gVGjYMXz
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s26D0F2N1t
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2ThmugNzC
+ 8:      crane: No Image built - Missing platform support?:
+ 9:       dra7:  Boot FAIL: http://slexy.org/raw/s21HdQFchd
+* DRA7 not enabled?
+10:        ldp: No Image built - Missing platform support?:
+11:   panda-es:  Boot PASS: http://slexy.org/raw/s2042Y9Pyb
+12:    sdp2430: No Image built - Missing platform support?:
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s2NCg8nLki
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s25GxRkWcj
+15:       uevm:  Boot FAIL: http://slexy.org/raw/s2Q7xBYM3a
+* regulator/mmc missing here
+TOTAL = 15 boards, Booted Boards = 8, No Boot boards = 7
+
+
+clk-next-6a0cad9 + next-20140117 omap2plus_defconfig:
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2ll3LdMN2
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2jyAF2Och
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s20nPsCcUS
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2Rn7Vqh8x
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2frIhnu6Y
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s2GNee8kHF
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2G7fD4rGD
+ 8:      crane: No Image built - Missing platform support?: (pending
+merge from Benoit)
+ 9:       dra7:  Boot PASS: http://slexy.org/raw/s21W2zLl5q
+10:        ldp:  Boot FAIL: http://slexy.org/raw/s21518Tibq
+* intermittent failures seen previously as well -> debug pending
+11:   panda-es:  Boot PASS: http://slexy.org/raw/s20WddZMVp
+12:    sdp2430:  Boot PASS: http://slexy.org/raw/s2cVr3BLLi
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s21h9oDSCv
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s21PWBCUKn
+15:       uevm:  Boot PASS: http://slexy.org/raw/s2OxDQtC9E
+TOTAL = 15 boards, Booted Boards = 13, No Boot boards = 2
+
+clk-next-6a0cad9 + next-20140117 multi_v7_defconfig:
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20MpjXQ71
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2T0vnX8s7
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2hvsW2oVi
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2Li1DqaeQ
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2MHh0c19C
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s21RnOxxUk
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2qaKF0lqp
+ 8:      crane: No Image built - Missing platform support?:
+ 9:       dra7:  Boot FAIL: http://slexy.org/raw/s203u2hQ1m
+* DRA7 not enabled?
+10:        ldp:  Boot PASS: http://slexy.org/raw/s2ug8MyzzE
+11:   panda-es:  Boot FAIL: http://slexy.org/raw/s2NVPvwb2I
+* known issue (https://patchwork.kernel.org/patch/3084521/)
+12:    sdp2430:  Boot FAIL: v6 platform - wont boot with multi_v7
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s28vswaDnc
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s21wk2lqiC
+15:       uevm:  Boot PASS: http://slexy.org/raw/s21soF15Dy
+TOTAL = 15 boards, Booted Boards = 11, No Boot boards = 4
+
+clk-next-6a0cad9 + next-20140117 multi_v7_defconfig + CONFIG_LPAE=y:
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s21GRhEOj4
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s20zcNsD8h
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s27U9IfRKR
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2zYyeonec
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21iCRjTHK
+ 6: beagleboard-xm:  Boot PASS: http://slexy.org/raw/s20bPGL3Sz
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s21AhFmkCk
+ 8:      crane: No Image built - Missing platform support?:
+ 9:       dra7:  Boot FAIL: http://slexy.org/raw/s21Qh3sQRu
+* DRA7 not enabled?
+10:        ldp:  Boot PASS: http://slexy.org/raw/s21fvBfBgs
+11:   panda-es:  Boot FAIL: http://slexy.org/raw/s20RsgVUZJ
+* known issue (https://patchwork.kernel.org/patch/3084521/)
+12:    sdp2430:  Boot FAIL: v6 platform - wont boot with multi_v7
+13:    sdp3430:  Boot PASS: http://slexy.org/raw/s20rhjjBwe
+14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2My0UfNPm
+15:       uevm:  Boot PASS: http://slexy.org/raw/s21aqF6eMN
+TOTAL = 15 boards, Booted Boards = 11, No Boot boards = 4
+
+
+
+-- 
+Regards,
+Nishanth Menon
