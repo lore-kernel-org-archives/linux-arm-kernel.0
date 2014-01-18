@@ -1,75 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 17 Jan 2014 19:47:17 -0800
-Subject: [PATCH] clk: Export more clk-provider functions
-Message-ID: <1390016837-24837-1-git-send-email-sboyd@codeaurora.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sat, 18 Jan 2014 11:52:18 +0800
+Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
+ directory
+In-Reply-To: <52D9F8E8.8030602@linaro.org>
+References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
+ <1389924207-7360-2-git-send-email-hanjun.guo@linaro.org>
+ <52D91CE2.3050704@arm.com> <52D9F8E8.8030602@linaro.org>
+Message-ID: <52D9FA72.5020505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow drivers to be compiled as modules by exporting more clock
-provider functions.
+On 2014-1-18 11:45, Hanjun Guo wrote:
+> On 2014-1-17 20:06, Sudeep Holla wrote:
+>> On 17/01/14 02:03, Hanjun Guo wrote:
+>>> Move idle_boot_override out of the arch directory to be a single enum
+>>> including both platforms values, this will make it rather easier to
+>>> avoid ifdefs around which definitions are for which processor in
+>>> generally used ACPI code.
+>>>
+>>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
+>>>
+>>> No functional change in this patch.
+>>>
+>>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> ---
+[...]
+>>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+>>> index 03e235ad..e324561 100644
+>>> --- a/include/linux/cpu.h
+>>> +++ b/include/linux/cpu.h
+>>> @@ -220,6 +220,14 @@ void cpu_idle(void);
+>>>  
+>>>  void cpu_idle_poll_ctrl(bool enable);
+>>>  
+>>> +enum idle_boot_override {
+>>> +	IDLE_NO_OVERRIDE = 0,
+>>> +	IDLE_HALT,
+>>> +	IDLE_NOMWAIT,
+>>> +	IDLE_POLL,
+>>> +	IDLE_POWERSAVE_OFF
+>>> +};
+>>> +
+>>
+>> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
+>> specific and may not make sense for other architectures.
+> 
+> yes, this is the strange part, the value is arch-dependent.
+> 
+>>
+>> It will also require every architecture using ACPI to export
+>> boot_option_idle_override which may not be really required.
+> 
+> so, how about forget this patch and move boot_option_idle_override
+> related code into arch directory such as arch/x86/acpi/boot.c for
+> x86?
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+The general idea is that we can move all the arch-dependent codes
+in ACPI driver to arch directory, then make codes in drivers/acpi/
+arch independent.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0b27b543dacf..2e83cf643db0 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -547,16 +547,19 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
- {
- 	return !clk ? NULL : clk->hw;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_hw);
- 
- u8 __clk_get_num_parents(struct clk *clk)
- {
- 	return !clk ? 0 : clk->num_parents;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_num_parents);
- 
- struct clk *__clk_get_parent(struct clk *clk)
- {
- 	return !clk ? NULL : clk->parent;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_parent);
- 
- struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
- {
-@@ -570,6 +573,7 @@ struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
- 	else
- 		return clk->parents[index];
- }
-+EXPORT_SYMBOL_GPL(clk_get_parent_by_index);
- 
- unsigned int __clk_get_enable_count(struct clk *clk)
- {
-@@ -601,6 +605,7 @@ unsigned long __clk_get_rate(struct clk *clk)
- out:
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_rate);
- 
- unsigned long __clk_get_flags(struct clk *clk)
- {
-@@ -649,6 +654,7 @@ bool __clk_is_enabled(struct clk *clk)
- out:
- 	return !!ret;
- }
-+EXPORT_SYMBOL_GPL(__clk_is_enabled);
- 
- static struct clk *__clk_lookup_subtree(const char *name, struct clk *clk)
- {
-@@ -740,6 +746,7 @@ out:
- 
- 	return best;
- }
-+EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
- 
- /***        clk api        ***/
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks
+Hanjun
