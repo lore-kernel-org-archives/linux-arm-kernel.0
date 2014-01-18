@@ -1,49 +1,63 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Jan 2014 18:44:27 +0000
+Date: Sat, 18 Jan 2014 19:03:37 +0000
 Subject: imx6 eSATA
-Message-ID: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+In-Reply-To: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+References: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+Message-ID: <20140118190337.GK15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So, I see we have AHCI support for SATA on the iMX6.  Great... but it
-doesn't work on the cubox-i, because the phy settings are wrong.
+On Sat, Jan 18, 2014 at 06:44:27PM +0000, Russell King - ARM Linux wrote:
+> So, I see we have AHCI support for SATA on the iMX6.  Great... but it
+> doesn't work on the cubox-i, because the phy settings are wrong.
 
-The Cubox-i requires GPR13 set to 0x0593A044 - I haven't decoded what
-this means yet, but it's different from the 0x0593E4A4 which is
-currently hard-coded into the driver (and I've independently tested
-that this is indeed required.)
+And another thing.  This is wonderful... really wonderful.
 
-So, there's presently no DT properties for this - given that these
-parameters would be board specific, it surprises me that this has not
-been thought about, and properties already generated, because now it
-means that we need to _add_ new properties to this driver.
+static int imx_ahci_probe(struct platform_device *pdev)
+{  
+        struct device *dev = &pdev->dev;
+...
+        ahci_pdev = platform_device_alloc("ahci", -1);
+...
+        ahci_dev = &ahci_pdev->dev; 
+...
+        ahci_dev->of_node = dev->of_node;
 
-Also, this PDDQ mode thing, which can't be recovered except by reset.
-This is another illustration why Linux is unfriendly - the thing can
-silently go into this power down mode which is irrecoverable without
-any messages being generated nor any hints how to avoid it - maybe
-this should also be a DT property, not just a command line option.
+This is a hanging offence.
 
-More importantly, maybe we should print a message when we discover
-that there's nothing connected and we're going to enter this mode -
-maybe something like this:
+Here's a lesson in how DT matching works:
 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 3e23e9941dad..0a1ae7213992 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -77,6 +77,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
- 			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
- 	clk_disable_unprepare(imxpriv->sata_ref_clk);
- 	imxpriv->no_device = true;
-+
-+	dev_info(ap->dev, "no device, link disabled until next reset.\n");
-+	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
-+		 ".hotplug=1 to enable link hotplug support\n");
- }
- 
- static struct ata_port_operations ahci_imx_ops = {
+- A device gets declared into the device model.
+- The device is offered to each driver in turn via the bus specific
+  code to see whether the driver should be bound to the device.
+- If there's an of_node present, the DT IDs for the driver are walked
+  to compare the device with the driver's DT IDs.  If a match is found,
+  the device is passed to the driver probe function.
+- If there is no of_node present, and it's a platform device, the bare
+  device name is compared the driver name(s) and if it matches the
+  probe function is called.
 
+Now, what does this mean for the above monstrosity?  If the driver
+model happens to find the ahci_imx driver _before_ the ahci driver
+while trying to bind the ahci_dev, it will find that the ahci_dev
+has an of_node with a compatible string which matches this driver.
+So, imx_ahci_probe() _can_ be called with the ahci_pdev that it
+just created.
+
+It doesn't take much to understand what the result will be of that.
+It will try to create another ahci device... hopefully this time
+erroring out.
+
+This is utterly disgusting.  You must *never* *ever* assign an of_node
+from one device to another of the same bus type.  If you need to pass
+the of_node to another device, then it _must_ be done outside of the
+child device's of_node pointer - in other words, it must be done using
+platform data.
+
+Alternatively, turn ahci into a library that both the original ahci
+and ahci_imx drivers can use without jumping through these kinds of
+games - or in this case, just get rid of that assignment - I can't
+see anything in ahci.c which needs the of_node.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
