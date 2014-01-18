@@ -1,104 +1,162 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jan 2014 00:48:47 +0100
-Subject: [RFC v3 05/13] ahci-platform: Pass ahci_host_priv ptr to
- ahci_platform_data init method
+Date: Sun, 19 Jan 2014 00:48:49 +0100
+Subject: [RFC v3 07/13] ahci-platform: Add support for an optional regulator
+ for sata-target power
 In-Reply-To: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
 References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390088935-7193-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390088935-7193-8-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ahci_platform_data->init methods need access to the ahci_host_priv data.
-
-Note:
-
-When calling ahci_platform_data->init the ata_host has not been allocated yet,
-so access to ahci_host_priv through the dev argument is not possible.
-
-The hpriv->mmio argument may seem redundant, but it is useful for drivers
-which live outside of drivers/ata and thus don't know the contents of the
-ahci_platform_data data type.
-
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 3 ++-
- arch/arm/mach-spear/spear1340.c       | 3 ++-
- drivers/ata/ahci_imx.c                | 3 ++-
- drivers/ata/ahci_platform.c           | 2 +-
- include/linux/ahci_platform.h         | 4 +++-
- 5 files changed, 10 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/ata/ahci-platform.txt      |  1 +
+ drivers/ata/ahci.h                                 |  2 ++
+ drivers/ata/ahci_platform.c                        | 39 +++++++++++++++++++---
+ 3 files changed, 38 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 78829c5..81d0110 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -1061,7 +1061,8 @@ static unsigned long da850_sata_xtal[] = {
- 	KHZ_TO_HZ(60000),
- };
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 3ced07d..1ac807f 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -11,6 +11,7 @@ Required properties:
+ Optional properties:
+ - dma-coherent      : Present if dma operations are coherent
+ - clocks            : a list of phandle + clock specifier pairs
++- target-supply     : regulator for SATA target power
  
--static int da850_sata_init(struct device *dev, void __iomem *addr)
-+static int da850_sata_init(struct device *dev, struct ahci_host_priv *hpriv,
-+			   void __iomem *addr)
- {
- 	int i, ret;
- 	unsigned int val;
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index c4cbbd2..9e4f70b 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -77,7 +77,8 @@
- 			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
+ Example:
+         sata at ffe08000 {
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 7950b3a..c3e0c49 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -36,6 +36,7 @@
+ #define _AHCI_H
  
- /* SATA device registration */
--static int sata_miphy_init(struct device *dev, void __iomem *addr)
-+static int sata_miphy_init(struct device *dev, struct ahci_host_priv *hpriv,
-+			   void __iomem *addr)
- {
- 	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
- 	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 30568d3..0051f29 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -91,7 +91,8 @@ static const struct ata_port_info ahci_imx_port_info = {
- 	.port_ops	= &ahci_imx_ops,
- };
+ #include <linux/clk.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/libata.h>
  
--static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
-+static int imx6q_sata_init(struct device *dev, struct ahci_host_priv *hpriv,
-+			   void __iomem *mmio)
- {
- 	int ret = 0;
- 	unsigned int reg_val;
+ /* Enclosure Management Control */
+@@ -323,6 +324,7 @@ struct ahci_host_priv {
+ 	u32			em_buf_sz;	/* EM buffer size in byte */
+ 	u32			em_msg_type;	/* EM message type */
+ 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
++	struct regulator	*target_pwr;	/* Optional */
+ 	void			*plat_data;	/* Other platform data */
+ 	/* Optional ahci_start_engine override */
+ 	void			(*start_engine)(struct ata_port *ap);
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 41720cb..33ac7a4 100644
+index 75a3d47..3bc2dab 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -149,7 +149,7 @@ static int ahci_probe(struct platform_device *pdev)
- 	 * returned successfully.
- 	 */
- 	if (pdata && pdata->init) {
--		rc = pdata->init(dev, hpriv->mmio);
-+		rc = pdata->init(dev, hpriv, hpriv->mmio);
- 		if (rc)
+@@ -181,6 +181,13 @@ static int ahci_probe(struct platform_device *pdev)
+ 		hpriv->clks[i] = clk;
+ 	}
+ 
++	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
++	if (IS_ERR(hpriv->target_pwr)) {
++		if (PTR_ERR(hpriv->target_pwr) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		hpriv->target_pwr = NULL;
++	}
++
+ 	rc = ahci_enable_clks(dev, hpriv);
+ 	if (rc)
+ 		goto free_clk;
+@@ -197,6 +204,12 @@ static int ahci_probe(struct platform_device *pdev)
  			goto disable_unprepare_clk;
  	}
-diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index a641cb6..796dfb4 100644
---- a/include/linux/ahci_platform.h
-+++ b/include/linux/ahci_platform.h
-@@ -19,9 +19,11 @@
  
- struct device;
- struct ata_port_info;
-+struct ahci_host_priv;
++	if (hpriv->target_pwr) {
++		rc = regulator_enable(hpriv->target_pwr);
++		if (rc)
++			goto pdata_exit;
++	}
++
+ 	ahci_save_initial_config(dev, hpriv,
+ 		pdata ? pdata->force_port_map : 0,
+ 		pdata ? pdata->mask_port_map  : 0);
+@@ -220,7 +233,7 @@ static int ahci_probe(struct platform_device *pdev)
+ 	host = ata_host_alloc_pinfo(dev, ppi, n_ports);
+ 	if (!host) {
+ 		rc = -ENOMEM;
+-		goto pdata_exit;
++		goto disable_regulator;
+ 	}
  
- struct ahci_platform_data {
--	int (*init)(struct device *dev, void __iomem *addr);
-+	int (*init)(struct device *dev, struct ahci_host_priv *hpriv,
-+		    void __iomem *addr);
- 	void (*exit)(struct device *dev);
- 	void (*suspend)(struct device *dev);
- 	int (*resume)(struct device *dev);
+ 	host->private_data = hpriv;
+@@ -250,7 +263,7 @@ static int ahci_probe(struct platform_device *pdev)
+ 
+ 	rc = ahci_reset_controller(host);
+ 	if (rc)
+-		goto pdata_exit;
++		goto disable_regulator;
+ 
+ 	ahci_init_controller(host);
+ 	ahci_print_info(host, "platform");
+@@ -258,9 +271,12 @@ static int ahci_probe(struct platform_device *pdev)
+ 	rc = ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
+ 			       &ahci_platform_sht);
+ 	if (rc)
+-		goto pdata_exit;
++		goto disable_regulator;
+ 
+ 	return 0;
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
+ pdata_exit:
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(dev);
+@@ -277,6 +293,9 @@ static void ahci_host_stop(struct ata_host *host)
+ 	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
++
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(dev);
+ 
+@@ -313,6 +332,9 @@ static int ahci_suspend(struct device *dev)
+ 	if (rc)
+ 		return rc;
+ 
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
++
+ 	if (pdata && pdata->suspend)
+ 		pdata->suspend(dev);
+ 
+@@ -338,10 +360,16 @@ static int ahci_resume(struct device *dev)
+ 			goto disable_unprepare_clk;
+ 	}
+ 
++	if (hpriv->target_pwr) {
++		rc = regulator_enable(hpriv->target_pwr);
++		if (rc)
++			goto pdata_suspend;
++	}
++
+ 	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+ 		rc = ahci_reset_controller(host);
+ 		if (rc)
+-			goto pdata_suspend;
++			goto disable_regulator;
+ 
+ 		ahci_init_controller(host);
+ 	}
+@@ -350,6 +378,9 @@ static int ahci_resume(struct device *dev)
+ 
+ 	return 0;
+ 
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
+ pdata_suspend:
+ 	if (pdata && pdata->suspend)
+ 		pdata->suspend(dev);
 -- 
 1.8.4.2
