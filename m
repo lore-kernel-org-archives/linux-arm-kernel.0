@@ -1,29 +1,32 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 19 Jan 2014 06:30:51 -0500
-Subject: [RFC v3 05/13] ahci-platform: Pass ahci_host_priv ptr to
- ahci_platform_data init method
-In-Reply-To: <1390088935-7193-6-git-send-email-hdegoede@redhat.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jan 2014 00:48:44 +0100
+Subject: [RFC v3 02/13] sata-highbank: Remove unnecessary ahci_platform.h
+ include
+In-Reply-To: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
 References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140119113051.GD11123@htj.dyndns.org>
+Message-ID: <1390088935-7193-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 12:48:47AM +0100, Hans de Goede wrote:
-> Some ahci_platform_data->init methods need access to the ahci_host_priv data.
-> 
-> Note:
-> 
-> When calling ahci_platform_data->init the ata_host has not been allocated yet,
-> so access to ahci_host_priv through the dev argument is not possible.
-> 
-> The hpriv->mmio argument may seem redundant, but it is useful for drivers
-> which live outside of drivers/ata and thus don't know the contents of the
-> ahci_platform_data data type.
+The sata-highbank driver is a complete standalone sata driver, which does
+not use ahci_platform.c / ahci_platform_data in any way.
 
-Wouldn't the right thing to do be moving them under drivers/ata?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/sata_highbank.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks.
-
+diff --git a/drivers/ata/sata_highbank.c b/drivers/ata/sata_highbank.c
+index ea3b3dc..870b11e 100644
+--- a/drivers/ata/sata_highbank.c
++++ b/drivers/ata/sata_highbank.c
+@@ -29,7 +29,6 @@
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
+ #include <linux/libata.h>
+-#include <linux/ahci_platform.h>
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
+ #include <linux/export.h>
 -- 
-tejun
+1.8.4.2
