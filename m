@@ -1,22 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Jan 2014 09:52:49 +0000
-Subject: [RFC v3 00/13] ahci: add sunxi driver and cleanup imx driver
-In-Reply-To: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140119095249.GL15937@n2100.arm.linux.org.uk>
+Date: Sun, 19 Jan 2014 10:02:35 +0000
+Subject: [PATCH] mmc: omap_hsmmc: Restrict compilation to ARM
+In-Reply-To: <1390123794-26401-1-git-send-email-geert@linux-m68k.org>
+References: <1390123794-26401-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140119100235.GN27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 12:48:42AM +0100, Hans de Goede wrote:
-> Hi All,
+On Sun, Jan 19, 2014 at 10:29:54AM +0100, Geert Uytterhoeven wrote:
+> commit bcf24e1daa94f4c52ef7a3f657e43cc6bc50d46b ("mmc: omap_hsmmc: use the
+> generic config for omap2plus devices"), enabled the build for other
+> platforms for compile testing.
 > 
-> Here is v3 of my patchset for adding ahci-sunxi support. It has grown quite
-> a bit since I've been going for a more generic approach this time and I've
-> also cleaned up the ahci-imx driver to use the same generic approach.
+> sh-allmodconfig now fails with:
+> 
+>     include/linux/omap-dma.h:171:8: error: expected identifier before numeric constant
+>     make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
+> 
+> This happens because sh #defines "CCR", which is one of the enum values in
+> include/linux/omap-dma.h.
+> 
+> I expect a similar failure on blackfin, which also has #define CCR.
+> 
+> Restrict the build to ARM to fix this.
 
-If you want to avoid getting caught in dwmw2's moderation queue, then
-please use "[PATCH RFC" and not just "[RFC" for threaded patches.  The
-important bit is the "[PATCH" bit.  Thanks.
+This isn't the right fix.  When this has happened on ARM in the past, we've
+had a lot of pressure to change the definition since it's far too generic.
+
+"CCR" should only be used for stuff which is restricted to (eg) one driver,
+and not in some system wide header file included by lots of files.
+
+In the case of OMAP, the unfortunate thing is that include/linux/omap-dma.h
+was moved lock stock and barrel out of the ARM-private includes.  It
+really needs splitting up in two - one which drivers are expected to
+include, and the other for shared definitions between arch/arm/*omap*/dma.c
+and drivers/dma/omap-dma.c.
+
+Even so, "CCR" will still exist - but will be localised to the compilation
+units which need it.  The same should happen with SH.
+
+So, as for this patch, that's a NAK.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
