@@ -1,61 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Jan 2014 19:56:42 +0000
-Subject: [RFC v3 09/13] ARM: sunxi: Add support for Allwinner SUNXi
- SoCs sata to ahci_platform
-In-Reply-To: <52DC2282.4040702@redhat.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jan 2014 21:01:37 +0100
+Subject: [RFC v3 09/13] ARM: sunxi: Add support for Allwinner SUNXi SoCs
+ sata to ahci_platform
+In-Reply-To: <20140119195642.GU15937@n2100.arm.linux.org.uk>
 References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
  <1390088935-7193-10-git-send-email-hdegoede@redhat.com>
  <20140119122216.GM15937@n2100.arm.linux.org.uk> <52DC2282.4040702@redhat.com>
-Message-ID: <20140119195642.GU15937@n2100.arm.linux.org.uk>
+ <20140119195642.GU15937@n2100.arm.linux.org.uk>
+Message-ID: <52DC2F21.30909@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 08:07:46PM +0100, Hans de Goede wrote:
-> Hi,
->
-> On 01/19/2014 01:22 PM, Russell King - ARM Linux wrote:
->> On Sun, Jan 19, 2014 at 12:48:51AM +0100, Hans de Goede wrote:
->>> +	timeout = 0x100000;
->>> +	do {
->>> +		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
->>> +	} while (--timeout && (reg_val != 0x2));
->>> +	if (!timeout) {
->>> +		dev_err(dev, "PHY power up failed.\n");
->>> +		return -EIO;
->>> +	}
+Hi,
+
+On 01/19/2014 08:56 PM, Russell King - ARM Linux wrote:
+> On Sun, Jan 19, 2014 at 08:07:46PM +0100, Hans de Goede wrote:
+>> Hi,
 >>
->> This is not a good way to detect failure - there's several things wrong
->> here.
+>> On 01/19/2014 01:22 PM, Russell King - ARM Linux wrote:
+>>> On Sun, Jan 19, 2014 at 12:48:51AM +0100, Hans de Goede wrote:
+>>>> +	timeout = 0x100000;
+>>>> +	do {
+>>>> +		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
+>>>> +	} while (--timeout && (reg_val != 0x2));
+>>>> +	if (!timeout) {
+>>>> +		dev_err(dev, "PHY power up failed.\n");
+>>>> +		return -EIO;
+>>>> +	}
+>>>
+>>> This is not a good way to detect failure - there's several things wrong
+>>> here.
+>>>
+>>> First, how long does sunxi_getbits() take?  What does that depend on?
+>>> Therefore, how long does it take to time out?
 >>
->> First, how long does sunxi_getbits() take?  What does that depend on?
->> Therefore, how long does it take to time out?
+>> You're interpreting the timeout in the above code as an actual timeout, but
+>> that is not what it is, it is a means to avoid looping forever if something
+>> is seriously amiss. The only time I've ever seen the timeout trigger is when
+>> I forgot to enable some clks iirc.
+>>
+>> I can rename the variable from timeout to max_tries to make this more clear.
+>>
+>>> Secondly, what if the success condition becomes true at the same time that
+>>> a timeout occurs?
+>>
+>> We should never get anywhere near timeout becoming 0, so if both happen at
+>> the same time, then something is pretty seriously broken and the returning of
+>> an error as the code does now is the right thing to do.
 >
-> You're interpreting the timeout in the above code as an actual timeout, but
-> that is not what it is, it is a means to avoid looping forever if something
-> is seriously amiss. The only time I've ever seen the timeout trigger is when
-> I forgot to enable some clks iirc.
+> Yes... and if we look back in history, there's been lots of stuff just
+> like this where the loop has had to have the number of iterations
+> increased as CPUs have become faster and compilers become better?
 >
-> I can rename the variable from timeout to max_tries to make this more clear.
+> So... my question stands: but let me put it a different way in two parts:
 >
->> Secondly, what if the success condition becomes true at the same time that
->> a timeout occurs?
->
-> We should never get anywhere near timeout becoming 0, so if both happen at
-> the same time, then something is pretty seriously broken and the returning of
-> an error as the code does now is the right thing to do.
+> 1. What is the maximum expected time for the success condition to be
+>     satisfied?
 
-Yes... and if we look back in history, there's been lots of stuff just
-like this where the loop has had to have the number of iterations
-increased as CPUs have become faster and compilers become better?
+TBH, I don't have a clue this code comes from the android driver (never an
+excuse, I know) and we don't have any documentation other then the android
+driver.
 
-So... my question stands: but let me put it a different way in two parts:
+> 2. How long does it actually take for the loop to time out in existing
+>     CPUs/compilers?
 
-1. What is the maximum expected time for the success condition to be
-   satisfied?
-2. How long does it actually take for the loop to time out in existing
-   CPUs/compilers?
+I don't know either. I understand where you're coming from, and I believe
+that the best way to solve this is to take your suggested implementation, start
+with a way too high timeout, and add a debug print to see how much time is left
+after a successfull phy_init, then do a couple of test runs to get a ballpark
+figure for how long we need to wait, multiply that by 5 to be on the safe side,
+and use that.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Does that sound like a plan ?
+
+Regards,
+
+Hans
