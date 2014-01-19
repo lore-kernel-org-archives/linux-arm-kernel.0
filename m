@@ -1,78 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jan 2014 21:01:37 +0100
-Subject: [RFC v3 09/13] ARM: sunxi: Add support for Allwinner SUNXi SoCs
- sata to ahci_platform
-In-Reply-To: <20140119195642.GU15937@n2100.arm.linux.org.uk>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-10-git-send-email-hdegoede@redhat.com>
- <20140119122216.GM15937@n2100.arm.linux.org.uk> <52DC2282.4040702@redhat.com>
- <20140119195642.GU15937@n2100.arm.linux.org.uk>
-Message-ID: <52DC2F21.30909@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 19 Jan 2014 21:26:40 +0100
+Subject: PWM...
+In-Reply-To: <20140119193026.GS15937@n2100.arm.linux.org.uk>
+References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
+ <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
+ <20140119193026.GS15937@n2100.arm.linux.org.uk>
+Message-ID: <201401192126.41543.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sunday 19 January 2014, Russell King - ARM Linux wrote:
+> On Sun, Jan 19, 2014 at 11:11:41AM -0800, Olof Johansson wrote:
+> > On Sun, Jan 19, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 01/19/2014 08:56 PM, Russell King - ARM Linux wrote:
-> On Sun, Jan 19, 2014 at 08:07:46PM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 01/19/2014 01:22 PM, Russell King - ARM Linux wrote:
->>> On Sun, Jan 19, 2014 at 12:48:51AM +0100, Hans de Goede wrote:
->>>> +	timeout = 0x100000;
->>>> +	do {
->>>> +		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
->>>> +	} while (--timeout && (reg_val != 0x2));
->>>> +	if (!timeout) {
->>>> +		dev_err(dev, "PHY power up failed.\n");
->>>> +		return -EIO;
->>>> +	}
->>>
->>> This is not a good way to detect failure - there's several things wrong
->>> here.
->>>
->>> First, how long does sunxi_getbits() take?  What does that depend on?
->>> Therefore, how long does it take to time out?
->>
->> You're interpreting the timeout in the above code as an actual timeout, but
->> that is not what it is, it is a means to avoid looping forever if something
->> is seriously amiss. The only time I've ever seen the timeout trigger is when
->> I forgot to enable some clks iirc.
->>
->> I can rename the variable from timeout to max_tries to make this more clear.
->>
->>> Secondly, what if the success condition becomes true at the same time that
->>> a timeout occurs?
->>
->> We should never get anywhere near timeout becoming 0, so if both happen at
->> the same time, then something is pretty seriously broken and the returning of
->> an error as the code does now is the right thing to do.
->
-> Yes... and if we look back in history, there's been lots of stuff just
-> like this where the loop has had to have the number of iterations
-> increased as CPUs have become faster and compilers become better?
->
-> So... my question stands: but let me put it a different way in two parts:
->
-> 1. What is the maximum expected time for the success condition to be
->     satisfied?
+> > Ah, yes, if you add a cell that can be done. There'll still be the
+> > "dead" first cell that will always be 0, but that's alright.
+> 
+> Does it not mean that PWM specifications of:
+> 
+>         <&pwm1 0 n> <&pwm2 0 n>
+> 
+> would need to be converted to:
+> 
+>         <&pwm1 0 n 0> <&pwm2 0 n 0>
+> 
+> in every DT file referring to these PWMs - because isn't this just
+> treated in DT as one single array of values?  (If DT knew how many
+> were in each specification, we wouldn't need the #foo-cells...)
 
-TBH, I don't have a clue this code comes from the android driver (never an
-excuse, I know) and we don't have any documentation other then the android
-driver.
+Right: if you change an existing dts file from #pwm-cells=<2> to
+#pwm-cells=<3>, that requires changing all references to the pwm
+controller at the same time. If both the per-soc .dtsi files
+and the per-board .dts files contain references to the same pwm
+controller, that can end up in significant work. I have not checked
+if this is the case for i.MX though.
 
-> 2. How long does it actually take for the loop to time out in existing
->     CPUs/compilers?
-
-I don't know either. I understand where you're coming from, and I believe
-that the best way to solve this is to take your suggested implementation, start
-with a way too high timeout, and add a debug print to see how much time is left
-after a successfull phy_init, then do a couple of test runs to get a ballpark
-figure for how long we need to wait, multiply that by 5 to be on the safe side,
-and use that.
-
-Does that sound like a plan ?
-
-Regards,
-
-Hans
+	Arnd
