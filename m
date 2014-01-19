@@ -1,45 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 11:29:55 -0800
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <alpine.LFD.2.10.1401171157340.28907@knanqh.ubzr>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
- <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
- <alpine.LFD.2.10.1401171157340.28907@knanqh.ubzr>
-Message-ID: <CAOesGMjVpTEku+UJntewi3FXoeEPe9rJP4BBmbSesfFMtY9hnA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Jan 2014 19:30:26 +0000
+Subject: PWM...
+In-Reply-To: <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
+References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
+ <20140119190324.GC28056@quad.lixom.net> <59642204.3UzJCDJHaS@wuerfel>
+ <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
+Message-ID: <20140119193026.GS15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 8:58 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 17 Jan 2014, Rob Herring wrote:
->
->> On Thu, Jan 16, 2014 at 9:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Thu, 16 Jan 2014, Olof Johansson wrote:
->> >
->> >> "for SDIO slots" is somewhat misleading; nearly all controllers only
->> >> do one slot/device per controller. The designware controller can do
->> >> multiple slots, and that adds a bit of driver and binding complexity
->> >> for something that seemingly not a single vendor has actually
->> >> implemented.
->> >
->> > The Marvell 8688, just to name one, does both WIFI and BlueTooth over
->> > the same SDIO controller using separate functions/slots.
->>
->> But that is logical functions within a chip, not multiple discrete
->> chips (i.e. slots) with their own reset, regulators, etc.
->
-> OK.  If that's the definition of a slot in this context then I agree.
+On Sun, Jan 19, 2014 at 11:11:41AM -0800, Olof Johansson wrote:
+> On Sun, Jan 19, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday 19 January 2014 11:03:24 Olof Johansson wrote:
+> >> >
+> >> > Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
+> >> > be specified in the pwms declaration in pwmleds.  So that doesn't work.
+> >> > There's no property to tell pwmleds that it should use inverted sense
+> >> > either.
+> >>
+> >> Adding a property for active-low to the pwm-leds binding would be
+> >> easy, and backwards compatible. I'm surprised the original binding
+> >> didn't specify it. The leds-pwm driver already seems to support it for
+> >> C-configured instances.
+> >>
+> >> I'm also surprised that the imx pwm driver even has a #pwm-cells of
+> >> two, since the driver only supports one output. It'd be nice if they
+> >> had allocated the extra cell for flags, but it's hard to change now,
+> >> unless you do a new binding/compatible value and deprecate the old one.
+> >
+> > Actually I think it's not that hard to change: The binding can specify
+> > that either #pwm-cells=<2> or #pwm-cells=<3> is supported, and the
+> > driver extended to handle both cases. This would maintain backwards
+> > compatibility for old dtb files, though no forward compatibility for
+> > new dtb files with old kernels.
+> 
+> Ah, yes, if you add a cell that can be done. There'll still be the
+> "dead" first cell that will always be 0, but that's alright.
 
-Correct -- the device that I've been doing the work in is actually the
-combined wifi/bluetooth module on the Samsung Chromebook, which is a
-Marvell 8797. It has multiple functions which still work well.
+Does it not mean that PWM specifications of:
 
-The "multi-slot" concept I was talking about was one host controller
-for several physical slots. Seems like at91 implements _and_ uses this
-but nobody else. However, it seems that they allocate one mmc host per
-slot, so the same model still works.
+	<&pwm1 0 n> <&pwm2 0 n>
 
+would need to be converted to:
 
--Olof
+	<&pwm1 0 n 0> <&pwm2 0 n 0>
+
+in every DT file referring to these PWMs - because isn't this just
+treated in DT as one single array of values?  (If DT knew how many
+were in each specification, we wouldn't need the #foo-cells...)
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
