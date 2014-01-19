@@ -1,33 +1,61 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jan 2014 20:56:09 +0100
-Subject: [RFC v3 05/13] ahci-platform: Pass ahci_host_priv ptr to
- ahci_platform_data init method
-In-Reply-To: <20140119191706.GC32165@mtj.dyndns.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Jan 2014 19:56:42 +0000
+Subject: [RFC v3 09/13] ARM: sunxi: Add support for Allwinner SUNXi
+ SoCs sata to ahci_platform
+In-Reply-To: <52DC2282.4040702@redhat.com>
 References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-6-git-send-email-hdegoede@redhat.com>
- <20140119113051.GD11123@htj.dyndns.org> <52DC1EC4.3090807@redhat.com>
- <20140119191706.GC32165@mtj.dyndns.org>
-Message-ID: <52DC2DD9.7070403@redhat.com>
+ <1390088935-7193-10-git-send-email-hdegoede@redhat.com>
+ <20140119122216.GM15937@n2100.arm.linux.org.uk> <52DC2282.4040702@redhat.com>
+Message-ID: <20140119195642.GU15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 01/19/2014 08:17 PM, Tejun Heo wrote:
-> On Sun, Jan 19, 2014 at 07:51:48PM +0100, Hans de Goede wrote:
->> Yes, but they are part of arch/arm/mach-foo, so moving them is non trivial, and
->> I don't want to go make these kinda changes without hardware to test. Please keep
->> in mind that I'm partially cleaning up other peoples mess here (the imx bits
->> specifically). I'm willing to do that to some extend (*). But buying an imx6q board
->> and fixing that is about as far as I'm willing to go.
+On Sun, Jan 19, 2014 at 08:07:46PM +0100, Hans de Goede wrote:
+> Hi,
 >
-> If they can't be moved, the right thing to do is moving the header out
-> to include/linux so that they can be included from those directories.
-> Let's please not contort the API to fit the organizational issues.
+> On 01/19/2014 01:22 PM, Russell King - ARM Linux wrote:
+>> On Sun, Jan 19, 2014 at 12:48:51AM +0100, Hans de Goede wrote:
+>>> +	timeout = 0x100000;
+>>> +	do {
+>>> +		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
+>>> +	} while (--timeout && (reg_val != 0x2));
+>>> +	if (!timeout) {
+>>> +		dev_err(dev, "PHY power up failed.\n");
+>>> +		return -EIO;
+>>> +	}
+>>
+>> This is not a good way to detect failure - there's several things wrong
+>> here.
+>>
+>> First, how long does sunxi_getbits() take?  What does that depend on?
+>> Therefore, how long does it take to time out?
+>
+> You're interpreting the timeout in the above code as an actual timeout, but
+> that is not what it is, it is a means to avoid looping forever if something
+> is seriously amiss. The only time I've ever seen the timeout trigger is when
+> I forgot to enable some clks iirc.
+>
+> I can rename the variable from timeout to max_tries to make this more clear.
+>
+>> Secondly, what if the success condition becomes true at the same time that
+>> a timeout occurs?
+>
+> We should never get anywhere near timeout becoming 0, so if both happen at
+> the same time, then something is pretty seriously broken and the returning of
+> an error as the code does now is the right thing to do.
 
-Ok, asking the obvious here I guess, but you would accept a patch moving drivers/ata/ahci.h
-to include/linux as part of this patch-set ?
+Yes... and if we look back in history, there's been lots of stuff just
+like this where the loop has had to have the number of iterations
+increased as CPUs have become faster and compilers become better?
 
-Regards,
+So... my question stands: but let me put it a different way in two parts:
 
-Hans
+1. What is the maximum expected time for the success condition to be
+   satisfied?
+2. How long does it actually take for the loop to time out in existing
+   CPUs/compilers?
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
