@@ -1,45 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 19 Jan 2014 10:29:54 +0100
-Subject: [PATCH] mmc: omap_hsmmc: Restrict compilation to ARM
-Message-ID: <1390123794-26401-1-git-send-email-geert@linux-m68k.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Jan 2014 09:52:49 +0000
+Subject: [RFC v3 00/13] ahci: add sunxi driver and cleanup imx driver
+In-Reply-To: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140119095249.GL15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit bcf24e1daa94f4c52ef7a3f657e43cc6bc50d46b ("mmc: omap_hsmmc: use the
-generic config for omap2plus devices"), enabled the build for other
-platforms for compile testing.
+On Sun, Jan 19, 2014 at 12:48:42AM +0100, Hans de Goede wrote:
+> Hi All,
+> 
+> Here is v3 of my patchset for adding ahci-sunxi support. It has grown quite
+> a bit since I've been going for a more generic approach this time and I've
+> also cleaned up the ahci-imx driver to use the same generic approach.
 
-sh-allmodconfig now fails with:
+If you want to avoid getting caught in dwmw2's moderation queue, then
+please use "[PATCH RFC" and not just "[RFC" for threaded patches.  The
+important bit is the "[PATCH" bit.  Thanks.
 
-    include/linux/omap-dma.h:171:8: error: expected identifier before numeric constant
-    make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
-
-This happens because sh #defines "CCR", which is one of the enum values in
-include/linux/omap-dma.h.
-
-I expect a similar failure on blackfin, which also has #define CCR.
-
-Restrict the build to ARM to fix this.
-
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
-http://kisskb.ellerman.id.au/kisskb/buildresult/10477672/
-
- drivers/mmc/host/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 7fc5099e44b2..14e94fb39164 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -284,7 +284,7 @@ config MMC_OMAP
- 
- config MMC_OMAP_HS
- 	tristate "TI OMAP High Speed Multimedia Card Interface support"
--	depends on ARCH_OMAP2PLUS || COMPILE_TEST
-+	depends on ARCH_OMAP2PLUS || (COMPILE_TEST && ARM)
- 	help
- 	  This selects the TI OMAP High Speed Multimedia card Interface.
- 	  If you have an omap2plus board with a Multimedia Card slot,
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
