@@ -1,41 +1,40 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 18 Jan 2014 21:49:22 -0500 (EST)
-Subject: [PATCH v7 0/2] ohci and ehci-platform clks, phy and dt support
-In-Reply-To: <52DAA9F4.2090601@redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1401182131290.28218-100000@netrider.rowland.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 19 Jan 2014 10:49:50 +0800
+Subject: [PATCH V8 1/3] ARM: imx: add suspend in ocram support for i.mx6q
+In-Reply-To: <1389929947-25707-1-git-send-email-b20788@freescale.com>
+References: <1389929947-25707-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140119024948.GC16158@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 18 Jan 2014, Hans de Goede wrote:
-
-> > A simple copy from the PPC driver isn't quite enough, because the
-> > platform data settings would override the DT values.
-> > ehci_platform_reset has to be changed so that it sets
-> > ehci->big_endian_desc and _mmio if the pdata flags are set, but
-> > otherwise leaves them alone.
-> >
-> > Hans, would you like to write another patch to take care of this?
+On Fri, Jan 17, 2014 at 11:39:05AM +0800, Anson Huang wrote:
+> When system enter suspend, we can set the DDR IO to
+> high-Z state to save DDR IOs' power consumption, this
+> operation can save many power(from ~26mA at 1.5V to ~15mA at 1.5V,
+> measured on i.MX6Q SabreSD board, R25) of DDR IOs. To
+> achieve that, we need to copy the suspend code to ocram
+> and run the low level hardware related code(set DDR IOs
+> to high-Z state) in ocram.
 > 
-> I already took a quick look at this, setting the ehci->big_endian* flags is easy,
-> the problem is that they won't work unless we also define
-> CONFIG_USB_EHCI_BIG_ENDIAN_DESC and CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
+> If there is no ocram space available, then system will
+> still do suspend in external DDR, hence no DDR IOs will
+> be set to high-Z.
+> 
+> The OCRAM usage layout is as below,
+> 
+> ocram suspend region(4K currently):
+> ======================== high address ======================
+>                               .
+>                               .
+>                               .
+>                               ^
+>                               ^
+>                               ^
+>                       imx6_suspend code
+>              PM_INFO structure(imx6_cpu_pm_info)
+> ======================== low address =======================
+> 
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-That's right.  The platforms have to define those symbols if they use 
-big-endian values (or even worse, mixed endian).
-
-> I would like to avoid doing something like the ugliness we've with
-> USB_OHCI_HCD_PPC_OF_BE and USB_OHCI_HCD_PPC_OF_LE, which means just selecting these
-> 2 config options whenever USB_EHCI_HCD_PLATFORM is enabled, but I'm not sure if that
-> is acceptable.
-
-At the moment, I don't think it's so terrible.  That ohci_ppc ugliness
-probably could have been avoided originally.  It looks like an attempt
-to make sure you don't end up matching the hardware to a driver built
-with the wrong endianness.  I imagine it would be less messy to detect 
-that sort of problem at runtime.
-
-> The same goes for the ohci code btw.
-
-Certainly.
-
-Alan Stern
+Thanks for the work.  Applied all 3, thanks.
