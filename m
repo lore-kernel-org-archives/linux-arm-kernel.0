@@ -1,40 +1,29 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Jan 2014 10:49:50 +0800
-Subject: [PATCH V8 1/3] ARM: imx: add suspend in ocram support for i.mx6q
-In-Reply-To: <1389929947-25707-1-git-send-email-b20788@freescale.com>
-References: <1389929947-25707-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140119024948.GC16158@S2101-09.ap.freescale.net>
+Date: Sun, 19 Jan 2014 11:18:18 +0800
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+Message-ID: <20140119031816.GD16158@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 11:39:05AM +0800, Anson Huang wrote:
-> When system enter suspend, we can set the DDR IO to
-> high-Z state to save DDR IOs' power consumption, this
-> operation can save many power(from ~26mA at 1.5V to ~15mA at 1.5V,
-> measured on i.MX6Q SabreSD board, R25) of DDR IOs. To
-> achieve that, we need to copy the suspend code to ocram
-> and run the low level hardware related code(set DDR IOs
-> to high-Z state) in ocram.
-> 
-> If there is no ocram space available, then system will
-> still do suspend in external DDR, hence no DDR IOs will
-> be set to high-Z.
-> 
-> The OCRAM usage layout is as below,
-> 
-> ocram suspend region(4K currently):
-> ======================== high address ======================
->                               .
->                               .
->                               .
->                               ^
->                               ^
->                               ^
->                       imx6_suspend code
->              PM_INFO structure(imx6_cpu_pm_info)
-> ======================== low address =======================
-> 
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+On Thu, Jan 16, 2014 at 06:22:12PM +0000, Russell King - ARM Linux wrote:
+> Now that the Cubox-i has been released, and I have one, I've been able to
+> update things a little.  Out of the following two patches, the first one
+> I think is critical to be merged before the microsom support hits
+> mainline, since it drops the flexcan support from the microsom level,
+> moving it to the Hummingboard level.
 
-Thanks for the work.  Applied all 3, thanks.
+I will be out of town for a few days, and won't be online until next
+weekend.  So please send the patch directly to arm-soc folks, so that
+they can send it together with imx-dt-3.14 stuff.
+
+arm-soc folks, please take this as another ping for my imx-dt-3.14 pull
+request :)
+
+Shawn
+
+> 
+> That doesn't have _too_ much visible effect, but it's something which
+> should not be there (since as far as the microsom is concerned, there's
+> nothing special about these pads.)
