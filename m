@@ -1,75 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 11:03:24 -0800
-Subject: PWM...
-In-Reply-To: <20140119164956.GR15937@n2100.arm.linux.org.uk>
-References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
-Message-ID: <20140119190324.GC28056@quad.lixom.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jan 2014 20:07:46 +0100
+Subject: [RFC v3 09/13] ARM: sunxi: Add support for Allwinner SUNXi SoCs
+ sata to ahci_platform
+In-Reply-To: <20140119122216.GM15937@n2100.arm.linux.org.uk>
+References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+ <1390088935-7193-10-git-send-email-hdegoede@redhat.com>
+ <20140119122216.GM15937@n2100.arm.linux.org.uk>
+Message-ID: <52DC2282.4040702@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding devicetree list since we're talking bindings]
+Hi,
 
-On Sun, Jan 19, 2014 at 04:49:57PM +0000, Russell King - ARM Linux wrote:
-> So, having looked at what else I can add support for on the cubox-i, I
-> decided it would be nice and simple to add support for the front panel
-> LED.  What could possibly go wrong with this.
-> 
-> Well, the hardware is wired such that the LED is connected between the
-> PWM output and +3.3v.  So, a constant low turns the LED on full, whereas
-> a constant high turns the LED off.
-> 
-> So, the polarity of the LED is inverted - but this _can't_ be specified
-> in the totally and utterly fucked misdesigned crap that DT is:
-> 
->         pwmleds {
->                 compatible = "pwm-leds";
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
->                   
->                 front {
->                         label = "imx6:red:front";
->                         pwms = <&pwm1 0 50000>;
->                         max-brightness = <248>;
->                 };
->         };
-> 
->                         pwm1: pwm at 02080000 {
->                                 #pwm-cells = <2>;
->                                 compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
->                                 reg = <0x02080000 0x4000>;
->                                 interrupts = <0 83 0x04>;
->                                 clocks = <&clks 62>, <&clks 145>;
->                                 clock-names = "ipg", "per";
->                         };
-> 
-> Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
-> be specified in the pwms declaration in pwmleds.  So that doesn't work.
-> There's no property to tell pwmleds that it should use inverted sense
-> either.
+On 01/19/2014 01:22 PM, Russell King - ARM Linux wrote:
+> On Sun, Jan 19, 2014 at 12:48:51AM +0100, Hans de Goede wrote:
+>> +	timeout = 0x100000;
+>> +	do {
+>> +		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
+>> +	} while (--timeout && (reg_val != 0x2));
+>> +	if (!timeout) {
+>> +		dev_err(dev, "PHY power up failed.\n");
+>> +		return -EIO;
+>> +	}
+>
+> This is not a good way to detect failure - there's several things wrong
+> here.
+>
+> First, how long does sunxi_getbits() take?  What does that depend on?
+> Therefore, how long does it take to time out?
 
-Adding a property for active-low to the pwm-leds binding would be
-easy, and backwards compatible. I'm surprised the original binding
-didn't specify it. The leds-pwm driver already seems to support it for
-C-configured instances.
+You're interpreting the timeout in the above code as an actual timeout, but
+that is not what it is, it is a means to avoid looping forever if something
+is seriously amiss. The only time I've ever seen the timeout trigger is when
+I forgot to enable some clks iirc.
 
-I'm also surprised that the imx pwm driver even has a #pwm-cells of
-two, since the driver only supports one output. It'd be nice if they
-had allocated the extra cell for flags, but it's hard to change now,
-unless you do a new binding/compatible value and deprecate the old one.
+I can rename the variable from timeout to max_tries to make this more clear.
 
-> Moreover, there's no way to specify a default brightness for the LED
-> in the absence of any trigger, so this results in the LED being fully
-> on.
+> Secondly, what if the success condition becomes true at the same time that
+> a timeout occurs?
 
-That seems to be missing from the led-pwm driver altogether, not just the DT
-bindings? Shouldn't be too bad to add a default-brightness property and plumb
-that up through the driver in this case.
+We should never get anywhere near timeout becoming 0, so if both happen at
+the same time, then something is pretty seriously broken and the returning of
+an error as the code does now is the right thing to do.
 
-> So, something which _should_ be nice and simple is turned into a major
-> fuckup because of the total and utter crappiness that DT is and the
-> total misdesign that this shite is.
+Regards,
 
-It's not a major fuckup. None of the above is unfixable.
-
-
--Olof
+Hans
