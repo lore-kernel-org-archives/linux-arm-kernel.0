@@ -1,53 +1,45 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 19 Jan 2014 19:58:45 +0100
-Subject: [PATCH v3 18/24] drm/i2c: tda998x: fix the ENABLE_SPACE register
+Date: Sun, 19 Jan 2014 19:58:46 +0100
+Subject: [PATCH v3 20/24] drm/i2c: tda998x: remove the unused variable ca_i2s
 In-Reply-To: <cover.1390153344.git.moinejf@free.fr>
 References: <cover.1390153344.git.moinejf@free.fr>
-Message-ID: <20140119195845.086be909@armhf>
+Message-ID: <20140119195846.368a44e6@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the ENABLE_SPACE register, the value of which was
-inverted.
-
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index ea7d1b4..ce832f0 100644
+index 324dc13..a2ad2ac 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -220,7 +220,7 @@ struct tda998x_priv {
- # define PLL_SERIAL_1_SRL_IZ(x)   (((x) & 3) << 1)
- # define PLL_SERIAL_1_SRL_MAN_IZ  (1 << 6)
- #define REG_PLL_SERIAL_2          REG(0x02, 0x01)     /* read/write */
--# define PLL_SERIAL_2_SRL_NOSC(x) (((x) & 3) << 0)
-+# define PLL_SERIAL_2_SRL_NOSC(x) ((x) << 0)
- # define PLL_SERIAL_2_SRL_PR(x)   (((x) & 0xf) << 4)
- #define REG_PLL_SERIAL_3          REG(0x02, 0x02)     /* read/write */
- # define PLL_SERIAL_3_SRL_CCIR    (1 << 0)
-@@ -932,6 +932,11 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 	}
+@@ -671,7 +671,7 @@ static void
+ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		struct drm_display_mode *mode)
+ {
+-	uint8_t buf[6], clksel_aip, clksel_fs, ca_i2s, cts_n, adiv;
++	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
+ 	uint32_t aclk, n;
  
- 	div = 148500 / adj_mode->clock;
-+	if (div != 0) {
-+		div--;
-+		if (div > 3)
-+			div = 3;
-+	}
+ 	/* Enable audio ports */
+@@ -685,7 +685,6 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_fs = AIP_CLKSEL_FS_FS64SPDIF;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
+ 		aclk = 0;				/* no clock */
+-		ca_i2s = 0;
+ 		break;
  
- 	/* mute the audio FIFO: */
- 	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
-@@ -1011,7 +1016,7 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 	case AFMT_I2S:
+@@ -694,7 +693,6 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_fs = AIP_CLKSEL_FS_ACLK;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
+ 		aclk = 1;				/* clock enable */
+-		ca_i2s = CA_I2S_CA_I2S(0);
+ 		break;
  
- 	if (priv->rev == TDA19988) {
- 		/* let incoming pixels fill the active space (if any) */
--		reg_write(priv, REG_ENABLE_SPACE, 0x01);
-+		reg_write(priv, REG_ENABLE_SPACE, 0x00);
- 	}
- 
- 	/*
+ 	default:
 -- 
 1.8.5.3
