@@ -1,89 +1,58 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Jan 2014 11:26:15 +0800
-Subject: [PATCH 1/2] ARM: move flexcan1 configuration to hummingboard
-In-Reply-To: <E1W3rab-00009u-5I@rmk-PC.arm.linux.org.uk>
-References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
- <E1W3rab-00009u-5I@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140119032613.GE16158@S2101-09.ap.freescale.net>
+Date: Sun, 19 Jan 2014 12:15:36 +0800
+Subject: imx6 eSATA
+In-Reply-To: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+References: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+Message-ID: <20140119041534.GF16158@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 06:22:49PM +0000, Russell King wrote:
-> Flexcan1 is not used on the cubox-i, so move it out of the microsom.
+Copy Richard who might be better to clarify.
+
+Shawn
+
+On Sat, Jan 18, 2014 at 06:44:27PM +0000, Russell King - ARM Linux wrote:
+> So, I see we have AHCI support for SATA on the iMX6.  Great... but it
+> doesn't work on the cubox-i, because the phy settings are wrong.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-The patch will not apply against the branch/tag - imx-dt-3.14 I'm
-sending to arm-soc.  Please re-generate it against the tag.
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-> ---
->  arch/arm/boot/dts/imx6dl-hummingboard.dts | 13 +++++++++++++
->  arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 -------------
->  2 files changed, 13 insertions(+), 13 deletions(-)
+> The Cubox-i requires GPR13 set to 0x0593A044 - I haven't decoded what
+> this means yet, but it's different from the 0x0593E4A4 which is
+> currently hard-coded into the driver (and I've independently tested
+> that this is indeed required.)
 > 
-> diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> index 6184b0366926..e22f3d855c02 100644
-> --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> @@ -36,6 +36,12 @@
->  	};
->  };
->  
-> +&can1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hummingboard_flexcan1>;
-> +	status = "okay";
-> +};
+> So, there's presently no DT properties for this - given that these
+> parameters would be board specific, it surprises me that this has not
+> been thought about, and properties already generated, because now it
+> means that we need to _add_ new properties to this driver.
+> 
+> Also, this PDDQ mode thing, which can't be recovered except by reset.
+> This is another illustration why Linux is unfriendly - the thing can
+> silently go into this power down mode which is irrecoverable without
+> any messages being generated nor any hints how to avoid it - maybe
+> this should also be a DT property, not just a command line option.
+> 
+> More importantly, maybe we should print a message when we discover
+> that there's nothing connected and we're going to enter this mode -
+> maybe something like this:
+> 
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index 3e23e9941dad..0a1ae7213992 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -77,6 +77,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
+>  			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+>  	clk_disable_unprepare(imxpriv->sata_ref_clk);
+>  	imxpriv->no_device = true;
 > +
->  &i2c1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_i2c1_1>;
-> @@ -53,6 +59,13 @@
+> +	dev_info(ap->dev, "no device, link disabled until next reset.\n");
+> +	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
+> +		 ".hotplug=1 to enable link hotplug support\n");
+>  }
 >  
->  &iomuxc {
->  	hummingboard {
-> +		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
-> +				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
-> +			>;
-> +		};
-> +
->  		pinctrl_hummingboard_gpio1_2: hummingboard-gpio1_2 {
->  			fsl,pins = <
->  				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
-> diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> index 8aa31a842236..965ac4c1f509 100644
-> --- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> @@ -36,21 +36,8 @@
->  	};
->  };
->  
-> -&can1 {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&pinctrl_microsom_flexcan1>;
-> -	status = "okay";
-> -};
-> -
->  &iomuxc {
->  	microsom {
-> -		pinctrl_microsom_flexcan1: microsom-flexcan1 {
-> -			fsl,pins = <
-> -				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
-> -				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
-> -			>;
-> -		};
-> -
->  		pinctrl_microsom_usbotg: microsom-usbotg {
->  			/*
->  			 * Similar to pinctrl_usbotg_2, but we want it
+>  static struct ata_port_operations ahci_imx_ops = {
+> 
+> 
 > -- 
-> 1.8.3.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
