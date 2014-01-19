@@ -1,33 +1,81 @@
-From: sj38.park@gmail.com (SeongJae Park)
-Date: Sun, 19 Jan 2014 14:55:07 +0900
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-Message-ID: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Sun, 19 Jan 2014 10:48:55 +0200
+Subject: [PATCH 00/12] ARM: dts: sbc-t3x: add support for more boards
+In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
+References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1390121335-4917-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following build comes while modprobe process:
-> ERROR: "__clk_get_hw" [drivers/clk/clk-max77686.ko] undefined!
-> make[2]: *** [__modpost] Error 1
-> make[1]: *** [modules] Error 2
+This is the fixed cover letter.
+The previous one was not consistent with respect to the actual path set.
 
-Export the symbol to fix it and for other part's usecase.
+Add support for CompuLab SBC-T3530 and SBC-T3517 boards:
 
-Signed-off-by: SeongJae Park <sj38.park@gmail.com>
----
- drivers/clk/clk.c | 1 +
- 1 file changed, 1 insertion(+)
+https://compulab.co.il/products/sbcs/sbc-t3530/
+https://compulab.co.il/products/sbcs/sbc-t3517/
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 2b38dc9..3883fba 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -575,6 +575,7 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
- {
- 	return !clk ? NULL : clk->hw;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_hw);
- 
- u8 __clk_get_num_parents(struct clk *clk)
- {
+along with respective CoMs - CM-T3530 and CM-T3517:
+
+https://compulab.co.il/products/computer-on-modules/cm-t3530/
+https://compulab.co.il/products/computer-on-modules/cm-t3517/
+
+The device tree files have the following structure:
+
+omap3-cm-t3x.dtsi
+ |
+ |<-- omap3-cm-t3x30.dtsi
+ |     |
+ |     |
+ |     |     -----                  -------          ------------
+ |     |    | CoM |                | Board |        | Base board |
+ |     |     -----                  -------          ------------
+ |     |                                            omap3-sb-t35.dtsi
+ |     |                                                  |
+ |     |<-- omap3-cm-t3730.dts <-- omap3-sbc-t3730.dts -->|
+ |     |                                                  |
+ |     |<-- omap3-cm-t3530.dts <-- omap3-sbc-t3530.dts -->|
+ |                                                        |
+ |<-------- omap3-cm-t3517.dts <-- omap3-sbc-t3517.dts -->|
+
+
+where omap3-cm-t3730.dts, omap3-cm-t3530.dts, omap3-cm-t3517.dts
+contain CoMs specific data, while omap3-sbc-t3730.dts, omap3-sbc-t3530.dts,
+omap3-sbc-t3517.dts represent eval boards with respective core modules.
+
+This series is based on Tony's omap-for-v3.14/dt branch
+
+Dmitry Lifshitz (12):
+  ARM: dts: sbc-t3x: use omap specific pinctrl defines
+  ARM: dts: sbc-t3x: refactor DT support
+  ARM: dts: sbc-t3x: disable mmc3
+  ARM: dts: sb-t35: fix Ethernet power supply
+  ARM: dts: cm-t3x: add gpio-led pinmux
+  ARM: dts: cm-t3x30: add twl4030 gpio pullups
+  ARM: dts: cm-t3x30: add HS USB Host support
+  ARM: dts: sbc-t3730: add pinmux for usb hub reset
+  ARM: dts: cm-t3x30: add USB OTG support
+  ARM: dts: sbc-t3530: add support for sbc-t3530
+  ARM: dts: sbc-t3517: add support for sbc-t3517
+  ARM: OMAP2+: make reset pulse for sbc-t3x usb hubs
+
+ arch/arm/boot/dts/Makefile            |    4 +
+ arch/arm/boot/dts/omap3-cm-t3517.dts  |  136 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3530.dts  |   12 +++
+ arch/arm/boot/dts/omap3-cm-t3730.dts  |   57 ++------------
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi   |  110 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   74 +++++++++++++-----
+ arch/arm/boot/dts/omap3-sb-t35.dtsi   |   29 +++++++-
+ arch/arm/boot/dts/omap3-sbc-t3517.dts |   43 ++++++++++
+ arch/arm/boot/dts/omap3-sbc-t3530.dts |   36 +++++++++
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |   23 +++---
+ arch/arm/mach-omap2/pdata-quirks.c    |   67 ++++++++++++++++-
+ 11 files changed, 506 insertions(+), 85 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3517.dts
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
+ create mode 100644 arch/arm/boot/dts/omap3-cm-t3x.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-sbc-t3517.dts
+ create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
+
 -- 
-1.8.3.2
+1.7.5.4
