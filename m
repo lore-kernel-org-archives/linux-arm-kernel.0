@@ -1,25 +1,33 @@
-From: ananaza@iki.fi (Antti Miettinen)
-Date: Sun, 19 Jan 2014 07:20:31 +0200
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D932B5.7020909@nvidia.com> (Prashant Gaikwad's message of
- "Fri, 17 Jan 2014 19:10:05 +0530")
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
- <20140115154526.GC3571@mudshark.cambridge.arm.com>
- <52D76BC8.6080405@nvidia.com>
- <20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com>
-Message-ID: <87zjmsy2cg.fsf@iki.fi>
+From: sj38.park@gmail.com (SeongJae Park)
+Date: Sun, 19 Jan 2014 14:55:07 +0900
+Subject: [PATCH] clk: export __clk_get_hw for re-use in others
+Message-ID: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prashant Gaikwad <pgaikwad@nvidia.com> writes:
-> For some idle states it may be required to change the timer when
-> entering idle state to adjust the exit latency.
+Following build comes while modprobe process:
+> ERROR: "__clk_get_hw" [drivers/clk/clk-max77686.ko] undefined!
+> make[2]: *** [__modpost] Error 1
+> make[1]: *** [modules] Error 2
 
-Would it work to set up a separate software timer to account for the
-exit latency?
+Export the symbol to fix it and for other part's usecase.
 
-	--Antti
+Signed-off-by: SeongJae Park <sj38.park@gmail.com>
+---
+ drivers/clk/clk.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2b38dc9..3883fba 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -575,6 +575,7 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
+ {
+ 	return !clk ? NULL : clk->hw;
+ }
++EXPORT_SYMBOL_GPL(__clk_get_hw);
+ 
+ u8 __clk_get_num_parents(struct clk *clk)
+ {
+-- 
+1.8.3.2
