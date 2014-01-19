@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Jan 2014 20:08:24 +0100
-Subject: PWM...
-In-Reply-To: <20140119190324.GC28056@quad.lixom.net>
-References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
- <20140119190324.GC28056@quad.lixom.net>
-Message-ID: <59642204.3UzJCDJHaS@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jan 2014 20:08:54 +0100
+Subject: [RFC v3 11/13] ahci-imx: Don't create a nested platform device
+ from probe
+In-Reply-To: <20140119122540.GN15937@n2100.arm.linux.org.uk>
+References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+ <1390088935-7193-12-git-send-email-hdegoede@redhat.com>
+ <20140119122540.GN15937@n2100.arm.linux.org.uk>
+Message-ID: <52DC22C6.6040806@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 January 2014 11:03:24 Olof Johansson wrote:
-> > 
-> > Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
-> > be specified in the pwms declaration in pwmleds.  So that doesn't work.
-> > There's no property to tell pwmleds that it should use inverted sense
-> > either.
-> 
-> Adding a property for active-low to the pwm-leds binding would be
-> easy, and backwards compatible. I'm surprised the original binding
-> didn't specify it. The leds-pwm driver already seems to support it for
-> C-configured instances.
-> 
-> I'm also surprised that the imx pwm driver even has a #pwm-cells of
-> two, since the driver only supports one output. It'd be nice if they
-> had allocated the extra cell for flags, but it's hard to change now,
-> unless you do a new binding/compatible value and deprecate the old one.
+Hi,
 
-Actually I think it's not that hard to change: The binding can specify
-that either #pwm-cells=<2> or #pwm-cells=<3> is supported, and the
-driver extended to handle both cases. This would maintain backwards
-compatibility for old dtb files, though no forward compatibility for
-new dtb files with old kernels.
+On 01/19/2014 01:25 PM, Russell King - ARM Linux wrote:
+> On Sun, Jan 19, 2014 at 12:48:53AM +0100, Hans de Goede wrote:
+>> Instead only provide platform_data through of_device_id, like the ahci-sunxi
+>> driver does.
+>
+> It looks like the whole of ahci_imx.c (apart from the inclues) is
+> enclosed in a big ifdef.  You can avoid that by using this in the
+> Makefile:
+>
+>> @@ -10,9 +10,8 @@ obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
+>>   obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+>>   obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+>>   obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+>> -obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
+>>
+>> -ahci_plat-objs := ahci_platform.o ahci_sunxi.o
+>> +ahci_plat-objs := ahci_platform.o ahci_imx.o ahci_sunxi.o
+>
+> ahci_plat-y := ahci_platform.o ahci_sunxi.o
+> ahci_plat-$(CONFIG_AHCI_IMX) += ahci_imx.o
+>
 
-	Arnd
+Ah, good idea, the same goes for the sunxi bits. I'll fix this in the next
+revision of the patch-set.
+
+Regards,
+
+Hans
