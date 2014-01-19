@@ -1,33 +1,25 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 18 Jan 2014 23:46:43 -0500
-Subject: [RFC v3 01/13] libahci: Allow drivers to override start_engine
-In-Reply-To: <1390088935-7193-2-git-send-email-hdegoede@redhat.com>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140119044643.GH3640@htj.dyndns.org>
+From: ananaza@iki.fi (Antti Miettinen)
+Date: Sun, 19 Jan 2014 07:20:31 +0200
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <52D932B5.7020909@nvidia.com> (Prashant Gaikwad's message of
+ "Fri, 17 Jan 2014 19:10:05 +0530")
+References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>
+ <20140115154526.GC3571@mudshark.cambridge.arm.com>
+ <52D76BC8.6080405@nvidia.com>
+ <20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
+ <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
+ <52D932B5.7020909@nvidia.com>
+Message-ID: <87zjmsy2cg.fsf@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Hans.
+Prashant Gaikwad <pgaikwad@nvidia.com> writes:
+> For some idle states it may be required to change the timer when
+> entering idle state to adjust the exit latency.
 
-On Sun, Jan 19, 2014 at 12:48:43AM +0100, Hans de Goede wrote:
->  void ahci_start_engine(struct ata_port *ap)
->  {
->  	void __iomem *port_mmio = ahci_port_base(ap);
-> +	struct ahci_host_priv *hpriv = ap->host->private_data;
->  	u32 tmp;
->  
-> +	if (hpriv->start_engine) {
-> +		hpriv->start_engine(ap);
-> +		return;
-> +	}
-> +
+Would it work to set up a separate software timer to account for the
+exit latency?
 
-I'd much prefer if the driver always calls hpriv->start_engine() which
-is initialized to the default callback during common init and then
-overridden if necessary.
-
-Thanks.
-
--- 
-tejun
+	--Antti
