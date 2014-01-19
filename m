@@ -1,43 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 15:30:08 -0800
-Subject: How to support SDIO wifi/bt in DT
-In-Reply-To: <20140119230924.GB8154@piout.net>
-References: <20140116133649.GV15937@n2100.arm.linux.org.uk>
- <3215037.8HVCjAeS8g@wuerfel>
- <CAOesGMgzi5Buduo2pd0PP8CvKVir69yZ-jjX0Gbda871GiD8rg@mail.gmail.com>
- <alpine.LFD.2.10.1401162204560.28907@knanqh.ubzr>
- <CAL_JsqKX2RT2E6uk3d35m+TWW7iuPFFiuZzOwd0xA9zMgqAZRw@mail.gmail.com>
- <alpine.LFD.2.10.1401171157340.28907@knanqh.ubzr>
- <CAOesGMjVpTEku+UJntewi3FXoeEPe9rJP4BBmbSesfFMtY9hnA@mail.gmail.com>
- <20140119230924.GB8154@piout.net>
-Message-ID: <20140119233008.GA4867@quad.lixom.net>
+Date: Sun, 19 Jan 2014 15:33:56 -0800
+Subject: PWM...
+In-Reply-To: <201401192126.41543.arnd@arndb.de>
+References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
+ <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
+ <20140119193026.GS15937@n2100.arm.linux.org.uk>
+ <201401192126.41543.arnd@arndb.de>
+Message-ID: <20140119233356.GA4986@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 12:09:25AM +0100, Alexandre Belloni wrote:
-> On Sun, Jan 19, 2014 at 11:29:55AM -0800, Olof Johansson wrote :
-> > The "multi-slot" concept I was talking about was one host controller
-> > for several physical slots. Seems like at91 implements _and_ uses this
-> > but nobody else. However, it seems that they allocate one mmc host per
-> > slot, so the same model still works.
+On Sun, Jan 19, 2014 at 09:26:40PM +0100, Arnd Bergmann wrote:
+> On Sunday 19 January 2014, Russell King - ARM Linux wrote:
+> > On Sun, Jan 19, 2014 at 11:11:41AM -0800, Olof Johansson wrote:
+> > > On Sun, Jan 19, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > > Ah, yes, if you add a cell that can be done. There'll still be the
+> > > "dead" first cell that will always be 0, but that's alright.
 > > 
+> > Does it not mean that PWM specifications of:
+> > 
+> >         <&pwm1 0 n> <&pwm2 0 n>
+> > 
+> > would need to be converted to:
+> > 
+> >         <&pwm1 0 n 0> <&pwm2 0 n 0>
+> > 
+> > in every DT file referring to these PWMs - because isn't this just
+> > treated in DT as one single array of values?  (If DT knew how many
+> > were in each specification, we wouldn't need the #foo-cells...)
 > 
-> I think we need to be extra careful about the DT bindings then because
-> adding a property in a slot is requiring handling that in the at91
-> driver whereas adding a common property for the various mmc hosts can be
-> done in the core code.
-> 
-> From what I remember, it would be really good to put the DT parsing for
-> the slots in the core code but I only had a really quick look at that.
+> Right: if you change an existing dts file from #pwm-cells=<2> to
+> #pwm-cells=<3>, that requires changing all references to the pwm
+> controller at the same time. If both the per-soc .dtsi files
+> and the per-board .dts files contain references to the same pwm
+> controller, that can end up in significant work. I have not checked
+> if this is the case for i.MX though.
 
-The patches I have here do it all in the core per host with common
-bindings. I hope to post them tonight. They should fit the at91 model
-just fine as well, since they do each slot as a mmc_host, not as a separate
-slot with a shared host controller.
+Only imx53-tx53.dtsi and imx6qdl-sabresd.dtsi seem to reference pwm nodes from
+a dtsi file, the rest are from dts.
 
-(Some drivers don't seem to call mmc_of_parse(), which they will need to do to
-take advantage of the common implementation. But that can be addressed driver
-by driver as someone has a chance to test it).
+Not all of the dts files have to be converted at the same time either;
+the #pwm-cells property can be changed per dts until they've all been
+converted, then the shared SoC dtsi can be converted.
 
 
 -Olof
