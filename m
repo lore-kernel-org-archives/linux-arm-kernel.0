@@ -1,80 +1,201 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sun, 19 Jan 2014 10:28:52 +0800
-Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
-References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
- <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
- <52D7A237.8@freescale.com>
- <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
- <20140117020226.GB27652@shlinux2.ap.freescale.net>
- <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
- <20140117065401.GA6140@shlinux2.ap.freescale.net>
- <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
-Message-ID: <52DB3864.2040606@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 19 Jan 2014 10:40:07 +0800
+Subject: [PATCH] ARM: dts: imx6q: Add support for Zealz GK802
+In-Reply-To: <1389876499-24247-1-git-send-email-s.hauer@pengutronix.de>
+References: <1389876499-24247-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140119024005.GA16158@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 16, 2014 at 01:48:19PM +0100, Sascha Hauer wrote:
+> Add support for the GK802 'QUAD CORE Mini PC', which seems to be loosely
+> based on the Freescale i.MX6Q HDMI dongle reference design.
+> It is supposedly identical to the Hiapad Hi802.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-? 2014?01?17? 16:39, Jagan Teki ??:
-> On Fri, Jan 17, 2014 at 12:24 PM, Huang Shijie <b32955@freescale.com> wrote:
->> On Fri, Jan 17, 2014 at 12:36:08PM +0530, Jagan Teki wrote:
->>>>> My basic question is like I have a qspi spi controller in my SOC and I
->>>>> designed two boards B1 and B2
->>>> okay.
->>>>
->>>>> B1 with quad spi controller connected with non-flash as a slave and B2
->>>>> with quad spi controller connected
->>>>> with quad flash as a slave.
->>>> You can use the framework for B2. But for B1, you should not use the framework,
->>>> since this framework is just for the SPI-NOR. If you do not connected with
->>>> a NOR, i think it's better to code another driver for your controller.
->>> Means we have two separate controller drivers for same controller one
->>> with spi-nor and
->>> another with spi is it?
->> Take drivers/spi/spi-imx.c for example, if you connect a NOR to it, you only
->> need to add a NOR device node in the device tree. In the probe, it will call
->> the m25p80.c to probe the NOR device.
->>
->> But if we connect other device to it. you should set another device node for it.
->>
->> I am not sure if your controller driver can works as the spi-imx.c
-> My question here was - this new framework suggest to write a two
-> different controller
-> drivers one is for non spi-nor and spi-nor models? do you agree that?
+The patch has a couple of minor things like we did for patch 'ARM: dts:
+imx6: Add DFI FS700-M60 board support' to fix up.  I fixed them up and
+apply the patch.
 
+Shawn
 
-If your controller can either connects to a NOR, or can connects to 
-other devices, it means your controller is a _BUS_.
-You just need to write the bus driver for your controller, such as the 
-spi-imx.c and drivers/bus/imx-weim.c do.
-
-Since you have connect a device to your controller. you also need to 
-write a driver for your device, such as the m25p80.c is
-for your spi nor device.
-
-Just think about that how do you code your driver for SPI NOR _without_ 
-this framework:
-do your driver need to call the m25p80.c? if you do call the m25p80.c, 
-you actually write your so-called "two drivers" :)
-
-
-This framework does not change any logic for the current kernel, except 
-adding a layer. With the new layer, we can code the
-driver for the controllers which is a SPI-NOR controller, not a SPI bus 
-controller.
-
-
->
-> And also one important note from your design was spi-nor mode is
-> completely bypassing
-> Linux spi core is that the good idea?
->
-yes. I think it's a good idea.
-
-As Mark even pointed, the freescale's Quadspi controller is not a SPI 
-controller, it is a SPI-NOR controller, it does _not_ need the
-LINUX SPI core.
-
-
-thanks
-Huang Shijie
+> ---
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/imx6q-gk802.dts | 151 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 152 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-gk802.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index aeb8053..9ed00a0 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -171,6 +171,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-arm2.dtb \
+>  	imx6q-cm-fx6.dtb \
+>  	imx6q-dmo-edmqmx6.dtb \
+> +	imx6q-gk802.dtb \
+>  	imx6q-gw51xx.dtb \
+>  	imx6q-gw52xx.dtb \
+>  	imx6q-gw53xx.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-gk802.dts b/arch/arm/boot/dts/imx6q-gk802.dts
+> new file mode 100644
+> index 0000000..0d010df
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-gk802.dts
+> @@ -0,0 +1,151 @@
+> +/*
+> + * Copyright (C) 2013 Philipp Zabel
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "Zealz GK802";
+> +	compatible = "zealz,imx6q-gk802", "fsl,imx6q";
+> +
+> +	chosen {
+> +		linux,stdout-path = &uart4;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_3p3v: 3p3v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +
+> +		recovery-button {
+> +			label = "recovery";
+> +			gpios = <&gpio3 16 1>;
+> +			linux,code = <0x198>; /* KEY_RESTART */
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +};
+> +
+> +/* Internal I2C */
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2_gk802>;
+> +	clock-frequency = <100000>;
+> +	status = "okay";
+> +
+> +	/* SDMC DM2016 1024 bit EEPROM + 128 bit OTP */
+> +	eeprom: dm2016 at 51 {
+> +		compatible = "sdmc,dm2016";
+> +		reg = <0x51>;
+> +	};
+> +};
+> +
+> +/* External I2C via HDMI */
+> +&i2c3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3_gk802>;
+> +	clock-frequency = <100000>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	hog {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				/* Recovery button, active-low */
+> +				MX6QDL_PAD_EIM_D16__GPIO3_IO16  0x100b1
+> +				/* RTL8192CU enable GPIO, active-low */
+> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x1b0b0
+> +			>;
+> +		};
+> +	};
+> +
+> +	i2c {
+> +		pinctrl_i2c2_gk802: i2c2grp-1 {
+> +			fsl,pins = <MX6QDL_I2C2_PINGRP2>;
+> +		};
+> +
+> +		pinctrl_i2c3_gk802: i2c3grp-1 {
+> +			fsl,pins = <MX6QDL_I2C3_PINGRP3>;
+> +		};
+> +	};
+> +
+> +	uart {
+> +		pinctrl_uart4: uart4grp {
+> +			fsl,pins = <MX6QDL_UART4_PINGRP1>;
+> +		};
+> +	};
+> +
+> +	usdhc {
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <MX6QDL_USDHC3_PINGRP_D4>;
+> +		};
+> +
+> +		pinctrl_usdhc4: usdhc4grp {
+> +			fsl,pins = <MX6QDL_USDHC4_PINGRP_D4>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4>;
+> +	status = "okay";
+> +};
+> +
+> +/* External USB-A port (USBOTG) */
+> +&usbotg {
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +/* Internal USB port (USBH1), connected to RTL8192CU */
+> +&usbh1 {
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +/* External microSD */
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&gpio6 11 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +/* Internal microSD */
+> +&usdhc4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc4>;
+> +	bus-width = <4>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> -- 
+> 1.8.5.2
+> 
