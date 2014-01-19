@@ -1,38 +1,80 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 18 Jan 2014 21:29:53 -0300
-Subject: [PATCH] ARM: kirkwood: kirkwood_pm_init() should return void
-In-Reply-To: <20140118235411.GN29184@titan.lakedaemon.net>
-References: <1389984731-20220-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140118235411.GN29184@titan.lakedaemon.net>
-Message-ID: <20140119002952.GA2412@localhost>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sun, 19 Jan 2014 10:28:52 +0800
+Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
+References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
+ <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
+ <52D7A237.8@freescale.com>
+ <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
+ <20140117020226.GB27652@shlinux2.ap.freescale.net>
+ <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
+ <20140117065401.GA6140@shlinux2.ap.freescale.net>
+ <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
+Message-ID: <52DB3864.2040606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 18, 2014 at 06:54:11PM -0500, Jason Cooper wrote:
-> On Fri, Jan 17, 2014 at 03:52:11PM -0300, Ezequiel Garcia wrote:
-> > This function was originally meant to return void as declared in the
-> > common.h header. Fix it and include the header to catch these errors
-> > in the future.
-> > 
-> > Reported-by: Andrew Lunn <andrew@lunn.ch>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/mach-kirkwood/pm.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> merf.  I get the following warning when building kirkwood_defconfig:
-> 
-> arch/arm/mach-kirkwood/pm.c: In function 'kirkwood_pm_init':
-> arch/arm/mach-kirkwood/pm.c:73:2: warning: 'return' with a value, in function returning void [enabled by default]
-> 
 
-Doh...
+? 2014?01?17? 16:39, Jagan Teki ??:
+> On Fri, Jan 17, 2014 at 12:24 PM, Huang Shijie <b32955@freescale.com> wrote:
+>> On Fri, Jan 17, 2014 at 12:36:08PM +0530, Jagan Teki wrote:
+>>>>> My basic question is like I have a qspi spi controller in my SOC and I
+>>>>> designed two boards B1 and B2
+>>>> okay.
+>>>>
+>>>>> B1 with quad spi controller connected with non-flash as a slave and B2
+>>>>> with quad spi controller connected
+>>>>> with quad flash as a slave.
+>>>> You can use the framework for B2. But for B1, you should not use the framework,
+>>>> since this framework is just for the SPI-NOR. If you do not connected with
+>>>> a NOR, i think it's better to code another driver for your controller.
+>>> Means we have two separate controller drivers for same controller one
+>>> with spi-nor and
+>>> another with spi is it?
+>> Take drivers/spi/spi-imx.c for example, if you connect a NOR to it, you only
+>> need to add a NOR device node in the device tree. In the probe, it will call
+>> the m25p80.c to probe the NOR device.
+>>
+>> But if we connect other device to it. you should set another device node for it.
+>>
+>> I am not sure if your controller driver can works as the spi-imx.c
+> My question here was - this new framework suggest to write a two
+> different controller
+> drivers one is for non spi-nor and spi-nor models? do you agree that?
 
-> I've amended the patch as below and pushed it to mvebu/fixes
-> 
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+If your controller can either connects to a NOR, or can connects to 
+other devices, it means your controller is a _BUS_.
+You just need to write the bus driver for your controller, such as the 
+spi-imx.c and drivers/bus/imx-weim.c do.
+
+Since you have connect a device to your controller. you also need to 
+write a driver for your device, such as the m25p80.c is
+for your spi nor device.
+
+Just think about that how do you code your driver for SPI NOR _without_ 
+this framework:
+do your driver need to call the m25p80.c? if you do call the m25p80.c, 
+you actually write your so-called "two drivers" :)
+
+
+This framework does not change any logic for the current kernel, except 
+adding a layer. With the new layer, we can code the
+driver for the controllers which is a SPI-NOR controller, not a SPI bus 
+controller.
+
+
+>
+> And also one important note from your design was spi-nor mode is
+> completely bypassing
+> Linux spi core is that the good idea?
+>
+yes. I think it's a good idea.
+
+As Mark even pointed, the freescale's Quadspi controller is not a SPI 
+controller, it is a SPI-NOR controller, it does _not_ need the
+LINUX SPI core.
+
+
+thanks
+Huang Shijie
