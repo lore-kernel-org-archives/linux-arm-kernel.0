@@ -1,42 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 19 Jan 2014 19:51:48 +0100
-Subject: [RFC v3 05/13] ahci-platform: Pass ahci_host_priv ptr to
- ahci_platform_data init method
-In-Reply-To: <20140119113051.GD11123@htj.dyndns.org>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-6-git-send-email-hdegoede@redhat.com>
- <20140119113051.GD11123@htj.dyndns.org>
-Message-ID: <52DC1EC4.3090807@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 19 Jan 2014 10:52:46 -0800
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140119031816.GD16158@S2101-09.ap.freescale.net>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+ <20140119031816.GD16158@S2101-09.ap.freescale.net>
+Message-ID: <20140119185246.GB28056@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jan 19, 2014 at 11:18:18AM +0800, Shawn Guo wrote:
+> On Thu, Jan 16, 2014 at 06:22:12PM +0000, Russell King - ARM Linux wrote:
+> > Now that the Cubox-i has been released, and I have one, I've been able to
+> > update things a little.  Out of the following two patches, the first one
+> > I think is critical to be merged before the microsom support hits
+> > mainline, since it drops the flexcan support from the microsom level,
+> > moving it to the Hummingboard level.
+> 
+> I will be out of town for a few days, and won't be online until next
+> weekend.  So please send the patch directly to arm-soc folks, so that
+> they can send it together with imx-dt-3.14 stuff.
+> 
+> arm-soc folks, please take this as another ping for my imx-dt-3.14 pull
+> request :)
 
-On 01/19/2014 12:30 PM, Tejun Heo wrote:
-> On Sun, Jan 19, 2014 at 12:48:47AM +0100, Hans de Goede wrote:
->> Some ahci_platform_data->init methods need access to the ahci_host_priv data.
->>
->> Note:
->>
->> When calling ahci_platform_data->init the ata_host has not been allocated yet,
->> so access to ahci_host_priv through the dev argument is not possible.
->>
->> The hpriv->mmio argument may seem redundant, but it is useful for drivers
->> which live outside of drivers/ata and thus don't know the contents of the
->> ahci_platform_data data type.
->
-> Wouldn't the right thing to do be moving them under drivers/ata?
+I'm well aware that the DT branch has not been merged, and that's because
+there has been no consensus from DT maintainers on the massive rework
+you did as the base of the branch.
 
-Yes, but they are part of arch/arm/mach-foo, so moving them is non trivial, and
-I don't want to go make these kinda changes without hardware to test. Please keep
-in mind that I'm partially cleaning up other peoples mess here (the imx bits
-specifically). I'm willing to do that to some extend (*). But buying an imx6q board
-and fixing that is about as far as I'm willing to go.
-
-Regards,
-
-Hans
+Given the timing, it's not looking like it will be resolved in time for
+the 3.14 merge window (which might open today).
 
 
-*) Keep in mind that this is a hobby project done in my spare time, with all
-hardware bought from personal budget.
+
+-Olof
