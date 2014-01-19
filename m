@@ -1,21 +1,55 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Sun, 19 Jan 2014 06:15:58 -0500
-Subject: [RFC v3 02/13] sata-highbank: Remove unnecessary ahci_platform.h
- include
-In-Reply-To: <1390088935-7193-3-git-send-email-hdegoede@redhat.com>
+Date: Sun, 19 Jan 2014 06:27:37 -0500
+Subject: [RFC v3 04/13] ahci-platform: Undo pdata->resume on resume failure
+In-Reply-To: <1390088935-7193-5-git-send-email-hdegoede@redhat.com>
 References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140119111558.GB11123@htj.dyndns.org>
+ <1390088935-7193-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140119112737.GC11123@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 12:48:44AM +0100, Hans de Goede wrote:
-> The sata-highbank driver is a complete standalone sata driver, which does
-> not use ahci_platform.c / ahci_platform_data in any way.
+Hello,
+
+On Sun, Jan 19, 2014 at 12:48:46AM +0100, Hans de Goede wrote:
+> When the ahci_resume fails the error handling code tries to undo all changes
+> made, but it was not undoing the results of pdata->resume.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/ata/ahci_platform.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index dc1ef73..41720cb 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -307,7 +307,7 @@ static int ahci_resume(struct device *dev)
+>  	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+>  		rc = ahci_reset_controller(host);
+>  		if (rc)
+> -			goto disable_unprepare_clk;
+> +			goto pdata_suspend;
+>  
+>  		ahci_init_controller(host);
+>  	}
+> @@ -316,6 +316,9 @@ static int ahci_resume(struct device *dev)
+>  
+>  	return 0;
+>  
+> +pdata_suspend:
+> +	if (pdata && pdata->suspend)
+> +		pdata->suspend(dev);
+>  disable_unprepare_clk:
+>  	if (!IS_ERR(hpriv->clk))
+>  		clk_disable_unprepare(hpriv->clk);
 
-Applied to libata/for-3.14.
+Hmmmm... resume isn't an operation you can revert without side-effect
+when the whole system is waking up from sleep.  e.g. think about what
+should happen the driver is removed and loaded again - it should be
+able to reinitialized the device, which is unlikely to work if the
+device is suspended at the platform level.  If resume fails, the right
+state to be in is "failed with as much as resumed" instead of
+"suspended".
 
 Thanks.
 
