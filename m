@@ -1,33 +1,61 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 19 Jan 2014 08:19:10 -0500
-Subject: [RFC v3 08/13] ahci-platform: Allow specifying platform_data
- through of_device_id
-In-Reply-To: <20140119123055.GO15937@n2100.arm.linux.org.uk>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-9-git-send-email-hdegoede@redhat.com>
- <20140119113838.GE11123@htj.dyndns.org>
- <20140119123055.GO15937@n2100.arm.linux.org.uk>
-Message-ID: <20140119131910.GF11123@htj.dyndns.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Jan 2014 16:49:57 +0000
+Subject: PWM...
+Message-ID: <20140119164956.GR15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 12:30:55PM +0000, Russell King - ARM Linux wrote:
-> I don't see anything wrong with this.  Platform data should _never_ be
-> written to, because doing so will change the driver behaviour between
-> bindings.  It really should be read-only to driver code.
+So, having looked at what else I can add support for on the cubox-i, I
+decided it would be nice and simple to add support for the front panel
+LED.  What could possibly go wrong with this.
 
-Hmmm, problems usually arise when const is used to distinguish ro and
-rw users.  When it's simple, it seems okay but later on it often ends
-up requiring dropping const in almost arbitrary places or forced casts
-somewhere random.  Over time, it makes const annotations in the kernel
-sparse and inconsistent.  For anything non-trivial, I think it's best
-to ignore it.
+Well, the hardware is wired such that the LED is connected between the
+PWM output and +3.3v.  So, a constant low turns the LED on full, whereas
+a constant high turns the LED off.
 
-That said, if the object is actually immutable once initialized, it
-shouldn't cause any trouble.  That probably is one of the few proper
-use case for const on complex data types.
+So, the polarity of the LED is inverted - but this _can't_ be specified
+in the totally and utterly fucked misdesigned crap that DT is:
 
-Thanks.
+        pwmleds {
+                compatible = "pwm-leds";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
+                  
+                front {
+                        label = "imx6:red:front";
+                        pwms = <&pwm1 0 50000>;
+                        max-brightness = <248>;
+                };
+        };
+
+                        pwm1: pwm at 02080000 {
+                                #pwm-cells = <2>;
+                                compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+                                reg = <0x02080000 0x4000>;
+                                interrupts = <0 83 0x04>;
+                                clocks = <&clks 62>, <&clks 145>;
+                                clock-names = "ipg", "per";
+                        };
+
+Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
+be specified in the pwms declaration in pwmleds.  So that doesn't work.
+There's no property to tell pwmleds that it should use inverted sense
+either.
+
+Moreover, there's no way to specify a default brightness for the LED
+in the absence of any trigger, so this results in the LED being fully
+on.
+
+So, something which _should_ be nice and simple is turned into a major
+fuckup because of the total and utter crappiness that DT is and the
+total misdesign that this shite is.
+
+Frankly, board support via C files was FAR BETTER than this never
+ending pile of shite that I'm finding with DT.  Far from making board
+support easier, DT has turned it into a total disaster.  I say bring
+back board .c files... DT isn't worth bothering with.
 
 -- 
-tejun
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
