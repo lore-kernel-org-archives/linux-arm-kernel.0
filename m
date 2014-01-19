@@ -1,40 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 11:11:41 -0800
-Subject: PWM...
-In-Reply-To: <59642204.3UzJCDJHaS@wuerfel>
-References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
- <20140119190324.GC28056@quad.lixom.net>
- <59642204.3UzJCDJHaS@wuerfel>
-Message-ID: <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 19 Jan 2014 14:13:49 -0500
+Subject: [RFC v3 04/13] ahci-platform: Undo pdata->resume on resume failure
+In-Reply-To: <52DC1C15.1030107@redhat.com>
+References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
+ <1390088935-7193-5-git-send-email-hdegoede@redhat.com>
+ <20140119112737.GC11123@htj.dyndns.org>
+ <52DC1C15.1030107@redhat.com>
+Message-ID: <20140119191349.GA32165@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 19 January 2014 11:03:24 Olof Johansson wrote:
->> >
->> > Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
->> > be specified in the pwms declaration in pwmleds.  So that doesn't work.
->> > There's no property to tell pwmleds that it should use inverted sense
->> > either.
->>
->> Adding a property for active-low to the pwm-leds binding would be
->> easy, and backwards compatible. I'm surprised the original binding
->> didn't specify it. The leds-pwm driver already seems to support it for
->> C-configured instances.
->>
->> I'm also surprised that the imx pwm driver even has a #pwm-cells of
->> two, since the driver only supports one output. It'd be nice if they
->> had allocated the extra cell for flags, but it's hard to change now,
->> unless you do a new binding/compatible value and deprecate the old one.
->
-> Actually I think it's not that hard to change: The binding can specify
-> that either #pwm-cells=<2> or #pwm-cells=<3> is supported, and the
-> driver extended to handle both cases. This would maintain backwards
-> compatibility for old dtb files, though no forward compatibility for
-> new dtb files with old kernels.
+Hello,
 
-Ah, yes, if you add a cell that can be done. There'll still be the
-"dead" first cell that will always be 0, but that's alright.
+On Sun, Jan 19, 2014 at 07:40:21PM +0100, Hans de Goede wrote:
+> That sounds like your advocating for just returning from resume on the
+> first error without undoing any of the previous steps, have I gotten that
+> right?
 
+Yeah, or just ignore reset failure and proceed.
 
--Olof
+> That sounds as sensible as any other approach on resume errors
+> (there are IMHO no good answers), if that is what you mean, shall I do a
+
+Suspending back is the wrong answer tho.
+
+> patch in the next versions of my patch-set doing that ?
+
+Isn't just dropping this patch enough tho?
+
+Thanks.
+
+-- 
+tejun
