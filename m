@@ -1,31 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 20 Jan 2014 17:33:01 +0530
-Subject: [PATCH] dma: fix vchan_cookie_complete() debug print
-In-Reply-To: <20140120112822.GA15937@n2100.arm.linux.org.uk>
-References: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
- <20140120095917.GZ26823@intel.com>
- <20140120112822.GA15937@n2100.arm.linux.org.uk>
-Message-ID: <20140120120301.GE26823@intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 20 Jan 2014 14:09:23 +0100
+Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
+In-Reply-To: <20140120115919.GD26823@intel.com>
+References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
+ <20140120122840.36520f37@ipc1.ka-ro>
+ <20140120123627.1147f252@ipc1.ka-ro>
+ <20140120123849.GC15937@n2100.arm.linux.org.uk>
+ <20140120115919.GD26823@intel.com>
+Message-ID: <20140120130923.GP16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 11:28:22AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 20, 2014 at 03:29:17PM +0530, Vinod Koul wrote:
-> > On Fri, Dec 06, 2013 at 04:42:09PM +0100, Jonas Jensen wrote:
-> > > vd->tx.cookie is set zero on dma_cookie_complete(),
-> > > save to local before printing it.
-> > > 
-> > > Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> > > ---
-> > > 
-> > > Notes:
-> > >     dev_vdbg() could also be moved to happen earlier, what do you prefer?
-> > This would be preferred IMHO. Also pls cc dmaengine at vger on this
+On Mon, Jan 20, 2014 at 05:29:20PM +0530, Vinod Koul wrote:
+> On Mon, Jan 20, 2014 at 12:38:50PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Jan 20, 2014 at 12:36:27PM +0100, Lothar Wa?mann wrote:
+> > > In case user space firmware loading support (CONFIG_FW_LOADER) is
+> > > enabled, this message may still be inadequate, since the firmware may
+> > > very well be loaded lateron.
+> > 
+> > I haven't worked out whether that's actually possible - I saw no way to
+> > re-trigger the firmware request, and once the firmware request expires,
+> > there seems to be no way for userspace to say "okay, the firmware is now
+> > available, please load it".
+> In that case why don't we use async version and wait till the userspace is
+> availble and firmware is loaded. 
 > 
-> I prefer this version - it means that the verbose debug printk doesn't
-> impact the completion timing when printk is expensive (eg, because its
-> outputting via a serial port.)
-But if you know your printk is costly, do you want to enable these?
+> So request_firmware_nowait() seems to do the job, I have used in a device where
+> I call it in probe() so that not to slow booting and make firmware bloc availble
+> userpsace is availble.
+> 
+> Sounds too good, did I miss anything obvious for this case here?
+
+Been there, done that. This would make the RAM Firmware mandatory.
+
+The Linux firmware loading mechanism is not very suitable for the SDMA
+engine. The firmware loading mechanism expects that a driver cannot work
+without a firmware. Normally this is true, but The SDMA engine can run
+with the ROM firmware or a RAM firmware loaded during runtime. In fact
+the firmware consists of Program code, so the SDMA engine could even run
+with a combination of the ROM firmware and 0..n dynamically loaded
+firmware modules.
+
+Maybe using the firmware loading mechanism for the SDMA engine was the
+wrong approach from the start.
+
+Sascha
 
 -- 
-~Vinod
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
