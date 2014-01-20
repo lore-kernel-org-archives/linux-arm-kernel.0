@@ -1,60 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 19:34:22 -0800
-Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
-In-Reply-To: <20140120004434.GV15937@n2100.arm.linux.org.uk>
-References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
- <20140119031816.GD16158@S2101-09.ap.freescale.net>
- <20140119185246.GB28056@quad.lixom.net>
- <20140120004434.GV15937@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMiych-jeo_eKGgL1qxsYQ=rkb4UQwgGBsG-7+GMbLJWhg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 20 Jan 2014 11:39:18 +0800
+Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
+In-Reply-To: <20140118052059.GL9558@ns203013.ovh.net>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+ <20140118052059.GL9558@ns203013.ovh.net>
+Message-ID: <52DC9A66.6080009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 4:44 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jan 19, 2014 at 10:52:46AM -0800, Olof Johansson wrote:
->> On Sun, Jan 19, 2014 at 11:18:18AM +0800, Shawn Guo wrote:
->> > On Thu, Jan 16, 2014 at 06:22:12PM +0000, Russell King - ARM Linux wrote:
->> > > Now that the Cubox-i has been released, and I have one, I've been able to
->> > > update things a little.  Out of the following two patches, the first one
->> > > I think is critical to be merged before the microsom support hits
->> > > mainline, since it drops the flexcan support from the microsom level,
->> > > moving it to the Hummingboard level.
->> >
->> > I will be out of town for a few days, and won't be online until next
->> > weekend.  So please send the patch directly to arm-soc folks, so that
->> > they can send it together with imx-dt-3.14 stuff.
->> >
->> > arm-soc folks, please take this as another ping for my imx-dt-3.14 pull
->> > request :)
+Hi J,
+
+On 01/18/2014 01:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:59 Fri 17 Jan     , Bo Shen wrote:
+>> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
+>> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
 >>
->> I'm well aware that the DT branch has not been merged, and that's because
->> there has been no consensus from DT maintainers on the massive rework
->> you did as the base of the branch.
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
 >>
->> Given the timing, it's not looking like it will be resolved in time for
->> the 3.14 merge window (which might open today).
+>>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+>> index 2cb52e0..7e67a81 100644
+>> --- a/drivers/usb/gadget/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+>> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>>   	if (ep_status) {
+>>   		int i;
+>>
+>> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
+>> +		for (i = 0; i < udc->num_ep; i++)
 >
-> Okay, that presumably means that the Hummingboard stuff won't be going in
-> through this route, and it sounds like the imx DT stuff will need rework.
->
-> Is there any objection if I pushed just the Hummingboard files upstream
-> myself?
+> no the limit need to specified in the driver as a checkpoint by the compatible
+> or platform driver id
 
-I'm guessing this is going to mess up Shawn's cleanup patches, but
-time has ran out for 3.14 for those so they will need to be respun
-anyway, most likely.
+You mean, we should not trust the data passed from dt node or platform 
+data? Or do you think we should do double confirm?
 
-We can apply them to arm-soc's dt branch. I think it's better if we
-merge them since dts files tend to be one of the conflict-ridden areas
-(even if this particular instance isn't). Send the series our way if
-you want, or send a branch pull request, your choice.
+> Best Regards,
+> J.
+>>   			if (ep_status & (1 << i)) {
+>>   				if (ep_is_control(&udc->usba_ep[i]))
+>>   					usba_control_irq(udc, &udc->usba_ep[i]);
+>> --
+>> 1.8.5.2
+>>
 
-We're generally somewhat liberal w.r.t. applying brand new dts files
--- just like Greg is liberal with applying new PCI ids in -stable: as
-long as they don't break dtbs target compilation there's little reason
-to sit on them a whole release if they come in early during the cycle
-(pre-rc2 or so).
-
-
--Olof
+Best Regards,
+Bo Shen
