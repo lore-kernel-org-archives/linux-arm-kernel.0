@@ -1,175 +1,72 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 20 Jan 2014 22:22:00 +0100
-Subject: [PATCH 1/3] Add support for different binary target address sizes
+Date: Mon, 20 Jan 2014 22:22:02 +0100
+Subject: [PATCH 3/3] Dwarf: unwind the recorded stack frame of different
+ target address sizes
 In-Reply-To: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
 References: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1390252922-25889-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1390252922-25889-4-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of unwinding the debug info from a binary that has a different
-address size than the current native platform, it is needed to record
-it in the address space struct, in order to correctly parse the debug
-info later. This mode is known as compat mode.
-
-This is the case on e.g. profiling an ARMv7 binary that runs on an
-ARMv8 (aka AARCH64) platform.
-
-Add the target_addr_size field in the unw_addr_space struct and provide
-the 32 and 64 bit macros for use in the code.
+When in compat mode, correctly unwind the recorded stack frame. The
+returned pointers are cast to the desired target address size.
 
 Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
 ---
- include/libunwind_i.h              | 7 +++++++
- include/tdep-aarch64/libunwind_i.h | 1 +
- include/tdep-arm/libunwind_i.h     | 1 +
- include/tdep-hppa/libunwind_i.h    | 1 +
- include/tdep-ia64/libunwind_i.h    | 1 +
- include/tdep-mips/libunwind_i.h    | 1 +
- include/tdep-ppc32/libunwind_i.h   | 1 +
- include/tdep-ppc64/libunwind_i.h   | 1 +
- include/tdep-sh/libunwind_i.h      | 1 +
- include/tdep-x86/libunwind_i.h     | 1 +
- include/tdep-x86_64/libunwind_i.h  | 1 +
- 11 files changed, 17 insertions(+)
+ src/dwarf/Gparser.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/include/libunwind_i.h b/include/libunwind_i.h
-index 0be551f..859ae03 100644
---- a/include/libunwind_i.h
-+++ b/include/libunwind_i.h
-@@ -345,6 +345,13 @@ static inline void invalidate_edi (struct elf_dyn_info *edi)
- # define PT_ARM_EXIDX		0x70000001	/* ARM unwind segment */
- #endif /* !PT_ARM_EXIDX */
+diff --git a/src/dwarf/Gparser.c b/src/dwarf/Gparser.c
+index b251e31..d676861 100644
+--- a/src/dwarf/Gparser.c
++++ b/src/dwarf/Gparser.c
+@@ -706,6 +706,29 @@ eval_location_expr (struct dwarf_cursor *c, unw_addr_space_t as,
+   return 0;
+ }
  
-+/* Define binary target address size */
-+enum {
-+    TARGET_ADDR_SIZE_DEFAULT,
-+    TARGET_ADDR_SIZE_32,
-+    TARGET_ADDR_SIZE_64
-+};
++/* Cast pointer content to the type of target address size */
++static inline int cast_value_to_addr_size(unw_word_t *val, int addr_size)
++{
++    switch (addr_size) {
++    /*
++     * Return the value of the type found at binary load time (e.g. from the
++     * ELF format)...
++     */
++    case TARGET_ADDR_SIZE_32:
++	*val = (uint32_t) *val;
++	break;
++    case TARGET_ADDR_SIZE_64:
++	*val = (uint64_t) *val;
++	break;
++    /* ... otherwise leave it as is */
++    case TARGET_ADDR_SIZE_DEFAULT:
++    default:
++	break;
++    }
 +
- #include "tdep/libunwind_i.h"
- 
- #ifndef tdep_get_func_addr
-diff --git a/include/tdep-aarch64/libunwind_i.h b/include/tdep-aarch64/libunwind_i.h
-index b162271..5341118 100644
---- a/include/tdep-aarch64/libunwind_i.h
-+++ b/include/tdep-aarch64/libunwind_i.h
-@@ -61,6 +61,7 @@ struct unw_addr_space
-   {
-     struct unw_accessors acc;
-     int big_endian;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-arm/libunwind_i.h b/include/tdep-arm/libunwind_i.h
-index 291b101..7353f82 100644
---- a/include/tdep-arm/libunwind_i.h
-+++ b/include/tdep-arm/libunwind_i.h
-@@ -46,6 +46,7 @@ struct unw_addr_space
-   {
-     struct unw_accessors acc;
-     int big_endian;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-hppa/libunwind_i.h b/include/tdep-hppa/libunwind_i.h
-index b5bbcec..7e2ebd7 100644
---- a/include/tdep-hppa/libunwind_i.h
-+++ b/include/tdep-hppa/libunwind_i.h
-@@ -45,6 +45,7 @@ unw_tdep_frame_t;
- struct unw_addr_space
-   {
-     struct unw_accessors acc;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-ia64/libunwind_i.h b/include/tdep-ia64/libunwind_i.h
-index 2bea830..20dd999 100644
---- a/include/tdep-ia64/libunwind_i.h
-+++ b/include/tdep-ia64/libunwind_i.h
-@@ -96,6 +96,7 @@ struct unw_addr_space
-     struct unw_accessors acc;
-     int big_endian;
-     int abi;	/* abi < 0 => unknown, 0 => SysV, 1 => HP-UX, 2 => Windows */
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-mips/libunwind_i.h b/include/tdep-mips/libunwind_i.h
-index 3ef1cef..c7a0c16 100644
---- a/include/tdep-mips/libunwind_i.h
-+++ b/include/tdep-mips/libunwind_i.h
-@@ -52,6 +52,7 @@ struct unw_addr_space
-     int big_endian;
-     mips_abi_t abi;
-     unsigned int addr_size;
-+    int target_addr_size;		/* target binary: 32/64 bit */
- 
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-diff --git a/include/tdep-ppc32/libunwind_i.h b/include/tdep-ppc32/libunwind_i.h
-index 06c0023..3c67454 100644
---- a/include/tdep-ppc32/libunwind_i.h
-+++ b/include/tdep-ppc32/libunwind_i.h
-@@ -51,6 +51,7 @@ unw_tdep_frame_t;
- struct unw_addr_space
++    return 0;
++}
++
+ static int
+ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
  {
-   struct unw_accessors acc;
-+  int target_addr_size;		/* target binary: 32/64 bit */
-   unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-   AO_t cache_generation;
-diff --git a/include/tdep-ppc64/libunwind_i.h b/include/tdep-ppc64/libunwind_i.h
-index 6024455..faf6483 100644
---- a/include/tdep-ppc64/libunwind_i.h
-+++ b/include/tdep-ppc64/libunwind_i.h
-@@ -53,6 +53,7 @@ struct unw_addr_space
-   struct unw_accessors acc;
-   int big_endian;
-   ppc64_abi_t abi;
-+  int target_addr_size;		/* target binary: 32/64 bit */
-   unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-   AO_t cache_generation;
-diff --git a/include/tdep-sh/libunwind_i.h b/include/tdep-sh/libunwind_i.h
-index 51234d1..c731001 100644
---- a/include/tdep-sh/libunwind_i.h
-+++ b/include/tdep-sh/libunwind_i.h
-@@ -46,6 +46,7 @@ struct unw_addr_space
-   {
-     struct unw_accessors acc;
-     int big_endian;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-x86/libunwind_i.h b/include/tdep-x86/libunwind_i.h
-index f59a3cf..7f5be18 100644
---- a/include/tdep-x86/libunwind_i.h
-+++ b/include/tdep-x86/libunwind_i.h
-@@ -45,6 +45,7 @@ unw_tdep_frame_t;
- struct unw_addr_space
-   {
-     struct unw_accessors acc;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
-diff --git a/include/tdep-x86_64/libunwind_i.h b/include/tdep-x86_64/libunwind_i.h
-index 8c9cd05..623416b 100644
---- a/include/tdep-x86_64/libunwind_i.h
-+++ b/include/tdep-x86_64/libunwind_i.h
-@@ -62,6 +62,7 @@ unw_tdep_frame_t;
- struct unw_addr_space
-   {
-     struct unw_accessors acc;
-+    int target_addr_size;		/* target binary: 32/64 bit */
-     unw_caching_policy_t caching_policy;
- #ifdef HAVE_ATOMIC_OPS_H
-     AO_t cache_generation;
+@@ -743,6 +766,8 @@ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
+ 	  regnum = dwarf_to_unw_regnum (rs->reg[DWARF_CFA_REG_COLUMN].val);
+ 	  if ((ret = unw_get_reg ((unw_cursor_t *) c, regnum, &cfa)) < 0)
+ 	    return ret;
++	  /* Cast value to the type as found in the ELF binary format */
++	  cast_value_to_addr_size(&cfa, as->target_addr_size);
+ 	}
+       cfa += rs->reg[DWARF_CFA_OFF_COLUMN].val;
+     }
+@@ -797,6 +822,8 @@ apply_reg_state (struct dwarf_cursor *c, struct dwarf_reg_state *rs)
+     ret = dwarf_get (c, c->loc[c->ret_addr_column], &ip);
+     if (ret < 0)
+       return ret;
++    /* Cast value to the type as found in the ELF binary format */
++    cast_value_to_addr_size(&ip, as->target_addr_size);
+     c->ip = ip;
+   }
+ 
 -- 
 1.7.11.7
