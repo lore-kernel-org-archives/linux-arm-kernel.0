@@ -1,57 +1,45 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 20 Jan 2014 17:20:46 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1390234117.25903.0.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>	
- <201312182210.30544.arnd@arndb.de>	
- <1387401646.31516.14.camel@host5.omatika.ru>	
- <201312190630.11087.arnd@arndb.de>	
- <1389309176.32346.1.camel@host5.omatika.ru>
- <1390234117.25903.0.camel@host5.omatika.ru>
-Message-ID: <52DD4CDE.7020705@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 20 Jan 2014 17:24:17 +0100
+Subject: [PATCH RFC 04/10] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <87r48a8t99.fsf@linaro.org>
+References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
+ <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
+ <87r48a8t99.fsf@linaro.org>
+Message-ID: <52DD4DB1.2050200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 05:08 PM, Sergei Ianovich wrote:
-> On Fri, 2014-01-10 at 03:12 +0400, Sergei Ianovich wrote:
->> On Thu, 2013-12-19 at 06:30 +0100, Arnd Bergmann wrote:
->>> This would work only if we can probe the devices behind the external
->>> bus controller before the controller itsef has been set up, since
->>> the initialization order can depend on a number of things but not
->>> the bus hierarchy. It will also work if the code setting up the
->>> bus controller can be guaranteed to run before we call
->>> of_platform_populate for the regular devices, which is probably
->>> the best solution here.
+Hi Kevin,
+
+On 14.01.2014 16:42, Kevin Hilman wrote:
+> Tomasz Figa <tomasz.figa@gmail.com> writes:
+>
+>> This patch introduces generic code to perform power domain look-up using
+>> device tree and automatically bind devices to their power domains.
+>> Generic device tree binding is introduced to specify power domains of
+>> devices in their device tree nodes.
 >>
->> There has been no activity for 3 weeks. Could we resume the series?
-> 
-> It's over a month now. Is anything wrong?
-> 
+>> Backwards compatibility with legacy Samsung-specific power domain
+>> bindings is provided, but for now the new code is not compiled when
+>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>> will change as soon as Exynos power domain code gets converted to use
+>> the generic framework in further patch.
+>>
+>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>
+> I haven't read through this in detail yet, but wanted to make sure that
+> the DT representation can handle nested power domains.  At least
+> SH-mobile has a hierarchy of power domains and the genpd code can handle
+> that, so wanted to make sure that the DT representation can handle it as
+> well.
 
-No, I'm busy, that's all.
+The representation of power domains themselves as implied by this patch 
+is fully platform-specific. The only generic part is the 
+#power-domain-cells property, which defines the number of cells needed 
+to identify the power domain of given provider. You are free to have any 
+platform-specific properties (or even generic ones, added on top of this 
+patch) to let you specify the hierarchy in DT.
 
-That said, the current situation is
-
-a) we need someone to have a look at the performance regression of the
-MMC file system layer that you reported. I couldn't find a PXA-based
-board yet with a MMC slot soldered on it. But as you apparently have
-such hardware, I'd really appreciate your help here. Could you do some
-measurements and see whether you see major differences in packet size or
-timings?
-
-b) Marek Vasut thankfully reported back to me and signaled success with
-his pxa-pata driver. So we're most probably good in that area.
-
-c) Robert Jarzmik is still in the process of converting the camera
-driver. Here as well, I lack hardware, I can't even compile-test
-anything here.
-
-
-So please, if you have any spare time, have a look at the MMC
-regressions and see if you can contribute anything. I'll hope to find
-some time to rebase my patches on top of 3.13 very soon, so we have a
-new base to work on.
-
-
-Thanks,
-Daniel
+Best regards,
+Tomasz
