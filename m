@@ -1,89 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 Jan 2014 09:44:35 -0500
-Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
- SoCs
-In-Reply-To: <52DD0688.1080802@free-electrons.com>
-References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
- <20140114021421.GK19878@titan.lakedaemon.net>
- <52D4F966.6060200@free-electrons.com>
- <52DD0688.1080802@free-electrons.com>
-Message-ID: <20140120144435.GR29184@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 20 Jan 2014 08:49:11 -0600
+Subject: [PATCH] dt-bindings: add rockchip vendor prefix
+In-Reply-To: <2229282.4AAJ7iLdU7@phil>
+References: <201312201626.48119.heiko@sntech.de>
+	<2229282.4AAJ7iLdU7@phil>
+Message-ID: <CAL_JsqLwsJkCbu7rZDGTquryFzom4K4hg3GrczifbAV+pvpcaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 12:20:40PM +0100, Gregory CLEMENT wrote:
-> On 14/01/2014 09:46, Gregory CLEMENT wrote:
-> > On 14/01/2014 03:14, Jason Cooper wrote:
-> >> Gregory,
-> >>
-> >> On Wed, Jan 08, 2014 at 04:06:25PM +0100, Gregory CLEMENT wrote:
-> >>> Hi,
-> >>>
-> >>> Here come the 5th version of the series fixing the i2c bus hang on A0
-> >>> version of the Armada XP SoCs. It occurred on the early release of the
-> >>> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
-> >>> (A0 stepping) have issues related to the i2c controller which prevent
-> >>> to use the offload mechanism and lead to a kernel hang during boot.
-> >>>
-> >>> The main change are the use of marvell,mv78230-a0-i2c and that the
-> >>> function mvebu_get_soc_id() is now local to mach-mvebu.
-> >>>
-> >>> The first patch add a mean to detect the SoCs version at run-time and
-> >>> the second one use this feature in the driver.
-> >>>
-> >>> The 3 first patches should be applied on 3.13-rc and on stable kernel
-> >>> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
-> >>> "i2c: mv64xxx: Add I2C Transaction Generator support".
-> >>
-> >> Ok, I've pulled this in by cherrypicking the commits.  I needed to add
-> >> the 'Fixes: ...' and 'Cc: stable ...' language, so the commit ids were
-> >> going to change anyhow.  I also added the note to the binding as we
-> >> discussed.  I've also based this against v3.13-rc1 as there doesn't
-> >> appear to be any need to drag in everything up to -rc6.
-> >>
-> >> I've pushed this to mvebu/fixes.  Please take a look.  If it all looks
-> >> good I'll send the pull request off tomorrow.
-> > Hi Jason,
-> > 
-> > Everything looks perfect!
-> > 
-> > Thanks for having improved it,
-> > 
-> > Gregory
-> > 
-> 
-> Hi Jason,
-> 
-> Eventually we didn't finish with it!
-> Ezequiel found an issue when we try to access pci_base if it have
-> not been properly mapped, in this case the kernel hang. Indeed the check
-> of  the return of of_iomap was wrong.
-> 
-> The fix would be something like:
-> 
-> -o<---o<---o<---o<---o<---o<---o<---o<---o<---o<---o<--
-> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-> @@ -88,7 +88,7 @@ static int __init mvebu_soc_id_init(void)
->         }
-> 
->         pci_base = of_iomap(child, 0);
-> -       if (IS_ERR(pci_base)) {
-> +       if (pci_base == NULL) {
->                 pr_err("cannot map registers\n");
->                 ret = -ENOMEM;
->                 goto res_ioremap;
-> -o<---o<---o<---o<---o<---o<---o<---o<---o<---o<---o<--
-> 
-> How do you want we handle it?
-> 
-> Do you want a proper patch to amend?
-> A new series?
-> Something else?
-> 
+On Mon, Jan 20, 2014 at 8:23 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Freitag, 20. Dezember 2013, 16:26:47 schrieb Heiko St?bner:
+>> It seems I forgot to add the vendor prefix for rockchip to the vendor-prefix
+>> list. Therefore add it now.
+>>
+>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>
+> not sure, where this should go through
+> arm-soc? or is there a special dt-tree around?
 
-submit a patch, please.  We'll push it as a fix.
+Sorry, missed this one. I'll apply for 3.14.
 
-thx,
+Rob
 
-Jason.
+>
+>
+> Thanks
+> Heiko
+>
+>> ---
+>>  Documentation/devicetree/bindings/vendor-prefixes.txt |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
+>> ca2c190..2dc3b75 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -65,6 +65,7 @@ ralink      Mediatek/Ralink Technology Corp.
+>>  ramtron      Ramtron International
+>>  realtek Realtek Semiconductor Corp.
+>>  renesas      Renesas Electronics Corporation
+>> +rockchip     Fuzhou Rockchip Electronics Co., Ltd
+>>  samsung      Samsung Semiconductor
+>>  sbs  Smart Battery System
+>>  schindler    Schindler
+>
