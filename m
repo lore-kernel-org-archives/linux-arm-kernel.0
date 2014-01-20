@@ -1,30 +1,47 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 20 Jan 2014 18:24:51 +0800
-Subject: [PATCH] dmaengine: sirf: Add device_slave_caps interface
-In-Reply-To: <20140120075054.GK26823@intel.com>
-References: <1387801161-3126-1-git-send-email-21cnbao@gmail.com>
- <20140120074757.GI26823@intel.com> <20140120075054.GK26823@intel.com>
-Message-ID: <CAGsJ_4wvrC1uzkZHtFV2WfojwBQ9xi5cXN_abEfWC9ithBWwuw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Jan 2014 10:23:02 +0000
+Subject: [PATCH v6 0/3] AArch64: KGDB support
+In-Reply-To: <CALicx6tQu2O8o4pr-N8Xc=D-Y9kOMsFNsn6BLVDqRo0Pbay00Q@mail.gmail.com>
+References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
+ <20140116134550.GA7496@arm.com>
+ <CALicx6tQu2O8o4pr-N8Xc=D-Y9kOMsFNsn6BLVDqRo0Pbay00Q@mail.gmail.com>
+Message-ID: <20140120102302.GC16496@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/20 Vinod Koul <vinod.koul@intel.com>:
-> On Mon, Jan 20, 2014 at 01:17:57PM +0530, Vinod Koul wrote:
->> On Mon, Dec 23, 2013 at 08:19:21PM +0800, Barry Song wrote:
->> > From: Rongjun Ying <rongjun.ying@csr.com>
->> >
->> > this patch adds device_slave_caps() callback as SiRF SoC sound drivers
->> > depend on it.
->>
->> Applied, thanks
->
-> Btw you should send incremental patch for granurity reporting after the merge
-> window. Those changes are getting merged thru ASoC tree.
+On Sat, Jan 18, 2014 at 08:02:21AM +0000, Vijay Kilari wrote:
+> Hi Catalin,
+> 
+> On Thu, Jan 16, 2014 at 7:15 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Dec 19, 2013 at 11:50:48AM +0000, vijay.kilari at gmail.com wrote:
+> >> Vijaya Kumar K (3):
+> >>   AArch64: KGDB: Add Basic KGDB support
+> >>   AArch64: KGDB: Add step debugging support
+> >>   KGDB: make kgdb_breakpoint() as noinline
+> >
+> > I gave them a try and now I have some doubts about your testing
+> > methodology:
+> >
+> > 1. There is no HAVE_ARCH_KGDB anywhere in these patches, so
+> > the code here isn't compiled.
+> >
+> OK, I will send a patch
+> 
+> > 2. There are several compiler warnings that need to be addressed.
+> >
+> > 3. I enabled CONFIG_KGDB_TESTS and CONFIG_KGDB_TESTS_ON_BOOT and that's
+> > what really scared me.
+> >
+> 
+> Are you refering to these warning?. I don't see any warning in the
+> patched files. I will fix these.
 
-yes. Rongjun is now handling the audio stuff with ASoC guys.
+[...]
 
->
-> --
-> ~Vinod
+Well, the warnings are one thing but the 100 miles of backtrace output that
+appear on every boot (and I think end in an oops) are probably more
+important to fix. Please enable CONFIG_KGDB_TESTS and
+CONFIG_KGDB_TESTS_ON_BOOT and take a look.
 
--barry
+Will
