@@ -1,34 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 Jan 2014 15:16:21 -0500
-Subject: [PATCH] ARM: mvebu: Fix kernel hang in mvebu_soc_id_init()
- when of_iomap failed
-In-Reply-To: <1390229990-26450-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1390229990-26450-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140120201621.GX29184@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jan 2014 21:18:11 +0100
+Subject: [PATCH] ARM: mvebu: fix compilation warning on Armada 370 (i.e.
+ non-SMP)
+In-Reply-To: <87r48276ne.fsf@natisbad.org>
+References: <87r48276ne.fsf@natisbad.org>
+Message-ID: <3644485.dCdZFrR2be@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 03:59:50PM +0100, Gregory CLEMENT wrote:
-> When pci_base is accessed whereas it has not been properly mapped by
-> of_iomap() the kernel hang. The check of this pointer made an improper
-> use of IS_ERR() instead of comparing to NULL. This patch fix this
-> issue.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Jason,
-> 
-> As this is a fix on a fix which should be ported to the stable branch, I
-> don't know how to handle the cc:stable flag
+On Monday 20 January 2014 21:14:13 Arnaud Ebalard wrote:
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 433cc8568dec..499c5070f841 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -59,7 +59,9 @@
+>  #define PCI_MSI_DOORBELL_END                    (32)
+>  #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
+>  
+> +#ifdef CONFIG_SMP
+>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> +#endif
+>  
+>  static void __iomem *per_cpu_
 
-No problem, I added it.
+How about moving it inside of the existing #ifdef?
 
->  arch/arm/mach-mvebu/mvebu-soc-id.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+That also brings it closer to the one place it's used.
 
-Applied to mvebu/fixes.
-
-thx,
-
-Jason.
+	Arnd
