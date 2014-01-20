@@ -1,81 +1,67 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 20 Jan 2014 13:30:14 +0530
-Subject: [PATCH] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <201401171713.08550.arnd@arndb.de>
-References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
- <1389894803-4147-2-git-send-email-sthokal@xilinx.com>
- <201401171713.08550.arnd@arndb.de>
-Message-ID: <CA+mB=1L0ZSC8f6eMEuO7MEk6nG5SDahE7AH2F_uUr1TgTCD=cw@mail.gmail.com>
+From: sj38.park@gmail.com (SeongJae Park)
+Date: Mon, 20 Jan 2014 17:07:23 +0900
+Subject: [PATCH] clk: export __clk_get_hw for re-use in others
+In-Reply-To: <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
+References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
+ <20140119173712.GA26481@kroah.com>
+ <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
+Message-ID: <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Jan 17, 2014 at 9:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 16 January 2014, Srikanth Thokala wrote:
->> @@ -0,0 +1,71 @@
->> +Xilinx AXI VDMA engine, it does transfers between memory and video devices.
->> +It can be configured to have one channel or two channels. If configured
->> +as two channels, one is to transmit to the video device and another is
->> +to receive from the video device.
->> +
->> +Required properties:
->> +- compatible: Should be "xlnx,axi-vdma-1.00.a"
->> +- #dma-cells: Should be <1>, see "dmas" property below
->> +- reg: Should contain VDMA registers location and length.
->> +- interrupts: Should contain per channel VDMA interrupts.
->> +- compatible (child node): It should be either "xlnx,axi-vdma-mm2s-channel" or
->> +       "xlnx,axi-vdma-s2mm-channel". It depends on the hardware design and it
->> +       can also have both channels.
->> +- xlnx,device-id: Should contain device number in each channel. It should be
->> +       {0,1,2...so on} to the number of VDMA devices configured in hardware.
->> +- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
->> +- xlnx,data-width: Should contain the stream data width, takes {32,64...so on}.
->> +- xlnx,flush-fsync: (Optional) Tells whether which channel to Flush on Fsync.
->> +       It takes following values:
->> +       {1}, flush both channels
->> +       {2}, flush mm2s channel
->> +       {3}, flush s2mm channel
->> +- xlnx,include-sg: (Optional) Tells whether configured for Scatter-mode in
->> +       the hardware.
->> +- xlnx,include-dre: (Optional) Tells whether hardware is configured for Data
->> +       Realignment Engine.
->> +- xlnx,genlock-mode: (Optional) Tells whether Genlock synchornisation is
->> +       enabled/disabled in hardware.
+On Mon, Jan 20, 2014 at 4:47 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> On Sun, Jan 19, 2014 at 9:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>> On Sun, Jan 19, 2014 at 02:55:07PM +0900, SeongJae Park wrote:
+>>> Following build comes while modprobe process:
+>>> > ERROR: "__clk_get_hw" [drivers/clk/clk-max77686.ko] undefined!
+>>> > make[2]: *** [__modpost] Error 1
+>>> > make[1]: *** [modules] Error 2
+>>>
+>>> Export the symbol to fix it and for other part's usecase.
+>>>
+>>> Signed-off-by: SeongJae Park <sj38.park@gmail.com>
+>>> ---
+>>>  drivers/clk/clk.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>>> index 2b38dc9..3883fba 100644
+>>> --- a/drivers/clk/clk.c
+>>> +++ b/drivers/clk/clk.c
+>>> @@ -575,6 +575,7 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
+>>>  {
+>>>       return !clk ? NULL : clk->hw;
+>>>  }
+>>> +EXPORT_SYMBOL_GPL(__clk_get_hw);
+>>
+>> __ functions should usually only be for "internal" use, why does this
+>> get exported to modules?  Why not just put it in a .h file?
 >
-> The documentation doesn't seem to match the example, since you don't mention
-> the fact that the channels have separate nodes here, or which properties
-> are meant for the parent or the child node. Also, some of the "required"
-> properties are absent in the example, which makes no sense.
+> It was originally used only within the clock core but it is sensible
+> for hardware-specific clock drivers to use this as well. I plan to
+> audit all of the double-underscore functions in
+> include/linux/clk-provider.h for 3.15.
 >
-
-I will fix this ambiguity in my v2.
-
-> I also assume that some of the properties should just go away:
+> Regards,
+> Mike
 >
-> * xlnx,device-id should be the argument in the handle from the slave device
+Thank you very much for answering about it, Mike.
 
-We can have multiple instances of this VDMA IP configured in the FPGA and we
-need a unique identifier for each VDMA device that is present in the FPGA.
-This device-id dt parameter forms the filter mask for the slave devices. As an
-example, this can be used to get a channel of specific VDMA device (assuming
-multiple instances) using the API dma_request_channel().  Please note this
-is an example of a slave device that doesnt have dt node.
+I agree Greg's indication and think Mike's explanation is reasonable.
 
-> * data width should be a property of the slave driver that is configured
->   through dma_slave_config(), unless you can have dma engines that only
->   support certain a width.
+So, I think it would be better to just export the symbol now
+because it would be easier for future functions renaming and
+similar issues were solved in this way in past:
+https://lkml.org/lkml/2013/4/15/50
 
-Yes, this VDMA engine soft IP support only certain widths, which is
-configurable during IP synthesis.
+Or, maybe I can change the client code of __clk_get_hw to not use the function.
 
-Srikanth
+What do you think would be better to fix this build error? Or, do you
+have better idea?
+I will respect your opinion.
 
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks and Regards.
+SeongJae Park.
+
+>>
+>> greg k-h
