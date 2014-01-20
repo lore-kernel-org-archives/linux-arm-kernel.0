@@ -1,41 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jan 2014 15:11:52 +0000
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140120150902.207b9d66@ipc1.ka-ro>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro> <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
- <20140120150902.207b9d66@ipc1.ka-ro>
-Message-ID: <20140120151152.GE15937@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 20 Jan 2014 16:28:03 +0100
+Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
+In-Reply-To: <20140120145633.GA2725@e102568-lin.cambridge.arm.com>
+References: <20140116121649.GG30257@mudshark.cambridge.arm.com>
+ <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
+ <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
+ <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
+ <52D932B5.7020909@nvidia.com> <52D97831.6030700@codeaurora.org>
+ <52DD35C2.3070809@linaro.org>
+ <20140120145633.GA2725@e102568-lin.cambridge.arm.com>
+Message-ID: <52DD4083.5010306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 03:09:02PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Russell King - ARM Linux wrote:
-> > On Mon, Jan 20, 2014 at 12:36:27PM +0100, Lothar Wa?mann wrote:
-> > > In case user space firmware loading support (CONFIG_FW_LOADER) is
-> > > enabled, this message may still be inadequate, since the firmware may
-> > > very well be loaded lateron.
-> > 
-> > I haven't worked out whether that's actually possible - I saw no way to
-> > re-trigger the firmware request, and once the firmware request expires,
-> > there seems to be no way for userspace to say "okay, the firmware is now
-> > available, please load it".
-> > 
-> I can confirm that it does work, since I'm using it.
-> I have the following in my /etc/init.d/mdev.sh script:
-> |        [ "$VERBOSE" = no ] || echo -n "Triggering firmware load"
-> |        for dir in $(find /sys/class/firmware/ -type l);do
-> |            echo add > "$dir/uevent"
-> |        done
+On 01/20/2014 03:56 PM, Lorenzo Pieralisi wrote:
+> On Mon, Jan 20, 2014 at 02:42:10PM +0000, Daniel Lezcano wrote:
+>> On 01/17/2014 07:36 PM, Stephen Boyd wrote:
+>>> On 01/17/14 05:40, Prashant Gaikwad wrote:
+>>>>
+>>>> Another requirement:
+>>>>
+>>>> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
+>>>> C2, C3 respectively.
+>>>>
+>>>> Rating of T2 is better than T3. If I register T2 and T3 both as
+>>>> broadcast timers then T3 will not be used. But ...
+>>>>       - T2 is not preserved in C3 idle state.
+>>>>       - T3 resolution is very poor (ms) and can not be used as wake
+>>>> event for C2.
+>>>>
+>>>> Possible solution, register only T3 as broadcast device and use T2 as
+>>>> per-CPU fallback timer.
+>>>
+>>> We have the same situation on MSM. I've been thinking about proposing we
+>>> allow multiple broadcast timers to exist in the system and then have the
+>>> clockevents_notify() caller indicate which C state is being entered. The
+>>> broadcast timers would need to indicate which C state they don't work in
+>>> though.
+>>
+>> IMO, there are different solutions:
+>>
+>> 1. extend the C3STOP to C1STOP, C2STOP, etc ... and pass the idle state
+>> to the time framework where these flags are checked against. I don't
+>> like this approach but it is feasible.
+>>
+>> 2. use the generic power domain. When the power domain is shutdown via
+>> the cpuidle backend driver, it switches the timer.
+>
+> IMO, 2 is the way forward. It is the only solution that links resources to
+> the reason they need maintainance (ie power management). I am writing
+> v2 of C-state proposal where power domains are explicitly associated with
+> devices (eg arch timers), and 2 fits well with this approach.
 
-I can't check on iMX6 at the moment, but I did look in that directory
-after the iMX6 SDMA reported that it hadn't found any firmware, and
-it was empty apart from the "timeout" file.
+Thanks Lorenzo for your feedback.
+
+   -- Daniel
+
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
