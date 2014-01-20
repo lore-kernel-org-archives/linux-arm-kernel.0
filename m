@@ -1,73 +1,252 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 21 Jan 2014 00:34:24 +0100
-Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
- directory
-In-Reply-To: <52DD2DE9.9060202@linaro.org>
-References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
- <5375666.26CZK1LlZA@vostro.rjw.lan> <52DD2DE9.9060202@linaro.org>
-Message-ID: <1945528.uEVBjXteWy@vostro.rjw.lan>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon, 20 Jan 2014 17:20:21 -0600
+Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <20140114194348.GH14405@codeaurora.org>
+References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
+ <1389380874-22753-2-git-send-email-agross@codeaurora.org>
+ <20140114194348.GH14405@codeaurora.org>
+Message-ID: <20140120232021.GB3530@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 20, 2014 10:08:41 PM Hanjun Guo wrote:
-> On 2014?01?18? 21:47, Rafael J. Wysocki wrote:
-> > On Saturday, January 18, 2014 11:52:18 AM Hanjun Guo wrote:
-> >> On 2014-1-18 11:45, Hanjun Guo wrote:
-> >>> On 2014-1-17 20:06, Sudeep Holla wrote:
-> >>>> On 17/01/14 02:03, Hanjun Guo wrote:
-> >>>>> Move idle_boot_override out of the arch directory to be a single enum
-> >>>>> including both platforms values, this will make it rather easier to
-> >>>>> avoid ifdefs around which definitions are for which processor in
-> >>>>> generally used ACPI code.
-> >>>>>
-> >>>>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
-> >>>>>
-> >>>>> No functional change in this patch.
-> >>>>>
-> >>>>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
-> >>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>>> ---
-> >> [...]
-> >>>>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-> >>>>> index 03e235ad..e324561 100644
-> >>>>> --- a/include/linux/cpu.h
-> >>>>> +++ b/include/linux/cpu.h
-> >>>>> @@ -220,6 +220,14 @@ void cpu_idle(void);
-> >>>>>   
-> >>>>>   void cpu_idle_poll_ctrl(bool enable);
-> >>>>>   
-> >>>>> +enum idle_boot_override {
-> >>>>> +	IDLE_NO_OVERRIDE = 0,
-> >>>>> +	IDLE_HALT,
-> >>>>> +	IDLE_NOMWAIT,
-> >>>>> +	IDLE_POLL,
-> >>>>> +	IDLE_POWERSAVE_OFF
-> >>>>> +};
-> >>>>> +
-> >>>> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
-> >>>> specific and may not make sense for other architectures.
-> >>> yes, this is the strange part, the value is arch-dependent.
-> >>>
-> >>>> It will also require every architecture using ACPI to export
-> >>>> boot_option_idle_override which may not be really required.
-> >>> so, how about forget this patch and move boot_option_idle_override
-> >>> related code into arch directory such as arch/x86/acpi/boot.c for
-> >>> x86?
-> >> The general idea is that we can move all the arch-dependent codes
-> >> in ACPI driver to arch directory, then make codes in drivers/acpi/
-> >> arch independent.
-> > Well, MWAIT is arch-dependent, so I'm not sure how IDLE_NOMWAIT fits into
-> > include/linux/cpu.h?
+On Tue, Jan 14, 2014 at 11:43:48AM -0800, Stephen Boyd wrote:
+> (Mostly nitpicks)
 > 
-> So you will not happy with this patch and should find another solution?
+> On 01/10, Andy Gross wrote:
+> > Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
+> > found in the MSM 8x74 platforms.
+> > 
+> > Each BAM DMA device is associated with a specific on-chip peripheral.  Each
+> > channel provides a uni-directional data transfer engine that is capable of
+> > transferring data between the peripheral and system memory (System mode), or
+> > between two peripherals (BAM2BAM).
+> > 
+> > The initial release of this driver only supports slave transfers between
+> > peripherals and system memory.
+> > 
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  drivers/dma/Kconfig        |   9 +
+> >  drivers/dma/Makefile       |   1 +
+> >  drivers/dma/qcom_bam_dma.c | 843 +++++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/dma/qcom_bam_dma.h | 268 ++++++++++++++
+> >  4 files changed, 1121 insertions(+)
+> >  create mode 100644 drivers/dma/qcom_bam_dma.c
+> >  create mode 100644 drivers/dma/qcom_bam_dma.h
+> > 
+> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> > index c823daa..e58e6d2 100644
+> > --- a/drivers/dma/Kconfig
+> > +++ b/drivers/dma/Kconfig
+> > @@ -384,4 +384,13 @@ config DMATEST
+> >  config DMA_ENGINE_RAID
+> >  	bool
+> >  
+> > +config QCOM_BAM_DMA
+> > +	tristate "QCOM BAM DMA support"
+> > +	depends on ARCH_MSM || COMPILE_TEST
+> 
+> I don't think writel_relaxed() is available on every arch, so
+> it's possible this will break some random arch that doesn't have
+> that function.
+> 
 
-No, I'm not happy with it.
+I'll look into this to see.  If that's the case, I can remove the COMPILE_TEST
+if there is no alternative.
 
-If you want to move that to an arch-agnostic header, the symbol names cannot
-be arch-dependent any more.
+> > +	select DMA_ENGINE
+> > +	select DMA_VIRTUAL_CHANNELS
+> > +	---help---
+> > +	  Enable support for the QCOM BAM DMA controller.  This controller
+> > +	  provides DMA capabilities for a variety of on-chip devices.
+> > +
+> >  endif
+> > diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
+> > new file mode 100644
+> > index 0000000..7a84b02
+> > --- /dev/null
+> > +++ b/drivers/dma/qcom_bam_dma.c
+> [...]
+> > +static int bam_alloc_chan(struct dma_chan *chan)
+> [...]
+> > +
+> > +	/* Go ahead and initialize the pipe/channel hardware here
+> > +	   - Reset the channel to clear internal state of the FIFO
+> > +	   - Program in the FIFO address
+> > +	   - Configure the irq based on the EE passed in from the DT entry
+> > +	   - Set mode, direction and enable channel
+> > +
+> > +	   We do this here because the channel can only be enabled once and
+> > +	   can only be disabled via a reset.  If done here, we don't have to
+> > +	   manage additional state to figure out when to do this
+> > +	*/
+> 
+> Multi-line comments are of the form:
+> 
+> 	/*
+> 	 * comment
+> 	 */
+> 
 
-Thanks!
+Right.  I converted some comments and didn't do the correct multi-line
+
+> > +
+> > +	bam_reset_channel(bdev, bchan->id);
+> > +
+> > +	/* write out 8 byte aligned address.  We have enough space for this
+> > +	   because we allocated 1 more descriptor (8 bytes) than we can use */
+> > +	writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
+> > +			bdev->regs + BAM_P_DESC_FIFO_ADDR(bchan->id));
+> > +	writel_relaxed(BAM_DESC_FIFO_SIZE, bdev->regs +
+> > +			BAM_P_FIFO_SIZES(bchan->id));
+> [...]
+> > +
+> > +/**
+> > + * bam_dma_terminate_all - terminate all transactions
+> > + * @chan: dma channel
+> > + *
+> > + * Idles channel and dequeues and frees all transactions
+> > + * No callbacks are done
+> > + *
+> > +*/
+> 
+> Weird '*' starting the line here and on the next function.
+> 
+
+Will fix.
+
+> > +static void bam_dma_terminate_all(struct dma_chan *chan)
+> > +{
+> > +	struct bam_chan *bchan = to_bam_chan(chan);
+> > +	struct bam_device *bdev = bchan->bdev;
+> > +
+> > +	bam_reset_channel(bdev, bchan->id);
+> > +
+> > +	vchan_free_chan_resources(&bchan->vc);
+> > +}
+> > +
+> > +/**
+> > + * bam_control - DMA device control
+> > + * @chan: dma channel
+> > + * @cmd: control cmd
+> > + * @arg: cmd argument
+> > + *
+> > + * Perform DMA control command
+> > + *
+> > +*/
+> > +static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+> > +	unsigned long arg)
+> > +{
+> > +	struct bam_chan *bchan = to_bam_chan(chan);
+> > +	struct bam_device *bdev = bchan->bdev;
+> > +	int ret = 0;
+> > +	unsigned long flag;
+> > +
+> [...]
+> > +/**
+> > + * bam_dma_irq - irq handler for bam controller
+> > + * @irq: IRQ of interrupt
+> > + * @data: callback data
+> > + *
+> > + * IRQ handler for the bam controller
+> > + */
+> > +static irqreturn_t bam_dma_irq(int irq, void *data)
+> > +{
+> > +	struct bam_device *bdev = (struct bam_device *)data;
+> 
+> Unnecessary cast from void.
+> 
+
+Fixed.
+
+> > +static int bam_dma_probe(struct platform_device *pdev)
+> > +{
+> [...]
+> > +
+> > +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > +	if (!irq_res) {
+> > +		dev_err(bdev->dev, "irq resource is missing\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> Please use platform_get_irq() instead.
+> 
+
+Fixed.
+
+> > diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
+> > new file mode 100644
+> > index 0000000..2cb3b5f
+> > --- /dev/null
+> > +++ b/drivers/dma/qcom_bam_dma.h
+> [...]
+> > +#define BAM_CNFG_BITS_DEFAULT	(BAM_PIPE_CNFG |	\
+> > +			BAM_NO_EXT_P_RST |		\
+> > +			BAM_IBC_DISABLE |		\
+> > +			BAM_SB_CLK_REQ |		\
+> > +			BAM_PSM_CSW_REQ |		\
+> > +			BAM_PSM_P_RES |			\
+> > +			BAM_AU_P_RES |			\
+> > +			BAM_SI_P_RES |			\
+> > +			BAM_WB_P_RES |			\
+> > +			BAM_WB_BLK_CSW |		\
+> > +			BAM_WB_CSW_ACK_IDL |		\
+> > +			BAM_WB_RETR_SVPNT |		\
+> > +			BAM_WB_DSC_AVL_P_RST |		\
+> > +			BAM_REG_P_EN |			\
+> > +			BAM_PSM_P_HD_DATA |		\
+> > +			BAM_AU_ACCUMED |		\
+> > +			BAM_CMD_ENABLE)
+> > +
+> > +/* PIPE CTRL */
+> > +#define	P_EN			BIT(1)
+> 
+> Nit: Weird formatting here?
+> 
+
+That is odd.  Will fix.
+
+> > +#define P_DIRECTION		BIT(3)
+> [...]
+> > +
+> > +
+> > +struct bam_device {
+> > +	void __iomem *regs;
+> > +	struct device *dev;
+> > +	struct dma_device common;
+> > +	struct device_dma_parameters dma_parms;
+> > +	struct bam_chan *channels;
+> 
+> Maybe this should be a flexible array. It looks like probe might
+> need to be rewritten to detect the number of channels from the
+> hardware before assigning anything, but it should be possible.
+> But it probably doesn't matter.
+> 
+
+You can't take the number of channels at face value.  Only a subset of that
+number are actually usable by the CPUs execution environment.
+
+> > +	u32 num_channels;
+> > +	u32 num_ees;
+> > +	unsigned long enabled_ees;
+> > +	int irq;
+> 
+> Is irq used?
+> 
+
+Will remove.
+
+> > +	struct clk *bamclk;
+> > +
+> > +	/* dma start transaction tasklet */
+> > +	struct tasklet_struct task;
+> > +};
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
