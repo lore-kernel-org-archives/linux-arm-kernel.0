@@ -1,146 +1,278 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Jan 2014 18:47:20 -0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
-Message-ID: <1390250840-24196-1-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Jan 2014 21:54:49 +0100
+Subject: [PATCH 1/5] ARM: integrator: define clocks in the device trees
+Message-ID: <1390251289-6240-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+This adds the clock definitions to the Integrator/CP
+and Integrator/AP device trees.
 
-mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 110 +++++++++++++++++++++++++++++++
- 1 file changed, 110 insertions(+)
+ arch/arm/boot/dts/integratorap.dts |  35 +++++++++++++
+ arch/arm/boot/dts/integratorcp.dts | 102 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 135 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 47c5a3f..e44ff49 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -63,6 +63,112 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
+index e6be9315ff0a..b10e6351da53 100644
+--- a/arch/arm/boot/dts/integratorap.dts
++++ b/arch/arm/boot/dts/integratorap.dts
+@@ -18,6 +18,28 @@
+ 		bootargs = "root=/dev/ram0 console=ttyAM0,38400n8 earlyprintk";
+ 	};
  
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
++	/* 24 MHz chrystal on the core module */
++	xtal24mhz: xtal24mhz at 24M {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++	};
 +
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
++	pclk: pclk at 0 {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <1>;
++		clocks = <&xtal24mhz>;
++	};
 +
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
++	/* The UART clock is 14.74 MHz divided by an ICS525 */
++	uartclk: uartclk at 14.74M {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <14745600>;
++	};
 +
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
+ 	syscon {
+ 		compatible = "arm,integrator-ap-syscon";
+ 		reg = <0x11000000 0x100>;
+@@ -28,14 +50,17 @@
+ 
+ 	timer0: timer at 13000000 {
+ 		compatible = "arm,integrator-timer";
++		clocks = <&xtal24mhz>;
+ 	};
+ 
+ 	timer1: timer at 13000100 {
+ 		compatible = "arm,integrator-timer";
++		clocks = <&xtal24mhz>;
+ 	};
+ 
+ 	timer2: timer at 13000200 {
+ 		compatible = "arm,integrator-timer";
++		clocks = <&xtal24mhz>;
+ 	};
+ 
+ 	pic: pic at 14000000 {
+@@ -92,26 +117,36 @@
+ 		rtc: rtc at 15000000 {
+ 			compatible = "arm,pl030", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041030>;
++			clocks = <&pclk>;
++			clock-names = "apb_pclk";
+ 		};
+ 
+ 		uart0: uart at 16000000 {
+ 			compatible = "arm,pl010", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041010>;
++			clocks = <&uartclk>, <&pclk>;
++			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 
+ 		uart1: uart at 17000000 {
+ 			compatible = "arm,pl010", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041010>;
++			clocks = <&uartclk>, <&pclk>;
++			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 
+ 		kmi0: kmi at 18000000 {
+ 			compatible = "arm,pl050", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041050>;
++			clocks = <&xtal24mhz>, <&pclk>;
++			clock-names = "KMIREFCLK", "apb_pclk";
+ 		};
+ 
+ 		kmi1: kmi at 19000000 {
+ 			compatible = "arm,pl050", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041050>;
++			clocks = <&xtal24mhz>, <&pclk>;
++			clock-names = "KMIREFCLK", "apb_pclk";
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+index a21c17de9a5e..d43f15b4f79a 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
++++ b/arch/arm/boot/dts/integratorcp.dts
+@@ -13,25 +13,107 @@
+ 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
+ 	};
+ 
++	/*
++	 * The Integrator/CP overall clocking architecture can be found in
++	 * ARM DUI 0184B page 7-28 "Integrator/CP922T system clocks" which
++	 * appear to illustrate the layout used in most configurations.
++	 */
 +
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
++	/* The codec chrystal operates at 24.576 MHz */
++	xtal_codec: xtal24.576 at 24.576M {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <24576000>;
++	};
 +
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
++	/* The chrystal is divided by 2 by the codec for the AACI bit clock */
++	aaci_bitclk: aaci_bitclk at 12.288M {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <2>;
++		clock-mult = <1>;
++		clocks = <&xtal_codec>;
++	};
 +
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
++	/* This is a 25MHz chrystal on the base board */
++	xtal25mhz: xtal25mhz at 25M {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <25000000>;
++	};
 +
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
++	/* The UART clock is 14.74 MHz divided from 25MHz by an ICS525 */
++	uartclk: uartclk at 14.74M {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <14745600>;
++	};
 +
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
++	/* Actually sysclk I think */
++	pclk: pclk at 0 {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <0>;
++	};
 +
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
++	core-module at 10000000 {
++		/* 24 MHz chrystal on the core module */
++		xtal24mhz: xtal24mhz at 24M {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++		};
 +
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
++		/*
++		 * External oscillator on the core module, usually used
++		 * to drive video circuitry. Driven from the 24MHz clock.
++		 */
++		auxosc: cm_aux_osc at 25M {
++			#clock-cells = <0>;
++			compatible = "arm,integrator-cm-auxosc";
++			clocks = <&xtal24mhz>;
++		};
 +
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
++		/* The KMI clock is the 24 MHz oscillator divided to 8MHz */
++		kmiclk: kmiclk at 1M {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <3>;
++			clock-mult = <1>;
++			clocks = <&xtal24mhz>;
++		};
 +
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
++		/* The timer clock is the 24 MHz oscillator divided to 1MHz */
++		timclk: timclk at 1M {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <24>;
++			clock-mult = <1>;
++			clocks = <&xtal24mhz>;
 +		};
 +	};
-+};
 +
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -90,6 +196,10 @@
- 			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
+ 	syscon {
+ 		compatible = "arm,integrator-cp-syscon";
+ 		reg = <0xcb000000 0x100>;
+ 	};
+ 
+ 	timer0: timer at 13000000 {
+-		/* TIMER0 runs @ 25MHz */
++		/* TIMER0 runs directly on the 25MHz chrystal */
+ 		compatible = "arm,integrator-cp-timer";
+-		status = "disabled";
++		clocks = <&xtal25mhz>;
+ 	};
+ 
+ 	timer1: timer at 13000100 {
+ 		/* TIMER1 runs @ 1MHz */
+ 		compatible = "arm,integrator-cp-timer";
++		clocks = <&timclk>;
+ 	};
+ 
+ 	timer2: timer at 13000200 {
+ 		/* TIMER2 runs @ 1MHz */
+ 		compatible = "arm,integrator-cp-timer";
++		clocks = <&timclk>;
+ 	};
+ 
+ 	pic: pic at 14000000 {
+@@ -74,22 +156,32 @@
+ 		 */
+ 		rtc at 15000000 {
+ 			compatible = "arm,pl031", "arm,primecell";
++			clocks = <&pclk>;
++			clock-names = "apb_pclk";
  		};
  
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <MX6QDL_I2C2_PINGRP3>;
-+		};
-+
- 		pinctrl_gpmi_nand: gpminandgrp {
- 			fsl,pins = <MX6QDL_GPMI_NAND_PINGRP1>;
+ 		uart at 16000000 {
+ 			compatible = "arm,pl011", "arm,primecell";
++			clocks = <&uartclk>, <&pclk>;
++			clock-names = "uartclk", "apb_pclk";
  		};
+ 
+ 		uart at 17000000 {
+ 			compatible = "arm,pl011", "arm,primecell";
++			clocks = <&uartclk>, <&pclk>;
++			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 
+ 		kmi at 18000000 {
+ 			compatible = "arm,pl050", "arm,primecell";
++			clocks = <&kmiclk>, <&pclk>;
++			clock-names = "KMIREFCLK", "apb_pclk";
+ 		};
+ 
+ 		kmi at 19000000 {
+ 			compatible = "arm,pl050", "arm,primecell";
++			clocks = <&kmiclk>, <&pclk>;
++			clock-names = "KMIREFCLK", "apb_pclk";
+ 		};
+ 
+ 		/*
+@@ -100,18 +192,24 @@
+ 			reg = <0x1c000000 0x1000>;
+ 			interrupts = <23 24>;
+ 			max-frequency = <515633>;
++			clocks = <&uartclk>, <&pclk>;
++			clock-names = "mclk", "apb_pclk";
+ 		};
+ 
+ 		aaci at 1d000000 {
+ 			compatible = "arm,pl041", "arm,primecell";
+ 			reg = <0x1d000000 0x1000>;
+ 			interrupts = <25>;
++			clocks = <&pclk>;
++			clock-names = "apb_pclk";
+ 		};
+ 
+ 		clcd at c0000000 {
+ 			compatible = "arm,pl110", "arm,primecell";
+ 			reg = <0xC0000000 0x1000>;
+ 			interrupts = <22>;
++			clocks = <&auxosc>, <&pclk>;
++			clock-names = "clcd", "apb_pclk";
+ 		};
+ 	};
+ };
 -- 
-1.8.1.2
+1.8.4.2
