@@ -1,47 +1,72 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 20 Jan 2014 14:17:38 +0530
-Subject: [PATCH v4] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <CAGsJ_4zcwCx0RNMNx8YaDBFtGE=02-B79+WKDGeky80X5agcuw@mail.gmail.com>
-References: <1389190369-2012-1-git-send-email-21cnbao@gmail.com>
- <20140120074857.GJ26823@intel.com>
- <CAGsJ_4zcwCx0RNMNx8YaDBFtGE=02-B79+WKDGeky80X5agcuw@mail.gmail.com>
-Message-ID: <20140120084738.GO26823@intel.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 20 Jan 2014 10:54:10 +0100
+Subject: [PATCH v3 16/24] drm/i2c: tda998x: add DT documentation
+In-Reply-To: <CAOesGMi96wkHM8jfHNVnM7RJyW2vVoP6FT4YyYzKp-kfc0jTuQ@mail.gmail.com>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195844.0c975b90@armhf>
+ <CAOesGMi96wkHM8jfHNVnM7RJyW2vVoP6FT4YyYzKp-kfc0jTuQ@mail.gmail.com>
+Message-ID: <20140120105410.15705f32@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 05:35:07PM +0800, Barry Song wrote:
-> 2014/1/20 Vinod Koul <vinod.koul@intel.com>:
-> > On Wed, Jan 08, 2014 at 10:12:49PM +0800, Barry Song wrote:
-> >> From: Barry Song <Baohua.Song@csr.com>
-> >>
-> >> move to support of_dma_request_slave_channel() and dma_request_slave_channel.
-> >> we add a xlate() to let dma clients be able to find right dma_chan by generic
-> >> "dmas" properties in dts.
-> >>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Lars-Peter Clausen <lars@metafoo.de>
-> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > Look okay, need an ACk from DT maintainers before I can apply...
-> 
-> Vinod, will i send v5 with your ack to
-> devicetree-discuss at lists.ozlabs.org, and CC Grant & Rob?
-Which tree are you tragetting this, if dmaengine then my ack make no sense :)
+On Sun, 19 Jan 2014 20:06:09 -0800
+Olof Johansson <olof@lixom.net> wrote:
 
+> Hi,
 > 
-> Hi Rob, will you Ack this one if you have noticed this thread?
-I dont think Robs email is avlid anymore, I think he moved to Linaro, if I am
-not mistaken.
+> On Sun, Jan 19, 2014 at 10:58 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > ---
+> >  .../devicetree/bindings/drm/i2c/tda998x.txt        | 24 ++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+> 
+> Please cc bindings for review to devicetree at vger.kernel.org (cc:d here now)
+> 
+> > diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+> > new file mode 100644
+> > index 0000000..72da71d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+> > @@ -0,0 +1,24 @@
+> > +Device-Tree bindings for the NXP TDA998x HDMI transmitter
+> > +
+> > +Required properties;
+> > +  - compatible: must be "nxp,tda998x"
+> > +
+> > +Optional properties:
+> > +  - interrupts: interrupt number for HDMI exchanges - default: by polling
+> 
+> What are HDMI exchanges, and how do they differ from other interrupts?
 
-~Vinod
-> > ~Vinod
-> >> ---
-> >>  -v4: clear dt-binding document according to Mark's feedback
+The used HDMI interrupt events are screen plug/unplug and EDID read.
+There are also CEC read/write which are not yet implemented in the
+tda998x driver.
+
+There is no difference from normal interrupts, except that the events
+may be get by polling, so, the interrupt number is optional.
+
+> > +
+> > +  - pinctrl-0: pin control group to be used for this controller (IRQ).
+> > +
+> > +  - pinctrl-names: must contain a "default" entry.
+> > +
+> > +  - video-ports: 24 bits value - default: <0x230145>
 > 
-> -barry
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> What is this?
+
+The video-ports value defines how the video controller is connected to
+the tda998x chip. Each 4 bits value tells from which input pins comes
+the video data and if there is any bit inversion. Each byte of this
+video-ports is used to load the VIP_CNTRL_{0,1,2} registers. These ones
+are described in the TDA9983B documentation which is the closer
+available document about the TDA998x family.
+
+The default value is the one defined for TI boards.
+A known other value is <0x234501> which is used for Russell's Armada
+DRM driver in the Cubox (Marvell A510), but this driver has no DT
+support.
 
 -- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
