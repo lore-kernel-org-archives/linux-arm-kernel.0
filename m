@@ -1,34 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Jan 2014 09:32:44 +0900
-Subject: [PATCH 1/1] ARM: shmobile: Koelsch: pass Ether PHY IRQ
-In-Reply-To: <CANqRtoT1bN4jYHA2+DYRzsVjXXMXRdR_9mqx3sUUXDhJAxe5Ow@mail.gmail.com>
-References: <201312200226.38815.sergei.shtylyov@cogentembedded.com>
- <201312200228.00555.sergei.shtylyov@cogentembedded.com>
- <CANqRtoT1bN4jYHA2+DYRzsVjXXMXRdR_9mqx3sUUXDhJAxe5Ow@mail.gmail.com>
-Message-ID: <20140120003241.GG9752@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jan 2014 00:44:34 +0000
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140119185246.GB28056@quad.lixom.net>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+ <20140119031816.GD16158@S2101-09.ap.freescale.net>
+ <20140119185246.GB28056@quad.lixom.net>
+Message-ID: <20140120004434.GV15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 03:02:20PM +0900, Magnus Damm wrote:
-> On Fri, Dec 20, 2013 at 8:28 AM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
-> > trigger type to be low-level as per the Micrel PHY driver's setup.
-> >
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >
-> > ---
-> >  arch/arm/mach-shmobile/board-koelsch.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
+On Sun, Jan 19, 2014 at 10:52:46AM -0800, Olof Johansson wrote:
+> On Sun, Jan 19, 2014 at 11:18:18AM +0800, Shawn Guo wrote:
+> > On Thu, Jan 16, 2014 at 06:22:12PM +0000, Russell King - ARM Linux wrote:
+> > > Now that the Cubox-i has been released, and I have one, I've been able to
+> > > update things a little.  Out of the following two patches, the first one
+> > > I think is critical to be merged before the microsom support hits
+> > > mainline, since it drops the flexcan support from the microsom level,
+> > > moving it to the Hummingboard level.
+> > 
+> > I will be out of town for a few days, and won't be online until next
+> > weekend.  So please send the patch directly to arm-soc folks, so that
+> > they can send it together with imx-dt-3.14 stuff.
+> > 
+> > arm-soc folks, please take this as another ping for my imx-dt-3.14 pull
+> > request :)
 > 
-> Thanks for this. The code looks good to me. I have now tested this on
-> my Koelsch board using ifconfig up/down and checking /proc/interrupts.
+> I'm well aware that the DT branch has not been merged, and that's because
+> there has been no consensus from DT maintainers on the massive rework
+> you did as the base of the branch.
 > 
-> Acked-by: Magnus Damm <damm@opensource.se>
+> Given the timing, it's not looking like it will be resolved in time for
+> the 3.14 merge window (which might open today).
 
-Hi Sergei,
+Okay, that presumably means that the Hummingboard stuff won't be going in
+through this route, and it sounds like the imx DT stuff will need rework.
 
-please repost this patch with Magnus's ack once an rc release is
-available with the pre-requisites of this patch.
+Is there any objection if I pushed just the Hummingboard files upstream
+myself?
 
-Thanks
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
