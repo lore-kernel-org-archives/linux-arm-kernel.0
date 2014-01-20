@@ -1,51 +1,24 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 20 Jan 2014 11:39:18 +0800
-Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
-In-Reply-To: <20140118052059.GL9558@ns203013.ovh.net>
-References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
- <20140118052059.GL9558@ns203013.ovh.net>
-Message-ID: <52DC9A66.6080009@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 19 Jan 2014 19:56:52 -0800
+Subject: [PATCH 0/3] RFC/RFT: Powering on MMC Wifi/BT modules in MMC core
+Message-ID: <1390190215-22700-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J,
+This is a small series enhancing the MMC core code to power on modules
+before the host in cases where needed, and the corresponding DT bindings
+changes.
 
-On 01/18/2014 01:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:59 Fri 17 Jan     , Bo Shen wrote:
->> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
->> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->> ---
->>
->>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
->> index 2cb52e0..7e67a81 100644
->> --- a/drivers/usb/gadget/atmel_usba_udc.c
->> +++ b/drivers/usb/gadget/atmel_usba_udc.c
->> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
->>   	if (ep_status) {
->>   		int i;
->>
->> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
->> +		for (i = 0; i < udc->num_ep; i++)
->
-> no the limit need to specified in the driver as a checkpoint by the compatible
-> or platform driver id
+I've got some other issues to debug on the Chromebook, i.e. the interface
+doens't actually work. So far it seems unrelated to this patch set so
+it's worth posting this and get things going since others need the same
+functionality (i.e Cubox-i).
 
-You mean, we should not trust the data passed from dt node or platform 
-data? Or do you think we should do double confirm?
+As mentioned in the patch in the series, I haven't implemented power-down
+yet, I wanted to make sure that the power-on side will be adequate for
+those who are looking to use it right away.
 
-> Best Regards,
-> J.
->>   			if (ep_status & (1 << i)) {
->>   				if (ep_is_control(&udc->usba_ep[i]))
->>   					usba_control_irq(udc, &udc->usba_ep[i]);
->> --
->> 1.8.5.2
->>
+Comments/test reports/etc welcome.
 
-Best Regards,
-Bo Shen
+
+-Olof
