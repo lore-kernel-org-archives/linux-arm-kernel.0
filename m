@@ -1,53 +1,102 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 20 Jan 2014 14:56:33 +0000
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52DD35C2.3070809@linaro.org>
-References: <20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com> <52D97831.6030700@codeaurora.org>
- <52DD35C2.3070809@linaro.org>
-Message-ID: <20140120145633.GA2725@e102568-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 20 Jan 2014 08:57:53 -0600
+Subject: [PATCH v3 3/7] net: moxa: connect to PHY
+In-Reply-To: <1390216399-27028-3-git-send-email-jonas.jensen@gmail.com>
+References: <1390216399-27028-1-git-send-email-jonas.jensen@gmail.com>
+ <1390216399-27028-3-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CAL_JsqKs-snsRaD1JQRVUrg+WBDd9cYxPhtfKf9m5HeJ6df3Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 02:42:10PM +0000, Daniel Lezcano wrote:
-> On 01/17/2014 07:36 PM, Stephen Boyd wrote:
-> > On 01/17/14 05:40, Prashant Gaikwad wrote:
-> >>
-> >> Another requirement:
-> >>
-> >> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
-> >> C2, C3 respectively.
-> >>
-> >> Rating of T2 is better than T3. If I register T2 and T3 both as
-> >> broadcast timers then T3 will not be used. But ...
-> >>      - T2 is not preserved in C3 idle state.
-> >>      - T3 resolution is very poor (ms) and can not be used as wake
-> >> event for C2.
-> >>
-> >> Possible solution, register only T3 as broadcast device and use T2 as
-> >> per-CPU fallback timer.
-> >
-> > We have the same situation on MSM. I've been thinking about proposing we
-> > allow multiple broadcast timers to exist in the system and then have the
-> > clockevents_notify() caller indicate which C state is being entered. The
-> > broadcast timers would need to indicate which C state they don't work in
-> > though.
-> 
-> IMO, there are different solutions:
-> 
-> 1. extend the C3STOP to C1STOP, C2STOP, etc ... and pass the idle state 
-> to the time framework where these flags are checked against. I don't 
-> like this approach but it is feasible.
-> 
-> 2. use the generic power domain. When the power domain is shutdown via 
-> the cpuidle backend driver, it switches the timer.
+On Mon, Jan 20, 2014 at 5:13 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> The kernel now has a MDIO bus driver and a phy_driver (RTL8201CP),
+> connect to this PHY using OF.
+>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+>
+> Notes:
+>     Applies to next-20140120
+>
+>  .../devicetree/bindings/net/moxa,moxart-mac.txt    | 47 ++++++++++-
+>  drivers/net/ethernet/moxa/moxart_ether.c           | 92 +++++++++++++++++++++-
+>  drivers/net/ethernet/moxa/moxart_ether.h           |  2 +
+>  3 files changed, 138 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt b/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
+> index 583418b..94c1f3b 100644
+> --- a/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
+> +++ b/Documentation/devicetree/bindings/net/moxa,moxart-mac.txt
+> @@ -1,21 +1,64 @@
+>  MOXA ART Ethernet Controller
+>
+> +Integrated MDIO bus node:
+> +
+> +- compatible: "moxa,moxart-mdio"
+> +- Inherits from MDIO bus node binding[1]
+> +
+> +[1] Documentation/devicetree/bindings/net/phy.txt
+> +
+> +
+> +Ethernet node:
+> +
+>  Required properties:
+>
+>  - compatible : Must be "moxa,moxart-mac"
+>  - reg : Should contain register location and length
+>  - interrupts : Should contain the mac interrupt number
+>
+> +Optional Properties:
+> +
+> +- phy-handle : the phandle to a PHY node
+> +
+> +
+>  Example:
+>
+> +       mdio0: mdio at 90900090 {
+> +               compatible = "moxa,moxart-mdio";
+> +               reg = <0x90900090 0x8>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ethphy0: ethernet-phy at 1 {
+> +                       device_type = "ethernet-phy";
 
-IMO, 2 is the way forward. It is the only solution that links resources to
-the reason they need maintainance (ie power management). I am writing
-v2 of C-state proposal where power domains are explicitly associated with
-devices (eg arch timers), and 2 fits well with this approach.
+Drop this. device_type is only for real OpenFirmware.
 
-Lorenzo
+> +                       compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
+> +                       reg = <1>;
+> +               };
+> +       };
+> +
+> +       mdio1: mdio at 92000090 {
+> +               compatible = "moxa,moxart-mdio";
+> +               reg = <0x92000090 0x8>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               ethphy1: ethernet-phy at 1 {
+> +                       device_type = "ethernet-phy";
+> +                       compatible = "moxa,moxart-rtl8201cp", "ethernet-phy-ieee802.3-c22";
+> +                       reg = <1>;
+> +               };
+> +       };
+> +
+>         mac0: mac at 90900000 {
+
+Not part of this patch, but this should really be ethernet at ...
+
+>                 compatible = "moxa,moxart-mac";
+> -               reg =   <0x90900000 0x100>;
+> +               reg = <0x90900000 0x90>;
+>                 interrupts = <25 0>;
+> +               phy-handle = <&ethphy0>;
+>         };
+>
+>         mac1: mac at 92000000 {
+>                 compatible = "moxa,moxart-mac";
+> -               reg =   <0x92000000 0x100>;
+> +               reg = <0x92000000 0x90>;
+>                 interrupts = <27 0>;
+> +               phy-handle = <&ethphy1>;
+>         };
