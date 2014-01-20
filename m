@@ -1,53 +1,34 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Mon, 20 Jan 2014 21:25:31 +0100
-Subject: [PATCH] ARM: dts: omap3-gta04: Add EOC irq gpio line handling.
-In-Reply-To: <1387638743-12278-1-git-send-email-marek@goldelico.com>
-References: <1387638743-12278-1-git-send-email-marek@goldelico.com>
-Message-ID: <CAAfyv36Y+N9DpFWPf5SLmJv=fcnvktVPd30QBOEsNGFdr-A0xA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 Jan 2014 12:47:07 -0800
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140120095532.GW15937@n2100.arm.linux.org.uk>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+ <20140119031816.GD16158@S2101-09.ap.freescale.net>
+ <20140119185246.GB28056@quad.lixom.net>
+ <20140120004434.GV15937@n2100.arm.linux.org.uk>
+ <CAOesGMiych-jeo_eKGgL1qxsYQ=rkb4UQwgGBsG-7+GMbLJWhg@mail.gmail.com>
+ <20140120095532.GW15937@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMjBCbMZrpbKjBBUeFhWEkLHS5rERtajRDk0ew_5FYvQEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping? Benoit can you please merge this trivial update. Thanks.
-
-On Sat, Dec 21, 2013 at 4:12 PM, Marek Belisko <marek@goldelico.com> wrote:
-> BMP085 EOC (End Of Conversion) irq line is connected to
-> gpio113 on gta04. Set irq properties to have driver using irq
-> instead polling for EOC.
+On Mon, Jan 20, 2014 at 1:55 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 19, 2014 at 07:34:22PM -0800, Olof Johansson wrote:
+>> I'm guessing this is going to mess up Shawn's cleanup patches, but
+>> time has ran out for 3.14 for those so they will need to be respun
+>> anyway, most likely.
+>>
+>> We can apply them to arm-soc's dt branch. I think it's better if we
+>> merge them since dts files tend to be one of the conflict-ridden areas
+>> (even if this particular instance isn't). Send the series our way if
+>> you want, or send a branch pull request, your choice.
 >
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dts | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-> index b9b55c9..7a8e37d 100644
-> --- a/arch/arm/boot/dts/omap3-gta04.dts
-> +++ b/arch/arm/boot/dts/omap3-gta04.dts
-> @@ -92,6 +92,8 @@
->         bmp085 at 77 {
->                 compatible = "bosch,bmp085";
->                 reg = <0x77>;
-> +               interrupt-parent = <&gpio4>;
-> +               interrupts = <17 IRQ_TYPE_EDGE_RISING>;
->         };
->
->         /* leds */
-> --
-> 1.8.4.2
->
+> There's no conflict, and they build fine according to my autobuilder
+> which includes arm-soc for-next.
 
-BR,
+Great, I didn't see any patches sent from you though. Should I
+cherry-pick them from -next instead?
 
-marek
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+-Olof
