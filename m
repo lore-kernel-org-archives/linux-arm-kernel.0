@@ -1,38 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Jan 2014 10:57:28 +0100
-Subject: [RFC v3 08/13] ahci-platform: Allow specifying platform_data
- through of_device_id
-In-Reply-To: <52DCE9A4.50901@redhat.com>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-9-git-send-email-hdegoede@redhat.com>
- <20140120082438.GH16215@pengutronix.de>
- <52DCDFBA.2070903@redhat.com>
- <20140120090950.GI16215@pengutronix.de> <52DCE9A4.50901@redhat.com>
-Message-ID: <20140120095728.GM16215@pengutronix.de>
+Date: Mon, 20 Jan 2014 11:07:09 +0100
+Subject: [PATCH] dma: imx-sdma: remove firmare not found warning
+In-Reply-To: <20140120074205.GG26823@intel.com>
+References: <1389887186-6146-1-git-send-email-s.hauer@pengutronix.de>
+ <20140120074205.GG26823@intel.com>
+Message-ID: <20140120100709.GN16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 10:17:24AM +0100, Hans de Goede wrote:
-> Hi,
+On Mon, Jan 20, 2014 at 01:12:05PM +0530, Vinod Koul wrote:
+> On Thu, Jan 16, 2014 at 04:46:26PM +0100, Sascha Hauer wrote:
+> > When a firmware cannot be found for the SDMA engine then we can
+> > continue with the inernal ROM firmware.
+> typo		    ^^^^^^^
 > 
-> I'm currently working on a slightly different implementation of a more
-> generic ahci_platform.c where ahci_platform.c exports some standard platform
-> related functionality as library functions.
-> 
-> Drivers which need to override some of ahci_platform.c's behavior because of
-> non standard hw, will then export their own struct platform_driver and can
-> call into the exported functions for standard stuff to avoid code duplication
-> where appropriate, while still having 100% freedom to do things in a custom
-> way where necessary.
+> > The meaning of this message is frequently asked for and the usual
+> > answer is that this message is of no relevance, so just make it
+> > dev_dbg() and do not alienate the users anymore.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > ---
+> >  drivers/dma/imx-sdma.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > index c75679d..fe57a42 100644
+> > --- a/drivers/dma/imx-sdma.c
+> > +++ b/drivers/dma/imx-sdma.c
+> > @@ -1259,7 +1259,10 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
+> >  	unsigned short *ram_code;
+> >  
+> >  	if (!fw) {
+> > -		dev_err(sdma->dev, "firmware not found\n");
+> > +		dev_dbg(sdma->dev, "firmware not found\n");
+> Shouldn't this be dev_info and would amke sense, external firmware not found
+> using internal one??
 
-Nice, thanks.
-
-> 
-> I hope to post a PATCH RFC v4 with these changes later today, which you will
-> hopefully like better. Input on v4, even just a "yep better" remark would be
-> much appreciated.
-
-Yes, I will give feedback on v4.
+Yeah, sounds better. See v2.
 
 Sascha
 
