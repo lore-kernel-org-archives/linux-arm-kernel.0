@@ -1,30 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jan 2014 21:18:11 +0100
-Subject: [PATCH] ARM: mvebu: fix compilation warning on Armada 370 (i.e.
- non-SMP)
-In-Reply-To: <87r48276ne.fsf@natisbad.org>
-References: <87r48276ne.fsf@natisbad.org>
-Message-ID: <3644485.dCdZFrR2be@wuerfel>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Mon, 20 Jan 2014 21:25:31 +0100
+Subject: [PATCH] ARM: dts: omap3-gta04: Add EOC irq gpio line handling.
+In-Reply-To: <1387638743-12278-1-git-send-email-marek@goldelico.com>
+References: <1387638743-12278-1-git-send-email-marek@goldelico.com>
+Message-ID: <CAAfyv36Y+N9DpFWPf5SLmJv=fcnvktVPd30QBOEsNGFdr-A0xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 January 2014 21:14:13 Arnaud Ebalard wrote:
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 433cc8568dec..499c5070f841 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -59,7 +59,9 @@
->  #define PCI_MSI_DOORBELL_END                    (32)
->  #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
->  
-> +#ifdef CONFIG_SMP
->  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-> +#endif
->  
->  static void __iomem *per_cpu_
+Ping? Benoit can you please merge this trivial update. Thanks.
 
-How about moving it inside of the existing #ifdef?
+On Sat, Dec 21, 2013 at 4:12 PM, Marek Belisko <marek@goldelico.com> wrote:
+> BMP085 EOC (End Of Conversion) irq line is connected to
+> gpio113 on gta04. Set irq properties to have driver using irq
+> instead polling for EOC.
+>
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
+> index b9b55c9..7a8e37d 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dts
+> +++ b/arch/arm/boot/dts/omap3-gta04.dts
+> @@ -92,6 +92,8 @@
+>         bmp085 at 77 {
+>                 compatible = "bosch,bmp085";
+>                 reg = <0x77>;
+> +               interrupt-parent = <&gpio4>;
+> +               interrupts = <17 IRQ_TYPE_EDGE_RISING>;
+>         };
+>
+>         /* leds */
+> --
+> 1.8.4.2
+>
 
-That also brings it closer to the one place it's used.
+BR,
 
-	Arnd
+marek
+
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
