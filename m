@@ -1,52 +1,89 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 20 Jan 2014 15:42:10 +0100
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52D97831.6030700@codeaurora.org>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com> <52D97831.6030700@codeaurora.org>
-Message-ID: <52DD35C2.3070809@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 Jan 2014 09:44:35 -0500
+Subject: [PATCH v5 0/4] Fix i2c bus hang on A0 version of the Armada XP
+ SoCs
+In-Reply-To: <52DD0688.1080802@free-electrons.com>
+References: <1389193589-18485-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140114021421.GK19878@titan.lakedaemon.net>
+ <52D4F966.6060200@free-electrons.com>
+ <52DD0688.1080802@free-electrons.com>
+Message-ID: <20140120144435.GR29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 07:36 PM, Stephen Boyd wrote:
-> On 01/17/14 05:40, Prashant Gaikwad wrote:
->>
->> Another requirement:
->>
->> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
->> C2, C3 respectively.
->>
->> Rating of T2 is better than T3. If I register T2 and T3 both as
->> broadcast timers then T3 will not be used. But ...
->>      - T2 is not preserved in C3 idle state.
->>      - T3 resolution is very poor (ms) and can not be used as wake
->> event for C2.
->>
->> Possible solution, register only T3 as broadcast device and use T2 as
->> per-CPU fallback timer.
->
-> We have the same situation on MSM. I've been thinking about proposing we
-> allow multiple broadcast timers to exist in the system and then have the
-> clockevents_notify() caller indicate which C state is being entered. The
-> broadcast timers would need to indicate which C state they don't work in
-> though.
+On Mon, Jan 20, 2014 at 12:20:40PM +0100, Gregory CLEMENT wrote:
+> On 14/01/2014 09:46, Gregory CLEMENT wrote:
+> > On 14/01/2014 03:14, Jason Cooper wrote:
+> >> Gregory,
+> >>
+> >> On Wed, Jan 08, 2014 at 04:06:25PM +0100, Gregory CLEMENT wrote:
+> >>> Hi,
+> >>>
+> >>> Here come the 5th version of the series fixing the i2c bus hang on A0
+> >>> version of the Armada XP SoCs. It occurred on the early release of the
+> >>> OpenBlocks AX3-4 boards. Indeed the first variants of Armada XP SoCs
+> >>> (A0 stepping) have issues related to the i2c controller which prevent
+> >>> to use the offload mechanism and lead to a kernel hang during boot.
+> >>>
+> >>> The main change are the use of marvell,mv78230-a0-i2c and that the
+> >>> function mvebu_get_soc_id() is now local to mach-mvebu.
+> >>>
+> >>> The first patch add a mean to detect the SoCs version at run-time and
+> >>> the second one use this feature in the driver.
+> >>>
+> >>> The 3 first patches should be applied on 3.13-rc and on stable kernel
+> >>> 3.12 as it fixes a regression introduce by the commit 930ab3d403ae
+> >>> "i2c: mv64xxx: Add I2C Transaction Generator support".
+> >>
+> >> Ok, I've pulled this in by cherrypicking the commits.  I needed to add
+> >> the 'Fixes: ...' and 'Cc: stable ...' language, so the commit ids were
+> >> going to change anyhow.  I also added the note to the binding as we
+> >> discussed.  I've also based this against v3.13-rc1 as there doesn't
+> >> appear to be any need to drag in everything up to -rc6.
+> >>
+> >> I've pushed this to mvebu/fixes.  Please take a look.  If it all looks
+> >> good I'll send the pull request off tomorrow.
+> > Hi Jason,
+> > 
+> > Everything looks perfect!
+> > 
+> > Thanks for having improved it,
+> > 
+> > Gregory
+> > 
+> 
+> Hi Jason,
+> 
+> Eventually we didn't finish with it!
+> Ezequiel found an issue when we try to access pci_base if it have
+> not been properly mapped, in this case the kernel hang. Indeed the check
+> of  the return of of_iomap was wrong.
+> 
+> The fix would be something like:
+> 
+> -o<---o<---o<---o<---o<---o<---o<---o<---o<---o<---o<--
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> @@ -88,7 +88,7 @@ static int __init mvebu_soc_id_init(void)
+>         }
+> 
+>         pci_base = of_iomap(child, 0);
+> -       if (IS_ERR(pci_base)) {
+> +       if (pci_base == NULL) {
+>                 pr_err("cannot map registers\n");
+>                 ret = -ENOMEM;
+>                 goto res_ioremap;
+> -o<---o<---o<---o<---o<---o<---o<---o<---o<---o<---o<--
+> 
+> How do you want we handle it?
+> 
+> Do you want a proper patch to amend?
+> A new series?
+> Something else?
+> 
 
-IMO, there are different solutions:
+submit a patch, please.  We'll push it as a fix.
 
-1. extend the C3STOP to C1STOP, C2STOP, etc ... and pass the idle state 
-to the time framework where these flags are checked against. I don't 
-like this approach but it is feasible.
+thx,
 
-2. use the generic power domain. When the power domain is shutdown via 
-the cpuidle backend driver, it switches the timer.
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jason.
