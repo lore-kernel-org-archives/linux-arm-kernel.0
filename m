@@ -1,82 +1,33 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 20 Jan 2014 18:05:14 +0100
-Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
-In-Reply-To: <20140117100723.GB16003@mudshark.cambridge.arm.com>
-References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
- <20140116115634.GE30257@mudshark.cambridge.arm.com>
- <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
- <20140116125727.GI30257@mudshark.cambridge.arm.com>
- <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
- <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
- <20140117100723.GB16003@mudshark.cambridge.arm.com>
-Message-ID: <CAFrcx1=53sUDjxa-DjuJUScxanhQJqAVA36RaYNo5-Dfegij7g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Jan 2014 17:16:27 +0000
+Subject: New randconfig build failure: rx51 asoc / gpiolib
+In-Reply-To: <20140117131257.GB15937@n2100.arm.linux.org.uk>
+References: <20140117131257.GB15937@n2100.arm.linux.org.uk>
+Message-ID: <20140120171627.GW17314@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, Jan 17, 2014 at 01:12:58PM +0000, Russell King - ARM Linux wrote:
+> Last night's omap randconfig found this.  This has only appeared in the
+> builds in the last few days, so it's a new regression for the changes
+> queued up for merge window:
 
-Here is an updated version of the change, which uses compat_sp at only
-one place.
-The drawback is that compat_user_mode is checked when calling
-compat_user_stack_pointer, which seems unnecessary. Unfortunately the
-check is not optimized out by the complier as I could check with
-objdump -S.
+Really?  The relevant change is quite old...  it is possible some other
+thing removed a select though so gpiolib can now be unset.
 
-What do you think?
+> which is caused by "struct snd_soc_jack_gpio" not being defined.  For
+> some reason, this structure is defined in sound/soc.h, but is
+> conditionalised upon CONFIG_GPIOLIB.
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index fda2704..e71f81f 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -228,7 +228,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
-        return (u32)(unsigned long)uptr;
- }
+> This means either the dependencies on SND_OMAP_SOC_RX51 are incorrect
+> (they don't include a dependency on GPIOLIB) or ASoC is wrong to make
+> the definitions conditional upon GPIOLIB.
 
--#define compat_user_stack_pointer() (current_pt_regs()->compat_sp)
-+#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
-
- static inline void __user *arch_compat_alloc_user_space(long len)
- {
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index fbb0020..86d5b54 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -133,7 +133,7 @@ struct pt_regs {
-        (!((regs)->pstate & PSR_F_BIT))
-
- #define user_stack_pointer(regs) \
--       ((regs)->sp)
-+       (!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
-
- /*
-  * Are the current registers suitable for user mode? (used to maintain
-
-
-
-Regards,
-Jean
-
-On 17 January 2014 11:07, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 17, 2014 at 09:00:09AM +0000, Jean Pihet wrote:
->> On 16 January 2014 14:47, Jean Pihet <jean.pihet@linaro.org> wrote:
->> >> So the simplest thing would be to make compat_user_stack_pointer expand to
->> >> user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
->> >> original patch fixing user_stack_pointer.
->>
->> I see 2 issues in your proposal:
->>
->> 1) user_stack_pointer(regs) calls compat_user_stack_pointer if
->> compat_user_mode(regs)) and compat_user_stack_pointer expands to
->> user_stack_pointer. I see a circular dependency in the macros.
->
-> Not today it doesn't, so you just need to avoid writing the circular
-> dependency and instead make user_stack_pointer access (regs)->compat_sp
-> instead.
->
->> 2) current_pt_regs() returns the current task regs although perf
->> passes a regs struct that had been recorded previously.
->
-> Yes, but compat_user_stack_pointer doesn't take a regs paramater anyway, so
-> there's no change in behaviour here.
->
-> Will
+I'd add the dependency here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140120/e6087ac6/attachment.sig>
