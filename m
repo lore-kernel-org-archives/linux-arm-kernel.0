@@ -1,135 +1,27 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 20 Jan 2014 22:53:51 +0100
-Subject: [PATCH v2 02/11] iommu/arm-smmu: Introduce iommu_group notifier block
-In-Reply-To: <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20140120215351.GG3471@alberich>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 20 Jan 2014 21:53:55 +0000
+Subject: [PATCH] ARM: orion: provide C-style interrupt handler for
+ MULTI_IRQ_HANDLER
+In-Reply-To: <20140116184943.GK29184@titan.lakedaemon.net>
+References: <1389775235.10695.51.camel@dagon.hellion.org.uk>
+ <1389859831-9883-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140116164833.GH29184@titan.lakedaemon.net>
+ <1389891087.6697.26.camel@kazak.uk.xensource.com>
+ <20140116165347.GI29184@titan.lakedaemon.net> <52D82802.6090104@gmail.com>
+ <20140116184943.GK29184@titan.lakedaemon.net>
+Message-ID: <1390254835.10695.84.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2014-01-16 at 13:49 -0500, Jason Cooper wrote:
+> > @Ian: Thanks for hunting this down, please keep bothering us with
+> > bug reports :)
+> 
+> Yes, please!
 
-At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
-isolate all master devices for an SMMU.
+No worries there -- it seem Debian has quite a few people who use
+kirkwood based systems and will report bugs when they find them...
 
-Depending on DT information each device is put into its own protection
-domain (if possible).  For configuration with one or just a few
-masters per SMMU that is easy to achieve.
+Thanks (again?) for the quick fix.
 
-In case of many devices per SMMU (e.g. MMU-500 with it's distributed
-translation support) isolation of each device might not be possible --
-depending on number of available SMR groups and/or context banks.
-
-Default is that device isolation is contolled per SMMU with SMMU node
-property "arm,smmu-isolate-devices" in a DT. If this property is set
-for an SMMU node, device isolation is performed.
-
-W/o device isolation the driver detects SMMUs but no translation is
-configured (transactions just bypass translation process).
-
-Note that for device isolation dma_base and size are fixed as 0 and
-SZ_128M at the moment. Additional patches will address this
-restriction and allow automatic growth of mapping size.
-
-Cc: Varun Sethi <Varun.Sethi@freescale.com>
-Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- drivers/iommu/arm-smmu.c |   47 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
-
-Hi Will,
-
-This new patch addresses Varun's comments:
- - use iommu_group notifier instead of bus notifier
- - remove superfluous call to arm_smmu_add_device in
-   notifier function
-
-This patch depends on commit "iommu/arm-smmu: add devices attached to
-the SMMU to an IOMMU group" as found in your git tree (e.g. in branch
-iommu/devel or for-joerg/arm-smmu/updates).
-
-
-Andreas
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 0a5649f..edd0ffb 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -46,6 +46,7 @@
- #include <linux/amba/bus.h>
- 
- #include <asm/pgalloc.h>
-+#include <asm/dma-iommu.h>
- 
- /* Driver options */
- #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
-@@ -402,6 +403,13 @@ struct arm_smmu_domain {
- static DEFINE_SPINLOCK(arm_smmu_devices_lock);
- static LIST_HEAD(arm_smmu_devices);
- 
-+static int arm_smmu_group_notifier(struct notifier_block *nb,
-+				unsigned long action, void *data);
-+
-+static struct notifier_block group_nb = {
-+	.notifier_call = arm_smmu_group_notifier,
-+};
-+
- struct arm_smmu_option_prop {
- 	u32 opt;
- 	const char *prop;
-@@ -1566,6 +1574,8 @@ static int arm_smmu_add_device(struct device *dev)
- 		return PTR_ERR(group);
- 	}
- 
-+	iommu_group_register_notifier(group, &group_nb);
-+
- 	ret = iommu_group_add_device(group, dev);
- 	iommu_group_put(group);
- 	dev->archdata.iommu = smmu;
-@@ -1981,6 +1991,43 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int arm_smmu_group_notifier(struct notifier_block *nb,
-+				unsigned long action, void *data)
-+{
-+	struct device *dev = data;
-+	struct dma_iommu_mapping *mapping;
-+	struct arm_smmu_device *smmu;
-+	int ret;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_BIND_DRIVER:
-+
-+		smmu = dev->archdata.iommu;
-+		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
-+			break;
-+
-+		mapping = arm_iommu_create_mapping(&platform_bus_type,
-+						0, SZ_128M, 0);
-+		if (IS_ERR(mapping)) {
-+			ret = PTR_ERR(mapping);
-+			dev_info(dev, "arm_iommu_create_mapping failed\n");
-+			break;
-+		}
-+
-+		ret = arm_iommu_attach_device(dev, mapping);
-+		if (ret < 0) {
-+			dev_info(dev, "arm_iommu_attach_device failed\n");
-+			arm_iommu_release_mapping(mapping);
-+		}
-+
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
- #ifdef CONFIG_OF
- static struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v1", },
--- 
-1.7.9.5
+Ian.
