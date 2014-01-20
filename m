@@ -1,126 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Jan 2014 13:41:58 +0000
-Subject: [RFC PATCH 2/3] arm64: KVM: trap VM system registers until MMU
- and caches are ON
-In-Reply-To: <CAAhSdy1iwc2ZBoPO9KXJzzaEQz-SWpYXkkRvjyRjQPdPe31chQ@mail.gmail.com>
-References: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
- <1389970993-19371-3-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy1iwc2ZBoPO9KXJzzaEQz-SWpYXkkRvjyRjQPdPe31chQ@mail.gmail.com>
-Message-ID: <52DD27A6.5010706@arm.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 20 Jan 2014 19:15:57 +0530
+Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iGYapTX0tfTLaoiF02n+hNdXN2OEphOCkb3dAYvqA4N5g@mail.gmail.com>
+References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
+ <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
+ <527744B2.4090303@ti.com>
+ <030d01ced946$d6e23490$84a69db0$%debski@samsung.com>
+ <52779D28.9000905@ti.com>
+ <CAFp+6iH7vQ-OtMFL4pyr4tFDRchH4oh1Z0753WNgrHiUzj+kzw@mail.gmail.com>
+ <00fe01ceda0a$941957a0$bc4c06e0$%debski@samsung.com>
+ <000001ceda17$f41c2030$dc546090$%han@samsung.com>
+ <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
+ <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
+ <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
+ <5280BB65.5040305@ti.com>
+ <CAFp+6iGKpzOHjwnSMvSgTehzPLQMB8madoYqMk5JPSAZfSGSTg@mail.gmail.com>
+ <528C7B0E.3080401@ti.com>
+ <CAFp+6iF3UnV-w2pYQE2THQZBGma8xpp6pqSuwXzjUN3emJnftQ@mail.gmail.com>
+ <528CD8EC.9050403@ti.com> <529F3C1C.2050509@ti.com>
+ <CAFp+6iF+N+eMOd=B-J3oS_u0TEse+5V2gHkcNxN0OS+YbV_Y9g@mail.gmail.com>
+ <52B9C83E.6070502@ti.com>
+ <CAFp+6iGkNjCDHJSPd76V7SzOkma1q7CiOKg7oK7ws77Rh022Jg@mail.gmail.com>
+ <52CBCDB2.9080301@ti.com>
+ <CAFp+6iGYapTX0tfTLaoiF02n+hNdXN2OEphOCkb3dAYvqA4N5g@mail.gmail.com>
+Message-ID: <CAFp+6iGAKjxQEa8BK3NmbQemQ-=Vnrm=+TbKA3w5d0eRVKYFYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
+Hi Kishon,
 
-On 20/01/14 12:00, Anup Patel wrote:
-> On Fri, Jan 17, 2014 at 8:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> In order to be able to detect the point where the guest enables
->> its MMU and caches, trap all the VM related system registers.
+
+[...]
+
+>>>>>>>>>>>> Right.
+>>>>>>>>>>>>
+>>>>>>>>>>>> While 3.0 block(PIPE3) can be used for Super Speed, 2.0
+>>>>>>>>>>>> block(UTMI+)
+>>>>>>>>>>>> can be used for High speed.
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> It should then come under *single IP muliple PHY* category similar
+>>>>>>>>>>> to what
+>>>>>>>>>>> Sylwester has done.
+
+[...]
+
 >>
->> Once we see the guest enabling both the MMU and the caches, we
->> can go back to a saner mode of operation, which is to leave these
->> registers in complete control of the guest.
+>> The idea is to model the driver as close to the hardware though I understand
+>> there won't be any advantages w.r.t power or performance. maybe in later
+>> versions of the IP we'll have separate bits to control usb3 and usb2.
+>
+> Ok, i will prepare the next patchset for separating out the possible
+> code based on
+> the UTMI+ or PIPE3 phys. Though when experimenting with the PHY
+> settings i can see
+> there's little of such code  :-)
+>
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_arm.h |  3 ++-
->>  arch/arm64/kvm/sys_regs.c        | 58 ++++++++++++++++++++++++++++++++--------
->>  2 files changed, 49 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index c98ef47..fd0a651 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -62,6 +62,7 @@
->>   * RW:         64bit by default, can be overriden for 32bit VMs
->>   * TAC:                Trap ACTLR
->>   * TSC:                Trap SMC
->> + * TVM:                Trap VM ops (until M+C set in SCTLR_EL1)
->>   * TSW:                Trap cache operations by set/way
->>   * TWE:                Trap WFE
->>   * TWI:                Trap WFI
->> @@ -74,7 +75,7 @@
->>   * SWIO:       Turn set/way invalidates into set/way clean+invalidate
->>   */
->>  #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
->> -                        HCR_BSU_IS | HCR_FB | HCR_TAC | \
->> +                        HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
->>                          HCR_AMO | HCR_IMO | HCR_FMO | \
->>                          HCR_SWIO | HCR_TIDCP | HCR_RW)
->>  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 02e9d09..5e92b9e 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -121,6 +121,42 @@ done:
->>  }
->>
->>  /*
->> + * Generic accessor for VM registers. Only called as long as HCR_TVM
->> + * is set.
->> + */
->> +static bool access_vm_reg(struct kvm_vcpu *vcpu,
->> +                         const struct sys_reg_params *p,
->> +                         const struct sys_reg_desc *r)
->> +{
->> +       BUG_ON(!p->is_write);
->> +
->> +       vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
->> +       return true;
->> +}
->> +
->> +/*
->> + * SCTLR_EL1 accessor. Only called as long as HCR_TVM is set.  If the
->> + * guest enables the MMU, we stop trapping the VM sys_regs and leave
->> + * it in complete control of the caches.
->> + */
->> +static bool access_sctlr_el1(struct kvm_vcpu *vcpu,
->> +                            const struct sys_reg_params *p,
->> +                            const struct sys_reg_desc *r)
->> +{
->> +       unsigned long val;
->> +
->> +       BUG_ON(!p->is_write);
->> +
->> +       val = *vcpu_reg(vcpu, p->Rt);
->> +       vcpu_sys_reg(vcpu, r->reg) = val;
->> +
->> +       if ((val & (0b101)) == 0b101)   /* MMU+Caches enabled? */
->> +               vcpu->arch.hcr_el2 &= ~HCR_TVM;
->> +
->> +       return true;
->> +}
->> +
->> +/*
->>   * We could trap ID_DFR0 and tell the guest we don't support performance
->>   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
->>   * NAKed, so it will read the PMCR anyway.
->> @@ -185,32 +221,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>           NULL, reset_mpidr, MPIDR_EL1 },
->>         /* SCTLR_EL1 */
->>         { Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
->> -         NULL, reset_val, SCTLR_EL1, 0x00C50078 },
->> +         access_sctlr_el1, reset_val, SCTLR_EL1, 0x00C50078 },
-> 
-> This patch in its current form breaks Aarch32 VMs on Foundation v8 Model
-> because encoding for Aarch64 VM registers we get Op0=0b11 and for Aarch32
-> VM registers we get Op0=0b00 when trapped.
-> 
-> Either its a Foundation v8 Model bug or we need to add more enteries in
-> sys_reg_desc[] for Aarch32 VM registers with Op0=0b00.
+>> I think for power control we should have both usb3 and usb2 power-on callback
+>> calling a single function that controls the power bit.
+> Right. I will do that.
 
-That's a good point. But Op0 isn't defined for AArch32, the value is
-simply hardcoded in kvm_handle_cp15_32/kvm_handle_cp15_64, which is
-obviously horribly broken.
+Have posted the next version of patch with functionality to support
+multiple PHYs as suggested.
+Please review the same.
+Thanks !!
 
-I'll work on a fix for that, thanks noticing it.
 
-Does this series otherwise fix your L3 cache issue (assuming you stick
-to 64bit guests)?
-
-Cheers,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
