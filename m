@@ -1,34 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jan 2014 19:39:52 +0100
-Subject: [PATCH 06/20] ARM64 / ACPI: Introduce some PCI functions when PCI
- is enabled
-In-Reply-To: <52DD2F23.2010109@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <4387274.ri38HmFxAV@wuerfel> <52DD2F23.2010109@linaro.org>
-Message-ID: <201401201939.53035.arnd@arndb.de>
+Date: Mon, 20 Jan 2014 19:41:07 +0100
+Subject: [PATCH] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <CA+mB=1+mrWAzBCxdMEji2MDRzHajmnxuWtz7iu96ML0DuAB3RQ@mail.gmail.com>
+References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+ <201401201239.47665.arnd@arndb.de>
+ <CA+mB=1+mrWAzBCxdMEji2MDRzHajmnxuWtz7iu96ML0DuAB3RQ@mail.gmail.com>
+Message-ID: <201401201941.07633.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 January 2014, Hanjun Guo wrote:
-> >> acpi_register_ioapic()/acpi_unregister_ioapic() will be used for IOAPIC
-> >> hotplug and GIC distributor is something like IOAPIC on x86, so I think
-> >> these two functions can be reserved for future use.
-> > But GIC is not hotplugged, is it? It still sounds x86 specific to me.
+On Monday 20 January 2014, Srikanth Thokala wrote:
+> >
+> >> > * data width should be a property of the slave driver that is configured
+> >> >   through dma_slave_config(), unless you can have dma engines that only
+> >> >   support certain a width.
+> >>
+> >> Yes, this VDMA engine soft IP support only certain widths, which is
+> >> configurable during IP synthesis.
+> >
+> > But what is this property used for in that case? Surely you can't
+> > connect a slave device to a dmaengine if the bus width doesn't match.
+> > You probably have a point here, but I don't understand it yet.
 > 
-> Well, if we want to do physical CPU hotplug on ARM/ARM64 (maybe years 
-> later?),
-> then GIC add/remove is needed because we have to remove GIC
-> on the SoC too when we remove the physical CPU.
+> There is a Data-Realignment Engine (DRE) in the IP which is only available for
+> data width setting of 64-bits and less.  So, we use the data-width DT parameter
+> to verify this condition and we update alignment shift accordingly.
 
-In general, I recommend not planning for the future in kernel code when you
-don't know what is going to happen. It's always easy enough to change
-things once you get there, as long as no stable ABI is involved.
-
-I just looked at the caller of these functions, and found a self-contained
-PCI driver in drivers/pci/ioapic.c, which uses two sepate PCI classes for
-ioapic and ioxapic. I think it's a safe assumption to say that even if we
-get ARM CPU+GIC hotplug, that would not use the same ioapic driver. This
-driver is currently marked X86-only, and that should probably stay this way,
-so you won't need the hooks.
+Ok, I have to admit I didn't understand all of that, but you clearly
+know what you are talking about here, so I assume you are correct.
 
 	Arnd
