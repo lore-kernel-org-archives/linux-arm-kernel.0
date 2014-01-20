@@ -1,92 +1,81 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 20 Jan 2014 08:48:14 +0100
-Subject: [PATCH v2 6/7] ARM: Exynos: switch to using generic cpufreq-cpu0
- driver
-In-Reply-To: <1390047057-2239-7-git-send-email-thomas.ab@samsung.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-7-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140120084814.220a8efa@amdc2363>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 20 Jan 2014 13:30:14 +0530
+Subject: [PATCH] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <201401171713.08550.arnd@arndb.de>
+References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+ <1389894803-4147-2-git-send-email-sthokal@xilinx.com>
+ <201401171713.08550.arnd@arndb.de>
+Message-ID: <CA+mB=1L0ZSC8f6eMEuO7MEk6nG5SDahE7AH2F_uUr1TgTCD=cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Arnd,
 
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> Remove the platform device instantiation for Exynos specific cpufreq
-> driver and add the platform device for cpufreq-cpu0 driver.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c          |    5 -----
->  arch/arm/mach-exynos/common.h          |    1 -
->  arch/arm/mach-exynos/mach-exynos4-dt.c |    2 +-
->  arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +-
->  4 files changed, 2 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.c
-> b/arch/arm/mach-exynos/common.c index f18be40..72ae5d3 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -303,11 +303,6 @@ void __init exynos_cpuidle_init(void)
->  	platform_device_register(&exynos_cpuidle);
->  }
->  
-> -void __init exynos_cpufreq_init(void)
-> -{
-> -	platform_device_register_simple("exynos-cpufreq", -1, NULL,
-> 0); -}
-> -
->  void __init exynos_init_late(void)
->  {
->  	if (of_machine_is_compatible("samsung,exynos5440"))
-> diff --git a/arch/arm/mach-exynos/common.h
-> b/arch/arm/mach-exynos/common.h index f76967b..0c31b34 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -22,7 +22,6 @@ void exynos_init_io(void);
->  void exynos4_restart(enum reboot_mode mode, const char *cmd);
->  void exynos5_restart(enum reboot_mode mode, const char *cmd);
->  void exynos_cpuidle_init(void);
-> -void exynos_cpufreq_init(void);
->  void exynos_init_late(void);
->  
->  void exynos_firmware_init(void);
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> b/arch/arm/mach-exynos/mach-exynos4-dt.c index d3e54b7..9a25320 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -22,8 +22,8 @@
->  static void __init exynos4_dt_machine_init(void)
->  {
->  	exynos_cpuidle_init();
-> -	exynos_cpufreq_init();
->  
-> +	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> NULL); }
->  
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> b/arch/arm/mach-exynos/mach-exynos5-dt.c index 37ea261..9dc3710 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -44,8 +44,8 @@ static void __init exynos5_dt_machine_init(void)
->  	}
->  
->  	exynos_cpuidle_init();
-> -	exynos_cpufreq_init();
->  
-> +	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> NULL); }
->  
+On Fri, Jan 17, 2014 at 9:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 16 January 2014, Srikanth Thokala wrote:
+>> @@ -0,0 +1,71 @@
+>> +Xilinx AXI VDMA engine, it does transfers between memory and video devices.
+>> +It can be configured to have one channel or two channels. If configured
+>> +as two channels, one is to transmit to the video device and another is
+>> +to receive from the video device.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "xlnx,axi-vdma-1.00.a"
+>> +- #dma-cells: Should be <1>, see "dmas" property below
+>> +- reg: Should contain VDMA registers location and length.
+>> +- interrupts: Should contain per channel VDMA interrupts.
+>> +- compatible (child node): It should be either "xlnx,axi-vdma-mm2s-channel" or
+>> +       "xlnx,axi-vdma-s2mm-channel". It depends on the hardware design and it
+>> +       can also have both channels.
+>> +- xlnx,device-id: Should contain device number in each channel. It should be
+>> +       {0,1,2...so on} to the number of VDMA devices configured in hardware.
+>> +- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+>> +- xlnx,data-width: Should contain the stream data width, takes {32,64...so on}.
+>> +- xlnx,flush-fsync: (Optional) Tells whether which channel to Flush on Fsync.
+>> +       It takes following values:
+>> +       {1}, flush both channels
+>> +       {2}, flush mm2s channel
+>> +       {3}, flush s2mm channel
+>> +- xlnx,include-sg: (Optional) Tells whether configured for Scatter-mode in
+>> +       the hardware.
+>> +- xlnx,include-dre: (Optional) Tells whether hardware is configured for Data
+>> +       Realignment Engine.
+>> +- xlnx,genlock-mode: (Optional) Tells whether Genlock synchornisation is
+>> +       enabled/disabled in hardware.
+>
+> The documentation doesn't seem to match the example, since you don't mention
+> the fact that the channels have separate nodes here, or which properties
+> are meant for the parent or the child node. Also, some of the "required"
+> properties are absent in the example, which makes no sense.
+>
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+I will fix this ambiguity in my v2.
 
--- 
-Best regards,
+> I also assume that some of the properties should just go away:
+>
+> * xlnx,device-id should be the argument in the handle from the slave device
 
-Lukasz Majewski
+We can have multiple instances of this VDMA IP configured in the FPGA and we
+need a unique identifier for each VDMA device that is present in the FPGA.
+This device-id dt parameter forms the filter mask for the slave devices. As an
+example, this can be used to get a channel of specific VDMA device (assuming
+multiple instances) using the API dma_request_channel().  Please note this
+is an example of a slave device that doesnt have dt node.
 
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> * data width should be a property of the slave driver that is configured
+>   through dma_slave_config(), unless you can have dma engines that only
+>   support certain a width.
+
+Yes, this VDMA engine soft IP support only certain widths, which is
+configurable during IP synthesis.
+
+Srikanth
+
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
