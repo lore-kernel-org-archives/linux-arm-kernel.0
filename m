@@ -1,45 +1,51 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Mon, 20 Jan 2014 18:44:50 +0800
-Subject: [PATCH] ARM: imx: correct usecount of IPG, ARM and MMDC clk on i.mx6sl
-Message-ID: <1390214690-13564-1-git-send-email-b20788@freescale.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 20 Jan 2014 15:29:17 +0530
+Subject: [PATCH] dma: fix vchan_cookie_complete() debug print
+In-Reply-To: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
+References: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20140120095917.GZ26823@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IPG, ARM and MMDC's clock should be enabled during kernel boot up,
-so we need to maintain their use count, otherwise, they may be
-disabled unexpectedly if their children's clock are turned off,
-which is not allowed.
+On Fri, Dec 06, 2013 at 04:42:09PM +0100, Jonas Jensen wrote:
+> vd->tx.cookie is set zero on dma_cookie_complete(),
+> save to local before printing it.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     dev_vdbg() could also be moved to happen earlier, what do you prefer?
+This would be preferred IMHO. Also pls cc dmaengine at vger on this
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/clk-imx6sl.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+--
+~Vinod
+>     
+>     Applies to next-20131206
+> 
+>  drivers/dma/virt-dma.h | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
+> index 85c19d6..181b9526 100644
+> --- a/drivers/dma/virt-dma.h
+> +++ b/drivers/dma/virt-dma.h
+> @@ -84,10 +84,12 @@ static inline bool vchan_issue_pending(struct virt_dma_chan *vc)
+>  static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
+>  {
+>  	struct virt_dma_chan *vc = to_virt_chan(vd->tx.chan);
+> +	dma_cookie_t cookie;
+>  
+> +	cookie = vd->tx.cookie;
+>  	dma_cookie_complete(&vd->tx);
+>  	dev_vdbg(vc->chan.device->dev, "txd %p[%x]: marked complete\n",
+> -		vd, vd->tx.cookie);
+> +		 vd, cookie);
+>  	list_add_tail(&vd->node, &vc->desc_completed);
+>  
+>  	tasklet_schedule(&vc->task);
+> -- 
+> 1.8.2.1
+> 
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 78f3bd6..8d720f9 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -291,6 +291,21 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 		pr_warn("%s: failed to set AHB clock rate %d!\n",
- 			__func__, ret);
- 
-+	/* Correct usecount of IPG clk */
-+	ret = clk_prepare_enable(clks[IMX6SL_CLK_IPG]);
-+	if (ret)
-+		pr_warn("%s: failed to enable IPG clock %d\n", __func__, ret);
-+
-+	/* Correct usecount of ARM clk */
-+	ret = clk_prepare_enable(clks[IMX6SL_CLK_ARM]);
-+	if (ret)
-+		pr_warn("%s: failed to enable ARM clock %d\n", __func__, ret);
-+
-+	/* Correct usecount of MMDC clk */
-+	ret = clk_prepare_enable(clks[IMX6SL_CLK_MMDC_ROOT]);
-+	if (ret)
-+		pr_warn("%s: failed to enable MMDC clock %d\n", __func__, ret);
-+
- 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
- 		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY1_GATE]);
- 		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY2_GATE]);
 -- 
-1.7.9.5
