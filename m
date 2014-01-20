@@ -1,65 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 20 Jan 2014 16:28:03 +0100
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <20140120145633.GA2725@e102568-lin.cambridge.arm.com>
-References: <20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com> <52D97831.6030700@codeaurora.org>
- <52DD35C2.3070809@linaro.org>
- <20140120145633.GA2725@e102568-lin.cambridge.arm.com>
-Message-ID: <52DD4083.5010306@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 20 Jan 2014 16:30:21 +0100
+Subject: [PATCH 13/15] fbdev: sh-mobile-lcdcfb: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <52DD06CB.8050606@ti.com>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <22423852.GiH1NBjiii@avalon> <52DD06CB.8050606@ti.com>
+Message-ID: <5189278.VEETF0BgjA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 03:56 PM, Lorenzo Pieralisi wrote:
-> On Mon, Jan 20, 2014 at 02:42:10PM +0000, Daniel Lezcano wrote:
->> On 01/17/2014 07:36 PM, Stephen Boyd wrote:
->>> On 01/17/14 05:40, Prashant Gaikwad wrote:
->>>>
->>>> Another requirement:
->>>>
->>>> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
->>>> C2, C3 respectively.
->>>>
->>>> Rating of T2 is better than T3. If I register T2 and T3 both as
->>>> broadcast timers then T3 will not be used. But ...
->>>>       - T2 is not preserved in C3 idle state.
->>>>       - T3 resolution is very poor (ms) and can not be used as wake
->>>> event for C2.
->>>>
->>>> Possible solution, register only T3 as broadcast device and use T2 as
->>>> per-CPU fallback timer.
->>>
->>> We have the same situation on MSM. I've been thinking about proposing we
->>> allow multiple broadcast timers to exist in the system and then have the
->>> clockevents_notify() caller indicate which C state is being entered. The
->>> broadcast timers would need to indicate which C state they don't work in
->>> though.
->>
->> IMO, there are different solutions:
->>
->> 1. extend the C3STOP to C1STOP, C2STOP, etc ... and pass the idle state
->> to the time framework where these flags are checked against. I don't
->> like this approach but it is feasible.
->>
->> 2. use the generic power domain. When the power domain is shutdown via
->> the cpuidle backend driver, it switches the timer.
->
-> IMO, 2 is the way forward. It is the only solution that links resources to
-> the reason they need maintainance (ie power management). I am writing
-> v2 of C-state proposal where power domains are explicitly associated with
-> devices (eg arch timers), and 2 fits well with this approach.
+Hi Tomi,
 
-Thanks Lorenzo for your feedback.
+On Monday 20 January 2014 13:21:47 Tomi Valkeinen wrote:
+> On 2014-01-19 23:01, Laurent Pinchart wrote:
+> > Hi Tomi,
+> > 
+> > The lcdc driver can be compiled without meram support. This is handled by
+> > conditional compilation in include/video/sh_mobile_meram.h that defines
+> > the
+> > meram functions as stubs when meram support isn't selected.
+> > 
+> > The problem comes from the combination of FB_SH_MOBILE_MERAM=m and
+> > FB_SH_MOBILE_LCDC=y. The former makes the meram function non-stubs, while
+> > the later makes the LCDC driver fail to link, as meram support is then
+> > compiled as a module.
+> > 
+> > How do you usually handle this ?
+> 
+> I guess the easiest option is to make FB_SH_MOBILE_MERAM a bool, instead
+> of tristate.
 
-   -- Daniel
-
+That's easy, but it would prevent meram support from being compiled as a 
+module when lcdc support is compiled as a module as well.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Regards,
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140120/5f7481fa/attachment-0001.sig>
