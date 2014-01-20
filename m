@@ -1,36 +1,43 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 20 Jan 2014 16:11:28 +0200
-Subject: [PATCH v6 07/10] ARM: dts: omap5: Update omap-usb-host node
+Date: Mon, 20 Jan 2014 16:11:26 +0200
+Subject: [PATCH v6 05/10] mfd: omap-usb-tll: Update DT clock binding
+ information
 In-Reply-To: <1390227091-4523-1-git-send-email-rogerq@ti.com>
 References: <1390227091-4523-1-git-send-email-rogerq@ti.com>
-Message-ID: <1390227091-4523-8-git-send-email-rogerq@ti.com>
+Message-ID: <1390227091-4523-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap-usb-host driver expects a certain name for internal
-and external reference clocks. Provide these clocks.
+The omap-usb-tll driver needs one clock for each TLL channel.
+Add this information to the DT binding document.
 
+CC: Lee Jones <lee.jones@linaro.org>
+CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/mfd/omap-usb-tll.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 2f12a47..0f82ecf 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -765,6 +765,12 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			clocks = <&l3init_60m_fclk>,
-+				 <&xclk60mhsp1_ck>,
-+				 <&xclk60mhsp2_ck>;
-+			clock-names = "refclk_60m_int",
-+				      "refclk_60m_ext_p1",
-+				      "refclk_60m_ext_p2";
+diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+index 62fe697..c58d704 100644
+--- a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
++++ b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+@@ -7,6 +7,16 @@ Required properties:
+ - interrupts : should contain the TLL module's interrupt
+ - ti,hwmod : must contain "usb_tll_hs"
  
- 			usbhsohci: ohci at 4a064800 {
- 				compatible = "ti,ohci-omap3", "usb-ohci";
++Optional properties:
++
++- clocks: a list of phandles and clock-specifier pairs, one for each entry in
++  clock-names.
++
++- clock-names: should include:
++  * "usb_tll_hs_usb_ch0_clk" - USB TLL channel 0 clock
++  * "usb_tll_hs_usb_ch1_clk" - USB TLL channel 1 clock
++  * "usb_tll_hs_usb_ch2_clk" - USB TLL channel 2 clock
++
+ Example:
+ 
+ 	usbhstll: usbhstll at 4a062000 {
 -- 
 1.8.3.2
