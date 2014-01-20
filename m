@@ -1,36 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jan 2014 21:33:27 +0000
-Subject: [PATCH 5/5] clk: versatile: respect parent rate in ICST clock
-In-Reply-To: <CACRpkdZ1F_SvGcerMDfmhSgnLVzLXBJnQ9iftSG6yW2mMhOOKQ@mail.gmail.com>
-References: <1390251332-6411-1-git-send-email-linus.walleij@linaro.org>
- <20140120211207.GI15937@n2100.arm.linux.org.uk>
- <CACRpkdZ1F_SvGcerMDfmhSgnLVzLXBJnQ9iftSG6yW2mMhOOKQ@mail.gmail.com>
-Message-ID: <20140120213327.GK15937@n2100.arm.linux.org.uk>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 20 Jan 2014 22:42:18 +0100
+Subject: [PATCH] ARM: mvebu: fix compilation warning on Armada 370 (i.e.
+ non-SMP)
+In-Reply-To: <3644485.dCdZFrR2be@wuerfel> (Arnd Bergmann's message of "Mon, 20
+ Jan 2014 21:18:11 +0100")
+References: <87r48276ne.fsf@natisbad.org> <3644485.dCdZFrR2be@wuerfel>
+Message-ID: <87zjmq8h51.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 10:16:53PM +0100, Linus Walleij wrote:
-> On Mon, Jan 20, 2014 at 10:12 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> >> -static const struct icst_params impd1_vco2_params = {
-> >> +static struct icst_params impd1_vco2_params = {
-> >>       .ref            = 24000000,     /* 24 MHz */
-> >>       .vco_max        = ICST525_VCO_MAX_3V,
-> >>       .vco_min        = ICST525_VCO_MIN,
-> >
-> > Right, so we end up writing directly into these _shared_ _statically_
-> > _allocated_ structures.
-> 
-> Argh yeah that's right.
-> 
-> I'll think of something better, like allocating the params on-the-fly
-> for DT instead.
+Hi Arnd,
 
-That's actually why they're const - they're const because they are not
-supposed to be written to...
+Arnd Bergmann <arnd@arndb.de> writes:
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> On Monday 20 January 2014 21:14:13 Arnaud Ebalard wrote:
+>> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+>> index 433cc8568dec..499c5070f841 100644
+>> --- a/drivers/irqchip/irq-armada-370-xp.c
+>> +++ b/drivers/irqchip/irq-armada-370-xp.c
+>> @@ -59,7 +59,9 @@
+>>  #define PCI_MSI_DOORBELL_END                    (32)
+>>  #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
+>>  
+>> +#ifdef CONFIG_SMP
+>>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>> +#endif
+>>  
+>>  static void __iomem *per_cpu_
+>
+> How about moving it inside of the existing #ifdef?
+>
+> That also brings it closer to the one place it's used.
+
+I also hesitated but decided to let the declaration of this global
+at the beginning of the file. I will send a v2 with the declaration
+moved inside the existing #ifdef.
+
+Cheers,
+
+a+
