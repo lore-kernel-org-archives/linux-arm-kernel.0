@@ -1,230 +1,185 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 20 Jan 2014 17:44:57 +0100
-Subject: [PATCH RFC v4 04/10] ahci-platform: Add support for devices with more
- then 1 clock
+Date: Mon, 20 Jan 2014 17:44:59 +0100
+Subject: [PATCH RFC v4 06/10] ahci-platform: Add enable_ / disable_resources
+ helper functions
 In-Reply-To: <1390236303-22538-1-git-send-email-hdegoede@redhat.com>
 References: <1390236303-22538-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390236303-22538-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390236303-22538-7-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The allwinner-sun4i AHCI controller needs 2 clocks to be enabled and the
-imx AHCI controller needs 3 clocks to be enabled.
-
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/ata/ahci-platform.txt      |  1 +
- drivers/ata/ahci_platform.c                        | 97 +++++++++++++++-------
- include/linux/ahci.h                               |  4 +-
- include/linux/ahci_platform.h                      |  3 +
- 4 files changed, 73 insertions(+), 32 deletions(-)
+ drivers/ata/ahci_platform.c   | 83 ++++++++++++++++++++++++-------------------
+ include/linux/ahci_platform.h |  2 ++
+ 2 files changed, 48 insertions(+), 37 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 89de156..3ced07d 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -10,6 +10,7 @@ Required properties:
- 
- Optional properties:
- - dma-coherent      : Present if dma operations are coherent
-+- clocks            : a list of phandle + clock specifier pairs
- 
- Example:
-         sata at ffe08000 {
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 434ab89..aaa0c08 100644
+index 2f319e9..1cce7a2 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -87,6 +87,44 @@ static struct scsi_host_template ahci_platform_sht = {
- 	AHCI_SHT("ahci_platform"),
- };
+@@ -117,6 +117,39 @@ void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
+ EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
  
-+
-+int ahci_platform_enable_clks(struct ahci_host_priv *hpriv)
+ 
++int ahci_platform_enable_resources(struct ahci_host_priv *hpriv)
 +{
-+	int c, rc;
++	int rc;
 +
-+	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++) {
-+		rc = clk_prepare_enable(hpriv->clks[c]);
++	if (hpriv->target_pwr) {
++		rc = regulator_enable(hpriv->target_pwr);
 +		if (rc)
-+			goto disable_unprepare_clk;
++			return rc;
 +	}
++
++	rc = ahci_platform_enable_clks(hpriv);
++	if (rc)
++		goto disable_regulator;
++
 +	return 0;
 +
-+disable_unprepare_clk:
-+	while (--c >= 0)
-+		clk_disable_unprepare(hpriv->clks[c]);
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
 +	return rc;
 +}
-+EXPORT_SYMBOL_GPL(ahci_platform_enable_clks);
++EXPORT_SYMBOL_GPL(ahci_platform_enable_resources);
 +
-+void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
++void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
 +{
-+	int c;
++	ahci_platform_disable_clks(hpriv);
 +
-+	for (c = AHCI_MAX_CLKS - 1; c >= 0; c--)
-+		if (hpriv->clks[c])
-+			clk_disable_unprepare(hpriv->clks[c]);
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
 +}
-+EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
++EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
 +
 +
-+static void ahci_put_clks(struct ahci_host_priv *hpriv)
-+{
-+	int c;
-+
-+	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
-+		clk_put(hpriv->clks[c]);
-+}
-+
- static int ahci_probe(struct platform_device *pdev)
+ static void ahci_put_clks(struct ahci_host_priv *hpriv)
  {
- 	struct device *dev = &pdev->dev;
-@@ -97,10 +135,8 @@ static int ahci_probe(struct platform_device *pdev)
- 	struct ahci_host_priv *hpriv;
- 	struct ata_host *host;
- 	struct resource *mem;
--	int irq;
--	int n_ports;
--	int i;
--	int rc;
-+	struct clk *clk;
-+	int i, irq, max_clk, n_ports, rc;
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!mem) {
-@@ -131,17 +167,26 @@ static int ahci_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ 	int c;
+@@ -190,15 +223,9 @@ static int ahci_probe(struct platform_device *pdev)
+ 		hpriv->clks[i] = clk;
  	}
  
--	hpriv->clk = clk_get(dev, NULL);
--	if (IS_ERR(hpriv->clk)) {
--		dev_err(dev, "can't get clock\n");
--	} else {
--		rc = clk_prepare_enable(hpriv->clk);
--		if (rc) {
--			dev_err(dev, "clock prepare enable failed");
+-	if (hpriv->target_pwr) {
+-		rc = regulator_enable(hpriv->target_pwr);
+-		if (rc)
 -			goto free_clk;
-+	max_clk = dev->of_node ? AHCI_MAX_CLKS : 1;
-+	for (i = 0; i < max_clk; i++) {
-+		if (i == 0)
-+			clk = clk_get(dev, NULL); /* For old platform init */
-+		else
-+			clk = of_clk_get(dev->of_node, i);
-+
-+		if (IS_ERR(clk)) {
-+			rc = PTR_ERR(clk);
-+			if (rc == -EPROBE_DEFER)
-+				goto free_clk;
-+			break;
- 		}
-+		hpriv->clks[i] = clk;
- 	}
- 
-+	rc = ahci_enable_clks(dev, hpriv);
-+	if (rc)
+-	}
+-
+-	rc = ahci_enable_clks(dev, hpriv);
++	rc = ahci_platform_enable_resources(hpriv);
+ 	if (rc)
+-		goto disable_regulator;
 +		goto free_clk;
-+
+ 
  	/*
  	 * Some platforms might need to prepare for mmio region access,
- 	 * which could be done in the following init call. So, the mmio
-@@ -222,11 +267,9 @@ pdata_exit:
+@@ -209,7 +236,7 @@ static int ahci_probe(struct platform_device *pdev)
+ 	if (pdata && pdata->init) {
+ 		rc = pdata->init(dev, hpriv);
+ 		if (rc)
+-			goto disable_unprepare_clk;
++			goto disable_resources;
+ 	}
+ 
+ 	ahci_save_initial_config(dev, hpriv,
+@@ -279,11 +306,8 @@ static int ahci_probe(struct platform_device *pdev)
+ pdata_exit:
  	if (pdata && pdata->exit)
  		pdata->exit(dev);
- disable_unprepare_clk:
--	if (!IS_ERR(hpriv->clk))
--		clk_disable_unprepare(hpriv->clk);
-+	ahci_disable_clks(hpriv);
+-disable_unprepare_clk:
+-	ahci_disable_clks(hpriv);
+-disable_regulator:
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
++disable_resources:
++	ahci_platform_disable_resources(hpriv);
  free_clk:
--	if (!IS_ERR(hpriv->clk))
--		clk_put(hpriv->clk);
-+	ahci_put_clks(hpriv);
+ 	ahci_put_clks(hpriv);
  	return rc;
- }
- 
-@@ -239,10 +282,8 @@ static void ahci_host_stop(struct ata_host *host)
+@@ -298,11 +322,8 @@ static void ahci_host_stop(struct ata_host *host)
  	if (pdata && pdata->exit)
  		pdata->exit(dev);
  
--	if (!IS_ERR(hpriv->clk)) {
--		clk_disable_unprepare(hpriv->clk);
--		clk_put(hpriv->clk);
--	}
-+	ahci_disable_clks(hpriv);
-+	ahci_put_clks(hpriv);
+-	ahci_disable_clks(hpriv);
++	ahci_platform_disable_resources(hpriv);
+ 	ahci_put_clks(hpriv);
+-
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
  }
  
  #ifdef CONFIG_PM_SLEEP
-@@ -277,8 +318,7 @@ static int ahci_suspend(struct device *dev)
+@@ -337,10 +358,7 @@ static int ahci_suspend(struct device *dev)
  	if (pdata && pdata->suspend)
  		return pdata->suspend(dev);
  
--	if (!IS_ERR(hpriv->clk))
--		clk_disable_unprepare(hpriv->clk);
-+	ahci_disable_clks(hpriv);
+-	ahci_disable_clks(hpriv);
+-
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
++	ahci_platform_disable_resources(hpriv);
  
  	return 0;
  }
-@@ -290,13 +330,9 @@ static int ahci_resume(struct device *dev)
+@@ -352,26 +370,20 @@ static int ahci_resume(struct device *dev)
  	struct ahci_host_priv *hpriv = host->private_data;
  	int rc;
  
--	if (!IS_ERR(hpriv->clk)) {
--		rc = clk_prepare_enable(hpriv->clk);
--		if (rc) {
--			dev_err(dev, "clock prepare enable failed");
+-	if (hpriv->target_pwr) {
+-		rc = regulator_enable(hpriv->target_pwr);
+-		if (rc)
 -			return rc;
--		}
 -	}
-+	rc = ahci_enable_clks(dev, hpriv);
-+	if (rc)
+-
+-	rc = ahci_enable_clks(dev, hpriv);
++	rc = ahci_platform_enable_resources(hpriv);
+ 	if (rc)
+-		goto disable_regulator;
 +		return rc;
  
  	if (pdata && pdata->resume) {
  		rc = pdata->resume(dev);
-@@ -317,8 +353,7 @@ static int ahci_resume(struct device *dev)
+ 		if (rc)
+-			goto disable_unprepare_clk;
++			goto disable_resources;
+ 	}
+ 
+ 	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+ 		rc = ahci_reset_controller(host);
+ 		if (rc)
+-			goto disable_unprepare_clk;
++			goto disable_resources;
+ 
+ 		ahci_init_controller(host);
+ 	}
+@@ -380,11 +392,8 @@ static int ahci_resume(struct device *dev)
+ 
  	return 0;
  
- disable_unprepare_clk:
--	if (!IS_ERR(hpriv->clk))
--		clk_disable_unprepare(hpriv->clk);
-+	ahci_disable_clks(hpriv);
+-disable_unprepare_clk:
+-	ahci_disable_clks(hpriv);
+-disable_regulator:
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
++disable_resources:
++	ahci_platform_disable_resources(hpriv);
  
  	return rc;
  }
-diff --git a/include/linux/ahci.h b/include/linux/ahci.h
-index 3499d44..19970b0 100644
---- a/include/linux/ahci.h
-+++ b/include/linux/ahci.h
-@@ -23,6 +23,8 @@
- 
- #include <linux/clk.h>
- 
-+#define AHCI_MAX_CLKS		3
-+
- struct ata_port;
- 
- struct ahci_host_priv {
-@@ -37,7 +39,7 @@ struct ahci_host_priv {
- 	u32			em_loc; /* enclosure management location */
- 	u32			em_buf_sz;	/* EM buffer size in byte */
- 	u32			em_msg_type;	/* EM message type */
--	struct clk		*clk;		/* Optional */
-+	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
- 	void			*plat_data;	/* Other platform data */
- 	/* Optional ahci_start_engine override */
- 	void			(*start_engine)(struct ata_port *ap);
 diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 737fe38..0071d0b 100644
+index 0071d0b..5e5f85e 100644
 --- a/include/linux/ahci_platform.h
 +++ b/include/linux/ahci_platform.h
-@@ -31,4 +31,7 @@ struct ahci_platform_data {
- 	unsigned int mask_port_map;
- };
+@@ -33,5 +33,7 @@ struct ahci_platform_data {
  
-+int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
-+void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
-+
+ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
+ void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
++int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
++void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
+ 
  #endif /* _AHCI_PLATFORM_H */
 -- 
 1.8.5.3
