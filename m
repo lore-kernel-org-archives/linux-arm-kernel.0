@@ -1,222 +1,105 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jan 2014 19:56:53 -0800
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+Date: Sun, 19 Jan 2014 19:56:55 -0800
+Subject: [PATCH 3/3] ARM: dts: exynos5250-snow: Enable wifi power-on
 In-Reply-To: <1390190215-22700-1-git-send-email-olof@lixom.net>
 References: <1390190215-22700-1-git-send-email-olof@lixom.net>
-Message-ID: <1390190215-22700-2-git-send-email-olof@lixom.net>
+Message-ID: <1390190215-22700-4-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables support for power-on sequencing of SDIO peripherals through DT.
+This adds the required specifications of reset-gpios on snow to enable wifi.
 
-In general, it's quite common that wifi modules and other similar
-peripherals have several signals in addition to the SDIO interface that
-needs wiggling before the module will power on. It's common to have a
-reference clock, one or several power rails and one or several lines
-for reset/enable type functions.
+The wifi module is always powered, but it has three more signals needed:
+- Enable line (active high)
+- Reset line (active low)
+- 32kHz reference clock
 
-The binding as written today introduces a number of reset gpios,
-a regulator and a clock specifier. The code will handle up to 2 gpio
-reset lines, but it's trivial to increase to more than that if needed
-at some point.
+The enable and reset lines are in practice quite similar (i.e. both
+need to be 1 for the module to be enabled), so treat them both as
+"reset gpios". The clock is specified using the new clock property on
+MMC, which due to lack of append options right now has to duplicate the
+first two clocks that are SoC generic.
 
-Implementation-wise, the MMC core has been changed to handle this during
-host power up, before the host interface is powered on. I have not yet
-implemented the power-down side, I wanted people to have a chance for
-reporting back w.r.t. issues (or comments on the bindings) first.
-
-I have not tested the regulator portion, since the system and module
-I'm working on doesn't need one (Samsung Chromebook with Marvell
-8797-based wifi). Testing of those portions (and reporting back) would
-be appreciated.
+Also, fix the pinctrl setting (that has moved from slot node to host
+controller node), and add the two gpio lines to the pinctrl setup.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- Documentation/devicetree/bindings/mmc/mmc.txt |   11 +++++++
- drivers/mmc/core/core.c                       |   42 +++++++++++++++++++++++++
- drivers/mmc/core/host.c                       |   30 +++++++++++++++++-
- include/linux/mmc/host.h                      |    5 +++
- 4 files changed, 87 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi |   17 ++++++++++++++++-
+ arch/arm/boot/dts/exynos5250-snow.dts         |   11 +++++++++--
+ 2 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-index 458b57f..962e0ee 100644
---- a/Documentation/devicetree/bindings/mmc/mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-@@ -5,6 +5,8 @@ these definitions.
- Interpreted by the OF core:
- - reg: Registers location and length.
- - interrupts: Interrupts used by the MMC controller.
-+- clocks: Clocks needed for the host controller, if any.
-+- clock-names: Goes with clocks above.
+diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+index 2c1560d..b72f342 100644
+--- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
+@@ -34,6 +34,20 @@
+ 			samsung,pin-pud = <0>;
+ 			samsung,pin-drv = <0>;
+ 		};
++
++		wifi_en: wifi-en {
++			samsung,pins = "gpx0-1";
++			samsung,pin-function = <1>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
++
++		wifi_rst: wifi-rst {
++			samsung,pins = "gpx0-2";
++			samsung,pin-function = <1>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
+ 	};
  
- Card detection:
- If no property below is supplied, host native card detect is used.
-@@ -30,6 +32,15 @@ Optional properties:
- - cap-sdio-irq: enable SDIO IRQ signalling on this interface
- - full-pwr-cycle: full power cycle of the card is supported
+ 	i2c at 12C60000 {
+@@ -41,7 +55,7 @@
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <378000>;
  
-+Card power and reset control:
-+The following properties can be specified for cases where the MMC
-+peripheral needs additional reset, regulator and clock lines. It is for
-+example common for WiFi/BT adapters to have these separate from the main
-+MMC bus:
-+  - card-reset-gpios: Specify GPIOs for card reset (reset active low)
-+  - card-external-vcc-supply: Regulator to drive (independent) card VCC
-+  - clock with name "card_ext_clock": External clock provided to the card
-+
- *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
- polarity properties, we have to fix the meaning of the "normal" and "inverted"
- line levels. We choose to follow the SDHCI standard, which specifies both those
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 098374b..c43e6c8 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -13,11 +13,13 @@
- #include <linux/module.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/clk.h>
- #include <linux/completion.h>
- #include <linux/device.h>
- #include <linux/delay.h>
- #include <linux/pagemap.h>
- #include <linux/err.h>
-+#include <linux/gpio.h>
- #include <linux/leds.h>
- #include <linux/scatterlist.h>
- #include <linux/log2.h>
-@@ -1519,6 +1521,43 @@ void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
- 	mmc_host_clk_release(host);
- }
+-		max77686 at 09 {
++		pmic: max77686 at 09 {
+ 			compatible = "maxim,max77686";
+ 			interrupt-parent = <&gpx3>;
+ 			interrupts = <2 0>;
+@@ -284,6 +298,7 @@
+ 		num-slots = <1>;
+ 		supports-highspeed;
+ 		broken-cd;
++		cap-sdio-irq;
+ 		card-detect-delay = <200>;
+ 		samsung,dw-mshc-ciu-div = <3>;
+ 		samsung,dw-mshc-sdr-timing = <2 3>;
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 7e45eea..c150483 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -11,6 +11,7 @@
+ /dts-v1/;
+ #include "exynos5250.dtsi"
+ #include "exynos5250-cros-common.dtsi"
++#include <dt-bindings/gpio/gpio.h>
  
-+static void mmc_card_power_up(struct mmc_host *host)
-+{
-+	int i;
-+	struct gpio_desc **gds = host->card_reset_gpios;
-+
-+	for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
-+		if (gds[i]) {
-+			dev_dbg(host->parent, "Asserting reset line %d", i);
-+			gpiod_set_value(gds[i], 1);
-+		}
-+	}
-+
-+	if (host->card_regulator) {
-+		dev_dbg(host->parent, "Enabling external regulator");
-+		if (regulator_enable(host->card_regulator))
-+			dev_err(host->parent, "Failed to enable external regulator");
-+	}
-+
-+	if (host->card_clk) {
-+		dev_dbg(host->parent, "Enabling external clock");
-+		clk_prepare_enable(host->card_clk);
-+	}
-+
-+	/* 2ms delay to let clocks and power settle */
-+	mmc_delay(20);
-+
-+	for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
-+		if (gds[i]) {
-+			dev_dbg(host->parent, "Deasserting reset line %d", i);
-+			gpiod_set_value(gds[i], 0);
-+		}
-+	}
-+
-+	/* 2ms delay to after reset release */
-+	mmc_delay(20);
-+}
-+
- /*
-  * Apply power to the MMC stack.  This is a two-stage process.
-  * First, we enable power to the card without the clock running.
-@@ -1535,6 +1574,9 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	if (host->ios.power_mode == MMC_POWER_ON)
- 		return;
+ / {
+ 	model = "Google Snow";
+@@ -186,9 +187,15 @@
+ 	 */
+ 	mmc at 12230000 {
+ 		status = "okay";
++		clocks = <&clock 280>, <&clock 139>, <&pmic 2>;
++		clock-names = "biu", "ciu", "card_ext_clock";
++		card-reset-gpios = <&gpx0 1 GPIO_ACTIVE_LOW>, /* WIFI_EN */
++				   <&gpx0 2 GPIO_ACTIVE_LOW>; /* WIFI_RSTn */
++		pinctrl-names = "default";
++		pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4 &wifi_en &wifi_rst>;
+ 		slot at 0 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
++			reg = <0>;
++			bus-width = <4>;
+ 		};
+ 	};
  
-+	/* Power up the card/module first, if needed */
-+	mmc_card_power_up(host);
-+
- 	mmc_host_clk_hold(host);
- 
- 	host->ios.vdd = fls(ocr) - 1;
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index 49bc403..e6b850b 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -12,14 +12,18 @@
-  *  MMC host class device management
-  */
- 
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/err.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/idr.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/pagemap.h>
- #include <linux/export.h>
- #include <linux/leds.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- #include <linux/suspend.h>
- 
-@@ -312,7 +316,7 @@ int mmc_of_parse(struct mmc_host *host)
- 	u32 bus_width;
- 	bool explicit_inv_wp, gpio_inv_wp = false;
- 	enum of_gpio_flags flags;
--	int len, ret, gpio;
-+	int i, len, ret, gpio;
- 
- 	if (!host->parent || !host->parent->of_node)
- 		return 0;
-@@ -415,6 +419,30 @@ int mmc_of_parse(struct mmc_host *host)
- 	if (explicit_inv_wp ^ gpio_inv_wp)
- 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
- 
-+	/* Parse card power/reset/clock control */
-+	if (of_find_property(np, "card-reset-gpios", NULL)) {
-+		struct gpio_desc *gpd;
-+		for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
-+			gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
-+			if (IS_ERR(gpd))
-+				break;
-+			gpiod_direction_output(gpd, 0);
-+			host->card_reset_gpios[i] = gpd;
-+		}
-+
-+		gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
-+		if (!IS_ERR(gpd)) {
-+			dev_warn(host->parent, "More reset gpios than we can handle");
-+			gpiod_put(gpd);
-+		}
-+	}
-+
-+	host->card_clk = of_clk_get_by_name(np, "card_ext_clock");
-+	if (IS_ERR(host->card_clk))
-+		host->card_clk = NULL;
-+
-+	host->card_regulator = regulator_get(host->parent, "card-external-vcc");
-+
- 	if (of_find_property(np, "cap-sd-highspeed", &len))
- 		host->caps |= MMC_CAP_SD_HIGHSPEED;
- 	if (of_find_property(np, "cap-mmc-highspeed", &len))
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index 99f5709..6781887 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -297,6 +297,11 @@ struct mmc_host {
- 	unsigned long           clkgate_delay;
- #endif
- 
-+	/* card specific properties to deal with power and reset */
-+	struct regulator	*card_regulator; /* External VCC needed by the card */
-+	struct gpio_desc	*card_reset_gpios[2]; /* External resets, active low */
-+	struct clk		*card_clk;	/* External clock needed by the card */
-+
- 	/* host specific block data */
- 	unsigned int		max_seg_size;	/* see blk_queue_max_segment_size */
- 	unsigned short		max_segs;	/* see blk_queue_max_segments */
 -- 
 1.7.10.4
