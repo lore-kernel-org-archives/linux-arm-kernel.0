@@ -1,342 +1,159 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 20 Jan 2014 22:22:01 +0100
-Subject: [PATCH 2/3] Dwarf: load and parse the debug info of different target
- address sizes
-In-Reply-To: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
-References: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1390252922-25889-3-git-send-email-jean.pihet@linaro.org>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 20 Jan 2014 22:29:08 +0100
+Subject: [PATCH 02/11] iommu/arm-smmu: Introduce bus notifier block
+In-Reply-To: <419c2609cab14842b5258f7048ce6d43@BL2PR03MB468.namprd03.prod.outlook.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
+ <419c2609cab14842b5258f7048ce6d43@BL2PR03MB468.namprd03.prod.outlook.com>
+Message-ID: <20140120212908.GF3471@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When in compat mode, load and parse the dwarf debug info accordingly.
+On Sat, Jan 18, 2014 at 03:59:53PM -0500, Varun Sethi wrote:
+> > -----Original Message-----
+> > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> > bounces at lists.linux-foundation.org] On Behalf Of Andreas Herrmann
+> > Sent: Thursday, January 16, 2014 6:14 PM
+> > To: Will Deacon
+> > Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: [PATCH 02/11] iommu/arm-smmu: Introduce bus notifier block
+> > 
+> > At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally isolate
+> > all master devices for an SMMU.
+> > 
+> > Depending on DT information each device is put into its own protection
+> > domain (if possible).  For configuration with one or just a few masters
+> > per SMMU that is easy to achieve.
+> > 
+> > In case of many devices per SMMU (e.g. MMU-500 with it's distributed
+> > translation support) isolation of each device might not be possible --
+> > depending on number of available SMR groups and/or context banks.
+> > 
+> > Default is that device isolation is contolled per SMMU with SMMU node
+> > property "arm,smmu-isolate-devices" in a DT. If this property is set for
+> > an SMMU node, device isolation is performed.
 
-Tested dwarf local unwinding on ARMv8 (aka AARCH64) with ARMv7 and
-ARMv8 binaries.
+> [Sethi Varun-B16395] What if the devices have to be assigned to
+> different virtual machines? Would the absence of this property
+> indicate that devices can't Be assigned to different virtual
+> machines i.e. devices would be in the same iommu group?
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- src/dwarf/Gfde.c                |  25 ++++--
- src/dwarf/Gfind_proc_info-lsb.c | 194 +++++++++++++++++++++++++++++++---------
- 2 files changed, 170 insertions(+), 49 deletions(-)
+The absence of this property implies that arm-smmu driver handling of
+master devices is equivalent to the current handling.
+(I.e. assignment to different VMs works or doesn't work as with the current
+mainline driver.)
 
-diff --git a/src/dwarf/Gfde.c b/src/dwarf/Gfde.c
-index 8659624..81959d1 100644
---- a/src/dwarf/Gfde.c
-+++ b/src/dwarf/Gfde.c
-@@ -59,14 +59,23 @@ parse_cie (unw_addr_space_t as, unw_accessors_t *a, unw_word_t addr,
-   /* Pick appropriate default for FDE-encoding.  DWARF spec says
-      start-IP (initial_location) and the code-size (address_range) are
-      "address-unit sized constants".  The `R' augmentation can be used
--     to override this, but by default, we pick an address-sized unit
--     for fde_encoding.  */
--  switch (dwarf_addr_size (as))
--    {
--    case 4:	fde_encoding = DW_EH_PE_udata4; break;
--    case 8:	fde_encoding = DW_EH_PE_udata8; break;
--    default:	fde_encoding = DW_EH_PE_omit; break;
--    }
-+     to override this, but by default, we pick the target binary address
-+     size unit for fde_encoding.  */
-+  switch (as->target_addr_size)
-+  {
-+  /* If defined at binary load time (e.g. from the ELF format) */
-+  case TARGET_ADDR_SIZE_32:	fde_encoding = DW_EH_PE_udata4; break;
-+  case TARGET_ADDR_SIZE_64:	fde_encoding = DW_EH_PE_udata8; break;
-+  /* If not defined, use the current address size unit */
-+  case TARGET_ADDR_SIZE_DEFAULT:
-+  default:
-+	switch (dwarf_addr_size (as))
-+	{
-+	case 4:    fde_encoding = DW_EH_PE_udata4; break;
-+	case 8:    fde_encoding = DW_EH_PE_udata8; break;
-+	default:   fde_encoding = DW_EH_PE_omit; break;
-+	}
-+  }
- 
-   dci->lsda_encoding = DW_EH_PE_omit;
-   dci->handler = 0;
-diff --git a/src/dwarf/Gfind_proc_info-lsb.c b/src/dwarf/Gfind_proc_info-lsb.c
-index f75bda2..8c35e58 100644
---- a/src/dwarf/Gfind_proc_info-lsb.c
-+++ b/src/dwarf/Gfind_proc_info-lsb.c
-@@ -81,36 +81,89 @@ linear_search (unw_addr_space_t as, unw_word_t ip,
- #endif /* !UNW_REMOTE_ONLY */
- 
- #ifdef CONFIG_DEBUG_FRAME
--/* Load .debug_frame section from FILE.  Allocates and returns space
--   in *BUF, and sets *BUFSIZE to its size.  IS_LOCAL is 1 if using the
--   local process, in which case we can search the system debug file
--   directory; 0 for other address spaces, in which case we do not; or
--   -1 for recursive calls following .gnu_debuglink.  Returns 0 on
--   success, 1 on error.  Succeeds even if the file contains no
--   .debug_frame.  */
--/* XXX: Could use mmap; but elf_map_image keeps tons mapped in.  */
--
--static int
--load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
-+static int load_debug_frame_Elf32(const char *file, FILE *f, char *linkbuf,
-+				  size_t *linksize, char **buf, size_t *bufsize)
- {
--  FILE *f;
--  Elf_W (Ehdr) ehdr;
--  Elf_W (Half) shstrndx;
--  Elf_W (Shdr) *sec_hdrs = NULL;
-+  Elf32_Ehdr ehdr;
-+  Elf32_Shdr *sec_hdrs = NULL;
-+  Elf32_Half shstrndx;
-   char *stringtab = NULL;
-   unsigned int i;
--  size_t linksize = 0;
--  char *linkbuf = NULL;
-+
-+  if (fseek(f, 0L, SEEK_SET))
-+    goto file_error;
-+  if (fread (&ehdr, sizeof(Elf32_Ehdr), 1, f) != 1)
-+    goto file_error;
-   
--  *buf = NULL;
--  *bufsize = 0;
-+  shstrndx = ehdr.e_shstrndx;
-   
--  f = fopen (file, "r");
-+  Debug (4, "opened file '%s'. Section header at offset %d\n",
-+         file, (int) ehdr.e_shoff);
-+
-+  fseek (f, ehdr.e_shoff, SEEK_SET);
-+  sec_hdrs = calloc (ehdr.e_shnum, sizeof(Elf32_Shdr));
-+  if (fread (sec_hdrs, sizeof(Elf32_Shdr), ehdr.e_shnum, f) != ehdr.e_shnum)
-+    goto file_error;
-   
--  if (!f)
--    return 1;
-+  Debug (4, "loading string table of size %zd\n",
-+	   sec_hdrs[shstrndx].sh_size);
-+  stringtab = malloc (sec_hdrs[shstrndx].sh_size);
-+  fseek (f, sec_hdrs[shstrndx].sh_offset, SEEK_SET);
-+  if (fread (stringtab, 1, sec_hdrs[shstrndx].sh_size, f) != sec_hdrs[shstrndx].sh_size)
-+    goto file_error;
-   
--  if (fread (&ehdr, sizeof (Elf_W (Ehdr)), 1, f) != 1)
-+  for (i = 1; i < ehdr.e_shnum && *buf == NULL; i++)
-+  {
-+      char *secname = &stringtab[sec_hdrs[i].sh_name];
-+
-+      if (strcmp (secname, ".debug_frame") == 0)
-+        {
-+	  *bufsize = sec_hdrs[i].sh_size;
-+	  *buf = malloc (*bufsize);
-+
-+	  fseek (f, sec_hdrs[i].sh_offset, SEEK_SET);
-+	  if (fread (*buf, 1, *bufsize, f) != *bufsize)
-+	    goto file_error;
-+
-+	  Debug (4, "read %zd bytes of .debug_frame from offset %d\n",
-+		 *bufsize, sec_hdrs[i].sh_offset);
-+	}
-+      else if (strcmp (secname, ".gnu_debuglink") == 0)
-+	{
-+	  *linksize = sec_hdrs[i].sh_size;
-+	  linkbuf = malloc(*linksize);
-+
-+	  fseek (f, sec_hdrs[i].sh_offset, SEEK_SET);
-+	  if (fread (linkbuf, 1, *linksize, f) != *linksize)
-+	    goto file_error;
-+
-+	  Debug (4, "read %d bytes of .gnu_debuglink from offset %d\n",
-+		 (int) *linksize, sec_hdrs[i].sh_offset);
-+	}
-+  }
-+
-+  free(sec_hdrs);
-+  free(stringtab);
-+  return 0;
-+
-+file_error:
-+  free(sec_hdrs);
-+  free(stringtab);
-+  return -1;
-+}
-+
-+static int load_debug_frame_Elf64(const char *file, FILE *f, char *linkbuf,
-+				  size_t *linksize, char **buf, size_t *bufsize)
-+{
-+  Elf64_Ehdr ehdr;
-+  Elf64_Shdr *sec_hdrs = NULL;
-+  Elf64_Half shstrndx;
-+  char *stringtab = NULL;
-+  unsigned int i;
-+
-+  if (fseek(f, 0L, SEEK_SET))
-+    goto file_error;
-+  if (fread (&ehdr, sizeof(Elf64_Ehdr), 1, f) != 1)
-     goto file_error;
-   
-   shstrndx = ehdr.e_shstrndx;
-@@ -119,8 +172,8 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
-          file, (int) ehdr.e_shoff);
- 
-   fseek (f, ehdr.e_shoff, SEEK_SET);
--  sec_hdrs = calloc (ehdr.e_shnum, sizeof (Elf_W (Shdr)));
--  if (fread (sec_hdrs, sizeof (Elf_W (Shdr)), ehdr.e_shnum, f) != ehdr.e_shnum)
-+  sec_hdrs = calloc (ehdr.e_shnum, sizeof(Elf64_Shdr));
-+  if (fread (sec_hdrs, sizeof(Elf64_Shdr), ehdr.e_shnum, f) != ehdr.e_shnum)
-     goto file_error;
-   
-   Debug (4, "loading string table of size %zd\n",
-@@ -131,7 +184,7 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
-     goto file_error;
-   
-   for (i = 1; i < ehdr.e_shnum && *buf == NULL; i++)
--    {
-+  {
-       char *secname = &stringtab[sec_hdrs[i].sh_name];
- 
-       if (strcmp (secname, ".debug_frame") == 0)
-@@ -148,20 +201,71 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
- 	}
-       else if (strcmp (secname, ".gnu_debuglink") == 0)
- 	{
--	  linksize = sec_hdrs[i].sh_size;
--	  linkbuf = malloc (linksize);
-+	  *linksize = sec_hdrs[i].sh_size;
-+	  linkbuf = malloc(*linksize);
- 
- 	  fseek (f, sec_hdrs[i].sh_offset, SEEK_SET);
--	  if (fread (linkbuf, 1, linksize, f) != linksize)
-+	  if (fread (linkbuf, 1, *linksize, f) != *linksize)
- 	    goto file_error;
- 
--	  Debug (4, "read %zd bytes of .gnu_debuglink from offset %zd\n",
--		 linksize, sec_hdrs[i].sh_offset);
-+	  Debug (4, "read %d bytes of .gnu_debuglink from offset %zd\n",
-+		 (int) *linksize, sec_hdrs[i].sh_offset);
- 	}
--    }
-+  }
-+
-+  free(sec_hdrs);
-+  free(stringtab);
-+  return 0;
-+
-+file_error:
-+  free(sec_hdrs);
-+  free(stringtab);
-+  return -1;
-+}
-+
-+/* Load .debug_frame section from FILE.  Allocates and returns space
-+   in *BUF, and sets *BUFSIZE to its size.  IS_LOCAL is 1 if using the
-+   local process, in which case we can search the system debug file
-+   directory; 0 for other address spaces, in which case we do not; or
-+   -1 for recursive calls following .gnu_debuglink.  Returns 0 on
-+   success, 1 on error.  Succeeds even if the file contains no
-+   .debug_frame.  */
-+/* XXX: Could use mmap; but elf_map_image keeps tons mapped in.  */
- 
--  free (stringtab);
--  free (sec_hdrs);
-+static int
-+load_debug_frame (const char *file, char **buf, size_t *bufsize,
-+		  unw_addr_space_t as, int is_local)
-+{
-+  FILE *f;
-+  unsigned char e_ident[sizeof(((Elf32_Ehdr *)0)->e_ident)];
-+  size_t linksize = 0;
-+  char *linkbuf = NULL;
-+  
-+  *buf = NULL;
-+  *bufsize = 0;
-+  
-+  f = fopen (file, "r");
-+  
-+  if (!f)
-+    return 1;
-+  
-+  if (fread (&e_ident, sizeof(e_ident), 1, f) != 1)
-+    goto file_error;
-+ 
-+  switch (e_ident[EI_CLASS]) {
-+  case ELFCLASS32:
-+	as->target_addr_size = TARGET_ADDR_SIZE_32;
-+	load_debug_frame_Elf32(file, f, linkbuf, &linksize, buf, bufsize);
-+	break;
-+  case ELFCLASS64:
-+	as->target_addr_size = TARGET_ADDR_SIZE_64;
-+	load_debug_frame_Elf64(file, f, linkbuf, &linksize, buf, bufsize);
-+  	break;
-+  case ELFCLASSNONE:
-+  default:
-+	Debug (15, "Wrong ELF class 0x%02x\n", e_ident[EI_CLASS]);
-+	goto file_error;
-+  }
- 
-   fclose (f);
- 
-@@ -195,14 +299,14 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
-       strcpy (newname, basedir);
-       strcat (newname, "/");
-       strcat (newname, linkbuf);
--      ret = load_debug_frame (newname, buf, bufsize, -1);
-+      ret = load_debug_frame (newname, buf, bufsize, as, -1);
- 
-       if (ret == 1)
- 	{
- 	  strcpy (newname, basedir);
- 	  strcat (newname, "/.debug/");
- 	  strcat (newname, linkbuf);
--	  ret = load_debug_frame (newname, buf, bufsize, -1);
-+	  ret = load_debug_frame (newname, buf, bufsize, as, -1);
- 	}
- 
-       if (ret == 1 && is_local == 1)
-@@ -211,20 +315,19 @@ load_debug_frame (const char *file, char **buf, size_t *bufsize, int is_local)
- 	  strcat (newname, basedir);
- 	  strcat (newname, "/");
- 	  strcat (newname, linkbuf);
--	  ret = load_debug_frame (newname, buf, bufsize, -1);
-+	  ret = load_debug_frame (newname, buf, bufsize, as, -1);
- 	}
- 
-       free (basedir);
-       free (newname);
-     }
--  free (linkbuf);
-+
-+  free(linkbuf);
- 
-   return 0;
- 
- /* An error reading image file. Release resources and return error code */
- file_error:
--  free(stringtab);
--  free(sec_hdrs);
-   free(linkbuf);
-   fclose(f);
- 
-@@ -303,7 +406,8 @@ locate_debug_info (unw_addr_space_t as, unw_word_t addr, const char *dlname,
-   else
-     name = (char*) dlname;
- 
--  err = load_debug_frame (name, &buf, &bufsize, as == unw_local_addr_space);
-+  err = load_debug_frame (name, &buf, &bufsize, as,
-+		  	  as == unw_local_addr_space);
-   
-   if (!err)
-     {
-@@ -851,6 +955,14 @@ dwarf_search_unwind_table (unw_addr_space_t as, unw_word_t ip,
- #ifndef UNW_REMOTE_ONLY
-       struct unw_debug_frame_list *fdesc = (void *) di->u.ti.table_data;
- 
-+      /*
-+       * Set the target address size as found in the loaded debug binary.
-+       * Note: in case of local unwinding the caller 'as' is set to
-+       * unw_local_addr_space, cf. below. Let's assign the value to
-+       * the caller 'as' before changing the value of 'as'.
-+       */
-+      as->target_addr_size = unw_local_addr_space->target_addr_size;
-+
-       /* UNW_INFO_FORMAT_TABLE (i.e. .debug_frame) is read from local address
-          space.  Both the index and the unwind tables live in local memory, but
-          the address space to check for properties like the address size and
--- 
-1.7.11.7
+> > W/o device isolation the driver detects SMMUs but no translation is
+> > configured (transactions just bypass translation process).
+> > 
+> [Sethi Varun-B16395] Would SMR and S2CR still be allocated?
+
+That's similar to the current handling of the driver. SMRs will be
+marked as invalid and all S2CRs are configured as bypass.
+
+As long as nobody creates a domain and attaches a device to it this
+won't change.
+
+> > Note that for device isolation dma_base and size are fixed as 0 and
+> > SZ_128M at the moment. Additional patches will address this restriction
+> > and allow automatic growth of mapping size.
+> > 
+> > Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   45
+> > +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> > 0b97d03..bc81dd0 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -46,6 +46,7 @@
+> >  #include <linux/amba/bus.h>
+> > 
+> >  #include <asm/pgalloc.h>
+> > +#include <asm/dma-iommu.h>
+> > 
+> >  /* Driver options */
+> >  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
+> > @@ -1964,6 +1965,48 @@ static int arm_smmu_device_remove(struct
+> > platform_device *pdev)
+> >  	return 0;
+> >  }
+> > 
+> > +static int arm_smmu_device_notifier(struct notifier_block *nb,
+> > +				unsigned long action, void *data)
+> > +{
+> > +	struct device *dev = data;
+> > +	struct dma_iommu_mapping *mapping;
+> > +	struct arm_smmu_device *smmu;
+> > +	int ret;
+> > +
+> > +	switch (action) {
+> > +	case BUS_NOTIFY_BIND_DRIVER:
+> > +
+> > +		arm_smmu_add_device(dev);
+> [Sethi Varun-B16395] This would have already happened by virtue of the add_device iommu_ops.
+
+You are right. That call is there for no good reason.
+
+> > +		smmu = dev->archdata.iommu;
+> > +		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
+> > +			break;
+> > +
+> > +		mapping = arm_iommu_create_mapping(&platform_bus_type,
+> > +						0, SZ_128M, 0);
+> > +		if (IS_ERR(mapping)) {
+> > +			ret = PTR_ERR(mapping);
+> > +			dev_info(dev, "arm_iommu_create_mapping failed\n");
+> > +			break;
+> > +		}
+> > +
+> > +		ret = arm_iommu_attach_device(dev, mapping);
+> > +		if (ret < 0) {
+> > +			dev_info(dev, "arm_iommu_attach_device failed\n");
+> > +			arm_iommu_release_mapping(mapping);
+> > +		}
+> > +
+> > +		break;
+> > +	default:
+> > +		break;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct notifier_block device_nb = {
+> > +	.notifier_call = arm_smmu_device_notifier, };
+> > +
+> >  #ifdef CONFIG_OF
+> >  static struct of_device_id arm_smmu_of_match[] = {
+> >  	{ .compatible = "arm,smmu-v1", },
+> > @@ -2000,6 +2043,8 @@ static int __init arm_smmu_init(void)
+> >  	if (!iommu_present(&amba_bustype))
+> >  		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+> > 
+> > +	bus_register_notifier(&platform_bus_type, &device_nb);
+> > +
+
+> [Sethi Varun-B16395] Notifier was already registered for the
+>  platform bus via bus_set_iommu. You can actually register a iommu
+>  group (once iommu group gets created) notifier
+>  (iommu_group_register_notifier) and listen for the
+>  IOMMU_GROUP_NOTIFY_BIND_DRIVER event.
+
+Sounds reasonable.
+
+So far the driver didn't care about iommu_groups. But there is already
+a patch "iommu/arm-smmu: add devices attached to the SMMU to an IOMMU
+group" pending in Will's iommu/devel branch that fixes this.
+
+I'll adapt my patch to use iommu_group notifier instead of bus
+notifier.
+
+Thanks for your review!
+
+
+Andreas
