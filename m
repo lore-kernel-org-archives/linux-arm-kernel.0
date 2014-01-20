@@ -1,40 +1,36 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 20 Jan 2014 11:14:17 +0200
-Subject: [PATCH v5 2/9] mfd: omap-usb-host: Get clocks based on hardware
- revision
-In-Reply-To: <20140110142640.GA32035@lee--X1>
+Date: Mon, 20 Jan 2014 11:14:55 +0200
+Subject: [PATCH v5 3/9] mfd: omap-usb-host: Update DT clock binding
+ information
+In-Reply-To: <20140110101107.GF28141@lee--X1>
 References: <1389269303-30465-1-git-send-email-rogerq@ti.com>
- <1389269303-30465-3-git-send-email-rogerq@ti.com>
- <20140110102251.GH28141@lee--X1> <201401101513.40470.arnd@arndb.de>
- <20140110142640.GA32035@lee--X1>
-Message-ID: <52DCE8E9.1040304@ti.com>
+ <1389269303-30465-4-git-send-email-rogerq@ti.com>
+ <20140110101107.GF28141@lee--X1>
+Message-ID: <52DCE90F.8040908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 04:26 PM, Lee Jones wrote:
-> On Fri, 10 Jan 2014, Arnd Bergmann wrote:
+On 01/10/2014 12:11 PM, Lee Jones wrote:
+> On Thu, 09 Jan 2014, Roger Quadros wrote:
 > 
->> On Friday 10 January 2014, Lee Jones wrote:
->>>>  
->>>> -     need_logic_fck = false;
->>>> +     /* Set all clocks as invalid to begin with */
->>>> +     omap->ehci_logic_fck = omap->init_60m_fclk = ERR_PTR(-EINVAL);
->>>> +     omap->utmi_p1_gfclk = omap->utmi_p2_gfclk = ERR_PTR(-EINVAL);
->>>> +     omap->xclk60mhsp1_ck = omap->xclk60mhsp2_ck = ERR_PTR(-EINVAL);
->>>
->>> I don't think this is the correct error code.
->>>
->>> -EINVAL means 'invalid parameter'.
->>>
->>> You probably want -ENODEV or -ENOSYS ('function not implemented'
->>> probably isn't ideal either tbh, but you get the idea). Perhaps you
->>> can set them as NULL and check for IS_ERR_OR_NULL() instead?
+>> The omap-usb-host driver expects certained named clocks.
+>> Add this information to the DT binding document.
 >>
->> I think ENODEV is ok here, I'd much prefer this over IS_ERR_OR_NULL().
+>> Use clock names as per function for reference clocks.
+>>
+>> CC: Lee Jones <lee.jones@linaro.org>
+>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
+>>  drivers/mfd/omap-usb-host.c                        |  6 +++---
+>>  2 files changed, 26 insertions(+), 3 deletions(-)
 > 
-> Sounds good to me.
+> Please don't mix up binding changes with code ones.
 > 
-OK. Will fix.
+> Separate patch please.
+> 
+OK.
 
 cheers,
 -roger
