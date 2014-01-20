@@ -1,38 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Jan 2014 15:03:50 -0200
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <20140120164859.GF15937@n2100.arm.linux.org.uk>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <20140120164859.GF15937@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5AfSe_c7gfee0BcZso8ZYg=PaTDwfsXwzpEcM1554VQ6Q@mail.gmail.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 20 Jan 2014 18:05:14 +0100
+Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
+In-Reply-To: <20140117100723.GB16003@mudshark.cambridge.arm.com>
+References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
+ <20140116115634.GE30257@mudshark.cambridge.arm.com>
+ <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
+ <20140116125727.GI30257@mudshark.cambridge.arm.com>
+ <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
+ <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
+ <20140117100723.GB16003@mudshark.cambridge.arm.com>
+Message-ID: <CAFrcx1=53sUDjxa-DjuJUScxanhQJqAVA36RaYNo5-Dfegij7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Will,
 
-> So far so good.  Now, what about this external oscillator which has its
-> own separate power control.  My immediate thought is that this can be
-> specified via card_ext_clock - I would simply need to declare a fixed-rate
-> clock with either a regulator (power switch) controlled via a gpio (which
-> would probably be closer to the hardware) or a gpio as an enable... ah,
-> that requires me to write a common clock driver for that bit since this
-> is currently not modelled by CCF...
+Here is an updated version of the change, which uses compat_sp at only
+one place.
+The drawback is that compat_user_mode is checked when calling
+compat_user_stack_pointer, which seems unnecessary. Unfortunately the
+check is not optimized out by the complier as I could check with
+objdump -S.
 
-Isn't this covered by the gpios property of fixed-clock?
+What do you think?
 
-We do the following to enable the 26MHz codec clock in
-imx51-babbage.dts via GPIO4_26:
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index fda2704..e71f81f 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -228,7 +228,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+        return (u32)(unsigned long)uptr;
+ }
 
-        clk_26M: codec_clock {
-            compatible = "fixed-clock";
-            reg=<0>;
-            #clock-cells = <0>;
-            clock-frequency = <26000000>;
-            gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-        };
+-#define compat_user_stack_pointer() (current_pt_regs()->compat_sp)
++#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
+
+ static inline void __user *arch_compat_alloc_user_space(long len)
+ {
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index fbb0020..86d5b54 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -133,7 +133,7 @@ struct pt_regs {
+        (!((regs)->pstate & PSR_F_BIT))
+
+ #define user_stack_pointer(regs) \
+-       ((regs)->sp)
++       (!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
+
+ /*
+  * Are the current registers suitable for user mode? (used to maintain
+
+
 
 Regards,
+Jean
 
-Fabio Estevam
+On 17 January 2014 11:07, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jan 17, 2014 at 09:00:09AM +0000, Jean Pihet wrote:
+>> On 16 January 2014 14:47, Jean Pihet <jean.pihet@linaro.org> wrote:
+>> >> So the simplest thing would be to make compat_user_stack_pointer expand to
+>> >> user_stack_pointer(current_pt_regs()) on arm64 and merge that in with your
+>> >> original patch fixing user_stack_pointer.
+>>
+>> I see 2 issues in your proposal:
+>>
+>> 1) user_stack_pointer(regs) calls compat_user_stack_pointer if
+>> compat_user_mode(regs)) and compat_user_stack_pointer expands to
+>> user_stack_pointer. I see a circular dependency in the macros.
+>
+> Not today it doesn't, so you just need to avoid writing the circular
+> dependency and instead make user_stack_pointer access (regs)->compat_sp
+> instead.
+>
+>> 2) current_pt_regs() returns the current task regs although perf
+>> passes a regs struct that had been recorded previously.
+>
+> Yes, but compat_user_stack_pointer doesn't take a regs paramater anyway, so
+> there's no change in behaviour here.
+>
+> Will
