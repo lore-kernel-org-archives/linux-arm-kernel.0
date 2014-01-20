@@ -1,68 +1,31 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 20 Jan 2014 09:35:06 +0100
-Subject: [RFC v3 08/13] ahci-platform: Allow specifying platform_data
- through of_device_id
-In-Reply-To: <20140120082438.GH16215@pengutronix.de>
-References: <1390088935-7193-1-git-send-email-hdegoede@redhat.com>
- <1390088935-7193-9-git-send-email-hdegoede@redhat.com>
- <20140120082438.GH16215@pengutronix.de>
-Message-ID: <52DCDFBA.2070903@redhat.com>
+From: phacht@linux.vnet.ibm.com (Philipp Hachtmann)
+Date: Mon, 20 Jan 2014 09:39:48 +0100
+Subject: [PATCH V3 2/2] mm/memblock: Add support for excluded memory areas
+In-Reply-To: <902E09E6452B0E43903E4F2D568737AB0B9852BA@DFRE01.ent.ti.com>
+References: <1389618217-48166-1-git-send-email-phacht@linux.vnet.ibm.com>
+ <1389618217-48166-3-git-send-email-phacht@linux.vnet.ibm.com>
+ <52D538FD.8010907@ti.com> <20140114195225.078f810a@lilie>
+ <902E09E6452B0E43903E4F2D568737AB0B9852BA@DFRE01.ent.ti.com>
+Message-ID: <20140120093948.0add11f4@lilie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Fri, 17 Jan 2014 18:08:13 +0000
+schrieb "Strashko, Grygorii" <grygorii.strashko@ti.com>:
 
-On 01/20/2014 09:24 AM, Sascha Hauer wrote:
-> On Sun, Jan 19, 2014 at 12:48:50AM +0100, Hans de Goede wrote:
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   drivers/ata/ahci_platform.c | 41 +++++++++++++++++++++++++++++------------
->>   1 file changed, 29 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> index 3bc2dab..0676d72 100644
->> --- a/drivers/ata/ahci_platform.c
->> +++ b/drivers/ata/ahci_platform.c
->> @@ -20,6 +20,7 @@
->>   #include <linux/init.h>
->>   #include <linux/interrupt.h>
->>   #include <linux/device.h>
->> +#include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/libata.h>
->>   #include <linux/ahci_platform.h>
->> @@ -87,6 +88,30 @@ static struct scsi_host_template ahci_platform_sht = {
->>   	AHCI_SHT("ahci_platform"),
->>   };
->>
->> +static const struct of_device_id ahci_of_match[] = {
->> +	{ .compatible = "snps,spear-ahci", },
->> +	{ .compatible = "snps,exynos5440-ahci", },
->> +	{ .compatible = "ibm,476gtr-ahci", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, ahci_of_match);
->> +
->> +static const struct ahci_platform_data *ahci_get_pdata(struct device *dev)
->> +{
->> +	struct ahci_platform_data *pdata;
->> +	const struct of_device_id *of_id;
->> +
->> +	pdata = dev_get_platdata(dev);
->> +	if (pdata)
->> +		return pdata;
->> +
->> +	of_id = of_match_device(ahci_of_match, dev);
->> +	if (of_id)
->> +		return of_id->data;
->
-> I don't think it's a good idea to force of_id->data to be of type struct
-> struct ahci_platform_data *. With this we don't have a place to store
-> SoC specific data anymore.
+Hello Grygorii,
 
-?? ahci_platform_data *is* soc specific data, it allows various soc
-specific overrides.
+> > The current patch seems to be overly complicated.
+> > The following patch contains only the nomap functionality without
+> > any cleanup and refactoring. I will post a V4 patch set which will
+> > contain this patch.
 
-Regards,
+please see the V4 patch set I've sent to the list. There you will
+clearly see that nothing is changed. No API is broken by the patch.
+The patch only adds functionality.
+Everything that worked before keeps working as before without any
+changes needed in any arch's code.
 
-Hans
+Kind regards
+
+Philipp
