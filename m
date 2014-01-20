@@ -1,93 +1,86 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Mon, 20 Jan 2014 06:48:24 +0000
-Subject: [PATCH v9 00/12] Add power management support for mxs phy
-In-Reply-To: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <e3a207a65094481e9a3e149ac89e6505@BL2PR03MB226.namprd03.prod.outlook.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 20 Jan 2014 08:21:02 +0100
+Subject: PWM...
+In-Reply-To: <20140119190324.GC28056@quad.lixom.net>
+References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
+ <20140119190324.GC28056@quad.lixom.net>
+Message-ID: <20140120072102.GA19940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jan 19, 2014 at 11:03:24AM -0800, Olof Johansson wrote:
+> [Adding devicetree list since we're talking bindings]
+> 
+> On Sun, Jan 19, 2014 at 04:49:57PM +0000, Russell King - ARM Linux wrote:
+> > So, having looked at what else I can add support for on the cubox-i, I
+> > decided it would be nice and simple to add support for the front panel
+> > LED.  What could possibly go wrong with this.
+> > 
+> > Well, the hardware is wired such that the LED is connected between the
+> > PWM output and +3.3v.  So, a constant low turns the LED on full, whereas
+> > a constant high turns the LED off.
+> > 
+> > So, the polarity of the LED is inverted - but this _can't_ be specified
+> > in the totally and utterly fucked misdesigned crap that DT is:
+> > 
+> >         pwmleds {
+> >                 compatible = "pwm-leds";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
+> >                   
+> >                 front {
+> >                         label = "imx6:red:front";
+> >                         pwms = <&pwm1 0 50000>;
+> >                         max-brightness = <248>;
+> >                 };
+> >         };
+> > 
+> >                         pwm1: pwm at 02080000 {
+> >                                 #pwm-cells = <2>;
+> >                                 compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+> >                                 reg = <0x02080000 0x4000>;
+> >                                 interrupts = <0 83 0x04>;
+> >                                 clocks = <&clks 62>, <&clks 145>;
+> >                                 clock-names = "ipg", "per";
+> >                         };
+> > 
+> > Yes, because iMX6 specifies #pwm-cells as 2, there's no flags able to
+> > be specified in the pwms declaration in pwmleds.  So that doesn't work.
+> > There's no property to tell pwmleds that it should use inverted sense
+> > either.
+> 
+> Adding a property for active-low to the pwm-leds binding would be
+> easy, and backwards compatible. I'm surprised the original binding
+> didn't specify it. The leds-pwm driver already seems to support it for
+> C-configured instances.
+> 
+> I'm also surprised that the imx pwm driver even has a #pwm-cells of
+> two, since the driver only supports one output. It'd be nice if they
+> had allocated the extra cell for flags, but it's hard to change now,
+> unless you do a new binding/compatible value and deprecate the old one.
+> 
+> > Moreover, there's no way to specify a default brightness for the LED
+> > in the absence of any trigger, so this results in the LED being fully
+> > on.
+> 
+> That seems to be missing from the led-pwm driver altogether, not just the DT
+> bindings? Shouldn't be too bad to add a default-brightness property and plumb
+> that up through the driver in this case.
+> 
+> > So, something which _should_ be nice and simple is turned into a major
+> > fuckup because of the total and utter crappiness that DT is and the
+> > total misdesign that this shite is.
+> 
+> It's not a major fuckup. None of the above is unfixable.
 
+Indeed, and we already have a patch for this:
 
- 
-> 
-> Hi Felipe & Shawn,
-> 
-> The serial adds power management support for MXS PHY, it includes:
-> 
-> - Add one PHY API .set_wakeup, and related API implementation at mxs phy
-> driver
-> - misc changes and bug fixes for mxs phy to support low power mode and
-> wakeup.
-> 
-> It is based on the lastest Greg's usb-next, 3.13-rc5.
-> 
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/294823
 
-Hi Felipe,
+Sascha
 
-I would like to confirm if this patchset is ok, and will be in
-your 3.15 tree?
-
-Peter
-
-> Changes for v9:
-> - Fix the build warning if CONFIG_SUSPEND is not set
-> 
-> Changes for v8:
-> - Shawn has already applied two dts patches, so delete them at
->   v8 version, http://marc.info/?l=linux-arm-kernel&m=138785188404939&w=2
-> - Using of_get_property to avoid imx6 fail at probe when using old DTB
-> [5/12]
-> - Do not consider failure if alias id is not existed, it can avoid fail
->   at probe when using old DTB [8/12]
-> - We don't need more changes for [8/12] change due to we use
->   "mxs_phy->port_id ==" as condition
-> 
-> Changes for v7:
-> - Fixed indentation problem at binding doc [1/14]
-> - s/ganranteed/guaranteed, and add explanation for "auto setting" [3/14]
-> - add static before SIMPLE_DEV_PM_OPS [13/14]
-> - add one patch to change usb device description [7/14]
-> - Delete the .nofity_suspend and .notify_resume due to Felipe
->   does not agree to add them as PHY API, will use other ways to implement
->   them in future.
-> 
-> Changes for v6:
-> - Add description for IC bug fixes logic. [9/15]
-> - Move is_imx6q_phy and is_imx6sl_phy from [9/15] to [14/15]
-> - %s/mxs_phy_clock_switch/mxs_phy_clock_switch_delay to reflect
-> the function meaning more precise [15/15]
-> 
-> Changes for v5:
-> Add Marc and Michael Grzeschik's commnets
-> - typo error at [2/15]
-> - sqhash patches which introducing mxs_phy_disconnect_line and
-> fixed but at this function. [13/15]
-> - Introducing flag MXS_PHY_NEED_IP_FIX who stands for the SoCs
-> who have IC fixes. [2/15, 8/15]
-> - Delete one patch for low speed connection problem at every rare
-> situations due to the root cause has still not found.
-> 
-> Peter Chen (12):
->   usb: doc: phy-mxs: Add more compatible strings
->   usb: phy-mxs: Add platform judgement code
->   usb: phy-mxs: Add auto clock and power setting
->   usb: doc: phy-mxs: update binding for adding anatop phandle
->   usb: phy-mxs: Add anatop regmap
->   usb: phy-mxs: change description of usb device speed
->   usb: phy-mxs: Enable IC fixes for related SoCs
->   usb: phy-mxs: add controller id
->   usb: phy: Add set_wakeup API
->   usb: phy-mxs: Add implementation of set_wakeup
->   usb: phy-mxs: Add system suspend/resume API
->   usb: phy-mxs: Add sync time after controller clear phcd
-> 
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    5 +-
->  drivers/usb/phy/phy-mxs-usb.c                     |  310
-> ++++++++++++++++++++-
->  include/linux/usb/phy.h                           |   16 +
->  3 files changed, 316 insertions(+), 15 deletions(-)
-> 
-> --
-> 1.7.8
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
