@@ -1,44 +1,69 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 20 Jan 2014 15:09:02 +0100
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140120123849.GC15937@n2100.arm.linux.org.uk>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro>
- <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
-Message-ID: <20140120150902.207b9d66@ipc1.ka-ro>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 20 Jan 2014 16:11:21 +0200
+Subject: [PATCH v6 00/10] USB Host support for OMAP5 uEVM (for 3.14)
+Message-ID: <1390227091-4523-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Benoit & Tony,
 
-Russell King - ARM Linux wrote:
-> On Mon, Jan 20, 2014 at 12:36:27PM +0100, Lothar Wa?mann wrote:
-> > In case user space firmware loading support (CONFIG_FW_LOADER) is
-> > enabled, this message may still be inadequate, since the firmware may
-> > very well be loaded lateron.
-> 
-> I haven't worked out whether that's actually possible - I saw no way to
-> re-trigger the firmware request, and once the firmware request expires,
-> there seems to be no way for userspace to say "okay, the firmware is now
-> available, please load it".
-> 
-I can confirm that it does work, since I'm using it.
-I have the following in my /etc/init.d/mdev.sh script:
-|        [ "$VERBOSE" = no ] || echo -n "Triggering firmware load"
-|        for dir in $(find /sys/class/firmware/ -type l);do
-|            echo add > "$dir/uevent"
-|        done
+This patchset brings up USB Host ports and Ethernet port on
+the OMAP5 uEVM board.
 
+It depends on the TI Clock DT conversion patches [1] and is based
+on 3.13
 
-Lothar
+[1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/293147
+
+Tested on:
+ - OMAP5 uEVM
+ - Pandaboard ES Rev. B1
+ - Beagleboard-XM Rev C2
+ - Beagleboard Rev C4.
+
+cheers,
+-roger
+
+Changelog:
+
+v6:
+- Initialized clocks to -ENODEV and split patch 3.
+
+v5:
+- Expose all clocks in the DT binding document for mfd:omap-usb-host
+and mfd:omap-usb-tll
+
+v4:
+- Updated DT binding document for clock binding
+
+v3:
+- Rebased on top of 3.13-rc7
+
+cheers,
+-roger
+
+Roger Quadros (10):
+  mfd: omap-usb-host: Use resource managed clk_get()
+  mfd: omap-usb-host: Get clocks based on hardware revision
+  mfd: omap-usb-host: Use clock names as per function for reference
+    clocks
+  mfd: omap-usb-host: Update DT clock binding information
+  mfd: omap-usb-tll: Update DT clock binding information
+  ARM: dts: omap4: Update omap-usb-host node
+  ARM: dts: omap5: Update omap-usb-host node
+  ARM: dts: omap4-panda: Provide USB PHY clock
+  ARM: dts: omap5-uevm: Provide USB PHY clock
+  ARM: OMAP2+: Remove legacy_init_ehci_clk()
+
+ .../devicetree/bindings/mfd/omap-usb-host.txt      |  23 +++
+ .../devicetree/bindings/mfd/omap-usb-tll.txt       |  10 ++
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+ arch/arm/boot/dts/omap4.dtsi                       |   6 +
+ arch/arm/boot/dts/omap5-uevm.dts                   |   8 +-
+ arch/arm/boot/dts/omap5.dtsi                       |   6 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |  16 --
+ drivers/mfd/omap-usb-host.c                        | 171 ++++++++++-----------
+ 8 files changed, 128 insertions(+), 120 deletions(-)
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.8.3.2
