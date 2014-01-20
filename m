@@ -1,117 +1,85 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 20 Jan 2014 10:44:18 -0800
-Subject: [PATCH v4 1/1] ARM: davinci: aemif: get rid of davinci-nand
- driver dependency on aemif
-In-Reply-To: <1389346564-24243-1-git-send-email-nsekhar@ti.com>
-References: <1389346564-24243-1-git-send-email-nsekhar@ti.com>
-Message-ID: <20140120184418.GI8919@ld-irv-0074>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Mon, 20 Jan 2014 19:45:25 +0100
+Subject: Deadlock in do_page_fault() on ARM (old kernel)
+In-Reply-To: <20140120101509.GA2626@dhcp22.suse.cz>
+References: <52D73220.3030108@signal11.us>
+ <20140120101509.GA2626@dhcp22.suse.cz>
+Message-ID: <20140120184525.GA29193@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Mon 20-01-14 11:15:09, Michal Hocko wrote:
+> On Wed 15-01-14 20:13:04, Alan Ott wrote:
+> [...]
+> > 2. __copy_to_user_memcpy() takes a read lock (down_read()) on
+> 
+> This looks like a bug. copy_to_user_* shouldn't take mmap_sem at all
+> Check the might_fault annotation used in generic code. Arm version of
+> copy_to_user* doesn't seem to use the annotation and I do not see a good
+> reason for that.
 
-Sorry, I do have one complaint about this patch.
+OK, so I have looked at the implementation of __copy_to_user_memcpy and
+it drops the semaphore before it does __put_user to fault memory in.  It
+then reacquires the lock to make sure that the pte doesn't vanish during
+memcpy. It holds pte lock to ensure that.
 
-On Fri, Jan 10, 2014 at 03:06:04PM +0530, Sekhar Nori wrote:
-> --- a/arch/arm/mach-davinci/aemif.c
-> +++ b/arch/arm/mach-davinci/aemif.c
-> @@ -130,4 +136,82 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
->  
->  	return 0;
->  }
-> -EXPORT_SYMBOL(davinci_aemif_setup_timing);
-> +
-> +/**
-> + * davinci_aemif_setup - setup AEMIF interface by davinci_nand_pdata
-> + * @pdev - link to platform device to setup settings for
-> + *
-> + * This function does not use any locking while programming the AEMIF
-> + * because it is expected that there is only one user of a given
-> + * chip-select.
-> + *
-> + * Returns 0 on success, else negative errno.
-> + */
-> +int davinci_aemif_setup(struct platform_device *pdev)
-> +{
-> +	struct davinci_nand_pdata *pdata = dev_get_platdata(&pdev->dev);
-> +	uint32_t val;
-> +	unsigned long clkrate;
-> +	struct resource	*res;
-> +	void __iomem *base;
-> +	struct clk *clk;
-> +	int ret = 0;
-> +
-> +	clk = clk_get(&pdev->dev, "aemif");
-> +	if (IS_ERR(clk)) {
-> +		ret = PTR_ERR(clk);
-> +		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret < 0) {
-> +		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
-> +			ret);
-> +		return ret;
+The mmap_sem reacquire happens with pte lock held though and this smells
+like a deadlock situation because the page fault takes mmap_sem first
+and only then takes ptl. I am not sure this is exactly what happens in
+your case though because you seem to have tasks blocked on the mmap_sem
+already.
 
-coccinelle gives a warning for this:
+> > mm->mmap_sem. While that lock is held, __copy_to_user_memcpy() can
+> > generate a page fault, causing do_page_fault() to get called, which
+> > will also try to get a read lock (down_read()) on mm->mmap_sem.
+> > Multiple read locks can be taken on an rw_semaphore, but deadlock
+> > will occur if another thread tries to get a write lock
+> > (down_write()) in between. For example:
+> >     Task 1:         Task 2:
+> >     down_read(sem)
+> >                     down_write(sem)    <-- Goes to sleep
+> >     down_read(sem)                     <-- Goes to sleep
+> > 
+> > There is a thread from 2005[3] which seems to discuss the same
+> > concept of recursive rw_semaphores, but for futexes.
+> > 
+> > Other comments:
+> > 1. My analysis of this probably wrong. Otherwise it seems many
+> > others would have the same problem, and they don't seem to. I'm
+> > hoping this email will help to correct my understanding.
+> > 2. I looked through the git logs for recent (since 2.6.37 time
+> > frame) and nothing else jumped out at me as being an obvious fix for
+> > this situation.
+> > 
+> > Thanks for any insight you can give,
+> > 
+> > Alan.
+> > 
+> > [1] http://www.signal11.us/~alan/show-all-tasks-deadlock.txt
+> > 
+> > [2] Some websites/bugtrackers mention this commit with a similar
+> > issue, but I'm not entirely sure how it's related:
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8878a539ff19a43cf3729e7562cd528f490246ae
+> > 
+> > This one seems obviously related, but has no effect on my system:
+> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=435a7ef52db7d86e67a009b36cac1457f8972391
+> > 
+> > [3] http://thread.gmane.org/gmane.linux.kernel/280900
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> -- 
+> Michal Hocko
+> SUSE Labs
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-  arch/arm/mach-davinci/aemif.c:171:2-8: ERROR: missing clk_put; clk_get on line 160 and execution via conditional on line 168 [coccinelle]
-
-You need a clk_put() on the error path for clk_prepare_enable. For
-instance, you can add a label below and replace this 'return ret' with
-'goto err_put'.
-
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "cannot get IORESOURCE_MEM\n");
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +
-> +	base = ioremap(res->start, resource_size(res));
-> +	if (!base) {
-> +		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res);
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +
-> +	/*
-> +	 * Setup Async configuration register in case we did not boot
-> +	 * from NAND and so bootloader did not bother to set it up.
-> +	 */
-> +	val = davinci_aemif_readl(base, A1CR_OFFSET + pdev->id * 4);
-> +	/*
-> +	 * Extended Wait is not valid and Select Strobe mode is not
-> +	 * used
-> +	 */
-> +	val &= ~(ACR_ASIZE_MASK | ACR_EW_MASK | ACR_SS_MASK);
-> +	if (pdata->options & NAND_BUSWIDTH_16)
-> +		val |= 0x1;
-> +
-> +	davinci_aemif_writel(base, A1CR_OFFSET + pdev->id * 4, val);
-> +
-> +	clkrate = clk_get_rate(clk);
-> +
-> +	if (pdata->timing)
-> +		ret = davinci_aemif_setup_timing(pdata->timing, base, pdev->id,
-> +						 clkrate);
-> +
-> +	if (ret < 0)
-> +		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
-> +
-> +	iounmap(base);
-> +err:
-> +	clk_disable_unprepare(clk);
-
-Then the label could be here:
-
-err_put:
-
-> +	clk_put(clk);
-> +	return ret;
-> +}
-
-Brian
+-- 
+Michal Hocko
+SUSE Labs
