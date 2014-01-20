@@ -1,40 +1,34 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Jan 2014 09:14:46 +0900
-Subject: PWM...
-In-Reply-To: <201401192126.41543.arnd@arndb.de>
-References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
- <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
- <20140119193026.GS15937@n2100.arm.linux.org.uk>
- <201401192126.41543.arnd@arndb.de>
-Message-ID: <20140120001446.GD9752@verge.net.au>
+Date: Mon, 20 Jan 2014 09:31:36 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Lager: pass Ether PHY IRQ
+In-Reply-To: <CANqRtoQ_qPBJUqnbU6wrrc+tmsspk_v99w-ZTdnhPivEdBzd4A@mail.gmail.com>
+References: <201312200218.08076.sergei.shtylyov@cogentembedded.com>
+ <201312200219.31121.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoQ_qPBJUqnbU6wrrc+tmsspk_v99w-ZTdnhPivEdBzd4A@mail.gmail.com>
+Message-ID: <20140120003133.GF9752@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 09:26:40PM +0100, Arnd Bergmann wrote:
-> On Sunday 19 January 2014, Russell King - ARM Linux wrote:
-> > On Sun, Jan 19, 2014 at 11:11:41AM -0800, Olof Johansson wrote:
-> > > On Sun, Jan 19, 2014 at 11:08 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Jan 17, 2014 at 03:00:29PM +0900, Magnus Damm wrote:
+> On Fri, Dec 20, 2013 at 8:19 AM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
+> > trigger type to be low-level as per the Micrel PHY driver's setup.
+> >
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >
+> > ---
+> >  arch/arm/mach-shmobile/board-lager.c |    4 ++++
+> >  1 file changed, 4 insertions(+)
 > 
-> > > Ah, yes, if you add a cell that can be done. There'll still be the
-> > > "dead" first cell that will always be 0, but that's alright.
-> > 
-> > Does it not mean that PWM specifications of:
-> > 
-> >         <&pwm1 0 n> <&pwm2 0 n>
-> > 
-> > would need to be converted to:
-> > 
-> >         <&pwm1 0 n 0> <&pwm2 0 n 0>
-> > 
-> > in every DT file referring to these PWMs - because isn't this just
-> > treated in DT as one single array of values?  (If DT knew how many
-> > were in each specification, we wouldn't need the #foo-cells...)
+> Thanks for your efforts. The code looks fine. I have now also tested
+> this on my Lager board.
 > 
-> Right: if you change an existing dts file from #pwm-cells=<2> to
-> #pwm-cells=<3>, that requires changing all references to the pwm
-> controller at the same time. If both the per-soc .dtsi files
-> and the per-board .dts files contain references to the same pwm
-> controller, that can end up in significant work. I have not checked
-> if this is the case for i.MX though.
+> Acked-by: Magnus Damm <damm@opensource.se>
 
-Would this change imply that old dtbs would no longer work with new kernels?
+Hi Sergei,
+
+please repost this patch with Magnus's ack once an rc release is
+available with the pre-requisites of this patch.
+
+Thanks
