@@ -1,29 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 Jan 2014 11:14:35 -0800
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <CAOMZO5A=tdzq8SW7P-D_Lxd6Ptjqkk+bKn29T2ggOZar=r4X+A@mail.gmail.com>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <CAOMZO5A=tdzq8SW7P-D_Lxd6Ptjqkk+bKn29T2ggOZar=r4X+A@mail.gmail.com>
-Message-ID: <CAOesGMgT_xEy-fK+tNb14MM0-FY0SsAVtDNr9aprNQNuS74Aug@mail.gmail.com>
+From: syin@broadcom.com (Sherman Yin)
+Date: Mon, 20 Jan 2014 11:14:57 -0800
+Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <CACRpkdYAANtY=9QtDnYNZLSrF09nTWUH4nK5oJ7mzznS+_=bHA@mail.gmail.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>	<1387592016-13740-1-git-send-email-syin@broadcom.com>	<1387592016-13740-4-git-send-email-syin@broadcom.com>	<CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>	<52D98B99.5050604@broadcom.com>	<20140118025600.GS31049@beef>
+ <CACRpkdYAANtY=9QtDnYNZLSrF09nTWUH4nK5oJ7mzznS+_=bHA@mail.gmail.com>
+Message-ID: <52DD75B1.3090701@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 11:14 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Jan 20, 2014 at 1:56 AM, Olof Johansson <olof@lixom.net> wrote:
+On 14-01-20 12:16 AM, Linus Walleij wrote:
+> On Sat, Jan 18, 2014 at 3:56 AM, Matt Porter <mporter@linaro.org> wrote:
 >
->> +Card power and reset control:
->> +The following properties can be specified for cases where the MMC
->> +peripheral needs additional reset, regulator and clock lines. It is for
->> +example common for WiFi/BT adapters to have these separate from the main
->> +MMC bus:
->> +  - card-reset-gpios: Specify GPIOs for card reset (reset active low)
+>> I wonder if Linus would accept a rename at this point (too late for 3.14
+>> presumably, but for 3.15) of s/capri/bcm281xx throughout, bcm11351 for
+>> the compatible string, as we have for the machine compatible, and also
+>> BCM281XX for the Kconfig option.
 >
-> Wouldn't it be better not to assume that the card reset is always
-> active low and read the GPIO_ACTIVE_xxx flags instead?
+> Yes, if there is some consensus that this is what we want to do.
+>
+> I can certainly merge that during the 3.14-rc phase for that matter.
 
-That's actually what the code does, I need to update the text. Thanks
-for spotting it.
+Hi Linus,
 
+I'll confirm the new name with Matt before sending out another patch. 
+Which would work better for you - a) a set of patches replacing my 
+previous ones, b) a set of patches on top of my previous ones, c) a 
+single patch on top of my previous ones? d) something else?
 
--Olof
+Thanks,
+Sherman
