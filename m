@@ -1,60 +1,91 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 20 Jan 2014 12:28:40 +0100
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140120122840.36520f37@ipc1.ka-ro>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Mon, 20 Jan 2014 11:30:41 +0000
+Subject: [PATCH v3] xen: swiotlb: handle sizeof(dma_addr_t) !=
+ sizeof(phys_addr_t)
+Message-ID: <1390217441-9910-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The use of phys_to_machine and machine_to_phys in the phys<=>bus conversions
+causes us to lose the top bits of the DMA address if the size of a DMA address is not the same as the size of the phyiscal address.
 
-Sascha Hauer wrote:
-> When a firmware cannot be found for the SDMA engine then we can
-> continue with the inernal ROM firmware.
-> 
-> The meaning of this message is frequently asked for, so make clear
-> that the driver still works with the internal ROM firmware and reduce
-> the loglevel from err to info.
-> 
-In case user space firmware loading 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> 
-> changes since v1:
-> - instead of removing the message make it more clear
-> 
->  drivers/dma/imx-sdma.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index c75679d..d79eaad 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1259,7 +1259,10 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
->  	unsigned short *ram_code;
->  
->  	if (!fw) {
-> -		dev_err(sdma->dev, "firmware not found\n");
-> +		dev_info(sdma->dev, "external firmware not found, using ROM firmware\n");
-> +		/*
-> +		 * In this case we just use the ROM firmware.
-> +		 */
->  		return;
->  	}
->  
+This can happen in practice on ARM where foreign pages can be above 4GB even
+though the local kernel does not have LPAE page tables enabled (which is
+totally reasonable if the guest does not itself have >4GB of RAM). In this
+case the kernel still maps the foreign pages at a phys addr below 4G (as it
+must) but the resulting DMA address (returned by the grant map operation) is
+much higher.
 
+This is analogous to a hardware device which has its view of RAM mapped up
+high for some reason.
 
+This patch makes I/O to foreign pages (specifically blkif) work on 32-bit ARM
+systems with more than 4GB of RAM.
+
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+v3: Added Stefano's ack, added accidentally forgotten Ccs to Russell and l-a-k.
+v2: Add comment on avoiding PFN_PHYS, and remove accidental truncation due to
+    it in xen_bus_to_phys.
+---
+ arch/arm/Kconfig          |    1 +
+ drivers/xen/swiotlb-xen.c |   22 ++++++++++++++++++++--
+ 2 files changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..24307dc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1885,6 +1885,7 @@ config XEN
+ 	depends on !GENERIC_ATOMIC64
+ 	select ARM_PSCI
+ 	select SWIOTLB_XEN
++	select ARCH_DMA_ADDR_T_64BIT
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 1eac073..ebd8f21 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -75,14 +75,32 @@ static unsigned long xen_io_tlb_nslabs;
+ 
+ static u64 start_dma_addr;
+ 
++/*
++ * Both of these functions should avoid PFN_PHYS because phys_addr_t
++ * can be 32bit when dma_addr_t is 64bit leading to a loss in
++ * information if the shift is done before casting to 64bit.
++ */
+ static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
+ {
+-	return phys_to_machine(XPADDR(paddr)).maddr;
++	unsigned long mfn = pfn_to_mfn(PFN_DOWN(paddr));
++	dma_addr_t dma = (dma_addr_t)mfn << PAGE_SHIFT;
++
++	dma |= paddr & ~PAGE_MASK;
++
++	return dma;
+ }
+ 
+ static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+ {
+-	return machine_to_phys(XMADDR(baddr)).paddr;
++	unsigned long pfn = mfn_to_pfn(PFN_DOWN(baddr));
++	dma_addr_t dma = (dma_addr_t)pfn << PAGE_SHIFT;
++	phys_addr_t paddr = dma;
++
++	BUG_ON(paddr != dma); /* truncation has occurred, should never happen */
++
++	paddr |= baddr & ~PAGE_MASK;
++
++	return paddr;
+ }
+ 
+ static inline dma_addr_t xen_virt_to_bus(void *address)
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.10.4
