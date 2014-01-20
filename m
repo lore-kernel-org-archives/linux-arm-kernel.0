@@ -1,47 +1,70 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jan 2014 21:06:42 +0000
-Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
-In-Reply-To: <CAOesGMjBCbMZrpbKjBBUeFhWEkLHS5rERtajRDk0ew_5FYvQEA@mail.gmail.com>
-References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
- <20140119031816.GD16158@S2101-09.ap.freescale.net>
- <20140119185246.GB28056@quad.lixom.net>
- <20140120004434.GV15937@n2100.arm.linux.org.uk>
- <CAOesGMiych-jeo_eKGgL1qxsYQ=rkb4UQwgGBsG-7+GMbLJWhg@mail.gmail.com>
- <20140120095532.GW15937@n2100.arm.linux.org.uk>
- <CAOesGMjBCbMZrpbKjBBUeFhWEkLHS5rERtajRDk0ew_5FYvQEA@mail.gmail.com>
-Message-ID: <20140120210642.GH15937@n2100.arm.linux.org.uk>
+Date: Mon, 20 Jan 2014 21:12:07 +0000
+Subject: [PATCH 5/5] clk: versatile: respect parent rate in ICST clock
+In-Reply-To: <1390251332-6411-1-git-send-email-linus.walleij@linaro.org>
+References: <1390251332-6411-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140120211207.GI15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 12:47:07PM -0800, Olof Johansson wrote:
-> On Mon, Jan 20, 2014 at 1:55 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Jan 19, 2014 at 07:34:22PM -0800, Olof Johansson wrote:
-> >> I'm guessing this is going to mess up Shawn's cleanup patches, but
-> >> time has ran out for 3.14 for those so they will need to be respun
-> >> anyway, most likely.
-> >>
-> >> We can apply them to arm-soc's dt branch. I think it's better if we
-> >> merge them since dts files tend to be one of the conflict-ridden areas
-> >> (even if this particular instance isn't). Send the series our way if
-> >> you want, or send a branch pull request, your choice.
-> >
-> > There's no conflict, and they build fine according to my autobuilder
-> > which includes arm-soc for-next.
-> 
-> Great, I didn't see any patches sent from you though. Should I
-> cherry-pick them from -next instead?
+On Mon, Jan 20, 2014 at 09:55:32PM +0100, Linus Walleij wrote:
+> If the ICST clock has a parent, respect the rate of the parent
+> when calculating the clock frequency. Alter const arguments
+> as this involves modifying the ICST parameter struct, and do
+> not define the reference clock on the Integrator as we have
+> the reference clock from the device tree. Keep it everywhere
+> else.
 
-If there's no conflicts, and if there other imx DT changes aren't going
-to be submitted, then why is there any need to cherry-pick them into
-arm-soc?
+This is not what I'd call a good idea.
 
-Are you suggesting that DT changes happen spontaneously all the time?
-If that's true, why couldn't the new board support be put in during
--rc kernels?
+> @@ -84,6 +84,8 @@ static unsigned long icst_recalc_rate(struct clk_hw *hw,
+>  	struct clk_icst *icst = to_icst(hw);
+>  	struct icst_vco vco;
+>  
+> +	if (parent_rate)
+> +		icst->params->ref = parent_rate;
+...
+> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
+> index 6d8b8e1a080a..a3edc0463517 100644
+> --- a/drivers/clk/versatile/clk-impd1.c
+> +++ b/drivers/clk/versatile/clk-impd1.c
+> @@ -39,7 +39,7 @@ static struct impd1_clk impd1_clks[4];
+>   * There are two VCO's on the IM-PD1
+>   */
+>  
+> -static const struct icst_params impd1_vco1_params = {
+> +static struct icst_params impd1_vco1_params = {
+>  	.ref		= 24000000,	/* 24 MHz */
+>  	.vco_max	= ICST525_VCO_MAX_3V,
+>  	.vco_min	= ICST525_VCO_MIN,
+> @@ -57,7 +57,7 @@ static const struct clk_icst_desc impd1_icst1_desc = {
+>  	.lock_offset = IMPD1_LOCK,
+>  };
+>  
+> -static const struct icst_params impd1_vco2_params = {
+> +static struct icst_params impd1_vco2_params = {
+>  	.ref		= 24000000,	/* 24 MHz */
+>  	.vco_max	= ICST525_VCO_MAX_3V,
+>  	.vco_min	= ICST525_VCO_MIN,
 
-What you're saying doesn't really make _that_ much sense to me at the
-moment.
+Right, so we end up writing directly into these _shared_ _statically_
+_allocated_ structures.
+
+> diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+> index c8b523117fb7..a1491590e028 100644
+> --- a/drivers/clk/versatile/clk-realview.c
+> +++ b/drivers/clk/versatile/clk-realview.c
+> @@ -21,7 +21,7 @@
+>   * Implementation of the ARM RealView clock trees.
+>   */
+>  
+> -static const struct icst_params realview_oscvco_params = {
+> +static struct icst_params realview_oscvco_params = {
+>  	.ref		= 24000000,
+
+And this one is shared by two different VCOs.  Thankfully, the only
+reason this isn't a problem is because they're both sourced from a
+24MHz clock.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
