@@ -1,53 +1,120 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Jan 2014 14:09:23 +0100
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140120115919.GD26823@intel.com>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro>
- <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
- <20140120115919.GD26823@intel.com>
-Message-ID: <20140120130923.GP16215@pengutronix.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 20 Jan 2014 13:19:07 +0000
+Subject: [PATCH] ARM: shmobile: compile drivers/sh for
+ CONFIG_ARCH_SHMOBILE_MULTI
+In-Reply-To: <20140120125436.GN17314@sirena.org.uk>
+References: <1389707776-23306-1-git-send-email-ben.dooks@codethink.co.uk>
+ <52D7B6A8.9000302@codethink.co.uk> <52D815F5.2080604@codethink.co.uk>
+ <3417477.Rj26gCLKM2@avalon> <20140120114705.GL17314@sirena.org.uk>
+ <52DD0FFC.8020307@codethink.co.uk> <20140120125436.GN17314@sirena.org.uk>
+Message-ID: <52DD224B.1050502@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 05:29:20PM +0530, Vinod Koul wrote:
-> On Mon, Jan 20, 2014 at 12:38:50PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 20, 2014 at 12:36:27PM +0100, Lothar Wa?mann wrote:
-> > > In case user space firmware loading support (CONFIG_FW_LOADER) is
-> > > enabled, this message may still be inadequate, since the firmware may
-> > > very well be loaded lateron.
-> > 
-> > I haven't worked out whether that's actually possible - I saw no way to
-> > re-trigger the firmware request, and once the firmware request expires,
-> > there seems to be no way for userspace to say "okay, the firmware is now
-> > available, please load it".
-> In that case why don't we use async version and wait till the userspace is
-> availble and firmware is loaded. 
-> 
-> So request_firmware_nowait() seems to do the job, I have used in a device where
-> I call it in probe() so that not to slow booting and make firmware bloc availble
-> userpsace is availble.
-> 
-> Sounds too good, did I miss anything obvious for this case here?
+I've added linux-arm-kernel to the list to get a wider view from
+people who actively use the clock subsystem.
 
-Been there, done that. This would make the RAM Firmware mandatory.
+On 20/01/14 12:54, Mark Brown wrote:
+> On Mon, Jan 20, 2014 at 12:01:00PM +0000, Ben Dooks wrote:
+>> On 20/01/14 11:47, Mark Brown wrote:
+>
+>>> I think that just makes things more complicated and isn't adding
+>>> anything over pm_runtime_enable(), it's just boilerplate code.  In
+>>> theory essentially every driver running on platforms which don't have
+>>> explicit management of core IP clocks ought to be calling this since
+>>> potentially the IP might be deployed on another platform which does have
+>>> clock management (this does actually happen with things like the
+>>> DesignWare IPs) and it doesn't do anything like say which clocks are
+>>> expected to be managed in this way which is another thing that can come
+>>> up when moving devices between platforms.
+>
+>> That sounds like a real headache where you have two sets of code
+>> looking at possibly the same clocks, and behaving differently between
+>> different platforms.
+>
+> Yup, it's usually only one set of code on the client side but it's
+> annoying that platform integrations aren't done consistently in hardware
+> and that this flows through into software.
+>
+>>> I'm also struggling to see how it provides any sort of build time
+>>> protection, it would allow the generation of a warning at runtime at
+>>> best.
+>
+>> If you don't have the code it WILL NOT LINK. At the moment it is
+>> entirely possible to link a kernel which will produce a set of confusing
+>> errors as drivers fail to initialise at startup.
+>
+> How will this prevent the code linking?  I would expect the "manage the
+> clocks via runtime PM" call to be a bit of core code, I wouldn't expect
+> it to be provided by a specific platform otherwise we're in for fail in
+> a multiplatform environment.  Besides, if it fails to link there's some
+> missing Kconfig anyway since randconfig is supposed to work.
+>
+>> We've already had other people run into the issue where they do not
+>> know why a driver is failing to work (rcar-thermal is one) as the code
+>> that was managing the clock for it magically vanished during the
+>> development cycle.
+>
+> I agree there's a usability problem here, I just don't think that this
+> is the best fix for it, I think it's breaking abstractions.
+>
+>>> As far as I can tell the problem that Ben has seen here is that the
+>>> platform really, really needs the code for its power domains running to
+>>> be functional (this doesn't seem unreasonable and may not be related to
+>>> clocks, this may be required to have the IPs powered up at all).  I'd
+>>> expect this is something for the platform to sort out rather than
+>>> something for individual drivers to have to carry code for.
+>
+>> What's power domains got to do with this? You keep bringing this up
+>> but the error is purely to do with clock management. The code happens
+>> to be sitting in the drivers/base/pm directory, but could easily sit
+>> elsewhere.
+>
+> What these platforms are saying is esssentially that the clocks are part
+> of the power domain - they're a fundamental part of getting the IP
+> available for use so there is no point in managing them separately.
+> This is where I think the abstraction problem is coming, to me it seems
+> like the platform isn't successfully ensuring that the code to manage
+> the power domain is there.  The fact that part of what's missing is the
+> clocks shouldn't matter to the drivers, in doing things like this the
+> platform is trying to abstract that detail away from the drivers.
+>
+>>> If it was going to be drivers carrying code for this I would expect it
+>>> to be something like providing a list of clocks to be managed along with
+>>> runtime PM - this would also make the code more widely applicable since
+>>> it's quite common for the runtime PM callbacks to do nothing more than
+>>> just enable and disable clocks.
+>
+>> If we are really saying that bus clocks should not be managed
+>> by the drivers, then we should just enable this across the whole
+>> kernel and remove the management from any extant drivers (or make
+>> it so that any drivers that must manage their bus clocks have a
+>> call to do so).
+>
+> Yes, I think that would be a useful way to go since it would factor out
+> some common code patterns that keep cropping up (as I suggested to you
+> previously).  It may not just be the main IP clocks that the drivers are
+> managing like this (some drivers end up managing other clocks at the
+> same time even if they could be more flexible) so if it was something
+> drivers could make use of themselves that'd be good.
 
-The Linux firmware loading mechanism is not very suitable for the SDMA
-engine. The firmware loading mechanism expects that a driver cannot work
-without a firmware. Normally this is true, but The SDMA engine can run
-with the ROM firmware or a RAM firmware loaded during runtime. In fact
-the firmware consists of Program code, so the SDMA engine could even run
-with a combination of the ROM firmware and 0..n dynamically loaded
-firmware modules.
+At the moment, the code to actually use the support is sitting in
+drivers/sh and gets initialised if it is built. This is the source
+of the original confusions.
 
-Maybe using the firmware loading mechanism for the SDMA engine was the
-wrong approach from the start.
+I think it would be ok if drivers could /opt out/ if the bus clock
+handling was done like this for all platforms and we simply noted
+that the pm code is doing it. At that point it would be nice just
+to build the code in drivers/base/power unconditionally.
 
-Sascha
+At the moment we could quite easily enable this code for all the
+ARM platforms as the clk framework should deal nicely with properly
+balanced clk_enable() and clk_disable() calls.
+
+Enabling it across the board would also remove any issues with
+changes in platform behaviour and find any bugs sooner rather than
+later.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
