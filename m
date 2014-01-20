@@ -1,252 +1,59 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 20 Jan 2014 17:20:21 -0600
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <20140114194348.GH14405@codeaurora.org>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <1389380874-22753-2-git-send-email-agross@codeaurora.org>
- <20140114194348.GH14405@codeaurora.org>
-Message-ID: <20140120232021.GB3530@qualcomm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 20 Jan 2014 17:29:02 -0600
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in device
+ tree boot
+Message-ID: <1390260542-22213-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 11:43:48AM -0800, Stephen Boyd wrote:
-> (Mostly nitpicks)
-> 
-> On 01/10, Andy Gross wrote:
-> > Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> > found in the MSM 8x74 platforms.
-> > 
-> > Each BAM DMA device is associated with a specific on-chip peripheral.  Each
-> > channel provides a uni-directional data transfer engine that is capable of
-> > transferring data between the peripheral and system memory (System mode), or
-> > between two peripherals (BAM2BAM).
-> > 
-> > The initial release of this driver only supports slave transfers between
-> > peripherals and system memory.
-> > 
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  drivers/dma/Kconfig        |   9 +
-> >  drivers/dma/Makefile       |   1 +
-> >  drivers/dma/qcom_bam_dma.c | 843 +++++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/dma/qcom_bam_dma.h | 268 ++++++++++++++
-> >  4 files changed, 1121 insertions(+)
-> >  create mode 100644 drivers/dma/qcom_bam_dma.c
-> >  create mode 100644 drivers/dma/qcom_bam_dma.h
-> > 
-> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> > index c823daa..e58e6d2 100644
-> > --- a/drivers/dma/Kconfig
-> > +++ b/drivers/dma/Kconfig
-> > @@ -384,4 +384,13 @@ config DMATEST
-> >  config DMA_ENGINE_RAID
-> >  	bool
-> >  
-> > +config QCOM_BAM_DMA
-> > +	tristate "QCOM BAM DMA support"
-> > +	depends on ARCH_MSM || COMPILE_TEST
-> 
-> I don't think writel_relaxed() is available on every arch, so
-> it's possible this will break some random arch that doesn't have
-> that function.
-> 
+When device is booted using devicetree, platforms impacted by
+Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
+indicates that the module cannot do multi-block transfers.
 
-I'll look into this to see.  If that's the case, I can remove the COMPILE_TEST
-if there is no alternative.
+Handle this by providing a boolean flag to indicate to driver that it is
+working on a hardware with mentioned limitation.
 
-> > +	select DMA_ENGINE
-> > +	select DMA_VIRTUAL_CHANNELS
-> > +	---help---
-> > +	  Enable support for the QCOM BAM DMA controller.  This controller
-> > +	  provides DMA capabilities for a variety of on-chip devices.
-> > +
-> >  endif
-> > diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-> > new file mode 100644
-> > index 0000000..7a84b02
-> > --- /dev/null
-> > +++ b/drivers/dma/qcom_bam_dma.c
-> [...]
-> > +static int bam_alloc_chan(struct dma_chan *chan)
-> [...]
-> > +
-> > +	/* Go ahead and initialize the pipe/channel hardware here
-> > +	   - Reset the channel to clear internal state of the FIFO
-> > +	   - Program in the FIFO address
-> > +	   - Configure the irq based on the EE passed in from the DT entry
-> > +	   - Set mode, direction and enable channel
-> > +
-> > +	   We do this here because the channel can only be enabled once and
-> > +	   can only be disabled via a reset.  If done here, we don't have to
-> > +	   manage additional state to figure out when to do this
-> > +	*/
-> 
-> Multi-line comments are of the form:
-> 
-> 	/*
-> 	 * comment
-> 	 */
-> 
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-Right.  I converted some comments and didn't do the correct multi-line
+This explains the logs I see:
+OMAP3430 LDP (ES2.2):
+	uImage only boot:  http://slexy.org/raw/s2YrbMAi7c 
+	uImage+dtb concatenated boot: http://slexy.org/raw/s20qVg17T0 
 
-> > +
-> > +	bam_reset_channel(bdev, bchan->id);
-> > +
-> > +	/* write out 8 byte aligned address.  We have enough space for this
-> > +	   because we allocated 1 more descriptor (8 bytes) than we can use */
-> > +	writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
-> > +			bdev->regs + BAM_P_DESC_FIFO_ADDR(bchan->id));
-> > +	writel_relaxed(BAM_DESC_FIFO_SIZE, bdev->regs +
-> > +			BAM_P_FIFO_SIZES(bchan->id));
-> [...]
-> > +
-> > +/**
-> > + * bam_dma_terminate_all - terminate all transactions
-> > + * @chan: dma channel
-> > + *
-> > + * Idles channel and dequeues and frees all transactions
-> > + * No callbacks are done
-> > + *
-> > +*/
-> 
-> Weird '*' starting the line here and on the next function.
-> 
+With the following flag set, device is now able to consistently boot with
+device tree supported uImage+dtb concat boot.
 
-Will fix.
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
+ drivers/mmc/host/omap_hsmmc.c                      |    3 +++
+ 2 files changed, 5 insertions(+)
 
-> > +static void bam_dma_terminate_all(struct dma_chan *chan)
-> > +{
-> > +	struct bam_chan *bchan = to_bam_chan(chan);
-> > +	struct bam_device *bdev = bchan->bdev;
-> > +
-> > +	bam_reset_channel(bdev, bchan->id);
-> > +
-> > +	vchan_free_chan_resources(&bchan->vc);
-> > +}
-> > +
-> > +/**
-> > + * bam_control - DMA device control
-> > + * @chan: dma channel
-> > + * @cmd: control cmd
-> > + * @arg: cmd argument
-> > + *
-> > + * Perform DMA control command
-> > + *
-> > +*/
-> > +static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> > +	unsigned long arg)
-> > +{
-> > +	struct bam_chan *bchan = to_bam_chan(chan);
-> > +	struct bam_device *bdev = bchan->bdev;
-> > +	int ret = 0;
-> > +	unsigned long flag;
-> > +
-> [...]
-> > +/**
-> > + * bam_dma_irq - irq handler for bam controller
-> > + * @irq: IRQ of interrupt
-> > + * @data: callback data
-> > + *
-> > + * IRQ handler for the bam controller
-> > + */
-> > +static irqreturn_t bam_dma_irq(int irq, void *data)
-> > +{
-> > +	struct bam_device *bdev = (struct bam_device *)data;
-> 
-> Unnecessary cast from void.
-> 
-
-Fixed.
-
-> > +static int bam_dma_probe(struct platform_device *pdev)
-> > +{
-> [...]
-> > +
-> > +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> > +	if (!irq_res) {
-> > +		dev_err(bdev->dev, "irq resource is missing\n");
-> > +		return -EINVAL;
-> > +	}
-> 
-> Please use platform_get_irq() instead.
-> 
-
-Fixed.
-
-> > diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
-> > new file mode 100644
-> > index 0000000..2cb3b5f
-> > --- /dev/null
-> > +++ b/drivers/dma/qcom_bam_dma.h
-> [...]
-> > +#define BAM_CNFG_BITS_DEFAULT	(BAM_PIPE_CNFG |	\
-> > +			BAM_NO_EXT_P_RST |		\
-> > +			BAM_IBC_DISABLE |		\
-> > +			BAM_SB_CLK_REQ |		\
-> > +			BAM_PSM_CSW_REQ |		\
-> > +			BAM_PSM_P_RES |			\
-> > +			BAM_AU_P_RES |			\
-> > +			BAM_SI_P_RES |			\
-> > +			BAM_WB_P_RES |			\
-> > +			BAM_WB_BLK_CSW |		\
-> > +			BAM_WB_CSW_ACK_IDL |		\
-> > +			BAM_WB_RETR_SVPNT |		\
-> > +			BAM_WB_DSC_AVL_P_RST |		\
-> > +			BAM_REG_P_EN |			\
-> > +			BAM_PSM_P_HD_DATA |		\
-> > +			BAM_AU_ACCUMED |		\
-> > +			BAM_CMD_ENABLE)
-> > +
-> > +/* PIPE CTRL */
-> > +#define	P_EN			BIT(1)
-> 
-> Nit: Weird formatting here?
-> 
-
-That is odd.  Will fix.
-
-> > +#define P_DIRECTION		BIT(3)
-> [...]
-> > +
-> > +
-> > +struct bam_device {
-> > +	void __iomem *regs;
-> > +	struct device *dev;
-> > +	struct dma_device common;
-> > +	struct device_dma_parameters dma_parms;
-> > +	struct bam_chan *channels;
-> 
-> Maybe this should be a flexible array. It looks like probe might
-> need to be rewritten to detect the number of channels from the
-> hardware before assigning anything, but it should be possible.
-> But it probably doesn't matter.
-> 
-
-You can't take the number of channels at face value.  Only a subset of that
-number are actually usable by the CPUs execution environment.
-
-> > +	u32 num_channels;
-> > +	u32 num_ees;
-> > +	unsigned long enabled_ees;
-> > +	int irq;
-> 
-> Is irq used?
-> 
-
-Will remove.
-
-> > +	struct clk *bamclk;
-> > +
-> > +	/* dma start transaction tasklet */
-> > +	struct tasklet_struct task;
-> > +};
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index 8c8908a..ab36f8b 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -26,6 +26,8 @@ specifier is required.
+ dma-names: List of DMA request names. These strings correspond
+ 1:1 with the DMA specifiers listed in dmas. The string naming is
+ to be "rx" and "tx" for RX and TX DMA requests, respectively.
++ti,erratum-2.1.1.128: boolean, for OMAP3430/OMAP35xx platforms with broken
++multiblock reads
+ 
+ Examples:
+ 
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 014bfe5..f2d5940 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1730,6 +1730,9 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+ 	if (of_find_property(np, "ti,dual-volt", NULL))
+ 		pdata->controller_flags |= OMAP_HSMMC_SUPPORTS_DUAL_VOLT;
+ 
++	if (of_find_property(np, "ti,erratum-2.1.1.128", NULL))
++		pdata->controller_flags |= OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
++
+ 	/* This driver only supports 1 slot */
+ 	pdata->nr_slots = 1;
+ 	pdata->slots[0].switch_pin = cd_gpio;
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
