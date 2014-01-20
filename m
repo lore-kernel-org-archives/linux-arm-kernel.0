@@ -1,33 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Jan 2014 09:17:22 +0100
-Subject: [PATCH] pinctrl: capri: add dependency on OF
-In-Reply-To: <52D9BC5B.30304@wwwdotorg.org>
-References: <1389912312-16285-1-git-send-email-linus.walleij@linaro.org>
- <52D989C2.6030603@broadcom.com>
- <CACRpkdYVLF+CNcAc8=MiSRJJMBWy3LriDw271Bx=gjuuzdOatA@mail.gmail.com>
- <CACRpkdZ9OBkKaLuQbc1oz0uPePBtqttGyOwV02iFWZ+CT1gwnw@mail.gmail.com>
- <52D9BC5B.30304@wwwdotorg.org>
-Message-ID: <CACRpkdZLDJ_+AnwXbPY9eEo8FHo8u8qy00Jc6Rr+9EUv+O5eiw@mail.gmail.com>
+Date: Mon, 20 Jan 2014 09:20:14 +0100
+Subject: [PATCH v2] pinctrl: sunxi: Honor GPIO output initial vaules
+In-Reply-To: <1389854063-31016-1-git-send-email-wens@csie.org>
+References: <1389854063-31016-1-git-send-email-wens@csie.org>
+Message-ID: <CACRpkdbJnsxazMfe7BvOYEsczQ_XLCc-nAy7q4CUySmvuvKpGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 18, 2014 at 12:27 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/17/2014 04:13 PM, Linus Walleij wrote:
->> On Sat, Jan 18, 2014 at 12:12 AM, Linus Walleij
->> <linus.walleij@linaro.org> wrote:
->>> On Fri, Jan 17, 2014 at 8:51 PM, Sherman Yin <syin@broadcom.com> wrote:
->>>
->>>> Thanks for the fix, Linus.  While we're visiting this config, should we add
->>>> "depends on MACH_BCM_MOBILE" as well?
->>>
->>> No, it's nice to get the compile coverage.
->>
->> But maybe you can experiment with that special option that only
->> turns on the driver on other platforms to do compile test.
+On Thu, Jan 16, 2014 at 7:34 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+
+> Some GPIO users, such as fixed-regulator, request GPIO output with
+> initial value of 1. This was ignored by sunxi driver.
 >
-> a/k/a
-> depends on XXX || COMPILE_TEST
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>
+> Changes since v2:
+>
+>   * Set output value before setting the pin function to avoid a glitch.
 
-Yep, thanks Stephen :-)
+Patch applied with Maxime's ACK and tagged for stable.
 
+Yours,
 Linus Walleij
