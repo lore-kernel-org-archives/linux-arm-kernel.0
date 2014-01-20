@@ -1,62 +1,30 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 20 Jan 2014 17:34:33 -0600
-Subject: [PATCH] ARM: dts: omap3-ldp: fix mmc configuration
-Message-ID: <1390260873-22354-1-git-send-email-nm@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 20 Jan 2014 17:39:41 -0600
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
+ device tree boot
+In-Reply-To: <1390260542-22213-1-git-send-email-nm@ti.com>
+References: <1390260542-22213-1-git-send-email-nm@ti.com>
+Message-ID: <20140120233941.GG6516@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC1 is the only MMC interface available on the platform. Further,
-since the platform is based on older revision of SoC which is not
-capable of doing multi-block writes, mark it so and add pinmux
-to ensure that all relevant pins are configured for non-MMC boot
-mode.
+On Mon, Jan 20, 2014 at 05:29:02PM -0600, Nishanth Menon wrote:
+> When device is booted using devicetree, platforms impacted by
+> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
+> indicates that the module cannot do multi-block transfers.
+> 
+> Handle this by providing a boolean flag to indicate to driver that it is
+> working on a hardware with mentioned limitation.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-ti,erratum-2.1.1.128 introduced in https://patchwork.kernel.org/patch/3514851/
-hence depends on the same.
- arch/arm/boot/dts/omap3-ldp.dts |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+sure there's no way of reading the revision register to figure this one
+out without having to add a new DT attribute ?
 
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-index ddce0d8..bc0cc66 100644
---- a/arch/arm/boot/dts/omap3-ldp.dts
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -176,6 +176,17 @@
- &mmc1 {
- 	vmmc-supply = <&vmmc1>;
- 	bus-width = <4>;
-+	ti,erratum-2.1.1.128;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+};
-+
-+&mmc2 {
-+	status="disabled";
-+};
-+
-+&mmc3 {
-+	status="disabled";
- };
- 
- &omap3_pmx_core {
-@@ -209,6 +220,17 @@
- 			0x174 (PIN_OUTPUT | MUX_MODE0)	/* hsusb0_stp.hsusb0_stp */
- 		>;
- 	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.mmc1_clk */
-+			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.mmc1_cmd */
-+			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.mmc1_dat0 */
-+			OMAP3_CORE1_IOPAD(0x214A, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.mmc1_dat1 */
-+			OMAP3_CORE1_IOPAD(0x214C, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.mmc1_dat2 */
-+			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.mmc1_dat3 */
-+		>;
-+	};
- };
- 
- &usb_otg_hs {
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140120/25bddc13/attachment.sig>
