@@ -1,66 +1,45 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 20 Jan 2014 12:37:02 +0100
-Subject: commit 40d4511 "can: Disable flexcan driver build for big endian
- CPU on ARM" breaks Flexcan on ARM
-In-Reply-To: <20140120123257.573205a9@ipc1.ka-ro>
-References: <20140120123257.573205a9@ipc1.ka-ro>
-Message-ID: <52DD0A5E.6010303@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jan 2014 12:39:47 +0100
+Subject: [PATCH] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <CA+mB=1L0ZSC8f6eMEuO7MEk6nG5SDahE7AH2F_uUr1TgTCD=cw@mail.gmail.com>
+References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+ <201401171713.08550.arnd@arndb.de>
+ <CA+mB=1L0ZSC8f6eMEuO7MEk6nG5SDahE7AH2F_uUr1TgTCD=cw@mail.gmail.com>
+Message-ID: <201401201239.47665.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 12:32 PM, Lothar Wa?mann wrote:
-> Hi,
+On Monday 20 January 2014, Srikanth Thokala wrote:
+> On Fri, Jan 17, 2014 at 9:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 16 January 2014, Srikanth Thokala wrote:
+> > I also assume that some of the properties should just go away:
+> >
+> > * xlnx,device-id should be the argument in the handle from the slave device
 > 
-> The commit 40d451181a7fa57e32bca4632ae7b22f80861a73
-> |Author: Guenter Roeck <linux@roeck-us.net>
-> |Date:   Mon Jan 6 05:21:03 2014 -0800
-> |
-> |    can: Disable flexcan driver build for big endian CPU on ARM
-> |    
-> |    Building arm:allmodconfig fails with
-> |    
-> |    flexcan.c: In function 'flexcan_read':
-> |    flexcan.c:243:2: error: implicit declaration of function 'in_be32'
-> |    flexcan.c: In function 'flexcan_write':
-> |    flexcan.c:248:2: error: implicit declaration of function 'out_be32'
-> |    
-> |    in_be32 and out_be32 do not (or no longer) exist for ARM targets.
-> |    Disable the build for ARM on big endian CPUs.
-> |    
-> |    Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> |    Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> |
-> |diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
-> |index 9e7d95d..d447b88 100644
-> |--- a/drivers/net/can/Kconfig
-> |+++ b/drivers/net/can/Kconfig
-> |@@ -104,7 +104,7 @@ config CAN_JANZ_ICAN3
-> | 
-> | config CAN_FLEXCAN
-> |        tristate "Support for Freescale FLEXCAN based chips"
-> |-       depends on ARM || PPC
-> |+       depends on (ARM && CPU_LITTLE_ENDIAN) || PPC
-> |        ---help---
-> |          Say Y here if you want to support for Freescale FlexCAN.
->>
-> completely disables the flexcan driver for all ARM platforms, since the
-> symbol CPU_LITTLE_ENDIAN does not exist on ARM!
+> We can have multiple instances of this VDMA IP configured in the FPGA and we
+> need a unique identifier for each VDMA device that is present in the FPGA.
+> This device-id dt parameter forms the filter mask for the slave devices. As an
+> example, this can be used to get a channel of specific VDMA device (assuming
+> multiple instances) using the API dma_request_channel().  Please note this
+> is an example of a slave device that doesnt have dt node.
 
-Arnd Bergmann posted a better patch, which I'll include in a pull
-request once the net tree is open again.
+That is not a valid scenario: You should not try to support legacy
+slave devices (without DT) connected to a dma-engine that is initialized
+using DT. If you still in the progress of converting drivers to DT, you
+can use auxdata to attach additional information that can be used for
+those slave devices, but the code should be kept out of the mainline
+kernel, and I don't want to see it manifest in the bindings.
 
-Marc
+> > * data width should be a property of the slave driver that is configured
+> >   through dma_slave_config(), unless you can have dma engines that only
+> >   support certain a width.
+> 
+> Yes, this VDMA engine soft IP support only certain widths, which is
+> configurable during IP synthesis.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+But what is this property used for in that case? Surely you can't
+connect a slave device to a dmaengine if the bus width doesn't match.
+You probably have a point here, but I don't understand it yet.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140120/b60177fc/attachment-0001.sig>
+	Arnd
