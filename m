@@ -1,224 +1,81 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 20 Jan 2014 15:32:48 +0000
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <20140116193123.GB22105@mudshark.cambridge.arm.com>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109103004.GB11089@mudshark.cambridge.arm.com>
- <201401091204.17932.arnd@arndb.de>
- <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
- <20140109184251.GL17838@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
- <20140116193123.GB22105@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 20 Jan 2014 16:41:43 +0100
+Subject: [PATCH v7 0/7] ARM: rockchip: add smp functionality
+Message-ID: <4970034.fqvMoHdOyd@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jan 2014, Will Deacon wrote:
-> Hi Stefano,
-> 
-> On Thu, Jan 16, 2014 at 04:27:55PM +0000, Stefano Stabellini wrote:
-> > On Thu, 9 Jan 2014, Will Deacon wrote:
-> > > Ok, thanks for the explanation. Looking at the patch, I wonder whether it's
-> > > not cleaner just to implement xchg code separately for Xen? The Linux code
-> > > isn't always sufficient (due to the GENERIC_ATOMIC64 stuff) and most of the
-> > > churn coming out of this patch is an attempt to provide some small code
-> > > reuse at the cost of code readability.
-> > > 
-> > > What do others think?
-> > 
-> > I am OK with that, in fact my first version of the patch did just that:
-> > 
-> > http://marc.info/?l=linux-arm-kernel&m=138436406724990&w=2
-> > 
-> > Is that what you had in mind?
-> 
-> For the xchg part, yes, that looks a lot better. I don't like the #undef
-> CONFIG_CPU_V6 though, can that be rewritten to use __LINUX_ARM_ARCH__?
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-The problem is that the 1 and 2 byte parameter size cases in __cmpxchg
-are ifdef'ed CONFIG_CPU_V6 but drivers/xen/grant-table.c needs them.
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-So we can either undef CONFIG_CPU_V6 in grant-table.c or call a
-different function.
+Tested on both a BQ Curie2 (rk3066a / dual core) and
+on a Radxa Rock (rk3188 / quad core).
 
-If I switch from ifdef CONFIG_CPU_V6 to if __LINUX_ARM_ARCH__ > 6 in
-__cmpxchg, we still have the problem that if __LINUX_ARM_ARCH__ == 6,
-grant-table.c doesn't compile.
+changes since v6:
+- address comments from Mark Rutland
+  - using of_property_read_u32_index instead of parsing the list manually
+  - include v4 of "of: add functions to count number of elements in a property"
+    to not have to count property-elements manually anymore
+changes since v5:
+- Grant Likely liked it better to "specify reserved regions of the
+  memory instead of the valid ranges", so go back to the mmio-sram-reserved
+  property originally suggested by Rob Herring
 
-Maybe the approach taken by the other patch for cmpxchg is better, see
-below.
+changes since v4:
+- rebase on top of the recent rk3188 board support
+- implement suggestion from Matt Sealey in moving the sram-limit from
+  marking reserved regions to marking available regions - hopefully
+  I got the usage right 
+- remove __CPUINIT as suggested by Fabio Estevam
 
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..ae54ae0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1881,8 +1881,7 @@ config XEN_DOM0
- config XEN
- 	bool "Xen guest support on ARM (EXPERIMENTAL)"
- 	depends on ARM && AEABI && OF
--	depends on CPU_V7 && !CPU_V6
--	depends on !GENERIC_ATOMIC64
-+	depends on CPU_V7
- 	select ARM_PSCI
- 	select SWIOTLB_XEN
- 	help
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index df2fbba..cc8a4a2 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
-  * cmpxchg only support 32-bits operands on ARMv6.
-  */
- 
-+static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg1\n"
-+		"	ldrexb	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexbeq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
-+static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg1\n"
-+		"	ldrexh	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexheq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
- static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 				      unsigned long new, int size)
- {
-@@ -141,28 +179,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	switch (size) {
- #ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
- 	case 1:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexb	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexbeq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg8(ptr, old, new);
- 		break;
- 	case 2:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexh	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexheq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg16(ptr, old, new);
- 		break;
- #endif
- 	case 4:
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-index 63479ee..942659a 100644
---- a/arch/arm/include/asm/sync_bitops.h
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -21,7 +21,29 @@
- #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
- #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
- #define sync_test_bit(nr, addr)		test_bit(nr, addr)
--#define sync_cmpxchg			cmpxchg
- 
-+static inline unsigned long sync_cmpxchg(volatile void *ptr,
-+										 unsigned long old,
-+										 unsigned long new)
-+{
-+	unsigned long oldval;
-+	int size = sizeof(*(ptr));
-+
-+	smp_mb();
-+	switch (size) {
-+	case 1:
-+		oldval = __cmpxchg8(ptr, old, new);
-+		break;
-+	case 2:
-+		oldval = __cmpxchg16(ptr, old, new);
-+		break;
-+	default:
-+		oldval = __cmpxchg(ptr, old, new, size);
-+		break;
-+	}
-+	smp_mb();
-+
-+	return oldval;
-+}
- 
- #endif
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 8b1f37b..2032ee6 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -16,7 +16,37 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
- }
- 
--#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-+#ifdef CONFIG_GENERIC_ATOMIC64
-+/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
-+ * atomic64_xchg function because it is implemented using spin locks.
-+ * Here we need proper atomic instructions to read and write memory
-+ * shared with the hypervisor.
-+ */
-+static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ xen_atomic64_xchg\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	strexd	%1, %4, %H4, [%3]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
-+	: "r" (&ptr->counter), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+#else
-+#define xen_atomic64_xchg atomic64_xchg
-+#endif
-+
-+#define xchg_xen_ulong(ptr, val) xen_atomic64_xchg(container_of((ptr),	\
- 							    atomic64_t,	\
- 							    counter), (val))
- 
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
+
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
+
+Heiko Stuebner (7):
+  of: add functions to count number of elements in a property
+  dt-bindings: sram: describe option to reserve parts of the memory
+  misc: sram: implement mmio-sram-reserved option
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit
+  ARM: rockchip: add smp bringup code
+
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
+ arch/arm/boot/dts/rk3188.dtsi                      |    6 +
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   30 +++
+ arch/arm/mach-rockchip/platsmp.c                   |  208 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |  121 +++++++++++-
+ drivers/of/base.c                                  |   32 +++
+ include/linux/of.h                                 |   76 +++++++
+ 15 files changed, 554 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
+-- 
+1.7.10.4
