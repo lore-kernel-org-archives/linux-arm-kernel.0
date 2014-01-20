@@ -1,78 +1,39 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 20 Jan 2014 15:50:07 +0530
-Subject: [PATCHv10 2/2] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <f173c2531461478899818365e06df437@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1389938684-29467-1-git-send-email-b35083@freescale.com>
- <1389938684-29467-3-git-send-email-b35083@freescale.com>
- <20140120074019.GF26823@intel.com>
- <43d79ce905e24e9bb58ef49ac19db7d7@BL2PR03MB467.namprd03.prod.outlook.com>
- <20140120093541.GX26823@intel.com>
- <f173c2531461478899818365e06df437@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <20140120102007.GC26823@intel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 20 Jan 2014 13:21:47 +0200
+Subject: [PATCH 13/15] fbdev: sh-mobile-lcdcfb: Enable driver compilation
+ with COMPILE_TEST
+In-Reply-To: <22423852.GiH1NBjiii@avalon>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52CD0CBB.3070801@ti.com> <52D8F14A.7030100@ti.com>
+ <22423852.GiH1NBjiii@avalon>
+Message-ID: <52DD06CB.8050606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 11:05:03AM +0000, Jingchang Lu wrote:
-> > > > > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-> > > > > +	struct dma_slave_config *cfg = (void *)arg;
-> > > > > +	unsigned long flags;
-> > > > > +	LIST_HEAD(head);
-> > > > > +
-> > > > > +	switch (cmd) {
-> > > > > +	case DMA_TERMINATE_ALL:
-> > > > > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-> > > > > +		fsl_edma_disable_request(fsl_chan);
-> > > > > +		fsl_chan->edesc = NULL;
-> > > > > +		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-> > > > > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-> > > > > +		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-> > > > > +		return 0;
-> > > > well what happens to the current ongoing transactions, i don't see
-> > those
-> > > > getting
-> > > > terminated?
-> > > The fsl_edma_disable_request(fsl_chan) would end the channel's ongoing
-> > transaction, then
-> > > the eDMA would not response to device dma request, and the
-> > vchan_dma_desc_free_list()
-> > > will release all associate memory. Thanks.
-> > Can you explain a bit more how terminate will happen, given taht you are
-> > using
-> > same thing for pause?
-> It works just like an interrupt controller on irq enable and disable. It has a register called
-> set/clear enable request register(SERQ/CERQ) to enable or disable the DMA request for a given
-> channel. It won't transfer data any more with the enable request register cleared. So for the
-> pause and terminate the pause is the same. And there is no other way to stop the channels.
-well then it is not pause! If you jave no way to stop the channel, you cant
-claim to support pause and resume!
+On 2014-01-19 23:01, Laurent Pinchart wrote:
+> Hi Tomi,
 
-Also, for terminate this will be problematic. Assuming you are doing transfers
-and terminate is invoked. Then you will disable irq. The transfers may get stuck
-and periphral clock may go away after transfer so current transaction never gets
-completed, how do we recovery from this?
+> The lcdc driver can be compiled without meram support. This is handled by 
+> conditional compilation in include/video/sh_mobile_meram.h that defines the 
+> meram functions as stubs when meram support isn't selected.
+> 
+> The problem comes from the combination of FB_SH_MOBILE_MERAM=m and 
+> FB_SH_MOBILE_LCDC=y. The former makes the meram function non-stubs, while the 
+> later makes the LCDC driver fail to link, as meram support is then compiled as 
+> a module.
+> 
+> How do you usually handle this ?
+
+I guess the easiest option is to make FB_SH_MOBILE_MERAM a bool, instead
+of tristate.
+
+ Tomi
 
 
-Alstly, have you looked at edma driver already existing, any similarties in teh
-controller with that?
-
-
-> > > > > +static struct dma_async_tx_descriptor *fsl_edma_prep_dma_cyclic(
-> > > > > +		struct dma_chan *chan, dma_addr_t dma_addr, size_t
-> > buf_len,
-> > > > > +		size_t period_len, enum dma_transfer_direction
-> > direction,
-> > > > > +		unsigned long flags, void *context)
-> > > > > +{
-> > > > you may want to implement the capablities api subsequently for audio
-> > > > usage.
-> > > Do you mean the device_slave_caps function? If it is, I will add it.
-> > Yes, that can be incrementally added..
-> I have send the v11 patch out with a basic device_slave_caps definition. I notice
-> that there is some new update of the dma capabilities, so if possible and others ok,
-> could you please merge this patch first and leave me improving the driver in subsequent
-> patches. Thanks.
-Sure, as I said this can be incremental but atm am worried about pause and
-terminate behaviour.
-
---
-~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140120/6d5866fc/attachment.sig>
