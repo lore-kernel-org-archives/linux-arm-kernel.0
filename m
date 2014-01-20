@@ -1,92 +1,176 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Mon, 20 Jan 2014 09:03:16 +0000
-Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6sl
-In-Reply-To: <30BEA0EF-C7F3-48FB-9B07-2C244788DD38@freescale.com>
-References: <CACUGKYOgJDMO-xF9GC4Xh7+t6FDk6DwJ0iYX17Hh6LvqSjVa4Q@mail.gmail.com>
- <30BEA0EF-C7F3-48FB-9B07-2C244788DD38@freescale.com>
-Message-ID: <953bc7807ffe45119eece19c803b047f@BY2PR03MB315.namprd03.prod.outlook.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Mon, 20 Jan 2014 09:06:43 +0000
+Subject: [PATCHv10 2/2] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20140120074019.GF26823@intel.com>
+References: <1389938684-29467-1-git-send-email-b35083@freescale.com>
+ <1389938684-29467-3-git-send-email-b35083@freescale.com>
+ <20140120074019.GF26823@intel.com>
+Message-ID: <43d79ce905e24e9bb58ef49ac19db7d7@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Tobias and Shawn
-	I debug into this issue today, the root cause is that we have a usleep_range(50, 500); in arch/arm/mach-imx/clk-pllv3.c's clk_pllv3_wait_lock function, which will cause kernel schedule during cpufreq change, and the idle thread has another clk operation which will cause mutex nest, and it will try to wake up previous mutex hold by cpufreq change's pll1 clk_set_rate.
-	So, to fix this issue, we should not use any usleep in the wait function of pllv3's code, or we should not call any clk API in the imx6sl_set_wait_clk function. What do you think?
-
-	BTW, I found another issue, if EVK board boot up with 396MHz, then the initialized clock parent status is wrong, as ARM is from PFD 396MHz, I will generate another patch to fix that once I have bandwidth.
-
-Best Regards.
-Anson huang ???
-?
-Freescale Semiconductor Shanghai
-?????????192?A?2?
-201203
-Tel:021-28937058
 
 
->-----Original Message-----
->From: Huang Yongcai-B20788
->Sent: Saturday, January 18, 2014 7:53 AM
->To: John Tobias
->Cc: <linux-arm-kernel@lists.infradead.org>; Shawn Guo
->Subject: Re: [PATCH] ARM: imx: add cpuidle support for i.mx6sl
->
->Hi, Tobias
->        I will debug it next week and feedback to you. Thanks.
->
->Sent from Anson's iPhone
->
->> ? 2014?1?18??7:42?"John Tobias" <john.tobias.ph@gmail.com> ???
->>
->> Hi Anson,
->>
->> My kernel for iMX6SL has a imx6q-cpufreq and I used your patch.
->> Unfortunately, the kernel crashes if the imx6sl_set_wait_clk being
->> called in imx6sl_enter_wait.
->>
->> [  288.166905] [<80044b80>] (dequeue_task+0x0/0xc8) from [<80045650>]
->> (deactivate_task+0x30/0x34)
->> [  288.176403] [<80045620>] (deactivate_task+0x0/0x34) from
->> [<8050ac88>] (__schedule+0x318/0x58c) [  288.185848] [<8050a970>]
->> (__schedule+0x0/0x58c) from [<8050af34>]
->> (schedule+0x38/0x88)
->> [  288.194758] [<8050aefc>] (schedule+0x0/0x88) from [<8050b1c8>]
->> (schedule_preempt_disabled+0x10/0x14)
->> [  288.204858] [<8050b1b8>] (schedule_preempt_disabled+0x0/0x14) from
->> [<8050bcd4>] (mutex_lock_nested+0x16c/0x334) [  288.215850]
->> [<8050bb68>] (mutex_lock_nested+0x0/0x334) from [<8034763c>]
->> (clk_prepare_lock+0x90/0x104) [  288.226041] [<803475ac>]
->> (clk_prepare_lock+0x0/0x104) from [<80349254>]
->> (clk_set_rate+0x1c/0xbc) [  288.235535]  r6:806fd360 r5:00000000
->> r4:bf817f80 r3:80713d80 [  288.242679] [<80349238>]
->> (clk_set_rate+0x0/0xbc) from [<8001e574>]
->> (imx6sl_set_wait_clk+0x28/0x70)
->> [  288.252354]  r5:00000043 r4:00000001 [  288.256585] [<8001e54c>]
->> (imx6sl_set_wait_clk+0x0/0x70) from [<8001def4>]
->> (imx6sl_enter_wait+0x24/0x2c) [  288.266684]  r5:00000043 r4:00000001
->> [  288.270949] [<8001ded0>] (imx6sl_enter_wait+0x0/0x2c) from
->> [<80317608>] (cpuidle_enter_state+0x44/0xfc) [  288.281051]
->> r4:13bf2645 r3:8001ded0 [  288.285682] [<803175c4>]
->> (cpuidle_enter_state+0x0/0xfc) from [<803177bc>]
->> (cpuidle_idle_call+0xfc/0x150) [  288.295871]  r8:806e00d8 r7:00000001
->> r6:00000000 r5:80c58034 r4:806fd360 [  288.304428] [<803176c0>]
->> (cpuidle_idle_call+0x0/0x150) from [<8000fa68>]
->> (arch_cpu_idle+0x10/0x44) [  288.314108]  r9:8070970a r8:8070970a
->> r7:806d2000 r6:806da0dc r5:806d2000
->> r4:806d2000
->> [  288.323611] [<8000fa58>] (arch_cpu_idle+0x0/0x44) from [<800590f4>]
->> (cpu_startup_entry+0xe0/0x120)
->> [  288.333460] [<80059014>] (cpu_startup_entry+0x0/0x120) from
->> [<80503c8c>] (rest_init+0xcc/0xdc) [  288.342810]  r7:ffffffff
->> r3:00000000 [  288.347115] [<80503bc0>] (rest_init+0x0/0xdc) from
->> [<806a2b00>]
->> (start_kernel+0x348/0x354)
->> [  288.356099]  r6:806da040 r5:806da040 r4:806da150 [  288.361972]
->> [<806a27b8>] (start_kernel+0x0/0x354) from [<80008070>]
->> (0x80008070)
->>
->>
->> Regards,
->>
->> john
->>
->>
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Monday, January 20, 2014 3:40 PM
+> To: Lu Jingchang-B35083
+> Cc: dan.j.williams at intel.com; arnd at arndb.de; shawn.guo at linaro.org;
+> pawel.moll at arm.com; mark.rutland at arm.com; swarren at wwwdotorg.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Wang Huan-B18965
+> Subject: Re: [PATCHv10 2/2] dma: Add Freescale eDMA engine driver support
+> 
+> On Fri, Jan 17, 2014 at 02:04:44PM +0800, Jingchang Lu wrote:
+> > Add Freescale enhanced direct memory(eDMA) controller support.
+> > This module can be found on Vybrid and LS-1 SoCs.
+> >
+> > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> 
+> > +static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd
+> cmd,
+> > +		unsigned long arg)
+> > +{
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +	struct dma_slave_config *cfg = (void *)arg;
+> > +	unsigned long flags;
+> > +	LIST_HEAD(head);
+> > +
+> > +	switch (cmd) {
+> > +	case DMA_TERMINATE_ALL:
+> > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> > +		fsl_edma_disable_request(fsl_chan);
+> > +		fsl_chan->edesc = NULL;
+> > +		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+> > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> > +		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
+> > +		return 0;
+> well what happens to the current ongoing transactions, i don't see those
+> getting
+> terminated?
+The fsl_edma_disable_request(fsl_chan) would end the channel's ongoing transaction, then
+the eDMA would not response to device dma request, and the vchan_dma_desc_free_list()
+will release all associate memory. Thanks.
+
+> 
+> > +
+> > +	case DMA_SLAVE_CONFIG:
+> > +		fsl_chan->fsc.dir = cfg->direction;
+> > +		if (cfg->direction == DMA_DEV_TO_MEM) {
+> > +			fsl_chan->fsc.dev_addr = cfg->src_addr;
+> > +			fsl_chan->fsc.addr_width = cfg->src_addr_width;
+> > +			fsl_chan->fsc.burst = cfg->src_maxburst;
+> > +			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg-
+> >src_addr_width);
+> > +		} else if (cfg->direction == DMA_MEM_TO_DEV) {
+> > +			fsl_chan->fsc.dev_addr = cfg->dst_addr;
+> > +			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
+> > +			fsl_chan->fsc.burst = cfg->dst_maxburst;
+> > +			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg-
+> >dst_addr_width);
+> okay atrr is address width, why not save this standard struct instead?
+The value saved in fsc.attr is transferred by fsl_edma_get_tcd_attr(), it can
+be set into the channel control register later directly. the edma driver doesn't
+need to save all dma_slave_config parameters, so it only gets the necessaries.
+Thanks.
+ 
+> 
+> > +		} else {
+> > +			return -EINVAL;
+> > +		}
+> > +		return 0;
+> > +
+> > +	case DMA_PAUSE:
+> > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> > +		if (fsl_chan->edesc) {
+> > +			fsl_edma_disable_request(fsl_chan);
+> > +			fsl_chan->status = DMA_PAUSED;
+> > +		}
+> > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> > +		return 0;
+> > +
+> > +	case DMA_RESUME:
+> > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> > +		if (fsl_chan->edesc) {
+> > +			fsl_edma_enable_request(fsl_chan);
+> > +			fsl_chan->status = DMA_IN_PROGRESS;
+> > +		}
+> > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> > +		return 0;
+> > +
+> > +	default:
+> > +		return -ENXIO;
+> > +	}
+> > +}
+> > +
+> 
+> > +static struct fsl_edma_desc *fsl_edma_alloc_desc(struct fsl_edma_chan
+> *fsl_chan,
+> > +		int sg_len)
+> > +{
+> > +	struct fsl_edma_desc *fsl_desc;
+> > +	int i;
+> > +
+> > +	fsl_desc = kzalloc(sizeof(*fsl_desc) + sizeof(struct
+> fsl_edma_sw_tcd) * sg_len,
+> > +				GFP_NOWAIT);
+> > +	if (!fsl_desc)
+> > +		return NULL;
+> > +
+> > +	fsl_desc->echan = fsl_chan;
+> > +	fsl_desc->n_tcds = sg_len;
+> > +	for (i = 0; i < sg_len; i++) {
+> > +		fsl_desc->tcd[i].vtcd = dma_pool_alloc(fsl_chan->tcd_pool,
+> > +					GFP_NOWAIT, &fsl_desc->tcd[i].ptcd);
+> > +		if (!fsl_desc->tcd[i].vtcd)
+> > +			goto err;
+> > +	}
+> > +	return fsl_desc;
+> > +
+> > +err:
+> > +	while (--i >= 0)
+> > +		dma_pool_free(fsl_chan->tcd_pool, fsl_desc->tcd[i].vtcd,
+> > +				fsl_desc->tcd[i].ptcd);
+> > +	kfree(fsl_desc);
+> > +	return NULL;
+> > +}
+> > +
+> > +static struct dma_async_tx_descriptor *fsl_edma_prep_dma_cyclic(
+> > +		struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
+> > +		size_t period_len, enum dma_transfer_direction direction,
+> > +		unsigned long flags, void *context)
+> > +{
+> you may want to implement the capablities api subsequently for audio
+> usage.
+Do you mean the device_slave_caps function? If it is, I will add it.
+Thanks.
+
+> 
+> > +	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+> > +	struct fsl_edma_desc *fsl_desc;
+> > +	dma_addr_t dma_buf_next;
+> > +	int sg_len, i;
+> > +	u32 src_addr, dst_addr, last_sg, nbytes;
+> > +	u16 soff, doff, iter;
+> > +
+> > +	if (!is_slave_direction(fsl_chan->fsc.dir))
+> > +		return NULL;
+> > +
+> > +	sg_len = buf_len / period_len;
+> > +	fsl_desc = fsl_edma_alloc_desc(fsl_chan, sg_len);
+> > +	if (!fsl_desc)
+> > +		return NULL;
+> > +	fsl_desc->iscyclic = true;
+> > +
+> > +	dma_buf_next = dma_addr;
+> > +	nbytes = fsl_chan->fsc.addr_width * fsl_chan->fsc.burst;
+> > +	iter = period_len / nbytes;
+> empty line here pls
+Ok, thanks.
+
+
+Best Regards,
+Jingchang
