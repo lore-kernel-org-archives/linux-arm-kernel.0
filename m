@@ -1,59 +1,38 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 20 Jan 2014 17:58:34 +0100
-Subject: [PATCH v2 00/16] ARM: support for ICP DAS LP-8x4x (with dts)
-In-Reply-To: <1390236763.25903.12.camel@host5.omatika.ru>
-References: <1386543229-1542-1-git-send-email-ynvich@gmail.com>		
- <201312182210.30544.arnd@arndb.de>		
- <1387401646.31516.14.camel@host5.omatika.ru>		
- <201312190630.11087.arnd@arndb.de>		
- <1389309176.32346.1.camel@host5.omatika.ru>	
- <1390234117.25903.0.camel@host5.omatika.ru> <52DD4CDE.7020705@gmail.com>
- <1390236763.25903.12.camel@host5.omatika.ru>
-Message-ID: <52DD55BA.4000201@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Jan 2014 15:03:50 -0200
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <20140120164859.GF15937@n2100.arm.linux.org.uk>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+ <20140120164859.GF15937@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5AfSe_c7gfee0BcZso8ZYg=PaTDwfsXwzpEcM1554VQ6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 05:52 PM, Sergei Ianovich wrote:
-> On Mon, 2014-01-20 at 17:20 +0100, Daniel Mack wrote:
->> On 01/20/2014 05:08 PM, Sergei Ianovich wrote:
->>> It's over a month now. Is anything wrong?
->> No, I'm busy, that's all.
-> 
-> Thanks for reply.
-> 
->> That said, the current situation is
->>
->> a) we need someone to have a look at the performance regression of the
->> MMC file system layer that you reported. I couldn't find a PXA-based
->> board yet with a MMC slot soldered on it. But as you apparently have
->> such hardware, I'd really appreciate your help here. Could you do some
->> measurements and see whether you see major differences in packet size or
->> timings?
-> 
-> I have the hardware with MMC, but none of the other devices. Could you
-> give some pointer where to start? How would you do measurements?
+On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Please check whether the DMA engine transfers data in chunks of
-comparable size in both cases. Also, take time stamps when the packet is
-submitted, and calculate the delta when the transfer returns. See if any
-significant time gap contributes to the regression you see.
+> So far so good.  Now, what about this external oscillator which has its
+> own separate power control.  My immediate thought is that this can be
+> specified via card_ext_clock - I would simply need to declare a fixed-rate
+> clock with either a regulator (power switch) controlled via a gpio (which
+> would probably be closer to the hardware) or a gpio as an enable... ah,
+> that requires me to write a common clock driver for that bit since this
+> is currently not modelled by CCF...
 
-After all, it's still quite possible that the DMA driver has performance
-bottlenecks. We need to find the code where so much more time is spent
-with the new implementation.
+Isn't this covered by the gpios property of fixed-clock?
 
-> It would be nice to have updated patches. Most interesting is whether
-> the new DMA still works as expected for other devices.
+We do the following to enable the 26MHz codec clock in
+imx51-babbage.dts via GPIO4_26:
 
-I'll allocate a time slot for that :)
+        clk_26M: codec_clock {
+            compatible = "fixed-clock";
+            reg=<0>;
+            #clock-cells = <0>;
+            clock-frequency = <26000000>;
+            gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+        };
 
-> Apart from that, would mind if my series is landed with a workaround
-> (Patch v3 7/21). I hope you understand it doesn't feel good to depend on
-> something with no development activity.
+Regards,
 
-I understand, but that shouldn't keep you you from maintaining a patch
-stack out-of-tree until things are in shape enough to go mainline.
-
-
-Thanks for you help,
-Daniel
+Fabio Estevam
