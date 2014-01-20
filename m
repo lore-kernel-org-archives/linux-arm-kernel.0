@@ -1,24 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jan 2014 20:12:46 +0100
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Jan 2014 17:14:04 -0200
 Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <CAOesGMgMnvFAFiO_K4U5n08Tj+ZPWh656D=vgaQOyYbVCyvSDg@mail.gmail.com>
+In-Reply-To: <1390190215-22700-2-git-send-email-olof@lixom.net>
 References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <201401201958.57997.arnd@arndb.de>
- <CAOesGMgMnvFAFiO_K4U5n08Tj+ZPWh656D=vgaQOyYbVCyvSDg@mail.gmail.com>
-Message-ID: <53209494.QWyQq2MDnI@wuerfel>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+Message-ID: <CAOMZO5A=tdzq8SW7P-D_Lxd6Ptjqkk+bKn29T2ggOZar=r4X+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 January 2014 11:04:26 Olof Johansson wrote:
-> 
-> I'd expect most usage of this to be through gpios, since we're talking
-> about external independent modules here. I would prefer not to bring
-> in the reset controller stuff here -- it just adds another layer of
-> abstraction that seems unnecessary.
-> 
-> I would prefer if the reset framework was contained to only be the
-> on-chip SoC IP block resets, etc, as originally intended.
+On Mon, Jan 20, 2014 at 1:56 AM, Olof Johansson <olof@lixom.net> wrote:
 
-Ok, fair enough.
+> +Card power and reset control:
+> +The following properties can be specified for cases where the MMC
+> +peripheral needs additional reset, regulator and clock lines. It is for
+> +example common for WiFi/BT adapters to have these separate from the main
+> +MMC bus:
+> +  - card-reset-gpios: Specify GPIOs for card reset (reset active low)
 
-	Arnd
+Wouldn't it be better not to assume that the card reset is always
+active low and read the GPIO_ACTIVE_xxx flags instead?
+
+Regards,
+
+Fabio Estevam
