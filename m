@@ -1,31 +1,37 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 20 Jan 2014 21:11:40 +0100
-Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio
- A701
-In-Reply-To: <87txd8vka8.fsf@free.fr> (Robert Jarzmik's message of "Mon, 13
- Jan 2014 00:43:11 +0100")
-References: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
- <87zjn9v7xx.fsf@free.fr> <87txd8vka8.fsf@free.fr>
-Message-ID: <87ha8y76rn.fsf@free.fr>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 20 Jan 2014 21:14:13 +0100
+Subject: [PATCH] ARM: mvebu: fix compilation warning on Armada 370 (i.e.
+ non-SMP)
+Message-ID: <87r48276ne.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> Hi Arnd,
->
-> I cannot reach Haojian, and my platform is currently screen-broken without
-> Thierry's patch (see [1] and [2]). I'm trying to have it since -rc6, with no luck.
->
-> Could you handle it in arm-soc fixes for -rc9 (if it happens) please ?
->
-> Cheers.
->
-> --
-> Robert
+The following appears during compilation for an Armada 370 target
+because 'irq_controller_lock' is used only when CONFIG_SMP is enabled:
 
-OK, so my platform is broken in 3.13, so be it.
-What now ? Do you have a backup for such cases ?
+  drivers/irqchip/irq-armada-370-xp.c:62:8: warning: 'irq_controller_lock' defined but not used [-Wunused-variable]
 
---
-Robert
+Fix that warning by protecting declaration via an #ifdef.
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 433cc8568dec..499c5070f841 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -59,7 +59,9 @@
+ #define PCI_MSI_DOORBELL_END                    (32)
+ #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
+ 
++#ifdef CONFIG_SMP
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
++#endif
+ 
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+-- 
+1.8.5.2
