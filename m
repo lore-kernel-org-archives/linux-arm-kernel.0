@@ -1,52 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 20 Jan 2014 08:49:08 +0400
-Subject: [PATCH v2 0/3] ARM: clps711x: IRQCHIP driver
-In-Reply-To: <20131229084340.10a4abdfc5815a709d7a6cc6@mail.ru>
-References: <1387454214-1171-1-git-send-email-shc_work@mail.ru>
- <20131229084340.10a4abdfc5815a709d7a6cc6@mail.ru>
-Message-ID: <20140120084908.751d1ffcf0dcb32beb32c54f@mail.ru>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 20 Jan 2014 13:53:10 +0900
+Subject: [PATCH 2/3] mmc: dw_mmc: call mmc_of_parse to fill in common
+ options
+In-Reply-To: <1390190215-22700-3-git-send-email-olof@lixom.net>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-3-git-send-email-olof@lixom.net>
+Message-ID: <52DCABB6.6000000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Dec 2013 08:43:40 +0400
-Alexander Shiyan <shc_work@mail.ru> wrote:
+Hi, Olof.
 
-> On Thu, 19 Dec 2013 15:56:54 +0400
-> Alexander Shiyan <shc_work@mail.ru> wrote:
+It looks good to me. When use the mmc_of_parse, we can also remove the duplicated property.
+I have also worked the patch for using mmc_of_parse().
+
+1. caps2-mmc-hs200-1_8v/1_2v capability can be moved into mmc_of_parse.
+then we can remove parsing of dt into dw_mmc.c
+2. keep-power-in-suspend/enable-sdio-wakeup can be removed.
+
+If i missed other patch, let me know, plz.
+
+how about?
+if you're ok, i will send the patch-set on this week.
+
+Best Regards,
+Jaehoon Chung
+
+On 01/20/2014 12:56 PM, Olof Johansson wrote:
+> The shared of parse function fills in common options for capabilities,
+> etc, but it needs to be called from each driver that wants to make use
+> of it. dw_mmc was missing the call.
 > 
-> > This series is devoted to new CLPS711X irqchip driver.
-> > The driver designed for booting from ATAGS and devicetree.
-> > 
-> > Alexander Shiyan (3):
-> >   ARM: clps711x: Add CLPS711X irqchip driver
-> >   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
-> >     driver
-> >   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
-> > 
-> >  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
-> >  arch/arm/Kconfig                                   |   2 -
-> >  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
-> >  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
-> >  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
-> >  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
-> >  arch/arm/mach-clps711x/board-p720t.c               |   2 -
-> >  arch/arm/mach-clps711x/common.c                    | 201 +----------------
-> >  arch/arm/mach-clps711x/common.h                    |   5 +-
-> >  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
-> >  drivers/irqchip/Kconfig                            |   8 +
-> >  drivers/irqchip/Makefile                           |   1 +
-> >  drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
-> >  13 files changed, 299 insertions(+), 228 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> >  create mode 100644 drivers/irqchip/irq-clps711x.c
-> > 
-> > -- 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  drivers/mmc/host/dw_mmc.c |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Ping.
-
-Silence more than two weeks from the last post on this series.
-Arnd, Olof, I beg to apply these patches to arm-soc.
-Thanks.
-
--- 
-Alexander Shiyan <shc_work@mail.ru>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index a776f24..7119f63 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2137,6 +2137,8 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>  	if (!mmc)
+>  		return -ENOMEM;
+>  
+> +	mmc_of_parse(mmc);
+> +
+>  	slot = mmc_priv(mmc);
+>  	slot->id = id;
+>  	slot->mmc = mmc;
+> 
