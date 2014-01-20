@@ -1,160 +1,73 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 20 Jan 2014 16:52:45 -0600
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <201401172349.28229.arnd@arndb.de>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <1389380874-22753-2-git-send-email-agross@codeaurora.org>
- <201401172349.28229.arnd@arndb.de>
-Message-ID: <20140120225245.GA3530@qualcomm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 21 Jan 2014 00:34:24 +0100
+Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
+ directory
+In-Reply-To: <52DD2DE9.9060202@linaro.org>
+References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
+ <5375666.26CZK1LlZA@vostro.rjw.lan> <52DD2DE9.9060202@linaro.org>
+Message-ID: <1945528.uEVBjXteWy@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 11:49:27PM +0100, Arnd Bergmann wrote:
-> On Friday 10 January 2014, Andy Gross wrote:
+On Monday, January 20, 2014 10:08:41 PM Hanjun Guo wrote:
+> On 2014?01?18? 21:47, Rafael J. Wysocki wrote:
+> > On Saturday, January 18, 2014 11:52:18 AM Hanjun Guo wrote:
+> >> On 2014-1-18 11:45, Hanjun Guo wrote:
+> >>> On 2014-1-17 20:06, Sudeep Holla wrote:
+> >>>> On 17/01/14 02:03, Hanjun Guo wrote:
+> >>>>> Move idle_boot_override out of the arch directory to be a single enum
+> >>>>> including both platforms values, this will make it rather easier to
+> >>>>> avoid ifdefs around which definitions are for which processor in
+> >>>>> generally used ACPI code.
+> >>>>>
+> >>>>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
+> >>>>>
+> >>>>> No functional change in this patch.
+> >>>>>
+> >>>>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
+> >>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>>> ---
+> >> [...]
+> >>>>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+> >>>>> index 03e235ad..e324561 100644
+> >>>>> --- a/include/linux/cpu.h
+> >>>>> +++ b/include/linux/cpu.h
+> >>>>> @@ -220,6 +220,14 @@ void cpu_idle(void);
+> >>>>>   
+> >>>>>   void cpu_idle_poll_ctrl(bool enable);
+> >>>>>   
+> >>>>> +enum idle_boot_override {
+> >>>>> +	IDLE_NO_OVERRIDE = 0,
+> >>>>> +	IDLE_HALT,
+> >>>>> +	IDLE_NOMWAIT,
+> >>>>> +	IDLE_POLL,
+> >>>>> +	IDLE_POWERSAVE_OFF
+> >>>>> +};
+> >>>>> +
+> >>>> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
+> >>>> specific and may not make sense for other architectures.
+> >>> yes, this is the strange part, the value is arch-dependent.
+> >>>
+> >>>> It will also require every architecture using ACPI to export
+> >>>> boot_option_idle_override which may not be really required.
+> >>> so, how about forget this patch and move boot_option_idle_override
+> >>> related code into arch directory such as arch/x86/acpi/boot.c for
+> >>> x86?
+> >> The general idea is that we can move all the arch-dependent codes
+> >> in ACPI driver to arch directory, then make codes in drivers/acpi/
+> >> arch independent.
+> > Well, MWAIT is arch-dependent, so I'm not sure how IDLE_NOMWAIT fits into
+> > include/linux/cpu.h?
 > 
-> > +static bool bam_dma_filter(struct dma_chan *chan, void *data)
-> > +{
-> > +	struct bam_filter_args *args = data;
-> > +	struct bam_chan *bchan = to_bam_chan(chan);
-> > +
-> > +	if (args->dev == chan->device &&
-> > +		args->id == bchan->id) {
-> > +
-> > +		/* we found the channel, so lets set the EE and dir */
-> > +		bchan->ee = args->ee;
-> > +		bchan->slave.direction = args->dir ?
-> > +				DMA_DEV_TO_MEM : DMA_MEM_TO_DEV;
-> > +		return true;
-> > +	}
-> > +
-> > +	return false;
-> > +}
-> 
-> A filter function should no longer be needed.
-> 
+> So you will not happy with this patch and should find another solution?
 
-Ok, will remove.
+No, I'm not happy with it.
 
-> > +static struct dma_chan *bam_dma_xlate(struct of_phandle_args *dma_spec,
-> > +		struct of_dma *of)
-> > +{
-> > +	struct bam_filter_args args;
-> > +	dma_cap_mask_t cap;
-> > +
-> > +	if (dma_spec->args_count != 3)
-> > +		return NULL;
-> > +
-> > +	args.dev = of->of_dma_data;
-> > +	args.id = dma_spec->args[0];
-> > +	args.ee = dma_spec->args[1];
-> > +	args.dir = dma_spec->args[2];
-> > +
-> > +	dma_cap_zero(cap);
-> > +	dma_cap_set(DMA_SLAVE, cap);
-> > +
-> > +	return dma_request_channel(cap, bam_dma_filter, &args);
-> > +}
-> 
-> Instead, call dma_get_slave_channel() with the right channel that you already know
-> here.
-> 
+If you want to move that to an arch-agnostic header, the symbol names cannot
+be arch-dependent any more.
 
-Agreed.
-
-> > +	if (pdev->dev.of_node) {
-> > +		ret = of_dma_controller_register(pdev->dev.of_node,
-> > +				bam_dma_xlate, &bdev->common);
-> > +
-> > +		if (ret) {
-> > +			dev_err(bdev->dev, "failed to register of_dma\n");
-> > +			goto err_unregister_dma;
-> > +		}
-> > +	}
-> 
-> No need to check for pdev->dev.of_node when that is the only mode of probing.
-> 
-
-Good point. I'll remove extraneous check.
-
-> > +
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id bam_of_match[] = {
-> > +	{ .compatible = "qcom,bam-v1.4.0", },
-> > +	{ .compatible = "qcom,bam-v1.4.1", },
-> > +	{}
-> > +};
-> > +MODULE_DEVICE_TABLE(of, bam_of_match);
-> > +#endif
-> 
-> Also, you can remove the #ifdef here and the of_match_ptr() below.
-> 
-
-If this is removed, then I'll have to add the OF dependency in the Kconfig,
-correct?
-
-> > +
-> > +static struct platform_driver bam_dma_driver = {
-> > +	.probe = bam_dma_probe,
-> > +	.remove = bam_dma_remove,
-> > +	.driver = {
-> > +		.name = "bam-dma-engine",
-> > +		.owner = THIS_MODULE,
-> > +		.of_match_table = of_match_ptr(bam_of_match),
-> > +	},
-> > +};
-> > +
-> > +static int __init bam_dma_init(void)
-> > +{
-> > +	return platform_driver_register(&bam_dma_driver);
-> > +}
-> > +
-> > +static void __exit bam_dma_exit(void)
-> > +{
-> > +	return platform_driver_unregister(&bam_dma_driver);
-> > +}
-> > +
-> 
-> module_platform_driver()
-> 
-
-Will fix.
-
-> > diff --git a/drivers/dma/qcom_bam_dma.h b/drivers/dma/qcom_bam_dma.h
-> > new file mode 100644
-> > index 0000000..2cb3b5f
-> > --- /dev/null
-> > +++ b/drivers/dma/qcom_bam_dma.h
-> > @@ -0,0 +1,268 @@
-> > +#ifndef __QCOM_BAM_DMA_H__
-> > +#define __QCOM_BAM_DMA_H__
-> > +
-> > +#include <linux/dmaengine.h>
-> > +#include "virt-dma.h"
-> > +
-> > +enum bam_channel_dir {
-> > +	BAM_PIPE_CONSUMER = 0,	/* channel reads from data-fifo or memory */
-> > +	BAM_PIPE_PRODUCER,	/* channel writes to data-fifo or memory */
-> > +};
-> 
-> Since the header does not serve as an interface, just move all the contents
-> into the driver directly.
-> 
-
-OK.  SBoyd made the same comment.  I'll go ahead and collapse both down to 1
-file.
-
-> > +struct bam_desc_hw {
-> > +	u32 addr;		/* Buffer physical address */
-> > +	u16 size;		/* Buffer size in bytes */
-> > +	u16 flags;
-> > +} __packed;
-> 
-> Remove __packed here, it only makes the access less efficient but does not change
-> the layout, which is already packed.
-
-Ok.  Will fix.
+Thanks!
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
