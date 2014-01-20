@@ -1,65 +1,87 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 20 Jan 2014 22:08:41 +0800
-Subject: [PATCH 1/3] ACPI / idle: Move idle_boot_override out of the arch
- directory
-In-Reply-To: <5375666.26CZK1LlZA@vostro.rjw.lan>
-References: <1389924207-7360-1-git-send-email-hanjun.guo@linaro.org>
- <52D9F8E8.8030602@linaro.org> <52D9FA72.5020505@linaro.org>
- <5375666.26CZK1LlZA@vostro.rjw.lan>
-Message-ID: <52DD2DE9.9060202@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 20 Jan 2014 08:10:26 -0600
+Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?01?18? 21:47, Rafael J. Wysocki wrote:
-> On Saturday, January 18, 2014 11:52:18 AM Hanjun Guo wrote:
->> On 2014-1-18 11:45, Hanjun Guo wrote:
->>> On 2014-1-17 20:06, Sudeep Holla wrote:
->>>> On 17/01/14 02:03, Hanjun Guo wrote:
->>>>> Move idle_boot_override out of the arch directory to be a single enum
->>>>> including both platforms values, this will make it rather easier to
->>>>> avoid ifdefs around which definitions are for which processor in
->>>>> generally used ACPI code.
->>>>>
->>>>> IDLE_FORCE_MWAIT for IA64 is not used anywhere, so romove it.
->>>>>
->>>>> No functional change in this patch.
->>>>>
->>>>> Suggested-by: Alan <gnomes@lxorguk.ukuu.org.uk>
->>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> ---
->> [...]
->>>>> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
->>>>> index 03e235ad..e324561 100644
->>>>> --- a/include/linux/cpu.h
->>>>> +++ b/include/linux/cpu.h
->>>>> @@ -220,6 +220,14 @@ void cpu_idle(void);
->>>>>   
->>>>>   void cpu_idle_poll_ctrl(bool enable);
->>>>>   
->>>>> +enum idle_boot_override {
->>>>> +	IDLE_NO_OVERRIDE = 0,
->>>>> +	IDLE_HALT,
->>>>> +	IDLE_NOMWAIT,
->>>>> +	IDLE_POLL,
->>>>> +	IDLE_POWERSAVE_OFF
->>>>> +};
->>>>> +
->>>> I do understand the idea behind this change, but IMO HALT and MWAIT are x86
->>>> specific and may not make sense for other architectures.
->>> yes, this is the strange part, the value is arch-dependent.
->>>
->>>> It will also require every architecture using ACPI to export
->>>> boot_option_idle_override which may not be really required.
->>> so, how about forget this patch and move boot_option_idle_override
->>> related code into arch directory such as arch/x86/acpi/boot.c for
->>> x86?
->> The general idea is that we can move all the arch-dependent codes
->> in ACPI driver to arch directory, then make codes in drivers/acpi/
->> arch independent.
-> Well, MWAIT is arch-dependent, so I'm not sure how IDLE_NOMWAIT fits into
-> include/linux/cpu.h?
+On Fri, Jan 17, 2014 at 5:03 PM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+>
+> The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
+> provide input and output FIFO's for it. I2C controller can operate
+> as master with supported bus speeds of 100Kbps and 400Kbps.
+>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> [bjorn: reformulated part of binding description and cleaned up example]
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
 
-So you will not happy with this patch and should find another solution?
+Patch history?
 
-Thanks
-Hanjun
+>  .../devicetree/bindings/i2c/qcom,i2c-qup.txt       | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+> new file mode 100644
+> index 0000000..a99711b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+> @@ -0,0 +1,41 @@
+> +Qualcomm Universal Peripheral (QUP) I2C controller
+> +
+> +Required properties:
+> + - compatible: Should be "qcom,i2c-qup".
+
+Seems a bit generic. All versions of the IP are exactly the same?
+"qcom,<chip>-i2c-qup" would be better.
+
+> + - reg: Should contain QUP register address and length.
+> + - interrupts: Should contain I2C interrupt.
+> +
+> + - clocks: Should contain the core clock and the AHB clock.
+> + - clock-names: Should be "core" for the core clock and "iface" for the
+> +                AHB clock.
+> +
+> + - #address-cells: Should be <1> Address cells for i2c device address
+> + - #size-cells: Should be <0> as i2c addresses have no size component
+> +
+> +Optional properties:
+> + - clock-frequency: Should specify the desired i2c bus clock frequency in Hz,
+> +                    default is 100kHz if omitted.
+> +
+> +Child nodes should conform to i2c bus binding.
+> +
+> +Example:
+> +
+> + i2c2: i2c at f9924000 {
+> +       compatible = "qcom,i2c-qup";
+> +       reg = <0xf9924000 0x1000>;
+> +       interrupts = <0 96 0>;
+> +
+> +       clocks = <&gcc_blsp1_qup2_i2c_apps_clk>, <&gcc_blsp1_ahb_clk>;
+> +       clock-names = "core", "iface";
+> +
+> +       clock-frequency = <355000>;
+> +
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +
+> +       dummy at 60 {
+> +               compatible = "dummy";
+> +               reg = <0x60>;
+> +       };
+> + };
+> +
+> --
+> 1.8.2.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
