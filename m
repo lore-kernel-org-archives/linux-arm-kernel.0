@@ -1,52 +1,135 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 20 Jan 2014 22:52:05 +0100
-Subject: [PATCHv2] ARM: mvebu: fix compilation warning on Armada 370 (i.e.
- non-SMP)
-Message-ID: <87txcy8goq.fsf@natisbad.org>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 20 Jan 2014 22:53:51 +0100
+Subject: [PATCH v2 02/11] iommu/arm-smmu: Introduce iommu_group notifier block
+In-Reply-To: <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20140120215351.GG3471@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The following appears during compilation for an Armada 370 target
-because 'irq_controller_lock' is used only when CONFIG_SMP is
-enabled:
+At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
+isolate all master devices for an SMMU.
 
- drivers/irqchip/irq-armada-370-xp.c:62:8: warning: 'irq_controller_lock' defined but not used [-Wunused-variable]
+Depending on DT information each device is put into its own protection
+domain (if possible).  For configuration with one or just a few
+masters per SMMU that is easy to achieve.
 
-Fix that warning by moving declaration of 'irq_controller_lock'
-inside existing #ifdef.
+In case of many devices per SMMU (e.g. MMU-500 with it's distributed
+translation support) isolation of each device might not be possible --
+depending on number of available SMR groups and/or context banks.
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Default is that device isolation is contolled per SMMU with SMMU node
+property "arm,smmu-isolate-devices" in a DT. If this property is set
+for an SMMU node, device isolation is performed.
+
+W/o device isolation the driver detects SMMUs but no translation is
+configured (transactions just bypass translation process).
+
+Note that for device isolation dma_base and size are fixed as 0 and
+SZ_128M at the moment. Additional patches will address this
+restriction and allow automatic growth of mapping size.
+
+Cc: Varun Sethi <Varun.Sethi@freescale.com>
+Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
 ---
+ drivers/iommu/arm-smmu.c |   47 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-Changes since v1:
- - moved declaration inside existing #ifdef as suggested by Arnd,
-   instead of adding a new one.
+Hi Will,
 
- drivers/irqchip/irq-armada-370-xp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This new patch addresses Varun's comments:
+ - use iommu_group notifier instead of bus notifier
+ - remove superfluous call to arm_smmu_add_device in
+   notifier function
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 433cc8568dec..9300bc32784e 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -59,8 +59,6 @@
- #define PCI_MSI_DOORBELL_END                    (32)
- #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
+This patch depends on commit "iommu/arm-smmu: add devices attached to
+the SMMU to an IOMMU group" as found in your git tree (e.g. in branch
+iommu/devel or for-joerg/arm-smmu/updates).
+
+
+Andreas
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 0a5649f..edd0ffb 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -46,6 +46,7 @@
+ #include <linux/amba/bus.h>
  
--static DEFINE_RAW_SPINLOCK(irq_controller_lock);
--
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-@@ -239,6 +237,8 @@ static inline int armada_370_xp_msi_init(struct device_node *node,
- #endif
+ #include <asm/pgalloc.h>
++#include <asm/dma-iommu.h>
  
- #ifdef CONFIG_SMP
-+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ /* Driver options */
+ #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
+@@ -402,6 +403,13 @@ struct arm_smmu_domain {
+ static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+ static LIST_HEAD(arm_smmu_devices);
+ 
++static int arm_smmu_group_notifier(struct notifier_block *nb,
++				unsigned long action, void *data);
 +
- static int armada_xp_set_affinity(struct irq_data *d,
- 				  const struct cpumask *mask_val, bool force)
- {
++static struct notifier_block group_nb = {
++	.notifier_call = arm_smmu_group_notifier,
++};
++
+ struct arm_smmu_option_prop {
+ 	u32 opt;
+ 	const char *prop;
+@@ -1566,6 +1574,8 @@ static int arm_smmu_add_device(struct device *dev)
+ 		return PTR_ERR(group);
+ 	}
+ 
++	iommu_group_register_notifier(group, &group_nb);
++
+ 	ret = iommu_group_add_device(group, dev);
+ 	iommu_group_put(group);
+ 	dev->archdata.iommu = smmu;
+@@ -1981,6 +1991,43 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int arm_smmu_group_notifier(struct notifier_block *nb,
++				unsigned long action, void *data)
++{
++	struct device *dev = data;
++	struct dma_iommu_mapping *mapping;
++	struct arm_smmu_device *smmu;
++	int ret;
++
++	switch (action) {
++	case BUS_NOTIFY_BIND_DRIVER:
++
++		smmu = dev->archdata.iommu;
++		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
++			break;
++
++		mapping = arm_iommu_create_mapping(&platform_bus_type,
++						0, SZ_128M, 0);
++		if (IS_ERR(mapping)) {
++			ret = PTR_ERR(mapping);
++			dev_info(dev, "arm_iommu_create_mapping failed\n");
++			break;
++		}
++
++		ret = arm_iommu_attach_device(dev, mapping);
++		if (ret < 0) {
++			dev_info(dev, "arm_iommu_attach_device failed\n");
++			arm_iommu_release_mapping(mapping);
++		}
++
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++
+ #ifdef CONFIG_OF
+ static struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v1", },
 -- 
-1.8.5.2
+1.7.9.5
