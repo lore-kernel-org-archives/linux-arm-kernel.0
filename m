@@ -1,81 +1,172 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 20 Jan 2014 16:41:43 +0100
-Subject: [PATCH v7 0/7] ARM: rockchip: add smp functionality
-Message-ID: <4970034.fqvMoHdOyd@phil>
+Date: Mon, 20 Jan 2014 16:42:26 +0100
+Subject: [PATCH v7 1/7] of: add functions to count number of elements in a
+ property
+In-Reply-To: <4970034.fqvMoHdOyd@phil>
+References: <4970034.fqvMoHdOyd@phil>
+Message-ID: <4654525.cdlNLasah1@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables the use of the additional cores on Rockchip
-Cortex-A9 SoCs.
+The need to know the number of array elements in a property is
+a common pattern. To prevent duplication of open-coded implementations
+add a helper static function that also centralises strict sanity
+checking and DTB format details, as well as a set of wrapper functions
+for u8, u16, u32 and u64.
 
-To achieve this, add the scu, the needed sram and power-management-unit.
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+This is the same as v4 when this patch was separate, that was a result of the
+discussion in in v6 of the rockchip-smp series.
 
-Tested on both a BQ Curie2 (rk3066a / dual core) and
-on a Radxa Rock (rk3188 / quad core).
+ drivers/of/base.c  |   32 ++++++++++++++++++++++
+ include/linux/of.h |   76 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
 
-changes since v6:
-- address comments from Mark Rutland
-  - using of_property_read_u32_index instead of parsing the list manually
-  - include v4 of "of: add functions to count number of elements in a property"
-    to not have to count property-elements manually anymore
-changes since v5:
-- Grant Likely liked it better to "specify reserved regions of the
-  memory instead of the valid ranges", so go back to the mmio-sram-reserved
-  property originally suggested by Rob Herring
-
-changes since v4:
-- rebase on top of the recent rk3188 board support
-- implement suggestion from Matt Sealey in moving the sram-limit from
-  marking reserved regions to marking available regions - hopefully
-  I got the usage right 
-- remove __CPUINIT as suggested by Fabio Estevam
-
-changes since v3:
-- address comments from Rob Herring:
-  - split the gathering of the reserve-data into a separate loop
-  - spelling and style fixes
-- first patch only included for reference, already part of the
-  char-misc git tree
-
-changes since v2:
-- rework the sram allocation following the suggestion from Philipp Zabel
-
-changes since v1:
-- add reserved block feature for mmio-sram, to not use two logical
-  sram nodes
-- the sram content is kept intact while the device is running, so
-  copying the trampoline is only needed once
-
-Heiko Stuebner (7):
-  of: add functions to count number of elements in a property
-  dt-bindings: sram: describe option to reserve parts of the memory
-  misc: sram: implement mmio-sram-reserved option
-  ARM: rockchip: add snoop-control-unit
-  ARM: rockchip: add sram dt nodes and documentation
-  ARM: rockchip: add power-management-unit
-  ARM: rockchip: add smp bringup code
-
- .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
- .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
- Documentation/devicetree/bindings/misc/sram.txt    |    8 +
- arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
- arch/arm/boot/dts/rk3188.dtsi                      |    6 +
- arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
- arch/arm/mach-rockchip/Kconfig                     |    1 +
- arch/arm/mach-rockchip/Makefile                    |    1 +
- arch/arm/mach-rockchip/core.h                      |   22 +++
- arch/arm/mach-rockchip/headsmp.S                   |   30 +++
- arch/arm/mach-rockchip/platsmp.c                   |  208 ++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  |    2 +
- drivers/misc/sram.c                                |  121 +++++++++++-
- drivers/of/base.c                                  |   32 +++
- include/linux/of.h                                 |   76 +++++++
- 15 files changed, 554 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
- create mode 100644 arch/arm/mach-rockchip/core.h
- create mode 100644 arch/arm/mach-rockchip/headsmp.S
- create mode 100644 arch/arm/mach-rockchip/platsmp.c
-
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 8d007d8..d08acbc 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -883,6 +883,38 @@ struct device_node *of_find_node_by_phandle(phandle handle)
+ EXPORT_SYMBOL(of_find_node_by_phandle);
+ 
+ /**
++ * of_property_count_elems_of_size - Count the number of elements in a property
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ * @elem_size:	size of the individual element
++ *
++ * Search for a property in a device node and count the number of elements of
++ * size elem_size in it. Returns number of elements on sucess, -EINVAL if the
++ * property does not exist or its length does not match a multiple of elem_size
++ * and -ENODATA if the property does not have a value.
++ */
++int of_property_count_elems_of_size(const struct device_node *np,
++				const char *propname, int elem_size)
++{
++	struct property *prop = of_find_property(np, propname, NULL);
++
++	if (!prop)
++		return -EINVAL;
++	if (!prop->value)
++		return -ENODATA;
++
++	if (prop->length % elem_size != 0) {
++		pr_err("size of %s in node %s is not a multiple of %d\n",
++		       propname, np->full_name, elem_size);
++		return -EINVAL;
++	}
++
++	return prop->length / elem_size;
++}
++EXPORT_SYMBOL_GPL(of_property_count_elems_of_size);
++
++/**
+  * of_find_property_value_of_size
+  *
+  * @np:		device node from which the property value is to be read.
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 70c64ba..b59f2e4 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -250,6 +250,8 @@ extern struct device_node *of_find_node_with_property(
+ extern struct property *of_find_property(const struct device_node *np,
+ 					 const char *name,
+ 					 int *lenp);
++extern int of_property_count_elems_of_size(const struct device_node *np,
++				const char *propname, int elem_size);
+ extern int of_property_read_u32_index(const struct device_node *np,
+ 				       const char *propname,
+ 				       u32 index, u32 *out_value);
+@@ -431,6 +433,12 @@ static inline struct device_node *of_find_compatible_node(
+ 	return NULL;
+ }
+ 
++static inline int of_property_count_elems_of_size(const struct device_node *np,
++			const char *propname, int elem_size)
++{
++	return -ENOSYS;
++}
++
+ static inline int of_property_read_u32_index(const struct device_node *np,
+ 			const char *propname, u32 index, u32 *out_value)
+ {
+@@ -570,6 +578,74 @@ static inline int of_node_to_nid(struct device_node *device) { return 0; }
+ #endif
+ 
+ /**
++ * of_property_count_u8_elems - Count the number of u8 elements in a property
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node and count the number of u8 elements
++ * in it. Returns number of elements on sucess, -EINVAL if the property does
++ * not exist or its length does not match a multiple of u8 and -ENODATA if the
++ * property does not have a value.
++ */
++static inline int of_property_count_u8_elems(const struct device_node *np,
++				const char *propname)
++{
++	return of_property_count_elems_of_size(np, propname, sizeof(u8));
++}
++
++/**
++ * of_property_count_u16_elems - Count the number of u16 elements in a property
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node and count the number of u16 elements
++ * in it. Returns number of elements on sucess, -EINVAL if the property does
++ * not exist or its length does not match a multiple of u16 and -ENODATA if the
++ * property does not have a value.
++ */
++static inline int of_property_count_u16_elems(const struct device_node *np,
++				const char *propname)
++{
++	return of_property_count_elems_of_size(np, propname, sizeof(u16));
++}
++
++/**
++ * of_property_count_u32_elems - Count the number of u32 elements in a property
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node and count the number of u32 elements
++ * in it. Returns number of elements on sucess, -EINVAL if the property does
++ * not exist or its length does not match a multiple of u32 and -ENODATA if the
++ * property does not have a value.
++ */
++static inline int of_property_count_u32_elems(const struct device_node *np,
++				const char *propname)
++{
++	return of_property_count_elems_of_size(np, propname, sizeof(u32));
++}
++
++/**
++ * of_property_count_u64_elems - Count the number of u64 elements in a property
++ *
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node and count the number of u64 elements
++ * in it. Returns number of elements on sucess, -EINVAL if the property does
++ * not exist or its length does not match a multiple of u64 and -ENODATA if the
++ * property does not have a value.
++ */
++static inline int of_property_count_u64_elems(const struct device_node *np,
++				const char *propname)
++{
++	return of_property_count_elems_of_size(np, propname, sizeof(u64));
++}
++
++/**
+  * of_property_read_bool - Findfrom a property
+  * @np:		device node from which the property value is to be read.
+  * @propname:	name of the property to be searched.
 -- 
 1.7.10.4
