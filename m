@@ -1,22 +1,28 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 20 Jan 2014 22:56:46 +0100
-Subject: [PATCH v2 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <20140120215351.GG3471@alberich>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
- <20140120215351.GG3471@alberich>
-Message-ID: <20140120215646.GH3471@alberich>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 20 Jan 2014 23:01:18 +0100
+Subject: Nomadik clk not MULTI_V5 friendly
+Message-ID: <20140120220118.GN15169@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 10:53:51PM +0100, Andreas Herrmann wrote:
-> 
-> At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
-> isolate all master devices for an SMMU.
+Hi Linus
 
-Oops, sent out too early. Please ignore this crap.
-(An iommu_group notifier that is handling BUS_NOTIFY_BIND_DRIVER ...)
+drivers/clk/clk-nomadik.c:
 
+static int __init nomadik_src_clk_init_debugfs(void)
+{
+        src_pcksr0_boot = readl(src_base + SRC_PCKSR0);
+        src_pcksr1_boot = readl(src_base + SRC_PCKSR1);
+        debugfs_create_file("nomadik-src-clk", S_IFREG | S_IRUGO,
+                            NULL, NULL, &nomadik_src_clk_debugfs_ops);
+        return 0;
+}
 
-Andreas
+module_init(nomadik_src_clk_init_debugfs);
+
+It does not check if it is actually running on a Nomadik, so when this
+module_init() is executed on kirkwood as part of a MULTI_V5 kernel,
+bad things happen. Please could you add the necessary check.
+
+Thanks
+	Andrew
