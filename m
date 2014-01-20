@@ -1,86 +1,31 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Mon, 20 Jan 2014 23:34:39 +0900
-Subject: [PATCH v5 4/4] [media] exynos-scaler: Add DT bindings for SCALER
- driver
-In-Reply-To: <2542868.mVreZlxTcT@amdc1032>
-References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
- <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
- <2542868.mVreZlxTcT@amdc1032>
-Message-ID: <CAOD6ATofW_M+z5vb7doOnjf=wsbZ7vcdjf9qMJpN0o9oz4_8fg@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 20 Jan 2014 14:36:25 +0000
+Subject: [RFC part2 PATCH 8/9] ACPI / ARM64: Update acpi_register_gsi to
+ register with the core IRQ subsystem
+In-Reply-To: <201312110623.04341.arnd@arndb.de>
+References: <1385999094-3152-1-git-send-email-hanjun.guo@linaro.org> <
+ 1385999094-3152-9-git-send-email-hanjun.guo@linaro.org> <20131210130521.
+ 3FE89C40A27@trevor.secretlab.ca> <201312110623.04341.arnd@arndb.de>
+Message-ID: <20140120143625.EB0E2C40B12@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Wed, 11 Dec 2013 06:23:04 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 10 December 2013, Grant Likely wrote:
+> > > --- a/drivers/acpi/plat/arm-core.c
+> > > +++ b/drivers/acpi/plat/arm-core.c
+> > > @@ -90,7 +90,7 @@ enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> > >  
+> > >  static unsigned int gsi_to_irq(unsigned int gsi)
+> > >  {
+> > > -     int irq = irq_create_mapping(NULL, gsi);
+> > > +     int irq = irq_find_mapping(NULL, gsi);
+> > 
+> > I suspect this will break FDT users that depend on the old behaviour.
+> 
+> I think not, given this is only in drivers/acpi and gets added in one
+> of the prior patches of the same series.
 
-Thanks for the review.
+Ah, okay.
 
-Yes you are right. I didn't add the users for this driver.
-Once the driver gets merged, I will send more patches with the users.
-Already this driver merge is pending on DT maintainers ack and  I
-don't want to complex it more by adding DT patches :)
-
-Definitely, I will send the users patches once the driver gets merged.
-And I will address all your comments in next version of patch series.
-
-
-Regards,
-Shaik Ameer Basha
-
-On Thu, Jan 9, 2014 at 6:20 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Thursday, January 09, 2014 08:58:14 AM Shaik Ameer Basha wrote:
->> This patch adds the DT binding documentation for the
->> Exynos5420/5410 based SCALER device driver.
->>
->> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
->> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  .../devicetree/bindings/media/exynos5-scaler.txt   |   22 ++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/media/exynos5-scaler.txt
->>
->> diff --git a/Documentation/devicetree/bindings/media/exynos5-scaler.txt b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
->> new file mode 100644
->> index 0000000..9328e7d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
->> @@ -0,0 +1,22 @@
->> +* Samsung Exynos5 SCALER device
->> +
->> +SCALER is used for scaling, blending, color fill and color space
->> +conversion on EXYNOS[5420/5410] SoCs.
->> +
->> +Required properties:
->> +- compatible: should be "samsung,exynos5420-scaler" or
->> +                     "samsung,exynos5410-scaler"
->> +- reg: should contain SCALER physical address location and length
->> +- interrupts: should contain SCALER interrupt number
->> +- clocks: should contain the SCALER clock specifier, from the
->> +                     common clock bindings
->> +- clock-names: should be "scaler"
->> +
->> +Example:
->> +     scaler_0: scaler at 12800000 {
->> +             compatible = "samsung,exynos5420-scaler";
->> +             reg = <0x12800000 0x1000>;
->> +             interrupts = <0 220 0>;
->> +             clocks = <&clock 381>;
->> +             clock-names = "scaler";
->> +     };
->
-> Your patchset adds support for EXYNOS5 SCALER but doesn't add any real
-> users of it yet.  Could you please explain why?
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+g.
