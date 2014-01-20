@@ -1,34 +1,146 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 Jan 2014 12:47:07 -0800
-Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
-In-Reply-To: <20140120095532.GW15937@n2100.arm.linux.org.uk>
-References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
- <20140119031816.GD16158@S2101-09.ap.freescale.net>
- <20140119185246.GB28056@quad.lixom.net>
- <20140120004434.GV15937@n2100.arm.linux.org.uk>
- <CAOesGMiych-jeo_eKGgL1qxsYQ=rkb4UQwgGBsG-7+GMbLJWhg@mail.gmail.com>
- <20140120095532.GW15937@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMjBCbMZrpbKjBBUeFhWEkLHS5rERtajRDk0ew_5FYvQEA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Jan 2014 18:47:20 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
+Message-ID: <1390250840-24196-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 1:55 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jan 19, 2014 at 07:34:22PM -0800, Olof Johansson wrote:
->> I'm guessing this is going to mess up Shawn's cleanup patches, but
->> time has ran out for 3.14 for those so they will need to be respun
->> anyway, most likely.
->>
->> We can apply them to arm-soc's dt branch. I think it's better if we
->> merge them since dts files tend to be one of the conflict-ridden areas
->> (even if this particular instance isn't). Send the series our way if
->> you want, or send a branch pull request, your choice.
->
-> There's no conflict, and they build fine according to my autobuilder
-> which includes arm-soc for-next.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Great, I didn't see any patches sent from you though. Should I
-cherry-pick them from -next instead?
+mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 110 +++++++++++++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
 
--Olof
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 47c5a3f..e44ff49 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -63,6 +63,112 @@
+ 	status = "okay";
+ };
+ 
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+@@ -90,6 +196,10 @@
+ 			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <MX6QDL_I2C2_PINGRP3>;
++		};
++
+ 		pinctrl_gpmi_nand: gpminandgrp {
+ 			fsl,pins = <MX6QDL_GPMI_NAND_PINGRP1>;
+ 		};
+-- 
+1.8.1.2
