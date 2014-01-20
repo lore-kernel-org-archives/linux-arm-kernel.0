@@ -1,60 +1,41 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 20 Jan 2014 11:04:31 +0900
-Subject: [PATCH] arm64: mm: use ubfm for dcache_line_size
-In-Reply-To: <20140117111307.GE16003@mudshark.cambridge.arm.com>
-References: <000301cf135a$c1390e40$43ab2ac0$%han@samsung.com>
- <20140117111307.GE16003@mudshark.cambridge.arm.com>
-Message-ID: <002001cf1583$f54f0790$dfed16b0$%han@samsung.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 20 Jan 2014 10:42:05 +0800
+Subject: [PATCH v2 0/5] mmc: sdhci: a few fixes on timeout and
+ max_discard_to
+In-Reply-To: <CAA+hA=QgPvTXWbKjpd9e0H3MacGqu8=zz_PpCRAB0NGu_drVtw@mail.gmail.com>
+References: <1387268191-19859-1-git-send-email-b29396@freescale.com>
+ <20131217143025.GX6691@S2101-09.ap.freescale.net>
+ <CAA+hA=QgPvTXWbKjpd9e0H3MacGqu8=zz_PpCRAB0NGu_drVtw@mail.gmail.com>
+Message-ID: <CAA+hA=Q_p8bLpEA+04cqRhZOCNJQ=i-cgshxQbP8n-fEbu89rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ping...
 
-
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Friday, January 17, 2014 8:13 PM
-> To: Jingoo Han
-> Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] arm64: mm: use ubfm for dcache_line_size
-> 
-> On Fri, Jan 17, 2014 at 08:04:32AM +0000, Jingoo Han wrote:
-> > Use 'ubfm' for the bitfield move instruction; thus, single
-> > instruction can be used instead of two instructions, when
-> > getting the minimum D-cache line size from CTR_EL0 register.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  arch/arm64/mm/proc-macros.S |    3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> > index 8957b82..c31f41e 100644
-> > --- a/arch/arm64/mm/proc-macros.S
-> > +++ b/arch/arm64/mm/proc-macros.S
-> > @@ -38,8 +38,7 @@
-> >   */
-> >  	.macro	dcache_line_size, reg, tmp
-> >  	mrs	\tmp, ctr_el0			// read CTR
-> > -	lsr	\tmp, \tmp, #16
-> > -	and	\tmp, \tmp, #0xf		// cache line size encoding
-> > +	ubfm	\tmp, \tmp, #0x16, 0x19		// cache line size encoding
-> 
-> 0x16 and 0x19. Are you sure?
-
-(+cc Ard Biesheuvel)
-
-Oh, it's my mistake.
-CTR_EL0[19:16] is a proper bit-field; it means 'DminLine'.
-So, I will fit it as below:
-
-ubfm    \tmp, \tmp, #16, #19
-
-> 
-> You can also grep for other occurences of this pattern and change
-> those too (pgtable stuff in head.S, clidr in cache.S).
-
-OK, I will change others of this pattern.
-I appreciate your comments. :-)
-
-Best regards,
-Jingoo Han
+On Mon, Jan 13, 2014 at 6:55 PM, Dong Aisheng <dongas86@gmail.com> wrote:
+> Hi Chris,
+>
+> On Tue, Dec 17, 2013 at 10:30 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On Tue, Dec 17, 2013 at 04:16:26PM +0800, Dong Aisheng wrote:
+>>> Dong Aisheng (5):
+>>>   mmc: sdhci: add platfrom get_max_timeout_count hook
+>>>   mmc: sdhci-esdhc-imx: fix incorrect max_discard_to for uSDHC
+>>>   mmc: sdhci: add platform set_timeout hook
+>>>   mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+>>>   mmc: sdhci: calculate max_discard_to dynamically for
+>>>     SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+>>
+>> For all,
+>>
+>> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+>>
+>
+> Can you pick this series?
+>
+> Regards
+> Dong Aisheng
+>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
