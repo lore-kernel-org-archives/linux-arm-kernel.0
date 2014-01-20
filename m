@@ -1,18 +1,48 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 19 Jan 2014 20:03:33 -0800 (PST)
-Subject: [PATCH net-next v3 0/8] net: stmmac: Add Allwinner A20 GMAC
- ethernet
-In-Reply-To: <1389965087-21971-1-git-send-email-wens@csie.org>
-References: <1389965087-21971-1-git-send-email-wens@csie.org>
-Message-ID: <20140119.200333.695302698969720789.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 19 Jan 2014 20:06:09 -0800
+Subject: [PATCH v3 16/24] drm/i2c: tda998x: add DT documentation
+In-Reply-To: <20140119195844.0c975b90@armhf>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195844.0c975b90@armhf>
+Message-ID: <CAOesGMi96wkHM8jfHNVnM7RJyW2vVoP6FT4YyYzKp-kfc0jTuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Fri, 17 Jan 2014 21:24:39 +0800
+Hi,
 
-> This is v3 of the  Allwinner A20 GMAC glue layer for stmmac.
-> I have split the series into stmmac driver changes for net-next,
-> and clock and DT patches for their respective trees.
+On Sun, Jan 19, 2014 at 10:58 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  .../devicetree/bindings/drm/i2c/tda998x.txt        | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/i2c/tda998x.txt
 
-Series applied, thanks.
+Please cc bindings for review to devicetree at vger.kernel.org (cc:d here now)
+
+> diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+> new file mode 100644
+> index 0000000..72da71d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+> @@ -0,0 +1,24 @@
+> +Device-Tree bindings for the NXP TDA998x HDMI transmitter
+> +
+> +Required properties;
+> +  - compatible: must be "nxp,tda998x"
+> +
+> +Optional properties:
+> +  - interrupts: interrupt number for HDMI exchanges - default: by polling
+
+What are HDMI exchanges, and how do they differ from other interrupts?
+
+> +
+> +  - pinctrl-0: pin control group to be used for this controller (IRQ).
+> +
+> +  - pinctrl-names: must contain a "default" entry.
+> +
+> +  - video-ports: 24 bits value - default: <0x230145>
+
+What is this?
+
+
+-Olof
