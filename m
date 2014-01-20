@@ -1,61 +1,122 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 Jan 2014 15:01:10 -0500
-Subject: [GIT PULL] ARM: mvebu: DT boards for v3.14 (incr #6)
-Message-ID: <20140120200110.GW29184@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 20 Jan 2014 14:06:37 -0600
+Subject: [PATCH] ARM: OMAP4+: move errata initialization to omap4_pm_init_early
+In-Reply-To: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
+References: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
+Message-ID: <1390248397-14112-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Move all OMAP4 PM errata initializations to centralized location in
+omap4_pm_init_early. This allows for users to utilize the erratas
+in various submodules as needed.
 
-I had a few boards that came in late in the cycle.  I was holding on to
-them for the next round, but after Olof's comment this morning:
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Reported by Tony here: https://patchwork.kernel.org/patch/3084521/
+Reproduced with .config: http://slexy.org/view/s2EEdvTGXV on next-20140120 tag (based on omap2plus_defconfig)
+Applies on v3.13 tag and on next-20140120
+Tested to boot on next-20140120 along with https://patchwork.kernel.org/patch/3084521/
+on PandaBoard-ES with multi_v7_defconfig: http://slexy.org/view/s27n0BWrPf
 
-  Re: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
-  http://www.spinics.net/lists/arm-kernel/msg301777.html
+ arch/arm/mach-omap2/common.h   |    6 ++++++
+ arch/arm/mach-omap2/io.c       |    1 +
+ arch/arm/mach-omap2/omap-smp.c |    6 +-----
+ arch/arm/mach-omap2/pm44xx.c   |   15 +++++++++++++++
+ 4 files changed, 23 insertions(+), 5 deletions(-)
 
-I figured I'd send them off.  As usual, they've been in -next for a
-while.  Also, this is an incremental request from tags/mvebu-dt-3.14-5
-to tags/mvebu-dt-3.14-6 on the mvebu/dt branch.
-
-If this is going to be ok for the forseeable future, I'll do a separate
-branch for new boards next time around.
-
-thx,
-
-Jason.
-
-
-The following changes since commit 2cc64b5655da65bbb6a760a722b5ab1f53f92cf7:
-
-  ARM: Kirkwood: DT board setup for LaPlug (2013-12-25 02:03:52 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.14-6
-
-for you to fetch changes up to 57d647cf8d32f52a505bc51c34f8074f06f00b03:
-
-  ARM: Kirkwood: Add DT description of QNAP 419 (2014-01-14 00:46:44 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.14 (incremental #6)
-
- - kirkwood
-    - add board Excito Bubba B3
-    - add board QNAP 419
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Add support for Excito Bubba B3
-      ARM: Kirkwood: Add DT description of QNAP 419
-
- arch/arm/boot/dts/Makefile                |   7 +-
- arch/arm/boot/dts/kirkwood-b3.dts         | 204 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-ts419-6281.dts |  20 +++
- arch/arm/boot/dts/kirkwood-ts419-6282.dts |  32 +++++
- arch/arm/boot/dts/kirkwood-ts419.dtsi     |  75 +++++++++++
- 5 files changed, 336 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 3adaa1d..a6aae30 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -62,11 +62,17 @@ static inline int omap3_pm_init(void)
+ 
+ #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+ int omap4_pm_init(void);
++int omap4_pm_init_early(void);
+ #else
+ static inline int omap4_pm_init(void)
+ {
+ 	return 0;
+ }
++
++static inline int omap4_pm_init_early(void)
++{
++	return 0;
++}
+ #endif
+ 
+ #ifdef CONFIG_OMAP_MUX
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 47381fd..d408b15 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -641,6 +641,7 @@ void __init omap4430_init_early(void)
+ 	omap_cm_base_init();
+ 	omap4xxx_check_revision();
+ 	omap4xxx_check_features();
++	omap4_pm_init_early();
+ 	omap44xx_prm_init();
+ 	omap44xx_voltagedomains_init();
+ 	omap44xx_powerdomains_init();
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 75e95d4..17550aa 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -39,8 +39,6 @@
+ 
+ #define OMAP5_CORE_COUNT	0x2
+ 
+-u16 pm44xx_errata;
+-
+ /* SCU base address */
+ static void __iomem *scu_base;
+ 
+@@ -217,10 +215,8 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 	if (scu_base)
+ 		scu_enable(scu_base);
+ 
+-	if (cpu_is_omap446x()) {
++	if (cpu_is_omap446x())
+ 		startup_addr = omap4460_secondary_startup;
+-		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
+-	}
+ 
+ 	/*
+ 	 * Write the address of secondary startup routine into the
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 82f06989..eefb30c 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -24,6 +24,8 @@
+ #include "powerdomain.h"
+ #include "pm.h"
+ 
++u16 pm44xx_errata;
++
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+ 	u32 next_state;
+@@ -199,6 +201,19 @@ static inline int omap4_init_static_deps(void)
+ }
+ 
+ /**
++ * omap4_pm_init_early - Does early initialization necessary for OMAP4+ devices
++ *
++ * Initializes basic stuff for power management functionality.
++ */
++int __init omap4_pm_init_early(void)
++{
++	if (cpu_is_omap446x())
++		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
++
++	return 0;
++}
++
++/**
+  * omap4_pm_init - Init routine for OMAP4+ devices
+  *
+  * Initializes all powerdomain and clockdomain target states
+-- 
+1.7.9.5
