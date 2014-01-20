@@ -1,159 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 20 Jan 2014 14:40:08 +0530
-Subject: [PATCH V3 REPOST] dma: tegra: register as an OF DMA controller
-In-Reply-To: <1386699949-13595-1-git-send-email-swarren@wwwdotorg.org>
-References: <1386699949-13595-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140120091008.GQ26823@intel.com>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Mon, 20 Jan 2014 11:15:09 +0100
+Subject: Deadlock in do_page_fault() on ARM (old kernel)
+In-Reply-To: <52D73220.3030108@signal11.us>
+References: <52D73220.3030108@signal11.us>
+Message-ID: <20140120101509.GA2626@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 10, 2013 at 11:25:49AM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Call of_dma_controller_register() so that DMA clients can look up the
-> Tegra DMA controller using standard APIs. This requires the of_xlate()
-> function to save off the DMA slave ID, and for tegra_dma_slave_config()
-> not to over-write this information; once DMA client drivers are converted
-> to dma_request_slave_channel() and DT-based lookups, they won't set this
-> field of struct dma_slave_config anymore.
-> 
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: dmaengine at vger.kernel.org
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+On Wed 15-01-14 20:13:04, Alan Ott wrote:
+[...]
+> 2. __copy_to_user_memcpy() takes a read lock (down_read()) on
 
-Sorry for delay in doing this
+This looks like a bug. copy_to_user_* shouldn't take mmap_sem at all
+Check the might_fault annotation used in generic code. Arm version of
+copy_to_user* doesn't seem to use the annotation and I do not see a good
+reason for that.
 
---
-~Vinod
-> ---
-> (just reposting this in order to get an ack from one of the dmaengine
-> maintainers)
+> mm->mmap_sem. While that lock is held, __copy_to_user_memcpy() can
+> generate a page fault, causing do_page_fault() to get called, which
+> will also try to get a read lock (down_read()) on mm->mmap_sem.
+> Multiple read locks can be taken on an rw_semaphore, but deadlock
+> will occur if another thread tries to get a write lock
+> (down_write()) in between. For example:
+>     Task 1:         Task 2:
+>     down_read(sem)
+>                     down_write(sem)    <-- Goes to sleep
+>     down_read(sem)                     <-- Goes to sleep
 > 
-> v3:
-> * Rework of_xlate() to use new dma_get_any_slave_channel().
-> v2:
-> * Use of_dma_slave_xlate() rather than of_dma_simple_xlate(), as
->   suggested by Arnd Bergmann.
+> There is a thread from 2005[3] which seems to discuss the same
+> concept of recursive rw_semaphores, but for futexes.
 > 
-> This patch is part of a series with strong internal depdendencies. I'm
-> looking for an ack so that I can take the entire series through the Tegra
-> and arm-soc trees. The series will be part of a stable branch that can be
-> merged into other subsystems if needed to avoid/resolve dependencies.
-> ---
->  drivers/dma/tegra20-apb-dma.c | 39 ++++++++++++++++++++++++++++++++++++---
->  1 file changed, 36 insertions(+), 3 deletions(-)
+> Other comments:
+> 1. My analysis of this probably wrong. Otherwise it seems many
+> others would have the same problem, and they don't seem to. I'm
+> hoping this email will help to correct my understanding.
+> 2. I looked through the git logs for recent (since 2.6.37 time
+> frame) and nothing else jumped out at me as being an obvious fix for
+> this situation.
 > 
-> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
-> index afa5844c9346..d11bb3620f27 100644
-> --- a/drivers/dma/tegra20-apb-dma.c
-> +++ b/drivers/dma/tegra20-apb-dma.c
-> @@ -1,7 +1,7 @@
->  /*
->   * DMA driver for Nvidia's Tegra20 APB DMA controller.
->   *
-> - * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-> + * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
->   *
->   * This program is free software; you can redistribute it and/or modify it
->   * under the terms and conditions of the GNU General Public License,
-> @@ -29,6 +29,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_dma.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm.h>
->  #include <linux/pm_runtime.h>
-> @@ -199,6 +200,7 @@ struct tegra_dma_channel {
->  	void			*callback_param;
->  
->  	/* Channel-slave specific configuration */
-> +	unsigned int slave_id;
->  	struct dma_slave_config dma_sconfig;
->  	struct tegra_dma_channel_regs	channel_reg;
->  };
-> @@ -340,6 +342,8 @@ static int tegra_dma_slave_config(struct dma_chan *dc,
->  	}
->  
->  	memcpy(&tdc->dma_sconfig, sconfig, sizeof(*sconfig));
-> +	if (!tdc->slave_id)
-> +		tdc->slave_id = sconfig->slave_id;
->  	tdc->config_init = true;
->  	return 0;
->  }
-> @@ -942,7 +946,7 @@ static struct dma_async_tx_descriptor *tegra_dma_prep_slave_sg(
->  	ahb_seq |= TEGRA_APBDMA_AHBSEQ_BUS_WIDTH_32;
->  
->  	csr |= TEGRA_APBDMA_CSR_ONCE | TEGRA_APBDMA_CSR_FLOW;
-> -	csr |= tdc->dma_sconfig.slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
-> +	csr |= tdc->slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
->  	if (flags & DMA_PREP_INTERRUPT)
->  		csr |= TEGRA_APBDMA_CSR_IE_EOC;
->  
-> @@ -1086,7 +1090,7 @@ static struct dma_async_tx_descriptor *tegra_dma_prep_dma_cyclic(
->  	csr |= TEGRA_APBDMA_CSR_FLOW;
->  	if (flags & DMA_PREP_INTERRUPT)
->  		csr |= TEGRA_APBDMA_CSR_IE_EOC;
-> -	csr |= tdc->dma_sconfig.slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
-> +	csr |= tdc->slave_id << TEGRA_APBDMA_CSR_REQ_SEL_SHIFT;
->  
->  	apb_seq |= TEGRA_APBDMA_APBSEQ_WRAP_WORD_1;
->  
-> @@ -1206,6 +1210,25 @@ static void tegra_dma_free_chan_resources(struct dma_chan *dc)
->  		kfree(sg_req);
->  	}
->  	clk_disable_unprepare(tdma->dma_clk);
-> +
-> +	tdc->slave_id = 0;
-> +}
-> +
-> +static struct dma_chan *tegra_dma_of_xlate(struct of_phandle_args *dma_spec,
-> +					   struct of_dma *ofdma)
-> +{
-> +	struct tegra_dma *tdma = ofdma->of_dma_data;
-> +	struct dma_chan *chan;
-> +	struct tegra_dma_channel *tdc;
-> +
-> +	chan = dma_get_any_slave_channel(&tdma->dma_dev);
-> +	if (!chan)
-> +		return NULL;
-> +
-> +	tdc = to_tegra_dma_chan(chan);
-> +	tdc->slave_id = dma_spec->args[0];
-> +
-> +	return chan;
->  }
->  
->  /* Tegra20 specific DMA controller information */
-> @@ -1383,10 +1406,20 @@ static int tegra_dma_probe(struct platform_device *pdev)
->  		goto err_irq;
->  	}
->  
-> +	ret = of_dma_controller_register(pdev->dev.of_node,
-> +					 tegra_dma_of_xlate, tdma);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev,
-> +			"Tegra20 APB DMA OF registration failed %d\n", ret);
-> +		goto err_unregister_dma_dev;
-> +	}
-> +
->  	dev_info(&pdev->dev, "Tegra20 APB DMA driver register %d channels\n",
->  			cdata->nr_channels);
->  	return 0;
->  
-> +err_unregister_dma_dev:
-> +	dma_async_device_unregister(&tdma->dma_dev);
->  err_irq:
->  	while (--i >= 0) {
->  		struct tegra_dma_channel *tdc = &tdma->channels[i];
-> -- 
-> 1.8.1.5
+> Thanks for any insight you can give,
 > 
+> Alan.
+> 
+> [1] http://www.signal11.us/~alan/show-all-tasks-deadlock.txt
+> 
+> [2] Some websites/bugtrackers mention this commit with a similar
+> issue, but I'm not entirely sure how it's related:
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8878a539ff19a43cf3729e7562cd528f490246ae
+> 
+> This one seems obviously related, but has no effect on my system:
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=435a7ef52db7d86e67a009b36cac1457f8972391
+> 
+> [3] http://thread.gmane.org/gmane.linux.kernel/280900
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
 -- 
+Michal Hocko
+SUSE Labs
