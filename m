@@ -1,37 +1,37 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 21 Jan 2014 14:00:28 +0100
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <1591253.8BzYfubhGS@avalon>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
- <1591253.8BzYfubhGS@avalon>
-Message-ID: <2118020.lZAv6IL4Xy@avalon>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 21 Jan 2014 18:31:38 +0530
+Subject: [RFC PATCH 0/3] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+Message-ID: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+and Coordination Interface (PSCI) v0.1.
 
-On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
-> On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
-> > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
-> > > Geert, could you please verify that the series fixes your QSPI clock
-> > > issues with the Koelsch board ?
-> > > 
-> > > Laurent Pinchart (2):
-> > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
-> > >   clk: shmobile: rcar-gen2: Fix qspi divisor
-> > 
-> > Thanks, both:
-> > 
-> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> 
-> Thank you.
-> 
-> Mike, could you please pick those patches up for v3.14 ?
+This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
+provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
+CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
+later.
 
-Ping ?
+The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+PSCI v0.2 to VCPUs. 
+
+Anup Patel (3):
+  KVM: Add capability to advertise PSCI v0.2 support
+  ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
+  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
+
+ Documentation/virtual/kvm/api.txt |    2 +
+ arch/arm/include/asm/kvm_host.h   |    2 +-
+ arch/arm/include/uapi/asm/kvm.h   |   39 ++++++++++++++++--
+ arch/arm/kvm/arm.c                |    6 ++-
+ arch/arm/kvm/psci.c               |   79 ++++++++++++++++++++++++++++++-------
+ arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm64/include/uapi/asm/kvm.h |   39 ++++++++++++++++--
+ include/uapi/linux/kvm.h          |    1 +
+ 8 files changed, 146 insertions(+), 24 deletions(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
