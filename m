@@ -1,246 +1,68 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 21 Jan 2014 12:42:12 +0100
-Subject: [PATCH v2 5/7] clk: exynos: use cpu-clock provider type to
- represent arm clock
-In-Reply-To: <CAJuA9agR182H1NPj8N6TmBhBvKEk=QvKqNa_7T95SA5GxqQXGg@mail.gmail.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-6-git-send-email-thomas.ab@samsung.com>
- <20140120084721.7f0050ea@amdc2363>
- <CAJuA9ajQWStgtFHDshM8PgRwizndzyTuRqvBNwh6GT4m-Exj6A@mail.gmail.com>
- <20140121113855.3875555d@amdc2363>
- <CAJuA9agR182H1NPj8N6TmBhBvKEk=QvKqNa_7T95SA5GxqQXGg@mail.gmail.com>
-Message-ID: <20140121124212.562d7efa@amdc2363>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 Jan 2014 12:44:45 +0100
+Subject: Removing PLAT_ORION dependency from ARCH_MVEBU (Was Re: [PATCH
+ v2 14/15] watchdog: orion: Allow to build on any Orion platform)
+In-Reply-To: <20140121110603.GB4356@localhost>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52DE40BD.10700@gmail.com> <20140121110603.GB4356@localhost>
+Message-ID: <52DE5DAD.7040308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 01/21/14 12:06, Ezequiel Garcia wrote:
+> Sebastian,
+>
+> I'm picking on this discussion, with a new Subject.
+>
+> On Tue, Jan 21, 2014 at 10:41:17AM +0100, Sebastian Hesselbarth wrote:
+>> On 01/21/14 10:12, Ezequiel Garcia wrote:
+>>> After getting rid of all the mach-specific code, it's now possible
+>>> to allow builds in any Orion platform.
+>>>
+>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>> ---
+>>>    drivers/watchdog/Kconfig | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>>> index 5be6e91..1689f72 100644
+>>> --- a/drivers/watchdog/Kconfig
+>>> +++ b/drivers/watchdog/Kconfig
+>>> @@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
+>>>
+>>>    config ORION_WATCHDOG
+>>>    	tristate "Orion watchdog"
+>>> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+>>> +	depends on PLAT_ORION
+> [..]
+>>
+>> I haven't checked why ARCH_MVEBU at all added PLAT_ORION as dependency,
+>> but IIRC it was just because of a missing mbus driver? If it is just
+>> this, we should also remove PLAT_ORION from ARCH_MVEBU to have a clean
+>> cut between new common arch and existing sub-archs.
+>>
+>
+> Well, I'm not sure if I'm following you. Many drivers currently depend
+> on PLAT_ORION, so if we remove PLAT_ORION from ARCH_MVEBU we would have
+> to replace: s/PLAT_ORION/ARCH_{MVEBU, KIRKWOOD, DOVE, ...}.
+>
+> Is this the suggested roadmap or I've completely misunderstood it?
 
-> Hi Lukasz,
-> 
-> On Tue, Jan 21, 2014 at 4:08 PM, Lukasz Majewski
-> <l.majewski@samsung.com> wrote:
-> > Hi Thomas,
-> >
-> >> On Mon, Jan 20, 2014 at 1:17 PM, Lukasz Majewski
-> >> <l.majewski@samsung.com> wrote:
-> >> > Hi Thomas,
-> >> >
-> >> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >> >>
-> >> >> With the addition of the new Samsung specific cpu-clock type,
-> >> >> the arm clock can be represented as a cpu-clock type and the
-> >> >> independent clock blocks that made up the arm clock can be
-> >> >> removed.
-> >> >>
-> >> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> >> ---
-> >> >>  .../devicetree/bindings/clock/exynos5250-clock.txt |    1 +
-> >> >>  drivers/clk/samsung/clk-exynos4.c                  |   11
-> >> >> +++++------ drivers/clk/samsung/clk-exynos5250.c
-> >> >> |    8 ++++---- include/dt-bindings/clock/exynos5250.h
-> >> >> |    1 + 4 files changed, 11 insertions(+), 10 deletions(-)
-> >> >>
-> >> >> diff --git
-> >> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> >> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> >> >> index 99eae9c..acf867a 100644 ---
-> >> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> >> >> +++
-> >> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
-> >> >> @@ -38,6 +38,7 @@ clock which they consume.
-> >> >> ---------------------------- fin_pll            1
-> >> >> +  armclk             12
-> >> >>
-> >> >>    [Clock Gate for Special Clocks]
-> >> >>
-> >> >> diff --git a/drivers/clk/samsung/clk-exynos4.c
-> >> >> b/drivers/clk/samsung/clk-exynos4.c index 010f071..efcf4a3
-> >> >> 100644 --- a/drivers/clk/samsung/clk-exynos4.c
-> >> >> +++ b/drivers/clk/samsung/clk-exynos4.c
-> >> >> @@ -437,8 +437,6 @@ static struct samsung_mux_clock
-> >> >> exynos4x12_mux_clks[] __initdata = {
-> >> >>  /* list of divider clocks supported in all exynos4 soc's */
-> >> >>  static struct samsung_div_clock exynos4_div_clks[] __initdata
-> >> >> = {
-> >> >> -     DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
-> >> >> -     DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
-> >> >>       DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
-> >> >>       DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
-> >> >>       DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-> >> >> @@ -484,8 +482,8 @@ static struct samsung_div_clock
-> >> >> exynos4_div_clks[] __initdata = { DIV(0, "div_spi_pre2",
-> >> >> "div_spi2", DIV_PERIL2, 8, 8), DIV(0, "div_audio1",
-> >> >> "mout_audio1", DIV_PERIL4, 0, 4), DIV(0, "div_audio2",
-> >> >> "mout_audio2", DIV_PERIL4, 16, 4),
-> >> >> -     DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
-> >> >> -     DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
-> >> >> 3),
-> >> >> +     DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0,
-> >> >> 24, 3,
-> >> >> +                     CLK_GET_RATE_NOCACHE, 0),
-> >> >>       DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
-> >> >>                       CLK_SET_RATE_PARENT, 0),
-> >> >>       DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
-> >> >> @@ -870,7 +868,6 @@ static struct samsung_gate_clock
-> >> >> exynos4x12_gate_clks[] __initdata = {
-> >> >>  static struct samsung_clock_alias exynos4_aliases[] __initdata
-> >> >> = { ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
-> >> >> -     ALIAS(CLK_ARM_CLK, NULL, "armclk"),
-> >> >>       ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
-> >> >>  };
-> >> >>
-> >> >> @@ -1125,12 +1122,14 @@ static void __init
-> >> >> exynos4_clk_init(struct device_node *np,
-> >> >> samsung_clk_register_alias(exynos4_aliases,
-> >> >> ARRAY_SIZE(exynos4_aliases));
-> >> >>
-> >> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
-> >> >> reg_base); +
-> >> >
-> >> > I've got some doubts about allowing only the "mout_apll" clock to
-> >> > be the only parent for armclk Samsung clock.
-> >> >
-> >> > For the Exynos4412 it is also valid to have SCLK_MPLL_USER_C [*]
-> >> > as a parent for this clock.
-> >> >
-> >> > The problem is that you are reparenting the armclk to [*] with
-> >> > the register modification - no CCF involved.
-> >>
-> >> The MUX_CORE mux is part of the larger cpu clock type and not
-> >> registered as a separate mux clock with CCF. So I would like to
-> >> know if there are any potential issues you see if this mux clock is
-> >> internally managed within the set_rate of the larger cpu clock
-> >> type.
-> >
-> > So the large opaque clock (armclk) starts with inputs to MUX_CORE
-> > (and embrace this MUX as well)?
-> 
-> Yes, the MUX_CORE is now part of the large opaque clock and will only
-> use mout_apll as the parent clock. The other parent will be used
-> temporarily only when the frequency of the mout_apll (leading to APLL)
-> has to be changed.
-> 
-> >
-> > If yes, then I don't mind if it is solely managed inside the armclk.
-> >
-> > This however allows the armclk to be fed from mout_apll[*] and
-> > sclk_mpll__user_c[**]. And this would be nice if reflected in the
-> > code.
-> 
-> Okay.
-> 
-> >
-> >>
-> >> >
-> >> > I just would like to know if this is yours design decision or
-> >> > something, that we have overlooked in the v1 of this patch
-> >> > series.
-> >>
-> >> I did overlook this one. This will be fixed in the next version by
-> >> ensuring that the dividers for SCLK_HPM clock will be updated only
-> >> if mout_apll is the parent of the MUX_HPM clock mux.
-> >
-> > Shall not they be updated if whatever connected to the MUX_HPM
-> > ([*] and [**]) changes?
-> 
-> They will be updated if their parent is mout_apll. If their parent is
-> a MPLL sourced clock, the divider will not be updated since the set
-> rate on this opaque clock will not change the frequency of the MPLL
-> sourced clock.
+Actually, you are right, PLAT_ORION is dependency for a bunch of
+drivers. But as PLAT_ORION - code-wise - almost only contains non-DT
+stuff, I'd prefer to use ARCH_MVEBU for DT enabled Marvell SoCs where
+possible.
 
-Ok, Thanks for clarification.
+So for the above, just add ARCH_MVEBU and remove ARCH_KIRKWOOD,
+ARCH_DOVE later when we kill them, instead of hiding all behind
+PLAT_ORION. Also remove the dependency of ARCH_MVEBU to PLAT_ORION
+where possible or replace it with ARCH_MVEBU directly.
 
-> 
-> Thanks,
-> Thomas.
-> 
-> >
-> >>
-> >> Thanks,
-> >> Thomas.
-> >>
-> >> >
-> >> >>       pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
-> >> >>               "\tsclk_epll = %ld, sclk_vpll = %ld, arm_clk =
-> >> >> %ld\n", exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
-> >> >>               _get_rate("sclk_apll"),
-> >> >> _get_rate("sclk_mpll"), _get_rate("sclk_epll"),
-> >> >> _get_rate("sclk_vpll"),
-> >> >> -             _get_rate("arm_clk"));
-> >> >> +             _get_rate("armclk"));
-> >> >>  }
-> >> >>
-> >> >>
-> >> >> diff --git a/drivers/clk/samsung/clk-exynos5250.c
-> >> >> b/drivers/clk/samsung/clk-exynos5250.c index ff4beeb..487be36
-> >> >> 100644 --- a/drivers/clk/samsung/clk-exynos5250.c
-> >> >> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> >> >> @@ -298,9 +298,8 @@ static struct samsung_div_clock
-> >> >> exynos5250_div_clks[] __initdata = { /*
-> >> >>        * CMU_CPU
-> >> >>        */
-> >> >> -     DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
-> >> >> -     DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
-> >> >> -     DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3,
-> >> >> "armclk"),
-> >> >> +     DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
-> >> >> +                     CLK_GET_RATE_NOCACHE, 0),
-> >> >>
-> >> >>       /*
-> >> >>        * CMU_TOP
-> >> >> @@ -684,8 +683,9 @@ static void __init
-> >> >> exynos5250_clk_init(struct device_node *np)
-> >> >> ARRAY_SIZE(exynos5250_div_clks));
-> >> >> samsung_clk_register_gate(exynos5250_gate_clks,
-> >> >> ARRAY_SIZE(exynos5250_gate_clks));
-> >> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
-> >> >> reg_base);
-> >> >>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
-> >> >> -                     _get_rate("div_arm2"));
-> >> >> +                     _get_rate("armclk"));
-> >> >>  }
-> >> >>  CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock",
-> >> >> exynos5250_clk_init); diff --git
-> >> >> a/include/dt-bindings/clock/exynos5250.h
-> >> >> b/include/dt-bindings/clock/exynos5250.h index 922f2dc..59a10fb
-> >> >> 100644 --- a/include/dt-bindings/clock/exynos5250.h +++
-> >> >> b/include/dt-bindings/clock/exynos5250.h @@ -21,6 +21,7 @@
-> >> >>  #define CLK_FOUT_CPLL                6
-> >> >>  #define CLK_FOUT_EPLL                7
-> >> >>  #define CLK_FOUT_VPLL                8
-> >> >> +#define CLK_ARM_CLK          12
-> >> >>
-> >> >>  /* gate for special clocks (sclk) */
-> >> >>  #define CLK_SCLK_CAM_BAYER   128
-> >> >
-> >> >
-> >> >
-> >> > --
-> >> > Best regards,
-> >> >
-> >> > Lukasz Majewski
-> >> >
-> >> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> >
-> >
-> > --
-> > Best regards,
-> >
-> > Lukasz Majewski
-> >
-> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+This way we would have a clean ARCH_MVEBU config for DT-enabled
+SoCs and PLAT_ORION for non-DT ones. BTW, there is also
+PLAT_ORION_LEGACY which is just selecting PLAT_ORION. IIRC, I added
+that to distinguish non-DT and DT earlier, but ARCH_MVEBU selecting
+PLAT_ORION made that redundant.
 
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Sebastian
