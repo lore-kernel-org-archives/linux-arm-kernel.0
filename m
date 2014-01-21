@@ -1,40 +1,72 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 21 Jan 2014 19:10:16 +0900
-Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
-In-Reply-To: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
-References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 21 Jan 2014 15:41:38 +0530
+Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
+ returns -ENODEV/-ENXIO
+In-Reply-To: <1385373690-12170-1-git-send-email-kishon@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+Message-ID: <1390299099-14764-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoke the do_idle() firmware call before suspending a CPU so that the
-underlying firmware (if any) can take necessary action.
+Since PHYs for dwc3 is optional (not all SoCs that have DWC3 use PHYs),
+do not return from probe if the USB PHY library returns -ENODEV as that
+indicates the platform does not have PHY.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-tegra/cpuidle-tegra114.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/usb/dwc3/core.c |   34 ++++++++++++++--------------------
+ 1 file changed, 14 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index e0b87300243d..c42fd41065d2 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -19,6 +19,7 @@
- #include <linux/cpuidle.h>
- #include <linux/cpu_pm.h>
- #include <linux/clockchips.h>
-+#include <asm/firmware.h>
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index a49217a..e009d4e 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -411,32 +411,26 @@ static int dwc3_probe(struct platform_device *pdev)
  
- #include <asm/cpuidle.h>
- #include <asm/suspend.h>
-@@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+ 	if (IS_ERR(dwc->usb2_phy)) {
+ 		ret = PTR_ERR(dwc->usb2_phy);
+-
+-		/*
+-		 * if -ENXIO is returned, it means PHY layer wasn't
+-		 * enabled, so it makes no sense to return -EPROBE_DEFER
+-		 * in that case, since no PHY driver will ever probe.
+-		 */
+-		if (ret == -ENXIO)
++		if (ret == -ENXIO || ret == -ENODEV) {
++			dwc->usb2_phy = NULL;
++		} else if (ret == -EPROBE_DEFER) {
+ 			return ret;
+-
+-		dev_err(dev, "no usb2 phy configured\n");
+-		return -EPROBE_DEFER;
++		} else {
++			dev_err(dev, "no usb2 phy configured\n");
++			return ret;
++		}
+ 	}
  
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+ 	if (IS_ERR(dwc->usb3_phy)) {
+ 		ret = PTR_ERR(dwc->usb3_phy);
+-
+-		/*
+-		 * if -ENXIO is returned, it means PHY layer wasn't
+-		 * enabled, so it makes no sense to return -EPROBE_DEFER
+-		 * in that case, since no PHY driver will ever probe.
+-		 */
+-		if (ret == -ENXIO)
++		if (ret == -ENXIO || ret == -ENODEV) {
++			dwc->usb3_phy = NULL;
++		} else if (ret == -EPROBE_DEFER) {
+ 			return ret;
+-
+-		dev_err(dev, "no usb3 phy configured\n");
+-		return -EPROBE_DEFER;
++		} else {
++			dev_err(dev, "no usb3 phy configured\n");
++			return ret;
++		}
+ 	}
  
-+	call_firmware_op(do_idle);
-+
- 	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
- 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+ 	dwc->xhci_resources[0].start = res->start;
 -- 
-1.8.5.3
+1.7.10.4
