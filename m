@@ -1,60 +1,34 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:47 +0200
-Subject: [PATCHv3 15/41] OMAPDSS: encoder-tfp410: Add DT support
+Date: Tue, 21 Jan 2014 12:56:48 +0200
+Subject: [PATCHv3 16/41] OMAPDSS: connector-dvi: Add DT support
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-16-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-17-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support for encoder-tfp410.
+Add DT support for connector-dvi.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/omap2/displays-new/encoder-tfp410.c | 43 ++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+ drivers/video/omap2/displays-new/connector-dvi.c | 43 ++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/drivers/video/omap2/displays-new/encoder-tfp410.c b/drivers/video/omap2/displays-new/encoder-tfp410.c
-index 4a291e756be9..e1ef972e33cd 100644
---- a/drivers/video/omap2/displays-new/encoder-tfp410.c
-+++ b/drivers/video/omap2/displays-new/encoder-tfp410.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/of_gpio.h>
- 
- #include <video/omapdss.h>
- #include <video/omap-panel-data.h>
-@@ -82,7 +83,8 @@ static int tfp410_enable(struct omap_dss_device *dssdev)
- 		return 0;
- 
- 	in->ops.dpi->set_timings(in, &ddata->timings);
--	in->ops.dpi->set_data_lines(in, ddata->data_lines);
-+	if (ddata->data_lines)
-+		in->ops.dpi->set_data_lines(in, ddata->data_lines);
- 
- 	r = in->ops.dpi->enable(in);
- 	if (r)
-@@ -179,6 +181,33 @@ static int tfp410_probe_pdata(struct platform_device *pdev)
+diff --git a/drivers/video/omap2/displays-new/connector-dvi.c b/drivers/video/omap2/displays-new/connector-dvi.c
+index b6c50904038e..4ea26abdcb64 100644
+--- a/drivers/video/omap2/displays-new/connector-dvi.c
++++ b/drivers/video/omap2/displays-new/connector-dvi.c
+@@ -277,6 +277,37 @@ static int dvic_probe_pdata(struct platform_device *pdev)
  	return 0;
  }
  
-+static int tfp410_probe_of(struct platform_device *pdev)
++static int dvic_probe_of(struct platform_device *pdev)
 +{
 +	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
 +	struct device_node *node = pdev->dev.of_node;
 +	struct omap_dss_device *in;
-+	int gpio;
-+
-+	gpio = of_get_gpio(node, 0);
-+
-+	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-+		ddata->pd_gpio = gpio;
-+	} else {
-+		dev_err(&pdev->dev, "failed to parse PD gpio\n");
-+		return gpio;
-+	}
++	struct device_node *adapter_node;
++	struct i2c_adapter *adapter;
 +
 +	in = omapdss_of_find_source_for_first_ep(node);
 +	if (IS_ERR(in)) {
@@ -64,41 +38,53 @@ index 4a291e756be9..e1ef972e33cd 100644
 +
 +	ddata->in = in;
 +
++	adapter_node = of_parse_phandle(node, "i2c-bus", 0);
++	if (adapter_node) {
++		adapter = of_find_i2c_adapter_by_node(adapter_node);
++		if (adapter == NULL) {
++			dev_err(&pdev->dev, "failed to parse i2c-bus\n");
++			omap_dss_put_device(ddata->in);
++			return -EPROBE_DEFER;
++		}
++
++		ddata->i2c_adapter = adapter;
++	}
++
 +	return 0;
 +}
 +
- static int tfp410_probe(struct platform_device *pdev)
+ static int dvic_probe(struct platform_device *pdev)
  {
  	struct panel_drv_data *ddata;
-@@ -195,6 +224,10 @@ static int tfp410_probe(struct platform_device *pdev)
- 		r = tfp410_probe_pdata(pdev);
+@@ -293,6 +324,10 @@ static int dvic_probe(struct platform_device *pdev)
+ 		r = dvic_probe_pdata(pdev);
  		if (r)
  			return r;
 +	} else if (pdev->dev.of_node) {
-+		r = tfp410_probe_of(pdev);
++		r = dvic_probe_of(pdev);
 +		if (r)
 +			return r;
  	} else {
  		return -ENODEV;
  	}
-@@ -251,12 +284,20 @@ static int __exit tfp410_remove(struct platform_device *pdev)
+@@ -342,12 +377,20 @@ static int __exit dvic_remove(struct platform_device *pdev)
  	return 0;
  }
  
-+static const struct of_device_id tfp410_of_match[] = {
-+	{ .compatible = "omapdss,ti,tfp410", },
++static const struct of_device_id dvic_of_match[] = {
++	{ .compatible = "omapdss,dvi-connector", },
 +	{},
 +};
 +
-+MODULE_DEVICE_TABLE(of, tfp410_of_match);
++MODULE_DEVICE_TABLE(of, dvic_of_match);
 +
- static struct platform_driver tfp410_driver = {
- 	.probe	= tfp410_probe,
- 	.remove	= __exit_p(tfp410_remove),
+ static struct platform_driver dvi_connector_driver = {
+ 	.probe	= dvic_probe,
+ 	.remove	= __exit_p(dvic_remove),
  	.driver	= {
- 		.name	= "tfp410",
+ 		.name	= "connector-dvi",
  		.owner	= THIS_MODULE,
-+		.of_match_table = tfp410_of_match,
++		.of_match_table = dvic_of_match,
  	},
  };
  
