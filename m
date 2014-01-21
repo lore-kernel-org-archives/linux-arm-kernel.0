@@ -1,63 +1,40 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 21 Jan 2014 19:10:15 +0900
-Subject: [PATCH 4/5] ARM: trusted_foundations: implement do_idle()
+Date: Tue, 21 Jan 2014 19:10:16 +0900
+Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
 In-Reply-To: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
 References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1390299016-14105-5-git-send-email-acourbot@nvidia.com>
+Message-ID: <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the do_idle() firmware call, which is necessary to properly
-support cpuidle.
+Invoke the do_idle() firmware call before suspending a CPU so that the
+underlying firmware (if any) can take necessary action.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/firmware/trusted_foundations.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index ef1e3d8f4af0..7c14af809995 100644
---- a/arch/arm/firmware/trusted_foundations.c
-+++ b/arch/arm/firmware/trusted_foundations.c
-@@ -22,6 +22,15 @@
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index e0b87300243d..c42fd41065d2 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -19,6 +19,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/clockchips.h>
++#include <asm/firmware.h>
  
- #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+ #include <asm/cpuidle.h>
+ #include <asm/suspend.h>
+@@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
  
-+#define TF_CPU_PM		 0xfffffffc
-+#define TF_CPU_PM_LP0		 0xffffffe3
-+#define TF_CPU_PM_LP1		 0xffffffe6
-+#define TF_CPU_PM_LP1_NO_MC_CLK	 0xffffffe5
-+#define TF_CPU_PM_LP2		 0xffffffe4
-+#define TF_CPU_PM_LP2_NOFLUSH_L2 0xffffffe7
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+ 
++	call_firmware_op(do_idle);
 +
-+static unsigned long cpu_boot_addr;
-+
- static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
- {
- 	asm volatile(
-@@ -41,13 +50,22 @@ static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+ 	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
  
- static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
- {
--	tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, boot_addr, 0);
-+	cpu_boot_addr = boot_addr;
-+	tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, cpu_boot_addr, 0);
-+
-+	return 0;
-+}
-+
-+static int tf_do_idle(void)
-+{
-+	tf_generic_smc(TF_CPU_PM, TF_CPU_PM_LP2_NOFLUSH_L2, cpu_boot_addr);
- 
- 	return 0;
- }
- 
- static const struct firmware_ops trusted_foundations_ops = {
- 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
-+	.do_idle = tf_do_idle,
- };
- 
- void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 -- 
 1.8.5.3
