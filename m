@@ -1,47 +1,83 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:35 +0200
-Subject: [PATCHv3 03/41] OMAPDSS: add 'label' support for DT
+Date: Tue, 21 Jan 2014 12:56:37 +0200
+Subject: [PATCHv3 05/41] OMAPFB: clean up default display search
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-6-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to get the label (i.e. a "nickname") for a display from the
-DT data. If there is no label defined, use the display's alias (e.g.
-'display0') as a name.
+Separate the code for finding the default display into a function for
+clarity and to make it easier to extend it in the future.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/omap2/dss/display.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/video/omap2/omapfb/omapfb-main.c | 46 ++++++++++++++++++++------------
+ 1 file changed, 29 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/video/omap2/dss/display.c b/drivers/video/omap2/dss/display.c
-index 669a81fdf58e..012ada38a29d 100644
---- a/drivers/video/omap2/dss/display.c
-+++ b/drivers/video/omap2/dss/display.c
-@@ -26,6 +26,7 @@
- #include <linux/module.h>
- #include <linux/jiffies.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
+diff --git a/drivers/video/omap2/omapfb/omapfb-main.c b/drivers/video/omap2/omapfb/omapfb-main.c
+index fcb9e932d00c..b7469636f15c 100644
+--- a/drivers/video/omap2/omapfb/omapfb-main.c
++++ b/drivers/video/omap2/omapfb/omapfb-main.c
+@@ -2417,6 +2417,34 @@ static int omapfb_init_connections(struct omapfb2_device *fbdev,
+ 	return 0;
+ }
  
- #include <video/omapdss.h>
- #include "dss.h"
-@@ -137,6 +138,14 @@ int omapdss_register_display(struct omap_dss_device *dssdev)
- 	snprintf(dssdev->alias, sizeof(dssdev->alias),
- 			"display%d", disp_num_counter++);
++static struct omap_dss_device *
++omapfb_find_default_display(struct omapfb2_device *fbdev)
++{
++	const char *def_name;
++	int i;
++
++	/* search with the display name from the user or the board file */
++
++	def_name = omapdss_get_default_display_name();
++
++	if (def_name) {
++		for (i = 0; i < fbdev->num_displays; ++i) {
++			struct omap_dss_device *dssdev;
++
++			dssdev = fbdev->displays[i].dssdev;
++
++			if (dssdev->name && strcmp(def_name, dssdev->name) == 0)
++				return dssdev;
++		}
++
++		/* def_name given but not found */
++		return NULL;
++	}
++
++	/* return the first display we have in the list */
++	return fbdev->displays[0].dssdev;
++}
++
+ static int omapfb_probe(struct platform_device *pdev)
+ {
+ 	struct omapfb2_device *fbdev = NULL;
+@@ -2494,23 +2522,7 @@ static int omapfb_probe(struct platform_device *pdev)
+ 	for (i = 0; i < fbdev->num_managers; i++)
+ 		fbdev->managers[i] = omap_dss_get_overlay_manager(i);
  
-+	/* Use 'label' property for name, if it exists */
-+	if (dssdev->dev->of_node)
-+		of_property_read_string(dssdev->dev->of_node, "label",
-+			&dssdev->name);
-+
-+	if (dssdev->name == NULL)
-+		dssdev->name = dssdev->alias;
-+
- 	if (drv && drv->get_resolution == NULL)
- 		drv->get_resolution = omapdss_default_get_resolution;
- 	if (drv && drv->get_recommended_bpp == NULL)
+-	def_display = NULL;
+-
+-	for (i = 0; i < fbdev->num_displays; ++i) {
+-		struct omap_dss_device *dssdev;
+-		const char *def_name;
+-
+-		def_name = omapdss_get_default_display_name();
+-
+-		dssdev = fbdev->displays[i].dssdev;
+-
+-		if (def_name == NULL ||
+-			(dssdev->name && strcmp(def_name, dssdev->name) == 0)) {
+-			def_display = dssdev;
+-			break;
+-		}
+-	}
+-
++	def_display = omapfb_find_default_display(fbdev);
+ 	if (def_display == NULL) {
+ 		dev_err(fbdev->dev, "failed to find default display\n");
+ 		r = -EPROBE_DEFER;
 -- 
 1.8.3.2
