@@ -1,150 +1,287 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jan 2014 14:15:26 +0000
-Subject: [RFC PATCH 2/3] arm64: KVM: trap VM system registers until MMU
- and caches are ON
-In-Reply-To: <CAAHg+Hh2O+njMvU5pWvkNwSWoRiBv9Bd9o1C9kbtG5bGxJsvoQ@mail.gmail.com>
-References: <1389970993-19371-1-git-send-email-marc.zyngier@arm.com>
- <1389970993-19371-3-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy1iwc2ZBoPO9KXJzzaEQz-SWpYXkkRvjyRjQPdPe31chQ@mail.gmail.com>
- <52DD27A6.5010706@arm.com>
- <CAAhSdy1+P0p5-i+oouFv_HwjG3gh1djee7S3er0+WE=TmX2fnw@mail.gmail.com>
- <CAAHg+Hh2O+njMvU5pWvkNwSWoRiBv9Bd9o1C9kbtG5bGxJsvoQ@mail.gmail.com>
-Message-ID: <52DE80FE.9000904@arm.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 21 Jan 2014 20:05:11 +0530
+Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
+References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
+ <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
+Message-ID: <CAP245DXdFS5FEkrDvSw07aDDuZDqFPZXF=CoBLPrBB4JuYE8cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranav,
+Hi Lorenzo,
 
-On 21/01/14 12:17, Pranavkumar Sawargaonkar wrote:
-> Hi Marc,
-> 
-> On 20 January 2014 22:00, Anup Patel <anup@brainfault.org> wrote:
->> Hi Marc,
->>
->> On Mon, Jan 20, 2014 at 7:11 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Hi Anup,
->>>
->>> On 20/01/14 12:00, Anup Patel wrote:
->>>> On Fri, Jan 17, 2014 at 8:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> In order to be able to detect the point where the guest enables
->>>>> its MMU and caches, trap all the VM related system registers.
->>>>>
->>>>> Once we see the guest enabling both the MMU and the caches, we
->>>>> can go back to a saner mode of operation, which is to leave these
->>>>> registers in complete control of the guest.
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>>>> ---
->>>>>  arch/arm64/include/asm/kvm_arm.h |  3 ++-
->>>>>  arch/arm64/kvm/sys_regs.c        | 58 ++++++++++++++++++++++++++++++++--------
->>>>>  2 files changed, 49 insertions(+), 12 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>>>> index c98ef47..fd0a651 100644
->>>>> --- a/arch/arm64/include/asm/kvm_arm.h
->>>>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>>>> @@ -62,6 +62,7 @@
->>>>>   * RW:         64bit by default, can be overriden for 32bit VMs
->>>>>   * TAC:                Trap ACTLR
->>>>>   * TSC:                Trap SMC
->>>>> + * TVM:                Trap VM ops (until M+C set in SCTLR_EL1)
->>>>>   * TSW:                Trap cache operations by set/way
->>>>>   * TWE:                Trap WFE
->>>>>   * TWI:                Trap WFI
->>>>> @@ -74,7 +75,7 @@
->>>>>   * SWIO:       Turn set/way invalidates into set/way clean+invalidate
->>>>>   */
->>>>>  #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
->>>>> -                        HCR_BSU_IS | HCR_FB | HCR_TAC | \
->>>>> +                        HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
->>>>>                          HCR_AMO | HCR_IMO | HCR_FMO | \
->>>>>                          HCR_SWIO | HCR_TIDCP | HCR_RW)
->>>>>  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
->>>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->>>>> index 02e9d09..5e92b9e 100644
->>>>> --- a/arch/arm64/kvm/sys_regs.c
->>>>> +++ b/arch/arm64/kvm/sys_regs.c
->>>>> @@ -121,6 +121,42 @@ done:
->>>>>  }
->>>>>
->>>>>  /*
->>>>> + * Generic accessor for VM registers. Only called as long as HCR_TVM
->>>>> + * is set.
->>>>> + */
->>>>> +static bool access_vm_reg(struct kvm_vcpu *vcpu,
->>>>> +                         const struct sys_reg_params *p,
->>>>> +                         const struct sys_reg_desc *r)
->>>>> +{
->>>>> +       BUG_ON(!p->is_write);
->>>>> +
->>>>> +       vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
->>>>> +       return true;
->>>>> +}
->>>>> +
->>>>> +/*
->>>>> + * SCTLR_EL1 accessor. Only called as long as HCR_TVM is set.  If the
->>>>> + * guest enables the MMU, we stop trapping the VM sys_regs and leave
->>>>> + * it in complete control of the caches.
->>>>> + */
->>>>> +static bool access_sctlr_el1(struct kvm_vcpu *vcpu,
->>>>> +                            const struct sys_reg_params *p,
->>>>> +                            const struct sys_reg_desc *r)
->>>>> +{
->>>>> +       unsigned long val;
->>>>> +
->>>>> +       BUG_ON(!p->is_write);
->>>>> +
->>>>> +       val = *vcpu_reg(vcpu, p->Rt);
->>>>> +       vcpu_sys_reg(vcpu, r->reg) = val;
->>>>> +
->>>>> +       if ((val & (0b101)) == 0b101)   /* MMU+Caches enabled? */
->>>>> +               vcpu->arch.hcr_el2 &= ~HCR_TVM;
->>>>> +
->>>>> +       return true;
->>>>> +}
->>>>> +
->>>>> +/*
->>>>>   * We could trap ID_DFR0 and tell the guest we don't support performance
->>>>>   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
->>>>>   * NAKed, so it will read the PMCR anyway.
->>>>> @@ -185,32 +221,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>>>>           NULL, reset_mpidr, MPIDR_EL1 },
->>>>>         /* SCTLR_EL1 */
->>>>>         { Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
->>>>> -         NULL, reset_val, SCTLR_EL1, 0x00C50078 },
->>>>> +         access_sctlr_el1, reset_val, SCTLR_EL1, 0x00C50078 },
->>>>
->>>> This patch in its current form breaks Aarch32 VMs on Foundation v8 Model
->>>> because encoding for Aarch64 VM registers we get Op0=0b11 and for Aarch32
->>>> VM registers we get Op0=0b00 when trapped.
->>>>
->>>> Either its a Foundation v8 Model bug or we need to add more enteries in
->>>> sys_reg_desc[] for Aarch32 VM registers with Op0=0b00.
->>>
->>> That's a good point. But Op0 isn't defined for AArch32, the value is
->>> simply hardcoded in kvm_handle_cp15_32/kvm_handle_cp15_64, which is
->>> obviously horribly broken.
->>>
->>> I'll work on a fix for that, thanks noticing it.
->>>
->>> Does this series otherwise fix your L3 cache issue (assuming you stick
->>> to 64bit guests)?
->>
->> Just started trying your patches today.
->> First tried on Foundation v8 Model.
->> Next we will try on X-Gene.
->>
->> Me or Pranav will soon provide more feedback in this regard.
->>
-> 
-> Tested this patch with kvmtool on xgene, works fine !!
+On Mon, Jan 20, 2014 at 11:17 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> ARM based platforms implement a variety of power management schemes that
+> allow processors to enter at run-time low-power states, aka C-states
+> in ACPI jargon. The parameters defining these C-states vary on a per-platform
+> basis forcing the OS to hardcode the state parameters in platform
+> specific static tables whose size grows as the number of platforms supported
+> in the kernel increases and hampers device drivers standardization.
+>
+> Therefore, this patch aims at standardizing C-state device tree bindings for
+> ARM platforms. Bindings define C-state parameters inclusive of entry methods
+> and state latencies, to allow operating systems to retrieve the
+> configuration entries from the device tree and initialize the related
+> power management drivers, paving the way for common code in the kernel
+> to deal with power states and removing the need for static data in current
+> and previous kernel versions.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/c-states.txt | 774 +++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+>  2 files changed, 784 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/c-states.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/c-states.txt b/Documentation/devicetree/bindings/arm/c-states.txt
 
-Excellent, thanks for testing. I'll repost a new patch series with the
-32bit stuff later today or tomorrow.
+s/c-states/idle-states?
 
-Cheers,
+While C-states are widely used when talking about idle-states as
+you've noted, idle-states are still the correct generic term for them.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> new file mode 100644
+> index 0000000..0b5617b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/c-states.txt
+> @@ -0,0 +1,774 @@
+> +==========================================
+> +ARM C-states binding description
+> +==========================================
+> +
+> +==========================================
+> +1 - Introduction
+> +==========================================
+> +
+> +ARM systems contain HW capable of managing power consumption dynamically,
+> +where cores can be put in different low-power states (ranging from simple
+> +wfi to power gating) according to OSPM policies. Borrowing concepts
+> +from the ACPI specification[1], the CPU states representing the range of
+> +dynamic states that a processor can enter at run-time, aka C-state, can be
+> +specified through device tree bindings representing the parameters required to
+> +enter/exit specific C-states on a given processor.
+> +
+> +The state an ARM CPU can be put into is loosely identified by one of the
+> +following operating modes:
+> +
+> +- Running:
+> +        # Processor core is executing instructions
+> +
+> +- Wait for Interrupt:
+> +       # An ARM processor enters wait for interrupt (WFI) low power
+> +         state by executing a wfi instruction. When a processor enters
+> +         wfi state it disables most of the clocks while keeping the processor
+> +         powered up. This state is standard on all ARM processors and it is
+> +         defined as C1 in the remainder of this document.
+> +
+> +- Dormant:
+> +       # Dormant mode is entered by executing wfi instructions and by sending
+> +         platform specific commands to the platform power controller (coupled
+> +         with processor specific SW/HW control sequences).
+> +         In dormant mode, most of the processor control and debug logic is
+> +         powered up but cache RAM can be put in retention state, providing
+> +         additional power savings.
+> +
+> +- Sleep:
+> +       # Sleep mode is entered by executing the wfi instruction and by sending
+> +         platform specific commands to the platform power controller (coupled
+> +         with processor specific SW/HW control sequences). In sleep mode, a
+> +         processor and its caches are shutdown, the entire processor state is
+> +         lost.
+> +
+> +Building on top of the previous processor modes, ARM platforms implement power
+
+Nitpick: s/previous/above
+
+> +management schemes that allow an OS PM implementation to put the processor in
+> +different CPU states (C-states). C-states parameters (eg latency) are
+> +platform specific and need to be characterized with bindings that provide the
+> +required information to OSPM code so that it can build the required tables and
+> +use them at runtime.
+> +
+> +The device tree binding definition for ARM C-states is the subject of this
+> +document.
+> +
+> +===========================================
+> +2 - cpu-power-states node
+> +===========================================
+> +
+> +ARM processor C-states are defined within the cpu-power-states node, which is
+> +a direct child of the cpus node and provides a container where the processor
+> +states, defined as device tree nodes, are listed.
+> +
+> +- cpu-power-states node
+
+What do you think of s/cpu-power-states/cpu-idle-states?
+
+CPU Power management is more than just idle. Unless you have plans to
+add more properties to the cpu-power-states node later.
+
+> +
+> +       Usage: Optional - On ARM systems, is a container of processor C-state
+> +                         nodes. If the system does not provide CPU power
+> +                         management capabilities or the processor just
+> +                         supports WFI (C1 state) a cpu-power-states node is
+> +                         not required.
+> +
+> +       Description: cpu-power-states node is a container node, where its
+> +                    subnodes describe the CPU low-power C-states.
+> +
+> +       Node name must be "cpu-power-states".
+> +
+> +       The cpu-power-states node's parent node must be cpus node.
+> +
+> +       The cpu-power-states node's child nodes can be:
+> +
+> +       - one or more state nodes
+> +
+> +       Any other configuration is considered invalid.
+> +
+> +The nodes describing the C-states (state) can only be defined within the
+> +cpu-power-states node.
+> +
+> +Any other configuration is consider invalid and therefore must be ignored.
+> +
+> +===========================================
+> +2 - state node
+> +===========================================
+> +
+> +A state node represents a C-state description and must be defined as follows:
+> +
+> +- state node
+> +
+> +       Description: must be child of either the cpu-power-states node or
+> +                    a state node.
+> +
+> +       The state node name shall be "stateN", where N = {0, 1, ...} is
+> +       the node number; state nodes which are siblings within a single common
+> +       parent node must be given a unique and sequential N value, starting
+> +       from 0.
+> +
+> +       A state node can contain state child nodes. Child nodes inherit
+> +       properties from the parent state nodes that work as state
+> +       properties aggregators (ie contain properties valid on all state
+> +       nodes children).
+> +
+> +       A state node defines the following properties (either explicitly
+> +       or by inheriting them from a parent node):
+> +
+> +       - compatible
+> +               Usage: Required
+> +               Value type: <stringlist>
+> +               Definition: Must be "arm,cpu-power-state".
+> +
+> +       - index
+> +               Usage: Required
+> +               Value type: <u32>
+> +               Definition: It represents C-state index, starting from 2 (index
+> +                           0 represents the processor state "running" and
+> +                           index 1 represents processor mode "WFI"; indexes 0
+> +                           and 1 are standard ARM states that need not be
+> +                           described).
+> +
+> +       - power-domain
+> +               Usage: Required
+> +               Value type: <prop-encoded-array>
+> +               Definition: List of phandle and power domain specifiers
+> +                           as defined by bindings of power controller
+> +                           specified by the phandle [3]. It represents the
+> +                           power domains associated with the C-state. The
+> +                           power domains list can be used by OSPM to
+> +                           retrieve the devices belonging to the power
+> +                           domains and carry out corresponding actions to
+> +                           preserve functionality across power cycles
+> +                           (ie context save/restore, cache flushing).
+> +
+> +       - entry-method
+> +               Usage: Required
+> +               Value type: <stringlist>
+> +               Definition: Describes the method by which a CPU enters the
+> +                           C-state. This property is required and must be one
+> +                           of:
+> +
+> +                           - "psci"
+> +                             ARM Standard firmware interface
+> +
+> +                           - "[vendor],[method]"
+> +                             An implementation dependent string with
+> +                             format "vendor,method", where vendor is a string
+> +                             denoting the name of the manufacturer and
+> +                             method is a string specifying the mechanism
+> +                             used to enter the C-state.
+> +
+> +       - psci-power-state
+> +               Usage: Required if entry-method property value is set to
+> +                      "psci".
+> +               Value type: <u32>
+> +               Definition: power_state parameter to pass to the PSCI
+> +                           suspend call to enter the C-state.
+> +
+> +       - latency
+> +               Usage: Required
+> +               Value type: <prop-encoded-array>
+> +               Definition: List of u32 values representing worst case latency
+> +                           in microseconds required to enter and exit the
+> +                           C-state, one value per OPP [2]. The list should
+> +                           be specified in the same order as the operating
+> +                           points property list of the cpu this state is
+> +                           valid on.
+> +                           If no OPP bindings are present, the latency value
+> +                           is associated with the current OPP of CPUs in the
+> +                           system.
+
+DT-newbie here. What would happen if a vendor does not characterise
+the latency at each OPP? IOW, the table only contains latency values
+for a subset of the OPPs.
+
+> +
+> +       - min-residency
+> +               Usage: Required
+> +               Value type: <prop-encoded-array>
+> +               Definition: List of u32 values representing time in
+> +                           microseconds required for the CPU to be in
+> +                           the C-state to make up for the dynamic power
+> +                           consumed to enter/exit the C-state in order to
+> +                           break even in terms of power consumption compared
+> +                           to C1 state (wfi), one value per-OPP [2].
+> +                           This parameter depends on the operating conditions
+> +                           (HW state) and must assume worst case scenario.
+> +                           The list should be specified in the same order as
+> +                           the operating points property list of the cpu this
+> +                           state is valid on.
+> +                           If no OPP bindings are present the min-residency
+> +                           value is associated with the current OPP of CPUs
+> +                           in the system.
+
+Same question as latency above.
+
+> +
+> +===========================================
+> +3 - Examples
+> +===========================================
+> +
+> +Example 1 (ARM 64-bit, 16-cpu system, two clusters of clusters):
+
+
+     ^^^^^^^^^^^^^
+                                                         clusters of cpus?
+> +
+> +pd_clusters: power-domain-clusters at 80002000 {
+> +       compatible = "arm,power-controller";
+> +       reg = <0x0 0x80002000 0x0 0x1000>;
+> +       #power-domain-cells = <1>;
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +
+> +       pd_cores: power-domain-cores at 80000000 {
+> +               compatible = "arm,power-controller";
+> +               reg = <0x0 0x80000000 0x0 0x1000>;
+> +               #power-domain-cells = <1>;
+> +       };
+> +};
+> +
+
+<snip>
