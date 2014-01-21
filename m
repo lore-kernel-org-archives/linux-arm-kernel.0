@@ -1,47 +1,173 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 21 Jan 2014 11:40:46 -0500 (EST)
-Subject: [PATCH 1/2] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-In-Reply-To: <1390319315-8391-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1401211116370.1272-100000@iolanthe.rowland.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 21 Jan 2014 08:41:15 -0800
+Subject: [PATCH v3 11/15] watchdog: orion: Add support for Armada 370 and
+ Armada XP SoC
+In-Reply-To: <1390310774-20781-12-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390310774-20781-12-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140121164115.GC3311@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jan 2014, Hans de Goede wrote:
-
-> Note this commit uses the same devicetree booleans for this as the ones
-> already existing in the usb-ehci bindings.
+On Tue, Jan 21, 2014 at 10:26:10AM -0300, Ezequiel Garcia wrote:
+> Using the added infrastructure for handling SoC differences,
+> this commit adds support for the watchdog controller available
+> in Armada 370 and Armada XP SoCs.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -512,6 +512,10 @@ config USB_CNS3XXX_OHCI
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/watchdog/orion_wdt.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 93 insertions(+)
+> 
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index c2beb9f..a5e157c 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -30,6 +30,7 @@
+>   * Watchdog timer block registers.
+>   */
+>  #define TIMER_CTRL		0x0000
+> +#define TIMER_A370_STATUS	0x04
 >  
->  config USB_OHCI_HCD_PLATFORM
->  	tristate "Generic OHCI driver for a platform device"
-> +	# Always support LE, support BE on architectures which have readl_be
-> +	select USB_OHCI_LITTLE_ENDIAN
-> +	select USB_OHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
-> +	select USB_OHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
->  	default n
+>  #define WDT_MAX_CYCLE_COUNT	0xffffffff
+>  #define WDT_IN_USE		0
+> @@ -41,6 +42,12 @@
+>  
+>  #define WDT_AXP_FIXED_ENABLE_BIT BIT(10)
+>  
+> +#define WDT_A370_RATIO_MASK(v)	((v) << 16)
+> +#define WDT_A370_RATIO_SHIFT	5
+> +#define WDT_A370_RATIO		(1 << WDT_A370_RATIO_SHIFT)
+> +
 
-The comment line above is slightly misleading.  USB_OHCI_LITTLE_ENDIAN
-doesn't exactly mean to include support for little-endian controllers;  
-it means include mixed-endian support if either
-USB_OHCI_BIG_ENDIAN_DESC or USB_OHCI_BIG_ENDIAN_MMIO is set.  That is,
-the driver determines at runtime whether a particular controller is
-big-endian or little-endian, rather than choosing to support one or the
-other at compile time.
+Are those introduced twice ? I seem to recall seeing those defines in patch 8.
 
-In any case, the style we have adopted is that these select lines go in
-the arch-specific defconfig, not here.  For example, check out the
-occurrences of EHCI in arch/mips/Kconfig.  Also, I'm not sure how you
-came up with that list of architectures for the two selects; it's hard
-to say if they are right.  For instance, why did you include AVR32?
+> +#define WDT_A370_EXPIRED	BIT(31)
+> +
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  static int heartbeat = -1;		/* module parameter (seconds) */
+>  
+> @@ -80,6 +87,48 @@ static int orion_wdt_clock_init(struct platform_device *pdev,
+>  	return 0;
+>  }
+>  
+> +static int armada370_wdt_clock_init(struct platform_device *pdev,
+> +				    struct orion_watchdog *dev)
+> +{
+> +	int ret;
+> +
+> +	dev->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(dev->clk))
+> +		return PTR_ERR(dev->clk);
+> +	ret = clk_prepare_enable(dev->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Setup watchdog input clock */
+> +	atomic_io_modify(dev->reg + TIMER_CTRL,
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
+> +
+> +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
+> +	return 0;
+> +}
+> +
+> +static int armadaxp_wdt_clock_init(struct platform_device *pdev,
+> +				   struct orion_watchdog *dev)
+> +{
+> +	int ret;
+> +
+> +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
+> +	if (IS_ERR(dev->clk))
+> +		return PTR_ERR(dev->clk);
+> +	ret = clk_prepare_enable(dev->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Enable the fixed watchdog clock input */
+> +	atomic_io_modify(dev->reg + TIMER_CTRL,
+> +		WDT_AXP_FIXED_ENABLE_BIT,
+> +		WDT_AXP_FIXED_ENABLE_BIT);
 
-The changes to the driver itself look fine.
+Who am I to complain, but your continuation line indentation isn't really
+consistent ;-).
 
-Similar comments apply to the ehci-platform patch.
-
-Alan Stern
+> +
+> +	dev->clk_rate = clk_get_rate(dev->clk);
+> +	return 0;
+> +}
+> +
+>  static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+>  {
+>  	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+> @@ -89,6 +138,26 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+>  	return 0;
+>  }
+>  
+> +static int armada370_start(struct watchdog_device *wdt_dev)
+> +{
+> +	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+> +
+> +	/* Set watchdog duration */
+> +	writel(dev->clk_rate * wdt_dev->timeout,
+> +	       dev->reg + dev->data->wdt_counter_offset);
+> +
+> +	/* Clear the watchdog expiration bit */
+> +	atomic_io_modify(dev->reg + TIMER_A370_STATUS, WDT_A370_EXPIRED, 0);
+> +
+> +	/* Enable watchdog timer */
+> +	atomic_io_modify(dev->reg + TIMER_CTRL, dev->data->wdt_enable_bit,
+> +						dev->data->wdt_enable_bit);
+> +
+> +	atomic_io_modify(dev->rstout, dev->data->rstout_enable_bit,
+> +				      dev->data->rstout_enable_bit);
+> +	return 0;
+> +}
+> +
+>  static int orion_start(struct watchdog_device *wdt_dev)
+>  {
+>  	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+> @@ -170,11 +239,35 @@ static const struct orion_watchdog_data orion_data = {
+>  	.start = orion_start,
+>  };
+>  
+> +static const struct orion_watchdog_data armada370_data = {
+> +	.rstout_enable_bit = BIT(8),
+> +	.wdt_enable_bit = BIT(8),
+> +	.wdt_counter_offset = 0x34,
+> +	.clock_init = armada370_wdt_clock_init,
+> +	.start = armada370_start,
+> +};
+> +
+> +static const struct orion_watchdog_data armadaxp_data = {
+> +	.rstout_enable_bit = BIT(8),
+> +	.wdt_enable_bit = BIT(8),
+> +	.wdt_counter_offset = 0x34,
+> +	.clock_init = armadaxp_wdt_clock_init,
+> +	.start = armada370_start,
+> +};
+> +
+>  static const struct of_device_id orion_wdt_of_match_table[] = {
+>  	{
+>  		.compatible = "marvell,orion-wdt",
+>  		.data = &orion_data,
+>  	},
+> +	{
+> +		.compatible = "marvell,armada-370-wdt",
+> +		.data = &armada370_data,
+> +	},
+> +	{
+> +		.compatible = "marvell,armada-xp-wdt",
+> +		.data = &armadaxp_data,
+> +	},
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
+> -- 
+> 1.8.1.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
