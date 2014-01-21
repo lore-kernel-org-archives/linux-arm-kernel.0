@@ -1,127 +1,80 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 21 Jan 2014 13:40:35 +0530
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52DD35B3.9000606@linaro.org>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com> <52DD35B3.9000606@linaro.org>
-Message-ID: <52DE2B7B.5060708@nvidia.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 21 Jan 2014 16:12:53 +0800
+Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
+In-Reply-To: <20140121054932.GO9558@ns203013.ovh.net>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+ <20140118052059.GL9558@ns203013.ovh.net> <52DC9A66.6080009@atmel.com>
+ <20140121054932.GO9558@ns203013.ovh.net>
+Message-ID: <52DE2C05.9060800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 January 2014 08:11 PM, Daniel Lezcano wrote:
-> On 01/17/2014 02:40 PM, Prashant Gaikwad wrote:
->> On Friday 17 January 2014 05:38 PM, Daniel Lezcano wrote:
->>> On 01/17/2014 12:37 PM, Prashant Gaikwad wrote:
->>>> On Friday 17 January 2014 03:45 PM, Daniel Lezcano wrote:
->>>>> On 01/17/2014 11:11 AM, Prashant Gaikwad wrote:
->>>>>> On Friday 17 January 2014 02:42 PM, Daniel Lezcano wrote:
->>>>>>> On 01/17/2014 10:07 AM, Antti Miettinen wrote:
->>>>>>>> Will Deacon <will.deacon@arm.com> writes:
->>>>>>>>> Why can't you use the C3STOP feature so that the arch-timer isn't
->>>>>>>>> used when
->>>>>>>>> you go idle?
->>>>>>>> That would mean falling back to broadcast timer, right? That's not
->>>>>>>> necessarily on the local CPU so wakeups would often wake two CPUs.
->>>>>>> You can prevent that if the hardware supports it with the
->>>>>>> CLOCK_EVT_DYNIRQ flag on the broadcast timer.
->>>>>> Instead of falling back on broadcast timer, is it possible to fall
->>>>>> back
->>>>>> on other per-CPU timer which is preserved across idle state?
->>>>> Is it what you are looking for ?
->>>>>
->>>>> http://lwn.net/Articles/580568/
->>>>>
->>>> If I understand correctly these patches enables us to use per-CPU timers
->>>> as broadcast timers. I do not want to use broadcast timer.
->>> Why ?
+Hi J,
+
+On 01/21/2014 01:49 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:39 Mon 20 Jan     , Bo Shen wrote:
+>> Hi J,
+>>
+>> On 01/18/2014 01:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 10:59 Fri 17 Jan     , Bo Shen wrote:
+>>>> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
+>>>> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
+>>>>
+>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>>> ---
+>>>>
+>>>>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+>>>> index 2cb52e0..7e67a81 100644
+>>>> --- a/drivers/usb/gadget/atmel_usba_udc.c
+>>>> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+>>>> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>>>>   	if (ep_status) {
+>>>>   		int i;
+>>>>
+>>>> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
+>>>> +		for (i = 0; i < udc->num_ep; i++)
 >>>
->> For some idle states it may be required to change the timer when
->> entering idle state to adjust the exit latency.
+>>> no the limit need to specified in the driver as a checkpoint by the compatible
+>>> or platform driver id
 >>
->> It can be done for broadcast timer too but following scenario will not work
->>
->> 1. CPU1 enters in idle state:
->>           Broadcast timer next event is in 2ms, CPU latency is 50us. So
->> we change the broadcast timer to send event after (2ms - 50us).
->>
->> 2. After 1ms CPU2 enters in idle state:
->>           Next event is 5ms. Broadcast timer is already programmed to <
->> (5ms -50us) so we do nothing.
->>
->> 3. CPU1 exits from idle state because of timer interrupt
->>
->> 4. Broadcast event handler:
->>       - Timer event is handled and CPU1 is switched back to local timer.
->>       - Next CPU is CPU2 and next event for it is 4ms. So brodcast timer
->> is programmed to 4ms.
->>
->> We can not change brodcast timer here to adjust delay caused by CPU exit
->> latency.
-> Thanks for the detailed explanation. IIUC, this not only related to your
-> hardware only but with how is implemented the broadcast timer, no ?
-
-Yes.
-
-> I think there is a similar need with the scheduler when it needs to know
-> what is the idlest cpu. One thing the scheduler wants to know is the
-> wakeup latency in order to choose the cpu in the shallowest state.
+>> You mean, we should not trust the data passed from dt node or
+>> platform data? Or do you think we should do double confirm?
 >
->> CPU idle governors does help to solve the latency issue. I was thinking
->> this from sub-states perspective which are not exposed to CPU idle
->> governor.
-> Could you elaborate what you mean by these sub-states ? Is it related to
-> the cpuidle backend drivers choosing an intermediate state different
-> from the one the governor choose ?
-
-Yes.
-
->> Solution for this could be to expose those states to CPU idle governor
->> but just wanted to know if we can use timers this way
-> IMO, that should be studied in a larger scope including the scheduler.
+> no base on the driver name or the compatible you will known the MAX EP
 >
+> not based on the dt ep description
+>
+> as we do on pinctrl-at91
 
-Is this about the per-core timer switching as proposed below ...
+I am sorry, I am not fully get it after reading the code of 
+pinctrl-at91.c, can you give the example code in pinctrl-at91.c?
 
-Idle entry:
-     clockevents_shutdown(T1);
-     clockevents_set_mode(T2, ONESHOT);
-     clockevents_program_event(T2, next_event - latency);
+Btw, the udc->num_ep is get from the following code.
+for dt
+--->8---
+	while ((pp = of_get_next_child(np, pp)))
+		udc->num_ep++;
+---<8---
 
-Idle exit:
-     clockevents_shutdown(T2);
-     clockevents_set_mode(T1, ONESHOT);
+for non-dt
+--->8---
+	udc->num_ep = pdata->num_ep;
+---8<---
 
-... or about overall approach for this requirement?
-
->> Another requirement:
->>
->> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
->> C2, C3 respectively.
->>
->> Rating of T2 is better than T3. If I register T2 and T3 both as
->> broadcast timers then T3 will not be used. But ...
->>       - T2 is not preserved in C3 idle state.
->>       - T3 resolution is very poor (ms) and can not be used as wake event
->> for C2.
->>
->> Possible solution, register only T3 as broadcast device and use T2 as
->> per-CPU fallback timer.
->>
->>>> If I have 2 per-CPU timers T1 and T2, T1 is not preserved across idle
->>>> state and T2 is preserved. And I want to use T1 as scheduler timer.
->>>> Can I do following for idle state?
+> Best Regards,
+> J.
+>>>>   			if (ep_status & (1 << i)) {
+>>>>   				if (ep_is_control(&udc->usba_ep[i]))
+>>>>   					usba_control_irq(udc, &udc->usba_ep[i]);
+>>>> --
+>>>> 1.8.5.2
 >>>>
->>>> Idle entry:
->>>>        clockevents_shutdown(T1);
->>>>        clockevents_set_mode(T2, ONESHOT);
->>>>        clockevents_program_event(T2, next_event);
->>>>
->>>> Idle exit:
->>>>        clockevents_shutdown(T2);
->>>>        clockevents_set_mode(T1, ONESHOT);
-> See answer to Stephen.
->
->
+>>
+>> Best Regards,
+>> Bo Shen
+
+Best Regards,
+Bo Shen
