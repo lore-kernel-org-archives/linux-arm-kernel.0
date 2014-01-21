@@ -1,183 +1,94 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 21 Jan 2014 16:00:21 +0200
-Subject: [PATCH v4 2/2] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <1390299099-14764-2-git-send-email-kishon@ti.com>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
- <1390299099-14764-2-git-send-email-kishon@ti.com>
-Message-ID: <52DE7D75.4040302@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jan 2014 14:10:29 +0000
+Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
+In-Reply-To: <20140121143656.3c0b96c0@ipc1.ka-ro>
+References: <20140120122840.36520f37@ipc1.ka-ro>
+ <20140120123627.1147f252@ipc1.ka-ro>
+ <20140120123849.GC15937@n2100.arm.linux.org.uk>
+ <20140120150902.207b9d66@ipc1.ka-ro>
+ <20140120151152.GE15937@n2100.arm.linux.org.uk>
+ <20140121075922.2a83e076@ipc1.ka-ro>
+ <20140121110107.GS15937@n2100.arm.linux.org.uk>
+ <20140121125200.6b1e96bd@ipc1.ka-ro>
+ <20140121115706.GT15937@n2100.arm.linux.org.uk>
+ <20140121143656.3c0b96c0@ipc1.ka-ro>
+Message-ID: <20140121141029.GU15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On 01/21/2014 12:11 PM, Kishon Vijay Abraham I wrote:
-> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
-> power_on and power_off the following APIs are used phy_init(), phy_exit(),
-> phy_power_on() and phy_power_off().
+On Tue, Jan 21, 2014 at 02:36:56PM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> However using the old USB phy library wont be removed till the PHYs of all
-> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> Changes from v3:
-> * avoided using quirks
-> 
->  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->  drivers/usb/dwc3/core.c                        |   60 ++++++++++++++++++++++++
->  drivers/usb/dwc3/core.h                        |    7 +++
->  3 files changed, 71 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
-> index e807635..471366d 100644
-> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> @@ -6,11 +6,13 @@ Required properties:
->   - compatible: must be "snps,dwc3"
->   - reg : Address and length of the register set for the device
->   - interrupts: Interrupts used by the dwc3 controller.
-> +
-> +Optional properties:
->   - usb-phy : array of phandle for the PHY device.  The first element
->     in the array is expected to be a handle to the USB2/HS PHY and
->     the second element is expected to be a handle to the USB3/SS PHY
-> -
-> -Optional properties:
-> + - phys: from the *Generic PHY* bindings
-> + - phy-names: from the *Generic PHY* bindings
->   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->  
->  This is usually a subnode to DWC3 glue to which it is connected.
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index e009d4e..036d589 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -82,6 +82,11 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->  
->  	usb_phy_init(dwc->usb2_phy);
->  	usb_phy_init(dwc->usb3_phy);
-> +	if (dwc->usb2_generic_phy)
-> +		phy_init(dwc->usb2_generic_phy);
+> Russell King - ARM Linux wrote:
+> > On Tue, Jan 21, 2014 at 12:52:00PM +0100, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Russell King - ARM Linux wrote:
+> > > > On Tue, Jan 21, 2014 at 07:59:22AM +0100, Lothar Wa?mann wrote:
+> > > > > The file is automatically removed after the timeout has expired (or
+> > > > > the frimware has been loaded).
+> > > > > Thus you must check for it within the timeout period during boot.
+> > > > 
+> > > > ... which is impossible if imx-sdma is built into the kernel - it
+> > > > expires while the initramfs has only just started running, giving a
+> > > > very narrow window for userspace to load firmware.
+> > > > 
+> > > It works for me, but I'm not using initramfs.
+> > 
+> > You can take my email as a report of "it doesn't work for everyone."  The
+> > *only* way I can get firmware to load is to build imx-sdma as a module.
+> > Building it in is a hopeless case here.
+> > 
+> You could change the timeout from your initramfs as soon as sysfs has
+> been mounted by writing the number of seconds to
+> /sys/class/firmware/timeout. A timeout of '0' means 'wait forever' which
+> should be long enough for any boot case. ;)
 
-What if phy_init() fails? You need to report and fail. Same applies for all PHY apis in this patch.
+Err, no.  Let's walk through the code, shall we?
 
-> +	if (dwc->usb3_generic_phy)
-> +		phy_init(dwc->usb3_generic_phy);
-> +
->  	mdelay(100);
->  
->  	/* Clear USB3 PHY reset */
-> @@ -343,6 +348,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->  {
->  	usb_phy_shutdown(dwc->usb2_phy);
->  	usb_phy_shutdown(dwc->usb3_phy);
-> +	if (dwc->usb2_generic_phy)
-> +		phy_exit(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_exit(dwc->usb3_generic_phy);
-> +
->  }
->  
->  #define DWC3_ALIGN_MASK		(16 - 1)
-> @@ -433,6 +443,32 @@ static int dwc3_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
-> +	if (IS_ERR(dwc->usb2_generic_phy)) {
-> +		ret = PTR_ERR(dwc->usb2_generic_phy);
-> +		if (ret == -ENOSYS || ret == -ENODEV) {
-> +			dwc->usb2_generic_phy = NULL;
-> +		} else if (ret == -EPROBE_DEFER) {
-> +			return ret;
-> +		} else {
-> +			dev_err(dev, "no usb2 phy configured\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
-> +	if (IS_ERR(dwc->usb3_generic_phy)) {
-> +		ret = PTR_ERR(dwc->usb3_generic_phy);
-> +		if (ret == -ENOSYS || ret == -ENODEV) {
-> +			dwc->usb3_generic_phy = NULL;
-> +		} else if (ret == -EPROBE_DEFER) {
-> +			return ret;
-> +		} else {
-> +			dev_err(dev, "no usb3 phy configured\n");
-> +			return ret;
-> +		}
-> +	}
-> +
->  	dwc->xhci_resources[0].start = res->start;
->  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
->  					DWC3_XHCI_REGS_END;
-> @@ -482,6 +518,11 @@ static int dwc3_probe(struct platform_device *pdev)
->  	usb_phy_set_suspend(dwc->usb2_phy, 0);
->  	usb_phy_set_suspend(dwc->usb3_phy, 0);
->  
-> +	if (dwc->usb2_generic_phy)
-> +		phy_power_on(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_power_on(dwc->usb3_generic_phy);
-> +
+imx-sdma calls request_firmware_nowait() for the firmware.
 
-Is it OK to power on the phy before phy_init()?
+request_firmware_nowait() allocates a work structure, saves all the
+details, puts it on a queue, and triggers a workqueue to process this.
 
-I suggest to move phy_init() from core_soft_reset() to here, just before phy_power_on().
+When the work structure is dequeued, request_firmware_work_func() is
+called.  This calls _request_firmware() with the appropriate parameters,
+including nowait = true.
 
->  	ret = dwc3_event_buffers_setup(dwc);
->  	if (ret) {
->  		dev_err(dwc->dev, "failed to setup event buffers\n");
-> @@ -565,6 +606,10 @@ err2:
->  err1:
->  	usb_phy_set_suspend(dwc->usb2_phy, 1);
->  	usb_phy_set_suspend(dwc->usb3_phy, 1);
-> +	if (dwc->usb2_generic_phy)
-> +		phy_power_off(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_power_off(dwc->usb3_generic_phy);
->  	dwc3_core_exit(dwc);
->  
->  err0:
-> @@ -580,6 +625,11 @@ static int dwc3_remove(struct platform_device *pdev)
->  	usb_phy_set_suspend(dwc->usb2_phy, 1);
->  	usb_phy_set_suspend(dwc->usb3_phy, 1);
->  
-> +	if (dwc->usb2_generic_phy)
-> +		phy_power_off(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_power_off(dwc->usb3_generic_phy);
-> +
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> @@ -677,6 +727,11 @@ static int dwc3_suspend(struct device *dev)
->  	usb_phy_shutdown(dwc->usb3_phy);
->  	usb_phy_shutdown(dwc->usb2_phy);
->  
-> +	if (dwc->usb2_generic_phy)
-> +		phy_exit(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_exit(dwc->usb3_generic_phy);
-> +
->  	return 0;
->  }
->  
-> @@ -688,6 +743,11 @@ static int dwc3_resume(struct device *dev)
->  	usb_phy_init(dwc->usb3_phy);
->  	usb_phy_init(dwc->usb2_phy);
->  
-> +	if (dwc->usb2_generic_phy)
-> +		phy_init(dwc->usb2_generic_phy);
-> +	if (dwc->usb3_generic_phy)
-> +		phy_init(dwc->usb3_generic_phy);
-> +
->  	spin_lock_irqsave(&dwc->lock, flags);
->  
->  	dwc3_writel(dwc->regs, DWC3_GCTL, dwc->gctl);
+_request_firmware() reads the timeout, and then calls
+usermodehelper_read_lock_wait() with it.  (Once this has happened,
+changing the timeout has no effect.)  This waits for the requisit amount
+of time for usermodehelper_disabled.
 
-cheers,
--roger
+Once that happens, fw_get_filesystem_firmware() is called by
+_request_firmware(), which attempts to read the file from the mounted
+filesystem.
+
+If that fails, the kernel falls back to fw_load_from_user_helper()
+to invoke a usermode helper to load the firmware.
+
+This creates a file in /sys/class/firmware, and issues a uevent, sets
+a timeout using the timeout value read above, and waits either for the
+request to be satisfied or a timeout to happen.
+
+So... increasing the timeout can _only_ have an effect if it is done
+before the request is created - which, if imx-sdma is built into the
+kernel will be impossible to achieve.
+
+What I suspect is happening is that ubuntu's initramfs doesn't contain
+the firmware, but it unblocks the user helper (since it contains and
+runs udev) which also fails to find the firmware - and there's no
+provision for the firmware to be included in ubuntu's initramfs.
+
+So, let's go back to the point I've been making.  If you build imx-sdma
+into the kernel, there are situations where it is impossible to load
+replacement firmware, because the attempt to load firmware expires long
+before there is any chance for it to be loaded.
+
+Maybe you don't personally care about ubuntu.  Good for you, that's your
+personal choice.  That has absolutely no bearing on this issue though.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
