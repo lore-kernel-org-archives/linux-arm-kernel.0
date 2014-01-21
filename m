@@ -1,25 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Jan 2014 11:21:55 +0000
-Subject: [RFC PATCH 0/3] Add support for dwarf compat mode unwinding
-In-Reply-To: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
-References: <1390252922-25889-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140121112155.GI30706@mudshark.cambridge.arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 21 Jan 2014 11:26:27 +0000
+Subject: [RESEND][RFC PATCH 0/2] Early patches to get rid of meminfo
+In-Reply-To: <1389813057-26572-1-git-send-email-lauraa@codeaurora.org>
+References: <1389813057-26572-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140121112626.GN30907@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 09:21:59PM +0000, Jean Pihet wrote:
-> In the case of unwinding the debug info from a binary that has a different
-> address size than the current native platform, it is needed to record
-> it in the address space struct, in order to correctly parse the debug
-> info later. This mode is known as compat mode.
+On Wed, Jan 15, 2014 at 11:10:55AM -0800, Laura Abbott wrote:
+> With the move away from bootmem and the convergence on memblock, it seems
+> like meminfo should be deprecated as well to avoid duplication. This is
+> a first pass attempt to just use memblock and not have meminfo integrated.
+> There is still a major issue in terms of actually specifying mem at location
+> on the command line but I wanted to send this out for some early feedback
+> before putting any more effort into this. I've done basic boot testing on
+> a simple DT target.
 
-Terminology issues here.... compat mode isn't really that well defined, but
-typically involves a different kernel ABI. That doesn't necessarily affect
-the address size.
+Well, this set makes takes away most of the complexity of using the
+UEFI memory map instead of DT for populating memblock.
+I'm all for it.
 
-> This is the case when e.g. profiling an ARMv7 binary that runs on an
-> ARMv8 (aka AARCH64) platform.
-
-ARMv8 != AArch64
-
-Will
+/
+    Leif
