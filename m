@@ -1,32 +1,31 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 06:12:41 -0300
-Subject: [PATCH v2 15/15] ARM: mvebu: Enable watchdog support in defconfig
-In-Reply-To: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Jan 2014 07:18:44 -0200
+Subject: [PATCH v2 09/15] watchdog: orion: Add per-compatible clock
+ initialization
+In-Reply-To: <1390295561-3466-10-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390295561-3466-16-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CAOMZO5BDS8Dh1PR6SJv1CK5Pkq5mub-Hs7c4RhxUn7o5efnbKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have proper support for Armada 370/XP watchdog
-let's enable it in the defconfig.
+On Tue, Jan 21, 2014 at 7:12 AM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> +static int orion_wdt_clock_init(struct platform_device *pdev,
+> +                               struct orion_watchdog *dev)
+> +{
+> +       dev->clk = devm_clk_get(&pdev->dev, NULL);
+> +       if (IS_ERR(dev->clk))
+> +               return -ENODEV;
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 594d706..84ec924 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -60,6 +60,8 @@ CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_ORION_WATCHDOG=y
- CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.8.1.5
+Shouldn't it be 'return PTR_ERR(dev->clk)' instead?
+
+
+> +       clk_prepare_enable(dev->clk);
+
+clk_prepare_enable may fail, so better check its return value.
+
+Regards,
+
+Fabio Estevam
