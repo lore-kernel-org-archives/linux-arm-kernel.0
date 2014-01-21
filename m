@@ -1,46 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 06:42:15 -0300
-Subject: [PATCH v2 03/15] watchdog: orion: Use atomic access for shared
- registers
-In-Reply-To: <CAOMZO5BKjpkjQGOOAQ5fwmxhg1SYTmTq4Y9tUCZaDSQiosGYyw@mail.gmail.com>
+Date: Tue, 21 Jan 2014 06:43:14 -0300
+Subject: [PATCH v2 09/15] watchdog: orion: Add per-compatible clock
+ initialization
+In-Reply-To: <CAOMZO5BDS8Dh1PR6SJv1CK5Pkq5mub-Hs7c4RhxUn7o5efnbKg@mail.gmail.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAOMZO5BKjpkjQGOOAQ5fwmxhg1SYTmTq4Y9tUCZaDSQiosGYyw@mail.gmail.com>
-Message-ID: <20140121094214.GA3577@localhost>
+ <1390295561-3466-10-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CAOMZO5BDS8Dh1PR6SJv1CK5Pkq5mub-Hs7c4RhxUn7o5efnbKg@mail.gmail.com>
+Message-ID: <20140121094313.GB3577@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 07:19:52AM -0200, Fabio Estevam wrote:
+On Tue, Jan 21, 2014 at 07:18:44AM -0200, Fabio Estevam wrote:
 > On Tue, Jan 21, 2014 at 7:12 AM, Ezequiel Garcia
 > <ezequiel.garcia@free-electrons.com> wrote:
-> > Since the timer control register is shared with the clocksource driver,
-> > use the recently introduced atomic_io_clear_set() to access such register.
-> >
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/watchdog/orion_wdt.c | 20 ++++----------------
-> >  1 file changed, 4 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > index f7722a4..cf64510 100644
-> > --- a/drivers/watchdog/orion_wdt.c
-> > +++ b/drivers/watchdog/orion_wdt.c
-> > @@ -61,8 +61,6 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
-> >
-> >  static int orion_wdt_start(struct watchdog_device *wdt_dev)
-> >  {
-> > -       u32 reg;
-> > -
-> >         spin_lock(&wdt_lock);
 > 
-> Shouldn't this spin_lock be dropped now?
+> > +static int orion_wdt_clock_init(struct platform_device *pdev,
+> > +                               struct orion_watchdog *dev)
+> > +{
+> > +       dev->clk = devm_clk_get(&pdev->dev, NULL);
+> > +       if (IS_ERR(dev->clk))
+> > +               return -ENODEV;
+> 
+> Shouldn't it be 'return PTR_ERR(dev->clk)' instead?
+> 
+> 
+[..]
+> > +       clk_prepare_enable(dev->clk);
+> 
+> clk_prepare_enable may fail, so better check its return value.
 > 
 
-Hm... yes. The watchdog core uses a mutex to serialize all the watchdog hooks:
-start, stop, ping, set_timeout, etc. So it seems you're right, the spinlock
-should be dropped entirely as I see no need for it.
+Indeed.
 
-Thanks for the feedback,
+Thanks!
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
