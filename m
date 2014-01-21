@@ -1,84 +1,46 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:57 +0200
-Subject: [PATCHv3 25/41] ARM: omap4-panda.dts: add display information
+Date: Tue, 21 Jan 2014 12:56:58 +0200
+Subject: [PATCHv3 26/41] ARM: omap4-sdp.dts: add display information
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-26-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-27-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT data for OMAP4 Pandaboard. The board has the following displays:
+Add DT data for OMAP4 SDP board. The board has the following displays:
 
-dvi: uses TFP410 encoder to convert DPI to DVI
+lcd0: a command mode DSI panel connected to OMAP DSI1 encoder
+lcd1: a command mode DSI panel connected to OMAP DSI2 encoder
 hdmi: OMAP HDMI output with TPD12S015 ESD/level shifter
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi | 119 +++++++++++++++++++++++++++++-
- 1 file changed, 115 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/omap4-sdp.dts | 107 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 105 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 88c6a05cab41..20aa18ff4823 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -16,6 +16,11 @@
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index dbc81fb6ef03..cf9f6cbbd349 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -19,6 +19,12 @@
  		reg = <0x80000000 0x40000000>; /* 1 GB */
  	};
  
 +	aliases {
-+		display0 = &dvi0;
-+		display1 = &hdmi0;
++		display0 = &lcd0;
++		display1 = &lcd1;
++		display2 = &hdmi0;
 +	};
 +
- 	leds: leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -104,6 +109,87 @@
+ 	vdd_eth: fixedregulator-vdd-eth {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VDD_ETH";
+@@ -153,6 +159,47 @@
  		startup-delay-us = <70000>;
  		enable-active-high;
  	};
 +
-+	tfp410: encoder at 0 {
-+		compatible = "ti,tfp410";
-+		gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;	/* 0, power-down */
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tfp410_pins>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tfp410_in: endpoint at 0 {
-+					remote-endpoint = <&dpi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tfp410_out: endpoint at 0 {
-+					remote-endpoint = <&dvi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dvi0: connector at 0 {
-+		compatible = "dvi-connector";
-+		label = "dvi";
-+
-+		i2c-bus = <&i2c3>;
-+
-+		dvi_connector_in: endpoint {
-+			remote-endpoint = <&tfp410_out>;
-+		};
-+	};
-+
-+	tpd12s015: encoder at 1 {
++	tpd12s015: encoder at 0 {
 +		compatible = "ti,tpd12s015";
 +
 +		pinctrl-names = "default";
@@ -110,7 +72,7 @@ index 88c6a05cab41..20aa18ff4823 100644
 +		};
 +	};
 +
-+	hdmi0: connector at 1 {
++	hdmi0: connector at 0 {
 +		compatible = "hdmi-connector";
 +		label = "hdmi";
 +
@@ -121,37 +83,64 @@ index 88c6a05cab41..20aa18ff4823 100644
  };
  
  &omap4_pmx_core {
-@@ -112,10 +198,6 @@
- 			&twl6040_pins
- 			&mcpdm_pins
+@@ -163,8 +210,6 @@
+ 			&dmic_pins
  			&mcbsp1_pins
--			&dss_dpi_pins
--			&tfp410_pins
+ 			&mcbsp2_pins
 -			&dss_hdmi_pins
 -			&tpd12s015_pins
- 			&hsusbb1_pins
  	>;
  
-@@ -409,3 +491,32 @@
- &usbhsehci {
- 	phys = <&hsusb1_phy>;
+ 	uart2_pins: pinmux_uart2_pins {
+@@ -550,3 +595,61 @@
+ 	mode = <3>;
+ 	power = <50>;
  };
 +
 +&dss {
 +	status = "ok";
++};
 +
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
++&dsi1 {
++	status = "ok";
++	vdd-supply = <&vcxio>;
 +
-+	dpi_out: endpoint {
-+		remote-endpoint = <&tfp410_in>;
-+		data-lines = <24>;
++	dsi1_out_ep: endpoint {
++		remote-endpoint = <&lcd0_in>;
++		lanes = <0 1 2 3 4 5>;
++	};
++
++	lcd0: display {
++		compatible = "tpo,taal", "panel-dsi-cm";
++		label = "lcd0";
++
++		gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
++
++		lcd0_in: endpoint {
++			remote-endpoint = <&dsi1_out_ep>;
++		};
 +	};
 +};
 +
 +&dsi2 {
 +	status = "ok";
 +	vdd-supply = <&vcxio>;
++
++	dsi2_out_ep: endpoint {
++		remote-endpoint = <&lcd1_in>;
++		lanes = <0 1 2 3 4 5>;
++	};
++
++	lcd1: display {
++		compatible = "tpo,taal", "panel-dsi-cm";
++		label = "lcd1";
++
++		gpios = <&gpio4 8 GPIO_ACTIVE_HIGH>;	/* 104, reset */
++
++		lcd1_in: endpoint {
++			remote-endpoint = <&dsi2_out_ep>;
++		};
++	};
 +};
 +
 +&hdmi {
