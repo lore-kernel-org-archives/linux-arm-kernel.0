@@ -1,141 +1,61 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 21 Jan 2014 12:16:46 +0100
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Jan 2014 11:20:04 +0000
+Subject: [PATCH] ARM64: perf: support dwarf unwinding in compat mode
+In-Reply-To: <CAFrcx1=53sUDjxa-DjuJUScxanhQJqAVA36RaYNo5-Dfegij7g@mail.gmail.com>
+References: <1389869123-5884-1-git-send-email-jean.pihet@linaro.org>
+ <20140116115634.GE30257@mudshark.cambridge.arm.com>
+ <CAFrcx1=eAHsGZDsedGvvNai7Vrnf5p8RKLGFPS+cn5yGp7UQJw@mail.gmail.com>
+ <20140116125727.GI30257@mudshark.cambridge.arm.com>
+ <CAFrcx1npWFs3=rooqiGKSv-p7ivcG1J7SCvcmsz-hd3waXBfdA@mail.gmail.com>
+ <CAFrcx1=QWPFeuNDc0JatiykGnRuvPyOgwwCxnW7pSAiNa9RsxA@mail.gmail.com>
+ <20140117100723.GB16003@mudshark.cambridge.arm.com>
+ <CAFrcx1=53sUDjxa-DjuJUScxanhQJqAVA36RaYNo5-Dfegij7g@mail.gmail.com>
+Message-ID: <20140121112004.GH30706@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Mon, Jan 20, 2014 at 05:05:14PM +0000, Jean Pihet wrote:
+> Hi Will,
+> 
+> Here is an updated version of the change, which uses compat_sp at only
+> one place.
+> The drawback is that compat_user_mode is checked when calling
+> compat_user_stack_pointer, which seems unnecessary. Unfortunately the
+> check is not optimized out by the complier as I could check with
+> objdump -S.
+> 
+> What do you think?
 
-On 20 January 2014 18:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> ARM based platforms implement a variety of power management schemes that
-> allow processors to enter at run-time low-power states, aka C-states
-> in ACPI jargon. The parameters defining these C-states vary on a per-platform
-> basis forcing the OS to hardcode the state parameters in platform
-> specific static tables whose size grows as the number of platforms supported
-> in the kernel increases and hampers device drivers standardization.
->
-> Therefore, this patch aims at standardizing C-state device tree bindings for
-> ARM platforms. Bindings define C-state parameters inclusive of entry methods
-> and state latencies, to allow operating systems to retrieve the
-> configuration entries from the device tree and initialize the related
-> power management drivers, paving the way for common code in the kernel
-> to deal with power states and removing the need for static data in current
-> and previous kernel versions.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/c-states.txt | 774 +++++++++++++++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
->  2 files changed, 784 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/c-states.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/c-states.txt b/Documentation/devicetree/bindings/arm/c-states.txt
-> new file mode 100644
-> index 0000000..0b5617b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/c-states.txt
-> @@ -0,0 +1,774 @@
-> +==========================================
-> +ARM C-states binding description
-> +==========================================
-> +
-> +==========================================
-> +1 - Introduction
-> +==========================================
-> +
-> +ARM systems contain HW capable of managing power consumption dynamically,
-> +where cores can be put in different low-power states (ranging from simple
-> +wfi to power gating) according to OSPM policies. Borrowing concepts
-> +from the ACPI specification[1], the CPU states representing the range of
-> +dynamic states that a processor can enter at run-time, aka C-state, can be
-> +specified through device tree bindings representing the parameters required to
-> +enter/exit specific C-states on a given processor.
-> +
-> +The state an ARM CPU can be put into is loosely identified by one of the
-> +following operating modes:
-> +
-> +- Running:
-> +        # Processor core is executing instructions
-> +
-> +- Wait for Interrupt:
-> +       # An ARM processor enters wait for interrupt (WFI) low power
-> +         state by executing a wfi instruction. When a processor enters
-> +         wfi state it disables most of the clocks while keeping the processor
-> +         powered up. This state is standard on all ARM processors and it is
-> +         defined as C1 in the remainder of this document.
-> +
+I think that's cleaner and really wouldn't worry about the couple of extra
+instructions.
 
-> +- Dormant:
-> +       # Dormant mode is entered by executing wfi instructions and by sending
-> +         platform specific commands to the platform power controller (coupled
-> +         with processor specific SW/HW control sequences).
-> +         In dormant mode, most of the processor control and debug logic is
-> +         powered up but cache RAM can be put in retention state, providing
+Cheers,
 
-Base on your description, it's not clear for me what is on, what is
-lost and what is power down ?
-My understand of the dormant mode that you described above is : the
-cache is preserved (and especially the cache RAM) but the processor
-state is lost (registers ...). Do I understand correctly ?
+Will
 
-What about retention mode where the contents of processor and cache
-are preserved but the power consumption is reduced ? it can be seen as
-a special wfi mode which need specific SW/HW control sequences but i'm
-not sure to understand how to describe such state with your proposal.
-
-> +         additional power savings.
-> +
-> +- Sleep:
-> +       # Sleep mode is entered by executing the wfi instruction and by sending
-> +         platform specific commands to the platform power controller (coupled
-> +         with processor specific SW/HW control sequences). In sleep mode, a
-> +         processor and its caches are shutdown, the entire processor state is
-> +         lost.
-> +
-> +Building on top of the previous processor modes, ARM platforms implement power
-> +management schemes that allow an OS PM implementation to put the processor in
-> +different CPU states (C-states). C-states parameters (eg latency) are
-> +platform specific and need to be characterized with bindings that provide the
-> +required information to OSPM code so that it can build the required tables and
-> +use them at runtime.
-> +
-> +The device tree binding definition for ARM C-states is the subject of this
-> +document.
-> +
-
-[snip]
-
-> +
-> +       - psci-power-state
-> +               Usage: Required if entry-method property value is set to
-> +                      "psci".
-> +               Value type: <u32>
-> +               Definition: power_state parameter to pass to the PSCI
-> +                           suspend call to enter the C-state.
-
-Why psci has got a dedicated field and not vendor methods ? can't you
-make that more generic ?
-
-> +
-> +       - latency
-> +               Usage: Required
-> +               Value type: <prop-encoded-array>
-> +               Definition: List of u32 values representing worst case latency
-> +                           in microseconds required to enter and exit the
-> +                           C-state, one value per OPP [2]. The list should
-> +                           be specified in the same order as the operating
-> +                           points property list of the cpu this state is
-> +                           valid on.
-> +                           If no OPP bindings are present, the latency value
-> +                           is associated with the current OPP of CPUs in the
-> +                           system.
-> +
-
-[snip]
-
-Thanks
-Vincent
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index fda2704..e71f81f 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -228,7 +228,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+>         return (u32)(unsigned long)uptr;
+>  }
+> 
+> -#define compat_user_stack_pointer() (current_pt_regs()->compat_sp)
+> +#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
+> 
+>  static inline void __user *arch_compat_alloc_user_space(long len)
+>  {
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index fbb0020..86d5b54 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -133,7 +133,7 @@ struct pt_regs {
+>         (!((regs)->pstate & PSR_F_BIT))
+> 
+>  #define user_stack_pointer(regs) \
+> -       ((regs)->sp)
+> +       (!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
+> 
+>  /*
+>   * Are the current registers suitable for user mode? (used to maintain
