@@ -1,27 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jan 2014 11:01:07 +0000
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140121075922.2a83e076@ipc1.ka-ro>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro> <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
- <20140120150902.207b9d66@ipc1.ka-ro>
- <20140120151152.GE15937@n2100.arm.linux.org.uk>
- <20140121075922.2a83e076@ipc1.ka-ro>
-Message-ID: <20140121110107.GS15937@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 21 Jan 2014 12:57:13 +0200
+Subject: [PATCHv3 41/41] Doc/DT: Add DT binding documentation for tpd12s015
+ encoder
+In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-42-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 07:59:22AM +0100, Lothar Wa?mann wrote:
-> The file is automatically removed after the timeout has expired (or
-> the frimware has been loaded).
-> Thus you must check for it within the timeout period during boot.
+Add DT binding documentation for tpd12s015 encoder
 
-... which is impossible if imx-sdma is built into the kernel - it
-expires while the initramfs has only just started running, giving a
-very narrow window for userspace to load firmware.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ .../devicetree/bindings/video/ti,tpd12s015.txt     | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
 
+diff --git a/Documentation/devicetree/bindings/video/ti,tpd12s015.txt b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+new file mode 100644
+index 000000000000..26e6d32e3f20
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+@@ -0,0 +1,44 @@
++TPD12S015 HDMI level shifter and ESD protection chip
++====================================================
++
++Required properties:
++- compatible: "ti,tpd12s015"
++
++Optional properties:
++- gpios: CT CP HPD, LS OE and HPD gpios
++
++Required nodes:
++- Video port 0 for HDMI input
++- Video port 1 for HDMI output
++
++Example
++-------
++
++tpd12s015: encoder at 1 {
++	compatible = "ti,tpd12s015";
++
++	gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,	/* 60, CT CP HPD */
++		<&gpio2 9 GPIO_ACTIVE_HIGH>,	/* 41, LS OE */
++		<&gpio2 31 GPIO_ACTIVE_HIGH>;	/* 63, HPD */
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			tpd12s015_in: endpoint at 0 {
++				remote-endpoint = <&hdmi_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			tpd12s015_out: endpoint at 0 {
++				remote-endpoint = <&hdmi_connector_in>;
++			};
++		};
++	};
++};
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.3.2
