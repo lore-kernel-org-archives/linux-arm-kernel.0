@@ -1,68 +1,82 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Jan 2014 10:14:49 -0800
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <CAPDyKFpfrs=e3bDvdFRpnD3RkmD8ZvAJgFi6XvCRAOocqAKkKw@mail.gmail.com>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <CAPDyKFoywt_LcWXdWJCWMU8-GT2vLW27eiuF0WEyjHJV+96HpA@mail.gmail.com>
- <20140120191302.GA32178@quad.lixom.net>
- <CAPDyKFpfrs=e3bDvdFRpnD3RkmD8ZvAJgFi6XvCRAOocqAKkKw@mail.gmail.com>
-Message-ID: <CAOesGMi9puZSzdDJ-sur5ks7VcDH+XV_MbuA0xeidLgp=uJacg@mail.gmail.com>
+Date: Tue, 21 Jan 2014 10:17:56 -0800
+Subject: [PATCH v3 16/24] drm/i2c: tda998x: add DT documentation
+In-Reply-To: <20140120105410.15705f32@armhf>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195844.0c975b90@armhf>
+ <CAOesGMi96wkHM8jfHNVnM7RJyW2vVoP6FT4YyYzKp-kfc0jTuQ@mail.gmail.com>
+ <20140120105410.15705f32@armhf>
+Message-ID: <CAOesGMhngiw+f8bkfB9C4COTPksXg_ZsYA-p1r5WJ6FZuBE3KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 12:55 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-[pruning quotes a bit]
->>> Is the above regulator related to host->ocr_avail mask? Could the
->>> above regulator be replaced by vmmc?
+On Mon, Jan 20, 2014 at 1:54 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> On Sun, 19 Jan 2014 20:06:09 -0800
+> Olof Johansson <olof@lixom.net> wrote:
+>
+>> Hi,
 >>
->> I have to admit that I don't know MMC as well as I could, but OCR seems to be
->> something that's between the driver/controller/device, not related to external
->> power control in this case?
->
-> This is related to the power of the card, typically external
-> regulators controlled by the host driver.
->
-> Both the card and the host supports a voltage range. This range is
-> exactly what the OCR mask describes. At initialization of the card,
-> the host ocr is validated against the card ocr.
-
-Ok, so they specify the voltage needed, but there's no way to
-determine what regulator is wired up to control. So that information
-is still needed (possibly through vmmc though).
-
-
->>> At the moment host drivers uses mmc_regulator_get_supply(), which
->>> fetches regulators called "vmmc" and "vqmmc". It is also common to
->>> have these defined in DT like "vmmc-supply". This has not been
->>> properly documented for most host cases, and we should fix that. I
->>> also think it would make sense to include these in the documentation
->>> for the common mmc bindings, instead of host specific bindings.
+>> On Sun, Jan 19, 2014 at 10:58 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+>> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+>> > ---
+>> >  .../devicetree/bindings/drm/i2c/tda998x.txt        | 24 ++++++++++++++++++++++
+>> >  1 file changed, 24 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/drm/i2c/tda998x.txt
 >>
->> Hm, I had been of the impression that the vmmc stuff is to control
->> power/voltage on the signal lines, not for external card power. Still, even in
->> that case there's need for the reset line handling and clock control.
+>> Please cc bindings for review to devicetree at vger.kernel.org (cc:d here now)
+>>
+>> > diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+>> > new file mode 100644
+>> > index 0000000..72da71d
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+>> > @@ -0,0 +1,24 @@
+>> > +Device-Tree bindings for the NXP TDA998x HDMI transmitter
+>> > +
+>> > +Required properties;
+>> > +  - compatible: must be "nxp,tda998x"
+>> > +
+>> > +Optional properties:
+>> > +  - interrupts: interrupt number for HDMI exchanges - default: by polling
+>>
+>> What are HDMI exchanges, and how do they differ from other interrupts?
 >
-> vmmc: the power to the card.
-> vqmmc: the I/O voltage levels (for the signal lines).
-
-Ah, ok. So vmmc seems like it's the same then. I'll try to get some
-cycles to look at it today.
-
-
-> Regarding reset, I agree, those seems to be needed.
+> The used HDMI interrupt events are screen plug/unplug and EDID read.
+> There are also CEC read/write which are not yet implemented in the
+> tda998x driver.
 >
-> Regarding clock control. I suppose you are referring to separate
-> external clocks, not affecting the SDIO/SD/MMC interface speed!?
->
-> That could make sense, but still I wonder how those shall be handled
-> in a fine grained power management setup. In other words, when shall
-> those be gated/ungated? Is the mmc core able to take the correct
-> decision about these?
+> There is no difference from normal interrupts, except that the events
+> may be get by polling, so, the interrupt number is optional.]
 
-The reference clock is in most cases I've seen 32kHz, and not
-something that's under fine-grained power management. So it's not used
-to regulate interface speed, etc.
+Ok, then it looks like the property description is a little confusing.
+I'd remove the mentioning of HDMI exchanges from it.
+
+>> > +
+>> > +  - pinctrl-0: pin control group to be used for this controller (IRQ).
+>> > +
+>> > +  - pinctrl-names: must contain a "default" entry.
+>> > +
+>> > +  - video-ports: 24 bits value - default: <0x230145>
+>>
+>> What is this?
+>
+> The video-ports value defines how the video controller is connected to
+> the tda998x chip. Each 4 bits value tells from which input pins comes
+> the video data and if there is any bit inversion. Each byte of this
+> video-ports is used to load the VIP_CNTRL_{0,1,2} registers. These ones
+> are described in the TDA9983B documentation which is the closer
+> available document about the TDA998x family.
+>
+> The default value is the one defined for TI boards.
+> A known other value is <0x234501> which is used for Russell's Armada
+> DRM driver in the Cubox (Marvell A510), but this driver has no DT
+> support.
+
+Ok, this is a classic case where the binding should describe how
+things are configured/wired up instead of hardcoding a register value
+like this. From the data sheet there seems to be a _lot_ of settings,
+so selecting the needed subset for now might be acceptable (and go
+with defaults on the rest).
 
 
 -Olof
