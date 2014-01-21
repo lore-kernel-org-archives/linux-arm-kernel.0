@@ -1,39 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jan 2014 11:57:06 +0000
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140121125200.6b1e96bd@ipc1.ka-ro>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro> <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
- <20140120150902.207b9d66@ipc1.ka-ro>
- <20140120151152.GE15937@n2100.arm.linux.org.uk>
- <20140121075922.2a83e076@ipc1.ka-ro>
- <20140121110107.GS15937@n2100.arm.linux.org.uk>
- <20140121125200.6b1e96bd@ipc1.ka-ro>
-Message-ID: <20140121115706.GT15937@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Jan 2014 12:02:14 +0000
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+ <20140115161224.GH25824@e106331-lin.cambridge.arm.com>
+ <20140120224742.EC905C40B12@trevor.secretlab.ca>
+ <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
+Message-ID: <20140121120214.GK28747@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 12:52:00PM +0100, Lothar Wa?mann wrote:
-> Hi,
+On Tue, Jan 21, 2014 at 01:03:23AM +0000, Olof Johansson wrote:
+> On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >
+> >> > Another, more invasive option would be extend the dts syntax and teach
+> >> > dtc to handle property appending. Then the soc dts could stay as it is,
+> >> > and the board dts could have something like:
+> >> >
+> >> >     /append-property/ interrupts = <&intc1 6 1>;
+> >> >     /append-property/ interrupt-names = "board-specific-irq";
+> >> >
+> >> > Both these options solve the issue at the source, are general to other
+> >> > properties, and allow more than one level of hierarchy (the proposed
+> >> > interrupts-extended-2 only allows one level).
+> >>
+> >> I've just had a go at implementing the append-property mechanism above
+> >> in dtc, and it was far easier than I expected (patch below).
+> >>
+> >> Does anyone have any issues with the /append-property/ idea?
+> >
+> > I think that is reasonable.
 > 
-> Russell King - ARM Linux wrote:
-> > On Tue, Jan 21, 2014 at 07:59:22AM +0100, Lothar Wa?mann wrote:
-> > > The file is automatically removed after the timeout has expired (or
-> > > the frimware has been loaded).
-> > > Thus you must check for it within the timeout period during boot.
-> > 
-> > ... which is impossible if imx-sdma is built into the kernel - it
-> > expires while the initramfs has only just started running, giving a
-> > very narrow window for userspace to load firmware.
-> > 
-> It works for me, but I'm not using initramfs.
+> 
+> The main problem with this (same for clocks) is if you need to append
+> something with a name when the original didn't have any.
 
-You can take my email as a report of "it doesn't work for everyone."  The
-*only* way I can get firmware to load is to build imx-sdma as a module.
-Building it in is a hopeless case here.
+Can you not just add a name in the original file? I assume we're not
+going to use this to adjust dts files we're not already in full control
+of.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> 
+> Reordering entries might not work for interrupts, since the bindings
+> might have requirements on order.
+
+That's a fair point.
+
+Do we currently have any optional/board-specific interrupts which must
+appear at the start or middle of the list?
+
+For those, could we add names? The kernel should be abel to fall back to
+ordering if names aren't present, and we can recommend a particular
+ordering for compatiblity with older kernels.
+
+As a general preventative measure it would be nice to have named
+elements whenever elements can be optional.
+
+> 
+> I'm not aware of a good solution for this. Suggestions welcome.
+
+Me neither. Prepending and appending is easy.
+
+Inserting and/or modifying the list requires knowledge of the size of
+each element (and for variable-sized entries requires knowledge of the
+particular binding, which we cannot embed in dtc). 
+
+I suspect adding richer syntax for modifying properties in arbitrary
+ways will devolve into a turing tarpit.
+
+Thanks,
+Mark.
