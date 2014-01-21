@@ -1,40 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 21 Jan 2014 12:02:55 +0100
-Subject: [PATCH v2 02/15] clocksource: orion: Use atomic access for
- shared registers
-In-Reply-To: <4103670.WQZpL6dQdj@wuerfel>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 21 Jan 2014 08:06:04 -0300
+Subject: Removing PLAT_ORION dependency from ARCH_MVEBU (Was Re: [PATCH v2
+ 14/15] watchdog: orion: Allow to build on any Orion platform)
+In-Reply-To: <52DE40BD.10700@gmail.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5118193.GjKusj569J@wuerfel> <52DE44B9.70308@gmail.com>
- <4103670.WQZpL6dQdj@wuerfel>
-Message-ID: <20140121110255.GD13396@lunn.ch>
+ <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52DE40BD.10700@gmail.com>
+Message-ID: <20140121110603.GB4356@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The real problem with this is that it resides in orion-time.c which
-> > is fine for Orion SoCs. Armada 370/XP use a different timer and
-> > therefore the _common_ watchdog driver cannot call this function.
+Sebastian,
+
+I'm picking on this discussion, with a new Subject.
+
+On Tue, Jan 21, 2014 at 10:41:17AM +0100, Sebastian Hesselbarth wrote:
+> On 01/21/14 10:12, Ezequiel Garcia wrote:
+> > After getting rid of all the mach-specific code, it's now possible
+> > to allow builds in any Orion platform.
+> >
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >   drivers/watchdog/Kconfig | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index 5be6e91..1689f72 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
+> >
+> >   config ORION_WATCHDOG
+> >   	tristate "Orion watchdog"
+> > -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+> > +	depends on PLAT_ORION
+[..]
 > 
-> Right, I had missed this part.
+> I haven't checked why ARCH_MVEBU at all added PLAT_ORION as dependency,
+> but IIRC it was just because of a missing mbus driver? If it is just
+> this, we should also remove PLAT_ORION from ARCH_MVEBU to have a clean
+> cut between new common arch and existing sub-archs.
 > 
-> > Moreover, Dove (out of Orion) and Armada 370/XP will happily live in
-> > one V7 kernel with both time-orion and time-armada-370-xp compiled in.
-> 
-> It still wouldn't be too hard to do: both clock drivers could export
-> functions with different identifiers, and the wdt driver can use
-> conditional compilation (#ifdef or if(IS_ENABLED())) to only call
-> those functions when the respective clocksource drivers are enabled.
 
-Hi Arnd.
+Well, I'm not sure if I'm following you. Many drivers currently depend
+on PLAT_ORION, so if we remove PLAT_ORION from ARCH_MVEBU we would have
+to replace: s/PLAT_ORION/ARCH_{MVEBU, KIRKWOOD, DOVE, ...}.
 
-The plan is to make dove part of MULTI_V7. At that point, you have
-both dove and armada-370-xp in the same kernel. Conditional
-compilation does not work, the watchdog driver would need to know at
-runtime which timer is in use, and call the right timer function.
-
-I'm working on making DT Kirkwood part of MULTI_V5. The changes needed
-are mostly trivial. I expect making Dove part of MULTI_V7 is also
-trivial, so could happen during the next cycle. So this mix of Dove
-and Armada 370 XP is not a theoretical problem, it is something which
-needs to be solved ready for merging during the next window.
-
-	Andrew
+Is this the suggested roadmap or I've completely misunderstood it?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
