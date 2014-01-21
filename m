@@ -1,69 +1,116 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:57:09 +0200
-Subject: [PATCHv3 37/41] Doc/DT: Add DT binding documentation for MIPI DPI
- Panel
+Date: Tue, 21 Jan 2014 12:57:01 +0200
+Subject: [PATCHv3 29/41] ARM: omap3-igep0020.dts: add display information
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-38-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-30-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for MIPI DPI Panel.
+From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
+Add DT data for OMAP3 IGEPv2 board. The board has the following displays:
+
+dvi: uses TFP410 encoder to convert DPI to DVI
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- .../devicetree/bindings/video/panel-dpi.txt        | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/panel-dpi.txt
+ arch/arm/boot/dts/omap3-igep0020.dts | 59 +++++++++++++++++++++++++++++++-----
+ 1 file changed, 52 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/video/panel-dpi.txt b/Documentation/devicetree/bindings/video/panel-dpi.txt
-new file mode 100644
-index 000000000000..72636c6f1c67
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/panel-dpi.txt
-@@ -0,0 +1,43 @@
-+Generic MIPI DPI Panel
-+======================
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index 1c7e74d2d2bc..bd8dcc9f7ab4 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -61,14 +61,52 @@
+ 		reset-gpios = <&gpio1 24 GPIO_ACTIVE_LOW>; /* gpio_24 */
+ 		vcc-supply = <&hsusb1_power>;
+ 	};
 +
-+Required properties:
-+- compatible: "panel-dpi"
++	tfp410: encoder at 0 {
++		compatible = "ti,tfp410";
++		gpios = <&gpio6 10 GPIO_ACTIVE_LOW>; /* 170, power-down */
 +
-+Optional properties:
-+- label: a symbolic name for the panel
-+- gpios: panel enable gpio and backlight enable gpio
++		pinctrl-names = "default";
++		pinctrl-0 = <&tfp410_pins>;
 +
-+Required nodes:
-+- "panel-timing" containing video timings
-+  (Documentation/devicetree/bindings/video/display-timing.txt)
-+- Video port for DPI input
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+Example
-+-------
++			port at 0 {
++				reg = <0>;
 +
-+lcd0: display at 0 {
-+        compatible = "samsung,lte430wq-f0c", "panel-dpi";
-+        label = "lcd";
++				tfp410_in: endpoint at 0 {
++					remote-endpoint = <&dpi_out>;
++				};
++			};
 +
-+        lcd_in: endpoint {
-+                remote-endpoint = <&dpi_out>;
-+        };
++			port at 1 {
++				reg = <1>;
 +
-+        panel-timing {
-+                clock-frequency = <9200000>;
-+                hactive = <480>;
-+                vactive = <272>;
-+                hfront-porch = <8>;
-+                hback-porch = <4>;
-+                hsync-len = <41>;
-+                vback-porch = <2>;
-+                vfront-porch = <4>;
-+                vsync-len = <10>;
++				tfp410_out: endpoint at 0 {
++					remote-endpoint = <&dvi_connector_in>;
++				};
++			};
++		};
++	};
 +
-+                hsync-active = <0>;
-+                vsync-active = <0>;
-+                de-active = <1>;
-+                pixelclk-active = <1>;
-+        };
-+};
++	dvi0: connector at 0 {
++		compatible = "dvi-connector";
++		label = "dvi";
++
++		i2c-bus = <&i2c3>;
++
++		dvi_connector_in: endpoint {
++			remote-endpoint = <&tfp410_out>;
++		};
++	};
+ };
+ 
+ &omap3_pmx_core {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <
+ 		&hsusbb1_pins
+-		&tfp410_pins
+-		&dss_pins
+ 	>;
+ 
+ 	hsusbb1_pins: pinmux_hsusbb1_pins {
+@@ -88,13 +126,13 @@
+ 		>;
+ 	};
+ 
+-	tfp410_pins: tfp410_dvi_pins {
++	tfp410_pins: pinmux_tfp410_pins {
+ 		pinctrl-single,pins = <
+ 			0x196 (PIN_OUTPUT | MUX_MODE4)   /* hdq_sio.gpio_170 */
+ 		>;
+ 	};
+ 
+-	dss_pins: pinmux_dss_dvi_pins {
++	dss_dpi_pins: pinmux_dss_dpi_pins {
+ 		pinctrl-single,pins = <
+ 			0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
+ 			0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
+@@ -216,7 +254,14 @@
+ 	phys = <&hsusb1_phy>;
+ };
+ 
+-&vpll2 {
+-        /* Needed for DSS */
+-        regulator-name = "vdds_dsi";
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_dpi_pins>;
++
++	dpi_out: endpoint {
++		remote-endpoint = <&tfp410_in>;
++		data-lines = <24>;
++	};
+ };
 -- 
 1.8.3.2
