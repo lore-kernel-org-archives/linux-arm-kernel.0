@@ -1,28 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Jan 2014 13:35:05 +0100
-Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <52DD75B1.3090701@broadcom.com>
-References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-1-git-send-email-syin@broadcom.com>
- <1387592016-13740-4-git-send-email-syin@broadcom.com>
- <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
- <52D98B99.5050604@broadcom.com> <20140118025600.GS31049@beef>
- <CACRpkdYAANtY=9QtDnYNZLSrF09nTWUH4nK5oJ7mzznS+_=bHA@mail.gmail.com>
- <52DD75B1.3090701@broadcom.com>
-Message-ID: <CACRpkdYjLPAvt8-ZiZfAhUw6RbjE+1dYjtjfq0bjRkyYhm=9xw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Jan 2014 13:35:16 +0100
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
+ <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
+Message-ID: <201401211335.16885.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 8:14 PM, Sherman Yin <syin@broadcom.com> wrote:
+On Tuesday 21 January 2014, Linus Walleij wrote:
+> On Tue, Jan 21, 2014 at 4:11 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> > On Sat, Jan 18, 2014 at 8:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >
+> > I agree that's how it should be be done with the current API if your
+> > driver can obtain GPIOs from both ACPI and DT. This is a potential
+> > issue, as drivers are not supposed to make assumptions about who is
+> > going to be their GPIO provider. Let's say you started a driver with
+> > only DT in mind, and used gpio_get(dev, con_id) to get your GPIOs. DT
+> > bindings are thus of the form "con_id-gpio = <phandle>", and set in
+> > stone. Then later, someone wants to use your driver with ACPI. How do
+> > you handle that gracefully?
+> 
+> Short answer is you can't. You have to pour backward-compatibility
+> code into the driver first checking for that property and then falling
+> back to the new binding if it doesn't exist.
 
-> I'll confirm the new name with Matt before sending out another patch. Which
-> would work better for you - a) a set of patches replacing my previous ones,
-> b) a set of patches on top of my previous ones, c) a single patch on top of
-> my previous ones? d) something else?
+With the ACPI named properties extension, it should be possible to have
+something akin to a "gpio-names" list that can be attached to an indexed
+array of gpio descriptors. I assume that Intel is going to need this
+for named irqs, clocks, regulators, dmas as well, so I think it will
+eventually get there. It's not something that can be done today though,
+or that is standardized in APCI-5.0.
 
-(c)
+My guess is that named GPIOs are going to make more sense on x86 embedded
+than on arm64 server.
 
-The tree goes upstream now, you have to make this fix on top.
+> > I'm starting to wonder, now that ACPI is a first-class GPIO provider,
+> > whether we should not start to encourage the deprecation of the
+> > "con_id-gpio = <phandle>" binding form in DT and only use a single
+> > indexed GPIO property per device.
+> 
+> You have a valid point.
 
-Yours,
-Linus Walleij
+Independent of ACPI, I prefer indexed "gpios" properties over "con_id-gpio"
+properties anyway, because it's more consistent with some of the other
+subsystems. I don't have an opinion though on whether we should also
+allow a "gpios"/"gpio-names" pair, or whether we should keep the indexed
+"gpios" list for the anonymous case.
+
+> > The con_id parameter would then only
+> > be used as a label, which would also have the nice side-effect that
+> > all GPIOs used for a given function will be reported under the same
+> > name no matter what the GPIO provider is.
+> 
+> As discussed earlier in this thread I'm not sure the con_id is
+> suitable for labelling GPIOs. It'd be better to have a proper name
+> specified in DT/ACPI instead.
+
++1
+
+> > From an aesthetic point of view, I definitely prefer using con_id to
+> > identify GPIOs instead of indexes, but I don't see how we can make it
+> > play nice with ACPI. Thoughts?
+> 
+> Let's ask the DT maintainers...
+> 
+> I'm a bit sceptic to the whole ACPI-DT-API-should-be-unified
+> just-one-function-call business, as this was just a very simple example
+> of what can happen to something as simple as
+> devm_gpiod_get[_index]().
+
+I think a unified kernel API makes more sense for some subsystems than
+others, and it depends a bit on the rate of adoption of APCI for drivers
+that already have a DT binding (or vice versa, if that happens).
+
+GPIO might actually be in the first category since it's commonly used
+for off-chip components that will get shared across ARM and x86 (as
+well as everything else), while a common kernel API would be less
+important for things that are internal to an SoC where Intel is the
+only company needing ACPI support.
+
+	Arnd
