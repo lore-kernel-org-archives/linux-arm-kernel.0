@@ -1,105 +1,66 @@
-From: benjamin.widawsky@intel.com (Ben Widawsky)
-Date: Tue, 21 Jan 2014 11:05:20 -0800
-Subject: [Intel-gfx] [PATCH 1/2] drm: share drm_add_fake_info_node
-In-Reply-To: <20140115234222.GA4770@phenom.ffwll.local>
-References: <1389708847-25038-1-git-send-email-benjamin.widawsky@intel.com>
- <20140114232510.GV4770@phenom.ffwll.local>
- <20140114234018.GK15937@n2100.arm.linux.org.uk>
- <CAKMK7uF0kFCsc=3Ny_BMPwDd1fqpY-D6baRRBe0Z8DBKcdGHhg@mail.gmail.com>
- <CAKMK7uE7CSh1gcs341ji6duRH_FgNDhoMfZNc=4hoYf-an1M=w@mail.gmail.com>
- <20140115200819.GB1210@bwidawsk.net>
- <20140115234222.GA4770@phenom.ffwll.local>
-Message-ID: <20140121190520.GA10927@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Jan 2014 19:15:47 +0000
+Subject: [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI audio support
+ for TDA998x trough McASP I2S bus
+In-Reply-To: <52D67099.1040904@ti.com>
+References: <cover.1387535299.git.jsarha@ti.com>
+ <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
+ <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
+Message-ID: <20140121191547.GX17314@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 12:42:22AM +0100, Daniel Vetter wrote:
-> On Wed, Jan 15, 2014 at 12:08:19PM -0800, Ben Widawsky wrote:
-> > On Wed, Jan 15, 2014 at 09:45:28AM +0100, Daniel Vetter wrote:
-> > > On Wed, Jan 15, 2014 at 9:39 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> > > > On Wed, Jan 15, 2014 at 12:40 AM, Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > >> On Wed, Jan 15, 2014 at 12:25:10AM +0100, Daniel Vetter wrote:
-> > > >>> On Tue, Jan 14, 2014 at 06:14:06AM -0800, Ben Widawsky wrote:
-> > > >>> > Both i915 and Armada had the exact same implementation. For an upcoming
-> > > >>> > patch, I'd like to call this function from two different source files in
-> > > >>> > i915, and having it available externally helps there too.
-> > > >>> >
-> > > >>> > While moving, add 'debugfs_' to the name in order to match the other drm
-> > > >>> > debugfs helper functions.
-> > > >>> >
-> > > >>> > Cc: linux-arm-kernel at lists.infradead.org
-> > > >>> > Cc: intel-gfx at lists.freedesktop.org
-> > > >>> > Signed-off-by: Ben Widawsky <ben@bwidawsk.net>
-> > > >>>
-> > > >>> drm_debugfs_create_files in drm_debugfs.c has the almost same code again.
-> > > >>> Now the problem here is that the interface is a bit botched up, since all
-> > > >>> the users in i915 and armada actaully faile to clean up teh debugfs dentry
-> > > >>> if drm_add_fake_info_node.
-> > > >>
-> > > >> That's not correct - armada does clean up these, I think you need to
-> > > >> take a closer look at the code.
-> > > >>
-> > > >> We do this by setting node->info_ent to the file operations structure,
-> > > >> which is a unique key to the file being registered.
-> > > >>
-> > > >> Upon failure to create the fake node, we appropriately call
-> > > >> drm_debugfs_remove_files() with the first argument being a pointer to
-> > > >> the file operations.  This causes drm_debugfs_remove_files() to match
-> > > >> the fake entry, call debugfs_remove() on the dentry, and remove the
-> > > >> node from the list, and free the node structure we allocated.
-> > > >>
-> > > >> Upon driver teardown, we also call drm_debugfs_remove_files() but with
-> > > >> each fops which should be registered, thus cleaning up each fake node
-> > > >> which was created.
-> > > >>
-> > > >> So, Armada does clean up these entries properly.
-> > > >
-> > > > Indeed I've missed that and it's just i915 that botches this. I still
-> > > > think the helper would be saner if it cleans up all its leftovers in
-> > > > the failure case.
-> > > 
-> > > Ok, now I've actually page all the stuff back in - if
-> > > drm_add_fake_info_node fails we don't set up a drm_info_node structure
-> > > and link it anywhere. Which means drm_debugfs_remove_files won't ever
-> > > find it and hence can't possibly call debugfs_remove. Which means the
-> > > debugfs dentry is leaked. So I think the semantics of that new debugfs
-> > > helper should get fixed to also allocate and clean up the debugfs
-> > > node.
-> > > 
-> > > I agree that i915 is even worse since it doesn't bother to clean up
-> > > any debugfs files at all in the failure case.
-> > > -Daniel
-> > > -- 
-> > > Daniel Vetter
-> > > Software Engineer, Intel Corporation
-> > > +41 (0) 79 365 57 48 - http://blog.ffwll.ch
-> > 
-> > Perhaps I don't understand what you want here. The only failure path in
-> > the fake entry creation does already call debugfs_remove.
-> > 
-> >         if (node == NULL) {
-> >                 debugfs_remove(ent);
-> >                 return -ENOMEM;
-> >         }
-> > 
-> > So long as the function succeeds, the node will be findable and removable.
-> 
-> Oh dear, I didn't see that. Still stand by my opinion though that we
-> should shovel the debugfs_create_file into the helper - callers allocating
-> something and then the helper freeing it (but only if it fails) is rather
-> funky semantics.
-> -Daniel
+On Wed, Jan 15, 2014 at 01:27:21PM +0200, Jyri Sarha wrote:
+> On 12/31/2013 03:25 PM, Mark Brown wrote:
 
-This actually falls apart for the one usage I originally cared about.
-For CRC, we store our own info structure instead of fops as the key in
-the drm debug list. Therefore, it doesn't align with the usage in ours
-or other drivers. One option is to make the helper function take both a
-fops as well as a key (an ugly interface if you ask me).
+> >>support. The only supported sample format is SNDRV_PCM_FORMAT_S32_LE.
+> >>The 8 least significant bits are ignored.
 
-I've already written the patches as you wanted, so I can submit them -
-it's just unfortunate that the duplication I was hoping to get rid of
-will need to remain.
+> >Where does this constraint come from?
 
--- 
-Ben Widawsky, Intel Open Source Technology Center
+> From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N
+> register statically to a value that works only with 4 byte samples.
+> According to my tests it is possible to support 3 and 2 byte samples
+> too by changing the CTS_N register value, but I am not sure if the
+> configuration can be changed on the fly. My data sheet of the nxp
+> chip is very vague about the register definitions, but I suppose the
+> register configures some clock divider on the chip. HDMI supports
+> only upto 24bit audio and the data sheet states that any extraneous
+> least significant bits are ignored.
+
+Hrm.  This sounds like it ought to be presenting as an ASoC CODEC
+driver.
+
+> >>+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_CHANNELS,
+> >>+				     2, 2);
+
+> >Why not just set all this statically when registering the DAI?
+
+> Because there is no relevant DAI to where to put these limitations.
+> I did not want to add yet another dummy codec driver, but decided to
+> use the already existing ASoC HDMI codec. By default the driver
+> support all audio params supported by HDMI. The limitations are
+> coming from NXP chip, the NXP driver, and because the chip is used
+> in i2s mode. In other words the limitation is coming from machine
+> setup, not from the DAIs.
+
+OK, but it sounds like it's got register configuration as well?  That
+really does sound like a device that ought to have a driver...
+
+> No excuse for i initialization, I'll fix that. The casting is just
+> to survive with just one kmalloc call instead of separate memory
+> blobs for
+> struct snd_pcm_hw_constraint_list and referred list of supported
+> sample rates. I'll allocate a second blob, if that is easier to
+> read.
+
+Yes, please.  Unless it's something where memory is getting tight (eg,
+due to be allocated a lot) it's more important that we can read the code
+than that we save a few bytes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/b1d094fe/attachment.sig>
