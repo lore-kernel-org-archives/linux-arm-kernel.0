@@ -1,27 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 21 Jan 2014 09:39:22 +0900
-Subject: PWM...
-In-Reply-To: <20140120161147.GS17314@sirena.org.uk>
-References: <20140119164956.GR15937@n2100.arm.linux.org.uk>
- <CAOesGMi7g=PHjzhkuObkeu+P_c6kUz5uFcND7euafUW56CvsnQ@mail.gmail.com>
- <20140119193026.GS15937@n2100.arm.linux.org.uk>
- <201401192126.41543.arnd@arndb.de>
- <20140120001446.GD9752@verge.net.au>
- <20140120161147.GS17314@sirena.org.uk>
-Message-ID: <20140121003922.GA31997@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 Jan 2014 19:59:33 -0500
+Subject: [PATCHv2] ARM: mvebu: fix compilation warning on Armada 370
+ (i.e. non-SMP)
+In-Reply-To: <87txcy8goq.fsf@natisbad.org>
+References: <87txcy8goq.fsf@natisbad.org>
+Message-ID: <20140121005933.GY29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 04:11:47PM +0000, Mark Brown wrote:
-> On Mon, Jan 20, 2014 at 09:14:46AM +0900, Simon Horman wrote:
-> > On Sun, Jan 19, 2014 at 09:26:40PM +0100, Arnd Bergmann wrote:
+On Mon, Jan 20, 2014 at 10:52:05PM +0100, Arnaud Ebalard wrote:
 > 
-> > > Right: if you change an existing dts file from #pwm-cells=<2> to
-> > > #pwm-cells=<3>, that requires changing all references to the pwm
+> The following appears during compilation for an Armada 370 target
+> because 'irq_controller_lock' is used only when CONFIG_SMP is
+> enabled:
 > 
-> > Would this change imply that old dtbs would no longer work with new kernels?
+>  drivers/irqchip/irq-armada-370-xp.c:62:8: warning: 'irq_controller_lock' defined but not used [-Wunused-variable]
 > 
-> So long as the code can still handle both values for #pwm-cells existing
-> DTBs should work fine.
+> Fix that warning by moving declaration of 'irq_controller_lock'
+> inside existing #ifdef.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+> 
+> Changes since v1:
+>  - moved declaration inside existing #ifdef as suggested by Arnd,
+>    instead of adding a new one.
+> 
+>  drivers/irqchip/irq-armada-370-xp.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks, as long as that is the case I have no objections at this time.
+Applied to mvebu/fixes
+
+thx,
+
+Jason.
