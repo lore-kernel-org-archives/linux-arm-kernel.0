@@ -1,79 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Jan 2014 13:45:17 -0600
-Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
- device tree boot
-In-Reply-To: <CAGo_u6qHFmgb9s9Taw2NAuBgjLY5tDW5XHbfik7PHcTArW7szg@mail.gmail.com>
-References: <1390260542-22213-1-git-send-email-nm@ti.com>
- <20140120233941.GG6516@saruman.home> <52DEB078.5030005@ti.com>
- <20140121180549.GS30451@saruman.home>
- <CAGo_u6qHFmgb9s9Taw2NAuBgjLY5tDW5XHbfik7PHcTArW7szg@mail.gmail.com>
-Message-ID: <20140121194517.GU30451@saruman.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 21 Jan 2014 11:48:40 -0800
+Subject: [PATCH 1/2] ohci-platform: Add support for controllers with
+ big-endian regs / descriptors
+In-Reply-To: <Pine.LNX.4.44L0.1401211308040.1272-100000@iolanthe.rowland.org>
+References: <52DEA7CD.5070107@redhat.com>
+ <Pine.LNX.4.44L0.1401211308040.1272-100000@iolanthe.rowland.org>
+Message-ID: <CAGVrzcZ2arvg3yryHE5KcMz6f1Js2m1=TbWxwZzk12kyKq0tKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 01:39:20PM -0600, Nishanth Menon wrote:
-> On Tue, Jan 21, 2014 at 12:05 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Tue, Jan 21, 2014 at 11:38:00AM -0600, Nishanth Menon wrote:
-> >> On 01/20/2014 05:39 PM, Felipe Balbi wrote:
-> >> > On Mon, Jan 20, 2014 at 05:29:02PM -0600, Nishanth Menon wrote:
-> >> >> When device is booted using devicetree, platforms impacted by
-> >> >> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
-> >> >> indicates that the module cannot do multi-block transfers.
-> >> >>
-> >> >> Handle this by providing a boolean flag to indicate to driver that it is
-> >> >> working on a hardware with mentioned limitation.
-> >> >
-> >> > sure there's no way of reading the revision register to figure this one
-> >> > out without having to add a new DT attribute ?
-> >> >
-> >> I did a quick patch to read the Module revision register:
-> >> http://slexy.org/view/s21TKvlWlR
-> >>
-> >> sdp2430: Revision: 1.2, Spec: 0.0, normal interrupt
-> >>
-> >> OMAP3430-ldp: (ES2.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> >> SDP3430:(ES3.0) Revision: 2.6, Spec: 0.0, normal interrupt
-> >> AM3517-evm: (ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> >> AM3517-crane:(ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> >>
-> >> AM37x-evm: (ES1.2) Revision: 2.6, Spec: 0.0, normal interrupt
-> >> OMAP3630-beag-xm (ES1.2): Revision: 2.6, Spec: 0.0, normal interrupt
-> >>
-> >> am335x-evm:(ES1.0): Revision: 3.1, Spec: 0.1, normal interrupt
-> >> am335x-sk: (ES2.1): Revision: 3.1, Spec: 0.1, normal interrupt
-> >> am335x-beaglebone-black:(ES2.0): Revision: 3.1, Spec: 0.1, normal
-> >> interrupt
-> >>
-> >> sdp4430.txt: (ES2.2): Revision: 3.1, Spec: 0.1, normal interrupt
-> >>
-> >> OMAP4460-panda-es (ES1.1): Revision: 3.1, Spec: 0.1, normal interrupt
-> >>
-> >> OMAP5uevm:(ES2.0): Revision: 3.3, Spec: 0.2, normal interrupt
-> >> dra7-evm (es1.1): Revision: 3.3, Spec: 0.2, normal interrupt
-> >>
-> >>
-> >> OMAP3430-ldp seems to be the only one impacted with module revision
-> >> 2.6 -> so using revision information is not really helpful here. Hence
-> >> the usage of a flag in dt attribute to indicate hardware impacted by
-> >> erratum.
-> >
-> > alright, that's too bad. Seems like revision in this module isn't very
-> > useful :-(
-> 
-> Can I take that as an acked-by?
+2014/1/21 Alan Stern <stern@rowland.harvard.edu>:
+> On Tue, 21 Jan 2014, Hans de Goede wrote:
+>
+>> Hi,
+>>
+>> On 01/21/2014 05:40 PM, Alan Stern wrote:
+>> > On Tue, 21 Jan 2014, Hans de Goede wrote:
+>> >
+>> >> Note this commit uses the same devicetree booleans for this as the ones
+>> >> already existing in the usb-ehci bindings.
+>> >>
+>> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> >
+>> >> --- a/drivers/usb/host/Kconfig
+>> >> +++ b/drivers/usb/host/Kconfig
+>> >> @@ -512,6 +512,10 @@ config USB_CNS3XXX_OHCI
+>> >>
+>> >>   config USB_OHCI_HCD_PLATFORM
+>> >>    tristate "Generic OHCI driver for a platform device"
+>> >> +  # Always support LE, support BE on architectures which have readl_be
+>> >> +  select USB_OHCI_LITTLE_ENDIAN
+>> >> +  select USB_OHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
+>> >> +  select USB_OHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
+>> >>    default n
+>
+>> > In any case, the style we have adopted is that these select lines go in
+>> > the arch-specific defconfig, not here.
+>>
+>> Ok, so I should drop the Kconfig parts of both patches ?
+>
+> That's rigt.  They are likely to cause trouble, and if the selects were
+> needed then they should already be present somewhere else.
 
-sure
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
+Absolutely, they will actually break platforms. Since you added some
+guards for when these properties are set, but proper support in the
+kernel is not enabled, this is already catching misuses, and as such
+is already an improvement.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/c11cd052/attachment.sig>
+Florian
