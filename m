@@ -1,17 +1,17 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 21 Jan 2014 16:22:22 -0500
-Subject: [PATCH 19/73] arm: mach-s3c64xx mach-crag6410-module.c is not modular
+Date: Tue, 21 Jan 2014 16:22:30 -0500
+Subject: [PATCH 27/73] drivers/clk: don't use module_init in clk-nomadik.c
+ which is non-modular
 In-Reply-To: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1390339396-3479-20-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1390339396-3479-28-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Despite the name mach-crag6410-module.c, the code is built for
-MACH_WLF_CRAGG_6410 -- which is bool, and hence this code is
-either present or absent.  It will never be modular, so using
-module_init as an alias for __initcall can be somewhat
-misleading.
+The clk-nomadik.o is built for ARCH_NOMADIK -- which is bool, and
+hence this code is either present or absent.  It will never be
+modular, so using module_init as an alias for __initcall can be
+somewhat misleading.
 
 Fix this up now, so that we can relocate module_init from
 init.h into module.h in the future.  If we don't do this, we'd
@@ -24,25 +24,26 @@ mapped onto device_initcall, our use of device_initcall
 directly in this change means that the runtime impact is
 zero -- it will remain at level 6 in initcall ordering.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: patches at opensource.wolfsonmicro.com
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410-module.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/clk-nomadik.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 7ccfef2..9c00d83 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -401,4 +401,4 @@ static int __init wlf_gf_module_register(void)
- {
- 	return i2c_add_driver(&wlf_gf_module_driver);
+diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
+index 6a934a5..5be9b9f 100644
+--- a/drivers/clk/clk-nomadik.c
++++ b/drivers/clk/clk-nomadik.c
+@@ -500,8 +500,7 @@ static int __init nomadik_src_clk_init_debugfs(void)
+ 			    NULL, NULL, &nomadik_src_clk_debugfs_ops);
+ 	return 0;
  }
--module_init(wlf_gf_module_register);
-+device_initcall(wlf_gf_module_register);
+-
+-module_init(nomadik_src_clk_init_debugfs);
++device_initcall(nomadik_src_clk_init_debugfs);
+ 
+ #endif
+ 
 -- 
 1.8.4.1
