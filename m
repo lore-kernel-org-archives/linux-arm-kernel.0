@@ -1,133 +1,57 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 21 Jan 2014 09:26:06 -0800
-Subject: [PATCH] arm64: Add CONFIG_CC_STACKPROTECTOR
-Message-ID: <1390325166-16840-1-git-send-email-lauraa@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 21 Jan 2014 11:38:00 -0600
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
+ device tree boot
+In-Reply-To: <20140120233941.GG6516@saruman.home>
+References: <1390260542-22213-1-git-send-email-nm@ti.com>
+ <20140120233941.GG6516@saruman.home>
+Message-ID: <52DEB078.5030005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 currently lacks support for -fstack-protector. Add
-similar functionality to arm to detect stack corruption.
+On 01/20/2014 05:39 PM, Felipe Balbi wrote:
+> On Mon, Jan 20, 2014 at 05:29:02PM -0600, Nishanth Menon wrote:
+>> When device is booted using devicetree, platforms impacted by
+>> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
+>> indicates that the module cannot do multi-block transfers.
+>>
+>> Handle this by providing a boolean flag to indicate to driver that it is
+>> working on a hardware with mentioned limitation.
+> 
+> sure there's no way of reading the revision register to figure this one
+> out without having to add a new DT attribute ?
+> 
+I did a quick patch to read the Module revision register:
+http://slexy.org/view/s21TKvlWlR
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/Kconfig                      |   12 +++++++++
- arch/arm64/Makefile                     |    4 +++
- arch/arm64/include/asm/stackprotector.h |   38 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c             |    9 +++++++
- 4 files changed, 63 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/stackprotector.h
+sdp2430: Revision: 1.2, Spec: 0.0, normal interrupt
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6d4dd22..4f86874 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -168,6 +168,18 @@ config HOTPLUG_CPU
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
- 
-+config CC_STACKPROTECTOR
-+	bool "Enable -fstack-protector buffer overflow detection"
-+	help
-+	  This option turns on the -fstack-protector GCC feature. This
-+	  feature puts, at the beginning of functions, a canary value on
-+	  the stack just before the return address, and validates
-+	  the value just before actually returning.  Stack based buffer
-+	  overflows (that need to overwrite this return address) now also
-+	  overwrite the canary, which gets detected and the attack is then
-+	  neutralized via a kernel panic.
-+	  This feature requires gcc version 4.2 or above.
-+
- source kernel/Kconfig.preempt
- 
- config HZ
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2fceb71..1ce221e 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -48,6 +48,10 @@ core-$(CONFIG_XEN) += arch/arm64/xen/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- libs-y		+= $(LIBGCC)
- 
-+ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
-+KBUILD_CFLAGS	+=-fstack-protector
-+endif
-+
- # Default target when executing plain make
- KBUILD_IMAGE	:= Image.gz
- KBUILD_DTBS	:= dtbs
-diff --git a/arch/arm64/include/asm/stackprotector.h b/arch/arm64/include/asm/stackprotector.h
-new file mode 100644
-index 0000000..de00332
---- /dev/null
-+++ b/arch/arm64/include/asm/stackprotector.h
-@@ -0,0 +1,38 @@
-+/*
-+ * GCC stack protector support.
-+ *
-+ * Stack protector works by putting predefined pattern at the start of
-+ * the stack frame and verifying that it hasn't been overwritten when
-+ * returning from the function.  The pattern is called stack canary
-+ * and gcc expects it to be defined by a global variable called
-+ * "__stack_chk_guard" on ARM.  This unfortunately means that on SMP
-+ * we cannot have a different canary value per task.
-+ */
-+
-+#ifndef _ASM_STACKPROTECTOR_H
-+#define _ASM_STACKPROTECTOR_H 1
-+
-+#include <linux/random.h>
-+#include <linux/version.h>
-+
-+extern unsigned long __stack_chk_guard;
-+
-+/*
-+ * Initialize the stackprotector canary value.
-+ *
-+ * NOTE: this must only be called from functions that never return,
-+ * and it must always be inlined.
-+ */
-+static __always_inline void boot_init_stack_canary(void)
-+{
-+	unsigned long canary;
-+
-+	/* Try to get a semi random initial value. */
-+	get_random_bytes(&canary, sizeof(canary));
-+	canary ^= LINUX_VERSION_CODE;
-+
-+	current->stack_canary = canary;
-+	__stack_chk_guard = current->stack_canary;
-+}
-+
-+#endif	/* _ASM_STACKPROTECTOR_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index de17c89..592d630 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -50,6 +50,12 @@
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
- 
-+#ifdef CONFIG_CC_STACKPROTECTOR
-+#include <linux/stackprotector.h>
-+unsigned long __stack_chk_guard __read_mostly;
-+EXPORT_SYMBOL(__stack_chk_guard);
-+#endif
-+
- static void setup_restart(void)
- {
- 	/*
-@@ -288,6 +294,9 @@ struct task_struct *__switch_to(struct task_struct *prev,
- {
- 	struct task_struct *last;
- 
-+#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
-+	__stack_chk_guard = next->stack_canary;
-+#endif
- 	fpsimd_thread_switch(next);
- 	tls_thread_switch(next);
- 	hw_breakpoint_thread_switch(next);
+OMAP3430-ldp: (ES2.1): Revision: 2.6, Spec: 0.0, normal interrupt
+SDP3430:(ES3.0) Revision: 2.6, Spec: 0.0, normal interrupt
+AM3517-evm: (ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
+AM3517-crane:(ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
+
+AM37x-evm: (ES1.2) Revision: 2.6, Spec: 0.0, normal interrupt
+OMAP3630-beag-xm (ES1.2): Revision: 2.6, Spec: 0.0, normal interrupt
+
+am335x-evm:(ES1.0): Revision: 3.1, Spec: 0.1, normal interrupt
+am335x-sk: (ES2.1): Revision: 3.1, Spec: 0.1, normal interrupt
+am335x-beaglebone-black:(ES2.0): Revision: 3.1, Spec: 0.1, normal
+interrupt
+
+sdp4430.txt: (ES2.2): Revision: 3.1, Spec: 0.1, normal interrupt
+
+OMAP4460-panda-es (ES1.1): Revision: 3.1, Spec: 0.1, normal interrupt
+
+OMAP5uevm:(ES2.0): Revision: 3.3, Spec: 0.2, normal interrupt
+dra7-evm (es1.1): Revision: 3.3, Spec: 0.2, normal interrupt
+
+
+OMAP3430-ldp seems to be the only one impacted with module revision
+2.6 -> so using revision information is not really helpful here. Hence
+the usage of a flag in dt attribute to indicate hardware impacted by
+erratum.
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Nishanth Menon
