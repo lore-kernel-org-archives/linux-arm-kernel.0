@@ -1,49 +1,89 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Jan 2014 11:05:55 +0000
-Subject: [PATCH v2] arm64: mm: use ubfm for dcache_line_size
-In-Reply-To: <002501cf159c$85a358b0$90ea0a10$%han@samsung.com>
-References: <002501cf159c$85a358b0$90ea0a10$%han@samsung.com>
-Message-ID: <20140121110555.GF30706@mudshark.cambridge.arm.com>
+Date: Tue, 21 Jan 2014 11:08:26 +0000
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+ <201401091204.17932.arnd@arndb.de>
+ <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+ <20140109184251.GL17838@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
+ <20140116193123.GB22105@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
+Message-ID: <20140121110826.GG30706@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 05:00:21AM +0000, Jingoo Han wrote:
-> Use 'ubfm' for the bitfield move instruction; thus, single
-> instruction can be used instead of two instructions, when
-> getting the minimum D-cache line size from CTR_EL0 register.
+On Mon, Jan 20, 2014 at 03:32:48PM +0000, Stefano Stabellini wrote:
+> On Thu, 16 Jan 2014, Will Deacon wrote:
+> > For the xchg part, yes, that looks a lot better. I don't like the #undef
+> > CONFIG_CPU_V6 though, can that be rewritten to use __LINUX_ARM_ARCH__?
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> The problem is that the 1 and 2 byte parameter size cases in __cmpxchg
+> are ifdef'ed CONFIG_CPU_V6 but drivers/xen/grant-table.c needs them.
+> 
+> So we can either undef CONFIG_CPU_V6 in grant-table.c or call a
+> different function.
+> 
+> If I switch from ifdef CONFIG_CPU_V6 to if __LINUX_ARM_ARCH__ > 6 in
+> __cmpxchg, we still have the problem that if __LINUX_ARM_ARCH__ == 6,
+> grant-table.c doesn't compile.
+> 
+> Maybe the approach taken by the other patch for cmpxchg is better, see
+> below.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Yes, I prefer this approach. Minor comment below.
 
-Thanks,
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c1f1a7e..ae54ae0 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1881,8 +1881,7 @@ config XEN_DOM0
+>  config XEN
+>  	bool "Xen guest support on ARM (EXPERIMENTAL)"
+>  	depends on ARM && AEABI && OF
+> -	depends on CPU_V7 && !CPU_V6
+> -	depends on !GENERIC_ATOMIC64
+> +	depends on CPU_V7
+>  	select ARM_PSCI
+>  	select SWIOTLB_XEN
+>  	help
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index df2fbba..cc8a4a2 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
+>   * cmpxchg only support 32-bits operands on ARMv6.
+>   */
+>  
+> +static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
+> +				      unsigned long new)
+> +{
+> +	unsigned long oldval, res;
+> +
+> +	do {
+> +		asm volatile("@ __cmpxchg1\n"
+> +		"	ldrexb	%1, [%2]\n"
+> +		"	mov	%0, #0\n"
+> +		"	teq	%1, %3\n"
+> +		"	strexbeq %0, %4, [%2]\n"
+> +			: "=&r" (res), "=&r" (oldval)
+> +			: "r" (ptr), "Ir" (old), "r" (new)
+> +			: "memory", "cc");
+> +	} while (res);
+> +
+> +	return oldval;
+> +}
+> +
+> +static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
+> +				      unsigned long new)
+> +{
+> +	unsigned long oldval, res;
+> +
+> +	do {
+> +		asm volatile("@ __cmpxchg1\n"
+
+Can you fix this comment while you're here please?
 
 Will
-
-> ---
-> Change since v1
-> - Remove unnecessary prefix '0x' from immediates, per Will Deacon
-> - Add '#' to immediates for consistency, per Ard Biesheuvel
-> 
->  arch/arm64/mm/proc-macros.S |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> index 8957b82..005d29e 100644
-> --- a/arch/arm64/mm/proc-macros.S
-> +++ b/arch/arm64/mm/proc-macros.S
-> @@ -38,8 +38,7 @@
->   */
->  	.macro	dcache_line_size, reg, tmp
->  	mrs	\tmp, ctr_el0			// read CTR
-> -	lsr	\tmp, \tmp, #16
-> -	and	\tmp, \tmp, #0xf		// cache line size encoding
-> +	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
->  	mov	\reg, #4			// bytes per word
->  	lsl	\reg, \reg, \tmp		// actual cache line size
->  	.endm
-> -- 
-> 1.7.10.4
-> 
-> 
-> 
