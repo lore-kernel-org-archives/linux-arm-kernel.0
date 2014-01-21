@@ -1,96 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 21 Jan 2014 16:48:34 +0100
-Subject: [PATCH 1/2] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-Message-ID: <1390319315-8391-1-git-send-email-hdegoede@redhat.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Jan 2014 16:55:18 +0100
+Subject: [PATCH] pinctrl: at91: use locked variant of irq_set_handler
+Message-ID: <1390319718-12285-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note this commit uses the same devicetree booleans for this as the ones
-already existing in the usb-ehci bindings.
+When setting the gpio irq type, use the __irq_set_handler_locked()
+variant instead of the irq_set_handler() to prevent false
+spinlock recursion warning.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> # v3.12
 ---
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  3 +++
- drivers/usb/host/Kconfig                           |  4 ++++
- drivers/usb/host/ohci-platform.c                   | 27 ++++++++++++++++++++++
- 3 files changed, 34 insertions(+)
+ drivers/pinctrl/pinctrl-at91.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index f9d6c73..aa1d765 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -6,6 +6,9 @@ Required properties:
- - interrupts : ohci controller interrupt
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index a7549c4c83b4..7d7a21c20931 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1260,22 +1260,22 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
  
- Optional properties:
-+- big-endian-regs : boolean, set this for hcds with big-endian registers
-+- big-endian-desc : boolean, set this for hcds with big-endian descriptors
-+- big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index e28cbe0..237d7b1 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -512,6 +512,10 @@ config USB_CNS3XXX_OHCI
- 
- config USB_OHCI_HCD_PLATFORM
- 	tristate "Generic OHCI driver for a platform device"
-+	# Always support LE, support BE on architectures which have readl_be
-+	select USB_OHCI_LITTLE_ENDIAN
-+	select USB_OHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
-+	select USB_OHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
- 	default n
- 	---help---
- 	  Adds an OHCI host driver for a generic platform device, which
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b2d0e1e..71e9d8e 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -128,6 +128,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct resource *res_mem;
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
-+	struct ohci_hcd *ohci;
- 	int err, irq, clk = 0;
- 
- 	if (usb_disabled())
-@@ -164,8 +165,34 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	platform_set_drvdata(dev, hcd);
- 	dev->dev.platform_data = pdata;
- 	priv = hcd_to_ohci_priv(hcd);
-+	ohci = hcd_to_ohci(hcd);
- 
- 	if (pdata == &ohci_platform_defaults && dev->dev.of_node) {
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian-regs"))
-+			ohci->flags |= OHCI_QUIRK_BE_MMIO;
-+
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
-+			ohci->flags |= OHCI_QUIRK_BE_DESC;
-+
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
-+			ohci->flags |= OHCI_QUIRK_BE_MMIO | OHCI_QUIRK_BE_DESC;
-+
-+#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_MMIO
-+		if (ohci->flags & OHCI_QUIRK_BE_MMIO) {
-+			dev_err(&dev->dev,
-+				"Error big-endian-regs not compiled in\n");
-+			err = -EINVAL;
-+			goto err_put_hcd;
-+		}
-+#endif
-+#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_DESC
-+		if (ohci->flags & OHCI_QUIRK_BE_DESC) {
-+			dev_err(&dev->dev,
-+				"Error big-endian-desc not compiled in\n");
-+			err = -EINVAL;
-+			goto err_put_hcd;
-+		}
-+#endif
- 		priv->phy = devm_phy_get(&dev->dev, "usb");
- 		if (IS_ERR(priv->phy)) {
- 			err = PTR_ERR(priv->phy);
+ 	switch (type) {
+ 	case IRQ_TYPE_EDGE_RISING:
+-		irq_set_handler(d->irq, handle_simple_irq);
++		__irq_set_handler_locked(d->irq, handle_simple_irq);
+ 		writel_relaxed(mask, pio + PIO_ESR);
+ 		writel_relaxed(mask, pio + PIO_REHLSR);
+ 		break;
+ 	case IRQ_TYPE_EDGE_FALLING:
+-		irq_set_handler(d->irq, handle_simple_irq);
++		__irq_set_handler_locked(d->irq, handle_simple_irq);
+ 		writel_relaxed(mask, pio + PIO_ESR);
+ 		writel_relaxed(mask, pio + PIO_FELLSR);
+ 		break;
+ 	case IRQ_TYPE_LEVEL_LOW:
+-		irq_set_handler(d->irq, handle_level_irq);
++		__irq_set_handler_locked(d->irq, handle_level_irq);
+ 		writel_relaxed(mask, pio + PIO_LSR);
+ 		writel_relaxed(mask, pio + PIO_FELLSR);
+ 		break;
+ 	case IRQ_TYPE_LEVEL_HIGH:
+-		irq_set_handler(d->irq, handle_level_irq);
++		__irq_set_handler_locked(d->irq, handle_level_irq);
+ 		writel_relaxed(mask, pio + PIO_LSR);
+ 		writel_relaxed(mask, pio + PIO_REHLSR);
+ 		break;
+@@ -1284,7 +1284,7 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
+ 		 * disable additional interrupt modes:
+ 		 * fall back to default behavior
+ 		 */
+-		irq_set_handler(d->irq, handle_simple_irq);
++		__irq_set_handler_locked(d->irq, handle_simple_irq);
+ 		writel_relaxed(mask, pio + PIO_AIMDR);
+ 		return 0;
+ 	case IRQ_TYPE_NONE:
 -- 
-1.8.5.3
+1.8.2.2
