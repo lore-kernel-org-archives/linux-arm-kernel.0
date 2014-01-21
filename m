@@ -1,63 +1,40 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Tue, 21 Jan 2014 19:57:50 +1100
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115161224.GH25824@e106331-lin.cambridge.arm.com>
- <20140120224742.EC905C40B12@trevor.secretlab.ca>
- <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-Message-ID: <20140121085750.GC21650@voom.redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 Jan 2014 12:02:55 +0100
+Subject: [PATCH v2 02/15] clocksource: orion: Use atomic access for
+ shared registers
+In-Reply-To: <4103670.WQZpL6dQdj@wuerfel>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5118193.GjKusj569J@wuerfel> <52DE44B9.70308@gmail.com>
+ <4103670.WQZpL6dQdj@wuerfel>
+Message-ID: <20140121110255.GD13396@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 05:03:23PM -0800, Olof Johansson wrote:
-> On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >
-> >> > Another, more invasive option would be extend the dts syntax and teach
-> >> > dtc to handle property appending. Then the soc dts could stay as it is,
-> >> > and the board dts could have something like:
-> >> >
-> >> >     /append-property/ interrupts = <&intc1 6 1>;
-> >> >     /append-property/ interrupt-names = "board-specific-irq";
-> >> >
-> >> > Both these options solve the issue at the source, are general to other
-> >> > properties, and allow more than one level of hierarchy (the proposed
-> >> > interrupts-extended-2 only allows one level).
-> >>
-> >> I've just had a go at implementing the append-property mechanism above
-> >> in dtc, and it was far easier than I expected (patch below).
-> >>
-> >> Does anyone have any issues with the /append-property/ idea?
-> >
-> > I think that is reasonable.
+> > The real problem with this is that it resides in orion-time.c which
+> > is fine for Orion SoCs. Armada 370/XP use a different timer and
+> > therefore the _common_ watchdog driver cannot call this function.
 > 
+> Right, I had missed this part.
 > 
-> The main problem with this (same for clocks) is if you need to append
-> something with a name when the original didn't have any.
+> > Moreover, Dove (out of Orion) and Armada 370/XP will happily live in
+> > one V7 kernel with both time-orion and time-armada-370-xp compiled in.
 > 
-> Reordering entries might not work for interrupts, since the bindings
-> might have requirements on order.
-> 
-> I'm not aware of a good solution for this. Suggestions welcome.
+> It still wouldn't be too hard to do: both clock drivers could export
+> functions with different identifiers, and the wdt driver can use
+> conditional compilation (#ifdef or if(IS_ENABLED())) to only call
+> those functions when the respective clocksource drivers are enabled.
 
-So, in principle my preferred way to handle things like this would be
-to add richer expression support, including a token for "previous
-value" when overlaying.
+Hi Arnd.
 
-But although I've recently had another look at it, that's still a ways
-off, so I wouldn't object to another approach as a stopgap, as long as
-its not too hideous.
+The plan is to make dove part of MULTI_V7. At that point, you have
+both dove and armada-370-xp in the same kernel. Conditional
+compilation does not work, the watchdog driver would need to know at
+runtime which timer is in use, and call the right timer function.
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/a8e3ce63/attachment.sig>
+I'm working on making DT Kirkwood part of MULTI_V5. The changes needed
+are mostly trivial. I expect making Dove part of MULTI_V7 is also
+trivial, so could happen during the next cycle. So this mix of Dove
+and Armada 370 XP is not a theoretical problem, it is something which
+needs to be solved ready for merging during the next window.
+
+	Andrew
