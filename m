@@ -1,92 +1,82 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Jan 2014 10:06:35 +0100
-Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
-In-Reply-To: <52DE2C05.9060800@atmel.com>
-References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
- <20140118052059.GL9558@ns203013.ovh.net> <52DC9A66.6080009@atmel.com>
- <20140121054932.GO9558@ns203013.ovh.net> <52DE2C05.9060800@atmel.com>
-Message-ID: <52DE389B.3000702@atmel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 21 Jan 2014 06:12:28 -0300
+Subject: [PATCH v2 02/15] clocksource: orion: Use atomic access for shared
+ registers
+In-Reply-To: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390295561-3466-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/01/2014 09:12, Bo Shen :
-> Hi J,
-> 
-> On 01/21/2014 01:49 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 11:39 Mon 20 Jan     , Bo Shen wrote:
->>> Hi J,
->>>
->>> On 01/18/2014 01:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> On 10:59 Fri 17 Jan     , Bo Shen wrote:
->>>>> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
->>>>> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
->>>>>
->>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>>>> ---
->>>>>
->>>>>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
->>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
->>>>> index 2cb52e0..7e67a81 100644
->>>>> --- a/drivers/usb/gadget/atmel_usba_udc.c
->>>>> +++ b/drivers/usb/gadget/atmel_usba_udc.c
->>>>> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
->>>>>   	if (ep_status) {
->>>>>   		int i;
->>>>>
->>>>> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
->>>>> +		for (i = 0; i < udc->num_ep; i++)
->>>>
->>>> no the limit need to specified in the driver as a checkpoint by the compatible
->>>> or platform driver id
->>>
->>> You mean, we should not trust the data passed from dt node or
->>> platform data? Or do you think we should do double confirm?
->>
->> no base on the driver name or the compatible you will known the MAX EP
->>
->> not based on the dt ep description
->>
->> as we do on pinctrl-at91
-> 
-> I am sorry, I am not fully get it after reading the code of 
-> pinctrl-at91.c, can you give the example code in pinctrl-at91.c?
-> 
-> Btw, the udc->num_ep is get from the following code.
-> for dt
-> --->8---
-> 	while ((pp = of_get_next_child(np, pp)))
-> 		udc->num_ep++;
-> ---<8---
-> 
-> for non-dt
-> --->8---
-> 	udc->num_ep = pdata->num_ep;
-> ---8<---
+Replace the driver-specific thread-safe shared register API
+by the recently introduced atomic_io_clear_set().
 
-It seems to me pretty valid to use num_ep in this driver and not have to
-rely on another compatibility string just for this.
-The information is here, it is retrieved pretty cleanly so I vote for a
-simple use of it: if we introduce another information we will have to
-double check the cross errors that would happen...
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/clocksource/time-orion.c | 28 ++++++++++------------------
+ 1 file changed, 10 insertions(+), 18 deletions(-)
 
-Bye,
-
->>>>>   			if (ep_status & (1 << i)) {
->>>>>   				if (ep_is_control(&udc->usba_ep[i]))
->>>>>   					usba_control_irq(udc, &udc->usba_ep[i]);
->>>>> --
->>>>> 1.8.5.2
->>>>>
->>>
->>> Best Regards,
->>> Bo Shen
-> 
-> Best Regards,
-> Bo Shen
-> 
-
-
+diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
+index 9c7f018..3f14e56 100644
+--- a/drivers/clocksource/time-orion.c
++++ b/drivers/clocksource/time-orion.c
+@@ -35,20 +35,6 @@
+ #define ORION_ONESHOT_MAX	0xfffffffe
+ 
+ static void __iomem *timer_base;
+-static DEFINE_SPINLOCK(timer_ctrl_lock);
+-
+-/*
+- * Thread-safe access to TIMER_CTRL register
+- * (shared with watchdog timer)
+- */
+-void orion_timer_ctrl_clrset(u32 clr, u32 set)
+-{
+-	spin_lock(&timer_ctrl_lock);
+-	writel((readl(timer_base + TIMER_CTRL) & ~clr) | set,
+-		timer_base + TIMER_CTRL);
+-	spin_unlock(&timer_ctrl_lock);
+-}
+-EXPORT_SYMBOL(orion_timer_ctrl_clrset);
+ 
+ /*
+  * Free-running clocksource handling.
+@@ -68,7 +54,8 @@ static int orion_clkevt_next_event(unsigned long delta,
+ {
+ 	/* setup and enable one-shot timer */
+ 	writel(delta, timer_base + TIMER1_VAL);
+-	orion_timer_ctrl_clrset(TIMER1_RELOAD_EN, TIMER1_EN);
++	atomic_io_modify(timer_base + TIMER_CTRL,
++		TIMER1_RELOAD_EN | TIMER1_EN, TIMER1_EN);
+ 
+ 	return 0;
+ }
+@@ -80,10 +67,13 @@ static void orion_clkevt_mode(enum clock_event_mode mode,
+ 		/* setup and enable periodic timer at 1/HZ intervals */
+ 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
+ 		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
+-		orion_timer_ctrl_clrset(0, TIMER1_RELOAD_EN | TIMER1_EN);
++		atomic_io_modify(timer_base + TIMER_CTRL,
++			TIMER1_RELOAD_EN | TIMER1_EN,
++			TIMER1_RELOAD_EN | TIMER1_EN);
+ 	} else {
+ 		/* disable timer */
+-		orion_timer_ctrl_clrset(TIMER1_RELOAD_EN | TIMER1_EN, 0);
++		atomic_io_modify(timer_base + TIMER_CTRL,
++			TIMER1_RELOAD_EN | TIMER1_EN, 0);
+ 	}
+ }
+ 
+@@ -131,7 +121,9 @@ static void __init orion_timer_init(struct device_node *np)
+ 	/* setup timer0 as free-running clocksource */
+ 	writel(~0, timer_base + TIMER0_VAL);
+ 	writel(~0, timer_base + TIMER0_RELOAD);
+-	orion_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | TIMER0_EN);
++	atomic_io_modify(timer_base + TIMER_CTRL,
++		TIMER0_RELOAD_EN | TIMER0_EN,
++		TIMER0_RELOAD_EN | TIMER0_EN);
+ 	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
+ 			      clk_get_rate(clk), 300, 32,
+ 			      clocksource_mmio_readl_down);
 -- 
-Nicolas Ferre
+1.8.1.5
