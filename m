@@ -1,48 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Jan 2014 10:41:17 +0100
-Subject: [PATCH v2 14/15] watchdog: orion: Allow to build on any Orion
- platform
-In-Reply-To: <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 21 Jan 2014 06:42:15 -0300
+Subject: [PATCH v2 03/15] watchdog: orion: Use atomic access for shared
+ registers
+In-Reply-To: <CAOMZO5BKjpkjQGOOAQ5fwmxhg1SYTmTq4Y9tUCZaDSQiosGYyw@mail.gmail.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <52DE40BD.10700@gmail.com>
+ <1390295561-3466-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CAOMZO5BKjpkjQGOOAQ5fwmxhg1SYTmTq4Y9tUCZaDSQiosGYyw@mail.gmail.com>
+Message-ID: <20140121094214.GA3577@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/14 10:12, Ezequiel Garcia wrote:
-> After getting rid of all the mach-specific code, it's now possible
-> to allow builds in any Orion platform.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->   drivers/watchdog/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 5be6e91..1689f72 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
->
->   config ORION_WATCHDOG
->   	tristate "Orion watchdog"
-> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
-> +	depends on PLAT_ORION
+On Tue, Jan 21, 2014 at 07:19:52AM -0200, Fabio Estevam wrote:
+> On Tue, Jan 21, 2014 at 7:12 AM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > Since the timer control register is shared with the clocksource driver,
+> > use the recently introduced atomic_io_clear_set() to access such register.
+> >
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/watchdog/orion_wdt.c | 20 ++++----------------
+> >  1 file changed, 4 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> > index f7722a4..cf64510 100644
+> > --- a/drivers/watchdog/orion_wdt.c
+> > +++ b/drivers/watchdog/orion_wdt.c
+> > @@ -61,8 +61,6 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+> >
+> >  static int orion_wdt_start(struct watchdog_device *wdt_dev)
+> >  {
+> > -       u32 reg;
+> > -
+> >         spin_lock(&wdt_lock);
+> 
+> Shouldn't this spin_lock be dropped now?
+> 
 
-Ezequiel,
+Hm... yes. The watchdog core uses a mutex to serialize all the watchdog hooks:
+start, stop, ping, set_timeout, etc. So it seems you're right, the spinlock
+should be dropped entirely as I see no need for it.
 
-while above is true now, I tend to rather have ARCH_MVEBU added here.
-We really want to get rid of both !ARCH_MVEBU and PLAT_ORION and this
-unnecessarily will make it more complicated.
-
-I haven't checked why ARCH_MVEBU at all added PLAT_ORION as dependency,
-but IIRC it was just because of a missing mbus driver? If it is just
-this, we should also remove PLAT_ORION from ARCH_MVEBU to have a clean
-cut between new common arch and existing sub-archs.
-
-Sebastian
-
->   	select WATCHDOG_CORE
->   	help
->   	  Say Y here if to include support for the watchdog timer
->
+Thanks for the feedback,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
