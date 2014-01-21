@@ -1,66 +1,40 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:49 +0200
-Subject: [PATCHv3 17/41] OMAPDSS: encoder-tpd12s015: Add DT support
+Date: Tue, 21 Jan 2014 12:56:50 +0200
+Subject: [PATCHv3 18/41] OMAPDSS: hdmi-connector: Add DT support
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-18-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-19-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support for encoder-tpd12s015.
+Add DT support for hdmi-connector.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- .../video/omap2/displays-new/encoder-tpd12s015.c   | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ drivers/video/omap2/displays-new/connector-hdmi.c | 30 +++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/drivers/video/omap2/displays-new/encoder-tpd12s015.c b/drivers/video/omap2/displays-new/encoder-tpd12s015.c
-index d5c936cb217f..7e33686171e3 100644
---- a/drivers/video/omap2/displays-new/encoder-tpd12s015.c
-+++ b/drivers/video/omap2/displays-new/encoder-tpd12s015.c
-@@ -15,6 +15,7 @@
+diff --git a/drivers/video/omap2/displays-new/connector-hdmi.c b/drivers/video/omap2/displays-new/connector-hdmi.c
+index 9abe2c039ae9..2e026eab2dd0 100644
+--- a/drivers/video/omap2/displays-new/connector-hdmi.c
++++ b/drivers/video/omap2/displays-new/connector-hdmi.c
+@@ -12,6 +12,7 @@
  #include <linux/slab.h>
- #include <linux/gpio.h>
+ #include <linux/module.h>
  #include <linux/platform_device.h>
-+#include <linux/of_gpio.h>
++#include <linux/of.h>
  
- #include <video/omapdss.h>
- #include <video/omap-panel-data.h>
-@@ -289,6 +290,49 @@ static int tpd_probe_pdata(struct platform_device *pdev)
+ #include <drm/drm_edid.h>
+ 
+@@ -301,6 +302,23 @@ static int hdmic_probe_pdata(struct platform_device *pdev)
  	return 0;
  }
  
-+static int tpd_probe_of(struct platform_device *pdev)
++static int hdmic_probe_of(struct platform_device *pdev)
 +{
 +	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
 +	struct device_node *node = pdev->dev.of_node;
 +	struct omap_dss_device *in;
-+	int gpio;
-+
-+	/* CT CP HPD GPIO */
-+	gpio = of_get_gpio(node, 0);
-+	if (!gpio_is_valid(gpio)) {
-+		dev_err(&pdev->dev, "failed to parse CT CP HPD gpio\n");
-+		return gpio;
-+	}
-+	ddata->ct_cp_hpd_gpio = gpio;
-+
-+	/* LS OE GPIO */
-+	gpio = of_get_gpio(node, 1);
-+	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-+		ddata->ls_oe_gpio = gpio;
-+	} else {
-+		dev_err(&pdev->dev, "failed to parse LS OE gpio\n");
-+		return gpio;
-+	}
-+
-+	/* HPD GPIO */
-+	gpio = of_get_gpio(node, 2);
-+	if (!gpio_is_valid(gpio)) {
-+		dev_err(&pdev->dev, "failed to parse HPD gpio\n");
-+		return gpio;
-+	}
-+	ddata->hpd_gpio = gpio;
 +
 +	in = omapdss_of_find_source_for_first_ep(node);
 +	if (IS_ERR(in)) {
@@ -73,38 +47,38 @@ index d5c936cb217f..7e33686171e3 100644
 +	return 0;
 +}
 +
- static int tpd_probe(struct platform_device *pdev)
+ static int hdmic_probe(struct platform_device *pdev)
  {
- 	struct omap_dss_device *in, *dssdev;
-@@ -307,6 +351,10 @@ static int tpd_probe(struct platform_device *pdev)
- 		r = tpd_probe_pdata(pdev);
+ 	struct panel_drv_data *ddata;
+@@ -318,6 +336,10 @@ static int hdmic_probe(struct platform_device *pdev)
+ 		r = hdmic_probe_pdata(pdev);
  		if (r)
  			return r;
 +	} else if (pdev->dev.of_node) {
-+		r = tpd_probe_of(pdev);
++		r = hdmic_probe_of(pdev);
 +		if (r)
 +			return r;
  	} else {
  		return -ENODEV;
  	}
-@@ -379,12 +427,20 @@ static int __exit tpd_remove(struct platform_device *pdev)
+@@ -359,12 +381,20 @@ static int __exit hdmic_remove(struct platform_device *pdev)
  	return 0;
  }
  
-+static const struct of_device_id tpd_of_match[] = {
-+	{ .compatible = "omapdss,ti,tpd12s015", },
++static const struct of_device_id hdmic_of_match[] = {
++	{ .compatible = "omapdss,hdmi-connector", },
 +	{},
 +};
 +
-+MODULE_DEVICE_TABLE(of, tpd_of_match);
++MODULE_DEVICE_TABLE(of, hdmic_of_match);
 +
- static struct platform_driver tpd_driver = {
- 	.probe	= tpd_probe,
- 	.remove	= __exit_p(tpd_remove),
+ static struct platform_driver hdmi_connector_driver = {
+ 	.probe	= hdmic_probe,
+ 	.remove	= __exit_p(hdmic_remove),
  	.driver	= {
- 		.name	= "tpd12s015",
+ 		.name	= "connector-hdmi",
  		.owner	= THIS_MODULE,
-+		.of_match_table = tpd_of_match,
++		.of_match_table = hdmic_of_match,
  	},
  };
  
