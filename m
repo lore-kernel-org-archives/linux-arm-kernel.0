@@ -1,42 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 21 Jan 2014 13:09:45 -0500 (EST)
-Subject: [PATCH 1/2] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-In-Reply-To: <52DEA7CD.5070107@redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1401211308040.1272-100000@iolanthe.rowland.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Jan 2014 18:10:32 +0000
+Subject: Question: about wm8904's regulator consumer nodes
+In-Reply-To: <B256D81BAE5131468A838E5D7A24364172F64369@penmbx01>
+References: <B256D81BAE5131468A838E5D7A24364172F64369@penmbx01>
+Message-ID: <20140121181032.GI17314@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jan 2014, Hans de Goede wrote:
+On Tue, Jan 21, 2014 at 07:10:24AM +0000, Yang, Wenyou wrote:
 
-> Hi,
-> 
-> On 01/21/2014 05:40 PM, Alan Stern wrote:
-> > On Tue, 21 Jan 2014, Hans de Goede wrote:
-> >
-> >> Note this commit uses the same devicetree booleans for this as the ones
-> >> already existing in the usb-ehci bindings.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >> --- a/drivers/usb/host/Kconfig
-> >> +++ b/drivers/usb/host/Kconfig
-> >> @@ -512,6 +512,10 @@ config USB_CNS3XXX_OHCI
-> >>
-> >>   config USB_OHCI_HCD_PLATFORM
-> >>   	tristate "Generic OHCI driver for a platform device"
-> >> +	# Always support LE, support BE on architectures which have readl_be
-> >> +	select USB_OHCI_LITTLE_ENDIAN
-> >> +	select USB_OHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
-> >> +	select USB_OHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
-> >>   	default n
+>                                          DCVDD-supply = <&vcc_1v8_reg>;
+>                                          DBVDD-supply = <&vddana_reg>;
+>                                          AVDD-supply = <&vcc_1v8_reg>;
+>                                          CPVDD-supply = <&vcc_1v8_reg>;
+>                                          MICVDD-supply = <&vddana_reg>;
 
-> > In any case, the style we have adopted is that these select lines go in
-> > the arch-specific defconfig, not here.
-> 
-> Ok, so I should drop the Kconfig parts of both patches ?
+> 	But the power of DCVDD, DBVDD, AVDD, CPVDD and MICVDD is not supplied by any regulators, not the above regulator nodes.
 
-That's rigt.  They are likely to cause trouble, and if the selects were
-needed then they should already be present somewhere else.
+> 	How do I deal with this case? Could you give me some advice?
 
-Alan Stern
+You should set up the supplies to point to whatever regulator is
+supplying the power.  If there are supplies on the board which are
+generated using fixed voltage regulators then you should register those
+using the fixed regulator driver.  Recent kernels are more tolerant of
+missing supplies but it's still better to be explicit if you can be.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/c4ed9767/attachment.sig>
