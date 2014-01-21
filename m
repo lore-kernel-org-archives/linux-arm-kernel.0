@@ -1,258 +1,125 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 21 Jan 2014 05:09:22 +0100
-Subject: pinctrl: at91: drive strength control
-In-Reply-To: <CAJjB1qKAeMOdP03v85ZPcvxvS96A+_-HzO0565wtaKK8278guw@mail.gmail.com>
-References: <1390266470.26159.1.camel@bb>
- <20140121021925.GM9558@ns203013.ovh.net>
- <CAJjB1qKAeMOdP03v85ZPcvxvS96A+_-HzO0565wtaKK8278guw@mail.gmail.com>
-Message-ID: <20140121040922.GN9558@ns203013.ovh.net>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Mon, 20 Jan 2014 20:09:40 -0800
+Subject: No subject
+Message-ID: <CACUGKYPRA7fTKh9mf9D3=+XSSRrfKvWD05e1n1OFDzfA3pOLcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:34 Mon 20 Jan     , Mark Roszko wrote:
-> If I choose it at runtime what's the best way for me to detect the SoC
-> type to choose the correct register address at runtime? Only way I see
-> is adding new compatible types for the SAMA5s and the SAM9s with the
-> registers.
->
+Hi Guys,
 
-we could do it via cpu_is as a check as we may have older dts
-but it's better to do it via compatible
-> On Mon, Jan 20, 2014 at 9:19 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 20:07 Mon 20 Jan     , Marek Roszko wrote:
-> >> Hello Nick and Jean-Christophe,
-> >>
-> >> I submit a idea/patch for comments. The current pintctrl driver is missing the ability to set the drive strength in the SAMA5D3s and a few of the SAM9s.
-> >> A little feature I myself need for the SAMA5D3s because somebody let an analog engineer do the hardware design.
-> >>
-> >> Issues with this patch I need help with:
-> >> 1. Atmel for some reason shifted the PIO_DRIVER1 and PIO_DRIVER2 registers by one register address between the SAM9 chips and the SAMA5D3s
-> >>
-> >> i.e. this is the SAM9s
-> >> #define PIO_DRIVER1_V1 0x114
-> >> #define PIO_DRIVER2_V1 0x118
-> >>
-> >> this is the SAMA5D3s
-> >> #define PIO_DRIVER1_V2 0x118
-> >> #define PIO_DRIVER2_V2 0x11C
-> >>
-> >>
-> >> 2. Atmel changed the meaning of value of "low", "medium" and "high" drive strengths between the two sets of chips as well.
-> >>
-> >> SAM9s do:
-> >> 00 = high
-> >> 01 = medium
-> >> 10 = low
-> >> 11 = reserved/undefined
-> >>
-> >> SAMA5D3s do:
-> >> 00 = low
-> >> 01 = low
-> >> 10 = medium
-> >> 11 = high
-> >>
-> >> 3. The SAM9G25, SAM9G35 have the PIO_DRIVER but the SAM9G45 does not have the PIO_DRIVER register as an example of
-> >> how oddly the behavior doesn't appear everywhere. This could also be because the datasheets for the G45 and G46 are
-> >> not updated to the new style while the others already have been?
-> >>
-> >> Side note: The SAMA5D3 datasheet says the default drive strength is "low" with register values 0x00000000,
-> >> in reality the default is "medium" with 0xAAAAAAAA as the default value.
-> >> Confirmed with the JLINK debugger and by Atmel support. Not an real issue, just a note when testing.
-> >
-> > check the coding style tab for indentatnion, 80 charrs per line max etc...
-> >>
-> >>
-> >> So the only simple way I see is to #ifdef the SOC type/chip.
-> >> There's probably better far better ways I don't know.
-> >>
-> >> ---
-> >>  arch/arm/mach-at91/include/mach/at91_pio.h |    9 +++++
-> >>  drivers/pinctrl/pinctrl-at91.c             |   54 +++++++++++++++++++++++++++-
-> >>  include/dt-bindings/pinctrl/at91.h         |   13 +++++++
-> >>  3 files changed, 75 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mach-at91/include/mach/at91_pio.h b/arch/arm/mach-at91/include/mach/at91_pio.h
-> >> index 732b11c..28e8801 100644
-> >> --- a/arch/arm/mach-at91/include/mach/at91_pio.h
-> >> +++ b/arch/arm/mach-at91/include/mach/at91_pio.h
-> >> @@ -66,6 +66,15 @@
-> >>  #define PIO_FRLHSR   0xd8    /* Fall/Rise - Low/High Status Register */
-> >>  #define PIO_SCHMITT  0x100   /* Schmitt Trigger Register */
-> >>
-> >> +/*
-> >> + * SoC Specific PIO Address Offsets
-> >> + */
-> >> +#define PIO_DRIVER1_V1               0x114
-> >> +#define PIO_DRIVER2_V1               0x118
-> >> +
-> >> +#define PIO_DRIVER1_V2               0x118
-> >> +#define PIO_DRIVER2_V2               0x11C
-> >> +
-> >>  #define ABCDSR_PERIPH_A      0x0
-> >>  #define ABCDSR_PERIPH_B      0x1
-> >>  #define ABCDSR_PERIPH_C      0x2
-> >> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> >> index a7549c4..ccf456e 100644
-> >> --- a/drivers/pinctrl/pinctrl-at91.c
-> >> +++ b/drivers/pinctrl/pinctrl-at91.c
-> >> @@ -62,10 +62,37 @@ static int gpio_banks;
-> >>  #define DEGLITCH     (1 << 2)
-> >>  #define PULL_DOWN    (1 << 3)
-> >>  #define DIS_SCHMIT   (1 << 4)
-> >> +#define SET_DRIVE_STRENGTH  (1 << 5)
-> >> +#define DRIVE_STRENGTH_SHIFT    6
-> >> +#define DRIVE_STRENGTH   (0x3 << DRIVE_STRENGTH_SHIFT)
-> >>  #define DEBOUNCE     (1 << 16)
-> >>  #define DEBOUNCE_VAL_SHIFT   17
-> >>  #define DEBOUNCE_VAL (0x3fff << DEBOUNCE_VAL_SHIFT)
-> >>
-> >> +#define DRIVE_STRENGTH_MASK  0x3
-> >> +
-> >> +#define NUM_PINS_PER_DRIVE_STRENGTH_REG      16
-> >> +
-> >> +#define TWO_BIT_PIN_TO_SHIFT(pin)\
-> >> +     (2*((pin >= NUM_PINS_PER_DRIVE_STRENGTH_REG) ? \
-> >> +             pin - NUM_PINS_PER_DRIVE_STRENGTH_REG : pin))
-> >
-> >> +
-> >> +#define TWO_BIT_PIN_TO_MASK(pin)\
-> >> +     (DRIVE_STRENGTH_MASK  <<  TWO_BIT_PIN_TO_SHIFT(pin))
-> >> +
-> >> +#if defined(CONFIG_SOC_SAMA5D3)
-> >> +     #define PIO_DRIVER1  PIO_DRIVER1_V2  /* Drive Strength Register 1 */
-> >> +     #define PIO_DRIVER2  PIO_DRIVER2_V2  /* Drive Strength Register 2 */
-> >> +#elif defined(CONFIG_SOC_AT91SAM9X5) || defined(SOC_AT91SAM9G35) || defined(SOC_AT91SAM9G25)
-> >> +     #define PIO_DRIVER1  PIO_DRIVER1_V1  /* Drive Strength Register 1 */
-> >> +     #define PIO_DRIVER2  PIO_DRIVER2_V1  /* Drive Strength Register 2 */
-> >> +#endif
-> > no ifdef this is choose at runtime
-> >> +
-> >> +#if defined(PIO_DRIVER1) && defined(PIO_DRIVER2)
-> >> +     #define PIO_DRIVER(pin)\
-> >> +             ((pin > NUM_PINS_PER_DRIVE_STRENGTH_REG-1) ? PIO_DRIVER2 : PIO_DRIVER1)
-> >> +#endif
-> > use inline function
-> >> +
-> >>  /**
-> >>   * struct at91_pmx_func - describes AT91 pinmux functions
-> >>   * @name: the name of this specific function
-> >> @@ -148,6 +175,8 @@ struct at91_pinctrl_mux_ops {
-> >>       void (*set_deglitch)(void __iomem *pio, unsigned mask, bool is_on);
-> >>       bool (*get_debounce)(void __iomem *pio, unsigned pin, u32 *div);
-> >>       void (*set_debounce)(void __iomem *pio, unsigned mask, bool is_on, u32 div);
-> >> +     int (*get_drivestrength)(void __iomem *pio, unsigned pin);
-> >> +     void (*set_drivestrength)(void __iomem *pio, unsigned pin, u32 strength);
-> >>       bool (*get_pulldown)(void __iomem *pio, unsigned pin);
-> >>       void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
-> >>       bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
-> >> @@ -462,6 +491,20 @@ static void at91_mux_pio3_set_pulldown(void __iomem *pio, unsigned mask, bool is
-> >>       __raw_writel(mask, pio + (is_on ? PIO_PPDER : PIO_PPDDR));
-> >>  }
-> >>
-> >> +static int at91_mux_pio3_get_drivestrength(void __iomem *pio, unsigned pin)
-> >> +{
-> >> +    return (__raw_readl(pio + PIO_DRIVER(pin)) >> TWO_BIT_PIN_TO_SHIFT(pin)) & DRIVE_STRENGTH_MASK;
-> >> +}
-> >> +
-> >> +static void at91_mux_pio3_set_drivestrength(void __iomem *pio, unsigned pin, u32 strength)
-> >> +{
-> >> +    unsigned tmp = __raw_readl(pio + PIO_DRIVER(pin));
-> >> +    tmp &= ~TWO_BIT_PIN_TO_MASK(pin);
-> >> +    tmp |= strength << TWO_BIT_PIN_TO_SHIFT(pin);
-> >> +
-> >> +    __raw_writel(tmp, pio + PIO_DRIVER(pin));
-> >> +}
-> >> +
-> >>  static void at91_mux_pio3_disable_schmitt_trig(void __iomem *pio, unsigned mask)
-> >>  {
-> >>       __raw_writel(__raw_readl(pio + PIO_SCHMITT) | mask, pio + PIO_SCHMITT);
-> >> @@ -491,6 +534,8 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
-> >>       .set_deglitch   = at91_mux_pio3_set_deglitch,
-> >>       .get_debounce   = at91_mux_pio3_get_debounce,
-> >>       .set_debounce   = at91_mux_pio3_set_debounce,
-> >> +     .get_drivestrength = at91_mux_pio3_get_drivestrength,
-> >> +     .set_drivestrength = at91_mux_pio3_set_drivestrength,
-> >>       .get_pulldown   = at91_mux_pio3_get_pulldown,
-> >>       .set_pulldown   = at91_mux_pio3_set_pulldown,
-> >>       .get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
-> >> @@ -736,6 +781,8 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
-> >>               *config |= DEGLITCH;
-> >>       if (info->ops->get_debounce && info->ops->get_debounce(pio, pin, &div))
-> >>               *config |= DEBOUNCE | (div << DEBOUNCE_VAL_SHIFT);
-> >> +     if (info->ops->get_drivestrength)
-> >> +             *config |= DRIVE_STRENGTH | (info->ops->get_drivestrength(pio, pin) << DRIVE_STRENGTH_SHIFT);
-> >>       if (info->ops->get_pulldown && info->ops->get_pulldown(pio, pin))
-> >>               *config |= PULL_DOWN;
-> >>       if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
-> >> @@ -753,6 +800,7 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
-> >>       void __iomem *pio;
-> >>       int i;
-> >>       unsigned long config;
-> >> +     unsigned pin;
-> >>
-> >>       for (i = 0; i < num_configs; i++) {
-> >>               config = configs[i];
-> >> @@ -761,7 +809,8 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
-> >>                       "%s:%d, pin_id=%d, config=0x%lx",
-> >>                       __func__, __LINE__, pin_id, config);
-> >>               pio = pin_to_controller(info, pin_to_bank(pin_id));
-> >> -             mask = pin_to_mask(pin_id % MAX_NB_GPIO_PER_BANK);
-> >> +             pin = pin_id % MAX_NB_GPIO_PER_BANK;
-> >> +             mask = pin_to_mask(pin);
-> >>
-> >>               if (config & PULL_UP && config & PULL_DOWN)
-> >>                       return -EINVAL;
-> >> @@ -773,6 +822,9 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
-> >>               if (info->ops->set_debounce)
-> >>                       info->ops->set_debounce(pio, mask, config & DEBOUNCE,
-> >>                               (config & DEBOUNCE_VAL) >> DEBOUNCE_VAL_SHIFT);
-> >> +             if (info->ops->set_drivestrength && config & SET_DRIVE_STRENGTH)
-> >> +                     info->ops->set_drivestrength(pio, pin,
-> >> +                             (config & DRIVE_STRENGTH) >> DRIVE_STRENGTH_SHIFT);
-> >>               if (info->ops->set_pulldown)
-> >>                       info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
-> >>               if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
-> >> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
-> >> index 0fee6ff..78621a4 100644
-> >> --- a/include/dt-bindings/pinctrl/at91.h
-> >> +++ b/include/dt-bindings/pinctrl/at91.h
-> >> @@ -20,6 +20,19 @@
-> >>
-> >>  #define AT91_PINCTRL_PULL_UP_DEGLITCH        (AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
-> >>
-> >> +#define AT91_PINCTRL_SET_DRIVE_STRENGTH  (1 << 5)
-> >> +
-> >> +#if defined(CONFIG_SOC_SAMA5D3)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_LOW (0x2 << 6)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_MED (0x1 << 6)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_HI  (0x0 << 6)
-> >> +#elif defined(CONFIG_SOC_AT91SAM9X5) || defined(SOC_AT91SAM9G35) || defined(SOC_AT91SAM9G25)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_LOW (0x1 << 6)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_MED (0x2 << 6)
-> >> +     #define AT91_PINCTRL_DRIVE_STRENGTH_HI  (0x3 << 6)
-> >> +#endif
-> >
-> > no only one binding we do not care of the IP details
-> >
-> > 0 means no drive strength specified
-> >> +
-> >> +
-> >>  #define AT91_PIOA    0
-> >>  #define AT91_PIOB    1
-> >>  #define AT91_PIOC    2
-> >> --
-> >> 1.7.10.4
-> >>
-> >>
-> >>
-> >>
-> >> --
-> >> Mark
-> >>
-> >>
-> 
-> 
-> 
-> -- 
-> Mark
+Just wondering if you encountered the error below and if there's any
+existing patch?.
+
+Regards,
+
+john
+
+
+
+[  860.354231] Unable to handle kernel paging request at virtual
+address eaffff9d
+[  860.361466] pgd = bf190000
+[  860.364177] [eaffff9d] *pgd=00000000
+[  860.367773] Internal error: Oops: 5 [#1] ARM
+[  860.372048] Modules linked in: bt8xxx(O) sd8xxx(O) mlan(O)
+[  860.377597] CPU: 0 PID: 82 Comm: ksdioirqd/mmc1 Tainted: G
+ O 3.13.0-rc1 #1
+[  860.385344] task: bf05c280 ti: bf01a000 task.ti: bf01a000
+[  860.390756] PC is at mmc_io_rw_extended+0x38/0x310
+[  860.395552] LR is at mmc_io_rw_extended+0x38/0x310
+[  860.400346] pc : [<80319b68>]    lr : [<80319b68>]    psr: 400f0013
+[  860.400346] sp : bf01bc90  ip : bf01bd60  fp : bf01bd8c
+[  860.411824] r10: 806f9748  r9 : bf9e7800  r8 : eb075fb4
+[  860.417051] r7 : eaffff9d  r6 : 80327c24  r5 : 1a000009  r4 : 00000007
+[  860.423580] r3 : 00000000  r2 : ffffffc4  r1 : 00000000  r0 : bf01bd1c
+[  860.430112] Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+Segment kernel
+[  860.437423] Control: 10c53c7d  Table: bf190059  DAC: 00000015
+[  860.443172] Process ksdioirqd/mmc1 (pid: 82, stack limit = 0xbf01a238)
+[  860.449702] Stack: (0xbf01bc90 to 0xbf01c000)
+[  860.454065] bc80:                                     80319e04
+00000440 00000139 00000000
+[  860.462246] bca0: 00000139 00000000 817de8c2 000000c0 00000700
+beac60c0 3b9aca00 00000000
+[  860.470427] bcc0: 00000100 00000007 00000000 00000200 00000700
+00000000 bf01bd1c 00000001
+[  860.478609] bce0: bf01bca8 00000000 00000035 1a001207 00002000
+00000000 00000000 00000000
+[  860.486790] bd00: 000001b5 00000000 00000000 00000000 00000000
+bf01bcb8 bf01bd1c 00000000
+[  860.494971] bd20: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[  860.503153] bd40: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[  860.511334] bd60: bf01bd94 bf01bd70 80324254 80327c24 bf01be04
+bf9e7800 806f9748 b600003f
+[  860.519515] bd80: bf01bdd4 bf01bd90 8031ade8 80319b3c bf01be04
+80327c24 00000007 1a000009
+[  860.527697] bda0: bf05c280 000001ff 00100100 bfb52000 00000100
+00000007 beac60c0 00010009
+[  860.535878] bdc0: 7f03e578 c0adb000 bf01bdec bf01bdd8 8031aef8
+8031ad10 beac60c0 00000700
+[  860.544059] bde0: bf01be14 bf01bdf0 7f08c2bc 8031aee0 00000000
+00000009 00000700 7f03d328
+[  860.552240] be00: bfad9a00 00000000 bf01be24 bf01be18 7f0622f0
+7f08c278 bf01be6c bf01be28
+[  860.560422] be20: 7f0137a8 7f0622ec bf01be44 bf01be38 8004efd4
+00000001 bf01be5c 00000000
+[  860.568603] be40: 804fc960 c0adb000 c0adbce4 7f03d328 00000000
+7f03e578 7f061dec bfb52000
+[  860.576784] be60: bf01beac bf01be70 7f001e68 7f0134f8 00000000
+00000000 00000000 00000000
+[  860.584965] be80: 00000000 bfb52000 7f09a0d4 bfb51800 00000000
+bf9e7800 bf01a000 00000001
+[  860.593146] bea0: bf01bec4 bf01beb0 7f05a138 7f001ce0 00000001
+00000000 bf01bed4 bf01bec8
+[  860.601327] bec0: 7f08bfe4 7f05a0cc bf01bf24 bf01bed8 8031ba0c
+7f08bfc4 00000000 bf01bef3
+[  860.609509] bee0: bfb51800 00000001 bf9e7bb4 7fffffff 0215d9c0
+00000001 8031b874 00000000
+[  860.617690] bf00: bf15d9c0 bf9e7800 8031b874 00000000 00000000
+00000000 bf01bfac bf01bf28
+[  860.625871] bf20: 8003c7e8 8031b880 bf01bf44 00000000 8004efd4
+bf9e7800 00000000 00000001
+[  860.634052] bf40: dead4ead ffffffff ffffffff 80702208 00000000
+00000000 80600be8 bf01bf5c
+[  860.642233] bf60: bf01bf5c 00000000 00000001 dead4ead ffffffff
+ffffffff 80702208 00000000
+[  860.650415] bf80: 00000000 80600be8 bf01bf88 bf01bf88 bf15d9c0
+8003c724 00000000 00000000
+[  860.658595] bfa0: 00000000 bf01bfb0 8000f308 8003c730 00000000
+00000000 00000000 00000000
+[  860.666776] bfc0: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[  860.674956] bfe0: 00000000 00000000 00000000 00000000 00000013
+00000000 00000000 00000000
+[  860.683133] Backtrace:
+[  860.685607] [<80319b30>] (mmc_io_rw_extended+0x0/0x310) from
+[<8031ade8>] (sdio_io_rw_ext_helper+0xe4/0x1a4)
+[  860.695442] [<8031ad04>] (sdio_io_rw_ext_helper+0x0/0x1a4) from
+[<8031aef8>] (sdio_readsb+0x24/0x2c)
+[  860.704676] [<8031aed4>] (sdio_readsb+0x0/0x2c) from [<7f08c2bc>]
+(woal_read_data_sync+0x50/0x8c [sd8xxx])
+[  860.714455] [<7f08c26c>] (woal_read_data_sync+0x0/0x8c [sd8xxx])
+from [<7f0622f0>] (moal_read_data_sync+0x10/0x14 [sd8xxx])
+[  860.725586]  r8:00000000 r7:bfad9a00 r6:7f03d328 r5:00000700 r4:00000009
+r3:00000000
+[  860.733603] [<7f0622e0>] (moal_read_data_sync+0x0/0x14 [sd8xxx])
+from [<7f0137a8>] (wlan_process_int_status+0x2bc/0x928 [mlan])
+[  860.745139] [<7f0134ec>] (wlan_process_int_status+0x0/0x928 [mlan])
+from [<7f001e68>] (mlan_main_process+0x194/0x750 [mlan])
+[  860.756436] [<7f001cd4>] (mlan_main_process+0x0/0x750 [mlan]) from
+[<7f05a138>] (woal_interrupt+0x78/0x94 [sd8xxx])
+[  860.766982] [<7f05a0c0>] (woal_interrupt+0x0/0x94 [sd8xxx]) from
+[<7f08bfe4>] (woal_sdio_interrupt+0x2c/0x30 [sd8xxx])
+[  860.777677]  r5:00000000 r4:00000001
+[  860.781351] [<7f08bfb8>] (woal_sdio_interrupt+0x0/0x30 [sd8xxx])
+from [<8031ba0c>] (sdio_irq_thread+0x198/0x368)
+[  860.791537] [<8031b874>] (sdio_irq_thread+0x0/0x368) from
+[<8003c7e8>] (kthread+0xc4/0xe0)
+[  860.799814] [<8003c724>] (kthread+0x0/0xe0) from [<8000f308>]
+(ret_from_fork+0x14/0x2c)
+[  860.807818]  r7:00000000 r6:00000000 r5:8003c724 r4:bf15d9c0
+[  860.813538] Code: e1a09003 e59b400c e59b5010 ebfc3a75 (e5973000)
+[  860.819646] ---[ end trace 1920724507aeb8b4 ]---
+[  860.824270] Kernel panic - not syncing: Fatal exception
