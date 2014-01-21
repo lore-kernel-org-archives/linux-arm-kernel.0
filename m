@@ -1,70 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Jan 2014 10:35:10 +0100
-Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
-In-Reply-To: <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
-References: <1389941251-32692-1-git-send-email-wens@csie.org>
- <1389941251-32692-5-git-send-email-wens@csie.org>
- <201401171747.46332.arnd@arndb.de>
- <CAGb2v67UKiyfJbKZ_Frk3OwZupMPoA2Ck3Hj2zsRFXBQPztavg@mail.gmail.com>
- <CACRpkdZOD4zeA8T5kbJ4c5NsnuzHCg1mw8rRMYNT9c4R-Qnc6A@mail.gmail.com>
- <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
-Message-ID: <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 Jan 2014 10:41:17 +0100
+Subject: [PATCH v2 14/15] watchdog: orion: Allow to build on any Orion
+ platform
+In-Reply-To: <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <52DE40BD.10700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 4:11 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Sat, Jan 18, 2014 at 8:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-
->> gpio = devm_gpiod_get_index(&pdev->dev, NULL, 0);
->> gpio = devm_gpiod_get_index(&pdev->dev, NULL, 1);
->>
->> Heikki, are you OK with this change?
->>
->> I think this is actually necessary if the ACPI and DT unification
->> pipe dream shall limp forward, we cannot have arguments passed
->> that have a semantic effect on DT but not on ACPI... Drivers
->> that are supposed to use both ACPI and DT will always
->> have to pass NULL as con ID.
+On 01/21/14 10:12, Ezequiel Garcia wrote:
+> After getting rid of all the mach-specific code, it's now possible
+> to allow builds in any Orion platform.
 >
-> I agree that's how it should be be done with the current API if your
-> driver can obtain GPIOs from both ACPI and DT. This is a potential
-> issue, as drivers are not supposed to make assumptions about who is
-> going to be their GPIO provider. Let's say you started a driver with
-> only DT in mind, and used gpio_get(dev, con_id) to get your GPIOs. DT
-> bindings are thus of the form "con_id-gpio = <phandle>", and set in
-> stone. Then later, someone wants to use your driver with ACPI. How do
-> you handle that gracefully?
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>   drivers/watchdog/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 5be6e91..1689f72 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
+>
+>   config ORION_WATCHDOG
+>   	tristate "Orion watchdog"
+> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+> +	depends on PLAT_ORION
 
-Short answer is you can't. You have to pour backward-compatibility
-code into the driver first checking for that property and then falling
-back to the new binding if it doesn't exist.
+Ezequiel,
 
-> I'm starting to wonder, now that ACPI is a first-class GPIO provider,
-> whether we should not start to encourage the deprecation of the
-> "con_id-gpio = <phandle>" binding form in DT and only use a single
-> indexed GPIO property per device.
+while above is true now, I tend to rather have ARCH_MVEBU added here.
+We really want to get rid of both !ARCH_MVEBU and PLAT_ORION and this
+unnecessarily will make it more complicated.
 
-You have a valid point.
+I haven't checked why ARCH_MVEBU at all added PLAT_ORION as dependency,
+but IIRC it was just because of a missing mbus driver? If it is just
+this, we should also remove PLAT_ORION from ARCH_MVEBU to have a clean
+cut between new common arch and existing sub-archs.
 
-> The con_id parameter would then only
-> be used as a label, which would also have the nice side-effect that
-> all GPIOs used for a given function will be reported under the same
-> name no matter what the GPIO provider is.
+Sebastian
 
-As discussed earlier in this thread I'm not sure the con_id is
-suitable for labelling GPIOs. It'd be better to have a proper name
-specified in DT/ACPI instead.
-
-> From an aesthetic point of view, I definitely prefer using con_id to
-> identify GPIOs instead of indexes, but I don't see how we can make it
-> play nice with ACPI. Thoughts?
-
-Let's ask the DT maintainers...
-
-I'm a bit sceptic to the whole ACPI-DT-API-should-be-unified
-just-one-function-call business, as this was just a very simple example
-of what can happen to something as simple as
-devm_gpiod_get[_index]().
-
-Yours,
-Linus Walleij
+>   	select WATCHDOG_CORE
+>   	help
+>   	  Say Y here if to include support for the watchdog timer
+>
