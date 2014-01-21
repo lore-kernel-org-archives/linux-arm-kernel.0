@@ -1,208 +1,83 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 21 Jan 2014 13:44:21 +0100
-Subject: [PATCH v10] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
-References: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 21 Jan 2014 13:46:53 +0100
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <20140121120214.GK28747@e106331-lin.cambridge.arm.com>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
+ <20140115161224.GH25824@e106331-lin.cambridge.arm.com>
+ <20140120224742.EC905C40B12@trevor.secretlab.ca>
+ <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
+ <20140121120214.GK28747@e106331-lin.cambridge.arm.com>
+Message-ID: <20140121124653.GQ9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MOXA ART SoCs allow to determine PLL output and APB frequencies
-by reading registers holding multiplier and divisor information.
+On 12:02 Tue 21 Jan     , Mark Rutland wrote:
+> On Tue, Jan 21, 2014 at 01:03:23AM +0000, Olof Johansson wrote:
+> > On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> > > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
+> > >> >
+> > >> > Another, more invasive option would be extend the dts syntax and teach
+> > >> > dtc to handle property appending. Then the soc dts could stay as it is,
+> > >> > and the board dts could have something like:
+> > >> >
+> > >> >     /append-property/ interrupts = <&intc1 6 1>;
+> > >> >     /append-property/ interrupt-names = "board-specific-irq";
+> > >> >
+> > >> > Both these options solve the issue at the source, are general to other
+> > >> > properties, and allow more than one level of hierarchy (the proposed
+> > >> > interrupts-extended-2 only allows one level).
+> > >>
+> > >> I've just had a go at implementing the append-property mechanism above
+> > >> in dtc, and it was far easier than I expected (patch below).
+> > >>
+> > >> Does anyone have any issues with the /append-property/ idea?
+> > >
+> > > I think that is reasonable.
+> > 
+> > 
+> > The main problem with this (same for clocks) is if you need to append
+> > something with a name when the original didn't have any.
+> 
+> Can you not just add a name in the original file? I assume we're not
+> going to use this to adjust dts files we're not already in full control
+> of.
+> 
+> > 
+> > Reordering entries might not work for interrupts, since the bindings
+> > might have requirements on order.
+> 
+> That's a fair point.
+> 
+> Do we currently have any optional/board-specific interrupts which must
+> appear at the start or middle of the list?
+> 
+> For those, could we add names? The kernel should be abel to fall back to
+> ordering if names aren't present, and we can recommend a particular
+> ordering for compatiblity with older kernels.
+> 
+> As a general preventative measure it would be nice to have named
+> elements whenever elements can be optional.
 
-Add a clock driver for this SoC.
+I never was a fanof index search I do agree the names irq is the best way
+> 
+> > 
+> > I'm not aware of a good solution for this. Suggestions welcome.
+> 
+> Me neither. Prepending and appending is easy.
+> 
+> Inserting and/or modifying the list requires knowledge of the size of
+> each element (and for variable-sized entries requires knowledge of the
+> particular binding, which we cannot embed in dtc). 
+> 
+> I suspect adding richer syntax for modifying properties in arbitrary
+> ways will devolve into a turing tarpit.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+no this need to stay simple if too much complexe => mess up, unmaintainable
 
-Notes:
-    Thanks for the reply Sudeep, changes are in v10.
-    
-    Changes since v9:
-    
-    1. rebase drivers/clk/Makefile to next-20140121
-    2. remove unnecessary switch
-    3. use a more elaborate commit message
-    
-    Applies to next-20140121
+if you really have complex stuff duplicate the info
 
- .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
- drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-moxart.c                           | 99 ++++++++++++++++++++++
- 3 files changed, 148 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
- create mode 100644 drivers/clk/clk-moxart.c
-
-diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-new file mode 100644
-index 0000000..242e3fc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-@@ -0,0 +1,48 @@
-+Device Tree Clock bindings for arch-moxart
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+MOXA ART SoCs allow to determine PLL output and APB frequencies
-+by reading registers holding multiplier and divisor information.
-+
-+
-+PLL:
-+
-+Required properties:
-+- compatible : Must be "moxa,moxart-pll-clock"
-+- #clock-cells : Should be 0
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle to parent clock
-+
-+Optional properties:
-+- clock-output-names : Should contain clock name
-+
-+
-+APB:
-+
-+Required properties:
-+- compatible : Must be "moxa,moxart-apb-clock"
-+- #clock-cells : Should be 0
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle to parent clock
-+
-+Optional properties:
-+- clock-output-names : Should contain clock name
-+
-+
-+For example:
-+
-+	clk_pll: clk_pll at 98100000 {
-+		compatible = "moxa,moxart-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0x98100000 0x34>;
-+	};
-+
-+	clk_apb: clk_apb at 98100000 {
-+		compatible = "moxa,moxart-apb-clock";
-+		#clock-cells = <0>;
-+		reg = <0x98100000 0x34>;
-+		clocks = <&clk_pll>;
-+	};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 58b2d72..24361bf 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
- obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
-+obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
- obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
-diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-new file mode 100644
-index 0000000..7021748
---- /dev/null
-+++ b/drivers/clk/clk-moxart.c
-@@ -0,0 +1,99 @@
-+/*
-+ * MOXA ART SoCs clock driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/clkdev.h>
-+
-+void __init moxart_of_pll_clk_init(struct device_node *node)
-+{
-+	static void __iomem *base;
-+	struct clk *clk, *ref_clk;
-+	unsigned long rate;
-+	unsigned int mul;
-+	const char *name = node->name;
-+
-+	of_property_read_string(node, "clock-output-names", &name);
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+
-+	mul = readl(base + 0x30) >> 3 & 0x3f;
-+	iounmap(base);
-+
-+	ref_clk = of_clk_get(node, 0);
-+	if (IS_ERR(ref_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
-+
-+	rate = mul * clk_get_rate(ref_clk);
-+
-+	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
-+	       moxart_of_pll_clk_init);
-+
-+void __init moxart_of_apb_clk_init(struct device_node *node)
-+{
-+	static void __iomem *base;
-+	struct clk *clk, *pll_clk;
-+	unsigned long rate;
-+	unsigned int div, val;
-+	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
-+	const char *name = node->name;
-+
-+	of_property_read_string(node, "clock-output-names", &name);
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+
-+	val = readl(base + 0xc) >> 4 & 0x7;
-+	iounmap(base);
-+
-+	if (val > 4)
-+		val = 0;
-+	div = div_idx[val];
-+
-+	pll_clk = of_clk_get(node, 0);
-+	if (IS_ERR(pll_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
-+
-+	rate = clk_get_rate(pll_clk) / (div * 2);
-+
-+	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
-+	       moxart_of_apb_clk_init);
--- 
-1.8.2.1
+Best Regards,
+J.
+> 
+> Thanks,
+> Mark.
