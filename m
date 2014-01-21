@@ -1,116 +1,59 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 21 Jan 2014 23:53:13 +0900
-Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
-In-Reply-To: <201401211335.16885.arnd@arndb.de>
-References: <1389941251-32692-1-git-send-email-wens@csie.org>
- <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
- <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
- <201401211335.16885.arnd@arndb.de>
-Message-ID: <CAAVeFuKFfAvSPYLmvWV5jjT-peZFJ8sJ2bbh4F=JAYoWLhjZpA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jan 2014 15:12:36 +0000
+Subject: [PATCH v2 0/5] arm64: advertise availability of CRC and crypto
+ instructions
+In-Reply-To: <alpine.LFD.2.11.1401201427090.1652@knanqh.ubzr>
+References: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140120173838.GD29971@arm.com>
+ <alpine.LFD.2.11.1401201242480.1652@knanqh.ubzr>
+ <CAKv+Gu8jqctGFsyccg6_VGkZ6ogf8BD_kq1rsRQrc+cw7pk+qA@mail.gmail.com>
+ <alpine.LFD.2.11.1401201307300.1652@knanqh.ubzr>
+ <CAKv+Gu8JEaVZDiOEegUeYfWbAMMH0ddgcWaTjFBpjXzoiKRoQg@mail.gmail.com>
+ <alpine.LFD.2.11.1401201351120.1652@knanqh.ubzr>
+ <CAKv+Gu8G+oSFWhVxbjPuj+Vn8Tk9E-g6og-fFjGdKsbmheHz-A@mail.gmail.com>
+ <alpine.LFD.2.11.1401201427090.1652@knanqh.ubzr>
+Message-ID: <20140121151236.GE14830@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 9:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 21 January 2014, Linus Walleij wrote:
->> On Tue, Jan 21, 2014 at 4:11 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
->> > On Sat, Jan 18, 2014 at 8:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> >
->> > I agree that's how it should be be done with the current API if your
->> > driver can obtain GPIOs from both ACPI and DT. This is a potential
->> > issue, as drivers are not supposed to make assumptions about who is
->> > going to be their GPIO provider. Let's say you started a driver with
->> > only DT in mind, and used gpio_get(dev, con_id) to get your GPIOs. DT
->> > bindings are thus of the form "con_id-gpio = <phandle>", and set in
->> > stone. Then later, someone wants to use your driver with ACPI. How do
->> > you handle that gracefully?
->>
->> Short answer is you can't. You have to pour backward-compatibility
->> code into the driver first checking for that property and then falling
->> back to the new binding if it doesn't exist.
->
-> With the ACPI named properties extension, it should be possible to have
-> something akin to a "gpio-names" list that can be attached to an indexed
-> array of gpio descriptors. I assume that Intel is going to need this
-> for named irqs, clocks, regulators, dmas as well, so I think it will
-> eventually get there. It's not something that can be done today though,
-> or that is standardized in APCI-5.0.
+On Mon, Jan 20, 2014 at 07:42:36PM +0000, Nicolas Pitre wrote:
+> On Mon, 20 Jan 2014, Ard Biesheuvel wrote:
+> > Quoting Russell:
+> > 
+> > On 18 December 2013 12:42, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > The point is that they'll never appear on an ARMv7 implementation because
+> > > they're not part of the ARMv7 architecture.  I see no point in needlessly
+> > > polluting ARM32 with ARM64 stuff - in exactly the same way that you see
+> > > no point in polluting ARM64 with ARM32 stuff.
+> > >
+> > > So, frankly, find a different way to this.  We don't need to needlessly
+> > > waste HWCAP bits on ARM32.
+> > 
+> > So my idea was to use HWCAP2 bits instead ...
+[...]
+> You also decided to put the new crypto bits into HWCAP2.  I have no 
+> actual objection with that either.
+> 
+> What makes me wonder is Catalin's affirmation about putting those new 
+> bits into HWCAP2 making future extensions possible with old glibc 
+> versions that don't have knowledge about HWCAP2.  That is what I don't 
+> get the pertinence of.
 
-Good to know. I'm not sure this would help with the named GPIO
-resolution issue however. I assume that contrary to DT we will have no
-control over the naming of ACPI-defined GPIOs, and thus there is
-little chance that a GPIO serving a function will end up having the
-same name as the one we chose for the DT binding...
+I was looking for a justification for not touching HWCAP and instead
+going directly to HWCAP2. Some user application compiled against an old
+glibc could still access HWCAP via getauxval() but not HWCAP2. So that's
+not for old glibc using new HWCAP bits itself.
 
->
-> My guess is that named GPIOs are going to make more sense on x86 embedded
-> than on arm64 server.
->
->> > I'm starting to wonder, now that ACPI is a first-class GPIO provider,
->> > whether we should not start to encourage the deprecation of the
->> > "con_id-gpio = <phandle>" binding form in DT and only use a single
->> > indexed GPIO property per device.
->>
->> You have a valid point.
->
-> Independent of ACPI, I prefer indexed "gpios" properties over "con_id-gpio"
-> properties anyway, because it's more consistent with some of the other
-> subsystems. I don't have an opinion though on whether we should also
-> allow a "gpios"/"gpio-names" pair, or whether we should keep the indexed
-> "gpios" list for the anonymous case.
->
->> > The con_id parameter would then only
->> > be used as a label, which would also have the nice side-effect that
->> > all GPIOs used for a given function will be reported under the same
->> > name no matter what the GPIO provider is.
->>
->> As discussed earlier in this thread I'm not sure the con_id is
->> suitable for labelling GPIOs. It'd be better to have a proper name
->> specified in DT/ACPI instead.
->
-> +1
+A recent example is the HWCAP_EVSTRM which is ARMv7 only, some
+application could implement some user space polling using WFE (I think
+I've heard about smarter user locking in PostgreSQL). We may get other
+ARMv7 ideas in the future or CPU implementations with features not
+covered by the ARM ARM.
 
-I wonder why you guys prefer to have the name defined in the GPIO
-mapping. Having the driver decide the label makes it easier to look up
-which GPIO does what in debugfs, whereas nothing prevents people to
-name GPIOs whatever inadequate name they want in the device DT node.
-What am I overlooking here?
+But if we decide to keep ARMv8 bits in HWCAP2, it's fine by me, I
+already acked these patches. It's up to Russell whether he wants to take
+them in this form or not.
 
->
->> > From an aesthetic point of view, I definitely prefer using con_id to
->> > identify GPIOs instead of indexes, but I don't see how we can make it
->> > play nice with ACPI. Thoughts?
->>
->> Let's ask the DT maintainers...
->>
->> I'm a bit sceptic to the whole ACPI-DT-API-should-be-unified
->> just-one-function-call business, as this was just a very simple example
->> of what can happen to something as simple as
->> devm_gpiod_get[_index]().
->
-> I think a unified kernel API makes more sense for some subsystems than
-> others, and it depends a bit on the rate of adoption of APCI for drivers
-> that already have a DT binding (or vice versa, if that happens).
->
-> GPIO might actually be in the first category since it's commonly used
-> for off-chip components that will get shared across ARM and x86 (as
-> well as everything else), while a common kernel API would be less
-> important for things that are internal to an SoC where Intel is the
-> only company needing ACPI support.
-
-I am afraid I don't have a good enough view of the ACPI landscape to
-understand how often drivers might be reused on both ACPI and DT. But
-I suppose nothing speaks against that, technically speaking. Maybe
-Mika would have comments to make here?
-
-The good (or bad, rather) thing about DT is that we can do whatever we
-please with the new bindings: decide which name or which index
-(doesn't matter here) a GPIO should have. However we don't have this
-control over ACPI, where nothing guarantees that the same index will
-be used for the same GPIO function. And there goes our unified GPIO
-mapping. Workarounds would imply additional layers of mapping, or
-using different probe functions depending on whether we rely on DT or
-ACPI (I don't want to imagine there will be systems that use *both*).
-Considering that we already have drivers using that trick (e.g. to
-choose between SPI or I2C), the latter might be acceptable.
-
-Alex.
+-- 
+Catalin
