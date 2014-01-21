@@ -1,240 +1,304 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 21 Jan 2014 03:19:25 +0100
-Subject: pinctrl: at91: drive strength control
-In-Reply-To: <1390266470.26159.1.camel@bb>
-References: <1390266470.26159.1.camel@bb>
-Message-ID: <20140121021925.GM9558@ns203013.ovh.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Jan 2014 18:22:27 -0800
+Subject: [PATCH v3 2/2] i2c: New bus driver for the QUP I2C controller
+In-Reply-To: <1389999819-10648-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389999819-10648-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140121022227.GD13785@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:07 Mon 20 Jan     , Marek Roszko wrote:
-> Hello Nick and Jean-Christophe,
-> 
-> I submit a idea/patch for comments. The current pintctrl driver is missing the ability to set the drive strength in the SAMA5D3s and a few of the SAM9s. 
-> A little feature I myself need for the SAMA5D3s because somebody let an analog engineer do the hardware design.
-> 
-> Issues with this patch I need help with:
-> 1. Atmel for some reason shifted the PIO_DRIVER1 and PIO_DRIVER2 registers by one register address between the SAM9 chips and the SAMA5D3s
-> 
-> i.e. this is the SAM9s
-> #define PIO_DRIVER1_V1 0x114  
-> #define PIO_DRIVER2_V1 0x118
-> 
-> this is the SAMA5D3s
-> #define PIO_DRIVER1_V2 0x118  
-> #define PIO_DRIVER2_V2 0x11C
-> 
-> 
-> 2. Atmel changed the meaning of value of "low", "medium" and "high" drive strengths between the two sets of chips as well.
-> 
-> SAM9s do:
-> 00 = high
-> 01 = medium
-> 10 = low
-> 11 = reserved/undefined
-> 
-> SAMA5D3s do:
-> 00 = low
-> 01 = low
-> 10 = medium
-> 11 = high
-> 
-> 3. The SAM9G25, SAM9G35 have the PIO_DRIVER but the SAM9G45 does not have the PIO_DRIVER register as an example of 
-> how oddly the behavior doesn't appear everywhere. This could also be because the datasheets for the G45 and G46 are 
-> not updated to the new style while the others already have been?
-> 
-> Side note: The SAMA5D3 datasheet says the default drive strength is "low" with register values 0x00000000, 
-> in reality the default is "medium" with 0xAAAAAAAA as the default value. 
-> Confirmed with the JLINK debugger and by Atmel support. Not an real issue, just a note when testing.
-
-check the coding style tab for indentatnion, 80 charrs per line max etc...
-> 
-> 
-> So the only simple way I see is to #ifdef the SOC type/chip.
-> There's probably better far better ways I don't know.
-> 
-> ---
->  arch/arm/mach-at91/include/mach/at91_pio.h |    9 +++++
->  drivers/pinctrl/pinctrl-at91.c             |   54 +++++++++++++++++++++++++++-
->  include/dt-bindings/pinctrl/at91.h         |   13 +++++++
->  3 files changed, 75 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/at91_pio.h b/arch/arm/mach-at91/include/mach/at91_pio.h
-> index 732b11c..28e8801 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_pio.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_pio.h
-> @@ -66,6 +66,15 @@
->  #define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
->  #define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
->  
-> +/*
-> + * SoC Specific PIO Address Offsets
+On 01/17, Bjorn Andersson wrote:
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+> new file mode 100644
+> index 0000000..2e0020e
+> --- /dev/null
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -0,0 +1,894 @@
+> +/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
 > + */
-> +#define PIO_DRIVER1_V1		0x114
-> +#define PIO_DRIVER2_V1		0x118
 > +
-> +#define PIO_DRIVER1_V2		0x118
-> +#define PIO_DRIVER2_V2		0x11C
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/i2c.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
 > +
->  #define ABCDSR_PERIPH_A	0x0
->  #define ABCDSR_PERIPH_B	0x1
->  #define ABCDSR_PERIPH_C	0x2
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index a7549c4..ccf456e 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -62,10 +62,37 @@ static int gpio_banks;
->  #define DEGLITCH	(1 << 2)
->  #define PULL_DOWN	(1 << 3)
->  #define DIS_SCHMIT	(1 << 4)
-> +#define SET_DRIVE_STRENGTH  (1 << 5)
-> +#define DRIVE_STRENGTH_SHIFT    6
-> +#define DRIVE_STRENGTH   (0x3 << DRIVE_STRENGTH_SHIFT)
->  #define DEBOUNCE	(1 << 16)
->  #define DEBOUNCE_VAL_SHIFT	17
->  #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
->  
-> +#define DRIVE_STRENGTH_MASK  0x3
+> +/* QUP Registers */
+> +#define QUP_CONFIG		0x000
+> +#define QUP_STATE		0x004
+> +#define QUP_IO_MODE		0x008
+> +#define QUP_SW_RESET		0x00c
+> +#define QUP_OPERATIONAL		0x018
+> +#define QUP_ERROR_FLAGS		0x01c
+> +#define QUP_ERROR_FLAGS_EN	0x020
+> +#define QUP_HW_VERSION		0x030
+> +#define QUP_MX_OUTPUT_CNT	0x100
+> +#define QUP_OUT_FIFO_BASE	0x110
+> +#define QUP_MX_WRITE_CNT	0x150
+> +#define QUP_MX_INPUT_CNT	0x200
+> +#define QUP_MX_READ_CNT		0x208
+> +#define QUP_IN_FIFO_BASE	0x218
+> +#define QUP_I2C_CLK_CTL		0x400
+> +#define QUP_I2C_STATUS		0x404
 > +
-> +#define NUM_PINS_PER_DRIVE_STRENGTH_REG	16
+> +/* QUP States and reset values */
+> +#define QUP_RESET_STATE		0
+> +#define QUP_RUN_STATE		1
+> +#define QUP_PAUSE_STATE		3
+> +#define QUP_STATE_MASK		3
 > +
-> +#define TWO_BIT_PIN_TO_SHIFT(pin)\
-> +	(2*((pin >= NUM_PINS_PER_DRIVE_STRENGTH_REG) ? \
-> +		pin - NUM_PINS_PER_DRIVE_STRENGTH_REG : pin))
+> +#define QUP_STATE_VALID		BIT(2)
+> +#define QUP_I2C_MAST_GEN	BIT(4)
+> +
+> +#define QUP_OPERATIONAL_RESET	0x000ff0
+> +#define QUP_I2C_STATUS_RESET	0xfffffc
+> +
+> +/* QUP OPERATIONAL FLAGS */
+> +#define QUP_OUT_SVC_FLAG	BIT(8)
+> +#define QUP_IN_SVC_FLAG		BIT(9)
+> +#define QUP_MX_INPUT_DONE	BIT(11)
+> +
+> +/* I2C mini core related values */
+> +#define I2C_MINI_CORE		(2 << 8)
+> +#define I2C_N_VAL		15
+> +/* Most significant word offset in FIFO port */
+> +#define QUP_MSW_SHIFT		(I2C_N_VAL + 1)
+> +#define QUP_CLOCK_AUTO_GATE	BIT(13)
+> +
+> +/* Packing/Unpacking words in FIFOs, and IO modes */
+> +#define QUP_UNPACK_EN		BIT(14)
+> +#define QUP_PACK_EN		BIT(15)
+> +#define QUP_OUTPUT_BLK_MODE	BIT(10)
+> +#define QUP_INPUT_BLK_MODE	BIT(12)
+> +
+> +#define QUP_REPACK_EN		(QUP_UNPACK_EN | QUP_PACK_EN)
+> +
+> +#define QUP_OUTPUT_BLOCK_SIZE(x)(((x) & (0x03 << 0)) >> 0)
+> +#define QUP_OUTPUT_FIFO_SIZE(x)	(((x) & (0x07 << 2)) >> 2)
+> +#define QUP_INPUT_BLOCK_SIZE(x)	(((x) & (0x03 << 5)) >> 5)
+> +#define QUP_INPUT_FIFO_SIZE(x)	(((x) & (0x07 << 7)) >> 7)
+> +
+> +/* QUP tags */
+> +#define QUP_OUT_NOP		(0 << 8)
+> +#define QUP_OUT_START		(1 << 8)
+> +#define QUP_OUT_DATA		(2 << 8)
+> +#define QUP_OUT_STOP		(3 << 8)
+> +#define QUP_OUT_REC		(4 << 8)
+> +#define QUP_IN_DATA		(5 << 8)
+> +#define QUP_IN_STOP		(6 << 8)
+> +#define QUP_IN_NACK		(7 << 8)
+> +
+> +/* Status, Error flags */
+> +#define I2C_STATUS_WR_BUFFER_FULL	BIT(0)
+> +#define I2C_STATUS_BUS_ACTIVE		BIT(8)
+> +#define I2C_STATUS_BUS_MASTER		BIT(9)
+> +#define I2C_STATUS_ERROR_MASK		0x38000fc
+> +#define QUP_I2C_NACK_FLAG		BIT(3)
+> +#define QUP_IN_NOT_EMPTY		BIT(5)
+> +#define QUP_STATUS_ERROR_FLAGS		0x7c
+> +
+> +/* Master bus_err clock states */
+> +#define I2C_CLK_RESET_BUSIDLE_STATE	0
+> +#define I2C_CLK_FORCED_LOW_STATE	5
+> +
+> +#define QUP_MAX_CLK_STATE_RETRIES	300
+> +#define QUP_MAX_QUP_STATE_RETRIES	100
+> +#define I2C_STATUS_CLK_STATE		13
+> +#define QUP_OUT_FIFO_NOT_EMPTY		0x10
+> +#define QUP_READ_LIMIT			256
+> +
+> +struct qup_i2c_dev {
+> +	struct device		*dev;
+> +	void __iomem		*base;
+> +	int			irq;
+> +	struct clk		*clk;
+> +	struct clk		*pclk;
+> +	struct i2c_adapter	adap;
+> +
+> +	int			clk_ctl;
+> +	int			one_bit_t;
+> +	int			out_fifo_sz;
+> +	int			in_fifo_sz;
+> +	int			out_blk_sz;
+> +	int			in_blk_sz;
+> +	unsigned long		xfer_time;
+> +	unsigned long		wait_idle;
+> +
+> +	struct i2c_msg		*msg;
+> +	/* Current posion in user message buffer */
 
+s/posion/position/
+
+> +	int			pos;
+> +	/* Keep number of bytes left to be transmitted */
+> +	int			cnt;
+> +	/* I2C protocol errors */
+> +	u32			bus_err;
+> +	/* QUP core errors */
+> +	u32			qup_err;
+> +	/*
+> +	 * Maximum bytes that could be send (per iteration). Could be
+> +	 * equal of fifo size or block size (in block mode)
+> +	 */
+> +	int			chunk_sz;
+> +	struct completion	xfer;
+> +};
+[...]
 > +
-> +#define TWO_BIT_PIN_TO_MASK(pin)\
-> +	(DRIVE_STRENGTH_MASK  <<  TWO_BIT_PIN_TO_SHIFT(pin))
-> +
-> +#if defined(CONFIG_SOC_SAMA5D3)
-> +	#define PIO_DRIVER1  PIO_DRIVER1_V2  /* Drive Strength Register 1 */
-> +	#define PIO_DRIVER2  PIO_DRIVER2_V2  /* Drive Strength Register 2 */
-> +#elif defined(CONFIG_SOC_AT91SAM9X5) || defined(SOC_AT91SAM9G35) || defined(SOC_AT91SAM9G25)
-> +	#define PIO_DRIVER1  PIO_DRIVER1_V1  /* Drive Strength Register 1 */
-> +	#define PIO_DRIVER2  PIO_DRIVER2_V1  /* Drive Strength Register 2 */
-> +#endif
-no ifdef this is choose at runtime
-> +
-> +#if defined(PIO_DRIVER1) && defined(PIO_DRIVER2)
-> +	#define PIO_DRIVER(pin)\
-> +		((pin > NUM_PINS_PER_DRIVE_STRENGTH_REG-1) ? PIO_DRIVER2 : PIO_DRIVER1)
-> +#endif
-use inline function
-> +
->  /**
->   * struct at91_pmx_func - describes AT91 pinmux functions
->   * @name: the name of this specific function
-> @@ -148,6 +175,8 @@ struct at91_pinctrl_mux_ops {
->  	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool is_on);
->  	bool (*get_debounce)(void __iomem *pio, unsigned pin, u32 *div);
->  	void (*set_debounce)(void __iomem *pio, unsigned mask, bool is_on, u32 div);
-> +	int (*get_drivestrength)(void __iomem *pio, unsigned pin);
-> +	void (*set_drivestrength)(void __iomem *pio, unsigned pin, u32 strength);
->  	bool (*get_pulldown)(void __iomem *pio, unsigned pin);
->  	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
->  	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
-> @@ -462,6 +491,20 @@ static void at91_mux_pio3_set_pulldown(void __iomem *pio, unsigned mask, bool is
->  	__raw_writel(mask, pio + (is_on ? PIO_PPDER : PIO_PPDDR));
->  }
->  
-> +static int at91_mux_pio3_get_drivestrength(void __iomem *pio, unsigned pin)
+> +static int
+> +qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
 > +{
-> +    return (__raw_readl(pio + PIO_DRIVER(pin)) >> TWO_BIT_PIN_TO_SHIFT(pin)) & DRIVE_STRENGTH_MASK;
+> +	int retries = 0;
+> +	u32 state;
+> +
+> +	do {
+> +		state = readl(qup->base + QUP_STATE);
+> +
+> +		/*
+> +		 * If only valid bit needs to be checked, requested state is
+> +		 * 'don't care'
+> +		 */
+> +		if (state & QUP_STATE_VALID) {
+> +			if (only_valid)
+> +				return 0;
+> +			if ((req_state & QUP_I2C_MAST_GEN)
+> +			    && (state & QUP_I2C_MAST_GEN))
+> +				return 0;
+> +			if ((state & QUP_STATE_MASK) == req_state)
+> +				return 0;
+> +		}
+> +
+> +		udelay(1);
+> +	} while (retries++ != QUP_MAX_QUP_STATE_RETRIES);
+> +
+> +	return -ETIMEDOUT;
 > +}
 > +
-> +static void at91_mux_pio3_set_drivestrength(void __iomem *pio, unsigned pin, u32 strength)
-> +{
-> +    unsigned tmp = __raw_readl(pio + PIO_DRIVER(pin));
-> +    tmp &= ~TWO_BIT_PIN_TO_MASK(pin);
-> +    tmp |= strength << TWO_BIT_PIN_TO_SHIFT(pin);
-> +
-> +    __raw_writel(tmp, pio + PIO_DRIVER(pin));
-> +}
-> +
->  static void at91_mux_pio3_disable_schmitt_trig(void __iomem *pio, unsigned mask)
->  {
->  	__raw_writel(__raw_readl(pio + PIO_SCHMITT) | mask, pio + PIO_SCHMITT);
-> @@ -491,6 +534,8 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
->  	.set_deglitch	= at91_mux_pio3_set_deglitch,
->  	.get_debounce	= at91_mux_pio3_get_debounce,
->  	.set_debounce	= at91_mux_pio3_set_debounce,
-> +	.get_drivestrength = at91_mux_pio3_get_drivestrength,
-> +	.set_drivestrength = at91_mux_pio3_set_drivestrength,
->  	.get_pulldown	= at91_mux_pio3_get_pulldown,
->  	.set_pulldown	= at91_mux_pio3_set_pulldown,
->  	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
-> @@ -736,6 +781,8 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
->  		*config |= DEGLITCH;
->  	if (info->ops->get_debounce && info->ops->get_debounce(pio, pin, &div))
->  		*config |= DEBOUNCE | (div << DEBOUNCE_VAL_SHIFT);
-> +	if (info->ops->get_drivestrength)
-> +		*config |= DRIVE_STRENGTH | (info->ops->get_drivestrength(pio, pin) << DRIVE_STRENGTH_SHIFT);
->  	if (info->ops->get_pulldown && info->ops->get_pulldown(pio, pin))
->  		*config |= PULL_DOWN;
->  	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
-> @@ -753,6 +800,7 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
->  	void __iomem *pio;
->  	int i;
->  	unsigned long config;
-> +	unsigned pin;
->  
->  	for (i = 0; i < num_configs; i++) {
->  		config = configs[i];
-> @@ -761,7 +809,8 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
->  			"%s:%d, pin_id=%d, config=0x%lx",
->  			__func__, __LINE__, pin_id, config);
->  		pio = pin_to_controller(info, pin_to_bank(pin_id));
-> -		mask = pin_to_mask(pin_id % MAX_NB_GPIO_PER_BANK);
-> +		pin = pin_id % MAX_NB_GPIO_PER_BANK;
-> +		mask = pin_to_mask(pin);
->  
->  		if (config & PULL_UP && config & PULL_DOWN)
->  			return -EINVAL;
-> @@ -773,6 +822,9 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
->  		if (info->ops->set_debounce)
->  			info->ops->set_debounce(pio, mask, config & DEBOUNCE,
->  				(config & DEBOUNCE_VAL) >> DEBOUNCE_VAL_SHIFT);
-> +		if (info->ops->set_drivestrength && config & SET_DRIVE_STRENGTH)
-> +			info->ops->set_drivestrength(pio, pin,
-> +				(config & DRIVE_STRENGTH) >> DRIVE_STRENGTH_SHIFT);
->  		if (info->ops->set_pulldown)
->  			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
->  		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
-> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
-> index 0fee6ff..78621a4 100644
-> --- a/include/dt-bindings/pinctrl/at91.h
-> +++ b/include/dt-bindings/pinctrl/at91.h
-> @@ -20,6 +20,19 @@
->  
->  #define AT91_PINCTRL_PULL_UP_DEGLITCH	(AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
->  
-> +#define AT91_PINCTRL_SET_DRIVE_STRENGTH  (1 << 5)
-> +
-> +#if defined(CONFIG_SOC_SAMA5D3)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_LOW	(0x2 << 6)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_MED	(0x1 << 6)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_HI	(0x0 << 6)
-> +#elif defined(CONFIG_SOC_AT91SAM9X5) || defined(SOC_AT91SAM9G35) || defined(SOC_AT91SAM9G25)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_LOW	(0x1 << 6)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_MED	(0x2 << 6)
-> +	#define AT91_PINCTRL_DRIVE_STRENGTH_HI	(0x3 << 6)
-> +#endif
 
-no only one binding we do not care of the IP details
+This is what I was suggesting. Don't know if it's any clearer,
+but it saves us a whopping 3 lines!
 
-0 means no drive strength specified
-> +
-> +
->  #define AT91_PIOA	0
->  #define AT91_PIOB	1
->  #define AT91_PIOC	2
-> -- 
-> 1.7.10.4
-> 
-> 
-> 
-> 
-> -- 
-> Mark
-> 
-> 
+---8<----
+ drivers/i2c/busses/i2c-qup.c | 43 ++++++++++++++++++++-----------------------
+ 1 file changed, 20 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 2e0020e829ae..431de13f6281 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -47,7 +47,7 @@
+ #define QUP_STATE_MASK		3
+ 
+ #define QUP_STATE_VALID		BIT(2)
+-#define QUP_I2C_MAST_GEN	BIT(4)
++#define QUP_I2C_MAST_GEN	(QUP_STATE_VALID | BIT(4))
+ 
+ #define QUP_OPERATIONAL_RESET	0x000ff0
+ #define QUP_I2C_STATUS_RESET	0xfffffc
+@@ -190,43 +190,40 @@ done:
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int
+-qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 req_state, bool only_valid)
++static int __qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 mask, u32 value)
+ {
+ 	int retries = 0;
+ 	u32 state;
+ 
+ 	do {
+ 		state = readl(qup->base + QUP_STATE);
+-
+-		/*
+-		 * If only valid bit needs to be checked, requested state is
+-		 * 'don't care'
+-		 */
+-		if (state & QUP_STATE_VALID) {
+-			if (only_valid)
+-				return 0;
+-			if ((req_state & QUP_I2C_MAST_GEN)
+-			    && (state & QUP_I2C_MAST_GEN))
+-				return 0;
+-			if ((state & QUP_STATE_MASK) == req_state)
+-				return 0;
+-		}
+-
++		if ((state & mask) == value)
++			return 0;
+ 		udelay(1);
+ 	} while (retries++ != QUP_MAX_QUP_STATE_RETRIES);
+ 
+ 	return -ETIMEDOUT;
+ }
+ 
++static int qup_i2c_poll_state_bit(struct qup_i2c_dev *qup, u32 mask)
++{
++	return __qup_i2c_poll_state(qup, mask, mask);
++}
++
++static int qup_i2c_poll_state(struct qup_i2c_dev *qup, u32 state)
++{
++	return __qup_i2c_poll_state(qup, QUP_STATE_VALID | QUP_STATE_MASK,
++					 QUP_STATE_VALID | state);
++}
++
+ static int qup_i2c_change_state(struct qup_i2c_dev *qup, u32 state)
+ {
+-	if (qup_i2c_poll_state(qup, 0, true) != 0)
++	if (qup_i2c_poll_state_bit(qup, QUP_STATE_VALID) != 0)
+ 		return -EIO;
+ 
+ 	writel(state, qup->base + QUP_STATE);
+ 
+-	if (qup_i2c_poll_state(qup, state, false) != 0)
++	if (qup_i2c_poll_state(qup, state) != 0)
+ 		return -EIO;
+ 	return 0;
+ }
+@@ -616,7 +613,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 		goto out;
+ 
+ 	writel(1, qup->base + QUP_SW_RESET);
+-	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE, false);
++	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE);
+ 	if (ret) {
+ 		dev_err(qup->dev, "cannot goto reset state\n");
+ 		goto out;
+@@ -633,7 +630,7 @@ qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 		writel(0, qup->base + QUP_I2C_CLK_CTL);
+ 		writel(QUP_I2C_STATUS_RESET, qup->base + QUP_I2C_STATUS);
+ 
+-		if (qup_i2c_poll_state(qup, QUP_I2C_MAST_GEN, false) != 0) {
++		if (qup_i2c_poll_state_bit(qup, QUP_I2C_MAST_GEN) != 0) {
+ 			ret = -EIO;
+ 			goto out;
+ 		}
+@@ -730,7 +727,7 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 	 * so we reset the core before registering for interrupts.
+ 	 */
+ 	writel(1, qup->base + QUP_SW_RESET);
+-	ret = qup_i2c_poll_state(qup, 0, true);
++	ret = qup_i2c_poll_state(qup, QUP_STATE_VALID);
+ 	if (ret)
+ 		goto fail;
+ 
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
