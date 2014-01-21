@@ -1,50 +1,48 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:57:07 +0200
-Subject: [PATCHv3 35/41] Doc/DT: Add DT binding documentation for DVI Connector
+Date: Tue, 21 Jan 2014 12:57:08 +0200
+Subject: [PATCHv3 36/41] Doc/DT: Add DT binding documentation for HDMI
+ Connector
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-36-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-37-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for DVI Connector.
+Add DT binding documentation for HDMI Connector.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
+ .../devicetree/bindings/video/hdmi-connector.txt   | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
 
-diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
+diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
 new file mode 100644
-index 000000000000..6a0aff866c78
+index 000000000000..5d25f6a432bb
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
-@@ -0,0 +1,26 @@
-+DVI Connector
++++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+@@ -0,0 +1,23 @@
++HDMI Connector
 +==============
 +
 +Required properties:
-+- compatible: "dvi-connector"
++- compatible: "hdmi-connector"
 +
 +Optional properties:
 +- label: a symbolic name for the connector
-+- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
 +
 +Required nodes:
-+- Video port for DVI input
++- Video port for HDMI input
 +
 +Example
 +-------
 +
-+dvi0: connector at 0 {
-+	compatible = "dvi-connector";
-+	label = "dvi";
++hdmi0: connector at 1 {
++	compatible = "hdmi-connector";
++	label = "hdmi";
 +
-+	i2c-bus = <&i2c3>;
-+
-+	dvi_connector_in: endpoint {
-+		remote-endpoint = <&tfp410_out>;
++	hdmi_connector_in: endpoint {
++		remote-endpoint = <&tpd12s015_out>;
 +	};
 +};
 -- 
