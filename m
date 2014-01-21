@@ -1,127 +1,48 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:57:02 +0200
-Subject: [PATCHv3 30/41] ARM: omap3-n900.dts: add display information
+Date: Tue, 21 Jan 2014 12:57:06 +0200
+Subject: [PATCHv3 34/41] Doc/DT: Add DT binding documentation for Analog TV
+ Connector
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-31-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-35-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT data for OMAP3 N900 board. The board has the following displays:
-
-lcd: LCD panel connected to OMAP's SDI output
-tv: analog svideo
+Add DT binding documentation for Analog TV Connector.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 70 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 66 insertions(+), 4 deletions(-)
+ .../bindings/video/analog-tv-connector.txt         | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/analog-tv-connector.txt
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 6fc85f963530..c1bb04d55d4b 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -74,6 +74,14 @@
- 		};
- 	};
- 
-+	tv: connector {
-+		compatible = "composite-connector";
-+		label = "tv";
+diff --git a/Documentation/devicetree/bindings/video/analog-tv-connector.txt b/Documentation/devicetree/bindings/video/analog-tv-connector.txt
+new file mode 100644
+index 000000000000..d6be373d8705
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/analog-tv-connector.txt
+@@ -0,0 +1,23 @@
++Analog TV Connector
++===================
 +
-+		tv_connector_in: endpoint {
-+			remote-endpoint = <&venc_out>;
-+		};
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -140,11 +148,23 @@
- 		>;
- 	};
- 
--	display_pins: pinmux_display_pins {
-+	acx565akm_pins: pinmux_acx565akm_pins {
- 		pinctrl-single,pins = <
- 			0x0d4 (PIN_OUTPUT | MUX_MODE4)		/* RX51_LCD_RESET_GPIO */
- 		>;
- 	};
++Required properties:
++- compatible: "composite-connector" or "svideo-connector"
 +
-+	dss_sdi_pins: pinmux_dss_sdi_pins {
-+		pinctrl-single,pins = <
-+			0x0c0 (PIN_OUTPUT | MUX_MODE1)   /* dss_data10.sdi_dat1n */
-+			0x0c2 (PIN_OUTPUT | MUX_MODE1)   /* dss_data11.sdi_dat1p */
-+			0x0c4 (PIN_OUTPUT | MUX_MODE1)   /* dss_data12.sdi_dat2n */
-+			0x0c6 (PIN_OUTPUT | MUX_MODE1)   /* dss_data13.sdi_dat2p */
++Optional properties:
++- label: a symbolic name for the connector
 +
-+			0x0d8 (PIN_OUTPUT | MUX_MODE1)   /* dss_data22.sdi_clkp */
-+			0x0da (PIN_OUTPUT | MUX_MODE1)   /* dss_data23.sdi_clkn */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -471,13 +491,21 @@
- 		spi-max-frequency = <6000000>;
- 		reg = <0>;
- 	};
--	mipid at 2 {
--		compatible = "acx565akm";
++Required nodes:
++- Video port for TV input
 +
-+	acx565akm at 2 {
-+		compatible = "sony,acx565akm";
- 		spi-max-frequency = <6000000>;
- 		reg = <2>;
- 
- 		pinctrl-names = "default";
--		pinctrl-0 = <&display_pins>;
-+		pinctrl-0 = <&acx565akm_pins>;
++Example
++-------
 +
-+		label = "lcd";
-+		gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
++tv: connector {
++	compatible = "composite-connector";
++	label = "tv";
 +
-+		lcd_in: endpoint {
-+			remote-endpoint = <&sdi_out>;
-+		};
- 	};
- };
- 
-@@ -503,3 +531,37 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
- };
-+
-+&dss {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_sdi_pins>;
-+
-+	vdds_sdi-supply = <&vaux1>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			sdi_out: endpoint {
-+				remote-endpoint = <&lcd_in>;
-+				datapairs = <2>;
-+			};
-+		};
-+	};
-+};
-+
-+&venc {
-+	status = "ok";
-+
-+	vdda-supply = <&vdac>;
-+
-+	venc_out: endpoint {
-+		remote-endpoint = <&tv_connector_in>;
-+		ti,channels = <1>;
++	tv_connector_in: endpoint {
++		remote-endpoint = <&venc_out>;
 +	};
 +};
 -- 
