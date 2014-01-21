@@ -1,72 +1,92 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Jan 2014 12:02:14 +0000
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com>
- <20140115161224.GH25824@e106331-lin.cambridge.arm.com>
- <20140120224742.EC905C40B12@trevor.secretlab.ca>
- <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-Message-ID: <20140121120214.GK28747@e106331-lin.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 21 Jan 2014 12:08:02 +0000
+Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <20140121110826.GG30706@mudshark.cambridge.arm.com>
+References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140109103004.GB11089@mudshark.cambridge.arm.com>
+ <201401091204.17932.arnd@arndb.de>
+ <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
+ <20140109184251.GL17838@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
+ <20140116193123.GB22105@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
+ <20140121110826.GG30706@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1401211207080.21510@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 01:03:23AM +0000, Olof Johansson wrote:
-> On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >
-> >> > Another, more invasive option would be extend the dts syntax and teach
-> >> > dtc to handle property appending. Then the soc dts could stay as it is,
-> >> > and the board dts could have something like:
-> >> >
-> >> >     /append-property/ interrupts = <&intc1 6 1>;
-> >> >     /append-property/ interrupt-names = "board-specific-irq";
-> >> >
-> >> > Both these options solve the issue at the source, are general to other
-> >> > properties, and allow more than one level of hierarchy (the proposed
-> >> > interrupts-extended-2 only allows one level).
-> >>
-> >> I've just had a go at implementing the append-property mechanism above
-> >> in dtc, and it was far easier than I expected (patch below).
-> >>
-> >> Does anyone have any issues with the /append-property/ idea?
-> >
-> > I think that is reasonable.
+On Tue, 21 Jan 2014, Will Deacon wrote:
+> On Mon, Jan 20, 2014 at 03:32:48PM +0000, Stefano Stabellini wrote:
+> > On Thu, 16 Jan 2014, Will Deacon wrote:
+> > > For the xchg part, yes, that looks a lot better. I don't like the #undef
+> > > CONFIG_CPU_V6 though, can that be rewritten to use __LINUX_ARM_ARCH__?
+> > 
+> > The problem is that the 1 and 2 byte parameter size cases in __cmpxchg
+> > are ifdef'ed CONFIG_CPU_V6 but drivers/xen/grant-table.c needs them.
+> > 
+> > So we can either undef CONFIG_CPU_V6 in grant-table.c or call a
+> > different function.
+> > 
+> > If I switch from ifdef CONFIG_CPU_V6 to if __LINUX_ARM_ARCH__ > 6 in
+> > __cmpxchg, we still have the problem that if __LINUX_ARM_ARCH__ == 6,
+> > grant-table.c doesn't compile.
+> > 
+> > Maybe the approach taken by the other patch for cmpxchg is better, see
+> > below.
 > 
+> Yes, I prefer this approach. Minor comment below.
 > 
-> The main problem with this (same for clocks) is if you need to append
-> something with a name when the original didn't have any.
-
-Can you not just add a name in the original file? I assume we're not
-going to use this to adjust dts files we're not already in full control
-of.
-
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index c1f1a7e..ae54ae0 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1881,8 +1881,7 @@ config XEN_DOM0
+> >  config XEN
+> >  	bool "Xen guest support on ARM (EXPERIMENTAL)"
+> >  	depends on ARM && AEABI && OF
+> > -	depends on CPU_V7 && !CPU_V6
+> > -	depends on !GENERIC_ATOMIC64
+> > +	depends on CPU_V7
+> >  	select ARM_PSCI
+> >  	select SWIOTLB_XEN
+> >  	help
+> > diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> > index df2fbba..cc8a4a2 100644
+> > --- a/arch/arm/include/asm/cmpxchg.h
+> > +++ b/arch/arm/include/asm/cmpxchg.h
+> > @@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
+> >   * cmpxchg only support 32-bits operands on ARMv6.
+> >   */
+> >  
+> > +static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
+> > +				      unsigned long new)
+> > +{
+> > +	unsigned long oldval, res;
+> > +
+> > +	do {
+> > +		asm volatile("@ __cmpxchg1\n"
+> > +		"	ldrexb	%1, [%2]\n"
+> > +		"	mov	%0, #0\n"
+> > +		"	teq	%1, %3\n"
+> > +		"	strexbeq %0, %4, [%2]\n"
+> > +			: "=&r" (res), "=&r" (oldval)
+> > +			: "r" (ptr), "Ir" (old), "r" (new)
+> > +			: "memory", "cc");
+> > +	} while (res);
+> > +
+> > +	return oldval;
+> > +}
+> > +
+> > +static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
+> > +				      unsigned long new)
+> > +{
+> > +	unsigned long oldval, res;
+> > +
+> > +	do {
+> > +		asm volatile("@ __cmpxchg1\n"
 > 
-> Reordering entries might not work for interrupts, since the bindings
-> might have requirements on order.
+> Can you fix this comment while you're here please?
 
-That's a fair point.
-
-Do we currently have any optional/board-specific interrupts which must
-appear at the start or middle of the list?
-
-For those, could we add names? The kernel should be abel to fall back to
-ordering if names aren't present, and we can recommend a particular
-ordering for compatiblity with older kernels.
-
-As a general preventative measure it would be nice to have named
-elements whenever elements can be optional.
-
-> 
-> I'm not aware of a good solution for this. Suggestions welcome.
-
-Me neither. Prepending and appending is easy.
-
-Inserting and/or modifying the list requires knowledge of the size of
-each element (and for variable-sized entries requires knowledge of the
-particular binding, which we cannot embed in dtc). 
-
-I suspect adding richer syntax for modifying properties in arbitrary
-ways will devolve into a turing tarpit.
-
-Thanks,
-Mark.
+OK, I'll use @ __cmpxchg16 and @ __cmpxchg8.
+I'll resend as a separate patch.
