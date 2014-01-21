@@ -1,57 +1,47 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 21 Jan 2014 19:10:13 +0900
-Subject: [PATCH 2/5] ARM: trusted_foundations: fallback when TF support is
- missing
+Date: Tue, 21 Jan 2014 19:10:14 +0900
+Subject: [PATCH 3/5] ARM: firmware: enable Trusted Foundations by default
 In-Reply-To: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
 References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1390299016-14105-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <1390299016-14105-4-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Trusted Foundations is detected as present on the system, but
-Trusted Foundations support is not built into the kernel, the kernel
-used to issue a panic very early during boot, leaving little clue to the
-user as to what is going wrong.
+As discussed previously (https://lkml.org/lkml/2013/11/26/289), enable
+Trusted Foundation support by default since it already depends on a
+supporting architecture being selected.
 
-It turns out that even without TF support built-in, the kernel can boot
-on a TF-enabled system provided that SMP and cpuidle are disabled. This
-patch does this and continue booting on one CPU, leaving the user with a
-usable (however degraded) system.
+Doing so allows us to remove it from tegra_defconfig.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/include/asm/trusted_foundations.h | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/configs/tegra_defconfig | 1 -
+ arch/arm/firmware/Kconfig        | 1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index 997862fd5d77..b5f7705abcb0 100644
---- a/arch/arm/include/asm/trusted_foundations.h
-+++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -30,6 +30,8 @@
- #include <linux/printk.h>
- #include <linux/bug.h>
- #include <linux/of.h>
-+#include <linux/cpu.h>
-+#include <linux/smp.h>
- 
- struct trusted_foundations_platform_data {
- 	unsigned int version_major;
-@@ -47,10 +49,13 @@ static inline void register_trusted_foundations(
- 				   struct trusted_foundations_platform_data *pd)
- {
- 	/*
--	 * If we try to register TF, this means the system needs it to continue.
--	 * Its absence if thus a fatal error.
-+	 * If the system requires TF and we cannot provide it, continue booting
-+	 * but disable features that cannot be provided.
- 	 */
--	panic("No support for Trusted Foundations, stopping...\n");
-+	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
-+	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
-+	setup_max_cpus = 0;
-+	cpu_idle_poll_ctrl(true);
- }
- 
- static inline void of_register_trusted_foundations(void)
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 5fdc9a09d339..e38653876541 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -33,7 +33,6 @@ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_PCIEPORTBUS=y
+-CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
+index bb126594995e..ad396af68e47 100644
+--- a/arch/arm/firmware/Kconfig
++++ b/arch/arm/firmware/Kconfig
+@@ -11,6 +11,7 @@ menu "Firmware options"
+ config TRUSTED_FOUNDATIONS
+ 	bool "Trusted Foundations secure monitor support"
+ 	depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
++	default y
+ 	help
+ 	  Some devices (including most Tegra-based consumer devices on the
+ 	  market) are booted with the Trusted Foundations secure monitor
 -- 
 1.8.5.3
