@@ -1,221 +1,141 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Tue, 21 Jan 2014 16:45:19 +0530
-Subject: [PATCH v2 5/7] clk: exynos: use cpu-clock provider type to
- represent arm clock
-In-Reply-To: <20140121113855.3875555d@amdc2363>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-6-git-send-email-thomas.ab@samsung.com>
- <20140120084721.7f0050ea@amdc2363>
- <CAJuA9ajQWStgtFHDshM8PgRwizndzyTuRqvBNwh6GT4m-Exj6A@mail.gmail.com>
- <20140121113855.3875555d@amdc2363>
-Message-ID: <CAJuA9agR182H1NPj8N6TmBhBvKEk=QvKqNa_7T95SA5GxqQXGg@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 21 Jan 2014 12:16:46 +0100
+Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+Hi Lorenzo,
 
-On Tue, Jan 21, 2014 at 4:08 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Hi Thomas,
+On 20 January 2014 18:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> ARM based platforms implement a variety of power management schemes that
+> allow processors to enter at run-time low-power states, aka C-states
+> in ACPI jargon. The parameters defining these C-states vary on a per-platform
+> basis forcing the OS to hardcode the state parameters in platform
+> specific static tables whose size grows as the number of platforms supported
+> in the kernel increases and hampers device drivers standardization.
 >
->> On Mon, Jan 20, 2014 at 1:17 PM, Lukasz Majewski
->> <l.majewski@samsung.com> wrote:
->> > Hi Thomas,
->> >
->> >> From: Thomas Abraham <thomas.ab@samsung.com>
->> >>
->> >> With the addition of the new Samsung specific cpu-clock type, the
->> >> arm clock can be represented as a cpu-clock type and the
->> >> independent clock blocks that made up the arm clock can be removed.
->> >>
->> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> >> ---
->> >>  .../devicetree/bindings/clock/exynos5250-clock.txt |    1 +
->> >>  drivers/clk/samsung/clk-exynos4.c                  |   11
->> >> +++++------ drivers/clk/samsung/clk-exynos5250.c
->> >> |    8 ++++---- include/dt-bindings/clock/exynos5250.h
->> >> |    1 + 4 files changed, 11 insertions(+), 10 deletions(-)
->> >>
->> >> diff --git
->> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
->> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
->> >> index 99eae9c..acf867a 100644 ---
->> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt +++
->> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt @@
->> >> -38,6 +38,7 @@ clock which they consume.
->> >> ---------------------------- fin_pll            1
->> >> +  armclk             12
->> >>
->> >>    [Clock Gate for Special Clocks]
->> >>
->> >> diff --git a/drivers/clk/samsung/clk-exynos4.c
->> >> b/drivers/clk/samsung/clk-exynos4.c index 010f071..efcf4a3 100644
->> >> --- a/drivers/clk/samsung/clk-exynos4.c
->> >> +++ b/drivers/clk/samsung/clk-exynos4.c
->> >> @@ -437,8 +437,6 @@ static struct samsung_mux_clock
->> >> exynos4x12_mux_clks[] __initdata = {
->> >>  /* list of divider clocks supported in all exynos4 soc's */
->> >>  static struct samsung_div_clock exynos4_div_clks[] __initdata = {
->> >> -     DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
->> >> -     DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
->> >>       DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
->> >>       DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
->> >>       DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
->> >> @@ -484,8 +482,8 @@ static struct samsung_div_clock
->> >> exynos4_div_clks[] __initdata = { DIV(0, "div_spi_pre2",
->> >> "div_spi2", DIV_PERIL2, 8, 8), DIV(0, "div_audio1", "mout_audio1",
->> >> DIV_PERIL4, 0, 4), DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4,
->> >> 16, 4),
->> >> -     DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
->> >> -     DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
->> >> 3),
->> >> +     DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
->> >> 3,
->> >> +                     CLK_GET_RATE_NOCACHE, 0),
->> >>       DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
->> >>                       CLK_SET_RATE_PARENT, 0),
->> >>       DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
->> >> @@ -870,7 +868,6 @@ static struct samsung_gate_clock
->> >> exynos4x12_gate_clks[] __initdata = {
->> >>  static struct samsung_clock_alias exynos4_aliases[] __initdata = {
->> >>       ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
->> >> -     ALIAS(CLK_ARM_CLK, NULL, "armclk"),
->> >>       ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
->> >>  };
->> >>
->> >> @@ -1125,12 +1122,14 @@ static void __init exynos4_clk_init(struct
->> >> device_node *np, samsung_clk_register_alias(exynos4_aliases,
->> >>                       ARRAY_SIZE(exynos4_aliases));
->> >>
->> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
->> >> reg_base); +
->> >
->> > I've got some doubts about allowing only the "mout_apll" clock to
->> > be the only parent for armclk Samsung clock.
->> >
->> > For the Exynos4412 it is also valid to have SCLK_MPLL_USER_C [*] as
->> > a parent for this clock.
->> >
->> > The problem is that you are reparenting the armclk to [*] with the
->> > register modification - no CCF involved.
->>
->> The MUX_CORE mux is part of the larger cpu clock type and not
->> registered as a separate mux clock with CCF. So I would like to know
->> if there are any potential issues you see if this mux clock is
->> internally managed within the set_rate of the larger cpu clock type.
+> Therefore, this patch aims at standardizing C-state device tree bindings for
+> ARM platforms. Bindings define C-state parameters inclusive of entry methods
+> and state latencies, to allow operating systems to retrieve the
+> configuration entries from the device tree and initialize the related
+> power management drivers, paving the way for common code in the kernel
+> to deal with power states and removing the need for static data in current
+> and previous kernel versions.
 >
-> So the large opaque clock (armclk) starts with inputs to MUX_CORE (and
-> embrace this MUX as well)?
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/c-states.txt | 774 +++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+>  2 files changed, 784 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/c-states.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/c-states.txt b/Documentation/devicetree/bindings/arm/c-states.txt
+> new file mode 100644
+> index 0000000..0b5617b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/c-states.txt
+> @@ -0,0 +1,774 @@
+> +==========================================
+> +ARM C-states binding description
+> +==========================================
+> +
+> +==========================================
+> +1 - Introduction
+> +==========================================
+> +
+> +ARM systems contain HW capable of managing power consumption dynamically,
+> +where cores can be put in different low-power states (ranging from simple
+> +wfi to power gating) according to OSPM policies. Borrowing concepts
+> +from the ACPI specification[1], the CPU states representing the range of
+> +dynamic states that a processor can enter at run-time, aka C-state, can be
+> +specified through device tree bindings representing the parameters required to
+> +enter/exit specific C-states on a given processor.
+> +
+> +The state an ARM CPU can be put into is loosely identified by one of the
+> +following operating modes:
+> +
+> +- Running:
+> +        # Processor core is executing instructions
+> +
+> +- Wait for Interrupt:
+> +       # An ARM processor enters wait for interrupt (WFI) low power
+> +         state by executing a wfi instruction. When a processor enters
+> +         wfi state it disables most of the clocks while keeping the processor
+> +         powered up. This state is standard on all ARM processors and it is
+> +         defined as C1 in the remainder of this document.
+> +
 
-Yes, the MUX_CORE is now part of the large opaque clock and will only
-use mout_apll as the parent clock. The other parent will be used
-temporarily only when the frequency of the mout_apll (leading to APLL)
-has to be changed.
+> +- Dormant:
+> +       # Dormant mode is entered by executing wfi instructions and by sending
+> +         platform specific commands to the platform power controller (coupled
+> +         with processor specific SW/HW control sequences).
+> +         In dormant mode, most of the processor control and debug logic is
+> +         powered up but cache RAM can be put in retention state, providing
 
->
-> If yes, then I don't mind if it is solely managed inside the armclk.
->
-> This however allows the armclk to be fed from mout_apll[*] and
-> sclk_mpll__user_c[**]. And this would be nice if reflected in the code.
+Base on your description, it's not clear for me what is on, what is
+lost and what is power down ?
+My understand of the dormant mode that you described above is : the
+cache is preserved (and especially the cache RAM) but the processor
+state is lost (registers ...). Do I understand correctly ?
 
-Okay.
+What about retention mode where the contents of processor and cache
+are preserved but the power consumption is reduced ? it can be seen as
+a special wfi mode which need specific SW/HW control sequences but i'm
+not sure to understand how to describe such state with your proposal.
 
->
->>
->> >
->> > I just would like to know if this is yours design decision or
->> > something, that we have overlooked in the v1 of this patch series.
->>
->> I did overlook this one. This will be fixed in the next version by
->> ensuring that the dividers for SCLK_HPM clock will be updated only if
->> mout_apll is the parent of the MUX_HPM clock mux.
->
-> Shall not they be updated if whatever connected to the MUX_HPM
-> ([*] and [**]) changes?
+> +         additional power savings.
+> +
+> +- Sleep:
+> +       # Sleep mode is entered by executing the wfi instruction and by sending
+> +         platform specific commands to the platform power controller (coupled
+> +         with processor specific SW/HW control sequences). In sleep mode, a
+> +         processor and its caches are shutdown, the entire processor state is
+> +         lost.
+> +
+> +Building on top of the previous processor modes, ARM platforms implement power
+> +management schemes that allow an OS PM implementation to put the processor in
+> +different CPU states (C-states). C-states parameters (eg latency) are
+> +platform specific and need to be characterized with bindings that provide the
+> +required information to OSPM code so that it can build the required tables and
+> +use them at runtime.
+> +
+> +The device tree binding definition for ARM C-states is the subject of this
+> +document.
+> +
 
-They will be updated if their parent is mout_apll. If their parent is
-a MPLL sourced clock, the divider will not be updated since the set
-rate on this opaque clock will not change the frequency of the MPLL
-sourced clock.
+[snip]
 
-Thanks,
-Thomas.
+> +
+> +       - psci-power-state
+> +               Usage: Required if entry-method property value is set to
+> +                      "psci".
+> +               Value type: <u32>
+> +               Definition: power_state parameter to pass to the PSCI
+> +                           suspend call to enter the C-state.
 
->
->>
->> Thanks,
->> Thomas.
->>
->> >
->> >>       pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
->> >>               "\tsclk_epll = %ld, sclk_vpll = %ld, arm_clk =
->> >> %ld\n", exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
->> >>               _get_rate("sclk_apll"),
->> >> _get_rate("sclk_mpll"), _get_rate("sclk_epll"),
->> >> _get_rate("sclk_vpll"),
->> >> -             _get_rate("arm_clk"));
->> >> +             _get_rate("armclk"));
->> >>  }
->> >>
->> >>
->> >> diff --git a/drivers/clk/samsung/clk-exynos5250.c
->> >> b/drivers/clk/samsung/clk-exynos5250.c index ff4beeb..487be36
->> >> 100644 --- a/drivers/clk/samsung/clk-exynos5250.c
->> >> +++ b/drivers/clk/samsung/clk-exynos5250.c
->> >> @@ -298,9 +298,8 @@ static struct samsung_div_clock
->> >> exynos5250_div_clks[] __initdata = { /*
->> >>        * CMU_CPU
->> >>        */
->> >> -     DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
->> >> -     DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
->> >> -     DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3, "armclk"),
->> >> +     DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
->> >> +                     CLK_GET_RATE_NOCACHE, 0),
->> >>
->> >>       /*
->> >>        * CMU_TOP
->> >> @@ -684,8 +683,9 @@ static void __init exynos5250_clk_init(struct
->> >> device_node *np) ARRAY_SIZE(exynos5250_div_clks));
->> >>       samsung_clk_register_gate(exynos5250_gate_clks,
->> >>                       ARRAY_SIZE(exynos5250_gate_clks));
->> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
->> >> reg_base);
->> >>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
->> >> -                     _get_rate("div_arm2"));
->> >> +                     _get_rate("armclk"));
->> >>  }
->> >>  CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock",
->> >> exynos5250_clk_init); diff --git
->> >> a/include/dt-bindings/clock/exynos5250.h
->> >> b/include/dt-bindings/clock/exynos5250.h index 922f2dc..59a10fb
->> >> 100644 --- a/include/dt-bindings/clock/exynos5250.h +++
->> >> b/include/dt-bindings/clock/exynos5250.h @@ -21,6 +21,7 @@
->> >>  #define CLK_FOUT_CPLL                6
->> >>  #define CLK_FOUT_EPLL                7
->> >>  #define CLK_FOUT_VPLL                8
->> >> +#define CLK_ARM_CLK          12
->> >>
->> >>  /* gate for special clocks (sclk) */
->> >>  #define CLK_SCLK_CAM_BAYER   128
->> >
->> >
->> >
->> > --
->> > Best regards,
->> >
->> > Lukasz Majewski
->> >
->> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> Best regards,
->
-> Lukasz Majewski
->
-> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Why psci has got a dedicated field and not vendor methods ? can't you
+make that more generic ?
+
+> +
+> +       - latency
+> +               Usage: Required
+> +               Value type: <prop-encoded-array>
+> +               Definition: List of u32 values representing worst case latency
+> +                           in microseconds required to enter and exit the
+> +                           C-state, one value per OPP [2]. The list should
+> +                           be specified in the same order as the operating
+> +                           points property list of the cpu this state is
+> +                           valid on.
+> +                           If no OPP bindings are present, the latency value
+> +                           is associated with the current OPP of CPUs in the
+> +                           system.
+> +
+
+[snip]
+
+Thanks
+Vincent
