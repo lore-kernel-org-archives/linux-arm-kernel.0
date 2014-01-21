@@ -1,33 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Jan 2014 18:10:32 +0000
-Subject: Question: about wm8904's regulator consumer nodes
-In-Reply-To: <B256D81BAE5131468A838E5D7A24364172F64369@penmbx01>
-References: <B256D81BAE5131468A838E5D7A24364172F64369@penmbx01>
-Message-ID: <20140121181032.GI17314@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Jan 2014 18:07:50 +0000
+Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20140121180750.GO30706@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 07:10:24AM +0000, Yang, Wenyou wrote:
+On Tue, Jan 21, 2014 at 01:44:24PM +0000, Stefano Stabellini wrote:
+> Remove !GENERIC_ATOMIC64 build dependency:
+> - introduce xen_atomic64_xchg
+> - use it to implement xchg_xen_ulong
+> 
+> Remove !CPU_V6 build dependency:
+> - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+>   CONFIG_CPU_V6
+> - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: arnd at arndb.de
+> CC: linux at arm.linux.org.uk
+> CC: will.deacon at arm.com
+> CC: catalin.marinas at arm.com
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> CC: xen-devel at lists.xenproject.org
 
->                                          DCVDD-supply = <&vcc_1v8_reg>;
->                                          DBVDD-supply = <&vddana_reg>;
->                                          AVDD-supply = <&vcc_1v8_reg>;
->                                          CPVDD-supply = <&vcc_1v8_reg>;
->                                          MICVDD-supply = <&vddana_reg>;
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-> 	But the power of DCVDD, DBVDD, AVDD, CPVDD and MICVDD is not supplied by any regulators, not the above regulator nodes.
+Cheers Stefano,
 
-> 	How do I deal with this case? Could you give me some advice?
-
-You should set up the supplies to point to whatever regulator is
-supplying the power.  If there are supplies on the board which are
-generated using fixed voltage regulators then you should register those
-using the fixed regulator driver.  Recent kernels are more tolerant of
-missing supplies but it's still better to be explicit if you can be.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/c4ed9767/attachment.sig>
+Will
