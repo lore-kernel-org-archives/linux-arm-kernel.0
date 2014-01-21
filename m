@@ -1,56 +1,41 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 21 Jan 2014 16:22:20 -0500
-Subject: [PATCH 17/73] arm: fix implicit module.h use in mach-at91 gpio.h
-In-Reply-To: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1390339396-3479-18-git-send-email-paul.gortmaker@windriver.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 21 Jan 2014 15:29:20 -0600
+Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
+In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <52DEE6B0.20106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently get __init_or_module from init.h (implicitly) but if
-we move that to module.h we will get failures like this:
+Tomi,
 
-In file included from /home/paul/git/linux-head/arch/arm/include/asm/gpio.h:10:0,
-                 from include/linux/gpio.h:48,
-                 from include/linux/of_gpio.h:20,
-                 from drivers/input/touchscreen/ads7846.c:30:
-arch/arm/mach-at91/include/mach/gpio.h:191:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_GPIO_periph'
-arch/arm/mach-at91/include/mach/gpio.h:192:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_A_periph'
-arch/arm/mach-at91/include/mach/gpio.h:193:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_B_periph'
-arch/arm/mach-at91/include/mach/gpio.h:194:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_C_periph'
-arch/arm/mach-at91/include/mach/gpio.h:195:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_D_periph'
-arch/arm/mach-at91/include/mach/gpio.h:196:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_gpio_input'
-arch/arm/mach-at91/include/mach/gpio.h:197:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_gpio_output'
-arch/arm/mach-at91/include/mach/gpio.h:198:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_deglitch'
-arch/arm/mach-at91/include/mach/gpio.h:199:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_debounce'
-arch/arm/mach-at91/include/mach/gpio.h:200:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_multi_drive'
-arch/arm/mach-at91/include/mach/gpio.h:201:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_set_pulldown'
-arch/arm/mach-at91/include/mach/gpio.h:202:29: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'at91_disable_schmitt_trig'
-make[3]: *** [drivers/input/touchscreen/ads7846.o] Error 1
+On 01/21/2014 04:56 AM, Tomi Valkeinen wrote:
+> Hi,
+> 
+> Here's version 3 of the DSS DT series.
+> 
+> The previous version can be found from:
+> 
+> v1: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108249
+> v2: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108866
+> 
+> The main changes to v2 are:
+> 
+> - DT Binding documentation
+> - OMAP2 DSS support
+> - Split DSI register space
+> - DSS nodes disabled by default
+> - Hack to have generic DT bindings but OMAP specific drivers (for now)
+> 
+> This series can also be found from:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt-review-3
+> 
+http://slexy.org/view/s20JhteOFR is my quick build test report -> few
+checkpatch and build bisect issues would probably need fixing.
 
-Fix it up in advance by including module.h explicitly.
 
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- arch/arm/mach-at91/include/mach/gpio.h | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-index 5fc2377..78abd64 100644
---- a/arch/arm/mach-at91/include/mach/gpio.h
-+++ b/arch/arm/mach-at91/include/mach/gpio.h
-@@ -14,6 +14,7 @@
- #define __ASM_ARCH_AT91RM9200_GPIO_H
- 
- #include <linux/kernel.h>
-+#include <linux/module.h>	/* for __init_or_module */
- #include <asm/irq.h>
- 
- #define MAX_GPIO_BANKS		5
 -- 
-1.8.4.1
+Regards,
+Nishanth Menon
