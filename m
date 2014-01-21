@@ -1,29 +1,57 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 21 Jan 2014 16:35:56 +0300
-Subject: [patch] drm/exynos: potential use after free in exynos_drm_open()
-In-Reply-To: <52DE6B8B.6080304@bfs.de>
-References: <20140121065748.GC31535@elgon.mountain> <52DE69F3.9070307@bfs.de>
- <52DE6B8B.6080304@bfs.de>
-Message-ID: <20140121133556.GY7444@mwanda>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 21 Jan 2014 14:36:56 +0100
+Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
+In-Reply-To: <20140121115706.GT15937@n2100.arm.linux.org.uk>
+References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
+ <20140120122840.36520f37@ipc1.ka-ro>
+ <20140120123627.1147f252@ipc1.ka-ro>
+ <20140120123849.GC15937@n2100.arm.linux.org.uk>
+ <20140120150902.207b9d66@ipc1.ka-ro>
+ <20140120151152.GE15937@n2100.arm.linux.org.uk>
+ <20140121075922.2a83e076@ipc1.ka-ro>
+ <20140121110107.GS15937@n2100.arm.linux.org.uk>
+ <20140121125200.6b1e96bd@ipc1.ka-ro>
+ <20140121115706.GT15937@n2100.arm.linux.org.uk>
+Message-ID: <20140121143656.3c0b96c0@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 01:43:55PM +0100, walter harms wrote:
-> 
-> i have just noticed: The function already exits
-> 
-> 194 static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
-> 195 {
-> 196         if (!file->driver_priv)
-> 197                 return;
-> 198
-> 199         kfree(file->driver_priv);
-> 200         file->driver_priv = NULL;
-> 201 }
+Hi,
 
-The function is different in the current code.  I glanced through
-drm_open_helper() and I don't see that file->driver_priv to NULL is
-needed anyway...
+Russell King - ARM Linux wrote:
+> On Tue, Jan 21, 2014 at 12:52:00PM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Russell King - ARM Linux wrote:
+> > > On Tue, Jan 21, 2014 at 07:59:22AM +0100, Lothar Wa?mann wrote:
+> > > > The file is automatically removed after the timeout has expired (or
+> > > > the frimware has been loaded).
+> > > > Thus you must check for it within the timeout period during boot.
+> > > 
+> > > ... which is impossible if imx-sdma is built into the kernel - it
+> > > expires while the initramfs has only just started running, giving a
+> > > very narrow window for userspace to load firmware.
+> > > 
+> > It works for me, but I'm not using initramfs.
+> 
+> You can take my email as a report of "it doesn't work for everyone."  The
+> *only* way I can get firmware to load is to build imx-sdma as a module.
+> Building it in is a hopeless case here.
+> 
+You could change the timeout from your initramfs as soon as sysfs has
+been mounted by writing the number of seconds to
+/sys/class/firmware/timeout. A timeout of '0' means 'wait forever' which
+should be long enough for any boot case. ;)
 
-regards,
-dan carpenter
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
