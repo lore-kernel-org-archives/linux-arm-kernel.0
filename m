@@ -1,54 +1,49 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:58 +0200
-Subject: [PATCHv3 26/41] ARM: omap4-sdp.dts: add display information
+Date: Tue, 21 Jan 2014 12:56:59 +0200
+Subject: [PATCHv3 27/41] ARM: omap3-beagle.dts: add display information
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-27-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-28-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT data for OMAP4 SDP board. The board has the following displays:
+Add DT data for OMAP3 Beagle board. The board has the following displays:
 
-lcd0: a command mode DSI panel connected to OMAP DSI1 encoder
-lcd1: a command mode DSI panel connected to OMAP DSI2 encoder
-hdmi: OMAP HDMI output with TPD12S015 ESD/level shifter
+dvi: uses TFP410 encoder to convert DPI to DVI
+tv: analog svideo
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts | 107 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 105 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap3-beagle.dts | 116 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index dbc81fb6ef03..cf9f6cbbd349 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -19,6 +19,12 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 3ba4a625ea5b..2b8efe355734 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -24,6 +24,11 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
  	};
  
 +	aliases {
-+		display0 = &lcd0;
-+		display1 = &lcd1;
-+		display2 = &hdmi0;
++		display0 = &dvi0;
++		display1 = &tv0;
 +	};
 +
- 	vdd_eth: fixedregulator-vdd-eth {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VDD_ETH";
-@@ -153,6 +159,47 @@
- 		startup-delay-us = <70000>;
- 		enable-active-high;
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pmu_stat {
+@@ -80,6 +85,55 @@
+ 		};
+ 
  	};
 +
-+	tpd12s015: encoder at 0 {
-+		compatible = "ti,tpd12s015";
++	tfp410: encoder at 0 {
++		compatible = "ti,tfp410";
++		gpios = <&gpio6 10 GPIO_ACTIVE_LOW>;	/* 170, power-down */
 +
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&tpd12s015_pins>;
-+
-+		gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,	/* 60, CT CP HPD */
-+			<&gpio2 9 GPIO_ACTIVE_HIGH>,	/* 41, LS OE */
-+			<&gpio2 31 GPIO_ACTIVE_HIGH>;	/* 63, HPD */
++		pinctrl-0 = <&tfp410_pins>;
 +
 +		ports {
 +			#address-cells = <1>;
@@ -57,101 +52,114 @@ index dbc81fb6ef03..cf9f6cbbd349 100644
 +			port at 0 {
 +				reg = <0>;
 +
-+				tpd12s015_in: endpoint at 0 {
-+					remote-endpoint = <&hdmi_out>;
++				tfp410_in: endpoint at 0 {
++					remote-endpoint = <&dpi_out>;
 +				};
 +			};
 +
 +			port at 1 {
 +				reg = <1>;
 +
-+				tpd12s015_out: endpoint at 0 {
-+					remote-endpoint = <&hdmi_connector_in>;
++				tfp410_out: endpoint at 0 {
++					remote-endpoint = <&dvi_connector_in>;
 +				};
 +			};
 +		};
 +	};
 +
-+	hdmi0: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
++	dvi0: connector at 0 {
++		compatible = "dvi-connector";
++		label = "dvi";
 +
-+		hdmi_connector_in: endpoint {
-+			remote-endpoint = <&tpd12s015_out>;
++		i2c-bus = <&i2c3>;
++
++		dvi_connector_in: endpoint {
++			remote-endpoint = <&tfp410_out>;
++		};
++	};
++
++	tv0: connector at 1 {
++		compatible = "svideo-connector";
++		label = "tv";
++
++		tv_connector_in: endpoint {
++			remote-endpoint = <&venc_out>;
 +		};
 +	};
  };
  
- &omap4_pmx_core {
-@@ -163,8 +210,6 @@
- 			&dmic_pins
- 			&mcbsp1_pins
- 			&mcbsp2_pins
--			&dss_hdmi_pins
--			&tpd12s015_pins
- 	>;
+ &omap3_pmx_wkup {
+@@ -119,6 +173,45 @@
+ 			0x170 (PIN_OUTPUT | MUX_MODE0) /* uart3_tx_irtx.uart3_tx_irtx */
+ 		>;
+ 	};
++
++	tfp410_pins: pinmux_tfp410_pins {
++		pinctrl-single,pins = <
++			0x194 (PIN_OUTPUT | MUX_MODE4)	/* hdq_sio.gpio_170 */
++		>;
++	};
++
++	dss_dpi_pins: pinmux_dss_dpi_pins {
++		pinctrl-single,pins = <
++			0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
++			0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
++			0x0a8 (PIN_OUTPUT | MUX_MODE0)   /* dss_vsync.dss_vsync */
++			0x0aa (PIN_OUTPUT | MUX_MODE0)   /* dss_acbias.dss_acbias */
++			0x0ac (PIN_OUTPUT | MUX_MODE0)   /* dss_data0.dss_data0 */
++			0x0ae (PIN_OUTPUT | MUX_MODE0)   /* dss_data1.dss_data1 */
++			0x0b0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data2.dss_data2 */
++			0x0b2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data3.dss_data3 */
++			0x0b4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data4.dss_data4 */
++			0x0b6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data5.dss_data5 */
++			0x0b8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data6.dss_data6 */
++			0x0ba (PIN_OUTPUT | MUX_MODE0)   /* dss_data7.dss_data7 */
++			0x0bc (PIN_OUTPUT | MUX_MODE0)   /* dss_data8.dss_data8 */
++			0x0be (PIN_OUTPUT | MUX_MODE0)   /* dss_data9.dss_data9 */
++			0x0c0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data10.dss_data10 */
++			0x0c2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data11.dss_data11 */
++			0x0c4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data12.dss_data12 */
++			0x0c6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data13.dss_data13 */
++			0x0c8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data14.dss_data14 */
++			0x0ca (PIN_OUTPUT | MUX_MODE0)   /* dss_data15.dss_data15 */
++			0x0cc (PIN_OUTPUT | MUX_MODE0)   /* dss_data16.dss_data16 */
++			0x0ce (PIN_OUTPUT | MUX_MODE0)   /* dss_data17.dss_data17 */
++			0x0d0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data18.dss_data18 */
++			0x0d2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data19.dss_data19 */
++			0x0d4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data20.dss_data20 */
++			0x0d6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data21.dss_data21 */
++			0x0d8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data22.dss_data22 */
++			0x0da (PIN_OUTPUT | MUX_MODE0)   /* dss_data23.dss_data23 */
++		>;
++	};
+ };
  
- 	uart2_pins: pinmux_uart2_pins {
-@@ -550,3 +595,61 @@
- 	mode = <3>;
- 	power = <50>;
+ &i2c1 {
+@@ -199,3 +292,26 @@
+ 	regulator-max-microvolt = <1800000>;
+ 	regulator-always-on;
  };
 +
 +&dss {
 +	status = "ok";
-+};
-+
-+&dsi1 {
-+	status = "ok";
-+	vdd-supply = <&vcxio>;
-+
-+	dsi1_out_ep: endpoint {
-+		remote-endpoint = <&lcd0_in>;
-+		lanes = <0 1 2 3 4 5>;
-+	};
-+
-+	lcd0: display {
-+		compatible = "tpo,taal", "panel-dsi-cm";
-+		label = "lcd0";
-+
-+		gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;	/* 102, reset */
-+
-+		lcd0_in: endpoint {
-+			remote-endpoint = <&dsi1_out_ep>;
-+		};
-+	};
-+};
-+
-+&dsi2 {
-+	status = "ok";
-+	vdd-supply = <&vcxio>;
-+
-+	dsi2_out_ep: endpoint {
-+		remote-endpoint = <&lcd1_in>;
-+		lanes = <0 1 2 3 4 5>;
-+	};
-+
-+	lcd1: display {
-+		compatible = "tpo,taal", "panel-dsi-cm";
-+		label = "lcd1";
-+
-+		gpios = <&gpio4 8 GPIO_ACTIVE_HIGH>;	/* 104, reset */
-+
-+		lcd1_in: endpoint {
-+			remote-endpoint = <&dsi2_out_ep>;
-+		};
-+	};
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&vdac>;
 +
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_hdmi_pins>;
++	pinctrl-0 = <&dss_dpi_pins>;
 +
-+	hdmi_out: endpoint {
-+		remote-endpoint = <&tpd12s015_in>;
++	dpi_out: endpoint {
++		remote-endpoint = <&tfp410_in>;
++		data-lines = <24>;
++	};
++};
++
++&venc {
++	status = "ok";
++
++	vdda-supply = <&vdac>;
++
++	venc_out: endpoint {
++		remote-endpoint = <&tv_connector_in>;
++		ti,channels = <2>;
 +	};
 +};
 -- 
