@@ -1,89 +1,221 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Jan 2014 11:08:26 +0000
-Subject: [PATCH v3] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
-References: <1389204023-26912-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140109103004.GB11089@mudshark.cambridge.arm.com>
- <201401091204.17932.arnd@arndb.de>
- <alpine.DEB.2.02.1401091247000.21510@kaball.uk.xensource.com>
- <20140109184251.GL17838@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1401161622570.21510@kaball.uk.xensource.com>
- <20140116193123.GB22105@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1401201523240.21510@kaball.uk.xensource.com>
-Message-ID: <20140121110826.GG30706@mudshark.cambridge.arm.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue, 21 Jan 2014 16:45:19 +0530
+Subject: [PATCH v2 5/7] clk: exynos: use cpu-clock provider type to
+ represent arm clock
+In-Reply-To: <20140121113855.3875555d@amdc2363>
+References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
+ <1390047057-2239-6-git-send-email-thomas.ab@samsung.com>
+ <20140120084721.7f0050ea@amdc2363>
+ <CAJuA9ajQWStgtFHDshM8PgRwizndzyTuRqvBNwh6GT4m-Exj6A@mail.gmail.com>
+ <20140121113855.3875555d@amdc2363>
+Message-ID: <CAJuA9agR182H1NPj8N6TmBhBvKEk=QvKqNa_7T95SA5GxqQXGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 03:32:48PM +0000, Stefano Stabellini wrote:
-> On Thu, 16 Jan 2014, Will Deacon wrote:
-> > For the xchg part, yes, that looks a lot better. I don't like the #undef
-> > CONFIG_CPU_V6 though, can that be rewritten to use __LINUX_ARM_ARCH__?
-> 
-> The problem is that the 1 and 2 byte parameter size cases in __cmpxchg
-> are ifdef'ed CONFIG_CPU_V6 but drivers/xen/grant-table.c needs them.
-> 
-> So we can either undef CONFIG_CPU_V6 in grant-table.c or call a
-> different function.
-> 
-> If I switch from ifdef CONFIG_CPU_V6 to if __LINUX_ARM_ARCH__ > 6 in
-> __cmpxchg, we still have the problem that if __LINUX_ARM_ARCH__ == 6,
-> grant-table.c doesn't compile.
-> 
-> Maybe the approach taken by the other patch for cmpxchg is better, see
-> below.
+Hi Lukasz,
 
-Yes, I prefer this approach. Minor comment below.
+On Tue, Jan 21, 2014 at 4:08 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
+> Hi Thomas,
+>
+>> On Mon, Jan 20, 2014 at 1:17 PM, Lukasz Majewski
+>> <l.majewski@samsung.com> wrote:
+>> > Hi Thomas,
+>> >
+>> >> From: Thomas Abraham <thomas.ab@samsung.com>
+>> >>
+>> >> With the addition of the new Samsung specific cpu-clock type, the
+>> >> arm clock can be represented as a cpu-clock type and the
+>> >> independent clock blocks that made up the arm clock can be removed.
+>> >>
+>> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> >> ---
+>> >>  .../devicetree/bindings/clock/exynos5250-clock.txt |    1 +
+>> >>  drivers/clk/samsung/clk-exynos4.c                  |   11
+>> >> +++++------ drivers/clk/samsung/clk-exynos5250.c
+>> >> |    8 ++++---- include/dt-bindings/clock/exynos5250.h
+>> >> |    1 + 4 files changed, 11 insertions(+), 10 deletions(-)
+>> >>
+>> >> diff --git
+>> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+>> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
+>> >> index 99eae9c..acf867a 100644 ---
+>> >> a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt +++
+>> >> b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt @@
+>> >> -38,6 +38,7 @@ clock which they consume.
+>> >> ---------------------------- fin_pll            1
+>> >> +  armclk             12
+>> >>
+>> >>    [Clock Gate for Special Clocks]
+>> >>
+>> >> diff --git a/drivers/clk/samsung/clk-exynos4.c
+>> >> b/drivers/clk/samsung/clk-exynos4.c index 010f071..efcf4a3 100644
+>> >> --- a/drivers/clk/samsung/clk-exynos4.c
+>> >> +++ b/drivers/clk/samsung/clk-exynos4.c
+>> >> @@ -437,8 +437,6 @@ static struct samsung_mux_clock
+>> >> exynos4x12_mux_clks[] __initdata = {
+>> >>  /* list of divider clocks supported in all exynos4 soc's */
+>> >>  static struct samsung_div_clock exynos4_div_clks[] __initdata = {
+>> >> -     DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
+>> >> -     DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
+>> >>       DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
+>> >>       DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
+>> >>       DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
+>> >> @@ -484,8 +482,8 @@ static struct samsung_div_clock
+>> >> exynos4_div_clks[] __initdata = { DIV(0, "div_spi_pre2",
+>> >> "div_spi2", DIV_PERIL2, 8, 8), DIV(0, "div_audio1", "mout_audio1",
+>> >> DIV_PERIL4, 0, 4), DIV(0, "div_audio2", "mout_audio2", DIV_PERIL4,
+>> >> 16, 4),
+>> >> -     DIV(CLK_ARM_CLK, "arm_clk", "div_core2", DIV_CPU0, 28, 3),
+>> >> -     DIV(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
+>> >> 3),
+>> >> +     DIV_F(CLK_SCLK_APLL, "sclk_apll", "mout_apll", DIV_CPU0, 24,
+>> >> 3,
+>> >> +                     CLK_GET_RATE_NOCACHE, 0),
+>> >>       DIV_F(0, "div_mipi_pre0", "div_mipi0", DIV_LCD0, 20, 4,
+>> >>                       CLK_SET_RATE_PARENT, 0),
+>> >>       DIV_F(0, "div_mmc_pre0", "div_mmc0", DIV_FSYS1, 8, 8,
+>> >> @@ -870,7 +868,6 @@ static struct samsung_gate_clock
+>> >> exynos4x12_gate_clks[] __initdata = {
+>> >>  static struct samsung_clock_alias exynos4_aliases[] __initdata = {
+>> >>       ALIAS(CLK_MOUT_CORE, NULL, "moutcore"),
+>> >> -     ALIAS(CLK_ARM_CLK, NULL, "armclk"),
+>> >>       ALIAS(CLK_SCLK_APLL, NULL, "mout_apll"),
+>> >>  };
+>> >>
+>> >> @@ -1125,12 +1122,14 @@ static void __init exynos4_clk_init(struct
+>> >> device_node *np, samsung_clk_register_alias(exynos4_aliases,
+>> >>                       ARRAY_SIZE(exynos4_aliases));
+>> >>
+>> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
+>> >> reg_base); +
+>> >
+>> > I've got some doubts about allowing only the "mout_apll" clock to
+>> > be the only parent for armclk Samsung clock.
+>> >
+>> > For the Exynos4412 it is also valid to have SCLK_MPLL_USER_C [*] as
+>> > a parent for this clock.
+>> >
+>> > The problem is that you are reparenting the armclk to [*] with the
+>> > register modification - no CCF involved.
+>>
+>> The MUX_CORE mux is part of the larger cpu clock type and not
+>> registered as a separate mux clock with CCF. So I would like to know
+>> if there are any potential issues you see if this mux clock is
+>> internally managed within the set_rate of the larger cpu clock type.
+>
+> So the large opaque clock (armclk) starts with inputs to MUX_CORE (and
+> embrace this MUX as well)?
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c1f1a7e..ae54ae0 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1881,8 +1881,7 @@ config XEN_DOM0
->  config XEN
->  	bool "Xen guest support on ARM (EXPERIMENTAL)"
->  	depends on ARM && AEABI && OF
-> -	depends on CPU_V7 && !CPU_V6
-> -	depends on !GENERIC_ATOMIC64
-> +	depends on CPU_V7
->  	select ARM_PSCI
->  	select SWIOTLB_XEN
->  	help
-> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-> index df2fbba..cc8a4a2 100644
-> --- a/arch/arm/include/asm/cmpxchg.h
-> +++ b/arch/arm/include/asm/cmpxchg.h
-> @@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
->   * cmpxchg only support 32-bits operands on ARMv6.
->   */
->  
-> +static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
-> +				      unsigned long new)
-> +{
-> +	unsigned long oldval, res;
-> +
-> +	do {
-> +		asm volatile("@ __cmpxchg1\n"
-> +		"	ldrexb	%1, [%2]\n"
-> +		"	mov	%0, #0\n"
-> +		"	teq	%1, %3\n"
-> +		"	strexbeq %0, %4, [%2]\n"
-> +			: "=&r" (res), "=&r" (oldval)
-> +			: "r" (ptr), "Ir" (old), "r" (new)
-> +			: "memory", "cc");
-> +	} while (res);
-> +
-> +	return oldval;
-> +}
-> +
-> +static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
-> +				      unsigned long new)
-> +{
-> +	unsigned long oldval, res;
-> +
-> +	do {
-> +		asm volatile("@ __cmpxchg1\n"
+Yes, the MUX_CORE is now part of the large opaque clock and will only
+use mout_apll as the parent clock. The other parent will be used
+temporarily only when the frequency of the mout_apll (leading to APLL)
+has to be changed.
 
-Can you fix this comment while you're here please?
+>
+> If yes, then I don't mind if it is solely managed inside the armclk.
+>
+> This however allows the armclk to be fed from mout_apll[*] and
+> sclk_mpll__user_c[**]. And this would be nice if reflected in the code.
 
-Will
+Okay.
+
+>
+>>
+>> >
+>> > I just would like to know if this is yours design decision or
+>> > something, that we have overlooked in the v1 of this patch series.
+>>
+>> I did overlook this one. This will be fixed in the next version by
+>> ensuring that the dividers for SCLK_HPM clock will be updated only if
+>> mout_apll is the parent of the MUX_HPM clock mux.
+>
+> Shall not they be updated if whatever connected to the MUX_HPM
+> ([*] and [**]) changes?
+
+They will be updated if their parent is mout_apll. If their parent is
+a MPLL sourced clock, the divider will not be updated since the set
+rate on this opaque clock will not change the frequency of the MPLL
+sourced clock.
+
+Thanks,
+Thomas.
+
+>
+>>
+>> Thanks,
+>> Thomas.
+>>
+>> >
+>> >>       pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
+>> >>               "\tsclk_epll = %ld, sclk_vpll = %ld, arm_clk =
+>> >> %ld\n", exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+>> >>               _get_rate("sclk_apll"),
+>> >> _get_rate("sclk_mpll"), _get_rate("sclk_epll"),
+>> >> _get_rate("sclk_vpll"),
+>> >> -             _get_rate("arm_clk"));
+>> >> +             _get_rate("armclk"));
+>> >>  }
+>> >>
+>> >>
+>> >> diff --git a/drivers/clk/samsung/clk-exynos5250.c
+>> >> b/drivers/clk/samsung/clk-exynos5250.c index ff4beeb..487be36
+>> >> 100644 --- a/drivers/clk/samsung/clk-exynos5250.c
+>> >> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>> >> @@ -298,9 +298,8 @@ static struct samsung_div_clock
+>> >> exynos5250_div_clks[] __initdata = { /*
+>> >>        * CMU_CPU
+>> >>        */
+>> >> -     DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
+>> >> -     DIV(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3),
+>> >> -     DIV_A(0, "div_arm2", "div_arm", DIV_CPU0, 28, 3, "armclk"),
+>> >> +     DIV_F(0, "div_apll", "mout_apll", DIV_CPU0, 24, 3,
+>> >> +                     CLK_GET_RATE_NOCACHE, 0),
+>> >>
+>> >>       /*
+>> >>        * CMU_TOP
+>> >> @@ -684,8 +683,9 @@ static void __init exynos5250_clk_init(struct
+>> >> device_node *np) ARRAY_SIZE(exynos5250_div_clks));
+>> >>       samsung_clk_register_gate(exynos5250_gate_clks,
+>> >>                       ARRAY_SIZE(exynos5250_gate_clks));
+>> >> +     samsung_register_arm_clock(np, CLK_ARM_CLK, "mout_apll",
+>> >> reg_base);
+>> >>       pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+>> >> -                     _get_rate("div_arm2"));
+>> >> +                     _get_rate("armclk"));
+>> >>  }
+>> >>  CLK_OF_DECLARE(exynos5250_clk, "samsung,exynos5250-clock",
+>> >> exynos5250_clk_init); diff --git
+>> >> a/include/dt-bindings/clock/exynos5250.h
+>> >> b/include/dt-bindings/clock/exynos5250.h index 922f2dc..59a10fb
+>> >> 100644 --- a/include/dt-bindings/clock/exynos5250.h +++
+>> >> b/include/dt-bindings/clock/exynos5250.h @@ -21,6 +21,7 @@
+>> >>  #define CLK_FOUT_CPLL                6
+>> >>  #define CLK_FOUT_EPLL                7
+>> >>  #define CLK_FOUT_VPLL                8
+>> >> +#define CLK_ARM_CLK          12
+>> >>
+>> >>  /* gate for special clocks (sclk) */
+>> >>  #define CLK_SCLK_CAM_BAYER   128
+>> >
+>> >
+>> >
+>> > --
+>> > Best regards,
+>> >
+>> > Lukasz Majewski
+>> >
+>> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Best regards,
+>
+> Lukasz Majewski
+>
+> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
