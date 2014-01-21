@@ -1,61 +1,32 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 21 Jan 2014 11:05:02 +0100
-Subject: [PATCH] ARM: imx: correct usecount of IPG, ARM and MMDC clk on
- i.mx6sl
-In-Reply-To: <1390214690-13564-1-git-send-email-b20788@freescale.com>
-References: <1390214690-13564-1-git-send-email-b20788@freescale.com>
-Message-ID: <1390298702.8981.2.camel@weser.hi.pengutronix.de>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 21 Jan 2014 19:10:11 +0900
+Subject: [PATCH 0/5] ARM: firmware: improvements to Trusted Foundations support
+Message-ID: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 20.01.2014, 18:44 +0800 schrieb Anson Huang:
-> IPG, ARM and MMDC's clock should be enabled during kernel boot up,
-> so we need to maintain their use count, otherwise, they may be
-> disabled unexpectedly if their children's clock are turned off,
-> which is not allowed.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6sl.c |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-> index 78f3bd6..8d720f9 100644
-> --- a/arch/arm/mach-imx/clk-imx6sl.c
-> +++ b/arch/arm/mach-imx/clk-imx6sl.c
-> @@ -291,6 +291,21 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
->  		pr_warn("%s: failed to set AHB clock rate %d!\n",
->  			__func__, ret);
->  
-> +	/* Correct usecount of IPG clk */
+These (mostly minor) patches fix a few typos, improve points that
+were agreed upon when the Trusted Foundation series was initially
+submitted, and more importantly add support for the do_idle() firmware
+operation that is needed for cpuidle to be supported. Tegra's cpuidle
+driver is also updated accordingly.
 
-You don't really correct anything here, so this comment is misleading.
-If those are always on clocks, like you suggest in the commit message,
-please put this in the comment instead.
+These patches should be the last step before the device trees for NVIDIA
+SHIELD and Tegra Note 7 can be submitted.
 
-Regards,
-Lucas
+Alexandre Courbot (5):
+  ARM: trusted_foundations: fix vendor prefix typos
+  ARM: trusted_foundations: fallback when TF support is missing
+  ARM: firmware: enable Trusted Foundations by default
+  ARM: trusted_foundations: implement do_idle()
+  ARM: tegra: cpuidle: use firmware call for power down
 
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_IPG]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable IPG clock %d\n", __func__, ret);
-> +
-> +	/* Correct usecount of ARM clk */
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_ARM]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable ARM clock %d\n", __func__, ret);
-> +
-> +	/* Correct usecount of MMDC clk */
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_MMDC_ROOT]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable MMDC clock %d\n", __func__, ret);
-> +
->  	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
->  		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY1_GATE]);
->  		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY2_GATE]);
+ arch/arm/configs/tegra_defconfig           |  1 -
+ arch/arm/firmware/Kconfig                  |  3 ++-
+ arch/arm/firmware/trusted_foundations.c    | 20 +++++++++++++++++++-
+ arch/arm/include/asm/trusted_foundations.h | 13 +++++++++----
+ arch/arm/mach-tegra/cpuidle-tegra114.c     |  3 +++
+ 5 files changed, 33 insertions(+), 7 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.5.3
