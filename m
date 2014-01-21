@@ -1,92 +1,71 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 21 Jan 2014 11:51:22 -0500
-Subject: [PATCH v4 15/16] ARM: add uprobes support
-In-Reply-To: <1387564464.3404.106.camel@linaro1.home>
-References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
- <1387166930-13182-16-git-send-email-dave.long@linaro.org>
- <1387564464.3404.106.camel@linaro1.home>
-Message-ID: <52DEA58A.9050406@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 21 Jan 2014 20:59:24 +0300
+Subject: [PATCH v7 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <1389813883-567-2-git-send-email-hdegoede@redhat.com>
+References: <1389813883-567-1-git-send-email-hdegoede@redhat.com>
+ <1389813883-567-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <52DEB57C.8080700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/20/13 13:34, Jon Medhurst (Tixy) wrote:
-> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Using Rabin Vincent's ARM uprobes patches as a base, enable uprobes
->> support on ARM.
->>
->> Caveats:
->>
->>   - Thumb is not supported
->>   - XOL abort/trap handling is not implemented
->
-> I shall repeat my comment from version one of the patch...
->
-> What are the consequences of this, e.g. is it possible for a probe to
-> get stuck in an infinite loop of faulting? I hope there are no integrity
-> issues for the kernel itself.
->
-> Would be good if someone familiar with uprobes working could answer
-> that.
+Hello.
 
-Testing shows it does indeed get stuck continuously trapping. The 
-process is killable.  Fortunately all the infrastructure is already 
-there for fixing this.  I've patched the code to detect the trap and 
-allow it to be processed, using the powerpc uprobes code as a model. 
-The changes required are fairly small and entirely in the 
-architecture-specific code.
+On 01/15/2014 10:24 PM, Hans de Goede wrote:
 
-As mentioned before, thumb support is a follow-on project.
+> Add support for ohci-platform instantiation from devicetree, including
+> optionally getting clks and a phy from devicetree, and enabling / disabling
+> those on power_on / off.
 
-> I've a few other comments...
+> This should allow using ohci-platform from devicetree in various cases.
+> Specifically after this commit it can be used for the ohci controller found
+> on Allwinner sunxi SoCs.
 
-[snip]
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+[...]
 
->
->
->> +const union decode_item uprobes_probes_actions[] = {
->> +	[PROBES_EMULATE_NONE] {.handler = probes_simulate_nop},
->
-> There is a missing '=' in the line above. Interesting that GCC doesn't
-> complain (I tried compiling this patch and it didn't).
->
+   Have only found time to fully read the patches just now...
 
-That is indeed odd.  I have fixed it (my code, not the compiler).
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> new file mode 100644
+> index 0000000..f9d6c73
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> @@ -0,0 +1,22 @@
+> +USB OHCI controllers
+> +
+> +Required properties:
+> +- compatible : "usb-ohci"
+> +- reg : ohci controller register range (address and length)
+> +- interrupts : ohci controller interrupt
+> +
+> +Optional properties:
+> +- clocks : a list of phandle + clock specifier pairs
+> +- phys : phandle + phy specifier pair
+> +- phy-names : "usb"
+> +
+> +Example:
+> +
+> +	ohci0: ohci at 0x01c14400 {
 
-[snip]
+    Two minor nits: there should be no "0x" in the address part of the node 
+name. And according to ePAPR [1], "the name of a node should be somewhat 
+generic, reflecting the function of the device and not its precise programming 
+model. If appropriate, the name should be one of the following choices:
+[...]
+- usb".
 
->> +bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
->> +{
->> +	void *addr;
->
-> 'addr' is not used so this line can be deleted
->
->> +	probes_opcode_t opcode;
->> +
->> +	if (!auprobe->simulate)
->> +		return false;
->> +
->> +	addr = (void *) regs->ARM_pc;
->
-> and so can this line ^^^
+    Same comments for "usb-ehci" binding.
 
-Fixed.
+> +		compatible = "allwinner,sun4i-a10-ohci", "usb-ohci";
+> +		reg = <0x01c14400 0x100>;
+> +		interrupts = <64>;
+> +		clocks = <&usb_clk 6>, <&ahb_gates 2>;
+> +		phys = <&usbphy 1>;
+> +		phy-names = "usb";
+> +	};
 
->
->> +	opcode = __mem_to_opcode_arm(*(unsigned int *) auprobe->insn);
->> +
->> +	auprobe->asi.insn_singlestep(opcode, &auprobe->asi, regs);
->> +
->> +	return true;
->> +}
->> +
->
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
 
-Fixed.
-
-> [rest of patch snipped]
->
-
-
--dl
+WBR, Sergei
