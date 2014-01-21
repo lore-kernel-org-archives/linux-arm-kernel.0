@@ -1,48 +1,45 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 21 Jan 2014 16:22:21 -0500
-Subject: [PATCH 18/73] arm: fix implicit #include <linux/init.h> in entry asm.
+Date: Tue, 21 Jan 2014 16:22:24 -0500
+Subject: [PATCH 21/73] arm: don't use module_init in non-modular
+ mach-vexpress/spc.c code
 In-Reply-To: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1390339396-3479-19-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1390339396-3479-22-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They use the "_INIT" macro and friends, and hence need to
-source this header file, vs. relying on getting it implicitly.
+The spc.o is built for ARCH_VEXPRESS_SPC -- which is bool, and hence
+this code is either present or absent.  It will never be modular,
+so using module_init as an alias for __initcall can be somewhat
+misleading.
+
+Fix this up now, so that we can relocate module_init from
+init.h into module.h in the future.  If we don't do this, we'd
+have to add module.h to obviously non-modular code, and that
+would be a worse thing.
+
+Note that direct use of __initcall is discouraged, vs. one
+of the priority categorized subgroups.  As __initcall gets
+mapped onto device_initcall, our use of device_initcall
+directly in this change means that the runtime impact is
+zero -- it will remain at level 6 in initcall ordering.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm/kernel/entry-armv.S | 2 ++
- arch/arm/vfp/entry.S         | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm/mach-vexpress/spc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index b3fb8c9..ffc1c74 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -15,6 +15,8 @@
-  *  that causes it to save wrong values...  Be aware!
-  */
- 
-+#include <linux/init.h>
-+
- #include <asm/assembler.h>
- #include <asm/memory.h>
- #include <asm/glue-df.h>
-diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 46e1749..ec7ea24 100644
---- a/arch/arm/vfp/entry.S
-+++ b/arch/arm/vfp/entry.S
-@@ -8,6 +8,8 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/init.h>
-+
- #include <asm/thread_info.h>
- #include <asm/vfpmacros.h>
- #include "../kernel/entry-header.S"
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index c26ef5b..9312a9b 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -581,4 +581,4 @@ static int __init ve_spc_clk_init(void)
+ 	platform_device_register_simple("vexpress-spc-cpufreq", -1, NULL, 0);
+ 	return 0;
+ }
+-module_init(ve_spc_clk_init);
++device_initcall(ve_spc_clk_init);
 -- 
 1.8.4.1
