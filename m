@@ -1,69 +1,105 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Jan 2014 12:05:49 -0600
-Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
- device tree boot
-In-Reply-To: <52DEB078.5030005@ti.com>
-References: <1390260542-22213-1-git-send-email-nm@ti.com>
- <20140120233941.GG6516@saruman.home> <52DEB078.5030005@ti.com>
-Message-ID: <20140121180549.GS30451@saruman.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Jan 2014 18:07:11 +0000
+Subject: [PATCH v2 5/7] ARM: perf_event: Fully support Krait CPU PMU events
+In-Reply-To: <1389808535-23852-6-git-send-email-sboyd@codeaurora.org>
+References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+ <1389808535-23852-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140121180711.GN30706@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-On Tue, Jan 21, 2014 at 11:38:00AM -0600, Nishanth Menon wrote:
-> On 01/20/2014 05:39 PM, Felipe Balbi wrote:
-> > On Mon, Jan 20, 2014 at 05:29:02PM -0600, Nishanth Menon wrote:
-> >> When device is booted using devicetree, platforms impacted by
-> >> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
-> >> indicates that the module cannot do multi-block transfers.
-> >>
-> >> Handle this by providing a boolean flag to indicate to driver that it is
-> >> working on a hardware with mentioned limitation.
-> > 
-> > sure there's no way of reading the revision register to figure this one
-> > out without having to add a new DT attribute ?
-> > 
-> I did a quick patch to read the Module revision register:
-> http://slexy.org/view/s21TKvlWlR
-> 
-> sdp2430: Revision: 1.2, Spec: 0.0, normal interrupt
-> 
-> OMAP3430-ldp: (ES2.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> SDP3430:(ES3.0) Revision: 2.6, Spec: 0.0, normal interrupt
-> AM3517-evm: (ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> AM3517-crane:(ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
-> 
-> AM37x-evm: (ES1.2) Revision: 2.6, Spec: 0.0, normal interrupt
-> OMAP3630-beag-xm (ES1.2): Revision: 2.6, Spec: 0.0, normal interrupt
-> 
-> am335x-evm:(ES1.0): Revision: 3.1, Spec: 0.1, normal interrupt
-> am335x-sk: (ES2.1): Revision: 3.1, Spec: 0.1, normal interrupt
-> am335x-beaglebone-black:(ES2.0): Revision: 3.1, Spec: 0.1, normal
-> interrupt
-> 
-> sdp4430.txt: (ES2.2): Revision: 3.1, Spec: 0.1, normal interrupt
-> 
-> OMAP4460-panda-es (ES1.1): Revision: 3.1, Spec: 0.1, normal interrupt
-> 
-> OMAP5uevm:(ES2.0): Revision: 3.3, Spec: 0.2, normal interrupt
-> dra7-evm (es1.1): Revision: 3.3, Spec: 0.2, normal interrupt
-> 
-> 
-> OMAP3430-ldp seems to be the only one impacted with module revision
-> 2.6 -> so using revision information is not really helpful here. Hence
-> the usage of a flag in dt attribute to indicate hardware impacted by
-> erratum.
+Thanks for the updates. A few more comments inline.
 
-alright, that's too bad. Seems like revision in this module isn't very
-useful :-(
+On Wed, Jan 15, 2014 at 05:55:33PM +0000, Stephen Boyd wrote:
+> Krait supports a set of performance monitor region event
+> selection registers (PMRESR) sitting behind a cp15 based
+> interface that extend the architected PMU events to include Krait
+> CPU and Venum VFP specific events. To use these events the user
+> is expected to program the region register (PMRESRn) with the
+> event code shifted into the group they care about and then point
+> the PMNx event at that region+group combo by writing a
+> PMRESRn_GROUPx event. Add support for this hardware.
+> 
+> Note: the raw event number is a pure software construct that
+> allows us to map the multi-dimensional number space of regions,
+> groups, and event codes into a flat event number space suitable
+> for use by the perf framework.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/fde09f0c/attachment.sig>
+[...]
+
+> +static u32 krait_read_pmresrn(int n)
+> +{
+> +       u32 val;
+> +
+> +       switch (n) {
+> +       case 0:
+> +               asm volatile("mrc p15, 1, %0, c9, c15, 0" : "=r" (val));
+> +               break;
+> +       case 1:
+> +               asm volatile("mrc p15, 1, %0, c9, c15, 1" : "=r" (val));
+> +               break;
+> +       case 2:
+> +               asm volatile("mrc p15, 1, %0, c9, c15, 2" : "=r" (val));
+> +               break;
+> +       default:
+> +               BUG(); /* Should be validated in krait_pmu_get_event_idx() */
+> +       }
+> +
+> +       return val;
+> +}
+> +
+> +static void krait_write_pmresrn(int n, u32 val)
+> +{
+> +       switch (n) {
+> +       case 0:
+> +               asm volatile("mcr p15, 1, %0, c9, c15, 0" : : "r" (val));
+> +               break;
+> +       case 1:
+> +               asm volatile("mcr p15, 1, %0, c9, c15, 1" : : "r" (val));
+> +               break;
+> +       case 2:
+> +               asm volatile("mcr p15, 1, %0, c9, c15, 2" : : "r" (val));
+> +               break;
+> +       default:
+> +               BUG(); /* Should be validated in krait_pmu_get_event_idx() */
+> +       }
+> +}
+
+Do you need isbs to ensure the pmresrn side-effects have happened, or are
+the registers self-synchronising? Similarly for your other IMP DEF
+registers.
+
+> +static void krait_pre_vpmresr0(u32 *venum_orig_val, u32 *fp_orig_val)
+> +{
+> +       u32 venum_new_val;
+> +       u32 fp_new_val;
+> +
+> +       /* CPACR Enable CP10 and CP11 access */
+> +       *venum_orig_val = get_copro_access();
+> +       venum_new_val = *venum_orig_val | CPACC_SVC(10) | CPACC_SVC(11);
+> +       set_copro_access(venum_new_val);
+> +
+> +       /* Enable FPEXC */
+> +       *fp_orig_val = fmrx(FPEXC);
+> +       fp_new_val = *fp_orig_val | FPEXC_EN;
+> +       fmxr(FPEXC, fp_new_val);
+
+Messing around with the lot (especially with kernel-mode neon now in
+mainline) does scare me. I'd like some BUG_ON(preemptible()) and you could
+consider using kernel_neon_{begin,end} but they're a lot heavier than you
+need (due to non-lazy switching)
+
+Finally, I'd really like to see this get some test coverage, but I don't
+want to try running mainline on my phone :) Could you give your patches a
+spin with Vince's perf fuzzer please?
+
+  https://github.com/deater/perf_event_tests.git
+
+(then build the contents of the fuzzer directory and run it for as long as
+you can).
+
+Cheers,
+
+Will
