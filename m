@@ -1,65 +1,70 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 10:26:09 -0300
-Subject: [PATCH v3 10/15] watchdog: orion: Add per-compatible watchdog start
- implementation
+Date: Tue, 21 Jan 2014 10:26:11 -0300
+Subject: [PATCH v3 12/15] ARM: mvebu: Enable Armada 370/XP watchdog in the
+ devicetree
 In-Reply-To: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390310774-20781-11-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390310774-20781-13-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To handle differences between SoCs this commit adds per-compatible
-string start() function for the watchdog kick-off. This is preparation
-work and makes no functionality changes to the current driver.
+Add the DT nodes to enable watchdog support available in Armada 370
+and Armada XP SoCs.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 4 ++++
+ arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
+ arch/arm/boot/dts/armada-xp.dtsi     | 6 ++++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index b8d0f87..c2beb9f 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -52,6 +52,7 @@ struct orion_watchdog_data {
- 	int rstout_enable_bit;
- 	int (*clock_init) (struct platform_device *,
- 			   struct orion_watchdog *);
-+	int (*start) (struct watchdog_device *);
- };
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 7f10f62..96e0389 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -151,6 +151,10 @@
+ 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+ 			};
  
- struct orion_watchdog {
-@@ -88,7 +89,7 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
- 	return 0;
- }
- 
--static int orion_wdt_start(struct watchdog_device *wdt_dev)
-+static int orion_start(struct watchdog_device *wdt_dev)
- {
- 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
- 
-@@ -107,6 +108,14 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
- 	return 0;
- }
- 
-+static int orion_wdt_start(struct watchdog_device *wdt_dev)
-+{
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++			watchdog at 20300 {
++				reg = <0x20300 0x34>, <0x20704 0x4>;
++			};
 +
-+	/* There are some per-SoC quirks to handle */
-+	return dev->data->start(wdt_dev);
-+}
-+
- static int orion_wdt_stop(struct watchdog_device *wdt_dev)
- {
- 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-@@ -158,6 +167,7 @@ static const struct orion_watchdog_data orion_data = {
- 	.wdt_enable_bit = BIT(4),
- 	.wdt_counter_offset = 0x24,
- 	.clock_init = orion_wdt_clock_init,
-+	.start = orion_start,
- };
+ 			sata at a0000 {
+ 				compatible = "marvell,orion-sata";
+ 				reg = <0xa0000 0x5000>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 7a4b82e..aebed9e 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -168,6 +168,11 @@
+ 				clocks = <&coreclk 2>;
+ 			};
  
- static const struct of_device_id orion_wdt_of_match_table[] = {
++			watchdog at 20300 {
++				compatible = "marvell,armada-370-wdt";
++				clocks = <&coreclk 2>;
++			};
++
+ 			coreclk: mvebu-sar at 18230 {
+ 				compatible = "marvell,armada-370-core-clock";
+ 				reg = <0x18230 0x08>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 281c644..8c6c06c 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -74,6 +74,12 @@
+ 				clock-names = "nbclk", "fixed";
+ 			};
+ 
++			watchdog at 20300 {
++				compatible = "marvell,armada-xp-wdt";
++				clocks = <&coreclk 2>, <&refclk>;
++				clock-names = "nbclk", "fixed";
++			};
++
+ 			coreclk: mvebu-sar at 18230 {
+ 				compatible = "marvell,armada-xp-core-clock";
+ 				reg = <0x18230 0x08>;
 -- 
 1.8.1.5
