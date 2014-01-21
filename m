@@ -1,46 +1,57 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 21 Jan 2014 19:10:12 +0900
-Subject: [PATCH 1/5] ARM: trusted_foundations: fix vendor prefix typos
+Date: Tue, 21 Jan 2014 19:10:13 +0900
+Subject: [PATCH 2/5] ARM: trusted_foundations: fallback when TF support is
+ missing
 In-Reply-To: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
 References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1390299016-14105-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <1390299016-14105-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_register_trusted_foundations() and the firmware Kconfig used
-the wrong vendor prefix for Trusted Logic Mobility.
+When Trusted Foundations is detected as present on the system, but
+Trusted Foundations support is not built into the kernel, the kernel
+used to issue a panic very early during boot, leaving little clue to the
+user as to what is going wrong.
+
+It turns out that even without TF support built-in, the kernel can boot
+on a TF-enabled system provided that SMP and cpuidle are disabled. This
+patch does this and continue booting on one CPU, leaving the user with a
+usable (however degraded) system.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/firmware/Kconfig                  | 2 +-
- arch/arm/include/asm/trusted_foundations.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/trusted_foundations.h | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
-index bb00ccf00d66..bb126594995e 100644
---- a/arch/arm/firmware/Kconfig
-+++ b/arch/arm/firmware/Kconfig
-@@ -20,7 +20,7 @@ config TRUSTED_FOUNDATIONS
- 	  This option allows the kernel to invoke the secure monitor whenever
- 	  required on devices using Trusted Foundations. See
- 	  arch/arm/include/asm/trusted_foundations.h or the
--	  tl,trusted-foundations device tree binding documentation for details
-+	  tlm,trusted-foundations device tree binding documentation for details
- 	  on how to use it.
- 
- 	  Say n if you don't know what this is about.
 diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index 3bd36e2c5f2e..997862fd5d77 100644
+index 997862fd5d77..b5f7705abcb0 100644
 --- a/arch/arm/include/asm/trusted_foundations.h
 +++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -59,7 +59,7 @@ static inline void of_register_trusted_foundations(void)
- 	 * If we find the target should enable TF but does not support it,
- 	 * fail as the system won't be able to do much anyway
+@@ -30,6 +30,8 @@
+ #include <linux/printk.h>
+ #include <linux/bug.h>
+ #include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/smp.h>
+ 
+ struct trusted_foundations_platform_data {
+ 	unsigned int version_major;
+@@ -47,10 +49,13 @@ static inline void register_trusted_foundations(
+ 				   struct trusted_foundations_platform_data *pd)
+ {
+ 	/*
+-	 * If we try to register TF, this means the system needs it to continue.
+-	 * Its absence if thus a fatal error.
++	 * If the system requires TF and we cannot provide it, continue booting
++	 * but disable features that cannot be provided.
  	 */
--	if (of_find_compatible_node(NULL, NULL, "tl,trusted-foundations"))
-+	if (of_find_compatible_node(NULL, NULL, "tlm,trusted-foundations"))
- 		register_trusted_foundations(NULL);
+-	panic("No support for Trusted Foundations, stopping...\n");
++	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
++	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
++	setup_max_cpus = 0;
++	cpu_idle_poll_ctrl(true);
  }
- #endif /* CONFIG_TRUSTED_FOUNDATIONS */
+ 
+ static inline void of_register_trusted_foundations(void)
 -- 
 1.8.5.3
