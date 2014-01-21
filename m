@@ -1,86 +1,77 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:56:50 +0200
-Subject: [PATCHv3 18/41] OMAPDSS: hdmi-connector: Add DT support
+Date: Tue, 21 Jan 2014 12:56:55 +0200
+Subject: [PATCHv3 23/41] ARM: omap3.dtsi: add omapdss information
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-19-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-24-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support for hdmi-connector.
+Add DT data for OMAP3 display subsystem, which contains the following
+blocks:
+
+dss - the wrapper/glue for the display modules
+dispc - display controller
+dsi - MIPI DSI encoder
+rfbi - MIPI DBI encoder
+venc - analog TV encoder
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/omap2/displays-new/connector-hdmi.c | 30 +++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/omap3.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/drivers/video/omap2/displays-new/connector-hdmi.c b/drivers/video/omap2/displays-new/connector-hdmi.c
-index 9abe2c039ae9..2e026eab2dd0 100644
---- a/drivers/video/omap2/displays-new/connector-hdmi.c
-+++ b/drivers/video/omap2/displays-new/connector-hdmi.c
-@@ -12,6 +12,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- 
- #include <drm/drm_edid.h>
- 
-@@ -301,6 +302,23 @@ static int hdmic_probe_pdata(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int hdmic_probe_of(struct platform_device *pdev)
-+{
-+	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
-+	struct device_node *node = pdev->dev.of_node;
-+	struct omap_dss_device *in;
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index daabf99d402a..d942f9a4723f 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -630,5 +630,47 @@
+ 			num-eps = <16>;
+ 			ram-bits = <12>;
+ 		};
 +
-+	in = omapdss_of_find_source_for_first_ep(node);
-+	if (IS_ERR(in)) {
-+		dev_err(&pdev->dev, "failed to find video source\n");
-+		return PTR_ERR(in);
-+	}
++		dss: dss at 48050000 {
++			compatible = "ti,omap3-dss", "simple-bus";
++			reg = <0x48050000 0x200>;
++			status = "disabled";
++			ti,hwmods = "dss_core";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+	ddata->in = in;
++			dispc at 48050400 {
++				compatible = "ti,omap3-dispc";
++				reg = <0x48050400 0x400>;
++				interrupts = <25>;
++				ti,hwmods = "dss_dispc";
++			};
 +
-+	return 0;
-+}
++			dsi: encoder at 4804fc00 {
++				compatible = "ti,omap3-dsi";
++				reg = <0x4804fc00 0x200>,
++				      <0x4804fe00 0x40>,
++				      <0x4804ff00 0x20>;
++				reg-names = "proto", "phy", "pll";
++				interrupts = <25>;
++				status = "disabled";
++				ti,hwmods = "dss_dsi1";
++			};
 +
- static int hdmic_probe(struct platform_device *pdev)
- {
- 	struct panel_drv_data *ddata;
-@@ -318,6 +336,10 @@ static int hdmic_probe(struct platform_device *pdev)
- 		r = hdmic_probe_pdata(pdev);
- 		if (r)
- 			return r;
-+	} else if (pdev->dev.of_node) {
-+		r = hdmic_probe_of(pdev);
-+		if (r)
-+			return r;
- 	} else {
- 		return -ENODEV;
- 	}
-@@ -359,12 +381,20 @@ static int __exit hdmic_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id hdmic_of_match[] = {
-+	{ .compatible = "omapdss,hdmi-connector", },
-+	{},
-+};
++			rfbi: encoder at 48050800 {
++				compatible = "ti,omap3-rfbi";
++				reg = <0x48050800 0x100>;
++				status = "disabled";
++				ti,hwmods = "dss_rfbi";
++			};
 +
-+MODULE_DEVICE_TABLE(of, hdmic_of_match);
-+
- static struct platform_driver hdmi_connector_driver = {
- 	.probe	= hdmic_probe,
- 	.remove	= __exit_p(hdmic_remove),
- 	.driver	= {
- 		.name	= "connector-hdmi",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = hdmic_of_match,
- 	},
++			venc: encoder at 48050c00 {
++				compatible = "ti,omap3-venc";
++				reg = <0x48050c00 0x100>;
++				status = "disabled";
++				ti,hwmods = "dss_venc";
++			};
++		};
+ 	};
  };
- 
 -- 
 1.8.3.2
