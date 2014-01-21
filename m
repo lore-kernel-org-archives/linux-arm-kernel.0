@@ -1,43 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 21 Jan 2014 07:57:32 -0500
-Subject: [PATCH v2 15/15] ARM: mvebu: Enable watchdog support in defconfig
-In-Reply-To: <20140121125339.GH13396@lunn.ch>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-16-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121124746.GZ29184@titan.lakedaemon.net>
- <20140121125339.GH13396@lunn.ch>
-Message-ID: <20140121125732.GA29184@titan.lakedaemon.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 21 Jan 2014 14:00:28 +0100
+Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
+In-Reply-To: <1591253.8BzYfubhGS@avalon>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+ <1591253.8BzYfubhGS@avalon>
+Message-ID: <2118020.lZAv6IL4Xy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 01:53:39PM +0100, Andrew Lunn wrote:
-> On Tue, Jan 21, 2014 at 07:47:46AM -0500, Jason Cooper wrote:
-> > On Tue, Jan 21, 2014 at 06:12:41AM -0300, Ezequiel Garcia wrote:
-> > > Now that we have proper support for Armada 370/XP watchdog
-> > > let's enable it in the defconfig.
+Hi Mike,
+
+On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
+> On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
+> > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
+> > > Geert, could you please verify that the series fixes your QSPI clock
+> > > issues with the Koelsch board ?
 > > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  arch/arm/configs/mvebu_defconfig | 2 ++
-> > >  1 file changed, 2 insertions(+)
+> > > Laurent Pinchart (2):
+> > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
+> > >   clk: shmobile: rcar-gen2: Fix qspi divisor
 > > 
-> > Just a note to myself more than anything: I need to square up multi_v7
-> > with mvebu.  As we make these changes next cycle, we need to be able to
-> > easily test that we aren't breaking multiplat build or boot.
+> > Thanks, both:
+> > 
+> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 > 
-> Hi Jason
+> Thank you.
 > 
-> Hopefully you can also tackle multi_v5 as well, once DT kirkwood moves
-> into mach-mvebu.
+> Mike, could you please pick those patches up for v3.14 ?
 
-Yes.
+Ping ?
 
-> To check for breaking boot, you need some other hardware
-> platform. Nomadik was breaking kirkwood multi_v5, and you would not
-> see the problem on Nomadik.
+-- 
+Regards,
 
-Yes, I was more specifically looking to leverage arm-buildbot...
-
-thx,
-
-Jason.
+Laurent Pinchart
