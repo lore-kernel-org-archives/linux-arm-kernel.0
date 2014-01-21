@@ -1,167 +1,208 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 10:26:04 -0300
-Subject: [PATCH v3 05/15] watchdog: orion: Make RSTOUT register a separate
- resource
+Date: Tue, 21 Jan 2014 10:26:06 -0300
+Subject: [PATCH v3 07/15] watchdog: orion: Introduce an orion_watchdog device
+ structure
 In-Reply-To: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390310774-20781-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390310774-20781-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support other SoC, it's required to distinguish
-the 'control' timer register, from the 'rstout' register
-that enables system reset on watchdog expiration.
+In order to prepare to support multiple compatible-strings, this
+commit adds a device structure to hold the driver's state.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- Documentation/devicetree/bindings/watchdog/marvel.txt |  6 ++++--
- arch/arm/mach-dove/include/mach/bridge-regs.h         |  1 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h     |  1 +
- arch/arm/mach-mv78xx0/include/mach/bridge-regs.h      |  1 +
- arch/arm/mach-orion5x/include/mach/bridge-regs.h      |  1 +
- arch/arm/plat-orion/common.c                          | 10 ++++++----
- drivers/watchdog/orion_wdt.c                          | 12 ++++++++++--
- 7 files changed, 24 insertions(+), 8 deletions(-)
+ drivers/watchdog/orion_wdt.c | 97 +++++++++++++++++++++++++++-----------------
+ 1 file changed, 60 insertions(+), 37 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-index 0731fbd..1544fe9 100644
---- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -3,7 +3,9 @@
- Required Properties:
- 
- - Compatibility : "marvell,orion-wdt"
--- reg		: Address of the timer registers
-+- reg		: Should contain two entries: first one with the
-+		  timer control address, second one with the
-+		  rstout enable address.
- 
- Optional properties:
- 
-@@ -14,7 +16,7 @@ Example:
- 
- 	wdt at 20300 {
- 		compatible = "marvell,orion-wdt";
--		reg = <0x20300 0x28>;
-+		reg = <0x20300 0x28>, <0x20108 0x4>;
- 		interrupts = <3>;
- 		timeout-sec = <10>;
- 		status = "okay";
-diff --git a/arch/arm/mach-dove/include/mach/bridge-regs.h b/arch/arm/mach-dove/include/mach/bridge-regs.h
-index 5362df3..f4a5b34 100644
---- a/arch/arm/mach-dove/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-dove/include/mach/bridge-regs.h
-@@ -21,6 +21,7 @@
- #define  CPU_CTRL_PCIE1_LINK	0x00000008
- 
- #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
-+#define RSTOUTn_MASK_PHYS	(BRIDGE_PHYS_BASE + 0x0108)
- #define  SOFT_RESET_OUT_EN	0x00000004
- 
- #define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
-diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 8b9d1c9..60f6421 100644
---- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -21,6 +21,7 @@
- #define CPU_RESET		0x00000002
- 
- #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
-+#define RSTOUTn_MASK_PHYS	(BRIDGE_PHYS_BASE + 0x0108)
- #define SOFT_RESET_OUT_EN	0x00000004
- 
- #define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
-diff --git a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
-index 5f03484..e20d6da 100644
---- a/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/bridge-regs.h
-@@ -15,6 +15,7 @@
- #define L2_WRITETHROUGH		0x00020000
- 
- #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
-+#define RSTOUTn_MASK_PHYS	(BRIDGE_PHYS_BASE + 0x0108)
- #define SOFT_RESET_OUT_EN	0x00000004
- 
- #define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
-diff --git a/arch/arm/mach-orion5x/include/mach/bridge-regs.h b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-index f727d03..5766e3f 100644
---- a/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
-@@ -18,6 +18,7 @@
- #define CPU_CTRL		(ORION5X_BRIDGE_VIRT_BASE + 0x104)
- 
- #define RSTOUTn_MASK		(ORION5X_BRIDGE_VIRT_BASE + 0x108)
-+#define RSTOUTn_MASK_PHYS	(ORION5X_BRIDGE_PHYS_BASE + 0x108)
- 
- #define CPU_SOFT_RESET		(ORION5X_BRIDGE_VIRT_BASE + 0x10c)
- 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index c66d163..3375037 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -594,14 +594,16 @@ void __init orion_spi_1_init(unsigned long mapbase)
- /*****************************************************************************
-  * Watchdog
-  ****************************************************************************/
--static struct resource orion_wdt_resource =
--		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
-+static struct resource orion_wdt_resource[] = {
-+		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
-+		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
-+};
- 
- static struct platform_device orion_wdt_device = {
- 	.name		= "orion_wdt",
- 	.id		= -1,
--	.num_resources	= 1,
--	.resource	= &orion_wdt_resource,
-+	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
-+	.resource	= orion_wdt_resource,
- };
- 
- void __init orion_wdt_init(void)
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index c8ab377..19e4adc 100644
+index 7889309..9a904be 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -46,6 +46,7 @@ static unsigned int wdt_max_duration;	/* (seconds) */
- static struct clk *clk;
- static unsigned int wdt_tclk;
- static void __iomem *wdt_reg;
-+static void __iomem *wdt_rstout;
+@@ -40,45 +40,56 @@
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+-static unsigned int wdt_max_duration;	/* (seconds) */
+-static struct clk *clk;
+-static unsigned int wdt_tclk;
+-static void __iomem *wdt_reg;
+-static void __iomem *wdt_rstout;
++
++struct orion_watchdog {
++	struct watchdog_device wdt;
++	void __iomem *reg;
++	void __iomem *rstout;
++	unsigned long clk_rate;
++	struct clk *clk;
++};
  
  static int orion_wdt_ping(struct watchdog_device *wdt_dev)
  {
-@@ -66,14 +67,14 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
- 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 	/* Reload watchdog duration */
+-	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
++	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
+ 	return 0;
+ }
+ 
+ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ {
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
+ 	/* Set watchdog duration */
+-	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
++	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
+ 
+ 	/* Enable watchdog timer */
+-	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
++	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, WDT_EN);
  
  	/* Enable reset on watchdog */
--	atomic_io_modify(RSTOUTn_MASK, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
-+	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
+-	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
++	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
++
  	return 0;
  }
  
  static int orion_wdt_stop(struct watchdog_device *wdt_dev)
  {
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
  	/* Disable reset on watchdog */
--	atomic_io_modify(RSTOUTn_MASK, WDT_RESET_OUT_EN, 0);
-+	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, 0);
+-	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, 0);
++	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, 0);
  
  	/* Disable watchdog timer */
- 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
-@@ -138,6 +139,13 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	if (!wdt_reg)
- 		return -ENOMEM;
+-	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
++	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, 0);
++
+ 	return 0;
+ }
  
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res)
-+		return -ENODEV;
-+	wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-+	if (!wdt_rstout)
+ static unsigned int orion_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+ {
+-	return readl(wdt_reg + WDT_VAL) / wdt_tclk;
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++	return readl(dev->reg + WDT_VAL) / dev->clk_rate;
+ }
+ 
+ static int orion_wdt_set_timeout(struct watchdog_device *wdt_dev,
+@@ -102,12 +113,6 @@ static const struct watchdog_ops orion_wdt_ops = {
+ 	.get_timeleft = orion_wdt_get_timeleft,
+ };
+ 
+-static struct watchdog_device orion_wdt = {
+-	.info = &orion_wdt_info,
+-	.ops = &orion_wdt_ops,
+-	.min_timeout = 1,
+-};
+-
+ static irqreturn_t orion_wdt_irq(int irq, void *devid)
+ {
+ 	panic("Watchdog Timeout");
+@@ -116,29 +121,41 @@ static irqreturn_t orion_wdt_irq(int irq, void *devid)
+ 
+ static int orion_wdt_probe(struct platform_device *pdev)
+ {
++	struct orion_watchdog *dev;
++	unsigned int wdt_max_duration;	/* (seconds) */
+ 	struct resource *res;
+ 	int ret, irq;
+ 
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(clk)) {
++	dev = devm_kzalloc(&pdev->dev, sizeof(struct orion_watchdog),
++			   GFP_KERNEL);
++	if (!dev)
 +		return -ENOMEM;
 +
++	dev->wdt.info = &orion_wdt_info;
++	dev->wdt.ops = &orion_wdt_ops;
++	dev->wdt.min_timeout = 1;
++
++	dev->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(dev->clk)) {
+ 		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
+ 		return -ENODEV;
+ 	}
+-	clk_prepare_enable(clk);
+-	wdt_tclk = clk_get_rate(clk);
++	clk_prepare_enable(dev->clk);
++	dev->clk_rate = clk_get_rate(dev->clk);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res)
+ 		return -ENODEV;
+-	wdt_reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+-	if (!wdt_reg)
++	dev->reg = devm_ioremap(&pdev->dev, res->start,
++			       resource_size(res));
++	if (!dev->reg)
+ 		return -ENOMEM;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	if (!res)
+ 		return -ENODEV;
+-	wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+-	if (!wdt_rstout)
++	dev->rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
++	if (!dev->rstout)
+ 		return -ENOMEM;
+ 
  	irq = platform_get_irq(pdev, 0);
- 	if (irq > 0) {
- 		/*
+@@ -154,34 +171,40 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
++	wdt_max_duration = WDT_MAX_CYCLE_COUNT / dev->clk_rate;
+ 
+-	orion_wdt.timeout = wdt_max_duration;
+-	orion_wdt.max_timeout = wdt_max_duration;
+-	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
++	dev->wdt.timeout = wdt_max_duration;
++	dev->wdt.max_timeout = wdt_max_duration;
++	watchdog_init_timeout(&dev->wdt, heartbeat, &pdev->dev);
+ 
+-	watchdog_set_nowayout(&orion_wdt, nowayout);
+-	ret = watchdog_register_device(&orion_wdt);
++	platform_set_drvdata(pdev, &dev->wdt);
++	watchdog_set_drvdata(&dev->wdt, dev);
++	watchdog_set_nowayout(&dev->wdt, nowayout);
++	ret = watchdog_register_device(&dev->wdt);
+ 	if (ret) {
+-		clk_disable_unprepare(clk);
++		clk_disable_unprepare(dev->clk);
+ 		return ret;
+ 	}
+ 
+ 	pr_info("Initial timeout %d sec%s\n",
+-		orion_wdt.timeout, nowayout ? ", nowayout" : "");
++		dev->wdt.timeout, nowayout ? ", nowayout" : "");
+ 	return 0;
+ }
+ 
+ static int orion_wdt_remove(struct platform_device *pdev)
+ {
+-	watchdog_unregister_device(&orion_wdt);
+-	clk_disable_unprepare(clk);
++	struct watchdog_device *wdt_dev = platform_get_drvdata(pdev);
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
++	watchdog_unregister_device(wdt_dev);
++	clk_disable_unprepare(dev->clk);
+ 	return 0;
+ }
+ 
+ static void orion_wdt_shutdown(struct platform_device *pdev)
+ {
+-	orion_wdt_stop(&orion_wdt);
++	struct watchdog_device *wdt_dev = platform_get_drvdata(pdev);
++	orion_wdt_stop(wdt_dev);
+ }
+ 
+ static const struct of_device_id orion_wdt_of_match_table[] = {
 -- 
 1.8.1.5
