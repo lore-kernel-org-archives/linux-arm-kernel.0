@@ -1,67 +1,279 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 21 Jan 2014 14:23:38 +0530
-Subject: [PATCH] arch_timer: Move delay timer to drivers clocksource
-In-Reply-To: <52DE326F.40105@linaro.org>
-References: <1389791227-24097-1-git-send-email-pgaikwad@nvidia.com>	<20140115154526.GC3571@mudshark.cambridge.arm.com>	<52D76BC8.6080405@nvidia.com>	<20140116121649.GG30257@mudshark.cambridge.arm.com>
- <878uufyo13.fsf@iki.fi> <52D8F403.9070602@linaro.org>
- <52D901B6.1070800@nvidia.com> <52D902D6.3090208@linaro.org>
- <52D915F3.3030500@nvidia.com> <52D91D3A.80800@linaro.org>
- <52D932B5.7020909@nvidia.com> <52D97831.6030700@codeaurora.org>
- <52DD35C2.3070809@linaro.org> <52DE2DB5.5000101@nvidia.com>
- <52DE326F.40105@linaro.org>
-Message-ID: <52DE3592.2090103@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 21 Jan 2014 09:55:03 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <20140120191302.GA32178@quad.lixom.net>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+ <CAPDyKFoywt_LcWXdWJCWMU8-GT2vLW27eiuF0WEyjHJV+96HpA@mail.gmail.com>
+ <20140120191302.GA32178@quad.lixom.net>
+Message-ID: <CAPDyKFpfrs=e3bDvdFRpnD3RkmD8ZvAJgFi6XvCRAOocqAKkKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 January 2014 02:10 PM, Daniel Lezcano wrote:
-> On 01/21/2014 09:20 AM, Prashant Gaikwad wrote:
->> On Monday 20 January 2014 08:12 PM, Daniel Lezcano wrote:
->>> On 01/17/2014 07:36 PM, Stephen Boyd wrote:
->>>> On 01/17/14 05:40, Prashant Gaikwad wrote:
->>>>> Another requirement:
->>>>>
->>>>> We have 3 timers T1, T2, T3 used as wake events for 3 idle states C1,
->>>>> C2, C3 respectively.
->>>>>
->>>>> Rating of T2 is better than T3. If I register T2 and T3 both as
->>>>> broadcast timers then T3 will not be used. But ...
->>>>>        - T2 is not preserved in C3 idle state.
->>>>>        - T3 resolution is very poor (ms) and can not be used as wake
->>>>> event for C2.
->>>>>
->>>>> Possible solution, register only T3 as broadcast device and use T2 as
->>>>> per-CPU fallback timer.
->>>> We have the same situation on MSM. I've been thinking about proposing we
->>>> allow multiple broadcast timers to exist in the system and then have the
->>>> clockevents_notify() caller indicate which C state is being entered. The
->>>> broadcast timers would need to indicate which C state they don't work in
->>>> though.
->>> IMO, there are different solutions:
->>>
->>> 1. extend the C3STOP to C1STOP, C2STOP, etc ... and pass the idle state
->>> to the time framework where these flags are checked against. I don't
->>> like this approach but it is feasible.
->>>
->>> 2. use the generic power domain. When the power domain is shutdown via
->>> the cpuidle backend driver, it switches the timer.
->> I am aware of a way to attach idle state to GenPD where we enable an
->> idle state when that power domain is turned off but not the other way
->> where domain is shutdown via CPU idle driver. How do we do it?
+On 20 January 2014 20:13, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jan 20, 2014 at 09:44:23AM +0100, Ulf Hansson wrote:
+>> On 20 January 2014 04:56, Olof Johansson <olof@lixom.net> wrote:
+>> > This patch enables support for power-on sequencing of SDIO peripherals through DT.
+>> >
+>> > In general, it's quite common that wifi modules and other similar
+>> > peripherals have several signals in addition to the SDIO interface that
+>> > needs wiggling before the module will power on. It's common to have a
+>> > reference clock, one or several power rails and one or several lines
+>> > for reset/enable type functions.
+>> >
+>> > The binding as written today introduces a number of reset gpios,
+>> > a regulator and a clock specifier. The code will handle up to 2 gpio
+>> > reset lines, but it's trivial to increase to more than that if needed
+>> > at some point.
+>> >
+>> > Implementation-wise, the MMC core has been changed to handle this during
+>> > host power up, before the host interface is powered on. I have not yet
+>> > implemented the power-down side, I wanted people to have a chance for
+>> > reporting back w.r.t. issues (or comments on the bindings) first.
+>> >
+>> > I have not tested the regulator portion, since the system and module
+>> > I'm working on doesn't need one (Samsung Chromebook with Marvell
+>> > 8797-based wifi). Testing of those portions (and reporting back) would
+>> > be appreciated.
+>> >
+>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>> > ---
+>> >  Documentation/devicetree/bindings/mmc/mmc.txt |   11 +++++++
+>> >  drivers/mmc/core/core.c                       |   42 +++++++++++++++++++++++++
+>> >  drivers/mmc/core/host.c                       |   30 +++++++++++++++++-
+>> >  include/linux/mmc/host.h                      |    5 +++
+>> >  4 files changed, 87 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+>> > index 458b57f..962e0ee 100644
+>> > --- a/Documentation/devicetree/bindings/mmc/mmc.txt
+>> > +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+>> > @@ -5,6 +5,8 @@ these definitions.
+>> >  Interpreted by the OF core:
+>> >  - reg: Registers location and length.
+>> >  - interrupts: Interrupts used by the MMC controller.
+>> > +- clocks: Clocks needed for the host controller, if any.
+>> > +- clock-names: Goes with clocks above.
+>> >
+>> >  Card detection:
+>> >  If no property below is supplied, host native card detect is used.
+>> > @@ -30,6 +32,15 @@ Optional properties:
+>> >  - cap-sdio-irq: enable SDIO IRQ signalling on this interface
+>> >  - full-pwr-cycle: full power cycle of the card is supported
+>> >
+>> > +Card power and reset control:
+>> > +The following properties can be specified for cases where the MMC
+>> > +peripheral needs additional reset, regulator and clock lines. It is for
+>> > +example common for WiFi/BT adapters to have these separate from the main
+>> > +MMC bus:
+>> > +  - card-reset-gpios: Specify GPIOs for card reset (reset active low)
+>> > +  - card-external-vcc-supply: Regulator to drive (independent) card VCC
+>> > +  - clock with name "card_ext_clock": External clock provided to the card
+>> > +
+>> >  *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
+>> >  polarity properties, we have to fix the meaning of the "normal" and "inverted"
+>> >  line levels. We choose to follow the SDHCI standard, which specifies both those
+>> > diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+>> > index 098374b..c43e6c8 100644
+>> > --- a/drivers/mmc/core/core.c
+>> > +++ b/drivers/mmc/core/core.c
+>> > @@ -13,11 +13,13 @@
+>> >  #include <linux/module.h>
+>> >  #include <linux/init.h>
+>> >  #include <linux/interrupt.h>
+>> > +#include <linux/clk.h>
+>> >  #include <linux/completion.h>
+>> >  #include <linux/device.h>
+>> >  #include <linux/delay.h>
+>> >  #include <linux/pagemap.h>
+>> >  #include <linux/err.h>
+>> > +#include <linux/gpio.h>
+>> >  #include <linux/leds.h>
+>> >  #include <linux/scatterlist.h>
+>> >  #include <linux/log2.h>
+>> > @@ -1519,6 +1521,43 @@ void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
+>> >         mmc_host_clk_release(host);
+>> >  }
+>> >
+>> > +static void mmc_card_power_up(struct mmc_host *host)
+>> > +{
+>> > +       int i;
+>> > +       struct gpio_desc **gds = host->card_reset_gpios;
+>> > +
+>> > +       for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
+>> > +               if (gds[i]) {
+>> > +                       dev_dbg(host->parent, "Asserting reset line %d", i);
+>> > +                       gpiod_set_value(gds[i], 1);
+>> > +               }
+>> > +       }
+>> > +
+>> > +       if (host->card_regulator) {
+>> > +               dev_dbg(host->parent, "Enabling external regulator");
+>> > +               if (regulator_enable(host->card_regulator))
+>> > +                       dev_err(host->parent, "Failed to enable external regulator");
+>> > +       }
+>> > +
+>> > +       if (host->card_clk) {
+>> > +               dev_dbg(host->parent, "Enabling external clock");
+>> > +               clk_prepare_enable(host->card_clk);
+>> > +       }
+>> > +
+>> > +       /* 2ms delay to let clocks and power settle */
+>> > +       mmc_delay(20);
+>> > +
+>> > +       for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
+>> > +               if (gds[i]) {
+>> > +                       dev_dbg(host->parent, "Deasserting reset line %d", i);
+>> > +                       gpiod_set_value(gds[i], 0);
+>> > +               }
+>> > +       }
+>> > +
+>> > +       /* 2ms delay to after reset release */
+>> > +       mmc_delay(20);
+>> > +}
+>> > +
+>> >  /*
+>> >   * Apply power to the MMC stack.  This is a two-stage process.
+>> >   * First, we enable power to the card without the clock running.
+>> > @@ -1535,6 +1574,9 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+>> >         if (host->ios.power_mode == MMC_POWER_ON)
+>> >                 return;
+>> >
+>> > +       /* Power up the card/module first, if needed */
+>> > +       mmc_card_power_up(host);
+>> > +
+>> >         mmc_host_clk_hold(host);
+>> >
+>> >         host->ios.vdd = fls(ocr) - 1;
+>> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>> > index 49bc403..e6b850b 100644
+>> > --- a/drivers/mmc/core/host.c
+>> > +++ b/drivers/mmc/core/host.c
+>> > @@ -12,14 +12,18 @@
+>> >   *  MMC host class device management
+>> >   */
+>> >
+>> > +#include <linux/kernel.h>
+>> > +#include <linux/clk.h>
+>> >  #include <linux/device.h>
+>> >  #include <linux/err.h>
+>> > +#include <linux/gpio/consumer.h>
+>> >  #include <linux/idr.h>
+>> >  #include <linux/of.h>
+>> >  #include <linux/of_gpio.h>
+>> >  #include <linux/pagemap.h>
+>> >  #include <linux/export.h>
+>> >  #include <linux/leds.h>
+>> > +#include <linux/regulator/consumer.h>
+>> >  #include <linux/slab.h>
+>> >  #include <linux/suspend.h>
+>> >
+>> > @@ -312,7 +316,7 @@ int mmc_of_parse(struct mmc_host *host)
+>> >         u32 bus_width;
+>> >         bool explicit_inv_wp, gpio_inv_wp = false;
+>> >         enum of_gpio_flags flags;
+>> > -       int len, ret, gpio;
+>> > +       int i, len, ret, gpio;
+>> >
+>> >         if (!host->parent || !host->parent->of_node)
+>> >                 return 0;
+>> > @@ -415,6 +419,30 @@ int mmc_of_parse(struct mmc_host *host)
+>> >         if (explicit_inv_wp ^ gpio_inv_wp)
+>> >                 host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+>> >
+>> > +       /* Parse card power/reset/clock control */
 >>
->> Even though we shutdown power domain via cpuidle driver this still has
->> to happen from CPU idle state, is that correct assumption? and we switch
->> the timer here. So we still need a way to switch timer from CPU idle
->> state. Hence the question remains is how to switch timers from idle state?
-> You can effectively attach a power domain to a cpuidle state but that
-> wasn't the point.
+>> I would like us to prevent to open up for confusion with the "eMMC hw
+>> reset" when adding this. Unless we are able to combine them in some
+>> way?
+>>
+>> Could we maybe add some more comments about in what scenarios this DT
+>> property would be useful?
 >
-> What I meant is to create a generic power domain which maps the power
-> domain of the idle state. When the power domain is shutdown, the
-> callback of the genpd will switch to the timer.
+> Ok, can do. How about something like:
 >
-> I can't give too much details because I am not used to this code but
-> maybe it is a good solution for your specific case.
+>         /*
+>          * Some cards need separate power/reset/clock control from the main
+>          * MMC/SDIO bus. Parse the description of those controls so we can
+>          * power on the card before the host controller.
+>          */
 >
 
-Somehow this is not mapping to my use case. We are using generic power 
-domains with CPU idle states.
+
+
+>
+>> > +       if (of_find_property(np, "card-reset-gpios", NULL)) {
+>> > +               struct gpio_desc *gpd;
+>> > +               for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
+>> > +                       gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
+>> > +                       if (IS_ERR(gpd))
+>> > +                               break;
+>> > +                       gpiod_direction_output(gpd, 0);
+>> > +                       host->card_reset_gpios[i] = gpd;
+>> > +               }
+>> > +
+>> > +               gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
+>> > +               if (!IS_ERR(gpd)) {
+>> > +                       dev_warn(host->parent, "More reset gpios than we can handle");
+>> > +                       gpiod_put(gpd);
+>> > +               }
+>> > +       }
+>> > +
+>> > +       host->card_clk = of_clk_get_by_name(np, "card_ext_clock");
+>>
+>> of_clk_get_by_name relies on COMMON_CLK, is that really what you want here?
+>>
+>> > +       if (IS_ERR(host->card_clk))
+>> > +               host->card_clk = NULL;
+>> > +
+>> > +       host->card_regulator = regulator_get(host->parent, "card-external-vcc");
+>>
+>> Is the above regulator related to host->ocr_avail mask? Could the
+>> above regulator be replaced by vmmc?
+>
+> I have to admit that I don't know MMC as well as I could, but OCR seems to be
+> something that's between the driver/controller/device, not related to external
+> power control in this case?
+
+This is related to the power of the card, typically external
+regulators controlled by the host driver.
+
+Both the card and the host supports a voltage range. This range is
+exactly what the OCR mask describes. At initialization of the card,
+the host ocr is validated against the card ocr.
+
+>
+>> At the moment host drivers uses mmc_regulator_get_supply(), which
+>> fetches regulators called "vmmc" and "vqmmc". It is also common to
+>> have these defined in DT like "vmmc-supply". This has not been
+>> properly documented for most host cases, and we should fix that. I
+>> also think it would make sense to include these in the documentation
+>> for the common mmc bindings, instead of host specific bindings.
+>
+> Hm, I had been of the impression that the vmmc stuff is to control
+> power/voltage on the signal lines, not for external card power. Still, even in
+> that case there's need for the reset line handling and clock control.
+
+vmmc: the power to the card.
+vqmmc: the I/O voltage levels (for the signal lines).
+
+Regarding reset, I agree, those seems to be needed.
+
+Regarding clock control. I suppose you are referring to separate
+external clocks, not affecting the SDIO/SD/MMC interface speed!?
+
+That could make sense, but still I wonder how those shall be handled
+in a fine grained power management setup. In other words, when shall
+those be gated/ungated? Is the mmc core able to take the correct
+decision about these?
+
+Kind regards
+Uffe
+
+>
+> I'll take a look and see if there's a way to handle that in a properly
+> sequenced way and still use the same regulator.
+>
+
+>
+> -Olof
