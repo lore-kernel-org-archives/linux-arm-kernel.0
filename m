@@ -1,214 +1,79 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 21 Jan 2014 13:44:24 +0000
-Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-Message-ID: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 21 Jan 2014 15:53:09 +0200
+Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
+ returns -ENODEV/-ENXIO
+In-Reply-To: <1390299099-14764-1-git-send-email-kishon@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1390299099-14764-1-git-send-email-kishon@ti.com>
+Message-ID: <52DE7BC5.90001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove !GENERIC_ATOMIC64 build dependency:
-- introduce xen_atomic64_xchg
-- use it to implement xchg_xen_ulong
+On 01/21/2014 12:11 PM, Kishon Vijay Abraham I wrote:
+> Since PHYs for dwc3 is optional (not all SoCs that have DWC3 use PHYs),
+> do not return from probe if the USB PHY library returns -ENODEV as that
+> indicates the platform does not have PHY.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Remove !CPU_V6 build dependency:
-- introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-  CONFIG_CPU_V6
-- implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
+Reviewed-by: Roger Quadros <rogerq@ti.com>
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: arnd at arndb.de
-CC: linux at arm.linux.org.uk
-CC: will.deacon at arm.com
-CC: catalin.marinas at arm.com
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-CC: xen-devel at lists.xenproject.org
+cheers,
+-roger
 
----
-
-Changes in v4:
-- avoid moving and renaming atomic64_xchg
-- introduce xen_atomic64_xchg
-- fix asm comment in __cmpxchg8 and __cmpxchg16.
-
----
- arch/arm/Kconfig                   |    3 +-
- arch/arm/include/asm/cmpxchg.h     |   60 ++++++++++++++++++++++++------------
- arch/arm/include/asm/sync_bitops.h |   24 ++++++++++++++-
- arch/arm/include/asm/xen/events.h  |   32 ++++++++++++++++++-
- 4 files changed, 95 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..ae54ae0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1881,8 +1881,7 @@ config XEN_DOM0
- config XEN
- 	bool "Xen guest support on ARM (EXPERIMENTAL)"
- 	depends on ARM && AEABI && OF
--	depends on CPU_V7 && !CPU_V6
--	depends on !GENERIC_ATOMIC64
-+	depends on CPU_V7
- 	select ARM_PSCI
- 	select SWIOTLB_XEN
- 	help
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index df2fbba..a17cff1 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
-  * cmpxchg only support 32-bits operands on ARMv6.
-  */
- 
-+static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg8\n"
-+		"	ldrexb	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexbeq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
-+static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
-+				      unsigned long new)
-+{
-+	unsigned long oldval, res;
-+
-+	do {
-+		asm volatile("@ __cmpxchg16\n"
-+		"	ldrexh	%1, [%2]\n"
-+		"	mov	%0, #0\n"
-+		"	teq	%1, %3\n"
-+		"	strexheq %0, %4, [%2]\n"
-+			: "=&r" (res), "=&r" (oldval)
-+			: "r" (ptr), "Ir" (old), "r" (new)
-+			: "memory", "cc");
-+	} while (res);
-+
-+	return oldval;
-+}
-+
- static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 				      unsigned long new, int size)
- {
-@@ -141,28 +179,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 	switch (size) {
- #ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
- 	case 1:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexb	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexbeq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg8(ptr, old, new);
- 		break;
- 	case 2:
--		do {
--			asm volatile("@ __cmpxchg1\n"
--			"	ldrexh	%1, [%2]\n"
--			"	mov	%0, #0\n"
--			"	teq	%1, %3\n"
--			"	strexheq %0, %4, [%2]\n"
--				: "=&r" (res), "=&r" (oldval)
--				: "r" (ptr), "Ir" (old), "r" (new)
--				: "memory", "cc");
--		} while (res);
-+		oldval = __cmpxchg16(ptr, old, new);
- 		break;
- #endif
- 	case 4:
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-index 63479ee..942659a 100644
---- a/arch/arm/include/asm/sync_bitops.h
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -21,7 +21,29 @@
- #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
- #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
- #define sync_test_bit(nr, addr)		test_bit(nr, addr)
--#define sync_cmpxchg			cmpxchg
- 
-+static inline unsigned long sync_cmpxchg(volatile void *ptr,
-+										 unsigned long old,
-+										 unsigned long new)
-+{
-+	unsigned long oldval;
-+	int size = sizeof(*(ptr));
-+
-+	smp_mb();
-+	switch (size) {
-+	case 1:
-+		oldval = __cmpxchg8(ptr, old, new);
-+		break;
-+	case 2:
-+		oldval = __cmpxchg16(ptr, old, new);
-+		break;
-+	default:
-+		oldval = __cmpxchg(ptr, old, new, size);
-+		break;
-+	}
-+	smp_mb();
-+
-+	return oldval;
-+}
- 
- #endif
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 8b1f37b..2032ee6 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -16,7 +16,37 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
- }
- 
--#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
-+#ifdef CONFIG_GENERIC_ATOMIC64
-+/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
-+ * atomic64_xchg function because it is implemented using spin locks.
-+ * Here we need proper atomic instructions to read and write memory
-+ * shared with the hypervisor.
-+ */
-+static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
-+{
-+	u64 result;
-+	unsigned long tmp;
-+
-+	smp_mb();
-+
-+	__asm__ __volatile__("@ xen_atomic64_xchg\n"
-+"1:	ldrexd	%0, %H0, [%3]\n"
-+"	strexd	%1, %4, %H4, [%3]\n"
-+"	teq	%1, #0\n"
-+"	bne	1b"
-+	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
-+	: "r" (&ptr->counter), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+
-+	return result;
-+}
-+#else
-+#define xen_atomic64_xchg atomic64_xchg
-+#endif
-+
-+#define xchg_xen_ulong(ptr, val) xen_atomic64_xchg(container_of((ptr),	\
- 							    atomic64_t,	\
- 							    counter), (val))
- 
--- 
-1.7.10.4
+> ---
+>  drivers/usb/dwc3/core.c |   34 ++++++++++++++--------------------
+>  1 file changed, 14 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> index a49217a..e009d4e 100644
+> --- a/drivers/usb/dwc3/core.c
+> +++ b/drivers/usb/dwc3/core.c
+> @@ -411,32 +411,26 @@ static int dwc3_probe(struct platform_device *pdev)
+>  
+>  	if (IS_ERR(dwc->usb2_phy)) {
+>  		ret = PTR_ERR(dwc->usb2_phy);
+> -
+> -		/*
+> -		 * if -ENXIO is returned, it means PHY layer wasn't
+> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+> -		 * in that case, since no PHY driver will ever probe.
+> -		 */
+> -		if (ret == -ENXIO)
+> +		if (ret == -ENXIO || ret == -ENODEV) {
+> +			dwc->usb2_phy = NULL;
+> +		} else if (ret == -EPROBE_DEFER) {
+>  			return ret;
+> -
+> -		dev_err(dev, "no usb2 phy configured\n");
+> -		return -EPROBE_DEFER;
+> +		} else {
+> +			dev_err(dev, "no usb2 phy configured\n");
+> +			return ret;
+> +		}
+>  	}
+>  
+>  	if (IS_ERR(dwc->usb3_phy)) {
+>  		ret = PTR_ERR(dwc->usb3_phy);
+> -
+> -		/*
+> -		 * if -ENXIO is returned, it means PHY layer wasn't
+> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+> -		 * in that case, since no PHY driver will ever probe.
+> -		 */
+> -		if (ret == -ENXIO)
+> +		if (ret == -ENXIO || ret == -ENODEV) {
+> +			dwc->usb3_phy = NULL;
+> +		} else if (ret == -EPROBE_DEFER) {
+>  			return ret;
+> -
+> -		dev_err(dev, "no usb3 phy configured\n");
+> -		return -EPROBE_DEFER;
+> +		} else {
+> +			dev_err(dev, "no usb3 phy configured\n");
+> +			return ret;
+> +		}
+>  	}
+>  
+>  	dwc->xhci_resources[0].start = res->start;
+> 
