@@ -1,116 +1,51 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 21 Jan 2014 12:57:01 +0200
-Subject: [PATCHv3 29/41] ARM: omap3-igep0020.dts: add display information
+Date: Tue, 21 Jan 2014 12:57:07 +0200
+Subject: [PATCHv3 35/41] Doc/DT: Add DT binding documentation for DVI Connector
 In-Reply-To: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1390301833-24944-30-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1390301833-24944-36-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Add DT binding documentation for DVI Connector.
 
-Add DT data for OMAP3 IGEPv2 board. The board has the following displays:
-
-dvi: uses TFP410 encoder to convert DPI to DVI
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap3-igep0020.dts | 59 +++++++++++++++++++++++++++++++-----
- 1 file changed, 52 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
 
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 1c7e74d2d2bc..bd8dcc9f7ab4 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -61,14 +61,52 @@
- 		reset-gpios = <&gpio1 24 GPIO_ACTIVE_LOW>; /* gpio_24 */
- 		vcc-supply = <&hsusb1_power>;
- 	};
+diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
+new file mode 100644
+index 000000000000..6a0aff866c78
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
+@@ -0,0 +1,26 @@
++DVI Connector
++==============
 +
-+	tfp410: encoder at 0 {
-+		compatible = "ti,tfp410";
-+		gpios = <&gpio6 10 GPIO_ACTIVE_LOW>; /* 170, power-down */
++Required properties:
++- compatible: "dvi-connector"
 +
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tfp410_pins>;
++Optional properties:
++- label: a symbolic name for the connector
++- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++Required nodes:
++- Video port for DVI input
 +
-+			port at 0 {
-+				reg = <0>;
++Example
++-------
 +
-+				tfp410_in: endpoint at 0 {
-+					remote-endpoint = <&dpi_out>;
-+				};
-+			};
++dvi0: connector at 0 {
++	compatible = "dvi-connector";
++	label = "dvi";
 +
-+			port at 1 {
-+				reg = <1>;
++	i2c-bus = <&i2c3>;
 +
-+				tfp410_out: endpoint at 0 {
-+					remote-endpoint = <&dvi_connector_in>;
-+				};
-+			};
-+		};
++	dvi_connector_in: endpoint {
++		remote-endpoint = <&tfp410_out>;
 +	};
-+
-+	dvi0: connector at 0 {
-+		compatible = "dvi-connector";
-+		label = "dvi";
-+
-+		i2c-bus = <&i2c3>;
-+
-+		dvi_connector_in: endpoint {
-+			remote-endpoint = <&tfp410_out>;
-+		};
-+	};
- };
- 
- &omap3_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
- 		&hsusbb1_pins
--		&tfp410_pins
--		&dss_pins
- 	>;
- 
- 	hsusbb1_pins: pinmux_hsusbb1_pins {
-@@ -88,13 +126,13 @@
- 		>;
- 	};
- 
--	tfp410_pins: tfp410_dvi_pins {
-+	tfp410_pins: pinmux_tfp410_pins {
- 		pinctrl-single,pins = <
- 			0x196 (PIN_OUTPUT | MUX_MODE4)   /* hdq_sio.gpio_170 */
- 		>;
- 	};
- 
--	dss_pins: pinmux_dss_dvi_pins {
-+	dss_dpi_pins: pinmux_dss_dpi_pins {
- 		pinctrl-single,pins = <
- 			0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
- 			0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
-@@ -216,7 +254,14 @@
- 	phys = <&hsusb1_phy>;
- };
- 
--&vpll2 {
--        /* Needed for DSS */
--        regulator-name = "vdds_dsi";
-+&dss {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
-+
-+	dpi_out: endpoint {
-+		remote-endpoint = <&tfp410_in>;
-+		data-lines = <24>;
-+	};
- };
++};
 -- 
 1.8.3.2
