@@ -1,60 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Jan 2014 11:54:52 +0100
-Subject: [PATCH v2 02/15] clocksource: orion: Use atomic access for shared
- registers
-In-Reply-To: <52DE44B9.70308@gmail.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5118193.GjKusj569J@wuerfel> <52DE44B9.70308@gmail.com>
-Message-ID: <4103670.WQZpL6dQdj@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Jan 2014 08:56:56 -0200
+Subject: [PATCH V2] ARM: imx: correct usecount of IPG,
+ ARM and MMDC clk on i.mx6sl
+In-Reply-To: <1390301452-10143-1-git-send-email-b20788@freescale.com>
+References: <1390301452-10143-1-git-send-email-b20788@freescale.com>
+Message-ID: <CAOMZO5DjGn+-gLvm0U2UNWju_4aoVmRFo52GN-_85FJ9wUJD9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 January 2014 10:58:17 Sebastian Hesselbarth wrote:
-> On 01/21/14 10:46, Arnd Bergmann wrote:
-> > On Tuesday 21 January 2014 06:12:28 Ezequiel Garcia wrote:
-> >> -/*
-> >> - * Thread-safe access to TIMER_CTRL register
-> >> - * (shared with watchdog timer)
-> >> - */
-> >> -void orion_timer_ctrl_clrset(u32 clr, u32 set)
-> >> -{
-> >> -       spin_lock(&timer_ctrl_lock);
-> >> -       writel((readl(timer_base + TIMER_CTRL) & ~clr) | set,
-> >> -               timer_base + TIMER_CTRL);
-> >> -       spin_unlock(&timer_ctrl_lock);
-> >> -}
-> >> -EXPORT_SYMBOL(orion_timer_ctrl_clrset);
-> >
-> > I don't understand what's wrong with this function, it seems like
-> > a cleaner approach than touching the register directly from two
-> > different drivers. Is this something that would only work on
-> > orion but not on armadaxp?
-> 
-> The real problem with this is that it resides in orion-time.c which
-> is fine for Orion SoCs. Armada 370/XP use a different timer and
-> therefore the _common_ watchdog driver cannot call this function.
+On Tue, Jan 21, 2014 at 8:50 AM, Anson Huang <b20788@freescale.com> wrote:
+> IPG, ARM and MMDC's clock should be enabled during kernel boot up,
+> so we need to maintain their use count, otherwise, they may be
+> disabled unexpectedly if their children's clock are turned off,
+> which is not allowed.
+>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx6sl.c |   16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+> index 78f3bd6..047f4ff 100644
+> --- a/arch/arm/mach-imx/clk-imx6sl.c
+> +++ b/arch/arm/mach-imx/clk-imx6sl.c
+> @@ -291,6 +291,22 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+>                 pr_warn("%s: failed to set AHB clock rate %d!\n",
+>                         __func__, ret);
+>
+> +       /*
+> +        * Make sure those always on clocks are enabled to maintain the correct
+> +        * usecount and enabling/disabling of parent PLLs.
+> +        */
+> +       ret = clk_prepare_enable(clks[IMX6SL_CLK_IPG]);
+> +       if (ret)
+> +               pr_warn("%s: failed to enable IPG clock %d\n", __func__, ret);
 
-Right, I had missed this part.
+What about adding WARN_ON(!ret ) ?
 
-> Moreover, Dove (out of Orion) and Armada 370/XP will happily live in
-> one V7 kernel with both time-orion and time-armada-370-xp compiled in.
+Regards,
 
-It still wouldn't be too hard to do: both clock drivers could export
-functions with different identifiers, and the wdt driver can use
-conditional compilation (#ifdef or if(IS_ENABLED())) to only call
-those functions when the respective clocksource drivers are enabled.
-
-I think the part where it went wrong is the fact that we have two
-device nodes in DT that claim the same register range, which should
-not have happened, but seems too hard to fix now without breaking
-one part or another.
-
-> The idea of the atomic readl/writel was to have something lightweight
-> and _early_ to allow such locking even for timers.
-> 
-> IIRC, there was some kind of consensus that it is okay to have atomic
-> readl/writel here.
-
-Ok, Ezequiel pointed me to that discussion now, seems ok then.
-
-	Arnd
+Fabio Estevam
