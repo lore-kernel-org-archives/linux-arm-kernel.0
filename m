@@ -1,311 +1,392 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 20 Jan 2014 17:18:35 -0800
-Subject: [PATCH REPOST 2/5] ARM: fix KVM assembler files to work in BE case
-In-Reply-To: <1387558125-3460-3-git-send-email-victor.kamensky@linaro.org>
+Date: Mon, 20 Jan 2014 17:18:43 -0800
+Subject: [PATCH REPOST 3/5] ARM: kvm one_reg coproc set and get BE fixes
+In-Reply-To: <1387558125-3460-4-git-send-email-victor.kamensky@linaro.org>
 References: <1387558125-3460-1-git-send-email-victor.kamensky@linaro.org>
- <1387558125-3460-3-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140121011835.GJ13432@cbox>
+ <1387558125-3460-4-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140121011843.GK13432@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 20, 2013 at 08:48:42AM -0800, Victor Kamensky wrote:
-> ARM v7 KVM assembler files fixes to work in big endian mode:
+Hi Victor,
 
-I don't think 'files fixes' is proper English, could be something like:
+On Fri, Dec 20, 2013 at 08:48:43AM -0800, Victor Kamensky wrote:
+> This patch fixes issue of reading and writing
 
-Fix ARM v7 KVM assembler files to work...
+interesting line break.
 
-> 
-> vgic h/w registers are little endian; when asm code reads/writes from/to
+an issue with
 
-the vgic h/w registers
+> ARM V7 registers values from/to user land. Existing code was designed to
+> work only in LE case.
 
-> them, it needs to do byteswap after/before. Byte swap code uses ARM_BE8
+The existing code...
 
-Byteswap
-
-> wrapper to add swap only if BIG_ENDIAN kernel is configured
-
-what is the config symbol, CONFIG_BIG_ENDIAN?
+'LE case'?  'little-endian'?
 
 > 
-> mcrr and mrrc instructions take couple 32 bit registers as argument, one
-
-The mcrr and mrrc...
-
-a couple of
-
-as their arguments
-
-> is supposed to be high part of 64 bit value and another is low part of
-> 64 bit. Typically those values are loaded/stored with ldrd and strd
-
-one is supposed to be?
-
-> instructions and those will load high and low parts in opposite register
-> depending on endianity. Introduce and use rr_lo_hi macro that swap
-
-opposite register?  This text is more confusing that clarifying, I think
-you need to explain what how the rr_lo_hi macro is intended to be used
-if anything.
-
-> registers in BE mode when they are passed to mcrr and mrrc instructions.
+> struct kvm_one_reg
+> ------------------
 > 
-> function that returns 64 bit result __kvm_vcpu_run in couple registers
-> has to be adjusted for BE case.
+> registers value passed through kvm_one_reg structure. It is used by
 
-The __kvm_vcpu_run function returns a 64-bit result in two registers,
-which has...
+registers value passed through?  What are you trying to say?
+
+> KVM_SET_ONE_REG, KVM_GET_ONE_REG ioctls. Note by looking at structure
+
+by the KVM...
+
+the structure
+
+> itself we cannot tell what is size of register. Note that structure carries
+
+the size of the register
+
+> address of user memory, 'addr' where register should be read or written
+
+I'm a little confused as to the value of this Section of the commit
+text.  I believe the ONE_REG interface is quite well documented
+already...
+
+> 
+> Setting register (from user-land to kvm)
+> ----------------------------------------
+> 
+> kvm_arm_set_reg takes vcpu and pointer to struct kvm_one_reg which already
+> read from user space
+
+I think you could ditch this first sentence
+
+> 
+> kvm_arm_set_reg calls set_core_reg or kvm_arm_coproc_set_reg
+
+nit: adding kvm_arm_set_reg() makes it clear that this is the function
+you're refering to, and not the ioctl as a concept.
+
+> 
+> set_core_reg deals only with 4 bytes registers, it just reads 4 bytes from
+> user space and store it properly into vcpu->arch.regs
+
+stores
+
+> 
+> kvm_arm_coproc_set_reg deals with registers of different size. At certain
+
+different sizes
+
+At a certain point
+
+> point code reaches phase where it retrieves description of register by id
+
+the description of a register
+
+> and it knows register size, which could be either 4 or 8 bytes. Kernel code
+
+s/could be/is/
+
+Kernel code is ready?
+
+> is ready to read values from user space, but destination type may vary. It
+> could be pointer to 32 bit integer or it could be pointer to 64 bit
+> integer. And all possible permutation of size and destination pointer are
+
+permutations
+
+> possible.  Depending on destination pointer type, 4 bytes or 8 bytes, two
+
+the destination pointer type
+
+> new helper functions are introduced  - reg_from_user32 and reg_from_user64.
+> They are used instead of reg_from_user function which could work only in
+> LE case.
+
+which only worked in
+
+> 
+> Size  sizeof(*DstInt)   Function used to read from user
+>    4                4   reg_from_user32
+>    8                4   reg_from_user32 - read two registers
+>    4                8   reg_from_user64 - need special handling for BE
+>    8                8   reg_from_user64
+> 
+> Getting register (to user-land from kvm)
+> ----------------------------------------
+> 
+> Situation with reading registers is similar to writing. Integer pointer
+
+The situation
+
+> type of register to be copied could be 4 or 8 bytes. And size passed in
+
+The integer pointer
+
+pointer to be copied?  Please clarify what you are referring to.
+
+> struct kvm_one_reg could be 4 or 8. And any permutation is possible.
+
+Any permutation of source pointer type and size is possible.
+
+> Depending on src pointer type, 4 bytes or 8 bytes, two new helper functions
+> are introduced - reg_from_user32 and reg_to_user64. They are used instead
+
+reg_to_user32?
+
+> of reg_to_user function, which could work only in LE case.
+
+the reg_to_user, which worked only for LE.
+
+> 
+> Size  sizeof(*SrcInt)   Function used to write to user
+>    4                4   reg_to_user32
+>    8                4   reg_to_user32 - writes two registers
+>    4                8   reg_to_user64 - need special handleing for BE
+>    8                8   reg_to_user64
+
+I think it could be slightly more helpful to put a comment on the
+functions, like "Write to 32-bit user pointer" on reg_to_user32, but
+it's up to you.
+
+> 
+> Note code does assume that it can only deals with 4 or 8 byte registers.
+
+Note: We only support register sizes of 4 or 8 bytes.
 
 > 
 > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+
+I don't mean to hammer on your commit message with all my comments.  I
+really do appreciate you taking the time to document your changes.
+However, with the level of detail you are providing in the commit, I
+think you have to be slightly more careful with the language, so that it
+doesn't end up being misleading instead of helpful.  I think you could
+sum this up much shorter to simply say that core register handling is
+already endian-safe, but coprocessors and vfpregs use reg_to_user which
+is not endian-safe, and therefore needs changing.
+
+The motivation about the pointer types and register sizes being
+arbitrarily different is important though, so I appreciate you listing
+that.
+
+
 > ---
->  arch/arm/include/asm/assembler.h |  7 +++++++
->  arch/arm/include/asm/kvm_asm.h   |  4 ++--
->  arch/arm/kvm/init.S              |  7 +++++--
->  arch/arm/kvm/interrupts.S        | 12 +++++++++---
->  arch/arm/kvm/interrupts_head.S   | 27 ++++++++++++++++++++-------
->  5 files changed, 43 insertions(+), 14 deletions(-)
+>  arch/arm/kvm/coproc.c | 94 +++++++++++++++++++++++++++++++++++++--------------
+>  1 file changed, 69 insertions(+), 25 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 5c22851..ad1ad31 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -60,6 +60,13 @@
->  #define ARM_BE8(code...)
->  #endif
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 78c0885..64b2b94 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -634,17 +634,61 @@ static struct coproc_reg invariant_cp15[] = {
+>  	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+>  };
 >  
-> +/* swap pair of registers position depending on current endianity */
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define rr_lo_hi(a1, a2) a2, a1
-> +#else
-> +#define rr_lo_hi(a1, a2) a1, a2
-> +#endif
+> -static int reg_from_user(void *val, const void __user *uaddr, u64 id)
+> +static int reg_from_user64(u64 *val, const void __user *uaddr, u64 id)
+> +{
+> +	unsigned long regsize = KVM_REG_SIZE(id);
+> +	union {
+> +		u32	word;
+> +		u64	dword;
+> +	} tmp = {0};
 > +
-
-I'm not convinced that this is needed generally in the kernel and not
-locally to KVM, but if it is, then I think it needs to be documented
-more.  I assume the idea here is that a1 is always the lowered number
-register in an ldrd instruction loading the values to write to the
-register?
-
->  /*
->   * Data preload for architectures that support it
->   */
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 661da11..12981d6 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -26,9 +26,9 @@
->  #define c1_ACTLR	4	/* Auxilliary Control Register */
->  #define c1_CPACR	5	/* Coprocessor Access Control */
->  #define c2_TTBR0	6	/* Translation Table Base Register 0 */
-> -#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
-> +#define c2_TTBR0_hilo	7	/* TTBR0 top 32 bits in LE case, low 32 bits in BE case */
->  #define c2_TTBR1	8	/* Translation Table Base Register 1 */
-> -#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
-> +#define c2_TTBR1_hilo	9	/* TTBR1 top 32 bits in LE case, low 32 bits in BE case */
-
-These lines far exceed 80 chars, but not sure how to improve on that...
-
->  #define c2_TTBCR	10	/* Translation Table Base Control R. */
->  #define c3_DACR		11	/* Domain Access Control Register */
->  #define c5_DFSR		12	/* Data Fault Status Register */
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index 1b9844d..2d10b2d 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -22,6 +22,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/assembler.h>
->  
->  /********************************************************************
->   * Hypervisor initialization
-> @@ -70,8 +71,10 @@ __do_hyp_init:
->  	cmp	r0, #0			@ We have a SP?
->  	bne	phase2			@ Yes, second stage init
->  
-> +ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
+> +	if (copy_from_user(&tmp, uaddr, regsize) != 0)
+> +		return -EFAULT;
 > +
->  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
-> -	mcrr	p15, 4, r2, r3, c2
-> +	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
->  
->  	@ Set the HTCR and VTCR to the same shareability and cacheability
->  	@ settings as the non-secure TTBCR and with T0SZ == 0.
-> @@ -137,7 +140,7 @@ phase2:
->  	mov	pc, r0
->  
->  target:	@ We're now in the trampoline code, switch page tables
-> -	mcrr	p15, 4, r2, r3, c2
-> +	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
->  	isb
+> +	switch (regsize) {
+> +	case 4:
+> +		*val = tmp.word;
+> +		break;
+> +	case 8:
+> +		*val = tmp.dword;
+> +		break;
+> +	}
+> +	return 0;
+> +}
 
-I guess you could switch r2 and r3 (without a third register or using
-stack space) on big endian to avoid the need for the macro in a header
-file and define the macro locally in the interrupts*.S files...  Hmmm,
-undecided.
+You stated in the commit message that any permutation of
+KVM_REG_SIZE(id) and sizeof(*val) is possible.
 
->  
->  	@ Invalidate the old TLBs
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index df19133..0784ec3 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -25,6 +25,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/vfpmacros.h>
-> +#include <asm/assembler.h>
->  #include "interrupts_head.S"
->  
->  	.text
-> @@ -52,14 +53,14 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->  	dsb	ishst
->  	add	r0, r0, #KVM_VTTBR
->  	ldrd	r2, r3, [r0]
-> -	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
-> +	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
->  	isb
->  	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
->  	dsb	ish
->  	isb
->  	mov	r2, #0
->  	mov	r3, #0
-> -	mcrr	p15, 6, r2, r3, c2	@ Back to VMID #0
-> +	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Back to VMID #0
->  	isb				@ Not necessary if followed by eret
->  
->  	ldmia	sp!, {r2, r3}
-> @@ -135,7 +136,7 @@ ENTRY(__kvm_vcpu_run)
->  	ldr	r1, [vcpu, #VCPU_KVM]
->  	add	r1, r1, #KVM_VTTBR
->  	ldrd	r2, r3, [r1]
-> -	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
-> +	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
->  
->  	@ We're all done, just restore the GPRs and go to the guest
->  	restore_guest_regs
-> @@ -199,8 +200,13 @@ after_vfp_restore:
->  
->  	restore_host_regs
->  	clrex				@ Clear exclusive monitor
-> +#ifndef __ARMEB__
->  	mov	r0, r1			@ Return the return code
->  	mov	r1, #0			@ Clear upper bits in return value
-> +#else
-> +	@ r1 already has return code
-> +	mov	r0, #0			@ Clear upper bits in return value
-> +#endif /* __ARMEB__ */
->  	bx	lr			@ return to IOCTL
->  
->  /********************************************************************
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index c371db7..67b4002 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -251,8 +251,8 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	mrc	p15, 0, r3, c1, c0, 2	@ CPACR
->  	mrc	p15, 0, r4, c2, c0, 2	@ TTBCR
->  	mrc	p15, 0, r5, c3, c0, 0	@ DACR
-> -	mrrc	p15, 0, r6, r7, c2	@ TTBR 0
-> -	mrrc	p15, 1, r8, r9, c2	@ TTBR 1
-> +	mrrc	p15, 0, rr_lo_hi(r6, r7), c2	@ TTBR 0
-> +	mrrc	p15, 1, rr_lo_hi(r8, r9), c2	@ TTBR 1
->  	mrc	p15, 0, r10, c10, c2, 0	@ PRRR
->  	mrc	p15, 0, r11, c10, c2, 1	@ NMRR
->  	mrc	p15, 2, r12, c0, c0, 0	@ CSSELR
-> @@ -380,8 +380,8 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	mcr	p15, 0, r3, c1, c0, 2	@ CPACR
->  	mcr	p15, 0, r4, c2, c0, 2	@ TTBCR
->  	mcr	p15, 0, r5, c3, c0, 0	@ DACR
-> -	mcrr	p15, 0, r6, r7, c2	@ TTBR 0
-> -	mcrr	p15, 1, r8, r9, c2	@ TTBR 1
-> +	mcrr	p15, 0, rr_lo_hi(r6, r7), c2	@ TTBR 0
-> +	mcrr	p15, 1, rr_lo_hi(r8, r9), c2	@ TTBR 1
->  	mcr	p15, 0, r10, c10, c2, 0	@ PRRR
->  	mcr	p15, 0, r11, c10, c2, 1	@ NMRR
->  	mcr	p15, 2, r12, c0, c0, 0	@ CSSELR
-> @@ -413,13 +413,21 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	ldr	r9, [r2, #GICH_ELRSR1]
->  	ldr	r10, [r2, #GICH_APR]
->  
-> +ARM_BE8(rev	r3, r3	)
->  	str	r3, [r11, #VGIC_CPU_HCR]
-> +ARM_BE8(rev	r4, r4	)
->  	str	r4, [r11, #VGIC_CPU_VMCR]
-> +ARM_BE8(rev	r5, r5	)
->  	str	r5, [r11, #VGIC_CPU_MISR]
-> +ARM_BE8(rev	r6, r6	)
->  	str	r6, [r11, #VGIC_CPU_EISR]
-> +ARM_BE8(rev	r7, r7	)
->  	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
-> +ARM_BE8(rev	r8, r8	)
->  	str	r8, [r11, #VGIC_CPU_ELRSR]
-> +ARM_BE8(rev	r9, r9	)
->  	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
-> +ARM_BE8(rev	r10, r10	)
->  	str	r10, [r11, #VGIC_CPU_APR]
+So doesn't this totally mess up the the kernel if I pass a 32-bit
+pointer to reg_from_user64?  Or is that not really the case and that's
+an exception to all of the permutations?
 
-Wouldn't it be semantically cleaner to to the byteswap after the loads
-from the hardware instead?
+Basically you KVM_REG_SIZE(id) and sizeof your destination pointer type
+should always match, but we abuse this slightly so far.  I don't think
+you should cater to that, but just require callers to always provide a
+consistent size/type pair (you could also add a union you use as a
+parameter instead, or have two typed parameter) and simplify into a
+single function.
 
+The only special cases you now have to deal with are in:
+set_invariant_cp15(): declare two temp variables of u32 and u64 sizes
+get_invariant_cp15(): either have temporary values or change val in
+                      corproc_reg to be a union
+
+The current scheme is pretty hard to understand and to make sure we're
+not breaking anything...
+
+> +
+> +/* Note it may really copy two u32 registers */
+> +static int reg_from_user32(u32 *val, const void __user *uaddr, u64 id)
+>  {
+> -	/* This Just Works because we are little endian. */
+>  	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+>  		return -EFAULT;
+>  	return 0;
+>  }
 >  
->  	/* Clear GICH_HCR */
-> @@ -431,6 +439,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	add	r3, r11, #VGIC_CPU_LR
->  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
->  1:	ldr	r6, [r2], #4
-> +ARM_BE8(rev	r6, r6	)
->  	str	r6, [r3], #4
->  	subs	r4, r4, #1
->  	bne	1b
-> @@ -459,8 +468,11 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	ldr	r4, [r11, #VGIC_CPU_VMCR]
->  	ldr	r8, [r11, #VGIC_CPU_APR]
+> -static int reg_to_user(void __user *uaddr, const void *val, u64 id)
+> +static int reg_to_user64(void __user *uaddr, const u64 *val, u64 id)
+> +{
+> +	unsigned long regsize = KVM_REG_SIZE(id);
+> +	union {
+> +		u32	word;
+> +		u64	dword;
+> +	} tmp;
+> +
+> +	switch (regsize) {
+> +	case 4:
+> +		tmp.word = *val;
+> +		break;
+> +	case 8:
+> +		tmp.dword = *val;
+> +		break;
+> +	}
+> +
+> +	if (copy_to_user(uaddr, &tmp, regsize) != 0)
+> +		return -EFAULT;
+> +	return 0;
+> +}
+> +
+> +/* Note it may really copy two u32 registers */
+> +static int reg_to_user32(void __user *uaddr, const u32 *val, u64 id)
+>  {
+> -	/* This Just Works because we are little endian. */
+>  	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
+>  		return -EFAULT;
+>  	return 0;
+> @@ -662,7 +706,7 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
+>  	if (!r)
+>  		return -ENOENT;
 >  
-> +ARM_BE8(rev	r3, r3	)
->  	str	r3, [r2, #GICH_HCR]
-> +ARM_BE8(rev	r4, r4	)
->  	str	r4, [r2, #GICH_VMCR]
-> +ARM_BE8(rev	r8, r8	)
->  	str	r8, [r2, #GICH_APR]
+> -	return reg_to_user(uaddr, &r->val, id);
+> +	return reg_to_user64(uaddr, &r->val, id);
+>  }
 >  
->  	/* Restore list registers */
-> @@ -468,6 +480,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	add	r3, r11, #VGIC_CPU_LR
->  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
->  1:	ldr	r6, [r3], #4
-> +ARM_BE8(rev	r6, r6  )
->  	str	r6, [r2], #4
->  	subs	r4, r4, #1
->  	bne	1b
-> @@ -498,7 +511,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
->  	isb
+>  static int set_invariant_cp15(u64 id, void __user *uaddr)
+> @@ -678,7 +722,7 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+>  	if (!r)
+>  		return -ENOENT;
 >  
-> -	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
-> +	mrrc	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
->  	ldr	r4, =VCPU_TIMER_CNTV_CVAL
->  	add	r5, vcpu, r4
->  	strd	r2, r3, [r5]
-> @@ -538,12 +551,12 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+> -	err = reg_from_user(&val, uaddr, id);
+> +	err = reg_from_user64(&val, uaddr, id);
+>  	if (err)
+>  		return err;
 >  
->  	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
->  	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
-> -	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
-> +	mcrr	p15, 4, rr_lo_hi(r2, r3), c14	@ CNTVOFF
+> @@ -846,7 +890,7 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
+>  	if (vfpid < num_fp_regs()) {
+>  		if (KVM_REG_SIZE(id) != 8)
+>  			return -ENOENT;
+> -		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
+> +		return reg_to_user64(uaddr, &vcpu->arch.vfp_guest.fpregs[vfpid],
+>  				   id);
+>  	}
 >  
->  	ldr	r4, =VCPU_TIMER_CNTV_CVAL
->  	add	r5, vcpu, r4
->  	ldrd	r2, r3, [r5]
-> -	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
-> +	mcrr	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
->  	isb
+> @@ -856,22 +900,22 @@ static int vfp_get_reg(const struct kvm_vcpu *vcpu, u64 id, void __user *uaddr)
 >  
->  	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+>  	switch (vfpid) {
+>  	case KVM_REG_ARM_VFP_FPEXC:
+> -		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
+> +		return reg_to_user32(uaddr, &vcpu->arch.vfp_guest.fpexc, id);
+>  	case KVM_REG_ARM_VFP_FPSCR:
+> -		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
+> +		return reg_to_user32(uaddr, &vcpu->arch.vfp_guest.fpscr, id);
+>  	case KVM_REG_ARM_VFP_FPINST:
+> -		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
+> +		return reg_to_user32(uaddr, &vcpu->arch.vfp_guest.fpinst, id);
+>  	case KVM_REG_ARM_VFP_FPINST2:
+> -		return reg_to_user(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
+> +		return reg_to_user32(uaddr, &vcpu->arch.vfp_guest.fpinst2, id);
+>  	case KVM_REG_ARM_VFP_MVFR0:
+>  		val = fmrx(MVFR0);
+> -		return reg_to_user(uaddr, &val, id);
+> +		return reg_to_user32(uaddr, &val, id);
+>  	case KVM_REG_ARM_VFP_MVFR1:
+>  		val = fmrx(MVFR1);
+> -		return reg_to_user(uaddr, &val, id);
+> +		return reg_to_user32(uaddr, &val, id);
+>  	case KVM_REG_ARM_VFP_FPSID:
+>  		val = fmrx(FPSID);
+> -		return reg_to_user(uaddr, &val, id);
+> +		return reg_to_user32(uaddr, &val, id);
+>  	default:
+>  		return -ENOENT;
+>  	}
+> @@ -890,8 +934,8 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+>  	if (vfpid < num_fp_regs()) {
+>  		if (KVM_REG_SIZE(id) != 8)
+>  			return -ENOENT;
+> -		return reg_from_user(&vcpu->arch.vfp_guest.fpregs[vfpid],
+> -				     uaddr, id);
+> +		return reg_from_user64(&vcpu->arch.vfp_guest.fpregs[vfpid],
+> +				       uaddr, id);
+>  	}
+>  
+>  	/* FP control registers are all 32 bit. */
+> @@ -900,28 +944,28 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+>  
+>  	switch (vfpid) {
+>  	case KVM_REG_ARM_VFP_FPEXC:
+> -		return reg_from_user(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
+> +		return reg_from_user32(&vcpu->arch.vfp_guest.fpexc, uaddr, id);
+>  	case KVM_REG_ARM_VFP_FPSCR:
+> -		return reg_from_user(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
+> +		return reg_from_user32(&vcpu->arch.vfp_guest.fpscr, uaddr, id);
+>  	case KVM_REG_ARM_VFP_FPINST:
+> -		return reg_from_user(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
+> +		return reg_from_user32(&vcpu->arch.vfp_guest.fpinst, uaddr, id);
+>  	case KVM_REG_ARM_VFP_FPINST2:
+> -		return reg_from_user(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
+> +		return reg_from_user32(&vcpu->arch.vfp_guest.fpinst2, uaddr, id);
+>  	/* These are invariant. */
+>  	case KVM_REG_ARM_VFP_MVFR0:
+> -		if (reg_from_user(&val, uaddr, id))
+> +		if (reg_from_user32(&val, uaddr, id))
+>  			return -EFAULT;
+>  		if (val != fmrx(MVFR0))
+>  			return -EINVAL;
+>  		return 0;
+>  	case KVM_REG_ARM_VFP_MVFR1:
+> -		if (reg_from_user(&val, uaddr, id))
+> +		if (reg_from_user32(&val, uaddr, id))
+>  			return -EFAULT;
+>  		if (val != fmrx(MVFR1))
+>  			return -EINVAL;
+>  		return 0;
+>  	case KVM_REG_ARM_VFP_FPSID:
+> -		if (reg_from_user(&val, uaddr, id))
+> +		if (reg_from_user32(&val, uaddr, id))
+>  			return -EFAULT;
+>  		if (val != fmrx(FPSID))
+>  			return -EINVAL;
+> @@ -968,7 +1012,7 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  		return get_invariant_cp15(reg->id, uaddr);
+>  
+>  	/* Note: copies two regs if size is 64 bit. */
+> -	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+> +	return reg_to_user32(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+>  }
+>  
+>  int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> @@ -987,7 +1031,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  		return set_invariant_cp15(reg->id, uaddr);
+>  
+>  	/* Note: copies two regs if size is 64 bit */
+> -	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+> +	return reg_from_user32(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+>  }
+>  
+>  static unsigned int num_demux_regs(void)
 > -- 
 > 1.8.1.4
 > 
