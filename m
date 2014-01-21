@@ -1,79 +1,29 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 21 Jan 2014 15:53:09 +0200
-Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
- returns -ENODEV/-ENXIO
-In-Reply-To: <1390299099-14764-1-git-send-email-kishon@ti.com>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
-Message-ID: <52DE7BC5.90001@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 21 Jan 2014 08:49:37 -0500
+Subject: [PATCH v4 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <CACRpkdYAANtY=9QtDnYNZLSrF09nTWUH4nK5oJ7mzznS+_=bHA@mail.gmail.com>
+References: <1386787041-6035-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-1-git-send-email-syin@broadcom.com>
+ <1387592016-13740-4-git-send-email-syin@broadcom.com>
+ <CACRpkdaPZrR=kEknr3YKDWLd_E+o22Yn19ei7iT6cdbYdbeZ2w@mail.gmail.com>
+ <52D98B99.5050604@broadcom.com> <20140118025600.GS31049@beef>
+ <CACRpkdYAANtY=9QtDnYNZLSrF09nTWUH4nK5oJ7mzznS+_=bHA@mail.gmail.com>
+Message-ID: <20140121134937.GG31176@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/2014 12:11 PM, Kishon Vijay Abraham I wrote:
-> Since PHYs for dwc3 is optional (not all SoCs that have DWC3 use PHYs),
-> do not return from probe if the USB PHY library returns -ENODEV as that
-> indicates the platform does not have PHY.
+On Mon, Jan 20, 2014 at 09:16:24AM +0100, Linus Walleij wrote:
+> On Sat, Jan 18, 2014 at 3:56 AM, Matt Porter <mporter@linaro.org> wrote:
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-Reviewed-by: Roger Quadros <rogerq@ti.com>
-
-cheers,
--roger
-
-> ---
->  drivers/usb/dwc3/core.c |   34 ++++++++++++++--------------------
->  1 file changed, 14 insertions(+), 20 deletions(-)
+> > I wonder if Linus would accept a rename at this point (too late for 3.14
+> > presumably, but for 3.15) of s/capri/bcm281xx throughout, bcm11351 for
+> > the compatible string, as we have for the machine compatible, and also
+> > BCM281XX for the Kconfig option.
 > 
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index a49217a..e009d4e 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -411,32 +411,26 @@ static int dwc3_probe(struct platform_device *pdev)
->  
->  	if (IS_ERR(dwc->usb2_phy)) {
->  		ret = PTR_ERR(dwc->usb2_phy);
-> -
-> -		/*
-> -		 * if -ENXIO is returned, it means PHY layer wasn't
-> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
-> -		 * in that case, since no PHY driver will ever probe.
-> -		 */
-> -		if (ret == -ENXIO)
-> +		if (ret == -ENXIO || ret == -ENODEV) {
-> +			dwc->usb2_phy = NULL;
-> +		} else if (ret == -EPROBE_DEFER) {
->  			return ret;
-> -
-> -		dev_err(dev, "no usb2 phy configured\n");
-> -		return -EPROBE_DEFER;
-> +		} else {
-> +			dev_err(dev, "no usb2 phy configured\n");
-> +			return ret;
-> +		}
->  	}
->  
->  	if (IS_ERR(dwc->usb3_phy)) {
->  		ret = PTR_ERR(dwc->usb3_phy);
-> -
-> -		/*
-> -		 * if -ENXIO is returned, it means PHY layer wasn't
-> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
-> -		 * in that case, since no PHY driver will ever probe.
-> -		 */
-> -		if (ret == -ENXIO)
-> +		if (ret == -ENXIO || ret == -ENODEV) {
-> +			dwc->usb3_phy = NULL;
-> +		} else if (ret == -EPROBE_DEFER) {
->  			return ret;
-> -
-> -		dev_err(dev, "no usb3 phy configured\n");
-> -		return -EPROBE_DEFER;
-> +		} else {
-> +			dev_err(dev, "no usb3 phy configured\n");
-> +			return ret;
-> +		}
->  	}
->  
->  	dwc->xhci_resources[0].start = res->start;
+> Yes, if there is some consensus that this is what we want to do.
 > 
+> I can certainly merge that during the 3.14-rc phase for that matter.
+
+Ok, sounds great, thanks.
+
+-Matt
