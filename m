@@ -1,57 +1,214 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 21 Jan 2014 14:36:56 +0100
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <20140121115706.GT15937@n2100.arm.linux.org.uk>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
- <20140120122840.36520f37@ipc1.ka-ro>
- <20140120123627.1147f252@ipc1.ka-ro>
- <20140120123849.GC15937@n2100.arm.linux.org.uk>
- <20140120150902.207b9d66@ipc1.ka-ro>
- <20140120151152.GE15937@n2100.arm.linux.org.uk>
- <20140121075922.2a83e076@ipc1.ka-ro>
- <20140121110107.GS15937@n2100.arm.linux.org.uk>
- <20140121125200.6b1e96bd@ipc1.ka-ro>
- <20140121115706.GT15937@n2100.arm.linux.org.uk>
-Message-ID: <20140121143656.3c0b96c0@ipc1.ka-ro>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 21 Jan 2014 13:44:24 +0000
+Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+Message-ID: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Remove !GENERIC_ATOMIC64 build dependency:
+- introduce xen_atomic64_xchg
+- use it to implement xchg_xen_ulong
 
-Russell King - ARM Linux wrote:
-> On Tue, Jan 21, 2014 at 12:52:00PM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Russell King - ARM Linux wrote:
-> > > On Tue, Jan 21, 2014 at 07:59:22AM +0100, Lothar Wa?mann wrote:
-> > > > The file is automatically removed after the timeout has expired (or
-> > > > the frimware has been loaded).
-> > > > Thus you must check for it within the timeout period during boot.
-> > > 
-> > > ... which is impossible if imx-sdma is built into the kernel - it
-> > > expires while the initramfs has only just started running, giving a
-> > > very narrow window for userspace to load firmware.
-> > > 
-> > It works for me, but I'm not using initramfs.
-> 
-> You can take my email as a report of "it doesn't work for everyone."  The
-> *only* way I can get firmware to load is to build imx-sdma as a module.
-> Building it in is a hopeless case here.
-> 
-You could change the timeout from your initramfs as soon as sysfs has
-been mounted by writing the number of seconds to
-/sys/class/firmware/timeout. A timeout of '0' means 'wait forever' which
-should be long enough for any boot case. ;)
+Remove !CPU_V6 build dependency:
+- introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+  CONFIG_CPU_V6
+- implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
 
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: arnd at arndb.de
+CC: linux at arm.linux.org.uk
+CC: will.deacon at arm.com
+CC: catalin.marinas at arm.com
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+CC: xen-devel at lists.xenproject.org
 
-Lothar Wa?mann
+---
+
+Changes in v4:
+- avoid moving and renaming atomic64_xchg
+- introduce xen_atomic64_xchg
+- fix asm comment in __cmpxchg8 and __cmpxchg16.
+
+---
+ arch/arm/Kconfig                   |    3 +-
+ arch/arm/include/asm/cmpxchg.h     |   60 ++++++++++++++++++++++++------------
+ arch/arm/include/asm/sync_bitops.h |   24 ++++++++++++++-
+ arch/arm/include/asm/xen/events.h  |   32 ++++++++++++++++++-
+ 4 files changed, 95 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..ae54ae0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1881,8 +1881,7 @@ config XEN_DOM0
+ config XEN
+ 	bool "Xen guest support on ARM (EXPERIMENTAL)"
+ 	depends on ARM && AEABI && OF
+-	depends on CPU_V7 && !CPU_V6
+-	depends on !GENERIC_ATOMIC64
++	depends on CPU_V7
+ 	select ARM_PSCI
+ 	select SWIOTLB_XEN
+ 	help
+diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+index df2fbba..a17cff1 100644
+--- a/arch/arm/include/asm/cmpxchg.h
++++ b/arch/arm/include/asm/cmpxchg.h
+@@ -133,6 +133,44 @@ extern void __bad_cmpxchg(volatile void *ptr, int size);
+  * cmpxchg only support 32-bits operands on ARMv6.
+  */
+ 
++static inline unsigned long __cmpxchg8(volatile void *ptr, unsigned long old,
++				      unsigned long new)
++{
++	unsigned long oldval, res;
++
++	do {
++		asm volatile("@ __cmpxchg8\n"
++		"	ldrexb	%1, [%2]\n"
++		"	mov	%0, #0\n"
++		"	teq	%1, %3\n"
++		"	strexbeq %0, %4, [%2]\n"
++			: "=&r" (res), "=&r" (oldval)
++			: "r" (ptr), "Ir" (old), "r" (new)
++			: "memory", "cc");
++	} while (res);
++
++	return oldval;
++}
++
++static inline unsigned long __cmpxchg16(volatile void *ptr, unsigned long old,
++				      unsigned long new)
++{
++	unsigned long oldval, res;
++
++	do {
++		asm volatile("@ __cmpxchg16\n"
++		"	ldrexh	%1, [%2]\n"
++		"	mov	%0, #0\n"
++		"	teq	%1, %3\n"
++		"	strexheq %0, %4, [%2]\n"
++			: "=&r" (res), "=&r" (oldval)
++			: "r" (ptr), "Ir" (old), "r" (new)
++			: "memory", "cc");
++	} while (res);
++
++	return oldval;
++}
++
+ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 				      unsigned long new, int size)
+ {
+@@ -141,28 +179,10 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	switch (size) {
+ #ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
+ 	case 1:
+-		do {
+-			asm volatile("@ __cmpxchg1\n"
+-			"	ldrexb	%1, [%2]\n"
+-			"	mov	%0, #0\n"
+-			"	teq	%1, %3\n"
+-			"	strexbeq %0, %4, [%2]\n"
+-				: "=&r" (res), "=&r" (oldval)
+-				: "r" (ptr), "Ir" (old), "r" (new)
+-				: "memory", "cc");
+-		} while (res);
++		oldval = __cmpxchg8(ptr, old, new);
+ 		break;
+ 	case 2:
+-		do {
+-			asm volatile("@ __cmpxchg1\n"
+-			"	ldrexh	%1, [%2]\n"
+-			"	mov	%0, #0\n"
+-			"	teq	%1, %3\n"
+-			"	strexheq %0, %4, [%2]\n"
+-				: "=&r" (res), "=&r" (oldval)
+-				: "r" (ptr), "Ir" (old), "r" (new)
+-				: "memory", "cc");
+-		} while (res);
++		oldval = __cmpxchg16(ptr, old, new);
+ 		break;
+ #endif
+ 	case 4:
+diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+index 63479ee..942659a 100644
+--- a/arch/arm/include/asm/sync_bitops.h
++++ b/arch/arm/include/asm/sync_bitops.h
+@@ -21,7 +21,29 @@
+ #define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
+ #define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
+ #define sync_test_bit(nr, addr)		test_bit(nr, addr)
+-#define sync_cmpxchg			cmpxchg
+ 
++static inline unsigned long sync_cmpxchg(volatile void *ptr,
++										 unsigned long old,
++										 unsigned long new)
++{
++	unsigned long oldval;
++	int size = sizeof(*(ptr));
++
++	smp_mb();
++	switch (size) {
++	case 1:
++		oldval = __cmpxchg8(ptr, old, new);
++		break;
++	case 2:
++		oldval = __cmpxchg16(ptr, old, new);
++		break;
++	default:
++		oldval = __cmpxchg(ptr, old, new, size);
++		break;
++	}
++	smp_mb();
++
++	return oldval;
++}
+ 
+ #endif
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 8b1f37b..2032ee6 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -16,7 +16,37 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+ }
+ 
+-#define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
++#ifdef CONFIG_GENERIC_ATOMIC64
++/* if CONFIG_GENERIC_ATOMIC64 is defined we cannot use the generic
++ * atomic64_xchg function because it is implemented using spin locks.
++ * Here we need proper atomic instructions to read and write memory
++ * shared with the hypervisor.
++ */
++static inline u64 xen_atomic64_xchg(atomic64_t *ptr, u64 new)
++{
++	u64 result;
++	unsigned long tmp;
++
++	smp_mb();
++
++	__asm__ __volatile__("@ xen_atomic64_xchg\n"
++"1:	ldrexd	%0, %H0, [%3]\n"
++"	strexd	%1, %4, %H4, [%3]\n"
++"	teq	%1, #0\n"
++"	bne	1b"
++	: "=&r" (result), "=&r" (tmp), "+Qo" (ptr->counter)
++	: "r" (&ptr->counter), "r" (new)
++	: "cc");
++
++	smp_mb();
++
++	return result;
++}
++#else
++#define xen_atomic64_xchg atomic64_xchg
++#endif
++
++#define xchg_xen_ulong(ptr, val) xen_atomic64_xchg(container_of((ptr),	\
+ 							    atomic64_t,	\
+ 							    counter), (val))
+ 
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.10.4
