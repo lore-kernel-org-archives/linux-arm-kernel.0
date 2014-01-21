@@ -1,112 +1,77 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 21 Jan 2014 10:29:26 +0800
-Subject: [PATCH v4 0/7] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <CAD6G_RTwMJ5DgkCB7wcYw+2p---DqU4KCVJ3CUnHFfCJ0ui_Jw@mail.gmail.com>
-References: <1387950629-27448-1-git-send-email-b32955@freescale.com>
- <CAD6G_RTnNQgeJM8Tc16Sc1_n29d=V9sJN1ePrOAn5YzM+GujMQ@mail.gmail.com>
- <52D7A237.8@freescale.com>
- <CAD6G_RRNg-uRtKnnVgJYpUGPsKecAUm9mwETVJsCsaGSuL2eCw@mail.gmail.com>
- <20140117020226.GB27652@shlinux2.ap.freescale.net>
- <CAD6G_RR7vgmHGFj4GqwCYLQQO6tbsZAeCzVBivbcxnCGSwgiWQ@mail.gmail.com>
- <20140117065401.GA6140@shlinux2.ap.freescale.net>
- <CAD6G_RSF_TPk8g9CNmSc+xs+9psLmJoakZw3Eqf-a8KD5P4AVg@mail.gmail.com>
- <52DB3864.2040606@gmail.com>
- <CAD6G_RTwMJ5DgkCB7wcYw+2p---DqU4KCVJ3CUnHFfCJ0ui_Jw@mail.gmail.com>
-Message-ID: <20140121022925.GA18529@shlinux2.ap.freescale.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 21 Jan 2014 12:11:06 +0900
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <CACRpkdZOD4zeA8T5kbJ4c5NsnuzHCg1mw8rRMYNT9c4R-Qnc6A@mail.gmail.com>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <1389941251-32692-5-git-send-email-wens@csie.org>
+ <201401171747.46332.arnd@arndb.de>
+ <CAGb2v67UKiyfJbKZ_Frk3OwZupMPoA2Ck3Hj2zsRFXBQPztavg@mail.gmail.com>
+ <CACRpkdZOD4zeA8T5kbJ4c5NsnuzHCg1mw8rRMYNT9c4R-Qnc6A@mail.gmail.com>
+Message-ID: <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 03:39:34PM +0530, Jagan Teki wrote:
-> > Just think about that how do you code your driver for SPI NOR _without_ this
-> > framework:
-> > do your driver need to call the m25p80.c? if you do call the m25p80.c, you
-> > actually write your so-called "two drivers" :)
-> 
-> I'm still not convinced here, sorry!
-> Let me explain more with example, Just take your (q)spi controller as an example
-> B_FSL1 designed with - serial flash
-> B_FSL2 designed with - touch screen
-> 
-> With this design If we follow current we just need one controller
-> driver (drivers/spi/spi-fsl.c)
-> to serve touch screen and serial flash from upper layers.
-> 
-> MTD core                Input core
-> -------------           -------------------------------
-> m25p80.c             spi  touchscreen driver  (drivers/input/touchscreen)
-> ----------------------------------------------------
->                           SPI core
-> ----------------------------------------------------
->       controller driver (drivers/spi/spi-fsl.)
-> ----------------------------------------------------
-> 
-> But with your new SPI-NOR
-> 
-> MTD core
-> ------------
-> SPI-NOR              Input core
-> -----------           ------------------
-> fsl-quadspi.c     spi  touchscreen driver  (drivers/input/touchscreen)
-> ----------------      ------------------------------
->                          SPI Core
->                          -----------------------------
->                          controller driver (drivers/spi/spi-fsl.c)
->                          -----------------------------------------
-> 
-There is no relationship with the fsl-quadspi.c. 
+On Sat, Jan 18, 2014 at 8:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jan 17, 2014 at 6:43 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> On Sat, Jan 18, 2014 at 12:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>>>> +- NAME_shutdown-gpios  : GPIO phandle to shutdown control
+>>>> +                         (phandle must be the second)
+>>>> +- NAME_reset-gpios     : GPIO phandle to reset control
+>>>> +
+>>>> +NAME must match the rfkill-name property. NAME_shutdown-gpios or
+>>>> +NAME_reset-gpios, or both, must be defined.
+>>>> +
+>>>
+>>> I don't understand this part. Why do you include the name in the
+>>> gpios property, rather than just hardcoding the property strings
+>>> to "shutdown-gpios" and "reset-gpios"?
+>>
+>> This quirk is a result of how gpiod_get_index implements device tree
+>> lookup.
+>
+> Why can't it just have a single property "gpios", where the first
+> element is the reset GPIO and the second is the shutdown GPIO?
+>
+> rfkill-gpio does this:
+>
+> gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
+> gpio = devm_gpiod_get_index(&pdev->dev, rfkill->shutdown_name, 1);
+>
+> The passed con ID name parameter is only there for the device
+> tree case it seems. (ACPI ignores it.) So what about you just
+> don't pass it at all and patch it to do like this instead:
+>
+> gpio = devm_gpiod_get_index(&pdev->dev, NULL, 0);
+> gpio = devm_gpiod_get_index(&pdev->dev, NULL, 1);
+>
+> Heikki, are you OK with this change?
+>
+> I think this is actually necessary if the ACPI and DT unification
+> pipe dream shall limp forward, we cannot have arguments passed
+> that have a semantic effect on DT but not on ACPI... Drivers
+> that are supposed to use both ACPI and DT will always
+> have to pass NULL as con ID.
 
-It should be like this:
- MTD core
- ------------
- SPI-NOR  framework                       Input core
- -----------                              ------------------
- m25p80.c                                 spi  touchscreen driver  (drivers/input/touchscreen)
- ----------------                         ------------------------------
- SPI Core                                 SPI Core
- -----------------------                  -----------------------------
- drivers/spi/spi-fsl.c                    controller driver (drivers/spi/spi-fsl.c)
- --------------------------               -----------------------------------------
- 
+I agree that's how it should be be done with the current API if your
+driver can obtain GPIOs from both ACPI and DT. This is a potential
+issue, as drivers are not supposed to make assumptions about who is
+going to be their GPIO provider. Let's say you started a driver with
+only DT in mind, and used gpio_get(dev, con_id) to get your GPIOs. DT
+bindings are thus of the form "con_id-gpio = <phandle>", and set in
+stone. Then later, someone wants to use your driver with ACPI. How do
+you handle that gracefully?
 
-> Here see we have two separate drivers for the same controller as it offers two
-> functionalities. and also it never talk to Linux SPI subsystem which is not a
-> good for me as intern hw is SPI-based it must talk to subsystem to make use of
-> Linux SPI API's.
-> 
-> And also you mentioned SPI-NOR controller is not a SPI controller what does that
-> means because it's a NOR flash which is of SPI protocol based.
+I'm starting to wonder, now that ACPI is a first-class GPIO provider,
+whether we should not start to encourage the deprecation of the
+"con_id-gpio = <phandle>" binding form in DT and only use a single
+indexed GPIO property per device. The con_id parameter would then only
+be used as a label, which would also have the nice side-effect that
+all GPIOs used for a given function will be reported under the same
+name no matter what the GPIO provider is.
 
-The SPI controller (or spi bus controller) only handles the _byte_ streams;
-while the spi-nor controller, such as fsl-quadspi.c, can has to __known__
-the exact SPI NOR command to find the proper LUT.
+>From an aesthetic point of view, I definitely prefer using con_id to
+identify GPIOs instead of indexes, but I don't see how we can make it
+play nice with ACPI. Thoughts?
 
-Please read the thread i ever posted in the previous email.
-
-> 
-> I understand that your framework doing good things in matured manner, but
-> seems like it's confuse to me to follow common standards - Just my
-> opinion, may be I'm incorrect.
-> 
-> One more thing question - I have 1-wire spi controller which I was
-> used for flash in
-> one board and keyboard in another board, so if I follow your framework
-> I need to write
-> a driver in drivers/mtd/spi-nor/foo-spi.c and one more in
-> drivers/spi/spi-foo.c - correct?
-
-Please read the device tree node of your controller, find the code like
-
-...................................................
-	flash: m25p80 at 0 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "st,m25p32";
-		spi-max-frequency = <20000000>;
-		reg = <0>;
-	};
-...................................................
-
-if you call the m25p80,  you do not need to change anything. 
-
-thanks
-Huang Shijie
+Alex.
