@@ -1,37 +1,33 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 21 Jan 2014 18:31:38 +0530
-Subject: [RFC PATCH 0/3] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-Message-ID: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
+Date: Tue, 21 Jan 2014 18:31:39 +0530
+Subject: [RFC PATCH 1/3] KVM: Add capability to advertise PSCI v0.2 support
+In-Reply-To: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
+References: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1390309301-28424-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-and Coordination Interface (PSCI) v0.1.
+User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
 
-This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
-provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
-CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
-later.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ include/uapi/linux/kvm.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-PSCI v0.2 to VCPUs. 
-
-Anup Patel (3):
-  KVM: Add capability to advertise PSCI v0.2 support
-  ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
-  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
-
- Documentation/virtual/kvm/api.txt |    2 +
- arch/arm/include/asm/kvm_host.h   |    2 +-
- arch/arm/include/uapi/asm/kvm.h   |   39 ++++++++++++++++--
- arch/arm/kvm/arm.c                |    6 ++-
- arch/arm/kvm/psci.c               |   79 ++++++++++++++++++++++++++++++-------
- arch/arm64/include/asm/kvm_host.h |    2 +-
- arch/arm64/include/uapi/asm/kvm.h |   39 ++++++++++++++++--
- include/uapi/linux/kvm.h          |    1 +
- 8 files changed, 146 insertions(+), 24 deletions(-)
-
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 902f124..d64349e 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_ARM_EL1_32BIT 93
+ #define KVM_CAP_SPAPR_MULTITCE 94
+ #define KVM_CAP_EXT_EMUL_CPUID 95
++#define KVM_CAP_ARM_PSCI_0_2 96
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 1.7.9.5
