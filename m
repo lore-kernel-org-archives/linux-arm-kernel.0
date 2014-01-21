@@ -1,517 +1,358 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 21 Jan 2014 11:25:48 +0100
-Subject: [PATCH v2 2/7] clk: samsung: add infrastructure to register cpu
- clocks
-In-Reply-To: <CAJuA9ajpcB41b0d09emqPPVLxeXviQAjeEObNjPxnZ3PcZk0GA@mail.gmail.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-3-git-send-email-thomas.ab@samsung.com>
- <20140120092412.0c2d57e4@amdc2363>
- <CAJuA9ajpcB41b0d09emqPPVLxeXviQAjeEObNjPxnZ3PcZk0GA@mail.gmail.com>
-Message-ID: <20140121112548.247fca7f@amdc2363>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 21 Jan 2014 11:33:10 +0100
+Subject: [PATCH 1/2] tty: uartps: Fix kernel-doc errors in the driver
+Message-ID: <7d0c02bf2d7eb816eb505d04c3800112805e2b62.1390300383.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+No functional changes.
 
-> Hi Lukasz,
-> 
-> On Mon, Jan 20, 2014 at 1:54 PM, Lukasz Majewski
-> <l.majewski@samsung.com> wrote:
-> > Hi Thomas,
-> >
-> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>
-> >> The CPU clock provider supplies the clock to the CPU clock domain.
-> >> The composition and organization of the CPU clock provider could
-> >> vary among Exynos SoCs. A CPU clock provider can be composed of
-> >> clock mux, dividers and gates. This patch defines a new clock type
-> >> for CPU clock provider and adds infrastructure to register the CPU
-> >> clock providers for Samsung platforms.
-> >>
-> >> In addition to this, the arm cpu clock provider for Exynos4210 and
-> >> compatible SoCs is instantiated using the new cpu clock type. The
-> >> clock frequency table and the clock configuration data for this
-> >> clock is obtained from device tree. This implementation is
-> >> reusable for Exynos4x12 and Exynos5250 SoCs as well.
-> >>
-> >> Cc: Tomasz Figa <t.figa@samsung.com>
-> >> Cc: Lukasz Majewski <l.majewski@majess.pl>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> ---
-> >>  drivers/clk/samsung/Makefile  |    2 +-
-> >>  drivers/clk/samsung/clk-cpu.c |  345
-> >> +++++++++++++++++++++++++++++++++++++++++
-> >> drivers/clk/samsung/clk.h     |    3 + 3 files changed, 349
-> >> insertions(+), 1 deletions(-) create mode 100644
-> >> drivers/clk/samsung/clk-cpu.c
-> >>
-> >> diff --git a/drivers/clk/samsung/Makefile
-> >> b/drivers/clk/samsung/Makefile index 8eb4799..e2b453f 100644
-> >> --- a/drivers/clk/samsung/Makefile
-> >> +++ b/drivers/clk/samsung/Makefile
-> >> @@ -2,7 +2,7 @@
-> >>  # Samsung Clock specific Makefile
-> >>  #
-> >>
-> >> -obj-$(CONFIG_COMMON_CLK)     += clk.o clk-pll.o
-> >> +obj-$(CONFIG_COMMON_CLK)     += clk.o clk-pll.o clk-cpu.o
-> >>  obj-$(CONFIG_ARCH_EXYNOS4)   += clk-exynos4.o
-> >>  obj-$(CONFIG_SOC_EXYNOS5250) += clk-exynos5250.o
-> >>  obj-$(CONFIG_SOC_EXYNOS5420) += clk-exynos5420.o
-> >> diff --git a/drivers/clk/samsung/clk-cpu.c
-> >> b/drivers/clk/samsung/clk-cpu.c new file mode 100644
-> >> index 0000000..92fba45
-> >> --- /dev/null
-> >> +++ b/drivers/clk/samsung/clk-cpu.c
-> >> @@ -0,0 +1,345 @@
-> >> +/*
-> >> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> >> + * Author: Thomas Abraham <thomas.ab@samsung.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> modify
-> >> + * it under the terms of the GNU General Public License version 2
-> >> as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This file contains the utility functions to register the cpu
-> >> clocks
-> >> + * for samsung platforms.
-> >> +*/
-> >> +
-> >> +#include <linux/errno.h>
-> >> +#include "clk.h"
-> >> +
-> >> +#define SRC_CPU                      0x0
-> >> +#define STAT_CPU             0x200
-> >> +#define DIV_CPU0             0x300
-> >> +#define DIV_CPU1             0x304
-> >> +#define DIV_STAT_CPU0                0x400
-> >> +#define DIV_STAT_CPU1                0x404
-> >> +
-> >> +/**
-> >> + * struct samsung_cpuclk_freq_table: table of frequency supported
-> >> by
-> >> + * a cpu clock and associated data if any.
-> >> + * @freq: points to a table of supported frequencies (in KHz)
-> >> + * @freq_count: number of entries in the frequency table
-> >> + * @data: cpu clock specific data, if any
-> >> + *
-> >> + * This structure holds the frequency options supported by the cpu
-> >> clock in
-> >> + * which this structure is contained. The data pointer is an
-> >> optional data
-> >> + * that can provide any additional configuration options for the
-> >> supported
-> >> + * frequencies. This structure is intended to be reusable for all
-> >> cpu clocks
-> >> + * in Samsung SoC based platforms
-> >> + */
-> >> +struct samsung_cpuclk_freq_table {
-> >> +     const unsigned long     *freq;       /* in KHz */
-> >> +     unsigned long           freq_count;
-> >> +     const void              *data;
-> >> +};
-> >> +
-> >> +/**
-> >> + * struct exynos4210_freq_data: format of auxillary data
-> >> associated with
-> >> + * each frequency supported by the cpu clock for exynos4210.
-> >> + * @parent_freq: The frequency of the parent clock required to
-> >> generate the
-> >> + * supported cpu clock speed.
-> >> + * @div0: value to be programmed in the div_cpu0 register.
-> >> + * @div1: value to be programmed in the div_cpu1 register.
-> >> + *
-> >> + * This structure holds the auxillary configuration data for each
-> >> supported
-> >> + * cpu clock frequency on Exynos4210 and compatible SoCs.
-> >> + */
-> >> +struct exynos4210_freq_data {
-> >> +     unsigned long   parent_freq;
-> >> +     unsigned int    div0;
-> >> +     unsigned int    div1;
-> >> +};
-> >> +
-> >> +/**
-> >> + * struct samsung_cpuclk: information about clock supplied to a
-> >> CPU core.
-> >> + * @hw: handle between ccf and cpu clock.
-> >> + * @ctrl_base: base address of the clock controller.
-> >> + * @offset: offset from the ctrl_base address where the cpu clock
-> >> div/mux
-> >> + *          registers can be accessed.
-> >> + * @parent: clock handle representing the clock output of the
-> >> parent clock.
-> >> + * @freq_table: the frequency table supported by this cpu clock.
-> >> + */
-> >> +struct samsung_cpuclk {
-> >> +     struct clk_hw           hw;
-> >> +     void __iomem            *ctrl_base;
-> >> +     unsigned long           offset;
-> >> +     struct clk              *parent;
-> >> +     const struct samsung_cpuclk_freq_table *freq_table;
-> >> +};
-> >> +
-> >> +#define to_samsung_cpuclk(hw)        container_of(hw, struct
-> >> samsung_cpuclk, hw) +
-> >> +/**
-> >> + * struct samsung_cpuclk_match_data: soc specific data for cpu
-> >> clocks.
-> >> + * @parser: pointer to a function that can parse SoC specific cpu
-> >> clock
-> >> + *   frequency and associated configuration data.
-> >> + * @offset: optional offset from base of clock controller register
-> >> base,
-> >> + *   to be used when accessing clock controller registers
-> >> related to the
-> >> + * cpu clock.
-> >> + * @offset: offset from the ctrl_base address where the cpu clock
-> >> div/mux
-> >> + *   registers can be accessed.
-> >> + */
-> >> +struct samsung_cpuclk_match_data {
-> >> +     int (*parser)(struct device_node *,
-> >> +                     struct samsung_cpuclk_freq_table **);
-> >> +     unsigned int offset;
-> >> +};
-> >> +
-> >> +/* This is a helper function to perform clock rounding for cpu
-> >> clocks. */ +static long samsung_cpuclk_round_rate(struct clk_hw
-> >> *hw,
-> >> +                     unsigned long drate, unsigned long *prate)
-> >> +{
-> >> +     struct samsung_cpuclk *cpuclk = to_samsung_cpuclk(hw);
-> >> +     const struct samsung_cpuclk_freq_table *freq_tbl;
-> >> +     int i;
-> >> +
-> >> +     freq_tbl = cpuclk->freq_table;
-> >> +     drate /= 1000;
-> >> +
-> >> +     for (i = 0; i < freq_tbl->freq_count; i++) {
-> >> +             if (drate >= freq_tbl->freq[i])
-> >> +                     return freq_tbl->freq[i] * 1000;
-> >> +     }
-> >> +     return freq_tbl->freq[i - 1] * 1000;
-> >> +}
-> >> +
-> >> +#define EXYNOS4210_ARM_DIV1(base) ((readl(base + DIV_CPU0) & 0xf)
-> >> + 1) +#define EXYNOS4210_ARM_DIV2(base) (((readl(base + DIV_CPU0)
-> >> >> 28) & 0xf) + 1) +
-> >> +/*
-> >> + * CPU clock speed for Exynos4210 and compatible SoCs is
-> >> + * parent clock speed / core1_ratio / core2_ratio
-> >> + */
-> >> +static unsigned long exynos4210_armclk_recalc_rate(struct clk_hw
-> >> *hw,
-> >> +                             unsigned long parent_rate)
-> >> +{
-> >> +     struct samsung_cpuclk *armclk = to_samsung_cpuclk(hw);
-> >> +     void __iomem *base = armclk->ctrl_base + armclk->offset;
-> >> +
-> >> +     return parent_rate / EXYNOS4210_ARM_DIV1(base) /
-> >> +                             EXYNOS4210_ARM_DIV2(base);
-> >> +}
-> >> +
-> >> +/* set rate callback for cpuclk type on Exynos4210 and similar
-> >> SoCs */ +static int exynos4210_armclk_set_rate(struct clk_hw *hw,
-> >> unsigned long drate,
-> >> +                                     unsigned long prate)
-> >> +{
-> >> +     struct samsung_cpuclk *armclk = to_samsung_cpuclk(hw);
-> >> +     const struct samsung_cpuclk_freq_table *freq_tbl;
-> >> +     const struct exynos4210_freq_data *freq_data;
-> >> +     unsigned long mux_reg, idx;
-> >> +     void __iomem *base;
-> >> +
-> >> +     if (drate == prate)
-> >> +             return 0;
-> >> +
-> >> +     freq_tbl = armclk->freq_table;
-> >> +     freq_data = freq_tbl->data;
-> >> +     base = armclk->ctrl_base + armclk->offset;
-> >> +
-> >> +     for (idx = 0; idx < freq_tbl->freq_count; idx++, freq_data++)
-> >> +             if ((freq_tbl->freq[idx] * 1000) == drate)
-> >> +                     break;
-> >> +
-> >> +     if (drate < prate) {
-> >> +             mux_reg = readl(base + SRC_CPU);
-> >> +             writel(mux_reg | (1 << 16), base + SRC_CPU);
-> >> +             while (((readl(base + STAT_CPU) >> 16) & 0x7) != 2)
-> >> +                     ;
-> >> +
-> >> +             clk_set_rate(armclk->parent, drate);
-> >> +     }
-> >> +
-> >> +     writel(freq_data->div0, base + DIV_CPU0);
-> >> +     while (readl(base + DIV_STAT_CPU0) != 0)
-> >> +             ;
-> >> +     writel(freq_data->div1, base + DIV_CPU1);
-> >> +     while (readl(base + DIV_STAT_CPU1) != 0)
-> >> +             ;
-> >> +
-> >> +     if (drate > prate) {
-> >> +             mux_reg = readl(base + SRC_CPU);
-> >> +             writel(mux_reg | (1 << 16), base + SRC_CPU);
-> >> +             while (((readl(base + STAT_CPU) >> 16) & 0x7) != 2)
-> >> +                     ;
-> >> +
-> >> +             clk_set_rate(armclk->parent, freq_data->parent_freq
-> >> * 1000);
-> >> +     }
-> >> +
-> >> +     mux_reg = readl(base + SRC_CPU);
-> >> +     writel(mux_reg & ~(1 << 16), base + SRC_CPU);
-> >> +     while (((readl(base + STAT_CPU) >> 16) & 0x7) != 1)
-> >> +                     ;
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +/* clock ops for armclk on Exynos4210 and compatible platforms. */
-> >> +static const struct clk_ops exynos4210_armclk_clk_ops = {
-> >> +     .recalc_rate = exynos4210_armclk_recalc_rate,
-> >> +     .round_rate = samsung_cpuclk_round_rate,
-> >> +     .set_rate = exynos4210_armclk_set_rate,
-> >> +};
-> >> +
-> >> +/* helper function to register a cpu clock */
-> >> +static void __init samsung_cpuclk_register(unsigned int lookup_id,
-> >> +             const char *name, const char *parent, const struct
-> >> clk_ops *ops,
-> >> +             const struct samsung_cpuclk_freq_table *freq_tbl,
-> >> +             void __iomem *reg_base,
-> >> +             const struct samsung_cpuclk_match_data *data)
-> >> +{
-> >> +     struct samsung_cpuclk *cpuclk;
-> >> +     struct clk_init_data init;
-> >> +     struct clk *clk;
-> >> +
-> >> +     cpuclk = kzalloc(sizeof(*cpuclk), GFP_KERNEL);
-> >> +     if (!cpuclk) {
-> >> +             pr_err("%s: could not allocate memory for cpuclk
-> >> %s\n",
-> >> +                                     __func__, name);
-> >> +             return;
-> >> +     }
-> >> +
-> >> +     init.name = name;
-> >> +     init.flags = CLK_GET_RATE_NOCACHE;
-> >> +     init.parent_names = &parent;
-> >> +     init.num_parents = 1;
-> >> +     init.ops = ops;
-> >> +
-> >> +     cpuclk->hw.init = &init;
-> >> +     cpuclk->ctrl_base = reg_base;
-> >> +     cpuclk->offset = data->offset;
-> >> +     cpuclk->freq_table = freq_tbl;
-> >> +     cpuclk->parent = __clk_lookup(parent);
-> >> +
-> >> +     clk = clk_register(NULL, &cpuclk->hw);
-> >> +     if (IS_ERR(clk)) {
-> >> +             pr_err("%s: could not register cpuclk %s\n",
-> >> __func__,     name);
-> >> +             kfree(cpuclk);
-> >> +             return;
-> >> +     }
-> >> +     samsung_clk_add_lookup(clk, lookup_id);
-> >> +}
-> >> +
-> >> +#define EXYNOS4210_DIV_CPU01(d0, d1, d2, d3, d4, d5, d6,
-> >> d7)           \
-> >> +             ((d0 << 28) | (d1 << 24) | (d2 << 20) | (d3
-> >> << 16) |      \
-> >> +              (d4 << 12) | (d5 << 8) | (d6 << 4) | (d7 << 0))
-> >> +#define EXYNOS4210_DIV_CPU11(d0, d1,
-> >> d2)                           \
-> >> +             ((d0 << 8) | (d1 << 4) | (d2 << 0))
-> >> +#define EXYNOS4210_CFG_LEN 13
-> >> +
-> >> +/*
-> >> + * parse cpu clock frequency table and auxillary configuration
-> >> data from dt
-> >> + * for exynos4210 and compatible SoC's.
-> >> + */
-> >> +static int exynos4210_armclk_cfg_parser(struct device_node *np,
-> >> +             struct samsung_cpuclk_freq_table **tbl)
-> >> +{
-> >> +     struct samsung_cpuclk_freq_table *freq_tbl;
-> >> +     struct exynos4210_freq_data *fdata, *t_fdata;
-> >> +     unsigned long *freqs, cfg[EXYNOS4210_CFG_LEN];
-> >> +     const struct property *prop;
-> >> +     unsigned int tbl_sz, i, j;
-> >> +     const __be32 *val;
-> >> +     int ret;
-> >> +
-> >> +     prop = of_find_property(np, "arm-frequency-table", NULL);
-> >> +     if (!prop)
-> >> +             return -EINVAL;
-> >> +     if (!prop->value)
-> >> +             return -EINVAL;
-> >> +     if ((prop->length / sizeof(u32)) % EXYNOS4210_CFG_LEN)
-> >
-> > Cannot we have the EXYNOS4210_CFG_LEN parsed from DT as well?
-> 
-> As per Rob's suggestion, the clock divider ration table will be
-> removed. So this portion of the code will be reworked.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+./scripts/kernel-doc -v -man drivers/tty/serial/xilinx_uartps.c > /dev/null
+---
+ drivers/tty/serial/xilinx_uartps.c | 109 +++++++++++++++++--------------------
+ 1 file changed, 49 insertions(+), 60 deletions(-)
 
-Ok. Thanks.
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index f619ad5..b2f929e 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -163,11 +163,11 @@ MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
 
-> 
-> >
-> >> +             return -EINVAL;
-> >> +     tbl_sz = (prop->length / sizeof(u32)) / EXYNOS4210_CFG_LEN;
-> >> +
-> >> +     freq_tbl = kzalloc(sizeof(*freq_tbl), GFP_KERNEL);
-> >> +     if (!freq_tbl)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     freqs = kzalloc(sizeof(u32) * tbl_sz, GFP_KERNEL);
-> >> +     if (!freqs) {
-> >> +             ret = -ENOMEM;
-> >> +             goto free_freq_tbl;
-> >> +     }
-> >> +
-> >> +     fdata = kzalloc(sizeof(*fdata) * tbl_sz, GFP_KERNEL);
-> >> +     if (!fdata) {
-> >> +             ret = -ENOMEM;
-> >> +             goto free_freqs;
-> >> +     }
-> >> +     t_fdata = fdata;
-> >> +
-> >> +     val = prop->value;
-> >> +     for (i = 0; i < tbl_sz; i++, fdata++) {
-> >> +             for (j = 0; j < EXYNOS4210_CFG_LEN; j++)
-> >> +                     cfg[j] = be32_to_cpup(val++);
-> >> +             freqs[i] = cfg[0];
-> >> +             fdata->parent_freq = cfg[1];
-> >
-> > Why do we need the separate parent_freq entry here?
-> >
-> > In the patch 4/7 the freqs (cfg[0]) and parent_freq (cfg[1]) values
-> > are the same for all supported devices (at "arm-frequency-table").
-> >
-> > What is the rationale for having those values duplicated in the DT?
-> 
-> The intention was to support frequencies which may not be direct
-> output of the parent PLL clock. For instance, if the PLL supports
-> 200MHz, 400MHz and 600MHz and the CPU clock needs to be set to 300MHz,
-> then 600MHz / 2 is a valid clock output for the cpu clock. So this is
-> an example where the cpu clock speed is different from its parent
-> clock speed.
+ /**
+  * struct xuartps - device data
+- * @port		Pointer to the UART port
+- * @refclk		Reference clock
+- * @aperclk		APB clock
+- * @baud		Current baud rate
+- * @clk_rate_change_nb	Notifier block for clock changes
++ * @port:		Pointer to the UART port
++ * @refclk:		Reference clock
++ * @aperclk:		APB clock
++ * @baud:		Current baud rate
++ * @clk_rate_change_nb:	Notifier block for clock changes
+  */
+ struct xuartps {
+ 	struct uart_port	*port;
+@@ -183,8 +183,8 @@ struct xuartps {
+  * @irq: Irq number
+  * @dev_id: Id of the port
+  *
+- * Returns IRQHANDLED
+- **/
++ * Return: IRQHANDLED
++ */
+ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+ {
+ 	struct uart_port *port = (struct uart_port *)dev_id;
+@@ -325,7 +325,7 @@ static irqreturn_t xuartps_isr(int irq, void *dev_id)
+  * @rbdiv: BDIV value (return value)
+  * @rcd: CD value (return value)
+  * @div8: Value for clk_sel bit in mod (return value)
+- * Returns baud rate, requested baud when possible, or actual baud when there
++ * Return: baud rate, requested baud when possible, or actual baud when there
+  *	was too much error, zero if no valid divisors are found.
+  *
+  * Formula to obtain baud rate is
+@@ -384,7 +384,7 @@ static unsigned int xuartps_calc_baud_divs(unsigned int clk, unsigned int baud,
+  * xuartps_set_baud_rate - Calculate and set the baud rate
+  * @port: Handle to the uart port structure
+  * @baud: Baud rate to set
+- * Returns baud rate, requested baud when possible, or actual baud when there
++ * Return: baud rate, requested baud when possible, or actual baud when there
+  *	   was too much error, zero if no valid divisors are found.
+  */
+ static unsigned int xuartps_set_baud_rate(struct uart_port *port,
+@@ -419,7 +419,7 @@ static unsigned int xuartps_set_baud_rate(struct uart_port *port,
+  * @nb:		Notifier block
+  * @event:	Notify event
+  * @data:	Notifier data
+- * Returns NOTIFY_OK on success, NOTIFY_BAD on error.
++ * Return: NOTIFY_OK on success, NOTIFY_BAD on error.
+  */
+ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+ 		unsigned long event, void *data)
+@@ -514,8 +514,7 @@ static int xuartps_clk_notifier_cb(struct notifier_block *nb,
+ /**
+  * xuartps_start_tx -  Start transmitting bytes
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_start_tx(struct uart_port *port)
+ {
+ 	unsigned int status, numbytes = port->fifosize;
+@@ -562,8 +561,7 @@ static void xuartps_start_tx(struct uart_port *port)
+ /**
+  * xuartps_stop_tx - Stop TX
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_stop_tx(struct uart_port *port)
+ {
+ 	unsigned int regval;
+@@ -577,8 +575,7 @@ static void xuartps_stop_tx(struct uart_port *port)
+ /**
+  * xuartps_stop_rx - Stop RX
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_stop_rx(struct uart_port *port)
+ {
+ 	unsigned int regval;
+@@ -593,8 +590,8 @@ static void xuartps_stop_rx(struct uart_port *port)
+  * xuartps_tx_empty -  Check whether TX is empty
+  * @port: Handle to the uart port structure
+  *
+- * Returns TIOCSER_TEMT on success, 0 otherwise
+- **/
++ * Return: TIOCSER_TEMT on success, 0 otherwise
++ */
+ static unsigned int xuartps_tx_empty(struct uart_port *port)
+ {
+ 	unsigned int status;
+@@ -608,8 +605,7 @@ static unsigned int xuartps_tx_empty(struct uart_port *port)
+  *			transmitting char breaks
+  * @port: Handle to the uart port structure
+  * @ctl: Value based on which start or stop decision is taken
+- *
+- **/
++ */
+ static void xuartps_break_ctl(struct uart_port *port, int ctl)
+ {
+ 	unsigned int status;
+@@ -636,8 +632,7 @@ static void xuartps_break_ctl(struct uart_port *port, int ctl)
+  * @port: Handle to the uart port structure
+  * @termios: Handle to the input termios structure
+  * @old: Values of the previously saved termios structure
+- *
+- **/
++ */
+ static void xuartps_set_termios(struct uart_port *port,
+ 				struct ktermios *termios, struct ktermios *old)
+ {
+@@ -761,8 +756,8 @@ static void xuartps_set_termios(struct uart_port *port,
+  * xuartps_startup - Called when an application opens a xuartps port
+  * @port: Handle to the uart port structure
+  *
+- * Returns 0 on success, negative error otherwise
+- **/
++ * Return: 0 on success, negative error otherwise
++ */
+ static int xuartps_startup(struct uart_port *port)
+ {
+ 	unsigned int retval = 0, status = 0;
+@@ -824,8 +819,7 @@ static int xuartps_startup(struct uart_port *port)
+ /**
+  * xuartps_shutdown - Called when an application closes a xuartps port
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_shutdown(struct uart_port *port)
+ {
+ 	int status;
+@@ -844,8 +838,8 @@ static void xuartps_shutdown(struct uart_port *port)
+  * xuartps_type - Set UART type to xuartps port
+  * @port: Handle to the uart port structure
+  *
+- * Returns string on success, NULL otherwise
+- **/
++ * Return: string on success, NULL otherwise
++ */
+ static const char *xuartps_type(struct uart_port *port)
+ {
+ 	return port->type == PORT_XUARTPS ? XUARTPS_NAME : NULL;
+@@ -856,8 +850,8 @@ static const char *xuartps_type(struct uart_port *port)
+  * @port: Handle to the uart port structure
+  * @ser: Handle to the structure whose members are compared
+  *
+- * Returns 0 if success otherwise -EINVAL
+- **/
++ * Return: 0 if success otherwise -EINVAL
++ */
+ static int xuartps_verify_port(struct uart_port *port,
+ 					struct serial_struct *ser)
+ {
+@@ -880,8 +874,8 @@ static int xuartps_verify_port(struct uart_port *port,
+  *				uart_add_one_port()
+  * @port: Handle to the uart port structure
+  *
+- * Returns 0, -ENOMEM if request fails
+- **/
++ * Return: 0, -ENOMEM if request fails
++ */
+ static int xuartps_request_port(struct uart_port *port)
+ {
+ 	if (!request_mem_region(port->mapbase, XUARTPS_REGISTER_SPACE,
+@@ -903,8 +897,7 @@ static int xuartps_request_port(struct uart_port *port)
+  *				port, called when the driver removes a xuartps
+  *				port via uart_remove_one_port().
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_release_port(struct uart_port *port)
+ {
+ 	release_mem_region(port->mapbase, XUARTPS_REGISTER_SPACE);
+@@ -917,8 +910,7 @@ static void xuartps_release_port(struct uart_port *port)
+  *				xuartps port
+  * @port: Handle to the uart port structure
+  * @flags: If any
+- *
+- **/
++ */
+ static void xuartps_config_port(struct uart_port *port, int flags)
+ {
+ 	if (flags & UART_CONFIG_TYPE && xuartps_request_port(port) == 0)
+@@ -930,9 +922,8 @@ static void xuartps_config_port(struct uart_port *port, int flags)
+  *
+  * @port: Handle to the uart port structure
+  *
+- * Returns the modem control state
+- *
+- **/
++ * Return: the modem control state
++ */
+ static unsigned int xuartps_get_mctrl(struct uart_port *port)
+ {
+ 	return TIOCM_CTS | TIOCM_DSR | TIOCM_CAR;
+@@ -1040,8 +1031,8 @@ static struct uart_port xuartps_port[2];
+  * xuartps_get_port - Configure the port from the platform device resource
+  *			info
+  *
+- * Returns a pointer to a uart_port or NULL for failure
+- **/
++ * Return: a pointer to a uart_port or NULL for failure
++ */
+ static struct uart_port *xuartps_get_port(void)
+ {
+ 	struct uart_port *port;
+@@ -1078,8 +1069,7 @@ static struct uart_port *xuartps_get_port(void)
+ /**
+  * xuartps_console_wait_tx - Wait for the TX to be full
+  * @port: Handle to the uart port structure
+- *
+- **/
++ */
+ static void xuartps_console_wait_tx(struct uart_port *port)
+ {
+ 	while ((xuartps_readl(XUARTPS_SR_OFFSET) & XUARTPS_SR_TXEMPTY)
+@@ -1091,8 +1081,7 @@ static void xuartps_console_wait_tx(struct uart_port *port)
+  * xuartps_console_putchar - write the character to the FIFO buffer
+  * @port: Handle to the uart port structure
+  * @ch: Character to be written
+- *
+- **/
++ */
+ static void xuartps_console_putchar(struct uart_port *port, int ch)
+ {
+ 	xuartps_console_wait_tx(port);
+@@ -1101,10 +1090,10 @@ static void xuartps_console_putchar(struct uart_port *port, int ch)
 
-But shall not this case been handled by CCF internally? 
+ /**
+  * xuartps_console_write - perform write operation
+- * @port: Handle to the uart port structure
++ * @co: Console handle
+  * @s: Pointer to character array
+  * @count: No of characters
+- **/
++ */
+ static void xuartps_console_write(struct console *co, const char *s,
+ 				unsigned int count)
+ {
+@@ -1151,8 +1140,8 @@ static void xuartps_console_write(struct console *co, const char *s,
+  * @co: Console handle
+  * @options: Initial settings of uart
+  *
+- * Returns 0, -ENODEV if no device
+- **/
++ * Return: 0, -ENODEV if no device
++ */
+ static int __init xuartps_console_setup(struct console *co, char *options)
+ {
+ 	struct uart_port *port = &xuartps_port[co->index];
+@@ -1190,8 +1179,8 @@ static struct console xuartps_console = {
+ /**
+  * xuartps_console_init - Initialization call
+  *
+- * Returns 0 on success, negative error otherwise
+- **/
++ * Return: 0 on success, negative error otherwise
++ */
+ static int __init xuartps_console_init(void)
+ {
+ 	register_console(&xuartps_console);
+@@ -1221,7 +1210,7 @@ static struct uart_driver xuartps_uart_driver = {
+  * xuartps_suspend - suspend event
+  * @device: Pointer to the device structure
+  *
+- * Returns 0
++ * Return: 0
+  */
+ static int xuartps_suspend(struct device *device)
+ {
+@@ -1269,7 +1258,7 @@ static int xuartps_suspend(struct device *device)
+  * xuartps_resume - Resume after a previous suspend
+  * @device: Pointer to the device structure
+  *
+- * Returns 0
++ * Return: 0
+  */
+ static int xuartps_resume(struct device *device)
+ {
+@@ -1336,8 +1325,8 @@ static SIMPLE_DEV_PM_OPS(xuartps_dev_pm_ops, xuartps_suspend, xuartps_resume);
+  * xuartps_probe - Platform driver probe
+  * @pdev: Pointer to the platform device structure
+  *
+- * Returns 0 on success, negative error otherwise
+- **/
++ * Return: 0 on success, negative error otherwise
++ */
+ static int xuartps_probe(struct platform_device *pdev)
+ {
+ 	int rc;
+@@ -1437,8 +1426,8 @@ err_out_clk_dis_aper:
+  * xuartps_remove - called when the platform driver is unregistered
+  * @pdev: Pointer to the platform device structure
+  *
+- * Returns 0 on success, negative error otherwise
+- **/
++ * Return: 0 on success, negative error otherwise
++ */
+ static int xuartps_remove(struct platform_device *pdev)
+ {
+ 	struct uart_port *port = platform_get_drvdata(pdev);
+@@ -1481,8 +1470,8 @@ static struct platform_driver xuartps_platform_driver = {
+ /**
+  * xuartps_init - Initial driver registration call
+  *
+- * Returns whether the registration was successful or not
+- **/
++ * Return: whether the registration was successful or not
++ */
+ static int __init xuartps_init(void)
+ {
+ 	int retval = 0;
+@@ -1502,7 +1491,7 @@ static int __init xuartps_init(void)
 
-Is there any Samsung PLL clock, which has such property?
+ /**
+  * xuartps_exit - Driver unregistration call
+- **/
++ */
+ static void __exit xuartps_exit(void)
+ {
+ 	/* The order of unregistration is important. Unregister the
+--
+1.8.2.3
 
-> If possible, I will try and remove the need for this table in the
-> next version.
-
-Ok.
-
-> 
-> Thanks,
-> Thomas.
-> 
-> >
-> >
-> >> +             fdata->div0 = EXYNOS4210_DIV_CPU01(cfg[9], cfg[8],
-> >> cfg[7],
-> >> +                             cfg[6], cfg[5], cfg[4], cfg[3],
-> >> cfg[2]);
-> >> +             fdata->div1 = EXYNOS4210_DIV_CPU11(cfg[12], cfg[11],
-> >> cfg[10]);
-> >> +     }
-> >> +
-> >> +     freq_tbl->freq = freqs;
-> >> +     freq_tbl->freq_count = tbl_sz;
-> >> +     freq_tbl->data = t_fdata;
-> >> +     *tbl = freq_tbl;
-> >> +     return 0;
-> >> +
-> >> +free_freqs:
-> >> +     kfree(freqs);
-> >> +free_freq_tbl:
-> >> +     kfree(freq_tbl);
-> >> +     return ret;
-> >> +}
-> >> +
-> >> +static struct samsung_cpuclk_match_data
-> >> exynos4210_cpuclk_match_data = {
-> >> +     .parser = exynos4210_armclk_cfg_parser,
-> >> +     .offset = 0x14200,
-> >> +};
-> >> +
-> >> +static struct samsung_cpuclk_match_data
-> >> exynos5250_cpuclk_match_data = {
-> >> +     .parser = exynos4210_armclk_cfg_parser,
-> >> +     .offset = 0x200,
-> >> +};
-> >> +
-> >> +static const struct of_device_id samsung_clock_ids[] = {
-> >> +     { .compatible = "samsung,exynos4210-clock",
-> >> +                     .data = &exynos4210_cpuclk_match_data, },
-> >> +     { .compatible = "samsung,exynos4412-clock",
-> >> +                     .data = &exynos4210_cpuclk_match_data, },
-> >> +     { .compatible = "samsung,exynos5250-clock",
-> >> +                     .data = &exynos5250_cpuclk_match_data, },
-> >> +};
-> >> +
-> >> +int __init samsung_register_arm_clock(struct device_node *np,
-> >> +             unsigned int lookup_id, const char *parent,
-> >> void __iomem *base) +{
-> >> +     const struct of_device_id *match;
-> >> +     struct samsung_cpuclk_freq_table *freq_table;
-> >> +     const struct samsung_cpuclk_match_data *data;
-> >> +     int ret;
-> >> +
-> >> +     match = of_match_node(samsung_clock_ids, np);
-> >> +     if (!match) {
-> >> +             pr_err("%s: could not determine soc type\n",
-> >> __func__);
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     data = match->data;
-> >> +     ret = data->parser(np, &freq_table);
-> >> +     if (ret) {
-> >> +             pr_err("%s: error %d in parsing arm clock freq
-> >> table",
-> >> +                                             __func__, ret);
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     samsung_cpuclk_register(lookup_id, "armclk", parent,
-> >> +             &exynos4210_armclk_clk_ops, freq_table, base, data);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-> >> index 31b4174..a759330 100644
-> >> --- a/drivers/clk/samsung/clk.h
-> >> +++ b/drivers/clk/samsung/clk.h
-> >> @@ -340,4 +340,7 @@ extern void __init
-> >> samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
-> >>  extern unsigned long _get_rate(const char *clk_name);
-> >>
-> >> +extern int __init samsung_register_arm_clock(struct device_node
-> >> *np,
-> >> +             unsigned int lookup_id, const char *parent, void
-> >> __iomem *base); +
-> >>  #endif /* __SAMSUNG_CLK_H */
-> >
-> >
-> >
-> > --
-> > Best regards,
-> >
-> > Lukasz Majewski
-> >
-> > Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/f6942f96/attachment.sig>
