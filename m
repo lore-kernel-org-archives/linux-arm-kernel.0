@@ -1,74 +1,208 @@
-From: wharms@bfs.de (walter harms)
-Date: Tue, 21 Jan 2014 13:43:55 +0100
-Subject: [patch] drm/exynos: potential use after free in exynos_drm_open()
-In-Reply-To: <52DE69F3.9070307@bfs.de>
-References: <20140121065748.GC31535@elgon.mountain> <52DE69F3.9070307@bfs.de>
-Message-ID: <52DE6B8B.6080304@bfs.de>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 21 Jan 2014 13:44:21 +0100
+Subject: [PATCH v10] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
+References: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MOXA ART SoCs allow to determine PLL output and APB frequencies
+by reading registers holding multiplier and divisor information.
 
-i have just noticed: The function already exits
+Add a clock driver for this SoC.
 
-194 static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
-195 {
-196         if (!file->driver_priv)
-197                 return;
-198
-199         kfree(file->driver_priv);
-200         file->driver_priv = NULL;
-201 }
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
+Notes:
+    Thanks for the reply Sudeep, changes are in v10.
+    
+    Changes since v9:
+    
+    1. rebase drivers/clk/Makefile to next-20140121
+    2. remove unnecessary switch
+    3. use a more elaborate commit message
+    
+    Applies to next-20140121
 
-Am 21.01.2014 13:37, schrieb walter harms:
-> 
-> 
-> Am 21.01.2014 07:57, schrieb Dan Carpenter:
->> If exynos_drm_subdrv_open() fails then we re-use "file_priv".
->>
->> Fixes: 96f5421523df ('drm/exynos: use a new anon file for exynos gem mmaper')
->> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> index 9d096a0c5f8d..3c845292845a 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> @@ -174,6 +174,7 @@ static int exynos_drm_open(struct drm_device *dev, struct drm_file *file)
->>  	if (ret) {
->>  		kfree(file_priv);
->>  		file->driver_priv = NULL;
->> +		return ret;
->>  	}
-> 
-> using
-> 	kfree(	file->driver_priv );
-> 	file->driver_priv = NULL;
-> 
-> would be less confusing to read, and give checkers a better chance to spot mistakes.
-> (btw: file_priv could be removed from this function completely).
-> 
-> just my 2 cents,
-> re,
->  wh
-> 
->>  
->>  	anon_filp = anon_inode_getfile("exynos_gem", &exynos_drm_gem_fops,
->> @@ -186,7 +187,7 @@ static int exynos_drm_open(struct drm_device *dev, struct drm_file *file)
->>  	anon_filp->f_mode = FMODE_READ | FMODE_WRITE;
->>  	file_priv->anon_filp = anon_filp;
->>  
->> -	return ret;
->> +	return 0;
->>  }
->>  
->>  static void exynos_drm_preclose(struct drm_device *dev,
->> --
->> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
+ drivers/clk/Makefile                               |  1 +
+ drivers/clk/clk-moxart.c                           | 99 ++++++++++++++++++++++
+ 3 files changed, 148 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+ create mode 100644 drivers/clk/clk-moxart.c
+
+diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+new file mode 100644
+index 0000000..242e3fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+@@ -0,0 +1,48 @@
++Device Tree Clock bindings for arch-moxart
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++MOXA ART SoCs allow to determine PLL output and APB frequencies
++by reading registers holding multiplier and divisor information.
++
++
++PLL:
++
++Required properties:
++- compatible : Must be "moxa,moxart-pll-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle to parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++APB:
++
++Required properties:
++- compatible : Must be "moxa,moxart-apb-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle to parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++For example:
++
++	clk_pll: clk_pll at 98100000 {
++		compatible = "moxa,moxart-pll-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++	};
++
++	clk_apb: clk_apb at 98100000 {
++		compatible = "moxa,moxart-apb-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++		clocks = <&clk_pll>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 58b2d72..24361bf 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
++obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+new file mode 100644
+index 0000000..7021748
+--- /dev/null
++++ b/drivers/clk/clk-moxart.c
+@@ -0,0 +1,99 @@
++/*
++ * MOXA ART SoCs clock driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
++
++void __init moxart_of_pll_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *ref_clk;
++	unsigned long rate;
++	unsigned int mul;
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	mul = readl(base + 0x30) >> 3 & 0x3f;
++	iounmap(base);
++
++	ref_clk = of_clk_get(node, 0);
++	if (IS_ERR(ref_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = mul * clk_get_rate(ref_clk);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
++	       moxart_of_pll_clk_init);
++
++void __init moxart_of_apb_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *pll_clk;
++	unsigned long rate;
++	unsigned int div, val;
++	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
++	const char *name = node->name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	val = readl(base + 0xc) >> 4 & 0x7;
++	iounmap(base);
++
++	if (val > 4)
++		val = 0;
++	div = div_idx[val];
++
++	pll_clk = of_clk_get(node, 0);
++	if (IS_ERR(pll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = clk_get_rate(pll_clk) / (div * 2);
++
++	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
++	       moxart_of_apb_clk_init);
+-- 
+1.8.2.1
