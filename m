@@ -1,97 +1,50 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 10:26:03 -0300
-Subject: [PATCH v3 04/15] watchdog: orion: Handle IRQ
+Date: Tue, 21 Jan 2014 10:26:05 -0300
+Subject: [PATCH v3 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
 In-Reply-To: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390310774-20781-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390310774-20781-7-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-enabled where an irqchip driver for the brigde interrupt controller is
-available can handle the watchdog IRQ properly. Therefore, we request
-the interruption and add a dummy handler that merely calls panic().
-
-This is done in order to have an initial 'ack' of the interruption,
-which clears the watchdog state.
-
-Furthermore, since some platforms don't have such IRQ, this commit
-makes the interruption specification optional.
+After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
+bridge interrupt controller. There's no longer a need to do it in the watchdog
+driver, so we can simply remove it.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../devicetree/bindings/watchdog/marvel.txt        |  2 ++
- drivers/watchdog/orion_wdt.c                       | 22 +++++++++++++++++++++-
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ drivers/watchdog/orion_wdt.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-index 5dc8d30..0731fbd 100644
---- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- Optional properties:
- 
-+- interrupts	: Contains the IRQ for watchdog expiration
- - timeout-sec	: Contains the watchdog timeout in seconds
- 
- Example:
-@@ -14,6 +15,7 @@ Example:
- 	wdt at 20300 {
- 		compatible = "marvell,orion-wdt";
- 		reg = <0x20300 0x28>;
-+		interrupts = <3>;
- 		timeout-sec = <10>;
- 		status = "okay";
- 	};
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 0433ea8..c8ab377 100644
+index 19e4adc..7889309 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/watchdog.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
+@@ -24,7 +24,6 @@
  #include <linux/clk.h>
  #include <linux/err.h>
-@@ -111,10 +112,16 @@ static struct watchdog_device orion_wdt = {
- 	.min_timeout = 1,
- };
+ #include <linux/of.h>
+-#include <mach/bridge-regs.h>
  
-+static irqreturn_t orion_wdt_irq(int irq, void *devid)
-+{
-+	panic("Watchdog Timeout");
-+	return IRQ_HANDLED;
-+}
-+
- static int orion_wdt_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
--	int ret;
-+	int ret, irq;
+ /*
+  * Watchdog timer block registers.
+@@ -38,7 +37,6 @@
+ #define WDT_OK_TO_CLOSE		1
  
- 	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
-@@ -131,6 +138,19 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	if (!wdt_reg)
- 		return -ENOMEM;
+ #define WDT_RESET_OUT_EN	BIT(1)
+-#define WDT_INT_REQ		BIT(3)
  
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		/*
-+		 * Not all supported platforms specify an interruption for the
-+		 * watchdog, so let's make it optional.
-+		 */
-+		ret = request_irq(irq, orion_wdt_irq, 0, pdev->name, NULL);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to request IRQ\n");
-+			return ret;
-+		}
-+	}
-+
- 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+@@ -60,9 +58,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
  
- 	orion_wdt.timeout = wdt_max_duration;
+-	/* Clear watchdog timer interrupt */
+-	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
+-
+ 	/* Enable watchdog timer */
+ 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
+ 
 -- 
 1.8.1.5
