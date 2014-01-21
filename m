@@ -1,20 +1,53 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Tue, 21 Jan 2014 19:17:42 +0900
-Subject: Question: xilinx_zynq_defconfig
-In-Reply-To: <52DE3743.9000109@monstr.eu>
-References: <20140121173442.328B.AA925319@jp.panasonic.com>
- <52DE3743.9000109@monstr.eu>
-Message-ID: <20140121191742.3293.AA925319@jp.panasonic.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Tue, 21 Jan 2014 15:51:15 +0530
+Subject: [PATCH] Add Xilinx AXI Video DMA Engine driver
+In-Reply-To: <1389972737.7619.14.camel@smile>
+References: <1389894803-4147-1-git-send-email-sthokal@xilinx.com>
+ <1389972737.7619.14.camel@smile>
+Message-ID: <CA+mB=1Lb9cXUwxKG5ZqmDVtFgMgyGBP+G6mugxU-zjFs87_pew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Michal,
+Hi Andy,
 
-> zynq is enabled in multi_v7 defconfig that's why I don't have
-> a need to add defconfig just for zynq. Even one defconfig per soc
-> is permitted by maintainers.
+On Fri, Jan 17, 2014 at 9:02 PM, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+> On Thu, 2014-01-16 at 23:23 +0530, Srikanth Thokala wrote:
+>> Hi,
+>>
+>> This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+>> It is a soft IP core, which provides high-bandwidth direct memory
+>> access between memory and AXI4-Stream video type target peripherals
+>> including peripherals which support AXI4-Stream Video Protocol. The
+>> core provides efficient two dimensional DMA operations with independent
+>> asynchronous read and write channel operation.
+>>
+>> For more information on the IP, please refer to
+>> http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
+>>
+>> This patch also provides a test client, which assumes read and write channels
+>> of the core are configured in a back-to-back connection.  It transfers
+>> data on the write channel, read and verify the data on the read channel.
+>>
+>>  drivers/dma/xilinx/xilinx_vdma_test.c              |  629 ++++++++
+>
+> What about to modify dmatest.c accordingly to your needs?
+> I see no much sense to have another copy of that in the tree.
 
-Thanks!
+I agree with you, we thought it will be good to provide a simple test
+case for our driver,
+I will drop off this test client from my v2 patch set.
 
-Best Regards
-Masahiro Yamada
+Thanks
+Srikanth
+
+>
+> --
+> Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Intel Finland Oy
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
