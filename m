@@ -1,33 +1,65 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 06:12:39 -0300
-Subject: [PATCH v2 13/15] ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
+Date: Tue, 21 Jan 2014 06:12:36 -0300
+Subject: [PATCH v2 10/15] watchdog: orion: Add per-compatible watchdog start
+ implementation
 In-Reply-To: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390295561-3466-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390295561-3466-11-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support multiplatform builds the watchdog devicetree binding
-was modified and now the 'reg' property is specified to need two
-entries. This commit adds the second entry as-per the new specification.
+To handle differences between SoCs this commit adds per-compatible
+string start() function for the watchdog kick-off. This is preparation
+work and makes no functionality changes to the current driver.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/watchdog/orion_wdt.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 8b73c80..80a56b0 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -165,7 +165,7 @@
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index e94bb97..d6009fe 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -53,6 +53,7 @@ struct orion_watchdog_data {
+ 	int rstout_enable_bit;
+ 	int (*clock_init) (struct platform_device *,
+ 			   struct orion_watchdog *);
++	int (*start) (struct watchdog_device *);
+ };
  
- 		wdt: watchdog-timer at 20300 {
- 			compatible = "marvell,orion-wdt";
--			reg = <0x20300 0x28>;
-+			reg = <0x20300 0x28>, <0x20108 0x4>;
- 			interrupt-parent = <&bridge_intc>;
- 			interrupts = <3>;
- 			clocks = <&gate_clk 7>;
+ struct orion_watchdog {
+@@ -89,7 +90,7 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
+ 
+-static int orion_wdt_start(struct watchdog_device *wdt_dev)
++static int orion_start(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 
+@@ -111,6 +112,14 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
+ 
++static int orion_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
++	/* There are some per-SoC quirks to handle */
++	return dev->data->start(wdt_dev);
++}
++
+ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+@@ -172,6 +181,7 @@ static const struct orion_watchdog_data orion_data = {
+ 	.wdt_enable_bit = BIT(4),
+ 	.wdt_counter_offset = 0x24,
+ 	.clock_init = orion_wdt_clock_init,
++	.start = orion_start,
+ };
+ 
+ static const struct of_device_id orion_wdt_of_match_table[] = {
 -- 
 1.8.1.5
