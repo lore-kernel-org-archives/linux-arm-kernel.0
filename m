@@ -1,50 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 21 Jan 2014 11:48:40 -0800
-Subject: [PATCH 1/2] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-In-Reply-To: <Pine.LNX.4.44L0.1401211308040.1272-100000@iolanthe.rowland.org>
-References: <52DEA7CD.5070107@redhat.com>
- <Pine.LNX.4.44L0.1401211308040.1272-100000@iolanthe.rowland.org>
-Message-ID: <CAGVrzcZ2arvg3yryHE5KcMz6f1Js2m1=TbWxwZzk12kyKq0tKg@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 21 Jan 2014 21:58:41 +0200
+Subject: ARM kernel (& ext3) stability issues with GCC 4.8?
+In-Reply-To: <20130613220429.GC18360@blackmetal.musicnaut.iki.fi>
+References: <20130613220429.GC18360@blackmetal.musicnaut.iki.fi>
+Message-ID: <20140121195841.GA23238@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/21 Alan Stern <stern@rowland.harvard.edu>:
-> On Tue, 21 Jan 2014, Hans de Goede wrote:
->
->> Hi,
->>
->> On 01/21/2014 05:40 PM, Alan Stern wrote:
->> > On Tue, 21 Jan 2014, Hans de Goede wrote:
->> >
->> >> Note this commit uses the same devicetree booleans for this as the ones
->> >> already existing in the usb-ehci bindings.
->> >>
->> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> >
->> >> --- a/drivers/usb/host/Kconfig
->> >> +++ b/drivers/usb/host/Kconfig
->> >> @@ -512,6 +512,10 @@ config USB_CNS3XXX_OHCI
->> >>
->> >>   config USB_OHCI_HCD_PLATFORM
->> >>    tristate "Generic OHCI driver for a platform device"
->> >> +  # Always support LE, support BE on architectures which have readl_be
->> >> +  select USB_OHCI_LITTLE_ENDIAN
->> >> +  select USB_OHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
->> >> +  select USB_OHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
->> >>    default n
->
->> > In any case, the style we have adopted is that these select lines go in
->> > the arch-specific defconfig, not here.
->>
->> Ok, so I should drop the Kconfig parts of both patches ?
->
-> That's rigt.  They are likely to cause trouble, and if the selects were
-> needed then they should already be present somewhere else.
+Hi,
 
-Absolutely, they will actually break platforms. Since you added some
-guards for when these properties are set, but proper support in the
-kernel is not enabled, this is already catching misuses, and as such
-is already an improvement.
--- 
-Florian
+On Fri, Jun 14, 2013 at 01:04:29AM +0300, Aaro Koskinen wrote:
+> I'm having severe stability issues with 3.10-rc5 on OpenRD (kirkwood)
+> when cross-compiling it using GCC 4.8.1 (I tried also GCC 4.8.0
+> with 3.9-something earlier with pretty much same results).
+[...]
+> [ 3383.627778] ------------[ cut here ]------------
+> [ 3383.654029] kernel BUG at fs/buffer.c:2956!
+
+It looks like the issue was caused by GCC bug 58854
+(http://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854).
+
+The bug is still present in GCC 4.8.2 but there's a fix available in GCC
+repository. The bug resulted in at least fs/buffer.c getting compiled
+incorrectly, and what we saw were kernel crashes or file system getting
+corrupted or both.
+
+A.
