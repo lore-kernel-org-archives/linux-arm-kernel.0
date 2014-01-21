@@ -1,102 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Jan 2014 10:26:08 -0300
-Subject: [PATCH v3 09/15] watchdog: orion: Add per-compatible clock
- initialization
+Date: Tue, 21 Jan 2014 10:26:12 -0300
+Subject: [PATCH v3 13/15] ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
 In-Reply-To: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390310774-20781-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390310774-20781-14-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the introduction of the compatible-data field,
-it's now possible to further abstract the clock initialization.
-This will allow to support SoC with a different clock setup.
-
-While we're at it, let's fix the clock error handling by returning
-PTR_ERR and checking clk_prepare_enable().
+In order to support multiplatform builds the watchdog devicetree binding
+was modified and now the 'reg' property is specified to need two
+entries. This commit adds the second entry as-per the new specification.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 35 +++++++++++++++++++++++++++--------
- 1 file changed, 27 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 5108496..b8d0f87 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -44,10 +44,14 @@
- static bool nowayout = WATCHDOG_NOWAYOUT;
- static int heartbeat = -1;		/* module parameter (seconds) */
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 8b73c80..80a56b0 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -165,7 +165,7 @@
  
-+struct orion_watchdog;
-+
- struct orion_watchdog_data {
- 	int wdt_counter_offset;
- 	int wdt_enable_bit;
- 	int rstout_enable_bit;
-+	int (*clock_init) (struct platform_device *,
-+			   struct orion_watchdog *);
- };
- 
- struct orion_watchdog {
-@@ -59,6 +63,22 @@ struct orion_watchdog {
- 	struct orion_watchdog_data *data;
- };
- 
-+static int orion_wdt_clock_init(struct platform_device *pdev,
-+				struct orion_watchdog *dev)
-+{
-+	int ret;
-+
-+	dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dev->clk))
-+		return PTR_ERR(dev->clk);
-+	ret = clk_prepare_enable(dev->clk);
-+	if (ret)
-+		return ret;
-+
-+	dev->clk_rate = clk_get_rate(dev->clk);
-+	return 0;
-+}
-+
- static int orion_wdt_ping(struct watchdog_device *wdt_dev)
- {
- 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-@@ -137,6 +157,7 @@ static const struct orion_watchdog_data orion_data = {
- 	.rstout_enable_bit = BIT(1),
- 	.wdt_enable_bit = BIT(4),
- 	.wdt_counter_offset = 0x24,
-+	.clock_init = orion_wdt_clock_init,
- };
- 
- static const struct of_device_id orion_wdt_of_match_table[] = {
-@@ -171,14 +192,6 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	dev->wdt.min_timeout = 1;
- 	dev->data = (struct orion_watchdog_data *)match->data;
- 
--	dev->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(dev->clk)) {
--		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
--		return -ENODEV;
--	}
--	clk_prepare_enable(dev->clk);
--	dev->clk_rate = clk_get_rate(dev->clk);
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENODEV;
-@@ -194,6 +207,12 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	if (!dev->rstout)
- 		return -ENOMEM;
- 
-+	ret = dev->data->clock_init(pdev, dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "cannot initialize clock\n");
-+		return ret;
-+	}
-+
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq > 0) {
- 		/*
+ 		wdt: watchdog-timer at 20300 {
+ 			compatible = "marvell,orion-wdt";
+-			reg = <0x20300 0x28>;
++			reg = <0x20300 0x28>, <0x20108 0x4>;
+ 			interrupt-parent = <&bridge_intc>;
+ 			interrupts = <3>;
+ 			clocks = <&gate_clk 7>;
 -- 
 1.8.1.5
