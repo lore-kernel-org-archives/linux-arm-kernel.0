@@ -1,173 +1,92 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 21 Jan 2014 08:41:15 -0800
-Subject: [PATCH v3 11/15] watchdog: orion: Add support for Armada 370 and
- Armada XP SoC
-In-Reply-To: <1390310774-20781-12-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390310774-20781-12-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140121164115.GC3311@roeck-us.net>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 21 Jan 2014 11:51:22 -0500
+Subject: [PATCH v4 15/16] ARM: add uprobes support
+In-Reply-To: <1387564464.3404.106.camel@linaro1.home>
+References: <1387166930-13182-1-git-send-email-dave.long@linaro.org>
+ <1387166930-13182-16-git-send-email-dave.long@linaro.org>
+ <1387564464.3404.106.camel@linaro1.home>
+Message-ID: <52DEA58A.9050406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 10:26:10AM -0300, Ezequiel Garcia wrote:
-> Using the added infrastructure for handling SoC differences,
-> this commit adds support for the watchdog controller available
-> in Armada 370 and Armada XP SoCs.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/watchdog/orion_wdt.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
-> 
-> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> index c2beb9f..a5e157c 100644
-> --- a/drivers/watchdog/orion_wdt.c
-> +++ b/drivers/watchdog/orion_wdt.c
-> @@ -30,6 +30,7 @@
->   * Watchdog timer block registers.
->   */
->  #define TIMER_CTRL		0x0000
-> +#define TIMER_A370_STATUS	0x04
->  
->  #define WDT_MAX_CYCLE_COUNT	0xffffffff
->  #define WDT_IN_USE		0
-> @@ -41,6 +42,12 @@
->  
->  #define WDT_AXP_FIXED_ENABLE_BIT BIT(10)
->  
-> +#define WDT_A370_RATIO_MASK(v)	((v) << 16)
-> +#define WDT_A370_RATIO_SHIFT	5
-> +#define WDT_A370_RATIO		(1 << WDT_A370_RATIO_SHIFT)
-> +
+On 12/20/13 13:34, Jon Medhurst (Tixy) wrote:
+> On Sun, 2013-12-15 at 23:08 -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Using Rabin Vincent's ARM uprobes patches as a base, enable uprobes
+>> support on ARM.
+>>
+>> Caveats:
+>>
+>>   - Thumb is not supported
+>>   - XOL abort/trap handling is not implemented
+>
+> I shall repeat my comment from version one of the patch...
+>
+> What are the consequences of this, e.g. is it possible for a probe to
+> get stuck in an infinite loop of faulting? I hope there are no integrity
+> issues for the kernel itself.
+>
+> Would be good if someone familiar with uprobes working could answer
+> that.
 
-Are those introduced twice ? I seem to recall seeing those defines in patch 8.
+Testing shows it does indeed get stuck continuously trapping. The 
+process is killable.  Fortunately all the infrastructure is already 
+there for fixing this.  I've patched the code to detect the trap and 
+allow it to be processed, using the powerpc uprobes code as a model. 
+The changes required are fairly small and entirely in the 
+architecture-specific code.
 
-> +#define WDT_A370_EXPIRED	BIT(31)
-> +
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->  static int heartbeat = -1;		/* module parameter (seconds) */
->  
-> @@ -80,6 +87,48 @@ static int orion_wdt_clock_init(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +static int armada370_wdt_clock_init(struct platform_device *pdev,
-> +				    struct orion_watchdog *dev)
-> +{
-> +	int ret;
-> +
-> +	dev->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(dev->clk))
-> +		return PTR_ERR(dev->clk);
-> +	ret = clk_prepare_enable(dev->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Setup watchdog input clock */
-> +	atomic_io_modify(dev->reg + TIMER_CTRL,
-> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
-> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
-> +
-> +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
-> +	return 0;
-> +}
-> +
-> +static int armadaxp_wdt_clock_init(struct platform_device *pdev,
-> +				   struct orion_watchdog *dev)
-> +{
-> +	int ret;
-> +
-> +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
-> +	if (IS_ERR(dev->clk))
-> +		return PTR_ERR(dev->clk);
-> +	ret = clk_prepare_enable(dev->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Enable the fixed watchdog clock input */
-> +	atomic_io_modify(dev->reg + TIMER_CTRL,
-> +		WDT_AXP_FIXED_ENABLE_BIT,
-> +		WDT_AXP_FIXED_ENABLE_BIT);
+As mentioned before, thumb support is a follow-on project.
 
-Who am I to complain, but your continuation line indentation isn't really
-consistent ;-).
+> I've a few other comments...
 
-> +
-> +	dev->clk_rate = clk_get_rate(dev->clk);
-> +	return 0;
-> +}
-> +
->  static int orion_wdt_ping(struct watchdog_device *wdt_dev)
->  {
->  	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-> @@ -89,6 +138,26 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
->  	return 0;
->  }
->  
-> +static int armada370_start(struct watchdog_device *wdt_dev)
-> +{
-> +	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-> +
-> +	/* Set watchdog duration */
-> +	writel(dev->clk_rate * wdt_dev->timeout,
-> +	       dev->reg + dev->data->wdt_counter_offset);
-> +
-> +	/* Clear the watchdog expiration bit */
-> +	atomic_io_modify(dev->reg + TIMER_A370_STATUS, WDT_A370_EXPIRED, 0);
-> +
-> +	/* Enable watchdog timer */
-> +	atomic_io_modify(dev->reg + TIMER_CTRL, dev->data->wdt_enable_bit,
-> +						dev->data->wdt_enable_bit);
-> +
-> +	atomic_io_modify(dev->rstout, dev->data->rstout_enable_bit,
-> +				      dev->data->rstout_enable_bit);
-> +	return 0;
-> +}
-> +
->  static int orion_start(struct watchdog_device *wdt_dev)
->  {
->  	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-> @@ -170,11 +239,35 @@ static const struct orion_watchdog_data orion_data = {
->  	.start = orion_start,
->  };
->  
-> +static const struct orion_watchdog_data armada370_data = {
-> +	.rstout_enable_bit = BIT(8),
-> +	.wdt_enable_bit = BIT(8),
-> +	.wdt_counter_offset = 0x34,
-> +	.clock_init = armada370_wdt_clock_init,
-> +	.start = armada370_start,
-> +};
-> +
-> +static const struct orion_watchdog_data armadaxp_data = {
-> +	.rstout_enable_bit = BIT(8),
-> +	.wdt_enable_bit = BIT(8),
-> +	.wdt_counter_offset = 0x34,
-> +	.clock_init = armadaxp_wdt_clock_init,
-> +	.start = armada370_start,
-> +};
-> +
->  static const struct of_device_id orion_wdt_of_match_table[] = {
->  	{
->  		.compatible = "marvell,orion-wdt",
->  		.data = &orion_data,
->  	},
-> +	{
-> +		.compatible = "marvell,armada-370-wdt",
-> +		.data = &armada370_data,
-> +	},
-> +	{
-> +		.compatible = "marvell,armada-xp-wdt",
-> +		.data = &armadaxp_data,
-> +	},
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
-> -- 
-> 1.8.1.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+[snip]
+
+>
+>
+>> +const union decode_item uprobes_probes_actions[] = {
+>> +	[PROBES_EMULATE_NONE] {.handler = probes_simulate_nop},
+>
+> There is a missing '=' in the line above. Interesting that GCC doesn't
+> complain (I tried compiling this patch and it didn't).
+>
+
+That is indeed odd.  I have fixed it (my code, not the compiler).
+
+[snip]
+
+>> +bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
+>> +{
+>> +	void *addr;
+>
+> 'addr' is not used so this line can be deleted
+>
+>> +	probes_opcode_t opcode;
+>> +
+>> +	if (!auprobe->simulate)
+>> +		return false;
+>> +
+>> +	addr = (void *) regs->ARM_pc;
+>
+> and so can this line ^^^
+
+Fixed.
+
+>
+>> +	opcode = __mem_to_opcode_arm(*(unsigned int *) auprobe->insn);
+>> +
+>> +	auprobe->asi.insn_singlestep(opcode, &auprobe->asi, regs);
+>> +
+>> +	return true;
+>> +}
+>> +
+>
+
+Fixed.
+
+> [rest of patch snipped]
+>
+
+
+-dl
