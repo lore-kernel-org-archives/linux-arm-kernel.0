@@ -1,57 +1,149 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Jan 2014 11:38:00 -0600
-Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
- device tree boot
-In-Reply-To: <20140120233941.GG6516@saruman.home>
-References: <1390260542-22213-1-git-send-email-nm@ti.com>
- <20140120233941.GG6516@saruman.home>
-Message-ID: <52DEB078.5030005@ti.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 21 Jan 2014 17:48:02 +0000
+Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
+ block
+In-Reply-To: <20140120222814.GI3471@alberich>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
+ <20140120222814.GI3471@alberich>
+Message-ID: <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 05:39 PM, Felipe Balbi wrote:
-> On Mon, Jan 20, 2014 at 05:29:02PM -0600, Nishanth Menon wrote:
->> When device is booted using devicetree, platforms impacted by
->> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
->> indicates that the module cannot do multi-block transfers.
->>
->> Handle this by providing a boolean flag to indicate to driver that it is
->> working on a hardware with mentioned limitation.
+
+
+> -----Original Message-----
+> From: Andreas Herrmann [mailto:andreas.herrmann at calxeda.com]
+> Sent: Tuesday, January 21, 2014 3:58 AM
+> To: Will Deacon
+> Cc: iommu at lists.linux-foundation.org; linux-arm-
+> kernel at lists.infradead.org; Andreas Herrmann; Sethi Varun-B16395
+> Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
+> block
 > 
-> sure there's no way of reading the revision register to figure this one
-> out without having to add a new DT attribute ?
 > 
-I did a quick patch to read the Module revision register:
-http://slexy.org/view/s21TKvlWlR
+> At the moment just handle IOMMU_GROUP_NOTIFY_BIND_DRIVER to conditionally
+> isolate all master devices for an SMMU.
+> 
+> Depending on DT information each device is put into its own protection
+> domain (if possible).  For configuration with one or just a few masters
+> per SMMU that is easy to achieve.
+> 
+> In case of many devices per SMMU (e.g. MMU-500 with it's distributed
+> translation support) isolation of each device might not be possible --
+> depending on number of available SMR groups and/or context banks.
+> 
+> Default is that device isolation is contolled per SMMU with SMMU node
+> property "arm,smmu-isolate-devices" in a DT. If this property is set for
+> an SMMU node, device isolation is performed.
+> 
+> W/o device isolation the driver detects SMMUs but no translation is
+> configured (transactions just bypass translation process).
+> 
+> Note that for device isolation dma_base and size are fixed as 0 and
+> SZ_128M at the moment. Additional patches will address this restriction
+> and allow automatic growth of mapping size.
+> 
+> Cc: Varun Sethi <Varun.Sethi@freescale.com>
+> Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> ---
+>  drivers/iommu/arm-smmu.c |   44
+> ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> Hi Will,
+> 
+> This new patch addresses Varun's comments:
+>  - use iommu_group notifier instead of bus notifier
+>  - remove superfluous call to arm_smmu_add_device in
+>    notifier function
+> 
+> This patch depends on commit "iommu/arm-smmu: add devices attached to the
+> SMMU to an IOMMU group" as found in your git tree (e.g. in branch
+> iommu/devel or for-joerg/arm-smmu/updates).
+> 
+> 
+> Andreas
+> 
+> PS: This time with a proper adaption of the notifier function.
+> 
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> 0a5649f..da19bd6 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -46,6 +46,7 @@
+>  #include <linux/amba/bus.h>
+> 
+>  #include <asm/pgalloc.h>
+> +#include <asm/dma-iommu.h>
+> 
+>  /* Driver options */
+>  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
+> @@ -1517,6 +1518,47 @@ static int arm_smmu_domain_has_cap(struct
+> iommu_domain *domain,
+>  	return !!(cap & caps);
+>  }
+> 
+> +static int arm_smmu_group_notifier(struct notifier_block *nb,
+> +				unsigned long action, void *data)
+> +{
+> +	struct device *dev = data;
+> +	struct dma_iommu_mapping *mapping;
+> +	struct arm_smmu_device *smmu;
+> +	int ret;
+> +
+> +	switch (action) {
+> +	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
+> +
+> +		smmu = dev->archdata.iommu;
+> +		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
+> +			break;
+[Sethi Varun-B16395] Should this check be really done here? The "Isolate devices" property would allow us to set up iommu groups. My understanding is that if we specify the isolate devices property, then each device would have a separate iommu group otherwise all devices connected to the SMMU would share the iommu group.
 
-sdp2430: Revision: 1.2, Spec: 0.0, normal interrupt
+With that logic, we should link the mapping to the iommu group.
 
-OMAP3430-ldp: (ES2.1): Revision: 2.6, Spec: 0.0, normal interrupt
-SDP3430:(ES3.0) Revision: 2.6, Spec: 0.0, normal interrupt
-AM3517-evm: (ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
-AM3517-crane:(ES1.1): Revision: 2.6, Spec: 0.0, normal interrupt
+-Varun
 
-AM37x-evm: (ES1.2) Revision: 2.6, Spec: 0.0, normal interrupt
-OMAP3630-beag-xm (ES1.2): Revision: 2.6, Spec: 0.0, normal interrupt
-
-am335x-evm:(ES1.0): Revision: 3.1, Spec: 0.1, normal interrupt
-am335x-sk: (ES2.1): Revision: 3.1, Spec: 0.1, normal interrupt
-am335x-beaglebone-black:(ES2.0): Revision: 3.1, Spec: 0.1, normal
-interrupt
-
-sdp4430.txt: (ES2.2): Revision: 3.1, Spec: 0.1, normal interrupt
-
-OMAP4460-panda-es (ES1.1): Revision: 3.1, Spec: 0.1, normal interrupt
-
-OMAP5uevm:(ES2.0): Revision: 3.3, Spec: 0.2, normal interrupt
-dra7-evm (es1.1): Revision: 3.3, Spec: 0.2, normal interrupt
-
-
-OMAP3430-ldp seems to be the only one impacted with module revision
-2.6 -> so using revision information is not really helpful here. Hence
-the usage of a flag in dt attribute to indicate hardware impacted by
-erratum.
-
--- 
-Regards,
-Nishanth Menon
+> +
+> +		mapping = arm_iommu_create_mapping(&platform_bus_type,
+> +						0, SZ_128M, 0);
+> +		if (IS_ERR(mapping)) {
+> +			ret = PTR_ERR(mapping);
+> +			dev_info(dev, "arm_iommu_create_mapping failed\n");
+> +			break;
+> +		}
+> +
+> +		ret = arm_iommu_attach_device(dev, mapping);
+> +		if (ret < 0) {
+> +			dev_info(dev, "arm_iommu_attach_device failed\n");
+> +			arm_iommu_release_mapping(mapping);
+> +		}
+> +
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct notifier_block group_nb = {
+> +	.notifier_call = arm_smmu_group_notifier, };
+> +
+>  static int arm_smmu_add_device(struct device *dev)  {
+>  	struct arm_smmu_device *child, *parent, *smmu; @@ -1566,6 +1608,8
+> @@ static int arm_smmu_add_device(struct device *dev)
+>  		return PTR_ERR(group);
+>  	}
+> 
+> +	iommu_group_register_notifier(group, &group_nb);
+> +
+>  	ret = iommu_group_add_device(group, dev);
+>  	iommu_group_put(group);
+>  	dev->archdata.iommu = smmu;
+> --
+> 1.7.9.5
+> 
+> 
