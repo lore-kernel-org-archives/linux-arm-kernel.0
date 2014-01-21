@@ -1,149 +1,67 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Tue, 21 Jan 2014 17:48:02 +0000
-Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <20140120222814.GI3471@alberich>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
- <20140120222814.GI3471@alberich>
-Message-ID: <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 21 Jan 2014 18:10:07 +0100
+Subject: [PATCH v7 1/2] ohci-platform: Add support for devicetree
+ instantiation
+In-Reply-To: <52DEB57C.8080700@cogentembedded.com>
+References: <1389813883-567-1-git-send-email-hdegoede@redhat.com>
+ <1389813883-567-2-git-send-email-hdegoede@redhat.com>
+ <52DEB57C.8080700@cogentembedded.com>
+Message-ID: <52DEA9EF.2090509@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 01/21/2014 06:59 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 01/15/2014 10:24 PM, Hans de Goede wrote:
+>
+>> Add support for ohci-platform instantiation from devicetree, including
+>> optionally getting clks and a phy from devicetree, and enabling / disabling
+>> those on power_on / off.
+>
+>> This should allow using ohci-platform from devicetree in various cases.
+>> Specifically after this commit it can be used for the ohci controller found
+>> on Allwinner sunxi SoCs.
+>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> [...]
+>
+>    Have only found time to fully read the patches just now...
+>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+>> new file mode 100644
+>> index 0000000..f9d6c73
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+>> @@ -0,0 +1,22 @@
+>> +USB OHCI controllers
+>> +
+>> +Required properties:
+>> +- compatible : "usb-ohci"
+>> +- reg : ohci controller register range (address and length)
+>> +- interrupts : ohci controller interrupt
+>> +
+>> +Optional properties:
+>> +- clocks : a list of phandle + clock specifier pairs
+>> +- phys : phandle + phy specifier pair
+>> +- phy-names : "usb"
+>> +
+>> +Example:
+>> +
+>> +    ohci0: ohci at 0x01c14400 {
+>
+>     Two minor nits: there should be no "0x" in the address part of the node name. And according to ePAPR [1], "the name of a node should be somewhat generic, reflecting the function of the device and not its precise programming model. If appropriate, the name should be one of the following choices:
+> [...]
+> - usb".
+>
+>     Same comments for "usb-ehci" binding.
 
-> -----Original Message-----
-> From: Andreas Herrmann [mailto:andreas.herrmann at calxeda.com]
-> Sent: Tuesday, January 21, 2014 3:58 AM
-> To: Will Deacon
-> Cc: iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org; Andreas Herrmann; Sethi Varun-B16395
-> Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
-> block
-> 
-> 
-> At the moment just handle IOMMU_GROUP_NOTIFY_BIND_DRIVER to conditionally
-> isolate all master devices for an SMMU.
-> 
-> Depending on DT information each device is put into its own protection
-> domain (if possible).  For configuration with one or just a few masters
-> per SMMU that is easy to achieve.
-> 
-> In case of many devices per SMMU (e.g. MMU-500 with it's distributed
-> translation support) isolation of each device might not be possible --
-> depending on number of available SMR groups and/or context banks.
-> 
-> Default is that device isolation is contolled per SMMU with SMMU node
-> property "arm,smmu-isolate-devices" in a DT. If this property is set for
-> an SMMU node, device isolation is performed.
-> 
-> W/o device isolation the driver detects SMMUs but no translation is
-> configured (transactions just bypass translation process).
-> 
-> Note that for device isolation dma_base and size are fixed as 0 and
-> SZ_128M at the moment. Additional patches will address this restriction
-> and allow automatic growth of mapping size.
-> 
-> Cc: Varun Sethi <Varun.Sethi@freescale.com>
-> Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> ---
->  drivers/iommu/arm-smmu.c |   44
-> ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
-> 
-> Hi Will,
-> 
-> This new patch addresses Varun's comments:
->  - use iommu_group notifier instead of bus notifier
->  - remove superfluous call to arm_smmu_add_device in
->    notifier function
-> 
-> This patch depends on commit "iommu/arm-smmu: add devices attached to the
-> SMMU to an IOMMU group" as found in your git tree (e.g. in branch
-> iommu/devel or for-joerg/arm-smmu/updates).
-> 
-> 
-> Andreas
-> 
-> PS: This time with a proper adaption of the notifier function.
-> 
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
-> 0a5649f..da19bd6 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -46,6 +46,7 @@
->  #include <linux/amba/bus.h>
-> 
->  #include <asm/pgalloc.h>
-> +#include <asm/dma-iommu.h>
-> 
->  /* Driver options */
->  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
-> @@ -1517,6 +1518,47 @@ static int arm_smmu_domain_has_cap(struct
-> iommu_domain *domain,
->  	return !!(cap & caps);
->  }
-> 
-> +static int arm_smmu_group_notifier(struct notifier_block *nb,
-> +				unsigned long action, void *data)
-> +{
-> +	struct device *dev = data;
-> +	struct dma_iommu_mapping *mapping;
-> +	struct arm_smmu_device *smmu;
-> +	int ret;
-> +
-> +	switch (action) {
-> +	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
-> +
-> +		smmu = dev->archdata.iommu;
-> +		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
-> +			break;
-[Sethi Varun-B16395] Should this check be really done here? The "Isolate devices" property would allow us to set up iommu groups. My understanding is that if we specify the isolate devices property, then each device would have a separate iommu group otherwise all devices connected to the SMMU would share the iommu group.
+You're right on both accounts, I'll do a v8 tomorrow, including a re-spin of the
+big-endian patches.
 
-With that logic, we should link the mapping to the iommu group.
+Regards,
 
--Varun
-
-> +
-> +		mapping = arm_iommu_create_mapping(&platform_bus_type,
-> +						0, SZ_128M, 0);
-> +		if (IS_ERR(mapping)) {
-> +			ret = PTR_ERR(mapping);
-> +			dev_info(dev, "arm_iommu_create_mapping failed\n");
-> +			break;
-> +		}
-> +
-> +		ret = arm_iommu_attach_device(dev, mapping);
-> +		if (ret < 0) {
-> +			dev_info(dev, "arm_iommu_attach_device failed\n");
-> +			arm_iommu_release_mapping(mapping);
-> +		}
-> +
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct notifier_block group_nb = {
-> +	.notifier_call = arm_smmu_group_notifier, };
-> +
->  static int arm_smmu_add_device(struct device *dev)  {
->  	struct arm_smmu_device *child, *parent, *smmu; @@ -1566,6 +1608,8
-> @@ static int arm_smmu_add_device(struct device *dev)
->  		return PTR_ERR(group);
->  	}
-> 
-> +	iommu_group_register_notifier(group, &group_nb);
-> +
->  	ret = iommu_group_add_device(group, dev);
->  	iommu_group_put(group);
->  	dev->archdata.iommu = smmu;
-> --
-> 1.7.9.5
-> 
-> 
+Hans
