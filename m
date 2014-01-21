@@ -1,41 +1,26 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 21 Jan 2014 10:28:06 -0500
-Subject: [PATCH] ARM: Make pgtbl macro more robust
-In-Reply-To: <20140117185029.GC13785@codeaurora.org>
-References: <1389015593-31716-1-git-send-email-cov@codeaurora.org>
- <20140117185029.GC13785@codeaurora.org>
-Message-ID: <52DE9206.1000402@codeaurora.org>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 21 Jan 2014 16:28:31 +0100
+Subject: [PATCHv3 39/41] Doc/DT: Add DT binding documentation for Sony
+ acx565akm panel
+In-Reply-To: <1390301833-24944-40-git-send-email-tomi.valkeinen@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <1390301833-24944-40-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20140121152830.GB5983@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2014 01:50 PM, Stephen Boyd wrote:
-> On 01/06, Christopher Covington wrote:
->> The pgtbl macro couldn't handle the specific
->> (TEXT_OFFSET - PG_DIR_SIZE) value that the combination of
->> MSM platforms and LPAE created:
->>
->> head.S:163: Error: invalid constant (203000) after fixup
->>
->> Regardless of whether this combination of configuration options
->> will work on currently support platforms at run time, make it
->> at least assemble properly.
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+On Tue, Jan 21, 2014 at 12:57:11PM +0200, Tomi Valkeinen wrote:
+> Add DT binding documentation for Sony acx565akm panel
 > 
-> Looks good to me.
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> I think you can put it in the patch tracker. Russell?
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Added as
+Reviewed-by: Sebastian Reichel <sre@debian.org>
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7947/1
-
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140121/57e87725/attachment.sig>
