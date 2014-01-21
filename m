@@ -1,84 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Jan 2014 13:35:16 +0100
-Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
-In-Reply-To: <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
-References: <1389941251-32692-1-git-send-email-wens@csie.org>
- <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
- <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
-Message-ID: <201401211335.16885.arnd@arndb.de>
+From: wharms@bfs.de (walter harms)
+Date: Tue, 21 Jan 2014 13:37:07 +0100
+Subject: [patch] drm/exynos: potential use after free in exynos_drm_open()
+In-Reply-To: <20140121065748.GC31535@elgon.mountain>
+References: <20140121065748.GC31535@elgon.mountain>
+Message-ID: <52DE69F3.9070307@bfs.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 January 2014, Linus Walleij wrote:
-> On Tue, Jan 21, 2014 at 4:11 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> > On Sat, Jan 18, 2014 at 8:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >
-> > I agree that's how it should be be done with the current API if your
-> > driver can obtain GPIOs from both ACPI and DT. This is a potential
-> > issue, as drivers are not supposed to make assumptions about who is
-> > going to be their GPIO provider. Let's say you started a driver with
-> > only DT in mind, and used gpio_get(dev, con_id) to get your GPIOs. DT
-> > bindings are thus of the form "con_id-gpio = <phandle>", and set in
-> > stone. Then later, someone wants to use your driver with ACPI. How do
-> > you handle that gracefully?
+
+
+Am 21.01.2014 07:57, schrieb Dan Carpenter:
+> If exynos_drm_subdrv_open() fails then we re-use "file_priv".
 > 
-> Short answer is you can't. You have to pour backward-compatibility
-> code into the driver first checking for that property and then falling
-> back to the new binding if it doesn't exist.
-
-With the ACPI named properties extension, it should be possible to have
-something akin to a "gpio-names" list that can be attached to an indexed
-array of gpio descriptors. I assume that Intel is going to need this
-for named irqs, clocks, regulators, dmas as well, so I think it will
-eventually get there. It's not something that can be done today though,
-or that is standardized in APCI-5.0.
-
-My guess is that named GPIOs are going to make more sense on x86 embedded
-than on arm64 server.
-
-> > I'm starting to wonder, now that ACPI is a first-class GPIO provider,
-> > whether we should not start to encourage the deprecation of the
-> > "con_id-gpio = <phandle>" binding form in DT and only use a single
-> > indexed GPIO property per device.
+> Fixes: 96f5421523df ('drm/exynos: use a new anon file for exynos gem mmaper')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 > 
-> You have a valid point.
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> index 9d096a0c5f8d..3c845292845a 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> @@ -174,6 +174,7 @@ static int exynos_drm_open(struct drm_device *dev, struct drm_file *file)
+>  	if (ret) {
+>  		kfree(file_priv);
+>  		file->driver_priv = NULL;
+> +		return ret;
+>  	}
 
-Independent of ACPI, I prefer indexed "gpios" properties over "con_id-gpio"
-properties anyway, because it's more consistent with some of the other
-subsystems. I don't have an opinion though on whether we should also
-allow a "gpios"/"gpio-names" pair, or whether we should keep the indexed
-"gpios" list for the anonymous case.
+using
+	kfree(	file->driver_priv );
+	file->driver_priv = NULL;
 
-> > The con_id parameter would then only
-> > be used as a label, which would also have the nice side-effect that
-> > all GPIOs used for a given function will be reported under the same
-> > name no matter what the GPIO provider is.
+would be less confusing to read, and give checkers a better chance to spot mistakes.
+(btw: file_priv could be removed from this function completely).
+
+just my 2 cents,
+re,
+ wh
+
+>  
+>  	anon_filp = anon_inode_getfile("exynos_gem", &exynos_drm_gem_fops,
+> @@ -186,7 +187,7 @@ static int exynos_drm_open(struct drm_device *dev, struct drm_file *file)
+>  	anon_filp->f_mode = FMODE_READ | FMODE_WRITE;
+>  	file_priv->anon_filp = anon_filp;
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static void exynos_drm_preclose(struct drm_device *dev,
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> As discussed earlier in this thread I'm not sure the con_id is
-> suitable for labelling GPIOs. It'd be better to have a proper name
-> specified in DT/ACPI instead.
-
-+1
-
-> > From an aesthetic point of view, I definitely prefer using con_id to
-> > identify GPIOs instead of indexes, but I don't see how we can make it
-> > play nice with ACPI. Thoughts?
-> 
-> Let's ask the DT maintainers...
-> 
-> I'm a bit sceptic to the whole ACPI-DT-API-should-be-unified
-> just-one-function-call business, as this was just a very simple example
-> of what can happen to something as simple as
-> devm_gpiod_get[_index]().
-
-I think a unified kernel API makes more sense for some subsystems than
-others, and it depends a bit on the rate of adoption of APCI for drivers
-that already have a DT binding (or vice versa, if that happens).
-
-GPIO might actually be in the first category since it's commonly used
-for off-chip components that will get shared across ARM and x86 (as
-well as everything else), while a common kernel API would be less
-important for things that are internal to an SoC where Intel is the
-only company needing ACPI support.
-
-	Arnd
