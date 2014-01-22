@@ -1,74 +1,167 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Jan 2014 11:11:03 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <52D6C545.6080402@atmel.com>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com> <52D6C545.6080402@atmel.com>
-Message-ID: <CACRpkdaAe7M3RjOiOrs9-bF5p80mshxbcNwKoDSMAXJ+5D27Ew@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 22 Jan 2014 15:44:31 +0530
+Subject: [PATCH v4 2/2] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <52DF7A78.5030700@ti.com>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>	<1390299099-14764-1-git-send-email-kishon@ti.com>	<1390299099-14764-2-git-send-email-kishon@ti.com>	<52DE7D75.4040302@ti.com>
+ <CAFp+6iFkgD8x4DozhQdRSx=KLWGwR5pOsCxrVgWbcnCMTFT-sg@mail.gmail.com>
+ <52DF7A78.5030700@ti.com>
+Message-ID: <52DF9A07.7030808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 6:28 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 13/01/2014 11:35, boris brezillon :
+On Wednesday 22 January 2014 01:29 PM, Roger Quadros wrote:
+> On 01/22/2014 08:04 AM, Vivek Gautam wrote:
+>> Hi,
+>>
+>>
+>> On Tue, Jan 21, 2014 at 7:30 PM, Roger Quadros <rogerq@ti.com> wrote:
+>>> Hi Kishon,
+>>>
+>>> On 01/21/2014 12:11 PM, Kishon Vijay Abraham I wrote:
+>>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>>>> phy_power_on() and phy_power_off().
+>>>>
+>>>> However using the old USB phy library wont be removed till the PHYs of all
+>>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>> Changes from v3:
+>>>> * avoided using quirks
+>>>>
+>>>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+>>>>  drivers/usb/dwc3/core.c                        |   60 ++++++++++++++++++++++++
+>>>>  drivers/usb/dwc3/core.h                        |    7 +++
+>>>>  3 files changed, 71 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> index e807635..471366d 100644
+>>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>> @@ -6,11 +6,13 @@ Required properties:
+>>>>   - compatible: must be "snps,dwc3"
+>>>>   - reg : Address and length of the register set for the device
+>>>>   - interrupts: Interrupts used by the dwc3 controller.
+>>>> +
+>>>> +Optional properties:
+>>>>   - usb-phy : array of phandle for the PHY device.  The first element
+>>>>     in the array is expected to be a handle to the USB2/HS PHY and
+>>>>     the second element is expected to be a handle to the USB3/SS PHY
+>>>> -
+>>>> -Optional properties:
+>>>> + - phys: from the *Generic PHY* bindings
+>>>> + - phy-names: from the *Generic PHY* bindings
+>>>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>>>
+>>>>  This is usually a subnode to DWC3 glue to which it is connected.
+>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>> index e009d4e..036d589 100644
+>>>> --- a/drivers/usb/dwc3/core.c
+>>>> +++ b/drivers/usb/dwc3/core.c
+>>>> @@ -82,6 +82,11 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>>
+>>>>       usb_phy_init(dwc->usb2_phy);
+>>>>       usb_phy_init(dwc->usb3_phy);
+>>>> +     if (dwc->usb2_generic_phy)
+>>>> +             phy_init(dwc->usb2_generic_phy);
+>>>
+>>> What if phy_init() fails? You need to report and fail. Same applies for all PHY apis in this patch.
+>>>
+>>>> +     if (dwc->usb3_generic_phy)
+>>>> +             phy_init(dwc->usb3_generic_phy);
+>>>> +
+>>>>       mdelay(100);
+>>>>
+>>>>       /* Clear USB3 PHY reset */
+>>>> @@ -343,6 +348,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>>>>  {
+>>>>       usb_phy_shutdown(dwc->usb2_phy);
+>>>>       usb_phy_shutdown(dwc->usb3_phy);
+>>>> +     if (dwc->usb2_generic_phy)
+>>>> +             phy_exit(dwc->usb2_generic_phy);
+>>>> +     if (dwc->usb3_generic_phy)
+>>>> +             phy_exit(dwc->usb3_generic_phy);
+>>>> +
+>>>>  }
+>>>>
+>>>>  #define DWC3_ALIGN_MASK              (16 - 1)
+>>>> @@ -433,6 +443,32 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>               }
+>>>>       }
+>>>>
+>>>> +     dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+>>>> +     if (IS_ERR(dwc->usb2_generic_phy)) {
+>>>> +             ret = PTR_ERR(dwc->usb2_generic_phy);
+>>>> +             if (ret == -ENOSYS || ret == -ENODEV) {
+>>>> +                     dwc->usb2_generic_phy = NULL;
+>>>> +             } else if (ret == -EPROBE_DEFER) {
+>>>> +                     return ret;
+>>>> +             } else {
+>>>> +                     dev_err(dev, "no usb2 phy configured\n");
+>>>> +                     return ret;
+>>>> +             }
+>>>> +     }
+>>>> +
+>>>> +     dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+>>>> +     if (IS_ERR(dwc->usb3_generic_phy)) {
+>>>> +             ret = PTR_ERR(dwc->usb3_generic_phy);
+>>>> +             if (ret == -ENOSYS || ret == -ENODEV) {
+>>>> +                     dwc->usb3_generic_phy = NULL;
+>>>> +             } else if (ret == -EPROBE_DEFER) {
+>>>> +                     return ret;
+>>>> +             } else {
+>>>> +                     dev_err(dev, "no usb3 phy configured\n");
+>>>> +                     return ret;
+>>>> +             }
+>>>> +     }
+>>>> +
+>>>>       dwc->xhci_resources[0].start = res->start;
+>>>>       dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
+>>>>                                       DWC3_XHCI_REGS_END;
+>>>> @@ -482,6 +518,11 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>       usb_phy_set_suspend(dwc->usb2_phy, 0);
+>>>>       usb_phy_set_suspend(dwc->usb3_phy, 0);
+>>>>
+>>>> +     if (dwc->usb2_generic_phy)
+>>>> +             phy_power_on(dwc->usb2_generic_phy);
+>>>> +     if (dwc->usb3_generic_phy)
+>>>> +             phy_power_on(dwc->usb3_generic_phy);
+>>>> +
+>>>
+>>> Is it OK to power on the phy before phy_init()?
+>>
+>> Isn't phy_init() being done before phy_power_on() in the
+>> core_soft_reset() in this patch ?
+>> Isn't that what you want here ?
+>>
+>>>
+>>> I suggest to move phy_init() from core_soft_reset() to here, just before phy_power_on().
+>>
+>> core_soft_reset() is called before phy_power_on() itself from
+>> dwc3_core_init(), right ?
+>> will moving the phy_inti() here make nay difference ?
+> 
+> You are right. This part is fine then.
 
->> You should only request it as a GPIO and then use gpio_to_irq to get the
->> related IRQ.
->> Because what is done here, is to solve the case where only the irq
->> is request, and in this specific case we need to request the pin as a
->> GPIO.
->
-> Yes, this is what we do.
->
-> It seems simple and obvious to me, but some may say that "you shall not
-> do that, it is horrible!". Well... I always tend to choose a solution
-> that works. It is one of my weaknesses, I admit ;-)
->
-> Linus W. any advice on this, before we hit again one of those infinite
-> threads that leads no progress at all?
+Yeah.. it was fixed in one of the earlier patches which got merged.
 
-So we recently established that it is actually OK for any IRQ
-consumer to request an IRQ from any irq_chip no matter if
-that is a combined GPIO+IRQ driver. This was concluded after
-a long discussion involving several parties.
+commit 3088f1085d1c08f31f02db26796555a66cdf7ca1
+Author: Kishon Vijay Abraham I <kishon@ti.com>
+Date:   Mon Nov 25 15:31:21 2013 +0530
 
-gpio_to_irq() is just a convenience function and should not be
-relied upon to have been called before the IRQ is used.
+    usb: dwc3: invoke phy_resume after phy_init
 
-The basic premise is that gpio_chip and irq_chip are
-orthogonal, and offering their services independent of each
-other.
+    usb_phy_set_suspend(phy, 0) is called before usb_phy_init. Fix it.
 
-Especially in the device tree use case it is very hard to
-dictate that a certain semantic need to be followed to use
-a certain interrupt-controller to have dependencies to a
-certain gpio-controller. So they need to be orthogonal.
+    Reported-by: Roger Quadros <rogerq@ti.com>
+    Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+    Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-First step is: always prepare the hardware and make it
-ready for action in respective callbacks from the gpio_chip API
-and irq_chip API. Do not rely on gpio_to_irq() having been
-called first anymore.
-
-This leads to ambiguities that we need to solve: if there is
-competition inside the subsystem which side is using
-the resource (a certain GPIO line and register for example)
-it needs to deny certain operations and keep track of usage
-inside of the gpiolib subsystem.
-
-We have added a new API to help with this situation:
-
- gpio_lock_as_irq(struct gpio_chip *chip, unsigned int offset)
- gpio_unlock_as_irq(struct gpio_chip *chip,
-                                      unsigned int offset)
-
-These should be called from the irq_chip startup() and
-.shutdown() callbacks to flag that the line is now in use by
-an IRQ. For example the GPIOlib core will deny the line to
-be set as output after this.
-
-If we need more infrastructure to help with this, I'm game.
-
-Clear as mud? ;-)
-
-Yours,
-Linus Walleij
+Cheers,
+Kishon
+> 
+> cheers,
+> -roger
+> 
