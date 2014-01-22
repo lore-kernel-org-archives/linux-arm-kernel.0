@@ -1,31 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 Jan 2014 17:26:41 -0500
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <87bnz364h0.fsf@natisbad.org>
-References: <87bnzekz5l.fsf@natisbad.org>
- <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
- <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
- <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
- <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
- <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
-Message-ID: <20140122222641.GD29184@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jan 2014 22:27:05 +0000
+Subject: [PATCH v3 15/24] drm/i2c: tda998x: use irq for connection
+ status and EDID read
+In-Reply-To: <20140119195843.7ae9753d@armhf>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195843.7ae9753d@armhf>
+Message-ID: <20140122222705.GL15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:23:23PM +0100, Arnaud Ebalard wrote:
-> With the patch applied on top of 3.13.0 kernel recompiled w/
-> CONFIG_PCI_MSI enabled, I cannot reproduce the bug. I guess
-> you can add my:
+On Sun, Jan 19, 2014 at 07:58:43PM +0100, Jean-Francois Moine wrote:
+> This patch adds the optional treatment of the tda998x IRQ.
 > 
->  Reported-and-tested-By: Arnaud Ebalard <arno@natisbad.org>
+> The interrupt function is used to know the display connection status
+> without polling and to speedup reading the EDID.
 > 
-> Since you'll have to push the patch to -stable team at least for 3.13,
-> I wonder if it would not make sense to extend that at least to 3.12.
-> and possibly 3.10 (3.2 is still widely used but I wonder if it makes
-> sense to go that far).
+> The interrupt number may be defined either in the DT or at encoder set
+> config time for non-DT boards.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> v3
+>     - remarks from Russell King
+> 	- move the setting of the wq_edid_wait flag before asking the
+> 	  device to read the EDID
+> 	  Thanks about this bug fix, but I don't see the other problem:
+> 	  there is no reason for the read_edid_block function to be
+> 	  called more than once...
 
-Can you pinpoint the commit that introduced the regression?
+It will happen whenever DRM asks the connector for the modes.  However,
+since the read process is triggered each time, I think this is fine.
 
-thx,
+> 	- use '0' as 'no irq'
+> 	- remove the useless delay after irq init
 
-Jason.
+Some further comments...
+
+> @@ -720,6 +787,10 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
+>  		priv->audio_port = p->audio_cfg;
+>  		priv->audio_format = p->audio_format;
+>  	}
+> +
+> +	priv->irq = p->irq;
+> +	if (p->irq)
+> +		tda_irq_init(priv);
+
+If we're going to do it this way, this should probably release the IRQ if
+there was one before re-claiming it, just in case this function gets called
+more than once by some driver using it.
+
+The alternative is, as I said before, to use the infrastructure which is
+already there, namely setting the interrupt via struct i2c_client's
+irq member.  Yes, that doesn't satisfy Sebastian's comment about using
+a GPIO, but there's no sign of GPIO usage in here at the moment anyway.
+So we might as well use what's already provided.
+
+That would then avoid the need to deal with IRQ changes etc in
+tda998x_encoder_set_config().
+
+In any case, I've tested this patch in both non-IRQ and IRQ modes, and it
+appears to work - but I'd like the suggestion above before I provide any
+attributations.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
