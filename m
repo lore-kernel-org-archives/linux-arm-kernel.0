@@ -1,44 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 22 Jan 2014 15:18:57 +0100
-Subject: [PATCH] ARM: EXYNOS: cpuidle: Fix build error of no type of
- module_init
-Message-ID: <1390400337-22850-1-git-send-email-k.kozlowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jan 2014 14:19:05 +0000
+Subject: [PATCH RFC 08/26] dmaengine: omap-dma: consolidate setup of CCR
+In-Reply-To: <52DFBFDD.8040506@ti.com>
+References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
+ <E1VyjuU-0005EQ-H5@rmk-PC.arm.linux.org.uk> <52DFBFDD.8040506@ti.com>
+Message-ID: <20140122141905.GQ27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing include to fix build error:
-arch/arm/mach-exynos/cpuidle.c:256:1: warning: data definition has no type or storage class [enabled by default]
-arch/arm/mach-exynos/cpuidle.c:256:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
-arch/arm/mach-exynos/cpuidle.c:256:1: warning: parameter names (without types) in function declaration [enabled by default]
-arch/arm/mach-exynos/cpuidle.c:256:1: warning: data definition has no type or storage class [enabled by default]
-arch/arm/mach-exynos/cpuidle.c:256:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
-arch/arm/mach-exynos/cpuidle.c:256:1: warning: parameter names (without types) in function declaration [enabled by default]
-arch/arm/mach-exynos/cpuidle.c:256:1: warning: ?exynos_cpuidle_driver_init? defined but not used [-Wunused-function]
-cc1: some warnings being treated as errors
-make[1]: *** [arch/arm/mach-exynos/cpuidle.o] Error 1
+On Wed, Jan 22, 2014 at 06:25:57PM +0530, Sricharan R wrote:
+> Setting up of DMA_DST_SYNC_PREFETCH is missing after this ?
 
-Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
-and was introduced by commit 35baa3369d1c (ARM: EXYNOS: convert cpuidle
-driver to be a platform driver).
+I'm not looking for the DMA engine driver to be a 100% reimplementation
+of the legacy driver.  Rather than supporting the entire set of features
+which the legacy driver did, and have many of them simply not used, the
+approach I'm taking here is to only support what is necessary for the
+drivers we have in mainline - and what fits the DMA engine interfaces.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c |    1 +
- 1 file changed, 1 insertion(+)
+There is no point inventing new DMA engine interfaces for features for
+which we have no users in mainline kernel - to try to do that will be
+quite rightfully thrown out by the DMA engine maintainers.
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index f57cb91f02aa..53dc1e705b2f 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/export.h>
- #include <linux/time.h>
-+#include <linux/module.h>
- #include <linux/platform_device.h>
- 
- #include <asm/proc-fns.h>
+Here's the total number of references/definitions of DMA_DST_SYNC_PREFETCH
+in the mainline kernel:
+
+arch/arm/plat-omap/dma.c:               if (src_or_dst_synch == OMAP_DMA_DST_SYNC_PREFETCH) {
+include/linux/omap-dma.h:#define OMAP_DMA_DST_SYNC_PREFETCH     0x02
+
+Hence, this feature is unused at present.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
