@@ -1,49 +1,57 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 22 Jan 2014 15:31:17 -0700
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140122221237.GA30763@localhost>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com>
- <52E02AB6.7040104@gmail.com>
- <20140122205213.GW18269@obsidianresearch.com>
- <20140122221237.GA30763@localhost>
-Message-ID: <20140122223117.GX18269@obsidianresearch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jan 2014 22:40:39 +0000
+Subject: [PATCH v3 16/24] drm/i2c: tda998x: add DT documentation
+In-Reply-To: <CAOesGMhngiw+f8bkfB9C4COTPksXg_ZsYA-p1r5WJ6FZuBE3KQ@mail.gmail.com>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195844.0c975b90@armhf>
+ <CAOesGMi96wkHM8jfHNVnM7RJyW2vVoP6FT4YyYzKp-kfc0jTuQ@mail.gmail.com>
+ <20140120105410.15705f32@armhf>
+ <CAOesGMhngiw+f8bkfB9C4COTPksXg_ZsYA-p1r5WJ6FZuBE3KQ@mail.gmail.com>
+Message-ID: <20140122224039.GM15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 07:12:38PM -0300, Ezequiel Garcia wrote:
-> On Wed, Jan 22, 2014 at 01:52:13PM -0700, Jason Gunthorpe wrote:
-> > > Clearing BRIDGE_CAUSE will only clear all currently pending upstream
-> > > IRQs, of course. If WDT IRQ will be re-raised right after that in
-> > > BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
-> > > clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
-> > 
-> > Which is why it makes no sense to clear it one time at kernel start.
-> > 
-> 
-> So, it seems we need to handle irq_startup(), as you suggested.
-> I've just tested the attached patch, and it's working fine: the driver's
-> probe() fully stops the watchdog, and then request_irq() acks and
-> pending interrupts, through the added irq_startup().
-> 
-> How does it look?
+On Tue, Jan 21, 2014 at 10:17:56AM -0800, Olof Johansson wrote:
+> Ok, this is a classic case where the binding should describe how
+> things are configured/wired up instead of hardcoding a register value
+> like this. From the data sheet there seems to be a _lot_ of settings,
+> so selecting the needed subset for now might be acceptable (and go
+> with defaults on the rest).
 
-Looks sane to me.
+The issue is not that simple, because the register is kind of backwards.
 
-I looked some more and there are other drivers (eg irq-metag-ext) that
-take this same approach.
+Rather than describing what is on each nibble of the input bus, you
+specify how each nibble of the internal bus maps to the external world.
+The internal bus is mostly fixed as to which nibbles are red, green and
+blue (there is internal support for swapping red/blue on the internal
+bus, but we don't use that - it just adds extra unnecessary headaches
+to the mapping.)
 
-Sebastian:
-I looked at the irq-orion driver a bit more and noticed this:
+The way I ended up describing it in platform data was via the individual
+nibble settings for the register:
 
-        ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
-                             handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
-                           ^^^^^^^^^^^^^^^^^^^^^
-Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
-does this work at all? :)
+        .swap_a = 2,
+        .swap_b = 3,
+        .swap_c = 4,
+        .swap_d = 5,
+        .swap_e = 0,
+        .swap_f = 1,
 
-Jason
+which gives you a way to refer back to the data sheet.  There's also the
+control whether the nibble is bit-big-endian or bit-little-endian.
+
+So basically, swap_a controls which nibble of the input bus is mapped to
+the internal bus bits 23:20, and mirror_a whether it's bit 0123 -> 0123
+or 0123 -> 3210.
+
+This means it's possible to tell the chip that each nibble of the interal
+bus comes from the same four pins!
+
+If we want to describe what each nibble set on the input pins does, it's
+going to make for some complex code to convert that from "forward" notation
+(which we'll have to invent) to the "reverse" notation that the chip needs.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
