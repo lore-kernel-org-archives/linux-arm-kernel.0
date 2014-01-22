@@ -1,79 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Jan 2014 13:49:56 +0100
-Subject: [PATCH 2/2] at91: pinctrl: use gpiolib API to mark a GPIO used
- as an IRQ
-In-Reply-To: <1390394341-12548-2-git-send-email-jjhiblot@traphandler.com>
-References: <1390394341-12548-1-git-send-email-jjhiblot@traphandler.com>
- <1390394341-12548-2-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <52DFBE74.7000300@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 22 Jan 2014 12:50:49 +0000
+Subject: [PATCH v4 00/36] mtd: st_spi_fsm: Add new driver
+In-Reply-To: <20140108143316.GA14575@lee--X1>
+References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
+ <20140108143316.GA14575@lee--X1>
+Message-ID: <20140122125049.GA8586@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Jacques,
+Hi Brian,
 
-On 22/01/2014 13:39, Jean-Jacques Hiblot wrote:
-> When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
-> the gpiolib so we can keep track of the usage centrally.
+> Version 4:
+>   Tended to Brian's previous review comments
+>     - Checkpatch acceptance
+>     - MODULE_DEVICE_TABLE() name slip correction
+>     - Timeout issue(s) resolved
+>     - Potential infinite loop mitigated
+>     - Code clarity suggests heeded
+>     - Duplication with MTD core code removed
+>     - Upgraded to using ROUND_UP() helper
+>     - Moved non-shared header code into main driver
+>     - Relocated dynamic msg sequence stores into main struct
+>     - Averted adaption of static (table) data
+>     - Basic whitespace/spelling/data type/dev_err suggestions accepted
 > 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> Version 3:
+>   Okay, this thing should be fully functional now. Identify a chip
+>   based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+>   Support for various chip quirks added too.
+>  
+> Version 2:
+>   The first bunch of these patches have been on the MLs before, but
+>   didn't receive a great deal of attention for the most part. We are
+>   a little more featureful this time however. We can now successfully
+>   setup and configure the N25Q256. We still can't read/write/erase
+>   it though. I'll start work on that next week and will provide it in
+>   the next instalment.
+>  
+> Version 1:
+>   First stab at getting this thing Mainlined. It doesn't do a great deal
+>   yet, but we are able to initialise the device and dynamically set it up
+>   correctly based on an extracted JEDEC ID.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index e8c8301..fbedde2 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1299,6 +1299,28 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
->  	return 0;
->  }
->  
-> +static unsigned int gpio_irq_startup(struct irq_data *d)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-> +	unsigned	pin = d->hwirq;
-> +	int ret;
-> +
-> +	ret = gpio_lock_as_irq(&at91_gpio->chip, pin);
-> +	if (ret) {
-> +		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
-> +			d->hwirq);
-> +		return ret;
-> +	}
-> +	return 0;
-> +}
+>  Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+>  arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+>  arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+>  drivers/mtd/devices/Kconfig                      |    8 +
+>  drivers/mtd/devices/Makefile                     |    1 +
+>  drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
+>  drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 2266 insertions(+)
 
-As for the 1st patch, a blank line between the 2 functions should be nice
+Can you confirm receipt of this set, or would you like me to resend?
 
-Thanks,
-
-Gregory
-
-> +static void gpio_irq_shutdown(struct irq_data *d)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-> +	unsigned	pin = d->hwirq;
-> +
-> +	gpio_unlock_as_irq(&at91_gpio->chip, pin);
-> +}
-> +
->  #ifdef CONFIG_PM
->  
->  static u32 wakeups[MAX_GPIO_BANKS];
-> @@ -1377,6 +1399,8 @@ void at91_pinctrl_gpio_resume(void)
->  
->  static struct irq_chip gpio_irqchip = {
->  	.name		= "GPIO",
-> +	.irq_startup	= gpio_irq_startup,
-> +	.irq_shutdown	= gpio_irq_shutdown,
->  	.irq_disable	= gpio_irq_mask,
->  	.irq_mask	= gpio_irq_mask,
->  	.irq_unmask	= gpio_irq_unmask,
-> 
-
+Kind regards,
+Lee
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
