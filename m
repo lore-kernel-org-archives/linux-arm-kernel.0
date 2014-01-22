@@ -1,362 +1,236 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jan 2014 20:04:44 +0100
-Subject: [PATCH v5 09/14] ARM: sunxi: Add support for Allwinner SUNXi SoCs
- sata to ahci_platform
+Date: Wed, 22 Jan 2014 20:04:46 +0100
+Subject: [PATCH v5 11/14] ahci-imx: Add imx_ahci_phy_init / _exit helpers
 In-Reply-To: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
 References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390417489-5354-10-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390417489-5354-12-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <oliver@schinagl.nl>
-
-This patch adds support for the ahci sata controler found on Allwinner A10
-and A20 SoCs to the ahci_platform driver.
-
-Orignally written by Olliver Schinagl using the approach of having a platform
-device which probe method creates a new child platform device which gets
-driven by ahci_platform.c, as done by ahci_imx.c .
-
-Refactored by Hans de Goede to add most of the non sunxi specific functionality
-to ahci_platform.c and use a platform_data pointer from of_device_id for the
-sunxi specific bits.
-
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/ata/ahci-platform.txt      |  18 +-
- drivers/ata/Kconfig                                |   9 +
- drivers/ata/Makefile                               |   1 +
- drivers/ata/ahci_sunxi.c                           | 251 +++++++++++++++++++++
- 4 files changed, 276 insertions(+), 3 deletions(-)
- create mode 100644 drivers/ata/ahci_sunxi.c
+ drivers/ata/ahci_imx.c | 142 +++++++++++++++++++++++++++----------------------
+ 1 file changed, 77 insertions(+), 65 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 1ac807f..78b2e80 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -4,7 +4,9 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 2210866..e58e062 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -51,6 +51,7 @@ static int ahci_imx_hotplug;
+ module_param_named(hotplug, ahci_imx_hotplug, int, 0644);
+ MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support)");
  
- Required properties:
--- compatible        : compatible list, contains "snps,spear-ahci"
-+- compatible        : compatible list, one of "snps,spear-ahci",
-+                      "snps,exynos5440-ahci", "ibm,476gtr-ahci", or
-+                      "allwinner,sun4i-a10-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
++static void imx_ahci_phy_exit(struct ahci_host_priv *hpriv);
+ static void ahci_imx_host_stop(struct ata_host *host);
  
-@@ -13,10 +15,20 @@ Optional properties:
- - clocks            : a list of phandle + clock specifier pairs
- - target-supply     : regulator for SATA target power
- 
--Example:
-+allwinner,sun4i-a10-ahci required properties:
-+- clocks            : index 0 must point to the sata_ref clk, 1 to the ahb clk
+ static void ahci_imx_error_handler(struct ata_port *ap)
+@@ -78,10 +79,8 @@ static void ahci_imx_error_handler(struct ata_port *ap)
+ 	 */
+ 	reg_val = readl(mmio + PORT_PHY_CTL);
+ 	writel(reg_val | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
+-	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+-			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+-			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+-	ahci_platform_disable_clks(hpriv);
 +
-+Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
- 		reg = <0xffe08000 0x1000>;
- 		interrupts = <115>;
++	imx_ahci_phy_exit(hpriv);
+ 	imxpriv->no_device = true;
+ }
+ 
+@@ -98,40 +97,18 @@ static const struct ata_port_info ahci_imx_port_info = {
+ 	.port_ops	= &ahci_imx_ops,
+ };
+ 
+-static int imx_ahci_probe(struct platform_device *pdev)
++static int imx_ahci_phy_init(struct ahci_host_priv *hpriv)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct ahci_host_priv *hpriv;
+-	struct imx_ahci_priv *imxpriv;
+-	unsigned int reg_val;
++	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
+ 	int rc;
+ 
+-	imxpriv = devm_kzalloc(dev, sizeof(*imxpriv), GFP_KERNEL);
+-	if (!imxpriv)
+-		return -ENOMEM;
 -
-         };
-+
-+	ahci: sata at 01c18000 {
-+		compatible = "allwinner,sun4i-a10-ahci";
-+		reg = <0x01c18000 0x1000>;
-+		interrupts = <56>;
-+		clocks = <&pll6 0>, <&ahb_gates 25>;
-+		target-supply = <&reg_ahci_5v>;
-+	};
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 4e73772..cc67cc0 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -106,6 +106,15 @@ config AHCI_IMX
+-	hpriv = ahci_platform_get_resources(pdev);
+-	if (IS_ERR(hpriv))
+-		return PTR_ERR(hpriv);
+-	if (!hpriv->clks[CLK_AHB]) {
+-		dev_err(dev, "no ahb clk, need sata, sata_ref and ahb clks\n");
+-		rc = -ENOENT;
+-		goto put_resources;
+-	}
+-	hpriv->plat_data = imxpriv;
+-
+-	imxpriv->gpr =
+-		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+-	if (IS_ERR(imxpriv->gpr)) {
+-		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
+-		rc = PTR_ERR(imxpriv->gpr);
+-		goto put_resources;
+-	}
++	if (imxpriv->no_device)
++		return 0;
  
- 	  If unsure, say N.
+ 	if (hpriv->target_pwr) {
+ 		rc = regulator_enable(hpriv->target_pwr);
+ 		if (rc)
+-			goto put_resources;
++			return rc;
+ 	}
  
-+config AHCI_SUNXI
-+	tristate "Allwinner sunxi AHCI SATA support"
-+	depends on ARCH_SUNXI && SATA_AHCI_PLATFORM
-+	help
-+	  This option enables support for the Allwinner sunxi SoC's
-+	  onboard AHCI SATA.
+ 	rc = ahci_platform_enable_clks(hpriv);
+@@ -144,7 +121,8 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 	 * is 0x07ffffff, and the other one write for setting
+ 	 * the mpll_clk_en.
+ 	 */
+-	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
++	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13
++			, IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK
+ 			| IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK
+ 			| IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK
+ 			| IMX6Q_GPR13_SATA_SPD_MODE_MASK
+@@ -162,9 +140,69 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 			| IMX6Q_GPR13_SATA_TX_ATTEN_9_16
+ 			| IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB
+ 			| IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
+-	regmap_update_bits(imxpriv->gpr, 0x34, IMX6Q_GPR13_SATA_MPLL_CLK_EN,
 +
-+	  If unsure, say N.
++	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
++			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+ 			IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+-	usleep_range(100, 200);
 +
- config SATA_FSL
- 	tristate "Freescale 3.0Gbps SATA support"
- 	depends on FSL_SOC
-diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-index 46518c6..246050b 100644
---- a/drivers/ata/Makefile
-+++ b/drivers/ata/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
- obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
- obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
- obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o
-+obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o
- 
- # SFF w/ custom DMA
- obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
-diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
-new file mode 100644
-index 0000000..568a211
---- /dev/null
-+++ b/drivers/ata/ahci_sunxi.c
-@@ -0,0 +1,251 @@
-+/*
-+ * Allwinner sunxi AHCI SATA platform driver
-+ * Copyright 2013 Olliver Schinagl <oliver@schinagl.nl>
-+ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * based on the AHCI SATA platform driver by Jeff Garzik and Anton Vorontsov
-+ * Based on code from Allwinner Technology Co., Ltd. <www.allwinnertech.com>,
-+ * Daniel Wang <danielwang@allwinnertech.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/ahci_platform.h>
-+#include <linux/clk.h>
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include "ahci.h"
-+
-+#define AHCI_BISTAFR 0x00a0
-+#define AHCI_BISTCR 0x00a4
-+#define AHCI_BISTFCTR 0x00a8
-+#define AHCI_BISTSR 0x00ac
-+#define AHCI_BISTDECR 0x00b0
-+#define AHCI_DIAGNR0 0x00b4
-+#define AHCI_DIAGNR1 0x00b8
-+#define AHCI_OOBR 0x00bc
-+#define AHCI_PHYCS0R 0x00c0
-+#define AHCI_PHYCS1R 0x00c4
-+#define AHCI_PHYCS2R 0x00c8
-+#define AHCI_TIMER1MS 0x00e0
-+#define AHCI_GPARAM1R 0x00e8
-+#define AHCI_GPARAM2R 0x00ec
-+#define AHCI_PPARAMR 0x00f0
-+#define AHCI_TESTR 0x00f4
-+#define AHCI_VERSIONR 0x00f8
-+#define AHCI_IDR 0x00fc
-+#define AHCI_RWCR 0x00fc
-+#define AHCI_P0DMACR 0x0170
-+#define AHCI_P0PHYCR 0x0178
-+#define AHCI_P0PHYSR 0x017c
-+
-+static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
-+{
-+	u32 reg_val;
-+
-+	reg_val = readl(reg);
-+	reg_val &= ~(clr_val);
-+	writel(reg_val, reg);
-+}
-+
-+static void sunxi_setbits(void __iomem *reg, u32 set_val)
-+{
-+	u32 reg_val;
-+
-+	reg_val = readl(reg);
-+	reg_val |= set_val;
-+	writel(reg_val, reg);
-+}
-+
-+static void sunxi_clrsetbits(void __iomem *reg, u32 clr_val, u32 set_val)
-+{
-+	u32 reg_val;
-+
-+	reg_val = readl(reg);
-+	reg_val &= ~(clr_val);
-+	reg_val |= set_val;
-+	writel(reg_val, reg);
-+}
-+
-+static u32 sunxi_getbits(void __iomem *reg, u8 mask, u8 shift)
-+{
-+	return (readl(reg) >> shift) & mask;
-+}
-+
-+static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
-+{
-+	u32 reg_val;
-+	int timeout;
-+
-+	/* This magic is from the original code */
-+	writel(0, reg_base + AHCI_RWCR);
-+	mdelay(5);
-+
-+	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(19));
-+	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
-+			 (0x7 << 24),
-+			 (0x5 << 24) | BIT(23) | BIT(18));
-+	sunxi_clrsetbits(reg_base + AHCI_PHYCS1R,
-+			 (0x3 << 16) | (0x1f << 8) | (0x3 << 6),
-+			 (0x2 << 16) | (0x6 << 8) | (0x2 << 6));
-+	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
-+	sunxi_clrbits(reg_base + AHCI_PHYCS1R, BIT(19));
-+	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
-+			 (0x7 << 20), (0x3 << 20));
-+	sunxi_clrsetbits(reg_base + AHCI_PHYCS2R,
-+			 (0x1f << 5), (0x19 << 5));
-+	mdelay(5);
-+
-+	sunxi_setbits(reg_base + AHCI_PHYCS0R, (0x1 << 19));
-+
-+	timeout = 250; /* Power up takes aprox 50 us */
-+	do {
-+		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS0R, 0x7, 28);
-+		if (reg_val == 0x02)
-+			break;
-+
-+		if (--timeout == 0) {
-+			dev_err(dev, "PHY power up failed.\n");
-+			return -EIO;
-+		}
-+		udelay(1);
-+	} while (1);
-+
-+	sunxi_setbits(reg_base + AHCI_PHYCS2R, (0x1 << 24));
-+
-+	timeout = 100; /* Calibration takes aprox 10 us */
-+	do {
-+		reg_val = sunxi_getbits(reg_base + AHCI_PHYCS2R, 0x1, 24);
-+		if (reg_val == 0x00)
-+			break;
-+
-+		if (--timeout == 0) {
-+			dev_err(dev, "PHY calibration failed.\n");
-+			return -EIO;
-+		}
-+		udelay(1);
-+	} while (1);
-+
-+	mdelay(15);
-+
-+	writel(0x7, reg_base + AHCI_RWCR);
-+
++	usleep_range(1000, 2000);
 +	return 0;
++
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
++	return rc;
 +}
 +
-+static void ahci_sunxi_start_engine(struct ata_port *ap)
++static void imx_ahci_phy_exit(struct ahci_host_priv *hpriv)
 +{
-+	void __iomem *port_mmio = ahci_port_base(ap);
-+	struct ahci_host_priv *hpriv = ap->host->private_data;
++	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
 +
-+	/* Setup DMA before DMA start */
-+	sunxi_clrsetbits(hpriv->mmio + AHCI_P0DMACR, 0x0000ff00, 0x00004400);
++	if (imxpriv->no_device)
++		return;
 +
-+	/* Start DMA */
-+	sunxi_setbits(port_mmio + PORT_CMD, PORT_CMD_START);
++	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
++			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
++			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
++	ahci_platform_disable_clks(hpriv);
++
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
 +}
 +
-+static const struct ata_port_info ahci_sunxi_port_info = {
-+	AHCI_HFLAGS(AHCI_HFLAG_32BIT_ONLY | AHCI_HFLAG_NO_MSI |
-+			  AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ),
-+	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NCQ,
-+	.pio_mask	= ATA_PIO4,
-+	.udma_mask	= ATA_UDMA6,
-+	.port_ops	= &ahci_platform_ops,
-+};
-+
-+static int ahci_sunxi_probe(struct platform_device *pdev)
++static int imx_ahci_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
 +	struct ahci_host_priv *hpriv;
++	struct imx_ahci_priv *imxpriv;
++	unsigned int reg_val;
 +	int rc;
++
++	imxpriv = devm_kzalloc(dev, sizeof(*imxpriv), GFP_KERNEL);
++	if (!imxpriv)
++		return -ENOMEM;
 +
 +	hpriv = ahci_platform_get_resources(pdev);
 +	if (IS_ERR(hpriv))
 +		return PTR_ERR(hpriv);
++	if (!hpriv->clks[CLK_AHB]) {
++		dev_err(dev, "no ahb clk, need sata, sata_ref and ahb clks\n");
++		rc = -ENOENT;
++		goto put_resources;
++	}
++	hpriv->plat_data = imxpriv;
 +
-+	hpriv->start_engine = ahci_sunxi_start_engine;
++	imxpriv->gpr =
++		syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
++	if (IS_ERR(imxpriv->gpr)) {
++		dev_err(dev, "failed to find fsl,imx6q-iomux-gpr regmap\n");
++		rc = PTR_ERR(imxpriv->gpr);
++		goto put_resources;
++	}
 +
-+	rc = ahci_platform_enable_resources(hpriv);
++	rc = imx_ahci_phy_init(hpriv);
 +	if (rc)
 +		goto put_resources;
-+
-+	rc = ahci_sunxi_phy_init(dev, hpriv->mmio);
-+	if (rc)
-+		goto disable_resources;
-+
-+	rc = ahci_platform_init_host(pdev, hpriv, &ahci_sunxi_port_info, 0, 0);
-+	if (rc)
-+		goto disable_resources;
-+
-+	return 0;
-+
-+disable_resources:
-+	ahci_platform_disable_resources(hpriv);
-+put_resources:
-+	ahci_platform_put_resources(hpriv);
-+	return rc;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+int ahci_sunxi_resume(struct device *dev)
-+{
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	int rc;
-+
-+	rc = ahci_platform_enable_resources(hpriv);
-+	if (rc)
-+		return rc;
-+
-+	rc = ahci_sunxi_phy_init(dev, hpriv->mmio);
-+	if (rc)
-+		goto disable_resources;
-+
-+	rc = ahci_platform_resume_host(dev);
-+	if (rc)
-+		goto disable_resources;
-+
-+	return 0;
-+
-+disable_resources:
-+	ahci_platform_disable_resources(hpriv);
-+	return rc;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(ahci_sunxi_pm_ops, ahci_platform_suspend,
-+			 ahci_sunxi_resume);
-+
-+static const struct of_device_id ahci_sunxi_of_match[] = {
-+	{ .compatible = "allwinner,sun4i-a10-ahci", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, ahci_sunxi_of_match);
-+
-+static struct platform_driver ahci_sunxi_driver = {
-+	.probe = ahci_sunxi_probe,
-+	.remove = ata_platform_remove_one,
-+	.driver = {
-+		.name = "ahci-sunxi",
-+		.owner = THIS_MODULE,
-+		.of_match_table = ahci_sunxi_of_match,
-+		.pm = &ahci_sunxi_pm_ops,
-+	},
-+};
-+module_platform_driver(ahci_sunxi_driver);
-+
-+MODULE_DESCRIPTION("Allwinner sunxi AHCI SATA driver");
-+MODULE_AUTHOR("Olliver Schinagl <oliver@schinagl.nl>");
-+MODULE_LICENSE("GPL");
+ 
+ 	/*
+ 	 * Configure the HWINIT bits of the HOST_CAP and HOST_PORTS_IMPL,
+@@ -189,15 +227,12 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 
+ 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_imx_port_info, 0, 0);
+ 	if (rc)
+-		goto disable_clks;
++		goto phy_exit;
+ 
+ 	return 0;
+ 
+-disable_clks:
+-	ahci_platform_disable_clks(hpriv);
+-disable_regulator:
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
++phy_exit:
++	imx_ahci_phy_exit(hpriv);
+ put_resources:
+ 	ahci_platform_put_resources(hpriv);
+ 	return rc;
+@@ -206,18 +241,8 @@ put_resources:
+ static void ahci_imx_host_stop(struct ata_host *host)
+ {
+ 	struct ahci_host_priv *hpriv = host->private_data;
+-	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
+-
+-	if (!imxpriv->no_device) {
+-		regmap_update_bits(imxpriv->gpr, 0x34,
+-			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+-			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+-		ahci_platform_disable_clks(hpriv);
+-	}
+-
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
+ 
++	imx_ahci_phy_exit(hpriv);
+ 	ahci_platform_put_resources(hpriv);
+ }
+ 
+@@ -225,26 +250,13 @@ static int imx_ahci_suspend(struct device *dev)
+ {
+ 	struct ata_host *host = dev_get_drvdata(dev);
+ 	struct ahci_host_priv *hpriv = host->private_data;
+-	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
+ 	int rc;
+ 
+ 	rc = ahci_platform_suspend_host(dev);
+ 	if (rc)
+ 		return rc;
+ 
+-	/*
+-	 * If no_device is set, The CLKs had been gated off in the
+-	 * initialization so don't do it again here.
+-	 */
+-	if (!imxpriv->no_device) {
+-		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+-				IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+-				!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+-		ahci_platform_disable_clks(hpriv);
+-	}
+-
+-	if (hpriv->target_pwr)
+-		regulator_disable(hpriv->target_pwr);
++	imx_ahci_phy_exit(hpriv);
+ 
+ 	return 0;
+ }
 -- 
 1.8.5.3
