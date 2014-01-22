@@ -1,54 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jan 2014 16:11:53 +0000
-Subject: [PATCH v7 5/6] misc: debug: remove compilation warnings
-In-Reply-To: <1390401773-12100-6-git-send-email-vijay.kilari@gmail.com>
-References: <1390401773-12100-1-git-send-email-vijay.kilari@gmail.com>
- <1390401773-12100-6-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20140122161152.GD8065@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Jan 2014 13:21:37 -0300
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a
+ separate resource
+In-Reply-To: <3176358.2QFcJHj0fv@wuerfel>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233321.GR18269@obsidianresearch.com>
+ <3176358.2QFcJHj0fv@wuerfel>
+Message-ID: <20140122162136.GA27273@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:42:52PM +0000, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> 
-> Resolve following compiler warnings
-> warning: format '%lx' expects argument of type 'long unsigned int',
-> but argument 2 has type 'u64' [-Wformat]
-> 
-> tested for warnings on arm32 & arm64
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> ---
->  drivers/misc/kgdbts.c |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/misc/kgdbts.c b/drivers/misc/kgdbts.c
-> index 36f5d52..78e10b2 100644
-> --- a/drivers/misc/kgdbts.c
-> +++ b/drivers/misc/kgdbts.c
-> @@ -350,8 +350,8 @@ static int check_single_step(char *put_str, char *arg)
->  	kgdb_hex2mem(&put_str[1], (char *)kgdbts_gdb_regs,
->  		 NUMREGBYTES);
->  	gdb_regs_to_pt_regs(kgdbts_gdb_regs, &kgdbts_regs);
-> -	v2printk("Singlestep stopped at IP: %lx\n",
-> -		   instruction_pointer(&kgdbts_regs));
-> +	v2printk("Singlestep stopped at IP: %llx\n",
-> +		   (unsigned long long)instruction_pointer(&kgdbts_regs));
->  
->  	if (sstep_thread_id != cont_thread_id) {
->  		/*
-> @@ -376,8 +376,8 @@ static int check_single_step(char *put_str, char *arg)
->  continue_test:
->  	matched_id = 0;
->  	if (instruction_pointer(&kgdbts_regs) == addr) {
-> -		eprintk("kgdbts: SingleStep failed at %lx\n",
-> -			   instruction_pointer(&kgdbts_regs));
-> +		eprintk("kgdbts: SingleStep failed at %llx\n",
-> +			(unsigned long long)instruction_pointer(&kgdbts_regs));
+Jason, Arnd:
 
-I think we could simply add the cast to the definition of
-instruction_pointer() on arm64. Even the generic instruction_pointer()
-definition returns unsigned long.
+On Wed, Jan 22, 2014 at 10:48:37AM +0100, Arnd Bergmann wrote:
+> On Tuesday 21 January 2014 16:33:21 Jason Gunthorpe wrote:
+> > On Tue, Jan 21, 2014 at 06:12:31AM -0300, Ezequiel Garcia wrote:
+> > > In order to support other SoC, it's required to distinguish
+> > > the 'control' timer register, from the 'rstout' register
+> > > that enables system reset on watchdog expiration.
+> > 
+> > > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > > +     if (!res)
+> > > +             return -ENODEV;
+> >            ^^^^^^^^^^^^^^^^^^^^^^
+> > 
+> > This change seems to break compatibility with existing DT files that
+> > have only a single entry in reg?
+> > 
+> > Can the value be defaulted some how if missing?
+> 
+> I think this is a direct consequence of the attempt to remove the
+> header file dependency, since the RSTOUTn_MASK macro is defined
+> in mach/bridge-regs.h.
+> 
 
+Exactly. Just for the record, I warned about this a while back:
+
+http://www.spinics.net/lists/arm-kernel/msg270163.html
+
+That said, it truly sucks to break compatibility so finding a way to
+keep backwards compatibility would be certainly desirable.
+
+> I don't see a good way out that would preserve backwards compatibility,
+> other than hardcoding the physical address in the driver, which seems
+> just as bad as breaking compatibility. That said, it is always the
+> same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
+> Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
+> a fallback would technically work, but we should print a fat warning at
+> boot time if we actually fall back to that.
+> 
+
+Yes, I was thinking just about this. Namely:
+
+If the second resource is missing *and* the compatible-string is
+"orion-watchdog" (or it's not DT-registered), then use a hardcoded
+RSTOUTn_MASK address. And pr_warn() something.
+
+Thanks for the feedback,
 -- 
-Catalin
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
