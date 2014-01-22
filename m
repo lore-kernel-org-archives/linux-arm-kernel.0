@@ -1,43 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Jan 2014 15:29:15 -0300
-Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a
- separate resource
-In-Reply-To: <20140122181409.GV18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233321.GR18269@obsidianresearch.com>
- <3176358.2QFcJHj0fv@wuerfel> <20140122162136.GA27273@localhost>
- <20140122180100.GE27273@localhost>
- <20140122181409.GV18269@obsidianresearch.com>
-Message-ID: <20140122182914.GH27273@localhost>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 22 Jan 2014 13:29:25 -0500
+Subject: [PATCH] ARM: hw_breakpoint: Add ARMv8 support
+Message-ID: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:14:09AM -0700, Jason Gunthorpe wrote:
-> On Wed, Jan 22, 2014 at 03:01:01PM -0300, Ezequiel Garcia wrote:
-> > On Wed, Jan 22, 2014 at 01:21:36PM -0300, Ezequiel Garcia wrote:
-> > > > I don't see a good way out that would preserve backwards compatibility,
-> > > > other than hardcoding the physical address in the driver, which seems
-> > > > just as bad as breaking compatibility. That said, it is always the
-> > > > same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
-> > > > Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
-> > > > a fallback would technically work, but we should print a fat warning at
-> > > > boot time if we actually fall back to that.
-> > > > 
-> > > 
-> > > Yes, I was thinking just about this. Namely:
-> > > 
-> > [..]
-> > 
-> > How about something like this?
-> 
-> I liked Arnd's idea to use an offset from the first register. With the
-> mbus driver we can now actually change the 0xF1.. prefix via the DT.
-> 
+Add the trivial support necessary to get hardware breakpoints
+working for GDB on ARMv8 simulators running in AArch32 mode.
 
-Good idea. Maybe extracting the base address from the timer control
-register: wdt_reg & 0xff000000 ?
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ arch/arm/include/asm/hw_breakpoint.h | 1 +
+ arch/arm/kernel/hw_breakpoint.c      | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index eef55ea..8e427c7 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_DEBUG_ARCH_V7_ECP14	3
+ #define ARM_DEBUG_ARCH_V7_MM	4
+ #define ARM_DEBUG_ARCH_V7_1	5
++#define ARM_DEBUG_ARCH_V8	6
+ 
+ /* Breakpoint */
+ #define ARM_BREAKPOINT_EXECUTE	0
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 3d44660..45fbcaf 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -257,6 +257,7 @@ static int enable_monitor_mode(void)
+ 		break;
+ 	case ARM_DEBUG_ARCH_V7_ECP14:
+ 	case ARM_DEBUG_ARCH_V7_1:
++	case ARM_DEBUG_ARCH_V8:
+ 		ARM_DBG_WRITE(c0, c2, 2, (dscr | ARM_DSCR_MDBGEN));
+ 		isb();
+ 		break;
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
