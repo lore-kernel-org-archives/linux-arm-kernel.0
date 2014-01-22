@@ -1,52 +1,40 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 22 Jan 2014 14:48:31 +0100
-Subject: [PATCHv6 7/7] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
-In-Reply-To: <1390398511-8041-1-git-send-email-denis@eukrea.com>
-References: <1390398511-8041-1-git-send-email-denis@eukrea.com>
-Message-ID: <1390398511-8041-7-git-send-email-denis@eukrea.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Jan 2014 14:49:36 +0100
+Subject: [PATCH 5/5 v2] ARM: integrator: select AMBA bus and GPIO block
+Message-ID: <1390398576-8760-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Eric B?nard <eric@eukrea.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+The Integrator/AP can be used with a logic module called
+IM-PD1, which contains a few AMBA PrimeCell devices, one of which
+is the PL061 GPIO controller. As the lines from this GPIO
+controller are looped back to devices on the board itself and
+provides resources back to it, we need to always have GPIO
+and the PL061 driver available for other devices to work.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v5->v6:
-- Reordered the Cc list.
-
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
-
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
+ChangeLog v1->v2:
+- Drop selection of ARM_AMBA as this is already done by the
+  parent ARCH_INTEGRATOR symbol.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-integrator/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index f37d65b..f8f5abe 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,6 +17,14 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+	};
-+
- 	reg_lcd_3v3: lcd-en {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 46be99007529..6e8b0e10b420 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -30,7 +30,9 @@ config ARCH_CINTEGRATOR
+ config INTEGRATOR_IMPD1
+ 	tristate "Include support for Integrator/IM-PD1"
+ 	depends on ARCH_INTEGRATOR_AP
++	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_VIC
++	select GPIO_PL061 if GPIOLIB
+ 	help
+ 	  The IM-PD1 is an add-on logic module for the Integrator which
+ 	  allows ARM(R) Ltd PrimeCells to be developed and evaluated.
 -- 
-1.7.9.5
+1.8.4.2
