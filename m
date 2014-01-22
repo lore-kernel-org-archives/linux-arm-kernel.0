@@ -1,43 +1,68 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 22 Jan 2014 13:29:25 -0500
-Subject: [PATCH] ARM: hw_breakpoint: Add ARMv8 support
-Message-ID: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 22 Jan 2014 12:58:48 -0600
+Subject: [PATCH RFC 0/4] reserved-memory regions/CMA in devicetree, again
+Message-ID: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the trivial support necessary to get hardware breakpoints
-working for GDB on ARMv8 simulators running in AArch32 mode.
+Hey Marek-
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
+What is the current status of the reserved-memory/CMA device tree support
+series?  It looks like it's stalled out a bit since the revert[2].  Hopefully
+this series is a push in the right direction?
+
 ---
- arch/arm/include/asm/hw_breakpoint.h | 1 +
- arch/arm/kernel/hw_breakpoint.c      | 1 +
- 2 files changed, 2 insertions(+)
+This set is an adaptation of Marek's original patchset posted here[1],
+and then subsequently reverted here[2].  In [3], Grant proposed a new
+set of bindings after discussion in Edinburgh.
 
-diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-index eef55ea..8e427c7 100644
---- a/arch/arm/include/asm/hw_breakpoint.h
-+++ b/arch/arm/include/asm/hw_breakpoint.h
-@@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
- #define ARM_DEBUG_ARCH_V7_ECP14	3
- #define ARM_DEBUG_ARCH_V7_MM	4
- #define ARM_DEBUG_ARCH_V7_1	5
-+#define ARM_DEBUG_ARCH_V8	6
- 
- /* Breakpoint */
- #define ARM_BREAKPOINT_EXECUTE	0
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 3d44660..45fbcaf 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -257,6 +257,7 @@ static int enable_monitor_mode(void)
- 		break;
- 	case ARM_DEBUG_ARCH_V7_ECP14:
- 	case ARM_DEBUG_ARCH_V7_1:
-+	case ARM_DEBUG_ARCH_V8:
- 		ARM_DBG_WRITE(c0, c2, 2, (dscr | ARM_DSCR_MDBGEN));
- 		isb();
- 		break;
+This is a partially complete implementation of these proposed bindings.
+
+It's functionality is now split into two pieces, the first of which
+implements a default/fallback behavior for reserved-memory nodes; that
+is, reserved memory nodes describing fixed-address static regions will
+be unconditionally reserved, regardless of their intended use.  In
+addition, it provides an interface for adding additional reserved-memory
+types, using a method similar to CLOCKSOURCE_OF_DECLARE().
+
+The second piece uses the above method to provide support for
+reserved-memory nodes whose compatible = "shared-dma-pool".  It makes
+use of CMA when available, and when a describing node has the 'reusable'
+property.
+
+There is basic support for dynamic allocation of memory reserved
+regions, however, noticeably missing is support for additional
+restrictions (use of alignment and alloc-ranges properties).
+
+[1]: http://lkml.kernel.org/g/1377527959-5080-1-git-send-email-m.szyprowski at samsung.com
+[2]: http://lkml.kernel.org/g/1381476448-14548-1-git-send-email-m.szyprowski at samsung.com
+[3]: http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+
+Grant Likely (1):
+  of: document bindings for reserved-memory nodes
+
+Josh Cartwright (1):
+  drivers: of: implement reserved-memory handling for dma
+
+Marek Szyprowski (2):
+  drivers: of: add initialization code for reserved memory
+  ARM: init: add support for reserved memory defined by device tree
+
+ .../bindings/reserved-memory/reserved-memory.txt   | 137 +++++++++++++++
+ arch/arm/mm/init.c                                 |   3 +
+ drivers/of/Kconfig                                 |  13 ++
+ drivers/of/Makefile                                |   2 +
+ drivers/of/of_reserved_mem.c                       | 188 +++++++++++++++++++++
+ drivers/of/of_reserved_mem_dma.c                   | 178 +++++++++++++++++++
+ drivers/of/platform.c                              |   4 +
+ include/asm-generic/vmlinux.lds.h                  |  11 ++
+ include/linux/of_reserved_mem.h                    |  61 +++++++
+ 9 files changed, 597 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+ create mode 100644 drivers/of/of_reserved_mem.c
+ create mode 100644 drivers/of/of_reserved_mem_dma.c
+ create mode 100644 include/linux/of_reserved_mem.h
+
 -- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
