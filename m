@@ -1,41 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jan 2014 10:22:29 +0000
-Subject: [PATCH REPOST 1/5] ARM: kvm: replace push and pop with stdmb and
- ldmia instrs to enable assembler.h inclusion
-In-Reply-To: <CAA3XUr3rpEBCWbE0HGu14qgGsmt6J21D_yDeK2nFvK6_-cjPag@mail.gmail.com>
-References: <1387558125-3460-1-git-send-email-victor.kamensky@linaro.org>
- <1387558125-3460-2-git-send-email-victor.kamensky@linaro.org>
- <20140121011825.GI13432@cbox> <52DE44C4.20503@arm.com>
- <CAA3XUr3rpEBCWbE0HGu14qgGsmt6J21D_yDeK2nFvK6_-cjPag@mail.gmail.com>
-Message-ID: <20140122102229.GB1621@mudshark.cambridge.arm.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 22 Jan 2014 10:32:54 +0000
+Subject: Question: about wm8904's regulator consumer nodes
+In-Reply-To: <20140121181032.GI17314@sirena.org.uk>
+References: <B256D81BAE5131468A838E5D7A24364172F64369@penmbx01>
+ <20140121181032.GI17314@sirena.org.uk>
+Message-ID: <B256D81BAE5131468A838E5D7A24364172F669CB@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Nico, as the author of the push/pull macros. Background is that kvm
-is using push to store to the stack and would now like to include assembler.h]
+Hi Mark,
 
-On Wed, Jan 22, 2014 at 06:41:09AM +0000, Victor Kamensky wrote:
-> On 21 January 2014 01:58, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > How about trying this alternative approach:
-> >
-> > It looks like all the users of the push/pop macros are located in
-> > arch/arm/lib (mostly checksumming code). Can't we move these macros to a
-> > separate include file and leave the code that uses push/pop (as defined
-> > by the assembler) alone?
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Mark Brown
+> Sent: Wednesday, January 22, 2014 2:11 AM
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: Question: about wm8904's regulator consumer nodes
 > 
-> Marc, personally I am OK with such proposal. I was considering something
-> along these lines as one of the options. It works for me both ways. If
-> others agree I am happy to recode it as your suggested. I choose
-> proposed above patch because kvm arm code came after push and pop
-> defines were introduced in asm/assembler.h and used in other places.
-> I am OK either way. I agree that use of push and pop as define names
-> seems a bit unfortunate, but I don't have any historic visibility here
+> On Tue, Jan 21, 2014 at 07:10:24AM +0000, Yang, Wenyou wrote:
 > 
-> Russell, Dave, Will, do you have any opinion on Marc's proposal to
-> fix this issue?
+> >                                          DCVDD-supply = <&vcc_1v8_reg>;
+> >                                          DBVDD-supply = <&vddana_reg>;
+> >                                          AVDD-supply = <&vcc_1v8_reg>;
+> >                                          CPVDD-supply = <&vcc_1v8_reg>;
+> >                                          MICVDD-supply =
+> > <&vddana_reg>;
+> 
+> > 	But the power of DCVDD, DBVDD, AVDD, CPVDD and MICVDD is not
+> supplied by any regulators, not the above regulator nodes.
+> 
+> > 	How do I deal with this case? Could you give me some advice?
+> 
+> You should set up the supplies to point to whatever regulator is
+> supplying the power.  If there are supplies on the board which are
+> generated using fixed voltage regulators then you should register those
+> using the fixed regulator driver.  Recent kernels are more tolerant of
+> missing supplies but it's still better to be explicit if you can be.
+Thank a lot for your answer.
 
-I'm perfectly fine with moving those macros into a lib/-local header file.
-An alternative is renaming push/pull to something like lspush and lspull
-and updating the files under lib.
-
-Will
+Best Regards,
+Wenyou Yang
