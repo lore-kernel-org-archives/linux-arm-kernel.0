@@ -1,30 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jan 2014 18:04:43 +0000
-Subject: [PATCH 4/6] arm64: add EFI stub
-In-Reply-To: <1389392950-22457-5-git-send-email-msalter@redhat.com>
-References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
- <1389392950-22457-5-git-send-email-msalter@redhat.com>
-Message-ID: <20140122180443.GF8065@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 22 Jan 2014 18:11:06 +0000
+Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <20140122163322.GF24288@e102568-lin.cambridge.arm.com>
+References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
+ <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
+ <20140122114232.GB20247@sirena.org.uk>
+ <20140122163322.GF24288@e102568-lin.cambridge.arm.com>
+Message-ID: <20140122181106.GQ17314@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 10:29:08PM +0000, Mark Salter wrote:
-> +ENTRY(efi_stub_entry)
-> +       stp     x29, x30, [sp, #-32]!
-> +
-> +       /*
-> +        * Call efi_entry to do the real work.
-> +        * x0 and x1 are already set up by firmware. Current runtime
-> +        * address of image is calculated and passed via *image_addr.
-> +        *
-> +        * unsigned long efi_entry(void *handle,
-> +        *                         efi_system_table_t *sys_table,
-> +        *                         unsigned long *image_addr) ;
-> +        */
-> +       adrp    x8, _text
-> +        add    x8, x8, #:lo12:_text
+On Wed, Jan 22, 2014 at 04:33:22PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Jan 22, 2014 at 11:42:32AM +0000, Mark Brown wrote:
 
-Possibly some minor whitespace corruption (or it's our email server).
+> > Would it not be sensible to define a PSCI binding that extends this and
+> > other bindings - ISTR some other properties getting scattered into
+> > bindings for it?
 
--- 
-Catalin
+> You mean adding the properties in the PSCI bindings instead of defining
+> them here ? Let me think about this, I really reckon these are C-state
+
+Yes.
+
+> specific properties that belong in here (but actually I have to add
+> a statement related to PSCI - ie bindings require a PSCI node to be
+> present and valid), I will look into this.
+
+It depends how you think about it - something like PSCI is going to to
+define properties used in a bunch of different parts of the low level
+code, it seems reasonable for things like this to say that the user
+should refer to the binding for the firmware to find out what options
+that firmware requires and can support rather than having to refer to
+each individual place and have those places enumerate the options for
+each firmware.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/6f4b6644/attachment.sig>
