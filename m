@@ -1,179 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jan 2014 19:20:42 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
-Message-ID: <20140122192041.GA3709@e102568-lin.cambridge.arm.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 22 Jan 2014 16:21:26 -0300
+Subject: [PATCH v2 5/5] [RFC] omapdss: remove FEAT_DPI_USES_VDDS_DSI from
+ omap3
+In-Reply-To: <1390417460-3134-6-git-send-email-chf.fritz@googlemail.com>
+References: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
+ <1390417460-3134-6-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <52E01A36.40502@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Hello Christoph,
 
-On Tue, Jan 21, 2014 at 11:16:46AM +0000, Vincent Guittot wrote:
-> Hi Lorenzo,
+On 01/22/2014 04:04 PM, Christoph Fritz wrote:
+> DBB056 doesn't use DSI for its display, but omap3 forces this
+> erroneously for all its boards:
 > 
-> On 20 January 2014 18:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > ARM based platforms implement a variety of power management schemes that
-> > allow processors to enter at run-time low-power states, aka C-states
-> > in ACPI jargon. The parameters defining these C-states vary on a per-platform
-> > basis forcing the OS to hardcode the state parameters in platform
-> > specific static tables whose size grows as the number of platforms supported
-> > in the kernel increases and hampers device drivers standardization.
-> >
-> > Therefore, this patch aims at standardizing C-state device tree bindings for
-> > ARM platforms. Bindings define C-state parameters inclusive of entry methods
-> > and state latencies, to allow operating systems to retrieve the
-> > configuration entries from the device tree and initialize the related
-> > power management drivers, paving the way for common code in the kernel
-> > to deal with power states and removing the need for static data in current
-> > and previous kernel versions.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/c-states.txt | 774 +++++++++++++++++++++
-> >  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
-> >  2 files changed, 784 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/c-states.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/c-states.txt b/Documentation/devicetree/bindings/arm/c-states.txt
-> > new file mode 100644
-> > index 0000000..0b5617b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/c-states.txt
-> > @@ -0,0 +1,774 @@
-> > +==========================================
-> > +ARM C-states binding description
-> > +==========================================
-> > +
-> > +==========================================
-> > +1 - Introduction
-> > +==========================================
-> > +
-> > +ARM systems contain HW capable of managing power consumption dynamically,
-> > +where cores can be put in different low-power states (ranging from simple
-> > +wfi to power gating) according to OSPM policies. Borrowing concepts
-> > +from the ACPI specification[1], the CPU states representing the range of
-> > +dynamic states that a processor can enter at run-time, aka C-state, can be
-> > +specified through device tree bindings representing the parameters required to
-> > +enter/exit specific C-states on a given processor.
-> > +
-> > +The state an ARM CPU can be put into is loosely identified by one of the
-> > +following operating modes:
-> > +
-> > +- Running:
-> > +        # Processor core is executing instructions
-> > +
-> > +- Wait for Interrupt:
-> > +       # An ARM processor enters wait for interrupt (WFI) low power
-> > +         state by executing a wfi instruction. When a processor enters
-> > +         wfi state it disables most of the clocks while keeping the processor
-> > +         powered up. This state is standard on all ARM processors and it is
-> > +         defined as C1 in the remainder of this document.
-> > +
+>   | OMAP DSS rev 2.0
+>   | omapdss DPI error: can't get VDDS_DSI regulator
+>   | omapfb omapfb: failed to connect default display
+>   | omapfb omapfb: failed to init overlay connections
+>   | omapfb omapfb: failed to setup omapfb
+>   | platform omapfb: Driver omapfb requests probe deferral
 > 
-> > +- Dormant:
-> > +       # Dormant mode is entered by executing wfi instructions and by sending
-> > +         platform specific commands to the platform power controller (coupled
-> > +         with processor specific SW/HW control sequences).
-> > +         In dormant mode, most of the processor control and debug logic is
-> > +         powered up but cache RAM can be put in retention state, providing
-> 
-> Base on your description, it's not clear for me what is on, what is
-> lost and what is power down ?
-> My understand of the dormant mode that you described above is : the
-> cache is preserved (and especially the cache RAM) but the processor
-> state is lost (registers ...). Do I understand correctly ?
-> 
-> What about retention mode where the contents of processor and cache
-> are preserved but the power consumption is reduced ? it can be seen as
-> a special wfi mode which need specific SW/HW control sequences but i'm
-> not sure to understand how to describe such state with your proposal.
+> So this patch just disables it for omap3. Consider this as a hack!
+> Is there a proper fix for this issue?
 
-I had an idea. To simplify things, I think that one possibility is to
-add a parameter to the power domain specifier (platform specific, see
-Tomasz bindings):
+It is also a hack but I solved on the IGEPv2 board by adding a regulator-name =
+"vdds_dsi" to the VPLL2 regulator as suggested by Tony.
 
-Documentation/devicetree/bindings/power/power_domain.txt
+Look at commit 2f2befd8 ("ARM: dts: omap3-igep0020: name twl4030 VPLL2 regulator
+as vdds_dsi")
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224928.html
+Having the workaround in the Device Tree is better IMHO since this is a
+per-board configuration. That can be later removed once the DSS DT bindings are
+added to mainline.
 
-to represent, when that state is entered the behavior of the power
-controller (ie cache RAM retention or cache shutdown or in general any
-substate within a power domain). Since it is platform specific, and since
-we are able to link caches to the power domain, the power controller will
-actually define what happens to the cache when that state is entered
-(basically we use the power domain specifier additional parameter to define
-a "substate" in that power domain e.g.:
-
-Example:
-
-foo_power_controller {
-	[...]
-	/*
-	 * first cell is register index, second one is the state index
-	 * that in turn implies the state behavior - eg cache lost or
-	 * retained
-	 */
-	#power-domain-cells = <2>;
-};
-
-l1-cache {
-	[...]
-	/*
-	 * syntax: power-domains = list of power domain specifiers
-		<[&power_domain_phandle register-index state],[&power_domain_phandle register-index state]>;
-		The syntax is defined by the power controller du jour
-		as described by Tomasz bindings
-	*/
-	power-domains =<&foo_power_controller 0 0 &foo_power_controller 0 1>;
-
-}:
-
-and then
-
-state0 {
-	index = <2>;
-	compatible = "arm,cpu-power-state";
-	latency = <...>;
-	/*
-	 * This means that when the state is entered, the power
-	 * controller should use register index 0 and state 0,
-	 * whose meaning is power controller specific. Since we
-	 * know all components affected (for every component
-	 * we declare its power domain(s) and states so we
-	 * know what components are affected by the state entry.
-	 * Given the cache node above and this phandle, the state
-	 * implies that the cache is retained, register index == 0 state == 0
-	 /*
-	power-domain =<&foo_power_controller 0 0>;
-};
-
-state1 {
-	index = <3>;
-	compatible = "arm,cpu-power-state";
-	latency = <...>;
-	/*
-	 * This means that when the state is entered, the power
-	 * controller should use register index 0 and state 1,
-	 * whose meaning is power controller specific. Since we
-	 * know all components affected (for every component
-	 * we declare its power domain(s) and states so we
-	 * know what components are affected by the state entry.
-	 * Given the cache node above and this phandle, the state
-	 * implies that the cache is lost, register index == 0 state == 1
-	 /*
-	power-domain =<&foo_power_controller 0 1>;
-};
-
-It is complex but it is probably the cleanest way. And it leaves complexity
-to power controller implementations (if managed in the kernel....), which
-actually makes sense because it is up to power controller to define the
-behavior of certain states.
-
-All in all it is just an idea, feel free to scotch it, it is complex but
-we have to sort it out, one way or another.
-
-Vincent, Tomasz, anyone, thoughts ?
-Lorenzo
+Thanks a lot and best regards,
+Javier
