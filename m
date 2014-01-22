@@ -1,73 +1,76 @@
-From: sj38.park@gmail.com (SeongJae Park)
-Date: Wed, 22 Jan 2014 12:05:57 +0900
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-In-Reply-To: <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
-References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
- <20140119173712.GA26481@kroah.com>
- <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
- <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
-Message-ID: <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
+From: marc.ceeeee@gmail.com (Marc Carino)
+Date: Tue, 21 Jan 2014 19:30:44 -0800
+Subject: [PATCH v5 0/8] ARM: brcmstb: Add Broadcom STB SoC support
+Message-ID: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Greg, Mike,
+This patchset contains the board support package for the
+Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
+minimal set of code needed for a BCM7445-based board to boot
+the Linux kernel.
 
-May I ask your answer or other opinion, please?
+These changes heavily leverage the OF/devicetree framework.
 
-On Mon, Jan 20, 2014 at 5:07 PM, SeongJae Park <sj38.park@gmail.com> wrote:
-> On Mon, Jan 20, 2014 at 4:47 PM, Mike Turquette <mturquette@linaro.org> wrote:
->> On Sun, Jan 19, 2014 at 9:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
->>> On Sun, Jan 19, 2014 at 02:55:07PM +0900, SeongJae Park wrote:
->>>> Following build comes while modprobe process:
->>>> > ERROR: "__clk_get_hw" [drivers/clk/clk-max77686.ko] undefined!
->>>> > make[2]: *** [__modpost] Error 1
->>>> > make[1]: *** [modules] Error 2
->>>>
->>>> Export the symbol to fix it and for other part's usecase.
->>>>
->>>> Signed-off-by: SeongJae Park <sj38.park@gmail.com>
->>>> ---
->>>>  drivers/clk/clk.c | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>>> index 2b38dc9..3883fba 100644
->>>> --- a/drivers/clk/clk.c
->>>> +++ b/drivers/clk/clk.c
->>>> @@ -575,6 +575,7 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
->>>>  {
->>>>       return !clk ? NULL : clk->hw;
->>>>  }
->>>> +EXPORT_SYMBOL_GPL(__clk_get_hw);
->>>
->>> __ functions should usually only be for "internal" use, why does this
->>> get exported to modules?  Why not just put it in a .h file?
->>
->> It was originally used only within the clock core but it is sensible
->> for hardware-specific clock drivers to use this as well. I plan to
->> audit all of the double-underscore functions in
->> include/linux/clk-provider.h for 3.15.
->>
->> Regards,
->> Mike
->>
-> Thank you very much for answering about it, Mike.
->
-> I agree Greg's indication and think Mike's explanation is reasonable.
->
-> So, I think it would be better to just export the symbol now
-> because it would be easier for future functions renaming and
-> similar issues were solved in this way in past:
-> https://lkml.org/lkml/2013/4/15/50
->
-> Or, maybe I can change the client code of __clk_get_hw to not use the function.
->
-> What do you think would be better to fix this build error? Or, do you
-> have better idea?
-> I will respect your opinion.
->
-> Thanks and Regards.
-> SeongJae Park.
->
->>>
->>> greg k-h
+v5:
+- rebased to v3.13 tag
+- make UART DT node a child of 'rdb' node
+- fix ordering of debug UART entries
+
+v4:
+- make a reboot driver and put it in the drivers folder
+- rework DT bindings to leverage 'syscon'
+- rework BSP code to use 'syscon' for all register mappings
+- misc. tweaks per suggestions from v3
+
+v3:
+- rebased to v3.13-rc8
+- switched to using 'multi_v7_defconfig'
+- eliminated dependence on compile-time peripheral register access
+- moved DT node iomap out from 'init_early'
+- misc. minor cleanups from mailing-list discussion for v2
+
+v2:
+- rebased to v3.13-rc1
+- moved implementation to 'mach-bcm' folder
+- added CPU init for B15
+
+v1:
+- initial submission
+
+[1] http://www.broadcom.com/products/Cable/Cable-Set-Top-Box-Solutions/BCM7445
+
+Marc Carino (8):
+  ARM: brcmstb: add infrastructure for ARM-based Broadcom STB SoCs
+  power: reset: Add reboot driver for brcmstb
+  ARM: brcmstb: add debug UART for earlyprintk support
+  ARM: do CPU-specific init for Broadcom Brahma15 cores
+  ARM: brcmstb: add CPU binding for Broadcom Brahma15
+  ARM: brcmstb: add misc. DT bindings for brcmstb
+  ARM: brcmstb: gic: add compatible string for Broadcom Brahma15
+  ARM: brcmstb: dts: add a reference DTS for Broadcom 7445
+
+ .../devicetree/bindings/arm/brcm-brcmstb.txt       |   95 ++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |    1 +
+ Documentation/devicetree/bindings/arm/gic.txt      |    1 +
+ arch/arm/Kconfig.debug                             |   16 +-
+ arch/arm/boot/dts/bcm7445.dts                      |  111 +++++++
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm/mach-bcm/Kconfig                          |   14 +
+ arch/arm/mach-bcm/Makefile                         |    4 +
+ arch/arm/mach-bcm/brcmstb.c                        |  110 +++++++
+ arch/arm/mach-bcm/brcmstb.h                        |   38 +++
+ arch/arm/mach-bcm/headsmp-brcmstb.S                |   34 ++
+ arch/arm/mach-bcm/hotplug-brcmstb.c                |  334 ++++++++++++++++++++
+ arch/arm/mm/proc-v7.S                              |   11 +
+ drivers/power/reset/Kconfig                        |   10 +
+ drivers/power/reset/Makefile                       |    1 +
+ drivers/power/reset/brcmstb-reboot.c               |  120 +++++++
+ 16 files changed, 900 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+ create mode 100644 arch/arm/boot/dts/bcm7445.dts
+ create mode 100644 arch/arm/mach-bcm/brcmstb.c
+ create mode 100644 arch/arm/mach-bcm/brcmstb.h
+ create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
+ create mode 100644 arch/arm/mach-bcm/hotplug-brcmstb.c
+ create mode 100644 drivers/power/reset/brcmstb-reboot.c
