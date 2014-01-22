@@ -1,136 +1,299 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jan 2014 20:04:38 +0100
-Subject: [PATCH v5 03/14] ahci-platform: Pass ahci_host_priv ptr to
- ahci_platform_data init method
+Date: Wed, 22 Jan 2014 20:04:42 +0100
+Subject: [PATCH v5 07/14] ahci-platform: "Library-ise" ahci_probe functionality
 In-Reply-To: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
 References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390417489-5354-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390417489-5354-8-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ahci_platform_data->init methods need access to the ahci_host_priv data.
+ahci_probe consists of 3 steps:
+1) Get resources (get mmio, clks, regulator)
+2) Enable resources, handled by ahci_platform_enable_resouces
+3) The more or less standard ahci-host controller init sequence
 
-When calling ahci_platform_data->init the ata_host has not been allocated yet,
-so access to ahci_host_priv through the dev argument is not possible.
+This commit refactors step 1 and 3 into separate functions, so the platform
+drivers for AHCI implementations which need a specific order in step 2,
+and / or need to do some custom register poking at some time, can re-use
+ahci-platform.c code without needing to copy and paste it.
+
+Note that ahci_platform_init_host's prototype takes the 3 non function
+members of ahci_platform_data as arguments, the idea is that drivers using
+the new exported utility functions will not use ahci_platform_data at all,
+and hopefully in the future ahci_platform_data can go away entirely.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c |  5 +++--
- arch/arm/mach-spear/spear1340.c       |  2 +-
- drivers/ata/ahci_imx.c                | 12 ++++++------
- drivers/ata/ahci_platform.c           |  2 +-
- include/linux/ahci_platform.h         |  3 ++-
- 5 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/ata/ahci_platform.c   | 158 ++++++++++++++++++++++++------------------
+ include/linux/ahci_platform.h |  14 ++++
+ 2 files changed, 106 insertions(+), 66 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 78829c5..28e7c4c 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -14,6 +14,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-contiguous.h>
- #include <linux/serial_8250.h>
-+#include <linux/ahci.h>
- #include <linux/ahci_platform.h>
- #include <linux/clk.h>
- #include <linux/reboot.h>
-@@ -1061,7 +1062,7 @@ static unsigned long da850_sata_xtal[] = {
- 	KHZ_TO_HZ(60000),
- };
- 
--static int da850_sata_init(struct device *dev, void __iomem *addr)
-+static int da850_sata_init(struct device *dev, struct ahci_host_priv *hpriv)
- {
- 	int i, ret;
- 	unsigned int val;
-@@ -1096,7 +1097,7 @@ static int da850_sata_init(struct device *dev, void __iomem *addr)
- 		SATA_PHY_TXSWING(3) |
- 		SATA_PHY_ENPLL(1);
- 
--	__raw_writel(val, addr + SATA_P0PHYCR_REG);
-+	__raw_writel(val, hpriv->mmio + SATA_P0PHYCR_REG);
- 
- 	return 0;
- 
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index 3fb6834..9e2f3ac 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -77,7 +77,7 @@
- 			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
- 
- /* SATA device registration */
--static int sata_miphy_init(struct device *dev, void __iomem *addr)
-+static int sata_miphy_init(struct device *dev, struct ahci_host_priv *hpriv)
- {
- 	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
- 	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 3e23e99..49fa0ca 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -91,7 +91,7 @@ static const struct ata_port_info ahci_imx_port_info = {
- 	.port_ops	= &ahci_imx_ops,
- };
- 
--static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
-+static int imx6q_sata_init(struct device *dev, struct ahci_host_priv *hpriv)
- {
- 	int ret = 0;
- 	unsigned int reg_val;
-@@ -145,19 +145,19 @@ static int imx6q_sata_init(struct device *dev, void __iomem *mmio)
- 	 * Implement the port0.
- 	 * Get the ahb clock rate, and configure the TIMER1MS register.
- 	 */
--	reg_val = readl(mmio + HOST_CAP);
-+	reg_val = readl(hpriv->mmio + HOST_CAP);
- 	if (!(reg_val & HOST_CAP_SSS)) {
- 		reg_val |= HOST_CAP_SSS;
--		writel(reg_val, mmio + HOST_CAP);
-+		writel(reg_val, hpriv->mmio + HOST_CAP);
- 	}
--	reg_val = readl(mmio + HOST_PORTS_IMPL);
-+	reg_val = readl(hpriv->mmio + HOST_PORTS_IMPL);
- 	if (!(reg_val & 0x1)) {
- 		reg_val |= 0x1;
--		writel(reg_val, mmio + HOST_PORTS_IMPL);
-+		writel(reg_val, hpriv->mmio + HOST_PORTS_IMPL);
- 	}
- 
- 	reg_val = clk_get_rate(imxpriv->ahb_clk) / 1000;
--	writel(reg_val, mmio + HOST_TIMER1MS);
-+	writel(reg_val, hpriv->mmio + HOST_TIMER1MS);
- 
- 	return 0;
- }
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 4b231ba..434ab89 100644
+index 1cce7a2..b260ebe 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -149,7 +149,7 @@ static int ahci_probe(struct platform_device *pdev)
- 	 * returned successfully.
- 	 */
- 	if (pdata && pdata->init) {
--		rc = pdata->init(dev, hpriv->mmio);
-+		rc = pdata->init(dev, hpriv);
- 		if (rc)
- 			goto disable_unprepare_clk;
+@@ -150,60 +150,31 @@ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
+ EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
+ 
+ 
+-static void ahci_put_clks(struct ahci_host_priv *hpriv)
+-{
+-	int c;
+-
+-	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
+-		clk_put(hpriv->clks[c]);
+-}
+-
+-static int ahci_probe(struct platform_device *pdev)
++struct ahci_host_priv *ahci_platform_get_resources(
++	struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+-	const struct platform_device_id *id = platform_get_device_id(pdev);
+-	struct ata_port_info pi = ahci_port_info[id ? id->driver_data : 0];
+-	const struct ata_port_info *ppi[] = { &pi, NULL };
+ 	struct ahci_host_priv *hpriv;
+-	struct ata_host *host;
+-	struct resource *mem;
+ 	struct clk *clk;
+-	int i, irq, max_clk, n_ports, rc;
+-
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!mem) {
+-		dev_err(dev, "no mmio space\n");
+-		return -EINVAL;
+-	}
+-
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq <= 0) {
+-		dev_err(dev, "no irq\n");
+-		return -EINVAL;
+-	}
+-
+-	if (pdata && pdata->ata_port_info)
+-		pi = *pdata->ata_port_info;
++	int i, max_clk, rc;
+ 
+ 	hpriv = devm_kzalloc(dev, sizeof(*hpriv), GFP_KERNEL);
+ 	if (!hpriv) {
+ 		dev_err(dev, "can't alloc ahci_host_priv\n");
+-		return -ENOMEM;
++		return ERR_PTR(-ENOMEM);
  	}
+ 
+-	hpriv->flags |= (unsigned long)pi.private_data;
+-
+-	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
++	hpriv->mmio = devm_ioremap_resource(dev,
++			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
+ 	if (!hpriv->mmio) {
+-		dev_err(dev, "can't map %pR\n", mem);
+-		return -ENOMEM;
++		dev_err(dev, "no mmio space\n");
++		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
+ 	if (IS_ERR(hpriv->target_pwr)) {
+ 		if (PTR_ERR(hpriv->target_pwr) == -EPROBE_DEFER)
+-			return -EPROBE_DEFER;
++			return ERR_PTR(-EPROBE_DEFER);
+ 		hpriv->target_pwr = NULL;
+ 	}
+ 
+@@ -223,27 +194,48 @@ static int ahci_probe(struct platform_device *pdev)
+ 		hpriv->clks[i] = clk;
+ 	}
+ 
+-	rc = ahci_platform_enable_resources(hpriv);
+-	if (rc)
+-		goto free_clk;
++	return hpriv;
+ 
+-	/*
+-	 * Some platforms might need to prepare for mmio region access,
+-	 * which could be done in the following init call. So, the mmio
+-	 * region shouldn't be accessed before init (if provided) has
+-	 * returned successfully.
+-	 */
+-	if (pdata && pdata->init) {
+-		rc = pdata->init(dev, hpriv);
+-		if (rc)
+-			goto disable_resources;
+-	}
++free_clk:
++	while (--i >= 0)
++		clk_put(hpriv->clks[i]);
++	return ERR_PTR(rc);
++}
++EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
++
++void ahci_platform_put_resources(struct ahci_host_priv *hpriv)
++{
++	int c;
++
++	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
++		clk_put(hpriv->clks[c]);
++}
++EXPORT_SYMBOL_GPL(ahci_platform_put_resources);
++
++
++int ahci_platform_init_host(struct platform_device *pdev,
++			    struct ahci_host_priv *hpriv,
++			    const struct ata_port_info *pi_template,
++			    unsigned int force_port_map,
++			    unsigned int mask_port_map)
++{
++	struct device *dev = &pdev->dev;
++	struct ata_port_info pi = *pi_template;
++	const struct ata_port_info *ppi[] = { &pi, NULL };
++	struct ata_host *host;
++	int i, irq, n_ports, rc;
+ 
+-	ahci_save_initial_config(dev, hpriv,
+-		pdata ? pdata->force_port_map : 0,
+-		pdata ? pdata->mask_port_map  : 0);
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0) {
++		dev_err(dev, "no irq\n");
++		return -EINVAL;
++	}
+ 
+ 	/* prepare host */
++	hpriv->flags |= (unsigned long)pi.private_data;
++
++	ahci_save_initial_config(dev, hpriv, force_port_map, mask_port_map);
++
+ 	if (hpriv->cap & HOST_CAP_NCQ)
+ 		pi.flags |= ATA_FLAG_NCQ;
+ 
+@@ -260,10 +252,8 @@ static int ahci_probe(struct platform_device *pdev)
+ 	n_ports = max(ahci_nr_ports(hpriv->cap), fls(hpriv->port_map));
+ 
+ 	host = ata_host_alloc_pinfo(dev, ppi, n_ports);
+-	if (!host) {
+-		rc = -ENOMEM;
+-		goto pdata_exit;
+-	}
++	if (!host)
++		return -ENOMEM;
+ 
+ 	host->private_data = hpriv;
+ 
+@@ -278,7 +268,8 @@ static int ahci_probe(struct platform_device *pdev)
+ 	for (i = 0; i < host->n_ports; i++) {
+ 		struct ata_port *ap = host->ports[i];
+ 
+-		ata_port_desc(ap, "mmio %pR", mem);
++		ata_port_desc(ap, "mmio %pR",
++			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
+ 		ata_port_desc(ap, "port 0x%x", 0x100 + ap->port_no * 0x80);
+ 
+ 		/* set enclosure management message type */
+@@ -292,13 +283,48 @@ static int ahci_probe(struct platform_device *pdev)
+ 
+ 	rc = ahci_reset_controller(host);
+ 	if (rc)
+-		goto pdata_exit;
++		return rc;
+ 
+ 	ahci_init_controller(host);
+ 	ahci_print_info(host, "platform");
+ 
+-	rc = ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
+-			       &ahci_platform_sht);
++	return ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
++				 &ahci_platform_sht);
++}
++EXPORT_SYMBOL_GPL(ahci_platform_init_host);
++
++static int ahci_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ahci_platform_data *pdata = dev_get_platdata(dev);
++	const struct platform_device_id *id = platform_get_device_id(pdev);
++	struct ahci_host_priv *hpriv;
++	int rc;
++
++	hpriv = ahci_platform_get_resources(pdev);
++	if (IS_ERR(hpriv))
++		return PTR_ERR(hpriv);
++
++	rc = ahci_platform_enable_resources(hpriv);
++	if (rc)
++		goto put_resources;
++
++	/*
++	 * Some platforms might need to prepare for mmio region access,
++	 * which could be done in the following init call. So, the mmio
++	 * region shouldn't be accessed before init (if provided) has
++	 * returned successfully.
++	 */
++	if (pdata && pdata->init) {
++		rc = pdata->init(dev, hpriv);
++		if (rc)
++			goto disable_resources;
++	}
++
++	rc = ahci_platform_init_host(pdev, hpriv,
++				     &ahci_port_info[id ? id->driver_data : 0],
++				     pdata ? pdata->force_port_map : 0,
++				     pdata ? pdata->mask_port_map  : 0);
+ 	if (rc)
+ 		goto pdata_exit;
+ 
+@@ -308,8 +334,8 @@ pdata_exit:
+ 		pdata->exit(dev);
+ disable_resources:
+ 	ahci_platform_disable_resources(hpriv);
+-free_clk:
+-	ahci_put_clks(hpriv);
++put_resources:
++	ahci_platform_put_resources(hpriv);
+ 	return rc;
+ }
+ 
+@@ -323,7 +349,7 @@ static void ahci_host_stop(struct ata_host *host)
+ 		pdata->exit(dev);
+ 
+ 	ahci_platform_disable_resources(hpriv);
+-	ahci_put_clks(hpriv);
++	ahci_platform_put_resources(hpriv);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
 diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 73a2500..737fe38 100644
+index 5e5f85e..1dc7602 100644
 --- a/include/linux/ahci_platform.h
 +++ b/include/linux/ahci_platform.h
-@@ -19,9 +19,10 @@
- 
+@@ -20,7 +20,13 @@
  struct device;
  struct ata_port_info;
-+struct ahci_host_priv;
+ struct ahci_host_priv;
++struct platform_device;
  
++/*
++ * Note ahci_platform_data is deprecated. New drivers which need to override
++ * any of these, should instead declare there own platform_driver struct, and
++ * use ahci_platform* functions in their own probe, suspend and resume methods.
++ */
  struct ahci_platform_data {
--	int (*init)(struct device *dev, void __iomem *addr);
-+	int (*init)(struct device *dev, struct ahci_host_priv *hpriv);
+ 	int (*init)(struct device *dev, struct ahci_host_priv *hpriv);
  	void (*exit)(struct device *dev);
- 	int (*suspend)(struct device *dev);
- 	int (*resume)(struct device *dev);
+@@ -35,5 +41,13 @@ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
+ void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
+ int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
+ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
++struct ahci_host_priv *ahci_platform_get_resources(
++	struct platform_device *pdev);
++void ahci_platform_put_resources(struct ahci_host_priv *hpriv);
++int ahci_platform_init_host(struct platform_device *pdev,
++			    struct ahci_host_priv *hpriv,
++			    const struct ata_port_info *pi_template,
++			    unsigned int force_port_map,
++			    unsigned int mask_port_map);
+ 
+ #endif /* _AHCI_PLATFORM_H */
 -- 
 1.8.5.3
