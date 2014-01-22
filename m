@@ -1,35 +1,61 @@
-From: sj38.park@gmail.com (SeongJae Park)
-Date: Wed, 22 Jan 2014 14:23:34 +0900
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-In-Reply-To: <20140122045937.GB23869@kroah.com>
-References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
- <20140119173712.GA26481@kroah.com>
- <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
- <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
- <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
- <20140122045937.GB23869@kroah.com>
-Message-ID: <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
+From: chenxg.marvell@gmail.com (Xiaoguang Chen)
+Date: Wed, 22 Jan 2014 14:02:57 +0800
+Subject: mutual exculsion between clk_prepare_enable /clk_disable_unprepare
+ and clk_set_parent
+Message-ID: <CAFgnuDdOKxzFSDCBQTGw=p_t0CvKfjVEudttOCP_wrzyA2K1Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 1:59 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Wed, Jan 22, 2014 at 12:05:57PM +0900, SeongJae Park wrote:
->> Dear Greg, Mike,
->>
->> May I ask your answer or other opinion, please?
->
-> It's the middle of the merge window, it's not time for new development,
-> or much time for free-time for me, sorry.  Feel free to fix it the best
-> way you know how.
+Hi, Mike
 
-Oops, I've forgot about the merge window. Thank you very much for your
-kind answer.
-Sorry if I bothered you while you're in busy time.
-Because the build problem is not a big deal because it exists only in
--next tree,
-I will wait until merge window be closed and then fix it again if it
-still exist.
+We met a issue between clk_prepare_enable /clk_disable_unprepare and
+clk_set_parent.
 
-SeongJae Park.
->
-> greg k-h
+As we know, clk preprare/unprare will grab preprare lock, and clk
+enable/disable will grab enable lock. clk_set_parent will grab prepare
+lock
+
+but there is no lock protection in clk_prepare_enable /clk_disable_unprepare,
+for example, in clk_disable_unprepare, it is expended as clk_disable +
+clk_unprepare,
+
+and if below condition occurs, there will be problem
+thread1                                                 thread 2
+call clk_disable_unprepare
+1) clk_disable
+get enable lock
+...............
+release enable lock
+
+                                                     call clk_set_parent
+                                                     get prepare lock
+                                                     set clock's
+parent to another parent
+                                                     release prepare lock
+
+2) clk_unprepare
+get prepare lock
+unprepare parent clock <<--------------
+release prepare lock
+
+In above sequence, After thread 1 call clock disable, thread 2 change
+clk's parent to another clock, then in thread1 step2, it will
+unprepare clk's new parent, but not old parent, this will cause old
+parent is not unprepared, but new parent is unprepared even when it is
+not prepared yet.
+
+So How can we use this API: clk_prepare_enable and clk_disable_unprepare  ?
+Should we add lock to protect this API, if we get a prepare lock
+inside this API, like
+clk_disable_unprepare ()
+{
+get_prepare_lock();
+clk_disable();
+clk_unprepare();
+clk_prepare_unlock();
+}
+
+is above sequence ok? if so, I can provide a patch for this.
+
+Thanks
+Xiaoguang
