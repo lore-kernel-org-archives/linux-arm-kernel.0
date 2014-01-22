@@ -1,18 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 21:22:42 +0000
-Subject: [PATCH v3 03/24] drm/i2c: tda998x: code cleanup
-In-Reply-To: <20140119195838.372fbbaa@armhf>
+Date: Wed, 22 Jan 2014 21:21:07 +0000
+Subject: [PATCH v3 02/24] drm/i2c: tda998x: check more I/O errors
+In-Reply-To: <20140119195838.348f8d6d@armhf>
 References: <cover.1390153344.git.moinejf@free.fr>
- <20140119195838.372fbbaa@armhf>
-Message-ID: <20140122212242.GG15937@n2100.arm.linux.org.uk>
+ <20140119195838.348f8d6d@armhf>
+Message-ID: <20140122212107.GF15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Jan 19, 2014 at 07:58:38PM +0100, Jean-Francois Moine wrote:
-> This patch:
-> - replaces ARRAY_SIZE() by sizeof() when a number of bytes is needed,
-> - adds a linefeed in an error message and
-> - removes an useless variable setting.
+> This patch adds more error checking inn I2C I/O functions.
+> In case of I/O error, this permits to avoid writing in bad controller
+> pages, a bad chipset detection or looping when getting the EDID.
 > 
 > Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
