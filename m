@@ -1,39 +1,37 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 22 Jan 2014 11:20:32 +0200
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
- audio support for TDA998x trough McASP I2S bus
-In-Reply-To: <20140115165100.3bfab96f@armhf>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
- <20140115165100.3bfab96f@armhf>
-Message-ID: <52DF8D60.9020505@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 22 Jan 2014 10:38:52 +0100
+Subject: [PATCH] tty/serial: atmel_serial: remove dev_dbg in atmel_set_termios
+Message-ID: <1390383532-2600-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2014 05:51 PM, Jean-Francois Moine wrote:
-> On Wed, 15 Jan 2014 13:27:21 +0200
-> Jyri Sarha <jsarha@ti.com> wrote:
->
->>   From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N
->> register statically to a value that works only with 4 byte samples.
->> According to my tests it is possible to support 3 and 2 byte samples too
->> by changing the CTS_N register value, but I am not sure if the
->> configuration can be changed on the fly. My data sheet of the nxp chip
->> is very vague about the register definitions, but I suppose the register
->> configures some clock divider on the chip. HDMI supports only upto 24bit
->> audio and the data sheet states that any extraneous least significant
->> bits are ignored.
->
-> In the tda998x driver, the CTS_N is automatic (AIP_CNTRL_0_ACR_MAN is
-> not set).
->
-> Then, in my Cubox (Marvell A510 + tda19988), the 16, 24 and 32 bits
-> formats are working well with I2S input at any rate.
->
+This fixes a driver bug which stopped the whole system (in case
+of serial console).
+This log message is not useful anyway as this information is
+printed elsewhere.
 
-Could you refer the kernel version (main line?) and the involved ASoC 
-drivers so could take I a look if there is something I could do differently?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Best regards,
-Jyri
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index a49f10d269b2..3d7206fc532f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1853,13 +1853,10 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	mode &= ~ATMEL_US_USMODE;
+ 
+ 	if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
+-		dev_dbg(port->dev, "Setting UART to RS485\n");
+ 		if ((atmel_port->rs485.delay_rts_after_send) > 0)
+ 			UART_PUT_TTGR(port,
+ 					atmel_port->rs485.delay_rts_after_send);
+ 		mode |= ATMEL_US_USMODE_RS485;
+-	} else {
+-		dev_dbg(port->dev, "Setting UART to RS232\n");
+ 	}
+ 
+ 	/* set the parity, stop bits and data size */
+-- 
+1.8.2.2
