@@ -1,16 +1,19 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jan 2014 19:21:37 +0100
-Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a separate
- resource
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Jan 2014 15:29:15 -0300
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a
+ separate resource
 In-Reply-To: <20140122181409.GV18269@obsidianresearch.com>
 References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233321.GR18269@obsidianresearch.com>
+ <3176358.2QFcJHj0fv@wuerfel> <20140122162136.GA27273@localhost>
  <20140122180100.GE27273@localhost>
  <20140122181409.GV18269@obsidianresearch.com>
-Message-ID: <3159777.ZVRLCgpLar@wuerfel>
+Message-ID: <20140122182914.GH27273@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 January 2014 11:14:09 Jason Gunthorpe wrote:
+On Wed, Jan 22, 2014 at 11:14:09AM -0700, Jason Gunthorpe wrote:
 > On Wed, Jan 22, 2014 at 03:01:01PM -0300, Ezequiel Garcia wrote:
 > > On Wed, Jan 22, 2014 at 01:21:36PM -0300, Ezequiel Garcia wrote:
 > > > > I don't see a good way out that would preserve backwards compatibility,
@@ -30,32 +33,11 @@ On Wednesday 22 January 2014 11:14:09 Jason Gunthorpe wrote:
 > 
 > I liked Arnd's idea to use an offset from the first register. With the
 > mbus driver we can now actually change the 0xF1.. prefix via the DT.
-
-That wasn't actually my idea, but it does sound reasonable.
-
-> > +     dev_warn(&pdev->dev, "falling back to harcoded RSTOUT reg 0x%x\n",
-> > +              ORION_RSTOUT_MASK);
 > 
-> Maybe:
-> dev_warn(&pdev->dev, FW_BUG "falling back to harcoded RSTOUT reg 0x%x\n",
 
-I was thinking of WARN_ON(), i.e. something that users will actually notice ;-)
-
-> > @@ -139,10 +166,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
-> >       if (!wdt_reg)
-> >               return -ENOMEM;
-> >  
-> > -     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > -     if (!res)
-> > -             return -ENODEV;
-> > -     wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> > +     wdt_rstout = try_compat_rstout_ioremap(pdev);
-> >       if (!wdt_rstout)
-> >               return -ENOMEM;
-> 
-> ENOMEM is probably not the right errno? Is there a standard errno for
-> malformed DT?
-
-I don't think so. I'd probably use ENODEV, but it's not ideal.
-
-	Arnd
+Good idea. Maybe extracting the base address from the timer control
+register: wdt_reg & 0xff000000 ?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
