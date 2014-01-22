@@ -1,50 +1,91 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Jan 2014 14:31:07 +0100
-Subject: [PATCH 1/5] irqchip: vic: update the base IRQ member correctly
+Date: Wed, 22 Jan 2014 14:31:09 +0100
+Subject: [PATCH 3/5] ARM: integrator: use managed resources for the IM-PD1
 In-Reply-To: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
 References: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1390397471-6802-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1390397471-6802-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When passing 0 as the irq base the VIC driver will dynamically
-allocate a number of consecutive interrupt descriptors at some
-available number range. Make sure this number is recorded in
-the state container rather than the passed-in zero argument
-in this case.
+Switch the IM-PD1 driver to use managed resources and cut down
+on boilerplate.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-tglx: if you're happy with this pls ACK it so I can take this
-through the ARM SoC tree.
----
- drivers/irqchip/irq-vic.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/mach-integrator/impd1.c | 36 ++++++++++--------------------------
+ 1 file changed, 10 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 8e21ae0bab46..70108c1491bc 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -273,7 +273,6 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
- 	v->base = base;
- 	v->valid_sources = valid_sources;
- 	v->resume_sources = resume_sources;
--	v->irq = irq;
- 	set_handle_irq(vic_handle_irq);
- 	vic_id++;
- 	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
-@@ -282,6 +281,11 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
- 	for (i = 0; i < fls(valid_sources); i++)
- 		if (valid_sources & (1 << i))
- 			irq_create_mapping(v->domain, i);
-+	/* If no base IRQ was passed, figure out our allocated base */
-+	if (irq)
-+		v->irq = irq;
-+	else
-+		v->irq = irq_find_mapping(v->domain, 0);
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 9f82f9dcbb98..aeeae0d79a18 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -307,25 +307,23 @@ static struct impd1_device impd1_devs[] = {
+ static int impd1_probe(struct lm_device *dev)
+ {
+ 	struct impd1_module *impd1;
+-	int i, ret;
++	int i;
+ 
+ 	if (dev->id != module_id)
+ 		return -EINVAL;
+ 
+-	if (!request_mem_region(dev->resource.start, SZ_4K, "LM registers"))
++	if (!devm_request_mem_region(&dev->dev, dev->resource.start,
++				     SZ_4K, "LM registers"))
+ 		return -EBUSY;
+ 
+-	impd1 = kzalloc(sizeof(struct impd1_module), GFP_KERNEL);
+-	if (!impd1) {
+-		ret = -ENOMEM;
+-		goto release_lm;
+-	}
++	impd1 = devm_kzalloc(&dev->dev, sizeof(struct impd1_module),
++			     GFP_KERNEL);
++	if (!impd1)
++		return -ENOMEM;
+ 
+-	impd1->base = ioremap(dev->resource.start, SZ_4K);
+-	if (!impd1->base) {
+-		ret = -ENOMEM;
+-		goto free_impd1;
+-	}
++	impd1->base = devm_ioremap(&dev->dev, dev->resource.start, SZ_4K);
++	if (!impd1->base)
++		return -ENOMEM;
+ 
+ 	lm_set_drvdata(dev, impd1);
+ 
+@@ -353,14 +351,6 @@ static int impd1_probe(struct lm_device *dev)
+ 	}
+ 
+ 	return 0;
+-
+- free_impd1:
+-	if (impd1 && impd1->base)
+-		iounmap(impd1->base);
+-	kfree(impd1);
+- release_lm:
+-	release_mem_region(dev->resource.start, SZ_4K);
+-	return ret;
  }
  
- static void vic_ack_irq(struct irq_data *d)
+ static int impd1_remove_one(struct device *dev, void *data)
+@@ -371,16 +361,10 @@ static int impd1_remove_one(struct device *dev, void *data)
+ 
+ static void impd1_remove(struct lm_device *dev)
+ {
+-	struct impd1_module *impd1 = lm_get_drvdata(dev);
+-
+ 	device_for_each_child(&dev->dev, NULL, impd1_remove_one);
+ 	integrator_impd1_clk_exit(dev->id);
+ 
+ 	lm_set_drvdata(dev, NULL);
+-
+-	iounmap(impd1->base);
+-	kfree(impd1);
+-	release_mem_region(dev->resource.start, SZ_4K);
+ }
+ 
+ static struct lm_driver impd1_driver = {
 -- 
 1.8.4.2
