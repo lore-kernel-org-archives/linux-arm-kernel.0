@@ -1,45 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Jan 2014 09:26:50 +0100
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 22 Jan 2014 10:41:55 +0200
+Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
+In-Reply-To: <52DEE6B0.20106@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <52DEE6B0.20106@ti.com>
+Message-ID: <52DF8453.7030501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+On 2014-01-21 23:29, Nishanth Menon wrote:
+> Tomi,
+> 
+> On 01/21/2014 04:56 AM, Tomi Valkeinen wrote:
+>> Hi,
+>>
+>> Here's version 3 of the DSS DT series.
+>>
+>> The previous version can be found from:
+>>
+>> v1: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108249
+>> v2: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108866
+>>
+>> The main changes to v2 are:
+>>
+>> - DT Binding documentation
+>> - OMAP2 DSS support
+>> - Split DSI register space
+>> - DSS nodes disabled by default
+>> - Hack to have generic DT bindings but OMAP specific drivers (for now)
+>>
+>> This series can also be found from:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt-review-3
+>>
+> http://slexy.org/view/s20JhteOFR is my quick build test report -> few
+> checkpatch and build bisect issues would probably need fixing.
 
-> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
->
-> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
-> name from the ACPI timer table is matched with all the registered
-> timer controllers and matching initialisation routine is invoked.
->
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Thanks. Shouldn't make trivial changes, and then not run a full
+commit-by-commit compile test...
 
-Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
-to TIMER_OF_DECLARE() and I think this macro, if needed, should
-be named TIMER_ACPI_DECLARE().
+I fixed the issues and pushed the branch again to work/dss-dt-review-3.
+The fixes are minor, so the already posted series can be reviewed.
 
-The reason is that "clocksource" is a Linux-internal name and this
-macro pertains to the hardware name in respective system
-description type.
+ Tomi
 
-> +#ifdef CONFIG_ACPI
-> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
-> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
-> +               __used __section(__clksrc_acpi_table)                   \
-> +                = { .id = compat,                              \
-> +                    .driver_data = (kernel_ulong_t)fn }
-> +#else
-> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
-> +#endif
 
-This hammers down the world to compile one binary for ACPI
-and one binary for device tree. Maybe that's fine, I don't know.
-
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/257a5b6c/attachment.sig>
