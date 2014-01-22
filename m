@@ -1,62 +1,31 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 22 Jan 2014 13:39:01 +0100
-Subject: [PATCH 2/2] at91: pinctrl: use gpiolib API to mark a GPIO used as an
- IRQ
-In-Reply-To: <1390394341-12548-1-git-send-email-jjhiblot@traphandler.com>
-References: <1390394341-12548-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1390394341-12548-2-git-send-email-jjhiblot@traphandler.com>
+From: naresh.bhat@linaro.org (naresh.bhat at linaro.org)
+Date: Wed, 22 Jan 2014 18:14:03 +0530
+Subject: [PATCH] watchdog: Add sp805_wdt depends on ARM64
+Message-ID: <1390394643-25443-1-git-send-email-naresh.bhat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
-the gpiolib so we can keep track of the usage centrally.
+From: Naresh Bhat <naresh.bhat@linaro.org>
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Add sp805_wdt depends on ARM64.
+
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 ---
- drivers/pinctrl/pinctrl-at91.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/watchdog/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index e8c8301..fbedde2 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1299,6 +1299,28 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
- 	return 0;
- }
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 5be6e91..2385124 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -109,7 +109,7 @@ config WM8350_WATCHDOG
  
-+static unsigned int gpio_irq_startup(struct irq_data *d)
-+{
-+	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-+	unsigned	pin = d->hwirq;
-+	int ret;
-+
-+	ret = gpio_lock_as_irq(&at91_gpio->chip, pin);
-+	if (ret) {
-+		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
-+			d->hwirq);
-+		return ret;
-+	}
-+	return 0;
-+}
-+static void gpio_irq_shutdown(struct irq_data *d)
-+{
-+	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-+	unsigned	pin = d->hwirq;
-+
-+	gpio_unlock_as_irq(&at91_gpio->chip, pin);
-+}
-+
- #ifdef CONFIG_PM
- 
- static u32 wakeups[MAX_GPIO_BANKS];
-@@ -1377,6 +1399,8 @@ void at91_pinctrl_gpio_resume(void)
- 
- static struct irq_chip gpio_irqchip = {
- 	.name		= "GPIO",
-+	.irq_startup	= gpio_irq_startup,
-+	.irq_shutdown	= gpio_irq_shutdown,
- 	.irq_disable	= gpio_irq_mask,
- 	.irq_mask	= gpio_irq_mask,
- 	.irq_unmask	= gpio_irq_unmask,
+ config ARM_SP805_WATCHDOG
+ 	tristate "ARM SP805 Watchdog"
+-	depends on ARM && ARM_AMBA
++	depends on (ARM || ARM64) && ARM_AMBA
+ 	select WATCHDOG_CORE
+ 	help
+ 	  ARM Primecell SP805 Watchdog timer. This will reboot your system when
 -- 
-1.8.5.2
+1.7.9.5
