@@ -1,9 +1,9 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jan 2014 22:36:25 +0100
-Subject: [PATCH v2 3/5] ARM: sun4i: dt: Add bindings for USB clocks
+Date: Wed, 22 Jan 2014 22:36:27 +0100
+Subject: [PATCH v2 5/5] ARM: sun7i: dt: Add bindings for USB clocks
 In-Reply-To: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
 References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390426587-16287-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390426587-16287-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +12,14 @@ From: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 9 +++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 7264ef9..913674b 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -290,6 +290,15 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 57f1fc9..a44b3b3 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -280,6 +280,15 @@
  			clock-output-names = "ir1";
  		};
  
