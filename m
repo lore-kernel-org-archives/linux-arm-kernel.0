@@ -1,83 +1,127 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jan 2014 20:32:56 +0100
-Subject: [PATCH v8 3/4] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-In-Reply-To: <1390419177-6481-1-git-send-email-hdegoede@redhat.com>
-References: <1390419177-6481-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1390419177-6481-4-git-send-email-hdegoede@redhat.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 22 Jan 2014 13:33:21 -0600
+Subject: [PATCH v2 4/5] ARM: OMAP2+: Add pdata quirk for sys_clkout2 for
+ omap3 DBB056
+In-Reply-To: <1390417460-3134-5-git-send-email-chf.fritz@googlemail.com>
+References: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
+ <1390417460-3134-5-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <52E01D01.2010709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note this commit uses the same devicetree booleans for this as the ones
-already existing in the usb-ehci bindings, see:
-Documentation/devicetree/bindings/usb/usb-ehci.txt
+On 01/22/2014 01:04 PM, Christoph Fritz wrote:
+> Full device tree support for clock control is not yet accomplished. Until
+> then, configure the 24Mhz of sys_clkout2 to feed an USB-Hub here.
+> 
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c |   37 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index a58590f..9ef7ca8 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -171,6 +171,43 @@ static void __init am3517_evm_legacy_init(void)
+>  }
+>  static void __init omap3_dbb056_legacy_init(void)
+>  {
+> +	struct clk *clkout2;
+> +	struct clk *cm96fck;
+> +
+> +	/* Reparent clkout2 to 96M_FCK */
+> +	pr_info("a83x-quirk: Late Reparent clkout2 to 96M_FCK\n");
+what'd be a83x?
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  3 +++
- drivers/usb/host/ohci-platform.c                   | 27 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+> +	clkout2 = clk_get(NULL, "clkout2_src_ck");
+> +	if(clkout2 < 0) {
+> +		pr_err("a83x-quirk: couldn't get clkout2_src_ck\n");
+> +		return;
+> +	}
+> +	cm96fck = clk_get(NULL, "cm_96m_fck");
+> +	if(cm96fck < 0) {
+> +		pr_err("a83x-quirk: couldn't get cm_96m_fck\n");
+> +		return;
+> +	}
+> +	if(clk_set_parent(clkout2, cm96fck) < 0) {
+> +		pr_err("a83x-quirk: couldn't reparent clkout2_src_ck\n");
+> +		return;
+> +	}
+yep - we have bunch of similar code in drivers/clk/ti -> but we'd need
+a generic property to handle this.
+> +
+> +	/* Set clkout2 to 24MHz for internal usb hub*/
+> +	pr_info("a83x-quirk: Set clkout2 to 24MHz for internal usb hub\n");
+> +	clkout2 = clk_get(NULL, "sys_clkout2");
+> +	if(clkout2 < 0) {
+> +		pr_err("a83x-quirk: couldn't get sys_clkout2\n");
+> +		return;
+> +	}
+> +	if(clk_set_rate(clkout2, 24000000) < 0) {
+same here.
+> +		printk(KERN_ERR "board-omap3evm: couldn't set sys_clkout2 rate\n");
+"board-omap3evm:" copy paste?
+any reason why not pr_err?
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 6ba38d9..6933b0c 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -6,6 +6,9 @@ Required properties:
- - interrupts : ohci controller interrupt
- 
- Optional properties:
-+- big-endian-regs : boolean, set this for hcds with big-endian registers
-+- big-endian-desc : boolean, set this for hcds with big-endian descriptors
-+- big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b2d0e1e..71e9d8e 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -128,6 +128,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct resource *res_mem;
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
-+	struct ohci_hcd *ohci;
- 	int err, irq, clk = 0;
- 
- 	if (usb_disabled())
-@@ -164,8 +165,34 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	platform_set_drvdata(dev, hcd);
- 	dev->dev.platform_data = pdata;
- 	priv = hcd_to_ohci_priv(hcd);
-+	ohci = hcd_to_ohci(hcd);
- 
- 	if (pdata == &ohci_platform_defaults && dev->dev.of_node) {
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian-regs"))
-+			ohci->flags |= OHCI_QUIRK_BE_MMIO;
-+
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
-+			ohci->flags |= OHCI_QUIRK_BE_DESC;
-+
-+		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
-+			ohci->flags |= OHCI_QUIRK_BE_MMIO | OHCI_QUIRK_BE_DESC;
-+
-+#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_MMIO
-+		if (ohci->flags & OHCI_QUIRK_BE_MMIO) {
-+			dev_err(&dev->dev,
-+				"Error big-endian-regs not compiled in\n");
-+			err = -EINVAL;
-+			goto err_put_hcd;
-+		}
-+#endif
-+#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_DESC
-+		if (ohci->flags & OHCI_QUIRK_BE_DESC) {
-+			dev_err(&dev->dev,
-+				"Error big-endian-desc not compiled in\n");
-+			err = -EINVAL;
-+			goto err_put_hcd;
-+		}
-+#endif
- 		priv->phy = devm_phy_get(&dev->dev, "usb");
- 		if (IS_ERR(priv->phy)) {
- 			err = PTR_ERR(priv->phy);
+> +		return;
+> +	}
+> +	if(clk_prepare_enable(clkout2) < 0) {
+> +		pr_err("a83x-quirk: couldn't enable sys_clkout2\n");
+> +		return;
+> +	}
+> +
+> +	/* Initialize display */
+>  	omap3_dbb056_display_init_of();
+>  }
+>  #endif /* CONFIG_ARCH_OMAP3 */
+> 
+
+looking at the coding style, I assume we'd missed running
+checkpatch.pl --strict?
+
+ERROR: space required before the open parenthesis '('
+#44: FILE: arch/arm/mach-omap2/pdata-quirks.c:180:
++	if(clkout2 < 0) {
+
+ERROR: space required before the open parenthesis '('
+#49: FILE: arch/arm/mach-omap2/pdata-quirks.c:185:
++	if(cm96fck < 0) {
+
+ERROR: space required before the open parenthesis '('
+#53: FILE: arch/arm/mach-omap2/pdata-quirks.c:189:
++	if(clk_set_parent(clkout2, cm96fck) < 0) {
+
+ERROR: space required before the open parenthesis '('
+#61: FILE: arch/arm/mach-omap2/pdata-quirks.c:197:
++	if(clkout2 < 0) {
+
+ERROR: space required before the open parenthesis '('
+#65: FILE: arch/arm/mach-omap2/pdata-quirks.c:201:
++	if(clk_set_rate(clkout2, 24000000) < 0) {
+
+WARNING: Prefer netdev_err(netdev, ... then dev_err(dev, ... then
+pr_err(...  to printk(KERN_ERR ...
+#66: FILE: arch/arm/mach-omap2/pdata-quirks.c:202:
++		printk(KERN_ERR "board-omap3evm: couldn't set sys_clkout2 rate\n");
+
+ERROR: space required before the open parenthesis '('
+#69: FILE: arch/arm/mach-omap2/pdata-quirks.c:205:
++	if(clk_prepare_enable(clkout2) < 0) {
+
+total: 6 errors, 1 warnings, 0 checks, 43 lines checked
+
+ has style problems, please review.
+
+If any of these errors are false positives, please report
+them to the maintainer, see CHECKPATCH in MAINTAINERS.
+
+you might want to run something like aiaiai[1] or
+kernel_patch_verify[2] or patman... etc.. to help you clean up for
+minimum needs.
+
+[1] https://lwn.net/Articles/488992/
+[2] https://github.com/nmenon/kernel_patch_verify
+
 -- 
-1.8.5.3
+Regards,
+Nishanth Menon
