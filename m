@@ -1,53 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Jan 2014 18:17:24 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140122162313.GE24288@e102568-lin.cambridge.arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
- <CAP245DXdFS5FEkrDvSw07aDDuZDqFPZXF=CoBLPrBB4JuYE8cQ@mail.gmail.com>
- <20140121152358.GD28801@e102568-lin.cambridge.arm.com>
- <20140122115214.GG17314@sirena.org.uk>
- <20140122162313.GE24288@e102568-lin.cambridge.arm.com>
-Message-ID: <20140122181724.GR17314@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jan 2014 19:21:37 +0100
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a separate
+ resource
+In-Reply-To: <20140122181409.GV18269@obsidianresearch.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140122180100.GE27273@localhost>
+ <20140122181409.GV18269@obsidianresearch.com>
+Message-ID: <3159777.ZVRLCgpLar@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 04:23:14PM +0000, Lorenzo Pieralisi wrote:
-> On Wed, Jan 22, 2014 at 11:52:14AM +0000, Mark Brown wrote:
+On Wednesday 22 January 2014 11:14:09 Jason Gunthorpe wrote:
+> On Wed, Jan 22, 2014 at 03:01:01PM -0300, Ezequiel Garcia wrote:
+> > On Wed, Jan 22, 2014 at 01:21:36PM -0300, Ezequiel Garcia wrote:
+> > > > I don't see a good way out that would preserve backwards compatibility,
+> > > > other than hardcoding the physical address in the driver, which seems
+> > > > just as bad as breaking compatibility. That said, it is always the
+> > > > same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
+> > > > Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
+> > > > a fallback would technically work, but we should print a fat warning at
+> > > > boot time if we actually fall back to that.
+> > > > 
+> > > 
+> > > Yes, I was thinking just about this. Namely:
+> > > 
+> > [..]
+> > 
+> > How about something like this?
+> 
+> I liked Arnd's idea to use an offset from the first register. With the
+> mbus driver we can now actually change the 0xF1.. prefix via the DT.
 
-> > Actually looking at the OPP binding I do wonder if it might not be
-> > better to have a v2/rich binding for them which is extensible - the fact
-> > that it's not possible to add additional information seems like an
-> > issue, this can't be the only thing anyone might want to add and lining
-> > up multiple tables is never fun.
+That wasn't actually my idea, but it does sound reasonable.
 
-> On one hand OPP bindings need improvement and that's on the cards. I am not
-> really following what you mean by "extensible", I only want to make sure
-> that the C-state bindings do not become too complex.
+> > +     dev_warn(&pdev->dev, "falling back to harcoded RSTOUT reg 0x%x\n",
+> > +              ORION_RSTOUT_MASK);
+> 
+> Maybe:
+> dev_warn(&pdev->dev, FW_BUG "falling back to harcoded RSTOUT reg 0x%x\n",
 
-By extensible I guess I mostly mean not just a list of numbers we can't
-add additional information to without breaking compatibility.  Having to
-look through tables and make sure they all use the same indexes gets
-error prone and generally miserable.
+I was thinking of WARN_ON(), i.e. something that users will actually notice ;-)
 
-> Do you mean extending OPP bindings to add eg C-state information there
-> (or whatever piece of information that is OPP dependent) ?
-> It seems a bit of a stretch but I can think about that.
+> > @@ -139,10 +166,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> >       if (!wdt_reg)
+> >               return -ENOMEM;
+> >  
+> > -     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > -     if (!res)
+> > -             return -ENODEV;
+> > -     wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> > +     wdt_rstout = try_compat_rstout_ioremap(pdev);
+> >       if (!wdt_rstout)
+> >               return -ENOMEM;
+> 
+> ENOMEM is probably not the right errno? Is there a standard errno for
+> malformed DT?
 
-> I think that C-state properties are better defined in the C-state bindings
-> that was the idea but I am open to suggestions.
+I don't think so. I'd probably use ENODEV, but it's not ideal.
 
-I think defining in these bindings makes total sense, it's just
-providing an extension to the OPP binding (which is already being looked
-at anyway).  The exensibility issue I see is that with the current OPP
-binding it's inelegant for another binding to add extra information
-about an operating point relevant to that binding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/8bda54c7/attachment.sig>
+	Arnd
