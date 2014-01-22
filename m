@@ -1,106 +1,37 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 22 Jan 2014 10:46:33 -0500
-Subject: [PATCH RESEND] cpufreq: exynos: Fix build error of no type of
- module_init
-In-Reply-To: <1390405030.18340.11.camel@AMDC1943>
-References: <1390400476-22951-1-git-send-email-k.kozlowski@samsung.com>
- <CAKohpo=2wR+Sqwxj4koH0rvuk29BkNyAZgN0RR7bVH+3uqpB1Q@mail.gmail.com>
- <1390402760.18340.6.camel@AMDC1943> <1390405030.18340.11.camel@AMDC1943>
-Message-ID: <52DFE7D9.5050001@windriver.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jan 2014 16:47:28 +0100
+Subject: [PATCH 18/20] clocksource / acpi: Add macro
+ CLOCKSOURCE_ACPI_DECLARE
+In-Reply-To: <20140122151749.GA1519@e106331-lin.cambridge.arm.com>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <3140612.0s75qS6VKb@wuerfel>
+ <20140122151749.GA1519@e106331-lin.cambridge.arm.com>
+Message-ID: <4603592.X6dscGmyfO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-01-22 10:37 AM, Krzysztof Kozlowski wrote:
+On Wednesday 22 January 2014 15:17:49 Mark Rutland wrote:
+> Except for the fact that some timers / clocksources that we already have
+> in 32-bit land will likely be reused in 64-bit SoC designs. People will
+> want to use the same driver for both 32-bit and 64-bit kernels, and thus
+> we need CLOCKSOURCE_OF_DECLARE in 64-bit kernels.
 > 
->>
->> On Wed, 2014-01-22 at 20:12 +0530, Viresh Kumar wrote:
->>> On 22 January 2014 19:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->>>> Add missing include to fix build error:
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
->>>> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
->>>> cc1: some warnings being treated as errors
->>>> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
->>>> make[1]: *** [drivers/cpufreq] Error 2
->>>>
->>>> Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
->>>> and was introduced by commit d568b6f71df1 (cpufreq: exynos: Convert
->>>> exynos-cpufreq to platform driver).
->>>>
->>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> Cc: Lukasz Majewski <l.majewski@samsung.com>
->>>> Cc: Tomasz Figa <t.figa@samsung.com>
->>>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>>  drivers/cpufreq/exynos-cpufreq.c |    1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
->>>> index fcd2914d081a..fa54c2b88dd7 100644
->>>> --- a/drivers/cpufreq/exynos-cpufreq.c
->>>> +++ b/drivers/cpufreq/exynos-cpufreq.c
->>>> @@ -17,6 +17,7 @@
->>>>  #include <linux/regulator/consumer.h>
->>>>  #include <linux/cpufreq.h>
->>>>  #include <linux/suspend.h>
->>>> +#include <linux/module.h>
->>>>  #include <linux/platform_device.h>
->>>
->>> I am surprised how that patch went through then? And nothing was
->>> reported by kbuild for it..
->>
->> Hi,
->>
->> A little more explanation from my side: the build error actually happens
->> only on next/master, not Linus' tree.
->>
->> Mentioned commit which changes the driver to platform driver is in
->> mainline since 3.12-rc2 so it seems this is not the cause of the build
->> error. I think I need to find first the real cause of this build error.
->>
->> Best regards,
->> Krzysztof
+> Those platforms which will have ACPI will likely reuse existing timer IP
+> blocks, and will want to make minimal changes to the driver, which will
+> likely be using CLOCKSOURCE_OF_DECLARE. We can't change these to
+> platform drivers or we can break existing systems because the timers
+> will be registered too late.
 > 
-> After bisecting, the real commit for build error is:
-> caa7dcde7c424cdc81698a6e4e48072eb67ec67e
->     module: relocate module_init from init.h to module.h
+> I don't see how we can share drivers between 32-bit and 64-bit kernels
+> without sharing a common driver model, and I think it makes sense to
+> have some uniformity across drivers (i.e. always use
+> CLOCKSOURCE_*_DECLARE rather than sometimes using platform drivers).
 
-Yep, even though I fixed a crap-tonne of implicit includes, and
-built all the arm configs, some were bound to sneak through.
+This still sounds like speculation. I would defer this change until
+we actually have a platform that needs it.
 
-I'll push a fix shortly to the init cleanup queue:
+The platforms that would reuse a lot of IP blocks are most likely
+embedded systems and /not/ server hardware following some strict
+specification, so they wouldn't use ACPI.
 
-   http://git.kernel.org/cgit/linux/kernel/git/paulg/init.git/
-
-so it will be fine for the next linux-next tree.
-
-Thanks,
-Paul.
---
-
-> 
-> My patch seems valid although the reason in commit msg should be updated:
-> ################
-> Add missing include to fix build error:
-> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
-> drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
-> cc1: some warnings being treated as errors
-> make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
-> make[1]: *** [drivers/cpufreq] Error 2
-> 
-> Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
-> and was introduced in next tree by commit caa7dcde7c42 (module: relocate
-> module_init from init.h to module.h).
-> ################
-> 
-> 
-> 
+	Arnd
