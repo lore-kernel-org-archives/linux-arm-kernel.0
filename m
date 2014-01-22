@@ -1,118 +1,213 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jan 2014 14:56:40 +0000
-Subject: [PATCH v2 08/10] ARM: KVM: introduce per-vcpu HYP Configuration
- Register
+Date: Wed, 22 Jan 2014 14:56:41 +0000
+Subject: [PATCH v2 09/10] ARM: KVM: trap VM system registers until MMU and
+ caches are ON
 In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1390402602-22777-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1390402602-22777-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, KVM/ARM used a fixed HCR configuration per guest, except for
-the VI/VF/VA bits to control the interrupt in absence of VGIC.
+In order to be able to detect the point where the guest enables
+its MMU and caches, trap all the VM related system registers.
 
-With the upcoming need to dynamically reconfigure trapping, it becomes
-necessary to allow the HCR to be changed on a per-vcpu basis.
-
-The fix here is to mimic what KVM/arm64 already does: a per vcpu HCR
-field, initialized at setup time.
+Once we see the guest enabling both the MMU and the caches, we
+can go back to a saner mode of operation, which is to leave these
+registers in complete control of the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_arm.h  | 1 -
- arch/arm/include/asm/kvm_host.h | 9 ++++++---
- arch/arm/kernel/asm-offsets.c   | 1 +
- arch/arm/kvm/guest.c            | 1 +
- arch/arm/kvm/interrupts_head.S  | 9 +++------
- 5 files changed, 11 insertions(+), 10 deletions(-)
+ arch/arm/include/asm/kvm_arm.h |  3 +-
+ arch/arm/kvm/coproc.c          | 85 ++++++++++++++++++++++++++++++++++--------
+ arch/arm/kvm/coproc_a15.c      |  2 +-
+ arch/arm/kvm/coproc_a7.c       |  2 +-
+ 4 files changed, 73 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 1d3153c..a843e74 100644
+index a843e74..816db0b 100644
 --- a/arch/arm/include/asm/kvm_arm.h
 +++ b/arch/arm/include/asm/kvm_arm.h
-@@ -69,7 +69,6 @@
+@@ -55,6 +55,7 @@
+  * The bits we set in HCR:
+  * TAC:		Trap ACTLR
+  * TSC:		Trap SMC
++ * TVM:		Trap VM ops (until MMU and caches are on)
+  * TSW:		Trap cache operations by set/way
+  * TWI:		Trap WFI
+  * TWE:		Trap WFE
+@@ -68,7 +69,7 @@
+  */
  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
  			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
- 			HCR_TWE | HCR_SWIO | HCR_TIDCP)
--#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+-			HCR_TWE | HCR_SWIO | HCR_TIDCP)
++			HCR_TVM | HCR_TWE | HCR_SWIO | HCR_TIDCP)
  
  /* System Control Register (SCTLR) bits */
  #define SCTLR_TE	(1 << 30)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ba6d33a..918fdc1 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -101,6 +101,12 @@ struct kvm_vcpu_arch {
- 	/* The CPU type we expose to the VM */
- 	u32 midr;
- 
-+	/* HYP trapping configuration */
-+	u32 hcr;
-+
-+	/* Interrupt related fields */
-+	u32 irq_lines;		/* IRQ and FIQ levels */
-+
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
- 
-@@ -128,9 +134,6 @@ struct kvm_vcpu_arch {
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
- 
--	/* Interrupt related fields */
--	u32 irq_lines;		/* IRQ and FIQ levels */
--
- 	/* Cache some mmu pages needed inside spinlock regions */
- 	struct kvm_mmu_memory_cache mmu_page_cache;
- 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index dbe0476..713e807 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -174,6 +174,7 @@ int main(void)
-   DEFINE(VCPU_FIQ_REGS,		offsetof(struct kvm_vcpu, arch.regs.fiq_regs));
-   DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_pc));
-   DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
-+  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-   DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
-   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 20f8d97..0c8c044 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -38,6 +38,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
- 
- int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
- {
-+	vcpu->arch.hcr = HCR_GUEST_MASK;
- 	return 0;
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 126c90d..1839770 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -23,6 +23,7 @@
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <trace/events/kvm.h>
+@@ -205,6 +206,55 @@ done:
  }
  
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 4a2a97a..7cb41e1 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -597,17 +597,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ /*
++ * Generic accessor for VM registers. Only called as long as HCR_TVM
++ * is set.
++ */
++static bool access_vm_reg(struct kvm_vcpu *vcpu,
++			  const struct coproc_params *p,
++			  const struct coproc_reg *r)
++{
++	if (p->is_write) {
++		vcpu->arch.cp15[r->reg] = *vcpu_reg(vcpu, p->Rt1);
++		if (p->is_64bit)
++			vcpu->arch.cp15[r->reg + 1] = *vcpu_reg(vcpu, p->Rt2);
++	} else {
++		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
++		if (p->is_64bit)
++			*vcpu_reg(vcpu, p->Rt2) = vcpu->arch.cp15[r->reg + 1];
++	}
++
++	return true;
++}
++
++/*
++ * SCTLR accessor. Only called as long as HCR_TVM is set.  If the
++ * guest enables the MMU, we stop trapping the VM sys_regs and leave
++ * it in complete control of the caches.
++ *
++ * Used by the cpu-specific code.
++ */
++bool access_sctlr(struct kvm_vcpu *vcpu,
++		  const struct coproc_params *p,
++		  const struct coproc_reg *r)
++{
++	if (p->is_write) {
++		unsigned long val;
++
++		val = *vcpu_reg(vcpu, p->Rt1);
++		vcpu->arch.cp15[r->reg] = val;
++
++		if ((val & (0b101)) == 0b101) {	/* MMU+Caches enabled? */
++			vcpu->arch.hcr &= ~HCR_TVM;
++			stage2_flush_vm(vcpu->kvm);
++		}
++	} else {
++		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
++	}
++
++	return true;
++}
++
++/*
+  * We could trap ID_DFR0 and tell the guest we don't support performance
+  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+  * NAKed, so it will read the PMCR anyway.
+@@ -261,33 +311,36 @@ static const struct coproc_reg cp15_regs[] = {
+ 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 2), is32,
+ 			NULL, reset_val, c1_CPACR, 0x00000000 },
  
- /* Enable/Disable: stage-2 trans., trap interrupts, trap wfi, trap smc */
- .macro configure_hyp_role operation
--	mrc	p15, 4, r2, c1, c1, 0	@ HCR
--	bic	r2, r2, #HCR_VIRT_EXCP_MASK
--	ldr	r3, =HCR_GUEST_MASK
- 	.if \operation == vmentry
--	orr	r2, r2, r3
-+	ldr	r2, [vcpu, #VCPU_HCR]
- 	ldr	r3, [vcpu, #VCPU_IRQ_LINES]
- 	orr	r2, r2, r3
- 	.else
--	bic	r2, r2, r3
-+	mov	r2, #0
- 	.endif
--	mcr	p15, 4, r2, c1, c1, 0
-+	mcr	p15, 4, r2, c1, c1, 0	@ HCR
- .endm
+-	/* TTBR0/TTBR1: swapped by interrupt.S. */
+-	{ CRm64( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+-	{ CRm64( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+-
+-	/* TTBCR: swapped by interrupt.S. */
++	/* TTBR0/TTBR1/TTBCR: swapped by interrupt.S. */
++	{ CRm64( 2), Op1( 0), is64, access_vm_reg, reset_unknown64, c2_TTBR0 },
++	{ CRn(2), CRm( 0), Op1( 0), Op2( 0), is32,
++			access_vm_reg, reset_unknown, c2_TTBR0 },
++	{ CRn(2), CRm( 0), Op1( 0), Op2( 1), is32,
++			access_vm_reg, reset_unknown, c2_TTBR1 },
+ 	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+-			NULL, reset_val, c2_TTBCR, 0x00000000 },
++			access_vm_reg, reset_val, c2_TTBCR, 0x00000000 },
++	{ CRm64( 2), Op1( 1), is64, access_vm_reg, reset_unknown64, c2_TTBR1 },
++
  
- .macro load_vcpu
+ 	/* DACR: swapped by interrupt.S. */
+ 	{ CRn( 3), CRm( 0), Op1( 0), Op2( 0), is32,
+-			NULL, reset_unknown, c3_DACR },
++			access_vm_reg, reset_unknown, c3_DACR },
+ 
+ 	/* DFSR/IFSR/ADFSR/AIFSR: swapped by interrupt.S. */
+ 	{ CRn( 5), CRm( 0), Op1( 0), Op2( 0), is32,
+-			NULL, reset_unknown, c5_DFSR },
++			access_vm_reg, reset_unknown, c5_DFSR },
+ 	{ CRn( 5), CRm( 0), Op1( 0), Op2( 1), is32,
+-			NULL, reset_unknown, c5_IFSR },
++			access_vm_reg, reset_unknown, c5_IFSR },
+ 	{ CRn( 5), CRm( 1), Op1( 0), Op2( 0), is32,
+-			NULL, reset_unknown, c5_ADFSR },
++			access_vm_reg, reset_unknown, c5_ADFSR },
+ 	{ CRn( 5), CRm( 1), Op1( 0), Op2( 1), is32,
+-			NULL, reset_unknown, c5_AIFSR },
++			access_vm_reg, reset_unknown, c5_AIFSR },
+ 
+ 	/* DFAR/IFAR: swapped by interrupt.S. */
+ 	{ CRn( 6), CRm( 0), Op1( 0), Op2( 0), is32,
+-			NULL, reset_unknown, c6_DFAR },
++			access_vm_reg, reset_unknown, c6_DFAR },
+ 	{ CRn( 6), CRm( 0), Op1( 0), Op2( 2), is32,
+-			NULL, reset_unknown, c6_IFAR },
++			access_vm_reg, reset_unknown, c6_IFAR },
+ 
+ 	/* PAR swapped by interrupt.S */
+ 	{ CRm64( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
+@@ -324,9 +377,9 @@ static const struct coproc_reg cp15_regs[] = {
+ 
+ 	/* PRRR/NMRR (aka MAIR0/MAIR1): swapped by interrupt.S. */
+ 	{ CRn(10), CRm( 2), Op1( 0), Op2( 0), is32,
+-			NULL, reset_unknown, c10_PRRR},
++			access_vm_reg, reset_unknown, c10_PRRR},
+ 	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
+-			NULL, reset_unknown, c10_NMRR},
++			access_vm_reg, reset_unknown, c10_NMRR},
+ 
+ 	/* VBAR: swapped by interrupt.S. */
+ 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+@@ -334,7 +387,7 @@ static const struct coproc_reg cp15_regs[] = {
+ 
+ 	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
+ 	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
+-			NULL, reset_val, c13_CID, 0x00000000 },
++			access_vm_reg, reset_val, c13_CID, 0x00000000 },
+ 	{ CRn(13), CRm( 0), Op1( 0), Op2( 2), is32,
+ 			NULL, reset_unknown, c13_TID_URW },
+ 	{ CRn(13), CRm( 0), Op1( 0), Op2( 3), is32,
+diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+index bb0cac1..e6f4ae4 100644
+--- a/arch/arm/kvm/coproc_a15.c
++++ b/arch/arm/kvm/coproc_a15.c
+@@ -34,7 +34,7 @@
+ static const struct coproc_reg a15_regs[] = {
+ 	/* SCTLR: swapped by interrupt.S. */
+ 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
+-			NULL, reset_val, c1_SCTLR, 0x00C50078 },
++			access_sctlr, reset_val, c1_SCTLR, 0x00C50078 },
+ };
+ 
+ static struct kvm_coproc_target_table a15_target_table = {
+diff --git a/arch/arm/kvm/coproc_a7.c b/arch/arm/kvm/coproc_a7.c
+index 1df76733..17fc7cd 100644
+--- a/arch/arm/kvm/coproc_a7.c
++++ b/arch/arm/kvm/coproc_a7.c
+@@ -37,7 +37,7 @@
+ static const struct coproc_reg a7_regs[] = {
+ 	/* SCTLR: swapped by interrupt.S. */
+ 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
+-			NULL, reset_val, c1_SCTLR, 0x00C50878 },
++			access_sctlr, reset_val, c1_SCTLR, 0x00C50878 },
+ };
+ 
+ static struct kvm_coproc_target_table a7_target_table = {
 -- 
 1.8.3.4
