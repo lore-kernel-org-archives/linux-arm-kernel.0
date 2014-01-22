@@ -1,32 +1,57 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Wed, 22 Jan 2014 20:12:53 +0530
-Subject: [PATCH v7 6/6] arm64: KGDB: Add KGDB config
-In-Reply-To: <1390401773-12100-1-git-send-email-vijay.kilari@gmail.com>
-References: <1390401773-12100-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1390401773-12100-7-git-send-email-vijay.kilari@gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 22 Jan 2014 17:45:05 +0300
+Subject: [PATCHv6 4/7] staging: imx-drm: Use de-active and
+ pixelclk-active display-timings.
+In-Reply-To: <1390398511-8041-4-git-send-email-denis@eukrea.com>
+References: <1390398511-8041-1-git-send-email-denis@eukrea.com>
+ <1390398511-8041-4-git-send-email-denis@eukrea.com>
+Message-ID: <20140122144505.GA7444@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+On Wed, Jan 22, 2014 at 02:48:28PM +0100, Denis Carikli wrote:
+> If de-active and/or pixelclk-active properties were set in the
+> display-timings DT node, they were not used.
+> 
+> Instead the data-enable and the pixel data clock polarity
+> were hardcoded.
+> 
+> This change is needed for making the eukrea-cpuimx51
+>   QVGA display work.
+> 
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: driverdev-devel at linuxdriverproject.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Add HAVE_ARCH_KGDB for arm64 Kconfig
+These CC blocks are massive...  What's the point of them?
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
----
- arch/arm64/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+>  	if (np) {
+>  		struct drm_display_mode *mode = drm_mode_create(connector->dev);
+> +		struct device_node *timings_np;
+> +		struct device_node *mode_np;
+> +		u32 val;
+> +
+>  		of_get_drm_display_mode(np, &imxpd->mode, 0);
+> +
+> +		timings_np = of_get_child_by_name(np, "display-timings");
+> +		if (timings_np) {
+> +			/* get the display mode node */
+> +			mode_np = of_parse_phandle(timings_np,
+> +						   "native-mode", 0);
+> +			if (!mode_np)
+> +				mode_np = of_get_next_child(timings_np, NULL);
+> +
+> +			/* set de-active to 1 if not set */
+> +			of_property_read_u32(mode_np, "de-active", &val);
+> +			if (val) {
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6d4dd22..c7a08e0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -28,6 +28,7 @@ config ARM64
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_MEMBLOCK
- 	select HAVE_PERF_EVENTS
-+	select HAVE_ARCH_KGDB
- 	select IRQ_DOMAIN
- 	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
--- 
-1.7.9.5
+If of_property_read_u32() fails then val is uninitialized.
+
+regards,
+dan carpenter
