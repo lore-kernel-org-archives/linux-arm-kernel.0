@@ -1,70 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jan 2014 10:31:40 +0000
-Subject: [PATCH v6 0/3] AArch64: KGDB support
-In-Reply-To: <CALicx6tn4SJ4BjDGBNwH_8dGt82yHeAVyLzP+97rb8FDJdZSYQ@mail.gmail.com>
-References: <1387453851-19341-1-git-send-email-vijay.kilari@gmail.com>
- <20140116134550.GA7496@arm.com>
- <CALicx6tQu2O8o4pr-N8Xc=D-Y9kOMsFNsn6BLVDqRo0Pbay00Q@mail.gmail.com>
- <20140120102302.GC16496@mudshark.cambridge.arm.com>
- <CALicx6v-pxOxdx4Q+a_Rx4XdHPXvgbVoYuouJoBxRdENMzCvAA@mail.gmail.com>
- <20140121183604.GQ30706@mudshark.cambridge.arm.com>
- <CALicx6tx9aLmXpai5SFzZeR6cfu7NKF7WipZWY1nrKGBcA-oGA@mail.gmail.com>
- <CALicx6tn4SJ4BjDGBNwH_8dGt82yHeAVyLzP+97rb8FDJdZSYQ@mail.gmail.com>
-Message-ID: <20140122103140.GC1621@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jan 2014 10:35:53 +0000
+Subject: mutual exculsion between clk_prepare_enable
+ /clk_disable_unprepare and clk_set_parent
+In-Reply-To: <CAFgnuDdOKxzFSDCBQTGw=p_t0CvKfjVEudttOCP_wrzyA2K1Og@mail.gmail.com>
+References: <CAFgnuDdOKxzFSDCBQTGw=p_t0CvKfjVEudttOCP_wrzyA2K1Og@mail.gmail.com>
+Message-ID: <20140122103553.GY15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 07:50:46AM +0000, Vijay Kilari wrote:
-> On Wed, Jan 22, 2014 at 10:01 AM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> >>> On Mon, Jan 20, 2014 at 3:53 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> That's a good point: I think we wait until our first exception before they
-> >> are unmasked. Perhaps we should:
-> >>
-> >>  (1) Move local_dbg_{save,restore} from debug-monitors.h into irqflags.h
+On Wed, Jan 22, 2014 at 02:02:57PM +0800, Xiaoguang Chen wrote:
+> Hi, Mike
 > 
-> local_dbg_save is setting bit #8 it should be bit #9?
+> We met a issue between clk_prepare_enable /clk_disable_unprepare and
+> clk_set_parent.
+
+clk_prepare_enable/disable_unprepare are perfectly fine in themselves.
+You're looking at the problem wrongly - because drivers can perfectly
+well call clk_prepare() and clk_unprepare() themselves.  There's no
+requirement for the enable and prepare to be paired together under any
+kind of lock.
+
+> and if below condition occurs, there will be problem
+>
+> thread1                                                 thread 2
+> call clk_disable_unprepare
+
+Okay, if we're calling clk_disable_unprepare(), then the clock
+must already have been prepared and enabled - which means that
+the current parent is already prepared and enabled.
+
+> 1) clk_disable
+> get enable lock
+> ...............
+> release enable lock
+
+This may result in the parent being disabled too.
+
 > 
-> #define local_dbg_save(flags)
->          \
->         do {
->          \
->                 typecheck(unsigned long, flags);
->          \
->                 asm volatile(
->          \
->                 "mrs    %0, daif                        //
-> local_dbg_save\n"    \
->                 "msr    daifset, #8"
+>                                                      call clk_set_parent
+>                                                      get prepare lock
+>                                                      set clock's
+> parent to another parent
 
-That uses daifset, so #8 is bit 3 which is D.
+At this point, the existing parent clock should be disabled if this
+clock was enabled, and unprepared if this clock was prepared.  The
+new parent should be prepared and enabled as appropriate too so that
+everything is kept balanced.
 
-> >>  (2) Add local_dbg_enable/local_dbg_disable macros
-> >>  (3) Add a call to local_dbg_enable in the clear_os_lock function after the
-> >>      isb().
-> >>
-> >> Does that work for you?
-> >
-> > Yes, only after first exception occurs the PSTATE.D is unmasked.
-> >
-> > I have patched (temp) as below and now KGDB boot tests pass
-> >
-> > diff --git a/arch/arm64/include/asm/debug-monitors.h
-> > b/arch/arm64/include/asm/debug-monitors.h
-> > index aff3a76..ea2bc46 100644
-> > --- a/arch/arm64/include/asm/debug-monitors.h
-> > +++ b/arch/arm64/include/asm/debug-monitors.h
-> > @@ -64,6 +111,24 @@ struct task_struct;
-> >
-> >  #define DBG_ARCH_ID_RESERVED   0       /* In case of ptrace ABI updates. */
-> >
-> > +#define local_dbg_enable()
-> >          \
-> > +       do {
-> >          \
-> > +               asm volatile(
-> >          \
-> > +               "msr    daifclr, #9             //
+>                                                      release prepare lock
+> 
+> 2) clk_unprepare
+> get prepare lock
+> unprepare parent clock <<--------------
+> release prepare lock
 
-I think this is going to unmask fiq as well...
+And with the above guarantee - which is required in any case to make
+reparenting safe - there's no problem here.
 
-Will
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
