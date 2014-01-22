@@ -1,67 +1,88 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Jan 2014 19:12:38 -0300
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140122205213.GW18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com>
- <52E02AB6.7040104@gmail.com>
- <20140122205213.GW18269@obsidianresearch.com>
-Message-ID: <20140122221237.GA30763@localhost>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 22 Jan 2014 23:23:23 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <20140121211741.GA12657@xanatos> (Sarah Sharp's message of "Tue,
+ 21 Jan 2014 13:17:41 -0800")
+References: <87sissopaf.fsf@natisbad.org> <20140114170719.GA12126@xanatos>
+ <87bnzekz5l.fsf@natisbad.org>
+ <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
+ <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
+ <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
+ <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
+ <20140121211741.GA12657@xanatos>
+Message-ID: <87bnz364h0.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 01:52:13PM -0700, Jason Gunthorpe wrote:
-> > Clearing BRIDGE_CAUSE will only clear all currently pending upstream
-> > IRQs, of course. If WDT IRQ will be re-raised right after that in
-> > BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
-> > clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
-> 
-> Which is why it makes no sense to clear it one time at kernel start.
-> 
+Hi Sarah,
 
-So, it seems we need to handle irq_startup(), as you suggested.
-I've just tested the attached patch, and it's working fine: the driver's
-probe() fully stops the watchdog, and then request_irq() acks and
-pending interrupts, through the added irq_startup().
+Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
 
-How does it look?
+> On Sat, Jan 18, 2014 at 10:49:17PM +0100, Arnaud Ebalard wrote:
+>> Hi,
+>> 
+>> I have added Thomas in the recipients, because I guess he may be of some
+>> help debugging the issue further. Thomas, the beginning of the thread is
+>> here: http://thread.gmane.org/gmane.linux.usb.general/101531
+>
+> ...
+>
+>> I started suspecting the introduction of MSI support in Marvell PCIe
+>> host controller driver (FL1009 is on the PCIe bus) and compiled a
+>> a 3.13.0-rc8 w/ CONFIG_PCI_MSI disabled (it was enabled in all my
+>> previous tests): I did not manage to reproduce the issue with this
+>> kernel. As a side note, commits 5b4deb6526bd, 31f614edb726 and
+>> 627dfcc249e2 are
+>> 
+>> ATM, I do not know if the problem is related to a bug in introduced MSI
+>> support or some weird incompatibility of that functionality with the
+>> FL1009 which would require some quirk in XHCI stack.
+>
+> We've actually had issues in the past with Fresco Logic hosts not
+> supporting MSI properly, even though the PCI devices claim to have MSI
+> support.  So turning off CONFIG_PCI_MSI may actually mean the Fresco
+> Logic host is to blame, rather than the Marvell patches.  I assume MSI
+> wouldn't have been turned on for the Fresco Logic host unless the parent
+> PCI host controller supported it.
+>
+> Let's see if the Fresco Logic host is really the root cause.  Please
+> apply the this patch to 3.13.0-rc8 and recompile with CONFIG_PCI_MSI
+> enabled:
+>
+> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+> index 6c03584ac15f..74748444c040 100644
+> --- a/drivers/usb/host/xhci-pci.c
+> +++ b/drivers/usb/host/xhci-pci.c
+> @@ -30,6 +30,7 @@
+>  /* Device for a quirk */
+>  #define PCI_VENDOR_ID_FRESCO_LOGIC	0x1b73
+>  #define PCI_DEVICE_ID_FRESCO_LOGIC_PDK	0x1000
+> +#define PCI_DEVICE_ID_FRESCO_LOGIC_FL1009	0x1009
+>  #define PCI_DEVICE_ID_FRESCO_LOGIC_FL1400	0x1400
+>  
+>  #define PCI_VENDOR_ID_ETRON		0x1b6f
+> @@ -63,6 +64,9 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
+>  
+>  	/* Look for vendor-specific quirks */
+>  	if (pdev->vendor == PCI_VENDOR_ID_FRESCO_LOGIC &&
+> +			pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_FL1009)
+> +		xhci->quirks |= XHCI_BROKEN_MSI;
+> +	if (pdev->vendor == PCI_VENDOR_ID_FRESCO_LOGIC &&
+>  			(pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_PDK ||
+>  			 pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_FL1400)) {
+>  		if (pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_PDK &&
 
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index e51d400..91a3955 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -108,6 +108,16 @@ IRQCHIP_DECLARE(orion_intc, "marvell,orion-intc", orion_irq_init);
- #define ORION_BRIDGE_IRQ_CAUSE	0x00
- #define ORION_BRIDGE_IRQ_MASK	0x04
- 
-+static unsigned int orion_bridge_irq_startup(struct irq_data *data)
-+{
-+	/* Ack pending interrupts */
-+	data->chip->irq_ack(data);
-+
-+	/* Unmask the interrupt */
-+	data->chip->irq_unmask(data);
-+	return 0;
-+}
-+
- static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
- 	struct irq_domain *d = irq_get_handler_data(irq);
-@@ -176,6 +186,7 @@ static int __init orion_bridge_irq_init(struct device_node *np,
- 
- 	gc->chip_types[0].regs.ack = ORION_BRIDGE_IRQ_CAUSE;
- 	gc->chip_types[0].regs.mask = ORION_BRIDGE_IRQ_MASK;
-+	gc->chip_types[0].chip.irq_startup = orion_bridge_irq_startup;
- 	gc->chip_types[0].chip.irq_ack = irq_gc_ack_clr_bit;
- 	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
- 	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+With the patch applied on top of 3.13.0 kernel recompiled w/
+CONFIG_PCI_MSI enabled, I cannot reproduce the bug. I guess
+you can add my:
 
+ Reported-and-tested-By: Arnaud Ebalard <arno@natisbad.org>
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Since you'll have to push the patch to -stable team at least for 3.13,
+I wonder if it would not make sense to extend that at least to 3.12.
+and possibly 3.10 (3.2 is still widely used but I wonder if it makes
+sense to go that far).
+
+Cheers,
+
+a+
