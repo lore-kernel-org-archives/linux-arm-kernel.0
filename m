@@ -1,36 +1,30 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Jan 2014 15:03:58 -0300
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140122175030.GU18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com>
- <20140122174539.GD27273@localhost>
- <20140122175030.GU18269@obsidianresearch.com>
-Message-ID: <20140122180357.GF27273@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jan 2014 18:04:43 +0000
+Subject: [PATCH 4/6] arm64: add EFI stub
+In-Reply-To: <1389392950-22457-5-git-send-email-msalter@redhat.com>
+References: <1389392950-22457-1-git-send-email-msalter@redhat.com>
+ <1389392950-22457-5-git-send-email-msalter@redhat.com>
+Message-ID: <20140122180443.GF8065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 10:50:30AM -0700, Jason Gunthorpe wrote:
-> On Wed, Jan 22, 2014 at 02:45:40PM -0300, Ezequiel Garcia wrote:
->  
-> > Agreed. So, let's assume we can guarantee that request_irq() does the
-> > job of clearing the cause register (clearing pending irqs).
-> > 
-> > So, your suggestion is to put request_irq() in the watchdog start()?
-> > 
-> > Otherwise, we can ensure a watchdog full stop at probe(), before
-> > requesting the IRQ. Both solutions should work, uh?
-> 
-> Right, I would keep the request_irq in probe, just because that feels
-> more idiomatic..
-> 
+On Fri, Jan 10, 2014 at 10:29:08PM +0000, Mark Salter wrote:
+> +ENTRY(efi_stub_entry)
+> +       stp     x29, x30, [sp, #-32]!
+> +
+> +       /*
+> +        * Call efi_entry to do the real work.
+> +        * x0 and x1 are already set up by firmware. Current runtime
+> +        * address of image is calculated and passed via *image_addr.
+> +        *
+> +        * unsigned long efi_entry(void *handle,
+> +        *                         efi_system_table_t *sys_table,
+> +        *                         unsigned long *image_addr) ;
+> +        */
+> +       adrp    x8, _text
+> +        add    x8, x8, #:lo12:_text
 
-Done. Baking v4...
+Possibly some minor whitespace corruption (or it's our email server).
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Catalin
