@@ -1,56 +1,41 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 22 Jan 2014 11:19:53 +0100
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
- audio support for TDA998x trough McASP I2S bus
-In-Reply-To: <52DF8D60.9020505@ti.com>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
- <20140115165100.3bfab96f@armhf> <52DF8D60.9020505@ti.com>
-Message-ID: <20140122111953.238349a5@armhf>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Jan 2014 10:22:29 +0000
+Subject: [PATCH REPOST 1/5] ARM: kvm: replace push and pop with stdmb and
+ ldmia instrs to enable assembler.h inclusion
+In-Reply-To: <CAA3XUr3rpEBCWbE0HGu14qgGsmt6J21D_yDeK2nFvK6_-cjPag@mail.gmail.com>
+References: <1387558125-3460-1-git-send-email-victor.kamensky@linaro.org>
+ <1387558125-3460-2-git-send-email-victor.kamensky@linaro.org>
+ <20140121011825.GI13432@cbox> <52DE44C4.20503@arm.com>
+ <CAA3XUr3rpEBCWbE0HGu14qgGsmt6J21D_yDeK2nFvK6_-cjPag@mail.gmail.com>
+Message-ID: <20140122102229.GB1621@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Jan 2014 11:20:32 +0200
-Jyri Sarha <jsarha@ti.com> wrote:
+[Adding Nico, as the author of the push/pull macros. Background is that kvm
+is using push to store to the stack and would now like to include assembler.h]
 
-> On 01/15/2014 05:51 PM, Jean-Francois Moine wrote:
-> > On Wed, 15 Jan 2014 13:27:21 +0200
-> > Jyri Sarha <jsarha@ti.com> wrote:
+On Wed, Jan 22, 2014 at 06:41:09AM +0000, Victor Kamensky wrote:
+> On 21 January 2014 01:58, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > How about trying this alternative approach:
 > >
-> >>   From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N
-> >> register statically to a value that works only with 4 byte samples.
-> >> According to my tests it is possible to support 3 and 2 byte samples too
-> >> by changing the CTS_N register value, but I am not sure if the
-> >> configuration can be changed on the fly. My data sheet of the nxp chip
-> >> is very vague about the register definitions, but I suppose the register
-> >> configures some clock divider on the chip. HDMI supports only upto 24bit
-> >> audio and the data sheet states that any extraneous least significant
-> >> bits are ignored.
-> >
-> > In the tda998x driver, the CTS_N is automatic (AIP_CNTRL_0_ACR_MAN is
-> > not set).
-> >
-> > Then, in my Cubox (Marvell A510 + tda19988), the 16, 24 and 32 bits
-> > formats are working well with I2S input at any rate.
-> >
+> > It looks like all the users of the push/pop macros are located in
+> > arch/arm/lib (mostly checksumming code). Can't we move these macros to a
+> > separate include file and leave the code that uses push/pop (as defined
+> > by the assembler) alone?
 > 
-> Could you refer the kernel version (main line?) and the involved ASoC 
-> drivers so could take I a look if there is something I could do differently?
+> Marc, personally I am OK with such proposal. I was considering something
+> along these lines as one of the options. It works for me both ways. If
+> others agree I am happy to recode it as your suggested. I choose
+> proposed above patch because kvm arm code came after push and pop
+> defines were introduced in asm/assembler.h and used in other places.
+> I am OK either way. I agree that use of push and pop as define names
+> seems a bit unfortunate, but I don't have any historic visibility here
+> 
+> Russell, Dave, Will, do you have any opinion on Marc's proposal to
+> fix this issue?
 
-Both drivers are in the kernel main line.
+I'm perfectly fine with moving those macros into a lib/-local header file.
+An alternative is renaming push/pull to something like lspush and lspull
+and updating the files under lib.
 
-The ASoC is in sound/soc/kirkwood/. kirkwood-i2s.c defines the DAIs I2S
-and S/PDIF outputs.
-
-As both I2S and S/PDIF may be used for HDMI output in the Cubox,
-I wrote a tda998x CODEC which gets the audio ports from the DT and
-dynamically sets these ports and the audio type (i2s / spdif) on audio
-streaming start. I have not submitted yet this codec and the associated
-changes in tda998x, because I am waiting for a first patch series on the
-tda998x to be applied
-(http://lists.freedesktop.org/archives/dri-devel/2014-January/051552.html).
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Will
