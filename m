@@ -1,35 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 14:19:05 +0000
-Subject: [PATCH RFC 08/26] dmaengine: omap-dma: consolidate setup of CCR
-In-Reply-To: <52DFBFDD.8040506@ti.com>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <E1VyjuU-0005EQ-H5@rmk-PC.arm.linux.org.uk> <52DFBFDD.8040506@ti.com>
-Message-ID: <20140122141905.GQ27282@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 22 Jan 2014 15:21:16 +0100
+Subject: [PATCH RESEND] cpufreq: exynos: Fix build error of no type of
+ module_init
+Message-ID: <1390400476-22951-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 06:25:57PM +0530, Sricharan R wrote:
-> Setting up of DMA_DST_SYNC_PREFETCH is missing after this ?
+Add missing include to fix build error:
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+make[1]: *** [drivers/cpufreq] Error 2
 
-I'm not looking for the DMA engine driver to be a 100% reimplementation
-of the legacy driver.  Rather than supporting the entire set of features
-which the legacy driver did, and have many of them simply not used, the
-approach I'm taking here is to only support what is necessary for the
-drivers we have in mainline - and what fits the DMA engine interfaces.
+Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+and was introduced by commit d568b6f71df1 (cpufreq: exynos: Convert
+exynos-cpufreq to platform driver).
 
-There is no point inventing new DMA engine interfaces for features for
-which we have no users in mainline kernel - to try to do that will be
-quite rightfully thrown out by the DMA engine maintainers.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Lukasz Majewski <l.majewski@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/cpufreq/exynos-cpufreq.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Here's the total number of references/definitions of DMA_DST_SYNC_PREFETCH
-in the mainline kernel:
-
-arch/arm/plat-omap/dma.c:               if (src_or_dst_synch == OMAP_DMA_DST_SYNC_PREFETCH) {
-include/linux/omap-dma.h:#define OMAP_DMA_DST_SYNC_PREFETCH     0x02
-
-Hence, this feature is unused at present.
-
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index fcd2914d081a..fa54c2b88dd7 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -17,6 +17,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/cpufreq.h>
+ #include <linux/suspend.h>
++#include <linux/module.h>
+ #include <linux/platform_device.h>
+ 
+ #include <plat/cpu.h>
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.7.9.5
