@@ -1,41 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jan 2014 10:48:37 +0100
-Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a separate
- resource
-In-Reply-To: <20140121233321.GR18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233321.GR18269@obsidianresearch.com>
-Message-ID: <3176358.2QFcJHj0fv@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Jan 2014 10:54:34 +0100
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <CAAVeFuKFfAvSPYLmvWV5jjT-peZFJ8sJ2bbh4F=JAYoWLhjZpA@mail.gmail.com>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
+ <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
+ <201401211335.16885.arnd@arndb.de>
+ <CAAVeFuKFfAvSPYLmvWV5jjT-peZFJ8sJ2bbh4F=JAYoWLhjZpA@mail.gmail.com>
+Message-ID: <CACRpkdbCQ3UHUJ5TLYqD9svOiuFBK9ManepiJ745PiU9fHjpFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 January 2014 16:33:21 Jason Gunthorpe wrote:
-> On Tue, Jan 21, 2014 at 06:12:31AM -0300, Ezequiel Garcia wrote:
-> > In order to support other SoC, it's required to distinguish
-> > the 'control' timer register, from the 'rstout' register
-> > that enables system reset on watchdog expiration.
-> 
-> > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +     if (!res)
-> > +             return -ENODEV;
->            ^^^^^^^^^^^^^^^^^^^^^^
-> 
-> This change seems to break compatibility with existing DT files that
-> have only a single entry in reg?
-> 
-> Can the value be defaulted some how if missing?
+On Tue, Jan 21, 2014 at 3:53 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Tue, Jan 21, 2014 at 9:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 21 January 2014, Linus Walleij wrote:
 
-I think this is a direct consequence of the attempt to remove the
-header file dependency, since the RSTOUTn_MASK macro is defined
-in mach/bridge-regs.h.
+>>> As discussed earlier in this thread I'm not sure the con_id is
+>>> suitable for labelling GPIOs. It'd be better to have a proper name
+>>> specified in DT/ACPI instead.
+>>
+>> +1
+>
+> I wonder why you guys prefer to have the name defined in the GPIO
+> mapping. Having the driver decide the label makes it easier to look up
+> which GPIO does what in debugfs, whereas nothing prevents people to
+> name GPIOs whatever inadequate name they want in the device DT node.
+> What am I overlooking here?
 
-I don't see a good way out that would preserve backwards compatibility,
-other than hardcoding the physical address in the driver, which seems
-just as bad as breaking compatibility. That said, it is always the
-same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
-Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
-a fallback would technically work, but we should print a fat warning at
-boot time if we actually fall back to that.
+The proper name of a GPIO does not come from the driver but from the
+usecase, i.e. often the name of the rail on the board where it is used.
 
-	Arnd
+Remember GPIO are per definition general purpose, they cannot get
+any clever names from the driver. They would just be named
+"chip-foo-gpio0" thru "chip-foo-gpioN" if the driver was to name them.
+
+Using the rail name on the board is way more useful. A GPIO line
+named "HAL_SENSOR" or "MMC_CD" is actually telling us what
+that line is used for.
+
+But such names can only come from a DT or ACPI table that has
+knowledge of how the GPIO is used on a certain system/board and
+not just from the driver.
+
+Yours,
+Linus Walleij
