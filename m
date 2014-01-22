@@ -1,95 +1,202 @@
 From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Wed, 22 Jan 2014 20:04:15 +0100
-Subject: [PATCH v2 0/5] ARM: add omap3 INCOstartec board support
-Message-ID: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
+Date: Wed, 22 Jan 2014 20:04:17 +0100
+Subject: [PATCH v2 2/5] ARM: dts: omap3: Add support for INCOstartec DBB056
+ baseboard
+In-Reply-To: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
+References: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <1390417460-3134-3-git-send-email-chf.fritz@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds board support for an omap3 system from INCOstartec.
-It's based on next-20140122.
+INCOstartec LILLY-DBB056 is a carrier board (baseboard) for
+computer-on-module LILLY-A83X.
 
-Previously it was based on next-20140115. There, everything works as expected.
+This patch adds device-tree support for most of its features.
 
-On branch git://git.linaro.org/people/ulf.hansson/clk.git linaro_clk/clk-next
-which holdes all "clock DT conversion" commits, bootlog shows these abnormalities:
-
-  [    0.559600] ------------[ cut here ]------------
-  [    0.559631] WARNING: CPU: 0 PID: 1 at /home/honschu/media/linux/drivers/video/omap2/dss/dss.c:540 dss_set_clock_div+0xac/0xcc()
-  [    0.559661] clk rate mismatch: 345600000 != 172800000
-  [    0.559661] Modules linked in:
-  [    0.559692] CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc7+ 0
-  [    0.559722] [<c0012fc4>] (unwind_backtrace+0x0/0xf8) from [<c0010e10>] (show_stack+0x10/0x14)
-  [    0.559753] [<c0010e10>] (show_stack+0x10/0x14) from [<c0033fdc>] (warn_slowpath_common+0x64/0x84)
-  [    0.559783] [<c0033fdc>] (warn_slowpath_common+0x64/0x84) from [<c0034090>] (warn_slowpath_fmt+0x30/0x40)
-  [    0.559814] [<c0034090>] (warn_slowpath_fmt+0x30/0x40) from [<c02b23c0>] (dss_set_clock_div+0xac/0xcc)
-  [    0.559844] [<c02b23c0>] (dss_set_clock_div+0xac/0xcc) from [<c0778f48>] (omap_dsshw_probe+0x1ec/0x2e0)
-  [    0.559875] [<c0778f48>] (omap_dsshw_probe+0x1ec/0x2e0) from [<c02ff360>] (platform_drv_probe+0x18/0x48)
-  [    0.559906] [<c02ff360>] (platform_drv_probe+0x18/0x48) from [<c02fdf84>] (driver_probe_device+0x110/0x230)
-  [    0.559936] [<c02fdf84>] (driver_probe_device+0x110/0x230) from [<c02fe138>] (__driver_attach+0x94/0x98)
-  [    0.559967] [<c02fe138>] (__driver_attach+0x94/0x98) from [<c02fc724>] (bus_for_each_dev+0x54/0x88)
-  [    0.559997] [<c02fc724>] (bus_for_each_dev+0x54/0x88) from [<c02fd720>] (bus_add_driver+0xd4/0x1d0)
-  [    0.559997] [<c02fd720>] (bus_add_driver+0xd4/0x1d0) from [<c02fe76c>] (driver_register+0x78/0xf4)
-  [    0.560028] [<c02fe76c>] (driver_register+0x78/0xf4) from [<c02ff2c4>] (platform_driver_probe+0x20/0xa4)
-  [    0.560058] [<c02ff2c4>] (platform_driver_probe+0x20/0xa4) from [<c0778ce0>] (omap_dss_init+0x1c/0x98)
-  [    0.560089] [<c0778ce0>] (omap_dss_init+0x1c/0x98) from [<c0008828>] (do_one_initcall+0xe4/0x144)
-  [    0.560119] [<c0008828>] (do_one_initcall+0xe4/0x144) from [<c075eadc>] (kernel_init_freeable+0xe8/0x1b0)
-  [    0.560150] [<c075eadc>] (kernel_init_freeable+0xe8/0x1b0) from [<c05522bc>] (kernel_init+0x8/0x118)
-  [    0.560180] [<c05522bc>] (kernel_init+0x8/0x118) from [<c000e4c8>] (ret_from_fork+0x14/0x2c)
-  [    0.560302] ---[ end trace 187e8d9dd0655394 ]---
-  [    0.560424] OMAP DSS rev 2.0
-  --snip--
-  [    2.601745] usb 1-1: new high-speed USB device number 2 using ehci-omap
-  [    2.767059] usb 1-1: device descriptor read/64, error -71
-  [    3.007934] usb 1-1: device descriptor read/64, error -71
-  [    3.237091] usb 1-1: new high-speed USB device number 3 using ehci-omap
-  [    3.387054] usb 1-1: device descriptor read/64, error -71
-  [    3.637054] usb 1-1: device descriptor read/64, error -71
-  [    3.867065] usb 1-1: new high-speed USB device number 4 using ehci-omap
-  [    4.296966] usb 1-1: device not accepting address 4, error -71
-  [    4.417053] usb 1-1: new high-speed USB device number 5 using ehci-omap
-  [    4.846954] usb 1-1: device not accepting address 5, error -71
-  [    4.853179] hub 1-0:1.0: unable to enumerate USB device on port 1
-  [    5.217041] usb 2-1: new full-speed USB device number 2 using ohci-omap3
-  [    5.407043] usb 2-1: device descriptor read/64, error -62
-  [    5.697052] usb 2-1: device descriptor read/64, error -62
-  [    5.987060] usb 2-1: new full-speed USB device number 3 using ohci-omap3
-  [    6.066955] .[    6.177062] usb 2-1: device descriptor read/64, error -62
-  [    6.467041] usb 2-1: device descriptor read/64, error -62
-  [    6.757049] usb 2-1: new full-speed USB device number 4 using ohci-omap3
-  [    7.176971] usb 2-1: device not accepting address 4, error -62
-  [    7.357055] usb 2-1: new full-speed USB device number 5 using ohci-omap3
-  [    7.776977] usb 2-1: device not accepting address 5, error -62
-  [    7.783233] hub 2-0:1.0: unable to enumerate USB device on port 1
-
-On next-20140122 the tps65930 (which should be compatible to twl4030) doesn't
-set voltage on IO.1P8 any more which leads to a lot of external subsystem
-failings like dss:
-
-[    0.602264] omapdss_dss: probe of omapdss_dss failed with error -22
-[    0.602691] omapdss CORE error: Failed to initialize DSS platform driver
-[    0.603240] panel-dpi panel-dpi.0: failed to find video source 'dpi.0'
-
-Changes compared to previous version:
- - rebased on next-20140122 from next-20140115
- - using omap36xx.dtsi instead of unsupported 1ghz omap37xx100
-
-Christoph Fritz (5):
-  ARM: dts: omap3: Add support for INCOstartec a83x module
-  ARM: dts: omap3: Add support for INCOstartec DBB056 baseboard
-  ARM: OMAP2+: add legacy display for omap3 DBB056
-  ARM: OMAP2+: Add pdata quirk for sys_clkout2 for omap3 DBB056
-  [RFC] omapdss: remove FEAT_DPI_USES_VDDS_DSI from omap3
-
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
  arch/arm/boot/dts/Makefile               |    1 +
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi  |  445 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-lilly-dbb056.dts |  160 +++++++++++
- arch/arm/mach-omap2/dss-common.c         |   49 ++++
- arch/arm/mach-omap2/dss-common.h         |    1 +
- arch/arm/mach-omap2/pdata-quirks.c       |   44 ++-
- drivers/video/omap2/dss/dss_features.c   |    1 -
- 7 files changed, 699 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+ arch/arm/boot/dts/omap3-lilly-dbb056.dts |  160 ++++++++++++++++++++++++++++++
+ 2 files changed, 161 insertions(+)
  create mode 100644 arch/arm/boot/dts/omap3-lilly-dbb056.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cfd364d..b449161 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -215,6 +215,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-gta04.dtb \
+ 	omap3-igep0020.dtb \
+ 	omap3-igep0030.dtb \
++	omap3-lilly-dbb056.dtb \
+ 	omap3-zoom3.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-panda-a4.dtb \
+diff --git a/arch/arm/boot/dts/omap3-lilly-dbb056.dts b/arch/arm/boot/dts/omap3-lilly-dbb056.dts
+new file mode 100644
+index 0000000..a700b71
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-lilly-dbb056.dts
+@@ -0,0 +1,160 @@
++/*
++ * Copyright (C) 2014 Christoph Fritz <chf.fritzc@googlemail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++/dts-v1/;
++
++#include "omap3-lilly-a83x.dtsi"
++
++/ {
++	model = "INCOstartec LILLY-DBB056 (DM3730)";
++	compatible = "incostartec,omap3-lilly-dbb056", "incostartec,omap3-lilly-a83x", "ti,omap36xx", "ti,omap3";
++};
++
++&twl {
++	vaux2: regulator-vaux2 {
++		compatible = "ti,twl4030-vaux2";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++	};
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_pins>;
++
++	lan9117_pins: pinmux_lan9117_pins {
++		pinctrl-single,pins = <
++			0xe4 (PIN_INPUT | MUX_MODE4)   /* gpio_98 */
++		>;
++	};
++
++	gpio4_pins: pinmux_gpio4_pins {
++		pinctrl-single,pins = <
++			0xfe (PIN_INPUT | MUX_MODE4)   /* gpio_111 -> sja1000 IRQ */
++		>;
++	};
++
++	lcd_pins: pinmux_lcd_pins {
++		pinctrl-single,pins = <
++			0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
++			0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
++			0x0a8 (PIN_OUTPUT | MUX_MODE0)   /* dss_vsync.dss_vsync */
++			0x0aa (PIN_OUTPUT | MUX_MODE0)   /* dss_acbias.dss_acbias */
++			0x0ac (PIN_OUTPUT | MUX_MODE0)   /* dss_data0.dss_data0 */
++			0x0ae (PIN_OUTPUT | MUX_MODE0)   /* dss_data1.dss_data1 */
++			0x0b0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data2.dss_data2 */
++			0x0b2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data3.dss_data3 */
++			0x0b4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data4.dss_data4 */
++			0x0b6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data5.dss_data5 */
++			0x0b8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data6.dss_data6 */
++			0x0ba (PIN_OUTPUT | MUX_MODE0)   /* dss_data7.dss_data7 */
++			0x0bc (PIN_OUTPUT | MUX_MODE0)   /* dss_data8.dss_data8 */
++			0x0be (PIN_OUTPUT | MUX_MODE0)   /* dss_data9.dss_data9 */
++			0x0c0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data10.dss_data10 */
++			0x0c2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data11.dss_data11 */
++			0x0c4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data12.dss_data12 */
++			0x0c6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data13.dss_data13 */
++			0x0c8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data14.dss_data14 */
++			0x0ca (PIN_OUTPUT | MUX_MODE0)   /* dss_data15.dss_data15 */
++			0x0cc (PIN_OUTPUT | MUX_MODE0)   /* dss_data16.dss_data16 */
++			0x0ce (PIN_OUTPUT | MUX_MODE0)   /* dss_data17.dss_data17 */
++			0x15c (PIN_OUTPUT | MUX_MODE4)   /* gpio_156 -> enable DSS */
++		>;
++	};
++
++	mmc2_pins: pinmux_mmc2_pins {
++		pinctrl-single,pins = <
++			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_clk.sdmmc2_clk */
++			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_cmd.sdmmc2_cmd */
++			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_dat0.sdmmc2_dat0 */
++			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_dat1.sdmmc2_dat1 */
++			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_dat2.sdmmc2_dat2 */
++			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)   /* sdmmc2_dat3.sdmmc2_dat3 */
++			0x134 (PIN_OUTPUT | MUX_MODE1)   /* sdmmc2_dat4.sdmmc2_dir_dat0 */
++			0x136 (PIN_OUTPUT | MUX_MODE1)   /* sdmmc2_dat5.sdmmc2_dir_dat1 */
++			0x138 (PIN_OUTPUT | MUX_MODE1)   /* sdmmc2_dat6.sdmmc2_dir_cmd */
++			0x13a (PIN_INPUT | MUX_MODE1)    /* sdmmc2_dat7.sdmmc2_clkin */
++			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)   /* gpio_163 -> wp */
++			0x16c (PIN_INPUT_PULLUP | MUX_MODE4)   /* gpio_164 -> cd */
++		>;
++	};
++
++	spi1_pins: pinmux_spi1_pins {
++		pinctrl-single,pins = <
++			0x198 (PIN_INPUT | MUX_MODE0)   /* mcspi1_clk.mcspi1_clk */
++			0x19a (PIN_INPUT | MUX_MODE0)   /* mcspi1_simo.mcspi1_simo */
++			0x19c (PIN_INPUT | MUX_MODE0)   /* mcspi1_somi.mcspi1_somi */
++			0x19e (PIN_INPUT_PULLDOWN | MUX_MODE0)   /* mcspi1_cs0.mcspi1_cs0 */
++		>;
++	};
++};
++
++&gpio4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gpio4_pins>;
++};
++
++&mmc2 {
++	status = "okay";
++	bus-width = <4>;
++	vmmc-supply = <&vmmc1>;
++	cd-gpios = <&gpio6 4 0>;   /* gpio_164 */
++	wp-gpios = <&gpio6 3 0>;   /* gpio_163 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	ti,dual-volt;
++};
++
++&mcspi1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_pins>;
++};
++
++&gpmc {
++	ranges = <0 0 0x30000000 0x1000000>,   /* nand assigned by COM a83x */
++		<4 0 0x20000000 0x01000000>,
++		<7 0 0x15000000 0x01000000>;   /* eth assigend by COM a83x */
++
++	ethernet at 4,0 {
++		compatible = "smsc,lan9117", "smsc,lan9115";
++		bank-width = <2>;
++		gpmc,mux-add-data = <2>;
++		gpmc,cs-on-ns = <10>;
++		gpmc,cs-rd-off-ns = <65>;
++		gpmc,cs-wr-off-ns = <65>;
++		gpmc,adv-on-ns = <0>;
++		gpmc,adv-rd-off-ns = <10>;
++		gpmc,adv-wr-off-ns = <10>;
++		gpmc,oe-on-ns = <10>;
++		gpmc,oe-off-ns = <65>;
++		gpmc,we-on-ns = <10>;
++		gpmc,we-off-ns = <65>;
++		gpmc,rd-cycle-ns = <100>;
++		gpmc,wr-cycle-ns = <100>;
++		gpmc,access-ns = <60>;
++		gpmc,page-burst-access-ns = <5>;
++		gpmc,bus-turnaround-ns = <0>;
++		gpmc,cycle2cycle-delay-ns = <75>;
++		gpmc,wr-data-mux-bus-ns = <15>;
++		gpmc,wr-access-ns = <75>;
++		gpmc,cycle2cycle-samecsen;
++		gpmc,cycle2cycle-diffcsen;
++		vddvario-supply = <&reg_vcc3>;
++		vdd33a-supply = <&reg_vcc3>;
++		reg-io-width = <4>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <2 0x2>;
++		reg = <4 0 0xff>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&lan9117_pins>;
++		phy-mode = "mii";
++		smsc,force-internal-phy;
++	};
++};
 -- 
 1.7.10.4
