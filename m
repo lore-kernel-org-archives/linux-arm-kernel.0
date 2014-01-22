@@ -1,131 +1,53 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 22 Jan 2014 15:11:18 +0100
-Subject: [PATCH 3/4] ARM64: perf: add support for frame pointer unwinding in
- compat mode
-In-Reply-To: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
-References: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1390399879-5109-4-git-send-email-jean.pihet@linaro.org>
+Date: Wed, 22 Jan 2014 15:11:15 +0100
+Subject: [PATCH v5 0/4] perf: AARCH64 arch support
+Message-ID: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When profiling a 32-bit application, user space callchain unwinding
-using the frame pointer is performed in compat mode. The code is taken
-over from the AARCH32 code and adapted to work on AARCH64.
+Add AARCH64 specific support. This includes the following:
+- AARCH64 perf registers definition and hooks,
+- compat mode registers use, i.e. profiling a 32-bit binary on
+   a 64-bit system,
+- unwinding using the dwarf information from the .debug_frame
+   section of the ELF binary,
+- unwinding using the frame pointer information; in 64-bit and
+   compat modes.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
----
- arch/arm64/kernel/perf_event.c | 75 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 67 insertions(+), 8 deletions(-)
+Note: support for unwinding using the dwarf information in compat
+mode requires some changes to the libunwind code. Those changes
+have been submitted on the libunwind ML and are in discussion.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 5b1cd79..e868c72 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -1348,8 +1348,8 @@ early_initcall(init_hw_perf_events);
-  * Callchain handling code.
-  */
- struct frame_tail {
--	struct frame_tail   __user *fp;
--	unsigned long	    lr;
-+	struct frame_tail	__user *fp;
-+	unsigned long		lr;
- } __attribute__((packed));
- 
- /*
-@@ -1386,22 +1386,80 @@ user_backtrace(struct frame_tail __user *tail,
- 	return buftail.fp;
- }
- 
-+/*
-+ * The registers we're interested in are at the end of the variable
-+ * length saved register structure. The fp points at the end of this
-+ * structure so the address of this struct is:
-+ * (struct compat_frame_tail *)(xxx->fp)-1
-+ *
-+ * This code has been adapted from the ARM OProfile support.
-+ */
-+struct compat_frame_tail {
-+	compat_uptr_t	fp; /* a (struct compat_frame_tail *) in compat mode */
-+	u32		sp;
-+	u32		lr;
-+} __attribute__((packed));
-+
-+static struct compat_frame_tail __user *
-+compat_user_backtrace(struct compat_frame_tail __user *tail,
-+		      struct perf_callchain_entry *entry)
-+{
-+	struct compat_frame_tail buftail;
-+	unsigned long err;
-+
-+	/* Also check accessibility of one struct frame_tail beyond */
-+	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
-+		return NULL;
-+
-+	pagefault_disable();
-+	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
-+	pagefault_enable();
-+
-+	if (err)
-+		return NULL;
-+
-+	perf_callchain_store(entry, buftail.lr);
-+
-+	/*
-+	 * Frame pointers should strictly progress back up the stack
-+	 * (towards higher addresses).
-+	 */
-+	if (tail + 1 >= (struct compat_frame_tail __user *)
-+			compat_ptr(buftail.fp))
-+		return NULL;
-+
-+	return (struct compat_frame_tail __user *)compat_ptr(buftail.fp) - 1;
-+}
-+
- void perf_callchain_user(struct perf_callchain_entry *entry,
- 			 struct pt_regs *regs)
- {
--	struct frame_tail __user *tail;
--
- 	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
- 		/* We don't support guest os callchain now */
- 		return;
- 	}
- 
- 	perf_callchain_store(entry, regs->pc);
--	tail = (struct frame_tail __user *)regs->regs[29];
- 
--	while (entry->nr < PERF_MAX_STACK_DEPTH &&
--	       tail && !((unsigned long)tail & 0xf))
--		tail = user_backtrace(tail, entry);
-+	if (!compat_user_mode(regs)) {
-+		/* AARCH64 mode */
-+		struct frame_tail __user *tail;
-+
-+		tail = (struct frame_tail __user *)regs->regs[29];
-+
-+		while (entry->nr < PERF_MAX_STACK_DEPTH &&
-+		       tail && !((unsigned long)tail & 0xf))
-+			tail = user_backtrace(tail, entry);
-+	} else {
-+		/* AARCH32 compat mode */
-+		struct compat_frame_tail __user *tail;
-+
-+		tail = (struct compat_frame_tail __user *)regs->compat_fp - 1;
-+
-+		while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
-+			tail && !((unsigned long)tail & 0x3))
-+			tail = compat_user_backtrace(tail, entry);
-+	}
- }
- 
- /*
-@@ -1429,6 +1487,7 @@ void perf_callchain_kernel(struct perf_callchain_entry *entry,
- 	frame.fp = regs->regs[29];
- 	frame.sp = regs->sp;
- 	frame.pc = regs->pc;
-+
- 	walk_stackframe(&frame, callchain_trace, entry);
- }
- 
+Tested on ARMv7, ARMv8 and x86_64 platforms. The compat mode has been
+tested on ARMv8 using statically built 32-bit binaries.
+
+
+Jean Pihet (4):
+  ARM64: perf: add support for perf registers API
+  ARM64: perf: wire up perf_regs and unwind support
+  ARM64: perf: add support for frame pointer unwinding in compat mode
+  ARM64: perf: support dwarf unwinding in compat mode
+
+ arch/arm64/Kconfig                        |  2 +
+ arch/arm64/include/asm/compat.h           |  2 +-
+ arch/arm64/include/asm/ptrace.h           |  3 +-
+ arch/arm64/include/uapi/asm/Kbuild        |  1 +
+ arch/arm64/include/uapi/asm/perf_regs.h   | 40 ++++++++++++++
+ arch/arm64/kernel/Makefile                |  1 +
+ arch/arm64/kernel/perf_event.c            | 75 +++++++++++++++++++++++---
+ arch/arm64/kernel/perf_regs.c             | 44 ++++++++++++++++
+ tools/perf/arch/arm64/Makefile            |  7 +++
+ tools/perf/arch/arm64/include/perf_regs.h | 88 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/dwarf-regs.c   | 80 ++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/unwind.c       | 82 ++++++++++++++++++++++++++++
+ tools/perf/config/Makefile                |  8 ++-
+ 13 files changed, 422 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm64/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm64/Makefile
+ create mode 100644 tools/perf/arch/arm64/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm64/util/dwarf-regs.c
+ create mode 100644 tools/perf/arch/arm64/util/unwind.c
+
 -- 
 1.7.11.7
