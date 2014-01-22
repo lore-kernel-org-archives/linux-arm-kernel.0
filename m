@@ -1,43 +1,30 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jan 2014 16:33:22 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140122114232.GB20247@sirena.org.uk>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
- <20140122114232.GB20247@sirena.org.uk>
-Message-ID: <20140122163322.GF24288@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jan 2014 16:41:00 +0000
+Subject: Internal error: Oops: 17 [#1] ARM
+In-Reply-To: <CACUGKYPXficVuqDgy6_Tnh9b-VOXDNK=+nqb6U5O6NpcZOGGpQ@mail.gmail.com>
+References: <CACUGKYPXficVuqDgy6_Tnh9b-VOXDNK=+nqb6U5O6NpcZOGGpQ@mail.gmail.com>
+Message-ID: <20140122164100.GE15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:42:32AM +0000, Mark Brown wrote:
-> On Tue, Jan 21, 2014 at 01:31:48PM +0000, Lorenzo Pieralisi wrote:
-> > On Tue, Jan 21, 2014 at 11:16:46AM +0000, Vincent Guittot wrote:
+On Wed, Jan 22, 2014 at 08:23:36AM -0800, John Tobias wrote:
+> Hello all,
 > 
-> > > > +       - psci-power-state
-> > > > +               Usage: Required if entry-method property value is set to
-> > > > +                      "psci".
-> > > > +               Value type: <u32>
-> > > > +               Definition: power_state parameter to pass to the PSCI
-> > > > +                           suspend call to enter the C-state.
-> 
-> > > Why psci has got a dedicated field and not vendor methods ? can't you
-> > > make that more generic ?
-> 
-> > If anyone provides me with an example usage why not, for now I know I
-> > need that parameter for PSCI, I can call it differently, define it for PSCI
-> > and leave it as optional for other methods.
-> 
-> Would it not be sensible to define a PSCI binding that extends this and
-> other bindings - ISTR some other properties getting scattered into
-> bindings for it?
+> I am using 3.13-rc1 kernel on iMX6SL processor. My filesystem is in
+> eMMC running SDR50.
+> Is anyone here encountered these problem and if there's any existing
+> patch that I can get?.
 
-You mean adding the properties in the PSCI bindings instead of defining
-them here ? Let me think about this, I really reckon these are C-state
-specific properties that belong in here (but actually I have to add
-a statement related to PSCI - ie bindings require a PSCI node to be
-present and valid), I will look into this.
+How reproducable is this?  I notice you're using 3.13-rc1 too, it could
+be the bug has already been fixed in a later kernel version.  -rc1
+kernels are really the "fresh after lots of new feature merging" kernels
+which should always be expected to be rather buggy.
 
-Thank you,
-Lorenzo
+Linux kernel "release candidates" are not "we think this is going to be
+a final kernel, please test it" but -rc1 marks the end of the new
+feature merging and the beginning of the stablisation phase.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
