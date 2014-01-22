@@ -1,49 +1,63 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Wed, 22 Jan 2014 15:14:47 +0800
-Subject: [PATCH V3] ARM: imx: add always-on clock array for i.mx6sl to
- maintain correct usecount
-Message-ID: <1390374887-22833-1-git-send-email-b20788@freescale.com>
+Date: Wed, 22 Jan 2014 15:16:13 +0800
+Subject: [PATCH V2] ARM: imx: correct usecount of IPG, ARM and MMDC clk
+ on i.mx6sl
+In-Reply-To: <20140122064740.GB16215@pengutronix.de>
+References: <1390301452-10143-1-git-send-email-b20788@freescale.com>
+ <20140122064740.GB16215@pengutronix.de>
+Message-ID: <20140122071613.GA22213@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IPG, ARM and MMDC's clock should be enabled during kernel boot up,
-so we need to maintain their usecount, otherwise, they may be
-disabled unexpectedly if their children's clock are turned off, and
-caused their parent PLLs also get disabled, which is incorrect.
+On Wed, Jan 22, 2014 at 07:47:40AM +0100, Sascha Hauer wrote:
+> On Tue, Jan 21, 2014 at 06:50:52PM +0800, Anson Huang wrote:
+> > IPG, ARM and MMDC's clock should be enabled during kernel boot up,
+> > so we need to maintain their use count, otherwise, they may be
+> > disabled unexpectedly if their children's clock are turned off,
+> > which is not allowed.
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6sl.c |   16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+> > index 78f3bd6..047f4ff 100644
+> > --- a/arch/arm/mach-imx/clk-imx6sl.c
+> > +++ b/arch/arm/mach-imx/clk-imx6sl.c
+> > @@ -291,6 +291,22 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+> >  		pr_warn("%s: failed to set AHB clock rate %d!\n",
+> >  			__func__, ret);
+> >  
+> > +	/*
+> > +	 * Make sure those always on clocks are enabled to maintain the correct
+> > +	 * usecount and enabling/disabling of parent PLLs.
+> > +	 */
+> > +	ret = clk_prepare_enable(clks[IMX6SL_CLK_IPG]);
+> > +	if (ret)
+> > +		pr_warn("%s: failed to enable IPG clock %d\n", __func__, ret);
+> > +
+> > +	ret = clk_prepare_enable(clks[IMX6SL_CLK_ARM]);
+> > +	if (ret)
+> > +		pr_warn("%s: failed to enable ARM clock %d\n", __func__, ret);
+> > +
+> > +	ret = clk_prepare_enable(clks[IMX6SL_CLK_MMDC_ROOT]);
+> > +	if (ret)
+> > +		pr_warn("%s: failed to enable MMDC clock %d\n", __func__, ret);
+> > +
+> 
+> Consider using a clk_init_on array like we have in clk-imx6q.c
+> 
+> Sascha
+> 
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/clk-imx6sl.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+Right, that can make code more clean, thanks for the comment, please help review V3 patch.
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 78f3bd6..04e9f1c 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -66,6 +66,10 @@ static struct clk_div_table video_div_table[] = {
- static struct clk *clks[IMX6SL_CLK_END];
- static struct clk_onecell_data clk_data;
- 
-+static const u32 clks_init_on[] __initconst = {
-+	IMX6SL_CLK_IPG, IMX6SL_CLK_ARM, IMX6SL_CLK_MMDC_ROOT,
-+};
-+
- /*
-  * ERR005311 CCM: After exit from WAIT mode, unwanted interrupt(s) taken
-  *           during WAIT mode entry process could cause cache memory
-@@ -291,6 +295,13 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 		pr_warn("%s: failed to set AHB clock rate %d!\n",
- 			__func__, ret);
- 
-+	/*
-+	 * Make sure those always on clocks are enabled to maintain the correct
-+	 * usecount and enabling/disabling of parent PLLs.
-+	 */
-+	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-+		clk_prepare_enable(clks[clks_init_on[i]]);
-+
- 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
- 		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY1_GATE]);
- 		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY2_GATE]);
--- 
-1.7.9.5
+Anson.
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> 
