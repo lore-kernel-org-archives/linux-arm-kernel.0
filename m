@@ -1,32 +1,46 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 22 Jan 2014 11:46:47 +0100
-Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
- audio support for TDA998x trough McASP I2S bus
-In-Reply-To: <20140122111953.238349a5@armhf>
-References: <cover.1387535299.git.jsarha@ti.com>
- <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
- <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
- <20140115165100.3bfab96f@armhf> <52DF8D60.9020505@ti.com>
- <20140122111953.238349a5@armhf>
-Message-ID: <20140122114647.20f75d0d@armhf>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Wed, 22 Jan 2014 13:00:11 +0200
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <CACRpkdZbb=eO8YRtMn6hW0vn97PkHUo88e_o61DEC8=wPY3_PQ@mail.gmail.com>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <CAAVeFuLP4MkfXGG1FMauvUw_J63zRXdhGwxqYy5W98L1wCQNbw@mail.gmail.com>
+ <CACRpkdYiy+sya6NqRfAmsrFOXvaa3qX=qjRuTDW1vZVSaG1+Gg@mail.gmail.com>
+ <201401211335.16885.arnd@arndb.de>
+ <CAAVeFuKFfAvSPYLmvWV5jjT-peZFJ8sJ2bbh4F=JAYoWLhjZpA@mail.gmail.com>
+ <CACRpkdZbb=eO8YRtMn6hW0vn97PkHUo88e_o61DEC8=wPY3_PQ@mail.gmail.com>
+Message-ID: <20140122110011.GU18029@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Jan 2014 11:19:53 +0100
-Jean-Francois Moine <moinejf@free.fr> wrote:
+On Wed, Jan 22, 2014 at 10:58:38AM +0100, Linus Walleij wrote:
+> On Tue, Jan 21, 2014 at 3:53 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> 
+> > The good (or bad, rather) thing about DT is that we can do whatever we
+> > please with the new bindings: decide which name or which index
+> > (doesn't matter here) a GPIO should have. However we don't have this
+> > control over ACPI, where nothing guarantees that the same index will
+> > be used for the same GPIO function.
+> 
+> It's not like ACPI will impose some tables on us and expect us to
+> use them as-is no matter how crazy they are. Then indeed the whole
+> idea of unifying ACPI and DT accessors would be moot and it would
+> only work by mistake or as a good joke.
 
-> As both I2S and S/PDIF may be used for HDMI output in the Cubox,
-> I wrote a tda998x CODEC which gets the audio ports from the DT and
-> dynamically sets these ports and the audio type (i2s / spdif) on audio
-> streaming start. I have not submitted yet this codec and the associated
-> changes in tda998x, because I am waiting for a first patch series on the
-> tda998x to be applied
-> (http://lists.freedesktop.org/archives/dri-devel/2014-January/051552.html).
+With the current ACPI version we really don't have much of a choice here.
+Only way we can distinguish between a set of GPIOs is to use index and hope
+that the vendor puts the GPIOs in the table in same order that the driver
+expects :-(
 
-Sorry, the last patch request is
+This is going to get a bit better when ACPI gets properties (like Arnd
+commented already) as then we can get the correct index based on a name in
+a table. However, it still requires the vendor to use naming that is
+suitable for Linux driver in question.
 
-http://lists.freedesktop.org/archives/dri-devel/2014-January/052201.html
+> The situation with ACPI is just like with DT, it is assumed that the
+> author of these tables also look at the Linux kernel drivers to figure
+> out what argument goes where and we can influence them.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+I certainly hope, now that Android is becoming more and more important,
+that the vendors will actually check what the Linux drivers expect and
+populate the tables with such information that is suitable for both ACPI
+and DT enabled driver.
