@@ -1,120 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jan 2014 11:54:53 +0000
-Subject: [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c and its related
- head file
-In-Reply-To: <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140122115453.GC24288@e102568-lin.cambridge.arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 22 Jan 2014 19:55:40 +0800
+Subject: [PATCH 1/3] ARM: Premit ioremap() to map reserved pages
+In-Reply-To: <20140122114215.GZ15937@n2100.arm.linux.org.uk>
+References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
+ <1390389916-8711-2-git-send-email-wangnan0@huawei.com>
+ <20140122114215.GZ15937@n2100.arm.linux.org.uk>
+Message-ID: <52DFB1BC.7080000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
+On 2014/1/22 19:42, Russell King - ARM Linux wrote:
+> On Wed, Jan 22, 2014 at 07:25:14PM +0800, Wang Nan wrote:
+>> This patch relaxes the restriction set by commit 309caa9cc, which
+>> prohibit ioremap() on all kernel managed pages.
+>>
+>> Other architectures, such as x86 and (some specific platforms of) powerpc,
+>> allow such mapping.
+>>
+>> ioremap() pages is an efficient way to avoid arm's mysterious cache control.
+>> This feature will be used for arm kexec support to ensure copied data goes into
+>> RAM even without cache flushing, because we found that flush_cache_xxx can't
+>> reliably flush code to memory.
+> 
+> Yes, let's bypass the check and allow this in violation of the
+> architecture specification by allowing mapping the same memory with
+> different types, which leads to unpredictable behaviour.  Yes, that's
+> a very good idea, because what we want to do is far more important than
+> following the requirements of the architecture.
+> 
+> So... NAK.
+> 
+> Yes, flush_cache_xxx() doesn't flush back to physical RAM, that's not
+> what it's defined to do - it's defined that it flushes enough of the
+> cache to ensure that page table updates are safe (such as when tearing
+> down a page mapping.)  So it's hardly surprising that doesn't work.
+> 
+> If you want to be able to have DMA access to memory, then you need to
+> use an API which has been designed for that purpose, and if there isn't
+> one, then you need to discuss your requirements, rather than trying to
+> hack around the problem.
 
-[...]
+So what is correct API which is designed for this propose?
 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index bd9bbd0..2210353 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -41,6 +41,7 @@
->  #include <linux/memblock.h>
->  #include <linux/of_fdt.h>
->  #include <linux/of_platform.h>
-> +#include <linux/acpi.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
->  
->  	arm64_memblock_init();
->  
-> +	/* Parse the ACPI tables for possible boot-time configuration */
-> +	acpi_boot_table_init();
-> +	early_acpi_boot_init();
-> +	acpi_boot_init();
-> +
->  	paging_init();
-
-Can I ask you please why we need to parse ACPI tables before
-paging_init() ?
-
-[...]
-
-> +/*
-> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
-> + * or early_memremap() should be called here.
-
-Again, why is this needed ? What's needed before paging_init() from ACPI ?
-
-[...]
-
-> +/*
-> + * acpi_boot_table_init() and acpi_boot_init()
-> + *  called from setup_arch(), always.
-> + *	1. checksums all tables
-> + *	2. enumerates lapics
-> + *	3. enumerates io-apics
-> + *
-> + * acpi_table_init() is separated to allow reading SRAT without
-> + * other side effects.
-> + */
-> +void __init acpi_boot_table_init(void)
-> +{
-> +	/*
-> +	 * If acpi_disabled, bail out
-> +	 */
-> +	if (acpi_disabled)
-> +		return;
-> +
-> +	/*
-> +	 * Initialize the ACPI boot-time table parser.
-> +	 */
-> +	if (acpi_table_init()) {
-> +		disable_acpi();
-> +		return;
-> +	}
-> +}
-> +
-> +int __init early_acpi_boot_init(void)
-> +{
-> +	/*
-> +	 * If acpi_disabled, bail out
-> +	 */
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	/*
-> +	 * Process the Multiple APIC Description Table (MADT), if present
-> +	 */
-> +	early_acpi_process_madt();
-> +
-> +	return 0;
-> +}
-> +
-> +int __init acpi_boot_init(void)
-> +{
-> +	/*
-> +	 * If acpi_disabled, bail out
-> +	 */
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
-> +
-> +	/*
-> +	 * Process the Multiple APIC Description Table (MADT), if present
-> +	 */
-> +	acpi_process_madt();
-> +
-> +	return 0;
-> +}
-
-Well, apart from having three init calls, one returning void and two
-returning proper values, do not understand why, and do not understand
-why we need three calls in the first place...why should we process MADT
-twice in two separate calls ? What is supposed to change in between that
-prevents you from merging the two together ?
-
-Thanks,
-Lorenzo
+> 
+> The issue here will be that the APIs we currently have for DMA become
+> extremely expensive when you want to deal with (eg) all system RAM.
+> Or, there's flush_cache_all() which should flush all levels of cache
+> in the system, and thus push all data back to RAM.
+> 
+> Now, why are you copying your patches to the stable people?  That makes
+> no sense - they haven't been reviewed and they haven't been integrated
+> into an existing kernel.  So, they don't meet the basic requirements
+> for stable tree submission...
+> 
