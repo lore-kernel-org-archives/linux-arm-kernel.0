@@ -1,74 +1,25 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 22 Jan 2014 13:54:11 +0000
-Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <20140122134028.GB14108@mudshark.cambridge.arm.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
- <20140120222814.GI3471@alberich>
- <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122122550.GA14108@mudshark.cambridge.arm.com>
- <a73ef0128a0141eabf0a3b899f3afdae@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140122134028.GB14108@mudshark.cambridge.arm.com>
-Message-ID: <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 22 Jan 2014 14:56:09 +0100
+Subject: [PATCHv5][ 6/8] ARM: dts: mbimx51sd: Add display support.
+In-Reply-To: <201312052156.50236.marex@denx.de>
+References: <1386268092-21719-1-git-send-email-denis@eukrea.com>
+ <1386268092-21719-6-git-send-email-denis@eukrea.com>
+ <201312052156.50236.marex@denx.de>
+Message-ID: <52DFCDF9.7050309@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/05/2013 09:56 PM, Marek Vasut wrote:
+>> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+[...]
+>> +&display {
+>> +	display-supply = <&reg_lcd_3v3>;
+>> +	status = "okay";
+>
+> The "status = " here should probably be in the board DTS, not in the LCD DTS.
+The display is optional on the baseboard of the cpuimx51.
 
+So my idea was to activate the display only for the configurations where 
+it's used.
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, January 22, 2014 7:10 PM
-> To: Sethi Varun-B16395
-> Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org; Andreas Herrmann
-> Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
-> notifier block
-> 
-> On Wed, Jan 22, 2014 at 01:14:13PM +0000, Varun Sethi wrote:
-> > > On Tue, Jan 21, 2014 at 05:48:02PM +0000, Varun Sethi wrote:
-> > > > > +static int arm_smmu_group_notifier(struct notifier_block *nb,
-> > > > > +				unsigned long action, void *data) {
-> > > > > +	struct device *dev = data;
-> > > > > +	struct dma_iommu_mapping *mapping;
-> > > > > +	struct arm_smmu_device *smmu;
-> > > > > +	int ret;
-> > > > > +
-> > > > > +	switch (action) {
-> > > > > +	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
-> > > > > +
-> > > > > +		smmu = dev->archdata.iommu;
-> > > > > +		if (!smmu || !(smmu->options &
-> ARM_SMMU_OPT_ISOLATE_DEVICES))
-> > > > > +			break;
-> > > > [Sethi Varun-B16395] Should this check be really done here? The
-> > > > "Isolate devices" property would allow us to set up iommu groups.
-> > > > My understanding is that if we specify the isolate devices
-> > > > property, then each device would have a separate iommu group
-> > > > otherwise all devices connected to the SMMU would share the iommu
-> group.
-> > >
-> > > That's not what currently happens (at least, in the patch I have
-> > > queued for groups). The code queued adds each device to its own
-> > > group in arm_smmu_add_device, which I think is the right thing to do.
-> > >
-> > > > With that logic, we should link the mapping to the iommu group.
-> > >
-> > > Ok, so are you suggesting that we perform the isolation mapping in
-> > > arm_smmu_add_device and drop the notifier altogether?
-> > I think that should be fine, until we want to delay mapping creation
-> > till driver bind time.
-> 
-> Is there a hard dependency on that?
-> 
-Not sure, may be Andreas can answer that.
-
-> > But the "isolate device" property should dictate iommu group creation.
-> 
-> The reason we added automatic group creation (per-device) is for VFIO,
-> which expects all devices to be in a group regardless of the device
-> isolation configuration.
-> 
-IIUC, with the "isolate devices" property we ensure that there would be independent SMR and S2CR per device. Is that correct?
-
--Varun
+Denis.
