@@ -1,53 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jan 2014 16:10:11 +0000
-Subject: [PATCH 11/11] arm: dma-mapping: Add support to extend DMA IOMMU
- mappings
-In-Reply-To: <1389876263-25759-12-git-send-email-andreas.herrmann@calxeda.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-12-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20140122161010.GH14108@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jan 2014 16:11:53 +0000
+Subject: [PATCH v7 5/6] misc: debug: remove compilation warnings
+In-Reply-To: <1390401773-12100-6-git-send-email-vijay.kilari@gmail.com>
+References: <1390401773-12100-1-git-send-email-vijay.kilari@gmail.com>
+ <1390401773-12100-6-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20140122161152.GD8065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 12:44:23PM +0000, Andreas Herrmann wrote:
-> Instead of using just one bitmap to keep track of IO virtual addresses
-> (handed out for IOMMU use) introduce a list of iova_ranges (each
-> having its own bitmap). This allows us to extend existing mappings
-> when running out of iova space for a mapping.
+On Wed, Jan 22, 2014 at 02:42:52PM +0000, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 > 
-> If there is not enough space in the mapping to service an IO virtual
-> address allocation request, __alloc_iova() tries to extend the mapping
-> -- by allocating another bitmap -- and makes another allocation
-> attempt using the freshly allocated bitmap.
+> Resolve following compiler warnings
+> warning: format '%lx' expects argument of type 'long unsigned int',
+> but argument 2 has type 'u64' [-Wformat]
 > 
-> This allows arm iommu drivers to start with a decent initial size when
-> an dma_iommu_mapping is created and still to avoid running out of IO
-> virtual addresses for the mapping.
+> tested for warnings on arm32 & arm64
 > 
-> Tests were done on Calxeda ECX-2000 with smmu for sata and xgmac.
-> I've used SZ_512K both for initial mapping size and grow_size.
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> ---
+>  drivers/misc/kgdbts.c |   12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/misc/kgdbts.c b/drivers/misc/kgdbts.c
+> index 36f5d52..78e10b2 100644
+> --- a/drivers/misc/kgdbts.c
+> +++ b/drivers/misc/kgdbts.c
+> @@ -350,8 +350,8 @@ static int check_single_step(char *put_str, char *arg)
+>  	kgdb_hex2mem(&put_str[1], (char *)kgdbts_gdb_regs,
+>  		 NUMREGBYTES);
+>  	gdb_regs_to_pt_regs(kgdbts_gdb_regs, &kgdbts_regs);
+> -	v2printk("Singlestep stopped at IP: %lx\n",
+> -		   instruction_pointer(&kgdbts_regs));
+> +	v2printk("Singlestep stopped at IP: %llx\n",
+> +		   (unsigned long long)instruction_pointer(&kgdbts_regs));
+>  
+>  	if (sstep_thread_id != cont_thread_id) {
+>  		/*
+> @@ -376,8 +376,8 @@ static int check_single_step(char *put_str, char *arg)
+>  continue_test:
+>  	matched_id = 0;
+>  	if (instruction_pointer(&kgdbts_regs) == addr) {
+> -		eprintk("kgdbts: SingleStep failed at %lx\n",
+> -			   instruction_pointer(&kgdbts_regs));
+> +		eprintk("kgdbts: SingleStep failed at %llx\n",
+> +			(unsigned long long)instruction_pointer(&kgdbts_regs));
 
-Aha, I thought grow_size was the *maximum* size, rather than the incremental
-size. In which case, you probably want to pick the maximum supported IOMMU
-page size that satisfies a fixed limit on the bitmap size.
+I think we could simply add the cast to the definition of
+instruction_pointer() on arm64. Even the generic instruction_pointer()
+definition returns unsigned long.
 
-> +static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
-> +{
-> +	struct dma_iommu_iova_range *iovar;
-> +	unsigned int count = mapping->grow_size >> (PAGE_SHIFT + mapping->order);
-> +	unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> +
-> +	if (!mapping->grow_size ||
-> +		(mapping->size + mapping->grow_size) >= mapping->max_size)
-> +		return -EINVAL;
-> +
-> +	iovar = kzalloc(sizeof(struct dma_iommu_iova_range), GFP_ATOMIC);
-> +	if (!iovar)
-> +		return -ENOMEM;
-> +
-> +	iovar->bitmap = kzalloc(bitmap_size, GFP_ATOMIC);
-
-Do these allocation really need to be atomic? I worry that's going to have
-severe restrictions on our ability to allocate large address spaces.
-
-Will
+-- 
+Catalin
