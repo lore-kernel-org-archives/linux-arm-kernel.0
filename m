@@ -1,105 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jan 2014 14:56:33 +0000
-Subject: [PATCH v2 01/10] arm64: KVM: force cache clean on page fault when
+Date: Wed, 22 Jan 2014 14:56:32 +0000
+Subject: [PATCH v2 00/10] arm/arm64: KVM: host cache maintainance when guest
  caches are off
-In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1390402602-22777-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the guest with caches off to observe data written
-contained in a given page, we need to make sure that page is
-committed to memory, and not just hanging in the cache (as
-guest accesses are completely bypassing the cache until it
-decides to enable it).
+When we run a guest with cache disabled, we don't flush the cache to
+the Point of Coherency, hence possibly missing bits of data that have
+been written in the cache, but have not yet reached memory.
 
-For this purpose, hook into the coherent_icache_guest_page
-function and flush the region if the guest SCTLR_EL1
-register doesn't show the MMU  and caches as being enabled.
-The function also get renamed to coherent_cache_guest_page.
+We also have the opposite issue: when a guest enables its cache,
+whatever sits in the cache is suddenly going to become visible,
+shadowing whatever the guest has written into RAM.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   |  4 ++--
- arch/arm/kvm/mmu.c               |  4 ++--
- arch/arm64/include/asm/kvm_mmu.h | 11 +++++++----
- 3 files changed, 11 insertions(+), 8 deletions(-)
+There are several approaches to these issues:
+- Using the DC bit when caches are off: this breaks guests assuming
+  caches off while doing DMA operations. Bootloaders, for example.
+  It also breaks the I-D coherency.
+- Fetch the memory attributes on translation fault, and flush the
+  cache while handling the fault. This relies on using the PAR_EL1
+  register to obtain the Stage-1 memory attributes, and tends to be
+  slow.
+- Detecting the translation faults occuring with MMU off (and
+  performing a cache clean), and trapping SCTLR_EL1 to detect the
+  moment when the guest is turning its caches on (and performing a
+  cache invalidation). Trapping of SCTLR_EL1 is then disabled to
+  ensure the best performance.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 77de4a4..f997b9e 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
- {
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5809069..415fd63 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -713,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pmd_writable(&new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
-+		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-@@ -721,7 +721,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
-+		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
- 	}
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 680f74e..2232dd0 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- 	return true;
- }
- 
--static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
-@@ -124,9 +123,14 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-+
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
- {
-+	if ((vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) != 0b101)
-+		kvm_flush_dcache_to_poc((void *)hva, size);
-+
- 	if (!icache_is_aliasing()) {		/* PIPT */
- 		flush_icache_range(hva, hva + size);
- 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
-@@ -135,7 +139,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
- 	}
- }
- 
--#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
- 
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
+This patch series implements the last solution, for both arm and
+arm64. Tested on TC2 (ARMv7) and FVP model (ARMv8).
+
+>From v1 (http://www.spinics.net/lists/kvm/msg99404.html):
+- Fixed AArch32 VM handling on arm64 (Reported by Anup)
+- Added ARMv7 support:
+  * Fixed a couple of issues regarding handling of 64bit cp15 regs
+  * Per-vcpu HCR
+  * Switching of AMAIR0 and AMAIR1
+
+Marc Zyngier (10):
+  arm64: KVM: force cache clean on page fault when caches are off
+  arm64: KVM: allows discrimination of AArch32 sysreg access
+  arm64: KVM: trap VM system registers until MMU and caches are ON
+  arm64: KVM: flush VM pages before letting the guest enable caches
+  ARM: KVM: force cache clean on page fault when caches are off
+  ARM: KVM: fix handling of trapped 64bit coprocessor accesses
+  ARM: KVM: fix ordering of 64bit coprocessor accesses
+  ARM: KVM: introduce per-vcpu HYP Configuration Register
+  ARM: KVM: trap VM system registers until MMU and caches are ON
+  ARM: KVM: add world-switch for AMAIR{0,1}
+
+ arch/arm/include/asm/kvm_arm.h   |   4 +-
+ arch/arm/include/asm/kvm_asm.h   |   4 +-
+ arch/arm/include/asm/kvm_host.h  |   9 ++--
+ arch/arm/include/asm/kvm_mmu.h   |  11 ++--
+ arch/arm/kernel/asm-offsets.c    |   1 +
+ arch/arm/kvm/coproc.c            |  95 +++++++++++++++++++++++++++-------
+ arch/arm/kvm/coproc.h            |  14 +++--
+ arch/arm/kvm/coproc_a15.c        |   2 +-
+ arch/arm/kvm/coproc_a7.c         |   2 +-
+ arch/arm/kvm/guest.c             |   1 +
+ arch/arm/kvm/interrupts_head.S   |  21 +++++---
+ arch/arm/kvm/mmu.c               |  87 ++++++++++++++++++++++++++++++-
+ arch/arm64/include/asm/kvm_arm.h |   3 +-
+ arch/arm64/include/asm/kvm_asm.h |   3 +-
+ arch/arm64/include/asm/kvm_mmu.h |  12 +++--
+ arch/arm64/kvm/sys_regs.c        | 107 ++++++++++++++++++++++++++++++++++-----
+ arch/arm64/kvm/sys_regs.h        |   2 +
+ 17 files changed, 316 insertions(+), 62 deletions(-)
+
 -- 
 1.8.3.4
