@@ -1,392 +1,95 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 22 Jan 2014 12:58:49 -0600
-Subject: [PATCH RFC 1/4] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
-References: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1390417133-6650-2-git-send-email-joshc@codeaurora.org>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Wed, 22 Jan 2014 20:04:15 +0100
+Subject: [PATCH v2 0/5] ARM: add omap3 INCOstartec board support
+Message-ID: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Szyprowski <m.szyprowski@samsung.com>
+This set of patches adds board support for an omap3 system from INCOstartec.
+It's based on next-20140122.
 
-This patch adds device tree support for contiguous and reserved memory
-regions defined in device tree.
+Previously it was based on next-20140115. There, everything works as expected.
 
-Large memory blocks can be reliably reserved only during early boot.
-This must happen before the whole memory management subsystem is
-initialized, because we need to ensure that the given contiguous blocks
-are not yet allocated by kernel. Also it must happen before kernel
-mappings for the whole low memory are created, to ensure that there will
-be no mappings (for reserved blocks) or mapping with special properties
-can be created (for CMA blocks). This all happens before device tree
-structures are unflattened, so we need to get reserved memory layout
-directly from fdt.
+On branch git://git.linaro.org/people/ulf.hansson/clk.git linaro_clk/clk-next
+which holdes all "clock DT conversion" commits, bootlog shows these abnormalities:
 
-Later, those reserved memory regions are assigned to devices on each
-device structure initialization.
+  [    0.559600] ------------[ cut here ]------------
+  [    0.559631] WARNING: CPU: 0 PID: 1 at /home/honschu/media/linux/drivers/video/omap2/dss/dss.c:540 dss_set_clock_div+0xac/0xcc()
+  [    0.559661] clk rate mismatch: 345600000 != 172800000
+  [    0.559661] Modules linked in:
+  [    0.559692] CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.0-rc7+ 0
+  [    0.559722] [<c0012fc4>] (unwind_backtrace+0x0/0xf8) from [<c0010e10>] (show_stack+0x10/0x14)
+  [    0.559753] [<c0010e10>] (show_stack+0x10/0x14) from [<c0033fdc>] (warn_slowpath_common+0x64/0x84)
+  [    0.559783] [<c0033fdc>] (warn_slowpath_common+0x64/0x84) from [<c0034090>] (warn_slowpath_fmt+0x30/0x40)
+  [    0.559814] [<c0034090>] (warn_slowpath_fmt+0x30/0x40) from [<c02b23c0>] (dss_set_clock_div+0xac/0xcc)
+  [    0.559844] [<c02b23c0>] (dss_set_clock_div+0xac/0xcc) from [<c0778f48>] (omap_dsshw_probe+0x1ec/0x2e0)
+  [    0.559875] [<c0778f48>] (omap_dsshw_probe+0x1ec/0x2e0) from [<c02ff360>] (platform_drv_probe+0x18/0x48)
+  [    0.559906] [<c02ff360>] (platform_drv_probe+0x18/0x48) from [<c02fdf84>] (driver_probe_device+0x110/0x230)
+  [    0.559936] [<c02fdf84>] (driver_probe_device+0x110/0x230) from [<c02fe138>] (__driver_attach+0x94/0x98)
+  [    0.559967] [<c02fe138>] (__driver_attach+0x94/0x98) from [<c02fc724>] (bus_for_each_dev+0x54/0x88)
+  [    0.559997] [<c02fc724>] (bus_for_each_dev+0x54/0x88) from [<c02fd720>] (bus_add_driver+0xd4/0x1d0)
+  [    0.559997] [<c02fd720>] (bus_add_driver+0xd4/0x1d0) from [<c02fe76c>] (driver_register+0x78/0xf4)
+  [    0.560028] [<c02fe76c>] (driver_register+0x78/0xf4) from [<c02ff2c4>] (platform_driver_probe+0x20/0xa4)
+  [    0.560058] [<c02ff2c4>] (platform_driver_probe+0x20/0xa4) from [<c0778ce0>] (omap_dss_init+0x1c/0x98)
+  [    0.560089] [<c0778ce0>] (omap_dss_init+0x1c/0x98) from [<c0008828>] (do_one_initcall+0xe4/0x144)
+  [    0.560119] [<c0008828>] (do_one_initcall+0xe4/0x144) from [<c075eadc>] (kernel_init_freeable+0xe8/0x1b0)
+  [    0.560150] [<c075eadc>] (kernel_init_freeable+0xe8/0x1b0) from [<c05522bc>] (kernel_init+0x8/0x118)
+  [    0.560180] [<c05522bc>] (kernel_init+0x8/0x118) from [<c000e4c8>] (ret_from_fork+0x14/0x2c)
+  [    0.560302] ---[ end trace 187e8d9dd0655394 ]---
+  [    0.560424] OMAP DSS rev 2.0
+  --snip--
+  [    2.601745] usb 1-1: new high-speed USB device number 2 using ehci-omap
+  [    2.767059] usb 1-1: device descriptor read/64, error -71
+  [    3.007934] usb 1-1: device descriptor read/64, error -71
+  [    3.237091] usb 1-1: new high-speed USB device number 3 using ehci-omap
+  [    3.387054] usb 1-1: device descriptor read/64, error -71
+  [    3.637054] usb 1-1: device descriptor read/64, error -71
+  [    3.867065] usb 1-1: new high-speed USB device number 4 using ehci-omap
+  [    4.296966] usb 1-1: device not accepting address 4, error -71
+  [    4.417053] usb 1-1: new high-speed USB device number 5 using ehci-omap
+  [    4.846954] usb 1-1: device not accepting address 5, error -71
+  [    4.853179] hub 1-0:1.0: unable to enumerate USB device on port 1
+  [    5.217041] usb 2-1: new full-speed USB device number 2 using ohci-omap3
+  [    5.407043] usb 2-1: device descriptor read/64, error -62
+  [    5.697052] usb 2-1: device descriptor read/64, error -62
+  [    5.987060] usb 2-1: new full-speed USB device number 3 using ohci-omap3
+  [    6.066955] .[    6.177062] usb 2-1: device descriptor read/64, error -62
+  [    6.467041] usb 2-1: device descriptor read/64, error -62
+  [    6.757049] usb 2-1: new full-speed USB device number 4 using ohci-omap3
+  [    7.176971] usb 2-1: device not accepting address 4, error -62
+  [    7.357055] usb 2-1: new full-speed USB device number 5 using ohci-omap3
+  [    7.776977] usb 2-1: device not accepting address 5, error -62
+  [    7.783233] hub 2-0:1.0: unable to enumerate USB device on port 1
 
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-[joshc: rework to implement new DT binding, provide mechanism for
- plugging in new reserved-memory node handlers via
- RESERVEDMEM_OF_DECLARE]
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- drivers/of/Kconfig                |   6 ++
- drivers/of/Makefile               |   1 +
- drivers/of/of_reserved_mem.c      | 188 ++++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c             |   4 +
- include/asm-generic/vmlinux.lds.h |  11 +++
- include/linux/of_reserved_mem.h   |  61 +++++++++++++
- 6 files changed, 271 insertions(+)
- create mode 100644 drivers/of/of_reserved_mem.c
- create mode 100644 include/linux/of_reserved_mem.h
+On next-20140122 the tps65930 (which should be compatible to twl4030) doesn't
+set voltage on IO.1P8 any more which leads to a lot of external subsystem
+failings like dss:
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index c6973f1..aba13df 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -75,4 +75,10 @@ config OF_MTD
- 	depends on MTD
- 	def_bool y
- 
-+config OF_RESERVED_MEM
-+	depends on HAVE_MEMBLOCK
-+	def_bool y
-+	help
-+	  Helpers to allow for reservation of memory regions
-+
- endmenu # OF
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index efd0510..ed9660a 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
- obj-$(CONFIG_OF_PCI)	+= of_pci.o
- obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
- obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-+obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-new file mode 100644
-index 0000000..9fcafb5
---- /dev/null
-+++ b/drivers/of/of_reserved_mem.c
-@@ -0,0 +1,188 @@
-+/*
-+ * Device tree based initialization code for reserved memory.
-+ *
-+ * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-+ * Author: Josh Cartwright <joshc@codeaurora.org>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
-+ */
-+#include <linux/memblock.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_platform.h>
-+#include <linux/mm.h>
-+#include <linux/sizes.h>
-+#include <linux/of_reserved_mem.h>
-+
-+#define MAX_RESERVED_REGIONS	16
-+static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
-+static int reserved_mem_count;
-+
-+static int __init rmem_default_early_setup(struct reserved_mem *rmem,
-+					   unsigned long node,
-+					   const char *uname)
-+{
-+	unsigned long len;
-+	__be32 *prop;
-+	int err;
-+
-+	prop = of_get_flat_dt_prop(node, "reg", &len);
-+	if (!prop) {
-+		pr_err("reg property missing for reserved-memory node '%s'\n",
-+				uname);
-+		err = -EINVAL;
-+		goto out;
-+	}
-+
-+	if (len < (dt_root_size_cells + dt_root_addr_cells) * sizeof(__be32)) {
-+		pr_err("invalid reg property for reserved-memory node '%s'\n",
-+				uname);
-+		err = -EINVAL;
-+		goto out;
-+	}
-+
-+	rmem->base = dt_mem_next_cell(dt_root_addr_cells, &prop);
-+	rmem->size = dt_mem_next_cell(dt_root_size_cells, &prop);
-+
-+	if (of_get_flat_dt_prop(node, "no-map", NULL))
-+		err = memblock_remove(rmem->base, rmem->size);
-+	else
-+		err = memblock_reserve(rmem->base, rmem->size);
-+
-+	pr_info("Reserved mem: found '%s', memory base %pa, size %ld MiB\n",
-+		uname, &rmem->base, (unsigned long)rmem->size / SZ_1M);
-+
-+out:
-+	return err;
-+}
-+
-+static const struct of_device_id rmem_default_id
-+	__used __section(__reservedmem_of_table_end) = {
-+	.data		= rmem_default_early_setup,
-+};
-+
-+static int __init fdt_scan_reserved_mem(unsigned long node, const char *uname,
-+					int depth, void *data)
-+{
-+	struct reserved_mem *rmem = &reserved_mem[reserved_mem_count];
-+	extern const struct of_device_id __reservedmem_of_table[];
-+	reservedmem_of_init_fn initfn;
-+	const struct of_device_id *id;
-+	const char *status;
-+
-+	if (reserved_mem_count == ARRAY_SIZE(reserved_mem)) {
-+		pr_err("Not enough space for reserved-memory regions.\n");
-+		return -ENOSPC;
-+	}
-+
-+	status = of_get_flat_dt_prop(node, "status", NULL);
-+	if (status && strcmp(status, "okay") != 0)
-+		return 0;
-+
-+	/*
-+	 * The default handler above ensures this section is terminated with a
-+	 * id whose compatible string is empty
-+	 */
-+	for (id = __reservedmem_of_table; ; id++) {
-+		const char *compat = id->compatible;
-+
-+		if (!compat[0] || of_flat_dt_is_compatible(node, compat)) {
-+			initfn = id->data;
-+			break;
-+		}
-+	}
-+
-+	if (!initfn(rmem, node, uname)) {
-+		strlcpy(rmem->name, uname, sizeof(rmem->name));
-+		reserved_mem_count++;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct reserved_mem *find_rmem(struct device_node *np)
-+{
-+	const char *name;
-+	unsigned int i;
-+
-+	name = kbasename(np->full_name);
-+
-+	for (i = 0; i < reserved_mem_count; i++)
-+		if (strcmp(name, reserved_mem[i].name) == 0)
-+			return &reserved_mem[i];
-+
-+	return NULL;
-+}
-+
-+/**
-+ * of_reserved_mem_device_init() - assign reserved memory region to given device
-+ *
-+ * This function assign memory region pointed by "memory-region" device tree
-+ * property to the given device.
-+ */
-+void of_reserved_mem_device_init(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct reserved_mem *rmem;
-+	struct of_phandle_args s;
-+	unsigned int i;
-+
-+	for (i = 0; of_parse_phandle_with_args(np, "memory-region",
-+				"#memory-region-cells", i, &s) == 0; i++) {
-+
-+		rmem = find_rmem(s.np);
-+		of_node_put(s.np);
-+
-+		if (!rmem || !rmem->ops || !rmem->ops->device_init)
-+			continue;
-+
-+		rmem->ops->device_init(rmem, pdev, &s);
-+	}
-+}
-+
-+/**
-+ * of_reserved_mem_device_release() - release reserved memory device structures
-+ *
-+ * This function releases structures allocated for memory region handling for
-+ * the given device.
-+ */
-+void of_reserved_mem_device_release(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct reserved_mem *rmem;
-+	struct of_phandle_args s;
-+	unsigned int i;
-+
-+	for (i = 0; of_parse_phandle_with_args(np, "memory-region",
-+				"#memory-region-cells", i, &s) == 0; i++) {
-+
-+		rmem = find_rmem(s.np);
-+		of_node_put(s.np);
-+
-+		if (!rmem || !rmem->ops || !rmem->ops->device_release)
-+			continue;
-+
-+		rmem->ops->device_release(rmem, pdev);
-+	}
-+}
-+
-+/**
-+ * early_init_dt_scan_reserved_mem() - create reserved memory regions
-+ *
-+ * This function grabs memory from early allocator for device exclusive use
-+ * defined in device tree structures. It should be called by arch specific code
-+ * once the early allocator (memblock) has been activated and all other
-+ * subsystems have already allocated/reserved memory.
-+ */
-+void __init early_init_dt_scan_reserved_mem(void)
-+{
-+	of_scan_flat_dt_by_path("/reserved-memory", fdt_scan_reserved_mem,
-+				NULL);
-+}
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 404d1da..b6d3cea 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -21,6 +21,7 @@
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/of_reserved_mem.h>
- #include <linux/platform_device.h>
- 
- const struct of_device_id of_default_bus_match_table[] = {
-@@ -220,6 +221,8 @@ static struct platform_device *of_platform_device_create_pdata(
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
-+	of_reserved_mem_device_init(dev);
-+
- 	/* We do not fill the DMA ops for platform devices by default.
- 	 * This is currently the responsibility of the platform code
- 	 * to do such, possibly using a device notifier
-@@ -227,6 +230,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 
- 	if (of_device_add(dev) != 0) {
- 		platform_device_put(dev);
-+		of_reserved_mem_device_release(dev);
- 		return NULL;
- 	}
- 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index bc2121f..f10f64f 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -167,6 +167,16 @@
- #define CLK_OF_TABLES()
- #endif
- 
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#define RESERVEDMEM_OF_TABLES()				\
-+	. = ALIGN(8);					\
-+	VMLINUX_SYMBOL(__reservedmem_of_table) = .;	\
-+	*(__reservedmem_of_table)			\
-+	*(__reservedmem_of_table_end)
-+#else
-+#define RESERVEDMEM_OF_TABLES()
-+#endif
-+
- #define KERNEL_DTB()							\
- 	STRUCT_ALIGN();							\
- 	VMLINUX_SYMBOL(__dtb_start) = .;				\
-@@ -490,6 +500,7 @@
- 	TRACE_SYSCALLS()						\
- 	MEM_DISCARD(init.rodata)					\
- 	CLK_OF_TABLES()							\
-+	RESERVEDMEM_OF_TABLES()						\
- 	CLKSRC_OF_TABLES()						\
- 	KERNEL_DTB()							\
- 	IRQCHIP_OF_MATCH_TABLE()
-diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-new file mode 100644
-index 0000000..a2de510
---- /dev/null
-+++ b/include/linux/of_reserved_mem.h
-@@ -0,0 +1,61 @@
-+#ifndef __OF_RESERVED_MEM_H
-+#define __OF_RESERVED_MEM_H
-+
-+struct cma;
-+struct platform_device;
-+struct of_phandle_args;
-+struct reserved_mem_ops;
-+
-+struct reserved_mem {
-+	const struct reserved_mem_ops	*ops;
-+	char				name[32];
-+	union {
-+		struct cma		*cma;
-+		struct {
-+			phys_addr_t	base;
-+			phys_addr_t	size;
-+		};
-+	};
-+};
-+
-+struct reserved_mem_ops {
-+	void	(*device_init)(struct reserved_mem *rmem,
-+			       struct platform_device *pdev,
-+			       struct of_phandle_args *args);
-+	void	(*device_release)(struct reserved_mem *rmem,
-+				  struct platform_device *pdev);
-+};
-+
-+typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
-+				      unsigned long node, const char *uname);
-+
-+#ifdef CONFIG_OF_RESERVED_MEM
-+void of_reserved_mem_device_init(struct platform_device *pdev);
-+void of_reserved_mem_device_release(struct platform_device *pdev);
-+void early_init_dt_scan_reserved_mem(void);
-+
-+#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
-+	static const struct of_device_id __reservedmem_of_table_##name	\
-+		__used __section(__reservedmem_of_table)		\
-+		 = { .compatible = compat,				\
-+		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
-+				init : init }
-+
-+#else
-+static inline void of_reserved_mem_device_init(struct platform_device *pdev) { }
-+
-+static inline
-+void of_reserved_mem_device_release(struct platform_device *pdev) { }
-+
-+static inline void early_init_dt_scan_reserved_mem(void) { }
-+
-+#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
-+	static const struct of_device_id __reservedmem_of_table_##name	\
-+		__attribute__((unused))					\
-+		 = { .compatible = compat,				\
-+		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
-+				init : init }
-+
-+#endif
-+
-+#endif /* __OF_RESERVED_MEM_H */
+[    0.602264] omapdss_dss: probe of omapdss_dss failed with error -22
+[    0.602691] omapdss CORE error: Failed to initialize DSS platform driver
+[    0.603240] panel-dpi panel-dpi.0: failed to find video source 'dpi.0'
+
+Changes compared to previous version:
+ - rebased on next-20140122 from next-20140115
+ - using omap36xx.dtsi instead of unsupported 1ghz omap37xx100
+
+Christoph Fritz (5):
+  ARM: dts: omap3: Add support for INCOstartec a83x module
+  ARM: dts: omap3: Add support for INCOstartec DBB056 baseboard
+  ARM: OMAP2+: add legacy display for omap3 DBB056
+  ARM: OMAP2+: Add pdata quirk for sys_clkout2 for omap3 DBB056
+  [RFC] omapdss: remove FEAT_DPI_USES_VDDS_DSI from omap3
+
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi  |  445 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-lilly-dbb056.dts |  160 +++++++++++
+ arch/arm/mach-omap2/dss-common.c         |   49 ++++
+ arch/arm/mach-omap2/dss-common.h         |    1 +
+ arch/arm/mach-omap2/pdata-quirks.c       |   44 ++-
+ drivers/video/omap2/dss/dss_features.c   |    1 -
+ 7 files changed, 699 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-lilly-dbb056.dts
+
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
