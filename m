@@ -1,23 +1,41 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 22 Jan 2014 09:43:51 +0000
-Subject: [Xen-devel] [PATCH v4] arm: remove !CPU_V6 and
- !GENERIC_ATOMIC64 build dependencies for XEN
-In-Reply-To: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1390383831.32519.26.camel@kazak.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jan 2014 10:48:37 +0100
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a separate
+ resource
+In-Reply-To: <20140121233321.GR18269@obsidianresearch.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233321.GR18269@obsidianresearch.com>
+Message-ID: <3176358.2QFcJHj0fv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-01-21 at 13:44 +0000, Stefano Stabellini wrote:
-> Remove !GENERIC_ATOMIC64 build dependency:
-> - introduce xen_atomic64_xchg
-> - use it to implement xchg_xen_ulong
+On Tuesday 21 January 2014 16:33:21 Jason Gunthorpe wrote:
+> On Tue, Jan 21, 2014 at 06:12:31AM -0300, Ezequiel Garcia wrote:
+> > In order to support other SoC, it's required to distinguish
+> > the 'control' timer register, from the 'rstout' register
+> > that enables system reset on watchdog expiration.
 > 
-> Remove !CPU_V6 build dependency:
-> - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
->   CONFIG_CPU_V6
-> - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
+> > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +     if (!res)
+> > +             return -ENODEV;
+>            ^^^^^^^^^^^^^^^^^^^^^^
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> This change seems to break compatibility with existing DT files that
+> have only a single entry in reg?
+> 
+> Can the value be defaulted some how if missing?
 
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+I think this is a direct consequence of the attempt to remove the
+header file dependency, since the RSTOUTn_MASK macro is defined
+in mach/bridge-regs.h.
+
+I don't see a good way out that would preserve backwards compatibility,
+other than hardcoding the physical address in the driver, which seems
+just as bad as breaking compatibility. That said, it is always the
+same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
+Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
+a fallback would technically work, but we should print a fat warning at
+boot time if we actually fall back to that.
+
+	Arnd
