@@ -1,47 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 Jan 2014 23:46:11 +0300
-Subject: [PATCH v8 3/4] ohci-platform: Add support for controllers with
- big-endian regs / descriptors
-In-Reply-To: <1390419177-6481-4-git-send-email-hdegoede@redhat.com>
-References: <1390419177-6481-1-git-send-email-hdegoede@redhat.com>
- <1390419177-6481-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <52E02E13.9070206@cogentembedded.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 22 Jan 2014 11:48:37 -0800
+Subject: [PATCH] clk: Fix notifier documentation
+Message-ID: <1390420117-25930-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Contradicting to documenation, the notifier callbacks do receive
+the original clock rate in struct clk_notifier_data.old_rate and the new
+frequency struct clk_notifier_data.new_rate, independent of the
+notification reason.
 
-On 01/22/2014 10:32 PM, Hans de Goede wrote:
+This behavior also seems to make more sense, since callbacks can use the
+same code to deterimine whether clocks are scaled up or down. Something
+which would not even possible in the post-rate-change case if the
+behavior was as documented.
 
-> Note this commit uses the same devicetree booleans for this as the ones
-> already existing in the usb-ehci bindings, see:
-> Documentation/devicetree/bindings/usb/usb-ehci.txt
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+Hi Mike,
 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-[...]
+I am working with some clock notifiers and if my results are correct the
+notifiers behave differently from how they are documented.
+I think the actual behavior makes more sense than the documented and my original
+plan was to change the behavior, but it seems I might get away with a
+doc-update.
 
-> diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-> index b2d0e1e..71e9d8e 100644
-> --- a/drivers/usb/host/ohci-platform.c
-> +++ b/drivers/usb/host/ohci-platform.c
-[...]
-> @@ -164,8 +165,34 @@ static int ohci_platform_probe(struct platform_device *dev)
-[...]
-> +#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_MMIO
-> +		if (ohci->flags & OHCI_QUIRK_BE_MMIO) {
-> +			dev_err(&dev->dev,
-> +				"Error big-endian-regs not compiled in\n");
-> +			err = -EINVAL;
-> +			goto err_put_hcd;
-> +		}
-> +#endif
-> +#ifndef CONFIG_USB_OHCI_BIG_ENDIAN_DESC
-> +		if (ohci->flags & OHCI_QUIRK_BE_DESC) {
-> +			dev_err(&dev->dev,
-> +				"Error big-endian-desc not compiled in\n");
+	Thanks,
+	S?ren
 
-    Small grammar nits (sorry): some punctuation like comma or semicolon 
-wouldn't hurt after "Error" word here and above. The same for ehci-platfrom.c. 
-Also, "support" word wouldn't hurt after the property names in the same message.
+ drivers/clk/clk.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-WBR, Sergei
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 2cf2ea6b77a1..26825db03e64 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1983,20 +1983,11 @@ EXPORT_SYMBOL_GPL(devm_clk_unregister);
+  * re-enter into the clk framework by calling any top-level clk APIs;
+  * this will cause a nested prepare_lock mutex.
+  *
+- * Pre-change notifier callbacks will be passed the current, pre-change
+- * rate of the clk via struct clk_notifier_data.old_rate.  The new,
+- * post-change rate of the clk is passed via struct
++ * In all notification cases cases (pre, post and abort rate change) the
++ * original clock rate is passed to the callback via struct
++ * clk_notifier_data.old_rate and the new frequency is passed via struct
+  * clk_notifier_data.new_rate.
+  *
+- * Post-change notifiers will pass the now-current, post-change rate of
+- * the clk in both struct clk_notifier_data.old_rate and struct
+- * clk_notifier_data.new_rate.
+- *
+- * Abort-change notifiers are effectively the opposite of pre-change
+- * notifiers: the original pre-change clk rate is passed in via struct
+- * clk_notifier_data.new_rate and the failed post-change rate is passed
+- * in via struct clk_notifier_data.old_rate.
+- *
+  * clk_notifier_register() must be called from non-atomic context.
+  * Returns -EINVAL if called with null arguments, -ENOMEM upon
+  * allocation failure; otherwise, passes along the return value of
+-- 
+1.8.5.3
