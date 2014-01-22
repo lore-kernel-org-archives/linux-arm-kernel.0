@@ -1,78 +1,35 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 22 Jan 2014 13:23:35 +0100
-Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
- used as an interrupt source.
-In-Reply-To: <CACRpkdaAe7M3RjOiOrs9-bF5p80mshxbcNwKoDSMAXJ+5D27Ew@mail.gmail.com>
-References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
- <52D3C166.5050908@overkiz.com> <52D6C545.6080402@atmel.com>
- <CACRpkdaAe7M3RjOiOrs9-bF5p80mshxbcNwKoDSMAXJ+5D27Ew@mail.gmail.com>
-Message-ID: <CACh+v5PzQdHbCh6OK-04MdHh3qfD+sXFv0ki+k=w_oPeQvSBAg@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Wed, 22 Jan 2014 17:54:29 +0530
+Subject: Kconfig errors
+In-Reply-To: <CA+V-a8vcvTRpP-cE6SKd1KgWgzSbOXvSNW+5Jh8wqOfr1za4SQ@mail.gmail.com>
+References: <CA+V-a8vcvTRpP-cE6SKd1KgWgzSbOXvSNW+5Jh8wqOfr1za4SQ@mail.gmail.com>
+Message-ID: <CA+V-a8uy6wM8nS993VeezJGOaoqM5GRsJE7FrKe7=bhD6nZhXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/22 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Jan 15, 2014 at 6:28 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> On 13/01/2014 11:35, boris brezillon :
->
->>> You should only request it as a GPIO and then use gpio_to_irq to get the
->>> related IRQ.
->>> Because what is done here, is to solve the case where only the irq
->>> is request, and in this specific case we need to request the pin as a
->>> GPIO.
->>
->> Yes, this is what we do.
->>
->> It seems simple and obvious to me, but some may say that "you shall not
->> do that, it is horrible!". Well... I always tend to choose a solution
->> that works. It is one of my weaknesses, I admit ;-)
->>
->> Linus W. any advice on this, before we hit again one of those infinite
->> threads that leads no progress at all?
->
-> So we recently established that it is actually OK for any IRQ
-> consumer to request an IRQ from any irq_chip no matter if
-> that is a combined GPIO+IRQ driver. This was concluded after
-> a long discussion involving several parties.
->
-> gpio_to_irq() is just a convenience function and should not be
-> relied upon to have been called before the IRQ is used.
->
-> The basic premise is that gpio_chip and irq_chip are
-> orthogonal, and offering their services independent of each
-> other.
->
-> Especially in the device tree use case it is very hard to
-> dictate that a certain semantic need to be followed to use
-> a certain interrupt-controller to have dependencies to a
-> certain gpio-controller. So they need to be orthogonal.
->
-> First step is: always prepare the hardware and make it
-> ready for action in respective callbacks from the gpio_chip API
-> and irq_chip API. Do not rely on gpio_to_irq() having been
-> called first anymore.
->
-> This leads to ambiguities that we need to solve: if there is
-> competition inside the subsystem which side is using
-> the resource (a certain GPIO line and register for example)
-> it needs to deny certain operations and keep track of usage
-> inside of the gpiolib subsystem.
->
-> We have added a new API to help with this situation:
->
->  gpio_lock_as_irq(struct gpio_chip *chip, unsigned int offset)
->  gpio_unlock_as_irq(struct gpio_chip *chip,
->                                       unsigned int offset)
->
-> These should be called from the irq_chip startup() and
-> .shutdown() callbacks to flag that the line is now in use by
-> an IRQ. For example the GPIOlib core will deny the line to
-> be set as output after this.
->
-> If we need more infrastructure to help with this, I'm game.
->
-> Clear as mud? ;-)
-it's actually crystal clear.
+Hi Russell,
 
+On Fri, Jan 17, 2014 at 1:07 PM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+> Hi,
 >
-> Yours,
-> Linus Walleij
+> On Linux-next branch I see following errors for davinci_all_defconfig
+> & da8xx_omapl_defconfig configs,
+>
+> arch/arm/Kconfig:1966:error: recursive dependency detected!
+> arch/arm/Kconfig:1966:    symbol ZBOOT_ROM depends on AUTO_ZRELADDR
+> arch/arm/Kconfig:2154:    symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
+> #
+> # configuration written to .config
+> #
+>
+I am seeing this errors on linux-next, with your recent patch,
+"[PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM"
+and strangely I see that AUTO_ZRELADDR doesnt select ZBOOT_ROM
+but still an error.
+
+Note: For the davinci configs CONFIG_AUTO_ZRELADDR is not set and
+CONFIG_ZBOOT_ROM_TEXT=0x0, CONFIG_ZBOOT_ROM_BSS=0x0
+
+Regards,
+--Prabhakar Lad
