@@ -1,68 +1,45 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 22 Jan 2014 12:58:48 -0600
-Subject: [PATCH RFC 0/4] reserved-memory regions/CMA in devicetree, again
-Message-ID: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
+Date: Wed, 22 Jan 2014 12:58:51 -0600
+Subject: [PATCH RFC 3/4] ARM: init: add support for reserved memory defined by
+ device tree
+In-Reply-To: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
+References: <1390417133-6650-1-git-send-email-joshc@codeaurora.org>
+Message-ID: <1390417133-6650-4-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Marek-
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-What is the current status of the reserved-memory/CMA device tree support
-series?  It looks like it's stalled out a bit since the revert[2].  Hopefully
-this series is a push in the right direction?
+Enable reserved memory initialization from device tree.
 
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
-This set is an adaptation of Marek's original patchset posted here[1],
-and then subsequently reverted here[2].  In [3], Grant proposed a new
-set of bindings after discussion in Edinburgh.
+ arch/arm/mm/init.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This is a partially complete implementation of these proposed bindings.
-
-It's functionality is now split into two pieces, the first of which
-implements a default/fallback behavior for reserved-memory nodes; that
-is, reserved memory nodes describing fixed-address static regions will
-be unconditionally reserved, regardless of their intended use.  In
-addition, it provides an interface for adding additional reserved-memory
-types, using a method similar to CLOCKSOURCE_OF_DECLARE().
-
-The second piece uses the above method to provide support for
-reserved-memory nodes whose compatible = "shared-dma-pool".  It makes
-use of CMA when available, and when a describing node has the 'reusable'
-property.
-
-There is basic support for dynamic allocation of memory reserved
-regions, however, noticeably missing is support for additional
-restrictions (use of alignment and alloc-ranges properties).
-
-[1]: http://lkml.kernel.org/g/1377527959-5080-1-git-send-email-m.szyprowski at samsung.com
-[2]: http://lkml.kernel.org/g/1381476448-14548-1-git-send-email-m.szyprowski at samsung.com
-[3]: http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
-
-Grant Likely (1):
-  of: document bindings for reserved-memory nodes
-
-Josh Cartwright (1):
-  drivers: of: implement reserved-memory handling for dma
-
-Marek Szyprowski (2):
-  drivers: of: add initialization code for reserved memory
-  ARM: init: add support for reserved memory defined by device tree
-
- .../bindings/reserved-memory/reserved-memory.txt   | 137 +++++++++++++++
- arch/arm/mm/init.c                                 |   3 +
- drivers/of/Kconfig                                 |  13 ++
- drivers/of/Makefile                                |   2 +
- drivers/of/of_reserved_mem.c                       | 188 +++++++++++++++++++++
- drivers/of/of_reserved_mem_dma.c                   | 178 +++++++++++++++++++
- drivers/of/platform.c                              |   4 +
- include/asm-generic/vmlinux.lds.h                  |  11 ++
- include/linux/of_reserved_mem.h                    |  61 +++++++
- 9 files changed, 597 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
- create mode 100644 drivers/of/of_reserved_mem.c
- create mode 100644 drivers/of/of_reserved_mem_dma.c
- create mode 100644 include/linux/of_reserved_mem.h
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 403ba90..5efe0b4 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -17,6 +17,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/initrd.h>
+ #include <linux/of_fdt.h>
++#include <linux/of_reserved_mem.h>
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
+@@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
+ 	if (mdesc->reserve)
+ 		mdesc->reserve();
+ 
++	early_init_dt_scan_reserved_mem();
++
+ 	/*
+ 	 * reserve memory for DMA contigouos allocations,
+ 	 * must come from DMA area inside low memory
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
