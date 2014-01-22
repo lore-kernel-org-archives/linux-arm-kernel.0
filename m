@@ -1,70 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 22:27:05 +0000
-Subject: [PATCH v3 15/24] drm/i2c: tda998x: use irq for connection
- status and EDID read
-In-Reply-To: <20140119195843.7ae9753d@armhf>
-References: <cover.1390153344.git.moinejf@free.fr>
- <20140119195843.7ae9753d@armhf>
-Message-ID: <20140122222705.GL15937@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 22 Jan 2014 15:31:17 -0700
+Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
+ clear
+In-Reply-To: <20140122221237.GA30763@localhost>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233537.GS18269@obsidianresearch.com>
+ <20140122164904.GB27273@localhost>
+ <20140122173417.GT18269@obsidianresearch.com>
+ <52E02AB6.7040104@gmail.com>
+ <20140122205213.GW18269@obsidianresearch.com>
+ <20140122221237.GA30763@localhost>
+Message-ID: <20140122223117.GX18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 19, 2014 at 07:58:43PM +0100, Jean-Francois Moine wrote:
-> This patch adds the optional treatment of the tda998x IRQ.
+On Wed, Jan 22, 2014 at 07:12:38PM -0300, Ezequiel Garcia wrote:
+> On Wed, Jan 22, 2014 at 01:52:13PM -0700, Jason Gunthorpe wrote:
+> > > Clearing BRIDGE_CAUSE will only clear all currently pending upstream
+> > > IRQs, of course. If WDT IRQ will be re-raised right after that in
+> > > BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
+> > > clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
+> > 
+> > Which is why it makes no sense to clear it one time at kernel start.
+> > 
 > 
-> The interrupt function is used to know the display connection status
-> without polling and to speedup reading the EDID.
+> So, it seems we need to handle irq_startup(), as you suggested.
+> I've just tested the attached patch, and it's working fine: the driver's
+> probe() fully stops the watchdog, and then request_irq() acks and
+> pending interrupts, through the added irq_startup().
 > 
-> The interrupt number may be defined either in the DT or at encoder set
-> config time for non-DT boards.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
-> v3
->     - remarks from Russell King
-> 	- move the setting of the wq_edid_wait flag before asking the
-> 	  device to read the EDID
-> 	  Thanks about this bug fix, but I don't see the other problem:
-> 	  there is no reason for the read_edid_block function to be
-> 	  called more than once...
+> How does it look?
 
-It will happen whenever DRM asks the connector for the modes.  However,
-since the read process is triggered each time, I think this is fine.
+Looks sane to me.
 
-> 	- use '0' as 'no irq'
-> 	- remove the useless delay after irq init
+I looked some more and there are other drivers (eg irq-metag-ext) that
+take this same approach.
 
-Some further comments...
+Sebastian:
+I looked at the irq-orion driver a bit more and noticed this:
 
-> @@ -720,6 +787,10 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
->  		priv->audio_port = p->audio_cfg;
->  		priv->audio_format = p->audio_format;
->  	}
-> +
-> +	priv->irq = p->irq;
-> +	if (p->irq)
-> +		tda_irq_init(priv);
+        ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
+                             handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+                           ^^^^^^^^^^^^^^^^^^^^^
+Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
+does this work at all? :)
 
-If we're going to do it this way, this should probably release the IRQ if
-there was one before re-claiming it, just in case this function gets called
-more than once by some driver using it.
-
-The alternative is, as I said before, to use the infrastructure which is
-already there, namely setting the interrupt via struct i2c_client's
-irq member.  Yes, that doesn't satisfy Sebastian's comment about using
-a GPIO, but there's no sign of GPIO usage in here at the moment anyway.
-So we might as well use what's already provided.
-
-That would then avoid the need to deal with IRQ changes etc in
-tda998x_encoder_set_config().
-
-In any case, I've tested this patch in both non-IRQ and IRQ modes, and it
-appears to work - but I'd like the suggestion above before I provide any
-attributations.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Jason
