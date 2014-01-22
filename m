@@ -1,37 +1,120 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Jan 2014 11:52:14 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140121152358.GD28801@e102568-lin.cambridge.arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
- <CAP245DXdFS5FEkrDvSw07aDDuZDqFPZXF=CoBLPrBB4JuYE8cQ@mail.gmail.com>
- <20140121152358.GD28801@e102568-lin.cambridge.arm.com>
-Message-ID: <20140122115214.GG17314@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Jan 2014 11:54:53 +0000
+Subject: [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c and its related
+ head file
+In-Reply-To: <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140122115453.GC24288@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 03:23:59PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 21, 2014 at 02:35:11PM +0000, Amit Kucheria wrote:
+On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
 
-> > DT-newbie here. What would happen if a vendor does not characterise
-> > the latency at each OPP? IOW, the table only contains latency values
-> > for a subset of the OPPs.
+[...]
 
-> The bindings are explicit, so the kernel will barf. Adding a LUT to map
-> latencies to OPPs make me cringe, so I would not change the current
-> bindings.
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index bd9bbd0..2210353 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -41,6 +41,7 @@
+>  #include <linux/memblock.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/acpi.h>
+>  
+>  #include <asm/cputype.h>
+>  #include <asm/elf.h>
+> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	arm64_memblock_init();
+>  
+> +	/* Parse the ACPI tables for possible boot-time configuration */
+> +	acpi_boot_table_init();
+> +	early_acpi_boot_init();
+> +	acpi_boot_init();
+> +
+>  	paging_init();
 
-Actually looking at the OPP binding I do wonder if it might not be
-better to have a v2/rich binding for them which is extensible - the fact
-that it's not possible to add additional information seems like an
-issue, this can't be the only thing anyone might want to add and lining
-up multiple tables is never fun.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/8b7df996/attachment.sig>
+Can I ask you please why we need to parse ACPI tables before
+paging_init() ?
+
+[...]
+
+> +/*
+> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
+> + * or early_memremap() should be called here.
+
+Again, why is this needed ? What's needed before paging_init() from ACPI ?
+
+[...]
+
+> +/*
+> + * acpi_boot_table_init() and acpi_boot_init()
+> + *  called from setup_arch(), always.
+> + *	1. checksums all tables
+> + *	2. enumerates lapics
+> + *	3. enumerates io-apics
+> + *
+> + * acpi_table_init() is separated to allow reading SRAT without
+> + * other side effects.
+> + */
+> +void __init acpi_boot_table_init(void)
+> +{
+> +	/*
+> +	 * If acpi_disabled, bail out
+> +	 */
+> +	if (acpi_disabled)
+> +		return;
+> +
+> +	/*
+> +	 * Initialize the ACPI boot-time table parser.
+> +	 */
+> +	if (acpi_table_init()) {
+> +		disable_acpi();
+> +		return;
+> +	}
+> +}
+> +
+> +int __init early_acpi_boot_init(void)
+> +{
+> +	/*
+> +	 * If acpi_disabled, bail out
+> +	 */
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * Process the Multiple APIC Description Table (MADT), if present
+> +	 */
+> +	early_acpi_process_madt();
+> +
+> +	return 0;
+> +}
+> +
+> +int __init acpi_boot_init(void)
+> +{
+> +	/*
+> +	 * If acpi_disabled, bail out
+> +	 */
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+> +
+> +	/*
+> +	 * Process the Multiple APIC Description Table (MADT), if present
+> +	 */
+> +	acpi_process_madt();
+> +
+> +	return 0;
+> +}
+
+Well, apart from having three init calls, one returning void and two
+returning proper values, do not understand why, and do not understand
+why we need three calls in the first place...why should we process MADT
+twice in two separate calls ? What is supposed to change in between that
+prevents you from merging the two together ?
+
+Thanks,
+Lorenzo
