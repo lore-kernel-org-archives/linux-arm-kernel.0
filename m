@@ -1,53 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 22 Jan 2014 10:11:04 -0800
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-In-Reply-To: <52E00703.5080001@codeaurora.org>
-References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
- <20140119173712.GA26481@kroah.com>
- <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
- <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
- <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
- <20140122045937.GB23869@kroah.com>
- <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
- <52E00703.5080001@codeaurora.org>
-Message-ID: <CAPtuhThZdDkKq_fruaduPknpXxCTHgCA7mCnDDh+vS_OiUy+1w@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 22 Jan 2014 11:14:09 -0700
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a
+ separate resource
+In-Reply-To: <20140122180100.GE27273@localhost>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233321.GR18269@obsidianresearch.com>
+ <3176358.2QFcJHj0fv@wuerfel> <20140122162136.GA27273@localhost>
+ <20140122180100.GE27273@localhost>
+Message-ID: <20140122181409.GV18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 9:59 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/21/14 21:23, SeongJae Park wrote:
->> On Wed, Jan 22, 2014 at 1:59 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
->>> On Wed, Jan 22, 2014 at 12:05:57PM +0900, SeongJae Park wrote:
->>>> Dear Greg, Mike,
->>>>
->>>> May I ask your answer or other opinion, please?
->>> It's the middle of the merge window, it's not time for new development,
->>> or much time for free-time for me, sorry.  Feel free to fix it the best
->>> way you know how.
->> Oops, I've forgot about the merge window. Thank you very much for your
->> kind answer.
->> Sorry if I bothered you while you're in busy time.
->> Because the build problem is not a big deal because it exists only in
->> -next tree,
->> I will wait until merge window be closed and then fix it again if it
->> still exist.
->>
->
-> I've already sent a patch that exports this and other clock provider
-> functions. Please use this one:
->
-> https://patchwork.kernel.org/patch/3507921/
+On Wed, Jan 22, 2014 at 03:01:01PM -0300, Ezequiel Garcia wrote:
+> On Wed, Jan 22, 2014 at 01:21:36PM -0300, Ezequiel Garcia wrote:
+> > > I don't see a good way out that would preserve backwards compatibility,
+> > > other than hardcoding the physical address in the driver, which seems
+> > > just as bad as breaking compatibility. That said, it is always the
+> > > same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
+> > > Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
+> > > a fallback would technically work, but we should print a fat warning at
+> > > boot time if we actually fall back to that.
+> > > 
+> > 
+> > Yes, I was thinking just about this. Namely:
+> > 
+> [..]
+> 
+> How about something like this?
 
-I'm going to take Stephen's patch into a fixes branch and send it as
-part of a pull request. Maybe -rc1 or -rc2 at the latest.
+I liked Arnd's idea to use an offset from the first register. With the
+mbus driver we can now actually change the 0xF1.. prefix via the DT.
 
-Thanks all.
+> +	dev_warn(&pdev->dev, "falling back to harcoded RSTOUT reg 0x%x\n",
+> +		 ORION_RSTOUT_MASK);
 
-Regards,
-Mike
+Maybe:
+dev_warn(&pdev->dev, FW_BUG "falling back to harcoded RSTOUT reg 0x%x\n",
 
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
->
+?
+
+> @@ -139,10 +166,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
+>  	if (!wdt_reg)
+>  		return -ENOMEM;
+>  
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> -	if (!res)
+> -		return -ENODEV;
+> -	wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> +	wdt_rstout = try_compat_rstout_ioremap(pdev);
+>  	if (!wdt_rstout)
+>  		return -ENOMEM;
+
+ENOMEM is probably not the right errno? Is there a standard errno for
+malformed DT?
+
+Jason
