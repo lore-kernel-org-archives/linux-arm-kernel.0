@@ -1,233 +1,176 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jan 2014 14:56:35 +0000
-Subject: [PATCH v2 03/10] arm64: KVM: trap VM system registers until MMU and
- caches are ON
+Date: Wed, 22 Jan 2014 14:56:36 +0000
+Subject: [PATCH v2 04/10] arm64: KVM: flush VM pages before letting the guest
+ enable caches
 In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1390402602-22777-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1390402602-22777-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to detect the point where the guest enables
-its MMU and caches, trap all the VM related system registers.
+When the guest runs with caches disabled (like in an early boot
+sequence, for example), all the writes are diectly going to RAM,
+bypassing the caches altogether.
 
-Once we see the guest enabling both the MMU and the caches, we
-can go back to a saner mode of operation, which is to leave these
-registers in complete control of the guest.
+Once the MMU and caches are enabled, whatever sits in the cache
+becomes suddently visible, which isn't what the guest expects.
+
+A way to avoid this potential disaster is to invalidate the cache
+when the MMU is being turned on. For this, we hook into the SCTLR_EL1
+trapping code, and scan the stage-2 page tables, invalidating the
+pages/sections that have already been mapped in.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  3 +-
- arch/arm64/include/asm/kvm_asm.h |  3 +-
- arch/arm64/kvm/sys_regs.c        | 99 +++++++++++++++++++++++++++++++++++-----
- 3 files changed, 91 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  2 +
+ arch/arm/kvm/mmu.c               | 83 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  1 +
+ arch/arm64/kvm/sys_regs.c        |  5 ++-
+ 4 files changed, 90 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index c98ef47..fd0a651 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -62,6 +62,7 @@
-  * RW:		64bit by default, can be overriden for 32bit VMs
-  * TAC:		Trap ACTLR
-  * TSC:		Trap SMC
-+ * TVM:		Trap VM ops (until M+C set in SCTLR_EL1)
-  * TSW:		Trap cache operations by set/way
-  * TWE:		Trap WFE
-  * TWI:		Trap WFI
-@@ -74,7 +75,7 @@
-  * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-  */
- #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
--			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
-+			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
- 			 HCR_AMO | HCR_IMO | HCR_FMO | \
- 			 HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 3d796b4..89d7796 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -81,7 +81,8 @@
- #define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
- #define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
- #define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
--#define c10_AMAIR	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
-+#define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
-+#define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
- #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
- #define NR_CP15_REGS	(NR_SYS_REGS * 2)
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index f997b9e..cbab9ba 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -141,6 +141,8 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index f063750..1a4731b 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -121,6 +121,55 @@ done:
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+ 
++void stage2_flush_vm(struct kvm *kvm);
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 415fd63..52f8b7d 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -187,6 +187,89 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 	}
  }
  
- /*
-+ * Generic accessor for VM registers. Only called as long as HCR_TVM
-+ * is set.
-+ */
-+static bool access_vm_reg(struct kvm_vcpu *vcpu,
-+			  const struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
++void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
++		       unsigned long addr, unsigned long end)
 +{
-+	unsigned long val;
++	pte_t *pte;
 +
-+	BUG_ON(!p->is_write);
++	pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++			kvm_flush_dcache_to_poc((void*)hva, PAGE_SIZE);
++		}
++	} while(pte++, addr += PAGE_SIZE, addr != end);
++}
 +
-+	val = *vcpu_reg(vcpu, p->Rt);
-+	if (!p->is_aarch32) {
-+		vcpu_sys_reg(vcpu, r->reg) = val;
-+	} else {
-+		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
-+		if (!p->is_32bit)
-+			vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
++void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
++		       unsigned long addr, unsigned long end)
++{
++	pmd_t *pmd;
++	unsigned long next;
++
++	pmd = pmd_offset(pud, addr);
++	do {
++		next = pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++				kvm_flush_dcache_to_poc((void*)hva, PMD_SIZE);
++			} else {
++				stage2_flush_ptes(kvm, pmd, addr, next);
++			}
++		}
++	} while(pmd++, addr = next, addr != end);
++}
++
++void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
++		       unsigned long addr, unsigned long end)
++{
++	pud_t *pud;
++	unsigned long next;
++
++	pud = pud_offset(pgd, addr);
++	do {
++		next = pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			if (pud_huge(*pud)) {
++				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++				kvm_flush_dcache_to_poc((void*)hva, PUD_SIZE);
++			} else {
++				stage2_flush_pmds(kvm, pud, addr, next);
++			}
++		}
++	} while(pud++, addr = next, addr != end);
++}
++
++static void stage2_flush_memslot(struct kvm *kvm,
++				 struct kvm_memory_slot *memslot)
++{
++	unsigned long addr = memslot->base_gfn << PAGE_SHIFT;
++	unsigned long end = addr + PAGE_SIZE * memslot->npages;
++	unsigned long next;
++	pgd_t *pgd;
++
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		stage2_flush_puds(kvm, pgd, addr, next);
++	} while(pgd++, addr = next, addr != end);
++}
++
++void stage2_flush_vm(struct kvm *kvm)
++{
++	struct kvm_memslots *slots;
++	struct kvm_memory_slot *memslot;
++
++	spin_lock(&kvm->mmu_lock);
++
++	slots = kvm_memslots(kvm);
++	kvm_for_each_memslot(memslot, slots)
++		stage2_flush_memslot(kvm, memslot);
++
++	spin_unlock(&kvm->mmu_lock);
++}
++
+ /**
+  * free_boot_hyp_pgd - free HYP boot page tables
+  *
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 2232dd0..b7b2ca3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -139,6 +139,7 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ 	}
+ }
+ 
++void stage2_flush_vm(struct kvm *kvm);
+ 
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 1a4731b..3d27bb8 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -27,6 +27,7 @@
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <trace/events/kvm.h>
+@@ -163,8 +164,10 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	else
+ 		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+ 
+-	if ((val & (0b101)) == 0b101)	/* MMU+Caches enabled? */
++	if ((val & (0b101)) == 0b101) {	/* MMU+Caches enabled? */
+ 		vcpu->arch.hcr_el2 &= ~HCR_TVM;
++		stage2_flush_vm(vcpu->kvm);
 +	}
-+	return true;
-+}
-+
-+/*
-+ * SCTLR_EL1 accessor. Only called as long as HCR_TVM is set.  If the
-+ * guest enables the MMU, we stop trapping the VM sys_regs and leave
-+ * it in complete control of the caches.
-+ */
-+static bool access_sctlr(struct kvm_vcpu *vcpu,
-+			 const struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
-+{
-+	unsigned long val;
-+
-+	BUG_ON(!p->is_write);
-+
-+	val = *vcpu_reg(vcpu, p->Rt);
-+
-+	if (!p->is_aarch32)
-+		vcpu_sys_reg(vcpu, r->reg) = val;
-+	else
-+		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
-+
-+	if ((val & (0b101)) == 0b101)	/* MMU+Caches enabled? */
-+		vcpu->arch.hcr_el2 &= ~HCR_TVM;
-+
-+	return true;
-+}
-+
-+/*
-  * We could trap ID_DFR0 and tell the guest we don't support performance
-  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-  * NAKed, so it will read the PMCR anyway.
-@@ -185,32 +234,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  NULL, reset_mpidr, MPIDR_EL1 },
- 	/* SCTLR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, SCTLR_EL1, 0x00C50078 },
-+	  access_sctlr, reset_val, SCTLR_EL1, 0x00C50078 },
- 	/* CPACR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
- 	  NULL, reset_val, CPACR_EL1, 0 },
- 	/* TTBR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, TTBR0_EL1 },
-+	  access_vm_reg, reset_unknown, TTBR0_EL1 },
- 	/* TTBR1_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
--	  NULL, reset_unknown, TTBR1_EL1 },
-+	  access_vm_reg, reset_unknown, TTBR1_EL1 },
- 	/* TCR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
--	  NULL, reset_val, TCR_EL1, 0 },
-+	  access_vm_reg, reset_val, TCR_EL1, 0 },
  
- 	/* AFSR0_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
--	  NULL, reset_unknown, AFSR0_EL1 },
-+	  access_vm_reg, reset_unknown, AFSR0_EL1 },
- 	/* AFSR1_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
--	  NULL, reset_unknown, AFSR1_EL1 },
-+	  access_vm_reg, reset_unknown, AFSR1_EL1 },
- 	/* ESR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
--	  NULL, reset_unknown, ESR_EL1 },
-+	  access_vm_reg, reset_unknown, ESR_EL1 },
- 	/* FAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, FAR_EL1 },
-+	  access_vm_reg, reset_unknown, FAR_EL1 },
- 	/* PAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
- 	  NULL, reset_unknown, PAR_EL1 },
-@@ -224,17 +273,17 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* MAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
--	  NULL, reset_unknown, MAIR_EL1 },
-+	  access_vm_reg, reset_unknown, MAIR_EL1 },
- 	/* AMAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
--	  NULL, reset_amair_el1, AMAIR_EL1 },
-+	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
- 
- 	/* VBAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
- 	  NULL, reset_val, VBAR_EL1, 0 },
- 	/* CONTEXTIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
--	  NULL, reset_val, CONTEXTIDR_EL1, 0 },
-+	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
- 	/* TPIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
- 	  NULL, reset_unknown, TPIDR_EL1 },
-@@ -305,14 +354,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
- };
- 
--/* Trapped cp15 registers */
-+/*
-+ * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
-+ * depending on the way they are accessed (as a 32bit or a 64bit
-+ * register).
-+ */
- static const struct sys_reg_desc cp15_regs[] = {
-+	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-+	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
-+	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-+	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
-+	{ Op1( 0), CRn( 2), CRm( 0), Op2( 2), access_vm_reg, NULL, c2_TTBCR },
-+	{ Op1( 0), CRn( 3), CRm( 0), Op2( 0), access_vm_reg, NULL, c3_DACR },
-+	{ Op1( 0), CRn( 5), CRm( 0), Op2( 0), access_vm_reg, NULL, c5_DFSR },
-+	{ Op1( 0), CRn( 5), CRm( 0), Op2( 1), access_vm_reg, NULL, c5_IFSR },
-+	{ Op1( 0), CRn( 5), CRm( 1), Op2( 0), access_vm_reg, NULL, c5_ADFSR },
-+	{ Op1( 0), CRn( 5), CRm( 1), Op2( 1), access_vm_reg, NULL, c5_AIFSR },
-+	{ Op1( 0), CRn( 6), CRm( 0), Op2( 0), access_vm_reg, NULL, c6_DFAR },
-+	{ Op1( 0), CRn( 6), CRm( 0), Op2( 2), access_vm_reg, NULL, c6_IFAR },
-+
- 	/*
- 	 * DC{C,I,CI}SW operations:
- 	 */
- 	{ Op1( 0), CRn( 7), CRm( 6), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
-+
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
-@@ -326,6 +393,14 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
-+
-+	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
-+	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
-+	{ Op1( 0), CRn(10), CRm( 3), Op2( 0), access_vm_reg, NULL, c10_AMAIR0 },
-+	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
-+	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
-+
-+	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
- };
- 
- /* Target specific emulation tables */
+ 	return true;
+ }
 -- 
 1.8.3.4
