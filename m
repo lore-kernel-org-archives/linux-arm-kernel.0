@@ -1,69 +1,163 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 Jan 2014 21:31:50 +0100
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140122173417.GT18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com>
-Message-ID: <52E02AB6.7040104@gmail.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Wed, 22 Jan 2014 21:34:34 +0100
+Subject: [PATCH 2/2] ehci-platform: Add support for controllers with
+ big-endian regs / descriptors
+In-Reply-To: <52E01BDA.8000606@redhat.com>
+References: <1390319315-8391-1-git-send-email-hdegoede@redhat.com>
+ <1390319315-8391-2-git-send-email-hdegoede@redhat.com>
+ <CAGVrzcZJBjVvJm5WkpXpp_u3a-q4qMqgHvcxCJF=RUoeEwdzjQ@mail.gmail.com>
+ <52E01BDA.8000606@redhat.com>
+Message-ID: <20140122213434.00000f25@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2014 06:34 PM, Jason Gunthorpe wrote:
-> On Wed, Jan 22, 2014 at 01:49:05PM -0300, Ezequiel Garcia wrote:
->>> Looking at this patch in isolation it looks to me like the clear
->>> bridge lines should be replaced with a request_irq (as that does the
->>> clear) - is the request_irq in the wrong spot?
->>
->> In that case, I thought that requesting the IRQ at probe time was enough
->> to ensure the BRIDGE_CAUSE would be cleared by the time the watchdog is
->> started. However, after reading through the irqchip code again, I'm no longer
->> sure this is the case.
->
-> The watchdog should ideally be fully stopped before request_irq so
-> there is no possible race.
->
->> It looks like the BRIDGE_CAUSE register is cleared when the interruption
->> is acked (which happens in the handler if I understood the code right).
->> So requesting the IRQ is useless...
->
-> IMHO, the IRQ stuff should clear out pending edge triggered interrupts
-> at request_irq time. It makes no sense to take an interrupt for a
-> stale edge event.
->
-> I had always assumed the core code did this via irq_gc_ack_clr_bit -
-> but I don't see an obvious path..
->
->> Sebastian: If the above is correct, do you think we can add a cause clear to
->> the orion irqchip? (supposing it's harmful) Something like this:
+Hi,
 
-Ezequiel,
+On Wed, 22 Jan 2014 20:28:26 +0100
+Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+> 
+> On 01/21/2014 08:39 PM, Florian Fainelli wrote:
+> > 2014/1/21 Hans de Goede <hdegoede@redhat.com>:
+> >> This uses the already documented devicetree booleans for this.
+> >
+> > (I would greatly appreciate if you could CC people who gave you
+> > feedback on this before)
+> 
+> Will do.
+> 
+> > A more informative commit message would be welcome, along with a
+> > reference to which Device Tree binding documentation you are referring
+> > to.
+> 
+> I've added a reference to the bindings doc in the commit msg for my next version.
+> 
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> ---
+> >>   drivers/usb/host/Kconfig         |  3 +++
+> >>   drivers/usb/host/ehci-platform.c | 33 +++++++++++++++++++++++++++++++--
+> >>   2 files changed, 34 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> >> index 237d7b1..4af41f3 100644
+> >> --- a/drivers/usb/host/Kconfig
+> >> +++ b/drivers/usb/host/Kconfig
+> >> @@ -256,6 +256,9 @@ config USB_EHCI_ATH79
+> >>   config USB_EHCI_HCD_PLATFORM
+> >>          tristate "Generic EHCI driver for a platform device"
+> >>          depends on !PPC_OF
+> >> +       # Support BE on architectures which have readl_be
+> >> +       select USB_EHCI_BIG_ENDIAN_DESC if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
+> >> +       select USB_EHCI_BIG_ENDIAN_MMIO if (AVR32 || MIPS || MICROBLAZE || SPARC || PPC32 || PPC64)
+> >
+> > I do not think this is that simple nor correct for at least Microblaze
+> > and MIPS since they can run in either BE or LE mode, and those
+> > specific platforms should already do the proper select at the
+> > board/SoC level. This *might* be correct for SPARC, PPC32 and PPC64,
+> > although I believe some specific PPC64 boards can run in little-endian
+> > mode like the P-series, SPARC might too.
+> >
+> > It seems to me that you should not touch this and keep the existing
+> > selects in place, if it turns out that the selects are missing the
+> > error messages you added below are catching those misuses.
+> 
+> As discussed with Alan, I will drop these lines from my next version.
+> 
+> >>          default n
+> >>          ---help---
+> >>            Adds an EHCI host driver for a generic platform device, which
+> >> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> >> index d8aebc0..5888abb 100644
+> >> --- a/drivers/usb/host/ehci-platform.c
+> >> +++ b/drivers/usb/host/ehci-platform.c
+> >> @@ -55,8 +55,10 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+> >>
+> >>          hcd->has_tt = pdata->has_tt;
+> >>          ehci->has_synopsys_hc_bug = pdata->has_synopsys_hc_bug;
+> >> -       ehci->big_endian_desc = pdata->big_endian_desc;
+> >> -       ehci->big_endian_mmio = pdata->big_endian_mmio;
+> >> +       if (pdata->big_endian_desc)
+> >> +               ehci->big_endian_desc = 1;
+> >> +       if (pdata->big_endian_mmio)
+> >> +               ehci->big_endian_mmio = 1;
+> >>
+> >>          if (pdata->pre_setup) {
+> >>                  retval = pdata->pre_setup(hcd);
+> >> @@ -142,6 +144,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+> >>          struct resource *res_mem;
+> >>          struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+> >>          struct ehci_platform_priv *priv;
+> >> +       struct ehci_hcd *ehci;
+> >>          int err, irq, clk = 0;
+> >>
+> >>          if (usb_disabled())
+> >> @@ -177,8 +180,34 @@ static int ehci_platform_probe(struct platform_device *dev)
+> >>          platform_set_drvdata(dev, hcd);
+> >>          dev->dev.platform_data = pdata;
+> >>          priv = hcd_to_ehci_priv(hcd);
+> >> +       ehci = hcd_to_ehci(hcd);
+> >>
+> >>          if (pdata == &ehci_platform_defaults && dev->dev.of_node) {
+> >> +               if (of_property_read_bool(dev->dev.of_node, "big-endian-regs"))
+> >> +                       ehci->big_endian_mmio = 1;
+> >> +
+> >> +               if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
+> >> +                       ehci->big_endian_desc = 1;
+> >> +
+> >> +               if (of_property_read_bool(dev->dev.of_node, "big-endian"))
+> >> +                       ehci->big_endian_mmio = ehci->big_endian_desc = 1;
+> >
+> > Ok, so I am confused now, should you update
+> > pdata->ehci_big_endian_{desc,mmio} here or is it valid to directly
+> > modify ehci->big_endian_{desc,mmio}, is not there any risk  to undo
+> > what is done in ehci_platform_reset(), or is ehci_platform_reset()
+> > only called for non-DT cases?
+> 
+> Both the pdata checks in ehci_platform_reset() and the dt checks here only
+> ever set these flags, neither code path clears them. And in the dt case pdata
+> will be NULL and vice versa.
 
-irqchip/irq-orion.c does mask all interrupts but you are right, it 
-should also clear pending interrupts right after that.
+If it's safe to set ehci->big_endian_{desc,mmio} from the _probe()
+routine, then maybe the pdata sets in _reset() should be moved into here
+instead of adding extra cludges/checks into _reset().
 
-So
-	/* mask all interrupts */
-	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_MASK);
+> 
+> >
+> >> +
+> >> +#ifndef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
+> >> +               if (ehci->big_endian_mmio) {
+> >> +                       dev_err(&dev->dev,
+> >> +                               "Error big-endian-regs not compiled in\n");
+> >
+> > I do not think using the Device Tree property name would be very
+> > informative since this is supposed to guard against misconfigurations
+> > for both DT and non-DT enabled platforms
+> 
+> Nope this is in a dt only code path.
 
-should become
+Then these built-in checks could be done for both paths, as !DT also
+has the issue, just doesn't warn/error out with it.
 
-	/* mask and clear all interrupts */
-	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_MASK);
-	writel(~0, gc->reg_base + ORION_BRIDGE_IRQ_CAUSE);
+I also agree with Florian that the error message could be better
+worded, or should be at least have a ":" after "Error". When seeing
+the error message the fist time, I would wonder what "error
+big-endian-regs" are, and why I would want to have them ;)
 
-Could also be clear on write 0, I'll check that. I already had some
-beer, so I'll postpone any patches till tomorrow.
+Finally, IS_ENABLED()* allows you to drop those ugly #ifndefs:
 
-Clearing BRIDGE_CAUSE will only clear all currently pending upstream
-IRQs, of course. If WDT IRQ will be re-raised right after that in
-BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
-clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
+	if (ehci->big_endian_mmio &&
+	    !IS_ENABLED(CONFIG_USB_EHCI_BIG_ENDIAN_MMIO)) {
+                       dev_err(&dev->dev,
+                               "Error big-endian-regs not compiled in\n");
 
-So, you should also clear WDT's irq in the driver yourself to clear a
-possible pending upstream BRIDGE_CAUSE.
+looks much nicer IMHO ;)
 
-Sebastian
+
+
+Regards
+Jonas
+
+
+*Yes, I know IS_BUILTIN() would be more formal correct, but IS_ENABLED()
+reads IMHO nicer, and I doubt these config symbols will ever go
+tristate ;)
