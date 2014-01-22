@@ -1,55 +1,78 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 22 Jan 2014 19:55:40 +0800
-Subject: [PATCH 1/3] ARM: Premit ioremap() to map reserved pages
-In-Reply-To: <20140122114215.GZ15937@n2100.arm.linux.org.uk>
-References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
- <1390389916-8711-2-git-send-email-wangnan0@huawei.com>
- <20140122114215.GZ15937@n2100.arm.linux.org.uk>
-Message-ID: <52DFB1BC.7080000@huawei.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 22 Jan 2014 13:23:35 +0100
+Subject: device-tree: at91: irq and gpios: problem while requesting a gpio
+ used as an interrupt source.
+In-Reply-To: <CACRpkdaAe7M3RjOiOrs9-bF5p80mshxbcNwKoDSMAXJ+5D27Ew@mail.gmail.com>
+References: <CACh+v5Os_FHh39oXGt=srw0s7bVkpnpH0pQ4ugit_k5BL_k-0A@mail.gmail.com>
+ <52D3C166.5050908@overkiz.com> <52D6C545.6080402@atmel.com>
+ <CACRpkdaAe7M3RjOiOrs9-bF5p80mshxbcNwKoDSMAXJ+5D27Ew@mail.gmail.com>
+Message-ID: <CACh+v5PzQdHbCh6OK-04MdHh3qfD+sXFv0ki+k=w_oPeQvSBAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/1/22 19:42, Russell King - ARM Linux wrote:
-> On Wed, Jan 22, 2014 at 07:25:14PM +0800, Wang Nan wrote:
->> This patch relaxes the restriction set by commit 309caa9cc, which
->> prohibit ioremap() on all kernel managed pages.
+2014/1/22 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Jan 15, 2014 at 6:28 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> On 13/01/2014 11:35, boris brezillon :
+>
+>>> You should only request it as a GPIO and then use gpio_to_irq to get the
+>>> related IRQ.
+>>> Because what is done here, is to solve the case where only the irq
+>>> is request, and in this specific case we need to request the pin as a
+>>> GPIO.
 >>
->> Other architectures, such as x86 and (some specific platforms of) powerpc,
->> allow such mapping.
+>> Yes, this is what we do.
 >>
->> ioremap() pages is an efficient way to avoid arm's mysterious cache control.
->> This feature will be used for arm kexec support to ensure copied data goes into
->> RAM even without cache flushing, because we found that flush_cache_xxx can't
->> reliably flush code to memory.
-> 
-> Yes, let's bypass the check and allow this in violation of the
-> architecture specification by allowing mapping the same memory with
-> different types, which leads to unpredictable behaviour.  Yes, that's
-> a very good idea, because what we want to do is far more important than
-> following the requirements of the architecture.
-> 
-> So... NAK.
-> 
-> Yes, flush_cache_xxx() doesn't flush back to physical RAM, that's not
-> what it's defined to do - it's defined that it flushes enough of the
-> cache to ensure that page table updates are safe (such as when tearing
-> down a page mapping.)  So it's hardly surprising that doesn't work.
-> 
-> If you want to be able to have DMA access to memory, then you need to
-> use an API which has been designed for that purpose, and if there isn't
-> one, then you need to discuss your requirements, rather than trying to
-> hack around the problem.
+>> It seems simple and obvious to me, but some may say that "you shall not
+>> do that, it is horrible!". Well... I always tend to choose a solution
+>> that works. It is one of my weaknesses, I admit ;-)
+>>
+>> Linus W. any advice on this, before we hit again one of those infinite
+>> threads that leads no progress at all?
+>
+> So we recently established that it is actually OK for any IRQ
+> consumer to request an IRQ from any irq_chip no matter if
+> that is a combined GPIO+IRQ driver. This was concluded after
+> a long discussion involving several parties.
+>
+> gpio_to_irq() is just a convenience function and should not be
+> relied upon to have been called before the IRQ is used.
+>
+> The basic premise is that gpio_chip and irq_chip are
+> orthogonal, and offering their services independent of each
+> other.
+>
+> Especially in the device tree use case it is very hard to
+> dictate that a certain semantic need to be followed to use
+> a certain interrupt-controller to have dependencies to a
+> certain gpio-controller. So they need to be orthogonal.
+>
+> First step is: always prepare the hardware and make it
+> ready for action in respective callbacks from the gpio_chip API
+> and irq_chip API. Do not rely on gpio_to_irq() having been
+> called first anymore.
+>
+> This leads to ambiguities that we need to solve: if there is
+> competition inside the subsystem which side is using
+> the resource (a certain GPIO line and register for example)
+> it needs to deny certain operations and keep track of usage
+> inside of the gpiolib subsystem.
+>
+> We have added a new API to help with this situation:
+>
+>  gpio_lock_as_irq(struct gpio_chip *chip, unsigned int offset)
+>  gpio_unlock_as_irq(struct gpio_chip *chip,
+>                                       unsigned int offset)
+>
+> These should be called from the irq_chip startup() and
+> .shutdown() callbacks to flag that the line is now in use by
+> an IRQ. For example the GPIOlib core will deny the line to
+> be set as output after this.
+>
+> If we need more infrastructure to help with this, I'm game.
+>
+> Clear as mud? ;-)
+it's actually crystal clear.
 
-So what is correct API which is designed for this propose?
-
-> 
-> The issue here will be that the APIs we currently have for DMA become
-> extremely expensive when you want to deal with (eg) all system RAM.
-> Or, there's flush_cache_all() which should flush all levels of cache
-> in the system, and thus push all data back to RAM.
-> 
-> Now, why are you copying your patches to the stable people?  That makes
-> no sense - they haven't been reviewed and they haven't been integrated
-> into an existing kernel.  So, they don't meet the basic requirements
-> for stable tree submission...
-> 
+>
+> Yours,
+> Linus Walleij
