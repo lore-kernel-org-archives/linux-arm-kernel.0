@@ -1,68 +1,39 @@
 From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Wed, 22 Jan 2014 20:04:19 +0100
-Subject: [PATCH v2 4/5] ARM: OMAP2+: Add pdata quirk for sys_clkout2 for omap3
- DBB056
+Date: Wed, 22 Jan 2014 20:04:20 +0100
+Subject: [PATCH v2 5/5] [RFC] omapdss: remove FEAT_DPI_USES_VDDS_DSI from omap3
 In-Reply-To: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
 References: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <1390417460-3134-5-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <1390417460-3134-6-git-send-email-chf.fritz@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Full device tree support for clock control is not yet accomplished. Until
-then, configure the 24Mhz of sys_clkout2 to feed an USB-Hub here.
+DBB056 doesn't use DSI for its display, but omap3 forces this
+erroneously for all its boards:
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+  | OMAP DSS rev 2.0
+  | omapdss DPI error: can't get VDDS_DSI regulator
+  | omapfb omapfb: failed to connect default display
+  | omapfb omapfb: failed to init overlay connections
+  | omapfb omapfb: failed to setup omapfb
+  | platform omapfb: Driver omapfb requests probe deferral
+
+So this patch just disables it for omap3. Consider this as a hack!
+Is there a proper fix for this issue?
 ---
- arch/arm/mach-omap2/pdata-quirks.c |   37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/video/omap2/dss/dss_features.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index a58590f..9ef7ca8 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -171,6 +171,43 @@ static void __init am3517_evm_legacy_init(void)
- }
- static void __init omap3_dbb056_legacy_init(void)
- {
-+	struct clk *clkout2;
-+	struct clk *cm96fck;
-+
-+	/* Reparent clkout2 to 96M_FCK */
-+	pr_info("a83x-quirk: Late Reparent clkout2 to 96M_FCK\n");
-+	clkout2 = clk_get(NULL, "clkout2_src_ck");
-+	if(clkout2 < 0) {
-+		pr_err("a83x-quirk: couldn't get clkout2_src_ck\n");
-+		return;
-+	}
-+	cm96fck = clk_get(NULL, "cm_96m_fck");
-+	if(cm96fck < 0) {
-+		pr_err("a83x-quirk: couldn't get cm_96m_fck\n");
-+		return;
-+	}
-+	if(clk_set_parent(clkout2, cm96fck) < 0) {
-+		pr_err("a83x-quirk: couldn't reparent clkout2_src_ck\n");
-+		return;
-+	}
-+
-+	/* Set clkout2 to 24MHz for internal usb hub*/
-+	pr_info("a83x-quirk: Set clkout2 to 24MHz for internal usb hub\n");
-+	clkout2 = clk_get(NULL, "sys_clkout2");
-+	if(clkout2 < 0) {
-+		pr_err("a83x-quirk: couldn't get sys_clkout2\n");
-+		return;
-+	}
-+	if(clk_set_rate(clkout2, 24000000) < 0) {
-+		printk(KERN_ERR "board-omap3evm: couldn't set sys_clkout2 rate\n");
-+		return;
-+	}
-+	if(clk_prepare_enable(clkout2) < 0) {
-+		pr_err("a83x-quirk: couldn't enable sys_clkout2\n");
-+		return;
-+	}
-+
-+	/* Initialize display */
- 	omap3_dbb056_display_init_of();
- }
- #endif /* CONFIG_ARCH_OMAP3 */
+diff --git a/drivers/video/omap2/dss/dss_features.c b/drivers/video/omap2/dss/dss_features.c
+index 7f89691..dbf5894 100644
+--- a/drivers/video/omap2/dss/dss_features.c
++++ b/drivers/video/omap2/dss/dss_features.c
+@@ -536,7 +536,6 @@ static const enum dss_feat_id omap3630_dss_feat_list[] = {
+ 	FEAT_ALPHA_FIXED_ZORDER,
+ 	FEAT_FIFO_MERGE,
+ 	FEAT_OMAP3_DSI_FIFO_BUG,
+-	FEAT_DPI_USES_VDDS_DSI,
+ };
+ 
+ static const enum dss_feat_id omap4430_es1_0_dss_feat_list[] = {
 -- 
 1.7.10.4
