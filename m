@@ -1,47 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jan 2014 15:33:52 +0000
-Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
- <20140120222814.GI3471@alberich>
- <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122122550.GA14108@mudshark.cambridge.arm.com>
- <a73ef0128a0141eabf0a3b899f3afdae@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140122134028.GB14108@mudshark.cambridge.arm.com>
- <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <20140122153352.GE14108@mudshark.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 22 Jan 2014 16:37:10 +0100
+Subject: [PATCH RESEND] cpufreq: exynos: Fix build error of no type of
+ module_init
+In-Reply-To: <1390402760.18340.6.camel@AMDC1943>
+References: <1390400476-22951-1-git-send-email-k.kozlowski@samsung.com>
+ <CAKohpo=2wR+Sqwxj4koH0rvuk29BkNyAZgN0RR7bVH+3uqpB1Q@mail.gmail.com>
+ <1390402760.18340.6.camel@AMDC1943>
+Message-ID: <1390405030.18340.11.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 01:54:11PM +0000, Varun Sethi wrote:
-> > > > Ok, so are you suggesting that we perform the isolation mapping in
-> > > > arm_smmu_add_device and drop the notifier altogether?
-> > > I think that should be fine, until we want to delay mapping creation
-> > > till driver bind time.
+
+> 
+> On Wed, 2014-01-22 at 20:12 +0530, Viresh Kumar wrote:
+> > On 22 January 2014 19:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> > > Add missing include to fix build error:
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+> > > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
+> > > cc1: some warnings being treated as errors
+> > > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> > > make[1]: *** [drivers/cpufreq] Error 2
+> > >
+> > > Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+> > > and was introduced by commit d568b6f71df1 (cpufreq: exynos: Convert
+> > > exynos-cpufreq to platform driver).
+> > >
+> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > Cc: Lukasz Majewski <l.majewski@samsung.com>
+> > > Cc: Tomasz Figa <t.figa@samsung.com>
+> > > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >  drivers/cpufreq/exynos-cpufreq.c |    1 +
+> > >  1 file changed, 1 insertion(+)
+> > >
+> > > diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> > > index fcd2914d081a..fa54c2b88dd7 100644
+> > > --- a/drivers/cpufreq/exynos-cpufreq.c
+> > > +++ b/drivers/cpufreq/exynos-cpufreq.c
+> > > @@ -17,6 +17,7 @@
+> > >  #include <linux/regulator/consumer.h>
+> > >  #include <linux/cpufreq.h>
+> > >  #include <linux/suspend.h>
+> > > +#include <linux/module.h>
+> > >  #include <linux/platform_device.h>
 > > 
-> > Is there a hard dependency on that?
-> > 
-> Not sure, may be Andreas can answer that.
+> > I am surprised how that patch went through then? And nothing was
+> > reported by kbuild for it..
+> 
+> Hi,
+> 
+> A little more explanation from my side: the build error actually happens
+> only on next/master, not Linus' tree.
+> 
+> Mentioned commit which changes the driver to platform driver is in
+> mainline since 3.12-rc2 so it seems this is not the cause of the build
+> error. I think I need to find first the real cause of this build error.
+> 
+> Best regards,
+> Krzysztof
 
-Ok. Andreas? I would have thought doing this *earlier* shouldn't be a
-problem (the DMA ops must be swizzled before the driver is probed).
+After bisecting, the real commit for build error is:
+caa7dcde7c424cdc81698a6e4e48072eb67ec67e
+    module: relocate module_init from init.h to module.h
 
-> > > But the "isolate device" property should dictate iommu group creation.
-> > 
-> > The reason we added automatic group creation (per-device) is for VFIO,
-> > which expects all devices to be in a group regardless of the device
-> > isolation configuration.
-> > 
-> IIUC, with the "isolate devices" property we ensure that there would be
-> independent SMR and S2CR per device. Is that correct?
+My patch seems valid although the reason in commit msg should be updated:
+################
+Add missing include to fix build error:
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+make[1]: *** [drivers/cpufreq] Error 2
 
-Yes, as part of giving them independent sets of page tables. Initially these
-tables don't have any valid mappings, but the dma-mapping API will populate
-them in response to dma_map_*/dma_alloc/etc.
-
-Not sure what this has to do with us putting devices into their own
-groups...
-
-Will
+Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+and was introduced in next tree by commit caa7dcde7c42 (module: relocate
+module_init from init.h to module.h).
+################
