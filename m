@@ -1,39 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 22 Jan 2014 09:39:26 -0500
-Subject: [PATCH RFC 08/26] dmaengine: omap-dma: consolidate setup of CCR
-In-Reply-To: <20140122141905.GQ27282@n2100.arm.linux.org.uk>
-References: <20140102150836.GA3826@n2100.arm.linux.org.uk>
- <E1VyjuU-0005EQ-H5@rmk-PC.arm.linux.org.uk> <52DFBFDD.8040506@ti.com>
- <20140122141905.GQ27282@n2100.arm.linux.org.uk>
-Message-ID: <52DFD81E.1070103@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 22 Jan 2014 20:10:54 +0530
+Subject: [PATCH] watchdog: Add sp805_wdt depends on ARM64
+In-Reply-To: <1390394643-25443-1-git-send-email-naresh.bhat@linaro.org>
+References: <1390394643-25443-1-git-send-email-naresh.bhat@linaro.org>
+Message-ID: <CAKohpo=_e-CH9ZGoAxJVsfoFO3pcr0Fi_=QzEc5DnR7EFVewcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 January 2014 09:19 AM, Russell King - ARM Linux wrote:
-> On Wed, Jan 22, 2014 at 06:25:57PM +0530, Sricharan R wrote:
->> Setting up of DMA_DST_SYNC_PREFETCH is missing after this ?
-> 
-> I'm not looking for the DMA engine driver to be a 100% reimplementation
-> of the legacy driver.  Rather than supporting the entire set of features
-> which the legacy driver did, and have many of them simply not used, the
-> approach I'm taking here is to only support what is necessary for the
-> drivers we have in mainline - and what fits the DMA engine interfaces.
-> 
-+1 on the approach.
+On 22 January 2014 18:14,  <naresh.bhat@linaro.org> wrote:
+> From: Naresh Bhat <naresh.bhat@linaro.org>
+>
+> Add sp805_wdt depends on ARM64.
+>
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> ---
+>  drivers/watchdog/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 5be6e91..2385124 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -109,7 +109,7 @@ config WM8350_WATCHDOG
+>
+>  config ARM_SP805_WATCHDOG
+>         tristate "ARM SP805 Watchdog"
+> -       depends on ARM && ARM_AMBA
+> +       depends on (ARM || ARM64) && ARM_AMBA
+>         select WATCHDOG_CORE
+>         help
+>           ARM Primecell SP805 Watchdog timer. This will reboot your system when
 
-> There is no point inventing new DMA engine interfaces for features for
-> which we have no users in mainline kernel - to try to do that will be
-> quite rightfully thrown out by the DMA engine maintainers.
-> 
-> Here's the total number of references/definitions of DMA_DST_SYNC_PREFETCH
-> in the mainline kernel:
-> 
-> arch/arm/plat-omap/dma.c:               if (src_or_dst_synch == OMAP_DMA_DST_SYNC_PREFETCH) {
-> include/linux/omap-dma.h:#define OMAP_DMA_DST_SYNC_PREFETCH     0x02
-> 
-> Hence, this feature is unused at present.
-> 
-I thought the crypto was using the prefetch feature but it isn't. 
-
-Regards,
-Santosh
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
