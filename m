@@ -1,54 +1,39 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 22 Jan 2014 10:41:55 +0200
-Subject: [PATCHv3 00/41] OMAPDSS: DT support v3
-In-Reply-To: <52DEE6B0.20106@ti.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <52DEE6B0.20106@ti.com>
-Message-ID: <52DF8453.7030501@ti.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Wed, 22 Jan 2014 11:20:32 +0200
+Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
+ audio support for TDA998x trough McASP I2S bus
+In-Reply-To: <20140115165100.3bfab96f@armhf>
+References: <cover.1387535299.git.jsarha@ti.com>
+ <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
+ <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
+ <20140115165100.3bfab96f@armhf>
+Message-ID: <52DF8D60.9020505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-01-21 23:29, Nishanth Menon wrote:
-> Tomi,
-> 
-> On 01/21/2014 04:56 AM, Tomi Valkeinen wrote:
->> Hi,
->>
->> Here's version 3 of the DSS DT series.
->>
->> The previous version can be found from:
->>
->> v1: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108249
->> v2: http://permalink.gmane.org/gmane.linux.ports.arm.omap/108866
->>
->> The main changes to v2 are:
->>
->> - DT Binding documentation
->> - OMAP2 DSS support
->> - Split DSI register space
->> - DSS nodes disabled by default
->> - Hack to have generic DT bindings but OMAP specific drivers (for now)
->>
->> This series can also be found from:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt-review-3
->>
-> http://slexy.org/view/s20JhteOFR is my quick build test report -> few
-> checkpatch and build bisect issues would probably need fixing.
+On 01/15/2014 05:51 PM, Jean-Francois Moine wrote:
+> On Wed, 15 Jan 2014 13:27:21 +0200
+> Jyri Sarha <jsarha@ti.com> wrote:
+>
+>>   From driver/gpu/drm/i2c/tda998x_drv.c. The driver configures CTS_N
+>> register statically to a value that works only with 4 byte samples.
+>> According to my tests it is possible to support 3 and 2 byte samples too
+>> by changing the CTS_N register value, but I am not sure if the
+>> configuration can be changed on the fly. My data sheet of the nxp chip
+>> is very vague about the register definitions, but I suppose the register
+>> configures some clock divider on the chip. HDMI supports only upto 24bit
+>> audio and the data sheet states that any extraneous least significant
+>> bits are ignored.
+>
+> In the tda998x driver, the CTS_N is automatic (AIP_CNTRL_0_ACR_MAN is
+> not set).
+>
+> Then, in my Cubox (Marvell A510 + tda19988), the 16, 24 and 32 bits
+> formats are working well with I2S input at any rate.
+>
 
-Thanks. Shouldn't make trivial changes, and then not run a full
-commit-by-commit compile test...
+Could you refer the kernel version (main line?) and the involved ASoC 
+drivers so could take I a look if there is something I could do differently?
 
-I fixed the issues and pushed the branch again to work/dss-dt-review-3.
-The fixes are minor, so the already posted series can be reviewed.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/257a5b6c/attachment.sig>
+Best regards,
+Jyri
