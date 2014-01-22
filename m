@@ -1,78 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Jan 2014 13:49:05 -0300
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140121233537.GS18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
-Message-ID: <20140122164904.GB27273@localhost>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 22 Jan 2014 22:22:44 +0530
+Subject: [PATCH v2] Add Xilinx AXI Video DMA Engine driver
+Message-ID: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 04:35:37PM -0700, Jason Gunthorpe wrote:
-> On Tue, Jan 21, 2014 at 06:12:32AM -0300, Ezequiel Garcia wrote:
-> > After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
-> > bridge interrupt controller. There's no longer a need to do it in the watchdog
-> > driver, so we can simply remove it.
-> 
-> When we talked about this before I pointed out that sequence here is
-> important:
-> 
-> - Disable WDT
-> - Clear bridge
-> - Enable WDT
-> 
+Hi,
 
-Sure, I wrote this series with that in mind and made some tests to
-ensure that no spurious trigger was possible.
+This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+It is a soft IP core, which provides high-bandwidth direct memory
+access between memory and AXI4-Stream video type target peripherals
+including peripherals which support AXI4-Stream Video Protocol. The
+core provides efficient two dimensional DMA operations with independent
+asynchronous read and write channel operation.
 
-> Looking at this patch in isolation it looks to me like the clear
-> bridge lines should be replaced with a request_irq (as that does the
-> clear) - is the request_irq in the wrong spot?
-> 
+For more information on the IP, please refer to
+http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
 
-First of all, it seems to me that the first item "Disable WDT" is not
-currently true on this driver. orion_wdt_start() seem to reset the
-counter, but doesn't clear the WDT_EN bit. Do you think we should
-enforce a "true" disable?
+Use cases:
+++++++++++
+1. Xilinx Video Targeted Reference design
+   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
+2. Common Display Framework
+   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
 
-As an example, s3c2410wdt calls stop() from start(). Maybe we should
-do something like it?
+Regards,
+Srikanth 
 
-Regarding the sequence. Let me see if I got this problem right. The
-concern here is about the bootloader leaving the registers in a
-weird-state, right?
+Srikanth Thokala (1):
+  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
 
-In that case, I thought that requesting the IRQ at probe time was enough
-to ensure the BRIDGE_CAUSE would be cleared by the time the watchdog is
-started. However, after reading through the irqchip code again, I'm no longer
-sure this is the case.
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 +
+ drivers/dma/Kconfig                                |   14 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xilinx/Makefile                        |    1 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1486 ++++++++++++++++++++
+ include/linux/amba/xilinx_dma.h                    |   50 +
+ 6 files changed, 1627 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+ create mode 100644 drivers/dma/xilinx/Makefile
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
+ create mode 100644 include/linux/amba/xilinx_dma.h
 
-It looks like the BRIDGE_CAUSE register is cleared when the interruption
-is acked (which happens in the handler if I understood the code right).
-So requesting the IRQ is useless...
-
-I'll trace the code to confirm this.
-
-Sebastian: If the above is correct, do you think we can add a cause clear to
-the orion irqchip? (supposing it's harmful) Something like this:
-
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index e51d400..fef9171 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -180,6 +180,9 @@ static int __init orion_bridge_irq_init(struct device_node *np,
- 	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
- 	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
- 
-+	/* clear pending interrupts */
-+	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_CAUSE);
-+
- 	/* mask all interrupts */
- 	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_MASK);
- 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.9.5
