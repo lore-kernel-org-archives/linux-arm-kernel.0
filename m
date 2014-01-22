@@ -1,58 +1,113 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Jan 2014 20:04:35 +0100
-Subject: [PATCH v5 00/14] ahci: library-ise ahci_platform,
- add sunxi driver and cleanup imx driver
-Message-ID: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+Date: Wed, 22 Jan 2014 20:04:37 +0100
+Subject: [PATCH v5 02/14] libahci: Move ahci_host_priv declaration to
+ include/linux/ahci.h
+In-Reply-To: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1390417489-5354-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+With the ahci-platform.c changes later in this patch-set, some
+arch/arm/mach-foo/*.c sata drivers need access to ahci_host_priv, so move
+its declaration outside of drivers/ata.
 
-Here is v4 of my patchset for adding ahci-sunxi support. It has grown quite
-a bit since I've been going for a more generic approach this time and I've
-also cleaned up the ahci-imx driver to use the same generic approach.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/ahci.h   | 20 +-------------------
+ include/linux/ahci.h | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 19 deletions(-)
+ create mode 100644 include/linux/ahci.h
 
-History:
-
-v1, by Olliver Schinagl:
-This was using the approach of having a platform device which probe method
-creates a new child platform device which gets driven by ahci_platform.c,
-as done by ahci_imx.c .
-
-v2, by Hans de Goede:
-Stand-alone platform driver based on Olliver's work
-
-v3, by Hans de Goede:
-patch-series, with 4 different parts
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) New ahci-sunxi code only populating ahci_platform_data, passed to
-   ahci_platform.c to of_device_id matching.
-c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
-   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
-   arrive so that I can actually test this.
-d) dts bindings for the sunxi ahci parts
-
-v4, by Hans de Goede:
-patch-series, with 5 different parts:
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) Turn parts of ahci_platform.c into a library for use by other drivers
-c) New ahci-sunxi driver using the ahci_platform.c library functionality
-d) Refactor ahci-imx code to work the same as the new ahci-sunxi code
-e) dts bindings for the sunxi ahci parts
-
-v5:
-v4 + the following changes:
-1) fsl,imx6q driver is now tested
-2) fixed suspend / resume on fsl,imx6q
-3) Modifed devicetree node naming to match dt spec
-4) Reworked the busy waiting code in the sunxi-phy handling as suggested by
-   Russell King
-
-Parts a-d are intended for merging through the ata tree, the dts bindings
-will be merged to Maxime Ripard's sunxi-dts tree.
-
-Regards,
-
-Hans
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 2c04211..0f80129 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -35,7 +35,7 @@
+ #ifndef _AHCI_H
+ #define _AHCI_H
+ 
+-#include <linux/clk.h>
++#include <linux/ahci.h>
+ #include <linux/libata.h>
+ 
+ /* Enclosure Management Control */
+@@ -309,24 +309,6 @@ struct ahci_port_priv {
+ 	char			*irq_desc;	/* desc in /proc/interrupts */
+ };
+ 
+-struct ahci_host_priv {
+-	void __iomem *		mmio;		/* bus-independent mem map */
+-	unsigned int		flags;		/* AHCI_HFLAG_* */
+-	u32			cap;		/* cap to use */
+-	u32			cap2;		/* cap2 to use */
+-	u32			port_map;	/* port map to use */
+-	u32			saved_cap;	/* saved initial cap */
+-	u32			saved_cap2;	/* saved initial cap2 */
+-	u32			saved_port_map;	/* saved initial port_map */
+-	u32 			em_loc; /* enclosure management location */
+-	u32			em_buf_sz;	/* EM buffer size in byte */
+-	u32			em_msg_type;	/* EM message type */
+-	struct clk		*clk;		/* Only for platforms supporting clk */
+-	void			*plat_data;	/* Other platform data */
+-	/* Optional ahci_start_engine override */
+-	void			(*start_engine)(struct ata_port *ap);
+-};
+-
+ extern int ahci_ignore_sss;
+ 
+ extern struct device_attribute *ahci_shost_attrs[];
+diff --git a/include/linux/ahci.h b/include/linux/ahci.h
+new file mode 100644
+index 0000000..3499d44
+--- /dev/null
++++ b/include/linux/ahci.h
+@@ -0,0 +1,46 @@
++/*
++ *  ahci.h - Common AHCI SATA definitions and declarations
++ *
++ *  Maintained by:  Tejun Heo <tj@kernel.org>
++ *                  Please ALWAYS copy linux-ide at vger.kernel.org
++ *                  on emails.
++ *
++ *  Copyright 2004-2005 Red Hat, Inc.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_AHCI_H__
++#define __LINUX_AHCI_H__
++
++#include <linux/clk.h>
++
++struct ata_port;
++
++struct ahci_host_priv {
++	void __iomem		*mmio;		/* bus-independent mem map */
++	unsigned int		flags;		/* AHCI_HFLAG_* */
++	u32			cap;		/* cap to use */
++	u32			cap2;		/* cap2 to use */
++	u32			port_map;	/* port map to use */
++	u32			saved_cap;	/* saved initial cap */
++	u32			saved_cap2;	/* saved initial cap2 */
++	u32			saved_port_map;	/* saved initial port_map */
++	u32			em_loc; /* enclosure management location */
++	u32			em_buf_sz;	/* EM buffer size in byte */
++	u32			em_msg_type;	/* EM message type */
++	struct clk		*clk;		/* Optional */
++	void			*plat_data;	/* Other platform data */
++	/* Optional ahci_start_engine override */
++	void			(*start_engine)(struct ata_port *ap);
++};
++
++#endif
+-- 
+1.8.5.3
