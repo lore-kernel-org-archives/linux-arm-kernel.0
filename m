@@ -1,41 +1,90 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jan 2014 09:59:31 -0800
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-In-Reply-To: <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
-References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
- <20140119173712.GA26481@kroah.com>
- <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
- <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
- <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
- <20140122045937.GB23869@kroah.com>
- <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
-Message-ID: <52E00703.5080001@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Jan 2014 15:01:01 -0300
+Subject: [PATCH v2 05/15] watchdog: orion: Make RSTOUT register a
+ separate resource
+In-Reply-To: <20140122162136.GA27273@localhost>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233321.GR18269@obsidianresearch.com>
+ <3176358.2QFcJHj0fv@wuerfel> <20140122162136.GA27273@localhost>
+Message-ID: <20140122180100.GE27273@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/14 21:23, SeongJae Park wrote:
-> On Wed, Jan 22, 2014 at 1:59 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
->> On Wed, Jan 22, 2014 at 12:05:57PM +0900, SeongJae Park wrote:
->>> Dear Greg, Mike,
->>>
->>> May I ask your answer or other opinion, please?
->> It's the middle of the merge window, it's not time for new development,
->> or much time for free-time for me, sorry.  Feel free to fix it the best
->> way you know how.
-> Oops, I've forgot about the merge window. Thank you very much for your
-> kind answer.
-> Sorry if I bothered you while you're in busy time.
-> Because the build problem is not a big deal because it exists only in
-> -next tree,
-> I will wait until merge window be closed and then fix it again if it
-> still exist.
->
+On Wed, Jan 22, 2014 at 01:21:36PM -0300, Ezequiel Garcia wrote:
+> > I don't see a good way out that would preserve backwards compatibility,
+> > other than hardcoding the physical address in the driver, which seems
+> > just as bad as breaking compatibility. That said, it is always the
+> > same constant (0xf1000000 + 0x20000 + 0x0108) on Dove, Kirkwood and
+> > Orion5x (not on mv78xx0, but that doesn't use the wdt), so hardcoding
+> > a fallback would technically work, but we should print a fat warning at
+> > boot time if we actually fall back to that.
+> > 
+> 
+> Yes, I was thinking just about this. Namely:
+> 
+[..]
 
-I've already sent a patch that exports this and other clock provider
-functions. Please use this one:
+How about something like this?
 
-https://patchwork.kernel.org/patch/3507921/
-
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index a861b88..0014d23 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -26,6 +26,9 @@
+ #include <linux/of.h>
+ #include <mach/bridge-regs.h>
+ 
++/* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
++#define ORION_RSTOUT_MASK	0xf1020108
++
+ /*
+  * Watchdog timer block registers.
+  */
+@@ -119,6 +122,30 @@ static irqreturn_t orion_wdt_irq(int irq, void *devid)
+ 	return IRQ_HANDLED;
+ }
+ 
++/*
++ * The original devicetree binding for this driver specified only
++ * one memory resource, so in order to keep DT backwards compatibility
++ * we try to fallback to a hardcoded register address, if the resource
++ * is missing from the devicetree.
++ */
++static void __iomem * try_compat_rstout_ioremap(struct platform_device *pdev)
++{
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (res)
++		return devm_ioremap(&pdev->dev, res->start,
++				    resource_size(res));
++
++	/* This workaround works only for "orion-wdt", DT-enabled */
++	if (!of_device_is_compatible(pdev->dev.of_node, "marvell,orion-wdt"))
++		return NULL;
++
++	dev_warn(&pdev->dev, "falling back to harcoded RSTOUT reg 0x%x\n",
++		 ORION_RSTOUT_MASK);
++	return devm_ioremap(&pdev->dev, ORION_RSTOUT_MASK, 0x4);
++}
++
+ static int orion_wdt_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -139,10 +166,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	if (!wdt_reg)
+ 		return -ENOMEM;
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!res)
+-		return -ENODEV;
+-	wdt_rstout = devm_ioremap(&pdev->dev, res->start, resource_size(res));
++	wdt_rstout = try_compat_rstout_ioremap(pdev);
+ 	if (!wdt_rstout)
+ 		return -ENOMEM;
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
