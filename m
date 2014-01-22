@@ -1,42 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 12:26:53 +0000
-Subject: Kconfig errors
-In-Reply-To: <CA+V-a8uy6wM8nS993VeezJGOaoqM5GRsJE7FrKe7=bhD6nZhXw@mail.gmail.com>
-References: <CA+V-a8vcvTRpP-cE6SKd1KgWgzSbOXvSNW+5Jh8wqOfr1za4SQ@mail.gmail.com>
- <CA+V-a8uy6wM8nS993VeezJGOaoqM5GRsJE7FrKe7=bhD6nZhXw@mail.gmail.com>
-Message-ID: <20140122122653.GA15937@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 22 Jan 2014 12:38:19 +0000
+Subject: [PATCH RFC 4/6] net: rfkill: gpio: add device tree support
+In-Reply-To: <201401211950.07011.arnd@arndb.de>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <201401211335.16885.arnd@arndb.de>
+ <CAAVeFuKFfAvSPYLmvWV5jjT-peZFJ8sJ2bbh4F=JAYoWLhjZpA@mail.gmail.com>
+ <201401211950.07011.arnd@arndb.de>
+Message-ID: <20140122123819.GH17314@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 05:54:29PM +0530, Prabhakar Lad wrote:
-> Hi Russell,
-> 
-> On Fri, Jan 17, 2014 at 1:07 PM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
-> > Hi,
-> >
-> > On Linux-next branch I see following errors for davinci_all_defconfig
-> > & da8xx_omapl_defconfig configs,
-> >
-> > arch/arm/Kconfig:1966:error: recursive dependency detected!
-> > arch/arm/Kconfig:1966:    symbol ZBOOT_ROM depends on AUTO_ZRELADDR
-> > arch/arm/Kconfig:2154:    symbol AUTO_ZRELADDR is selected by ZBOOT_ROM
-> > #
-> > # configuration written to .config
-> > #
-> >
-> I am seeing this errors on linux-next, with your recent patch,
-> "[PATCH] Fix select-induced Kconfig warning for ZBOOT_ROM"
-> and strangely I see that AUTO_ZRELADDR doesnt select ZBOOT_ROM
-> but still an error.
-> 
-> Note: For the davinci configs CONFIG_AUTO_ZRELADDR is not set and
-> CONFIG_ZBOOT_ROM_TEXT=0x0, CONFIG_ZBOOT_ROM_BSS=0x0
+On Tue, Jan 21, 2014 at 07:50:06PM +0100, Arnd Bergmann wrote:
 
-I've killed off the "select AUTO_ZRELADDR if !ZBOOT_ROM" in the IMX
-Kconfig now, so when linux-next picks up my tree, that should be gone.
+> I should have another look at the debugfs representation, but isn't
+> there a global namespace that gets used for all gpios?  Neither the
+> con_id nor the name that the driver picks would be globally unique
+> and stable across kernel versions, so they don't make a good user
+> interface.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Currently the globally unique name is the GPIO number but that's not
+stable since it gets dynamically assigned.  
+
+> I think what we want here is a system-wide unique identifier for
+> each gpio line that may get represented in debugfs, and use a new
+> DT mechanism to communicate that.
+
+We've mostly been using things based off dev_name() for stability.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/dfe74bd2/attachment.sig>
