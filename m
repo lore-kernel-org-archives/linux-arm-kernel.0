@@ -1,35 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jan 2014 12:47:58 -0800
-Subject: [PATCH v2 5/7] ARM: perf_event: Fully support Krait CPU PMU events
-In-Reply-To: <52DEBE6B.7000904@codeaurora.org>
-References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
- <1389808535-23852-6-git-send-email-sboyd@codeaurora.org>
- <20140121180711.GN30706@mudshark.cambridge.arm.com>
- <52DEBE6B.7000904@codeaurora.org>
-Message-ID: <52E02E7E.4050203@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 22 Jan 2014 13:52:13 -0700
+Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
+ clear
+In-Reply-To: <52E02AB6.7040104@gmail.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233537.GS18269@obsidianresearch.com>
+ <20140122164904.GB27273@localhost>
+ <20140122173417.GT18269@obsidianresearch.com>
+ <52E02AB6.7040104@gmail.com>
+Message-ID: <20140122205213.GW18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/21/14 10:37, Stephen Boyd wrote:
-> On 01/21/14 10:07, Will Deacon wrote:
->> Do you need isbs to ensure the pmresrn side-effects have happened, or are
->> the registers self-synchronising? Similarly for your other IMP DEF
->> registers.
-> There aren't any isbs in the downstream android sources so I assume
-> they're self synchronizing. I'll confirm with the CPU designers to make
-> sure.
->
+> Clearing BRIDGE_CAUSE will only clear all currently pending upstream
+> IRQs, of course. If WDT IRQ will be re-raised right after that in
+> BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
+> clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
 
-CPU folks say no need for isb. They mentioned that the lack of an isb
-after the armv7_pmnc_enable_counter() call will leave the action of
-enabling the counter "in-flight". The window is probably pretty short on
-an SMP kernel because of the spin_unlock right after with the barriers
-in it, but the same can't be said for a UP kernel.
+Which is why it makes no sense to clear it one time at kernel start.
 
-Also, the fuzzer didn't find anything else, but I found a bug in the
-bitmap logic, updated and reran the fuzzer this morning. Everything
-looks good.
+Either you only get new edge triggered interrupts after request_irq
+(sane behavior) or you might sometimes get an old pending edge
+triggered interrupt after request_irq (crazy behavior).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Clearing BRIDGE_CAUSE at kernel start only shortens the racy window it
+doesn't eliminate it.
+
+In the more familiar level triggered world the driver would go to the
+device and ensure it wasn't asserting an IRQ level and then do the
+request_irq. This guarentees it won't get an interrupt callback.
+
+In a edge triggered world the driver should go to the device an ensure
+that it won't create a new IRQ, then do request_irq - confident that
+there will NEVER be a call to the IRQ handler, under any
+circumstances.
+
+So I think edge triggered interrupts need to ack any possible old edge
+trigger in the cause register before the first unmask - eg in the
+setup callback.
+
+> So, you should also clear WDT's irq in the driver yourself to clear a
+> possible pending upstream BRIDGE_CAUSE.
+
+Which isn't possible - the BRIDGE_CAUSE is owned by the irq driver and
+it must be cleared there, and it must only be cleared after the wdt
+has been stopped so it doesn't set it again.
+
+Notice that Ezequiel has added an IRQ handler that just calls panic,
+so a spurious interrupt call is VERY VERY BAD.
+
+Jason
