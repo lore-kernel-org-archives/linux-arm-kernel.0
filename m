@@ -1,50 +1,22 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 22 Jan 2014 07:47:40 +0100
-Subject: [PATCH V2] ARM: imx: correct usecount of IPG, ARM and MMDC clk
- on i.mx6sl
-In-Reply-To: <1390301452-10143-1-git-send-email-b20788@freescale.com>
-References: <1390301452-10143-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140122064740.GB16215@pengutronix.de>
+Date: Wed, 22 Jan 2014 07:51:51 +0100
+Subject: [PATCH RFC v4 10/10] ahci_imx: Port to library-ised ahci_platform
+In-Reply-To: <1390236303-22538-11-git-send-email-hdegoede@redhat.com>
+References: <1390236303-22538-1-git-send-email-hdegoede@redhat.com>
+ <1390236303-22538-11-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140122065151.GC16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 06:50:52PM +0800, Anson Huang wrote:
-> IPG, ARM and MMDC's clock should be enabled during kernel boot up,
-> so we need to maintain their use count, otherwise, they may be
-> disabled unexpectedly if their children's clock are turned off,
-> which is not allowed.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-imx6sl.c |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-> index 78f3bd6..047f4ff 100644
-> --- a/arch/arm/mach-imx/clk-imx6sl.c
-> +++ b/arch/arm/mach-imx/clk-imx6sl.c
-> @@ -291,6 +291,22 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
->  		pr_warn("%s: failed to set AHB clock rate %d!\n",
->  			__func__, ret);
->  
-> +	/*
-> +	 * Make sure those always on clocks are enabled to maintain the correct
-> +	 * usecount and enabling/disabling of parent PLLs.
-> +	 */
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_IPG]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable IPG clock %d\n", __func__, ret);
-> +
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_ARM]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable ARM clock %d\n", __func__, ret);
-> +
-> +	ret = clk_prepare_enable(clks[IMX6SL_CLK_MMDC_ROOT]);
-> +	if (ret)
-> +		pr_warn("%s: failed to enable MMDC clock %d\n", __func__, ret);
-> +
+Hi Hans,
 
-Consider using a clk_init_on array like we have in clk-imx6q.c
+On Mon, Jan 20, 2014 at 05:45:03PM +0100, Hans de Goede wrote:
+> This avoids the ugliness of creating a nested platform device from probe.
+> 
+> Note untested, I've ordered a wandboard to be able to test these changes.
+
+Looks much better now, thanks. I could test this patch aswell, no need
+to buy new hardware for this.
 
 Sascha
 
