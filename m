@@ -1,44 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jan 2014 11:20:55 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140122112055.GF1621@mudshark.cambridge.arm.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 22 Jan 2014 13:25:32 +0200
+Subject: [PATCH 1/4] ARM: dts: cm-fx6: rearrange the dts file
+In-Reply-To: <20140121204201.GX16215@pengutronix.de>
+References: <1390320812-25100-1-git-send-email-grinberg@compulab.co.il>
+ <1390320812-25100-2-git-send-email-grinberg@compulab.co.il>
+ <20140121204201.GX16215@pengutronix.de>
+Message-ID: <52DFAAAC.5040701@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 11, 2014 at 01:05:21PM +0000, Leif Lindholm wrote:
-> A new macro for setting/clearing bits in the SCTLR.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/assembler.h |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index 5c22851..aba6458 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -383,4 +383,17 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  #endif
->  	.endm
->  
-> +#ifdef CONFIG_CPU_CP15
-> +/* Macro for setting/clearing bits in sctlr */
-> +	.macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
-> +	mrc	p15, 0, \tmp, c1, c0, 0
-> +	ldr	\tmp2, =\set
-> +	orr	\tmp, \tmp, \tmp2
-> +	ldr	\tmp2, =\clear
-> +	mvn	\tmp2, \tmp2
-> +	and	\tmp, \tmp, \tmp2
-> +	mcr	p15, 0, \tmp, c1, c0, 0
+Hi Sascha,
 
-I think this would be cleaner if you force the caller to put set and clear
-into registers beforehand, rather than have to do the literal load every
-time. Also, I don't think set and clear should be required (and then you can
-lose tmp2 as well).
+On 01/21/14 22:42, Sascha Hauer wrote:
+> Hi Igor,
+> 
+> On Tue, Jan 21, 2014 at 06:13:29PM +0200, Igor Grinberg wrote:
+>> Move the iomuxc definition before the devices definitions
+>> (e.g. gpmi, fec).
+> 
+> The nodes are sorted alphabetically. Please keep them sorted.
 
-Will
+Hmmm.. I missed that point... Thanks!
+
+Will fix this up and resend.
+
+-- 
+Regards,
+Igor.
