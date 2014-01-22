@@ -1,43 +1,50 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Jan 2014 14:31:06 +0100
-Subject: [PATCH 0/5] ARM: integrator: cascaded IRQs on IM-PD1
-Message-ID: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 22 Jan 2014 14:31:07 +0100
+Subject: [PATCH 1/5] irqchip: vic: update the base IRQ member correctly
+In-Reply-To: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
+References: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1390397471-6802-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series alters the VIC driver to allow for cascaded VICs off other
-IRQ parents, such as the VIC found on the IM-PD1 daughterboard on the
-Integrator/AP.
+When passing 0 as the irq base the VIC driver will dynamically
+allocate a number of consecutive interrupt descriptors at some
+available number range. Make sure this number is recorded in
+the state container rather than the passed-in zero argument
+in this case.
 
-After this series I can start a fully working console on the UARTs on
-the IM-PD1 that report their IRQs in /proc/interrupts like this:
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+tglx: if you're happy with this pls ACK it so I can take this
+through the ARM SoC tree.
+---
+ drivers/irqchip/irq-vic.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-root at integrator:/ cat /proc/interrupts
-           CPU0
- 17:        111       pic   1  uart-pl010
- 18:          7       pic   2  uart-pl010
- 22:       5377       pic   6  timer
- 24:          0       pic   8  rtc-pl030
- 33:          0       pic  17  PCIv3 error
- 39:        102       VIC   1  uart-pl011
- 40:          7       VIC   2  uart-pl011
-Err:          0
-
-(Dumped on the IM-PD1 UART.)
-
-Linus Walleij (5):
-  irqchip: vic: update the base IRQ member correctly
-  irqchip: support cascaded VICs
-  ARM: integrator: use managed resources for the IM-PD1
-  ARM: integrator: register the IM-PD1 VIC
-  ARM: integrator: select AMBA bus and GPIO block
-
- arch/arm/mach-integrator/Kconfig |  4 ++
- arch/arm/mach-integrator/impd1.c | 81 +++++++++++++++++++++++-----------------
- arch/arm/mach-versatile/core.c   |  2 +-
- drivers/irqchip/irq-vic.c        | 59 +++++++++++++++++++++++++----
- include/linux/irqchip/arm-vic.h  |  6 ++-
- 5 files changed, 107 insertions(+), 45 deletions(-)
-
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 8e21ae0bab46..70108c1491bc 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -273,7 +273,6 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+ 	v->base = base;
+ 	v->valid_sources = valid_sources;
+ 	v->resume_sources = resume_sources;
+-	v->irq = irq;
+ 	set_handle_irq(vic_handle_irq);
+ 	vic_id++;
+ 	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
+@@ -282,6 +281,11 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+ 	for (i = 0; i < fls(valid_sources); i++)
+ 		if (valid_sources & (1 << i))
+ 			irq_create_mapping(v->domain, i);
++	/* If no base IRQ was passed, figure out our allocated base */
++	if (irq)
++		v->irq = irq;
++	else
++		v->irq = irq_find_mapping(v->domain, 0);
+ }
+ 
+ static void vic_ack_irq(struct irq_data *d)
 -- 
 1.8.4.2
