@@ -1,213 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jan 2014 14:56:41 +0000
-Subject: [PATCH v2 09/10] ARM: KVM: trap VM system registers until MMU and
- caches are ON
-In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1390402602-22777-10-git-send-email-marc.zyngier@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 22 Jan 2014 15:59:20 +0100
+Subject: [PATCH RESEND] cpufreq: exynos: Fix build error of no type of
+ module_init
+In-Reply-To: <CAKohpo=2wR+Sqwxj4koH0rvuk29BkNyAZgN0RR7bVH+3uqpB1Q@mail.gmail.com>
+References: <1390400476-22951-1-git-send-email-k.kozlowski@samsung.com>
+ <CAKohpo=2wR+Sqwxj4koH0rvuk29BkNyAZgN0RR7bVH+3uqpB1Q@mail.gmail.com>
+Message-ID: <1390402760.18340.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to detect the point where the guest enables
-its MMU and caches, trap all the VM related system registers.
+On Wed, 2014-01-22 at 20:12 +0530, Viresh Kumar wrote:
+> On 22 January 2014 19:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> > Add missing include to fix build error:
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_init? [-Werror=implicit-int]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: data definition has no type or storage class [enabled by default]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: error: type defaults to ?int? in declaration of ?module_exit? [-Werror=implicit-int]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: parameter names (without types) in function declaration [enabled by default]
+> > drivers/cpufreq/exynos-cpufreq.c:292:1: warning: ?exynos_cpufreq_platdrv_init? defined but not used [-Wunused-function]
+> > cc1: some warnings being treated as errors
+> > make[2]: *** [drivers/cpufreq/exynos-cpufreq.o] Error 1
+> > make[1]: *** [drivers/cpufreq] Error 2
+> >
+> > Build error happens on gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+> > and was introduced by commit d568b6f71df1 (cpufreq: exynos: Convert
+> > exynos-cpufreq to platform driver).
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Cc: Lukasz Majewski <l.majewski@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  drivers/cpufreq/exynos-cpufreq.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> > index fcd2914d081a..fa54c2b88dd7 100644
+> > --- a/drivers/cpufreq/exynos-cpufreq.c
+> > +++ b/drivers/cpufreq/exynos-cpufreq.c
+> > @@ -17,6 +17,7 @@
+> >  #include <linux/regulator/consumer.h>
+> >  #include <linux/cpufreq.h>
+> >  #include <linux/suspend.h>
+> > +#include <linux/module.h>
+> >  #include <linux/platform_device.h>
+> 
+> I am surprised how that patch went through then? And nothing was
+> reported by kbuild for it..
 
-Once we see the guest enabling both the MMU and the caches, we
-can go back to a saner mode of operation, which is to leave these
-registers in complete control of the guest.
+Hi,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_arm.h |  3 +-
- arch/arm/kvm/coproc.c          | 85 ++++++++++++++++++++++++++++++++++--------
- arch/arm/kvm/coproc_a15.c      |  2 +-
- arch/arm/kvm/coproc_a7.c       |  2 +-
- 4 files changed, 73 insertions(+), 19 deletions(-)
+A little more explanation from my side: the build error actually happens
+only on next/master, not Linus' tree.
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index a843e74..816db0b 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -55,6 +55,7 @@
-  * The bits we set in HCR:
-  * TAC:		Trap ACTLR
-  * TSC:		Trap SMC
-+ * TVM:		Trap VM ops (until MMU and caches are on)
-  * TSW:		Trap cache operations by set/way
-  * TWI:		Trap WFI
-  * TWE:		Trap WFE
-@@ -68,7 +69,7 @@
-  */
- #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
- 			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
--			HCR_TWE | HCR_SWIO | HCR_TIDCP)
-+			HCR_TVM | HCR_TWE | HCR_SWIO | HCR_TIDCP)
- 
- /* System Control Register (SCTLR) bits */
- #define SCTLR_TE	(1 << 30)
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 126c90d..1839770 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -23,6 +23,7 @@
- #include <asm/kvm_host.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_mmu.h>
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <trace/events/kvm.h>
-@@ -205,6 +206,55 @@ done:
- }
- 
- /*
-+ * Generic accessor for VM registers. Only called as long as HCR_TVM
-+ * is set.
-+ */
-+static bool access_vm_reg(struct kvm_vcpu *vcpu,
-+			  const struct coproc_params *p,
-+			  const struct coproc_reg *r)
-+{
-+	if (p->is_write) {
-+		vcpu->arch.cp15[r->reg] = *vcpu_reg(vcpu, p->Rt1);
-+		if (p->is_64bit)
-+			vcpu->arch.cp15[r->reg + 1] = *vcpu_reg(vcpu, p->Rt2);
-+	} else {
-+		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
-+		if (p->is_64bit)
-+			*vcpu_reg(vcpu, p->Rt2) = vcpu->arch.cp15[r->reg + 1];
-+	}
-+
-+	return true;
-+}
-+
-+/*
-+ * SCTLR accessor. Only called as long as HCR_TVM is set.  If the
-+ * guest enables the MMU, we stop trapping the VM sys_regs and leave
-+ * it in complete control of the caches.
-+ *
-+ * Used by the cpu-specific code.
-+ */
-+bool access_sctlr(struct kvm_vcpu *vcpu,
-+		  const struct coproc_params *p,
-+		  const struct coproc_reg *r)
-+{
-+	if (p->is_write) {
-+		unsigned long val;
-+
-+		val = *vcpu_reg(vcpu, p->Rt1);
-+		vcpu->arch.cp15[r->reg] = val;
-+
-+		if ((val & (0b101)) == 0b101) {	/* MMU+Caches enabled? */
-+			vcpu->arch.hcr &= ~HCR_TVM;
-+			stage2_flush_vm(vcpu->kvm);
-+		}
-+	} else {
-+		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
-+	}
-+
-+	return true;
-+}
-+
-+/*
-  * We could trap ID_DFR0 and tell the guest we don't support performance
-  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-  * NAKed, so it will read the PMCR anyway.
-@@ -261,33 +311,36 @@ static const struct coproc_reg cp15_regs[] = {
- 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 2), is32,
- 			NULL, reset_val, c1_CPACR, 0x00000000 },
- 
--	/* TTBR0/TTBR1: swapped by interrupt.S. */
--	{ CRm64( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
--	{ CRm64( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
--
--	/* TTBCR: swapped by interrupt.S. */
-+	/* TTBR0/TTBR1/TTBCR: swapped by interrupt.S. */
-+	{ CRm64( 2), Op1( 0), is64, access_vm_reg, reset_unknown64, c2_TTBR0 },
-+	{ CRn(2), CRm( 0), Op1( 0), Op2( 0), is32,
-+			access_vm_reg, reset_unknown, c2_TTBR0 },
-+	{ CRn(2), CRm( 0), Op1( 0), Op2( 1), is32,
-+			access_vm_reg, reset_unknown, c2_TTBR1 },
- 	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
--			NULL, reset_val, c2_TTBCR, 0x00000000 },
-+			access_vm_reg, reset_val, c2_TTBCR, 0x00000000 },
-+	{ CRm64( 2), Op1( 1), is64, access_vm_reg, reset_unknown64, c2_TTBR1 },
-+
- 
- 	/* DACR: swapped by interrupt.S. */
- 	{ CRn( 3), CRm( 0), Op1( 0), Op2( 0), is32,
--			NULL, reset_unknown, c3_DACR },
-+			access_vm_reg, reset_unknown, c3_DACR },
- 
- 	/* DFSR/IFSR/ADFSR/AIFSR: swapped by interrupt.S. */
- 	{ CRn( 5), CRm( 0), Op1( 0), Op2( 0), is32,
--			NULL, reset_unknown, c5_DFSR },
-+			access_vm_reg, reset_unknown, c5_DFSR },
- 	{ CRn( 5), CRm( 0), Op1( 0), Op2( 1), is32,
--			NULL, reset_unknown, c5_IFSR },
-+			access_vm_reg, reset_unknown, c5_IFSR },
- 	{ CRn( 5), CRm( 1), Op1( 0), Op2( 0), is32,
--			NULL, reset_unknown, c5_ADFSR },
-+			access_vm_reg, reset_unknown, c5_ADFSR },
- 	{ CRn( 5), CRm( 1), Op1( 0), Op2( 1), is32,
--			NULL, reset_unknown, c5_AIFSR },
-+			access_vm_reg, reset_unknown, c5_AIFSR },
- 
- 	/* DFAR/IFAR: swapped by interrupt.S. */
- 	{ CRn( 6), CRm( 0), Op1( 0), Op2( 0), is32,
--			NULL, reset_unknown, c6_DFAR },
-+			access_vm_reg, reset_unknown, c6_DFAR },
- 	{ CRn( 6), CRm( 0), Op1( 0), Op2( 2), is32,
--			NULL, reset_unknown, c6_IFAR },
-+			access_vm_reg, reset_unknown, c6_IFAR },
- 
- 	/* PAR swapped by interrupt.S */
- 	{ CRm64( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
-@@ -324,9 +377,9 @@ static const struct coproc_reg cp15_regs[] = {
- 
- 	/* PRRR/NMRR (aka MAIR0/MAIR1): swapped by interrupt.S. */
- 	{ CRn(10), CRm( 2), Op1( 0), Op2( 0), is32,
--			NULL, reset_unknown, c10_PRRR},
-+			access_vm_reg, reset_unknown, c10_PRRR},
- 	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
--			NULL, reset_unknown, c10_NMRR},
-+			access_vm_reg, reset_unknown, c10_NMRR},
- 
- 	/* VBAR: swapped by interrupt.S. */
- 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
-@@ -334,7 +387,7 @@ static const struct coproc_reg cp15_regs[] = {
- 
- 	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
- 	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
--			NULL, reset_val, c13_CID, 0x00000000 },
-+			access_vm_reg, reset_val, c13_CID, 0x00000000 },
- 	{ CRn(13), CRm( 0), Op1( 0), Op2( 2), is32,
- 			NULL, reset_unknown, c13_TID_URW },
- 	{ CRn(13), CRm( 0), Op1( 0), Op2( 3), is32,
-diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
-index bb0cac1..e6f4ae4 100644
---- a/arch/arm/kvm/coproc_a15.c
-+++ b/arch/arm/kvm/coproc_a15.c
-@@ -34,7 +34,7 @@
- static const struct coproc_reg a15_regs[] = {
- 	/* SCTLR: swapped by interrupt.S. */
- 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
--			NULL, reset_val, c1_SCTLR, 0x00C50078 },
-+			access_sctlr, reset_val, c1_SCTLR, 0x00C50078 },
- };
- 
- static struct kvm_coproc_target_table a15_target_table = {
-diff --git a/arch/arm/kvm/coproc_a7.c b/arch/arm/kvm/coproc_a7.c
-index 1df76733..17fc7cd 100644
---- a/arch/arm/kvm/coproc_a7.c
-+++ b/arch/arm/kvm/coproc_a7.c
-@@ -37,7 +37,7 @@
- static const struct coproc_reg a7_regs[] = {
- 	/* SCTLR: swapped by interrupt.S. */
- 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
--			NULL, reset_val, c1_SCTLR, 0x00C50878 },
-+			access_sctlr, reset_val, c1_SCTLR, 0x00C50878 },
- };
- 
- static struct kvm_coproc_target_table a7_target_table = {
--- 
-1.8.3.4
+Mentioned commit which changes the driver to platform driver is in
+mainline since 3.12-rc2 so it seems this is not the cause of the build
+error. I think I need to find first the real cause of this build error.
+
+Best regards,
+Krzysztof
