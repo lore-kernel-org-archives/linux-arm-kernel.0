@@ -1,40 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 13:27:34 +0000
-Subject: [PATCH 2/3] ARM: kexec: copying code to ioremapped area
-In-Reply-To: <1390389916-8711-3-git-send-email-wangnan0@huawei.com>
-References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
- <1390389916-8711-3-git-send-email-wangnan0@huawei.com>
-Message-ID: <20140122132734.GB15937@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Jan 2014 14:31:06 +0100
+Subject: [PATCH 0/5] ARM: integrator: cascaded IRQs on IM-PD1
+Message-ID: <1390397471-6802-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 07:25:15PM +0800, Wang Nan wrote:
-> ARM's kdump is actually corrupted (at least for omap4460), mainly because of
-> cache problem: flush_icache_range can't reliably ensure the copied data
-> correctly goes into RAM.
+This series alters the VIC driver to allow for cascaded VICs off other
+IRQ parents, such as the VIC found on the IM-PD1 daughterboard on the
+Integrator/AP.
 
-Quite right too.  You're mistake here is thinking that flush_icache_range()
-should push it to RAM.  That's incorrect.
+After this series I can start a fully working console on the UARTs on
+the IM-PD1 that report their IRQs in /proc/interrupts like this:
 
-flush_icache_range() is there to deal with such things as loadable modules
-and self modifying code, where the MMU is not being turned off.  Hence, it
-only flushes to the point of coherency between the I and D caches, and
-any further levels of cache between that point and memory are not touched.
-Why should it touch any more levels - it's not the function's purpose.
+root at integrator:/ cat /proc/interrupts
+           CPU0
+ 17:        111       pic   1  uart-pl010
+ 18:          7       pic   2  uart-pl010
+ 22:       5377       pic   6  timer
+ 24:          0       pic   8  rtc-pl030
+ 33:          0       pic  17  PCIv3 error
+ 39:        102       VIC   1  uart-pl011
+ 40:          7       VIC   2  uart-pl011
+Err:          0
 
-> After mmu turned off and jump to the trampoline, kexec always failed due
-> to random undef instructions.
+(Dumped on the IM-PD1 UART.)
 
-We already have code in the kernel which deals with shutting the MMU off.
-An instance of how this can be done is illustrated in the soft_restart()
-code path, and kexec already uses this.
+Linus Walleij (5):
+  irqchip: vic: update the base IRQ member correctly
+  irqchip: support cascaded VICs
+  ARM: integrator: use managed resources for the IM-PD1
+  ARM: integrator: register the IM-PD1 VIC
+  ARM: integrator: select AMBA bus and GPIO block
 
-One of the first things soft_restart() does is turn off the outer cache -
-which OMAP4 does have, but this can only be done if there is a single CPU
-running.  If there's multiple CPUs running, then the outer cache can't be
-disabled, and that's the most likely cause of the problem you're seeing.
+ arch/arm/mach-integrator/Kconfig |  4 ++
+ arch/arm/mach-integrator/impd1.c | 81 +++++++++++++++++++++++-----------------
+ arch/arm/mach-versatile/core.c   |  2 +-
+ drivers/irqchip/irq-vic.c        | 59 +++++++++++++++++++++++++----
+ include/linux/irqchip/arm-vic.h  |  6 ++-
+ 5 files changed, 107 insertions(+), 45 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.4.2
