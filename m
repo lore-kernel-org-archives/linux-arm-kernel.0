@@ -1,67 +1,183 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jan 2014 11:00:18 +0000
-Subject: [PATCH RFC 04/10] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <52DD5DC5.3000908@samsung.com>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
- <20140116163409.GD25540@e102568-lin.cambridge.arm.com>
- <52DD5DC5.3000908@samsung.com>
-Message-ID: <20140122110018.GB24288@e102568-lin.cambridge.arm.com>
+From: ml@embed.me.uk (Jack Mitchell)
+Date: Wed, 22 Jan 2014 11:06:25 +0000
+Subject: [PATCH] ARM: dts: add BeagleBone Audio Cape (Rev A) dtsi
+Message-ID: <1390388785-19605-1-git-send-email-ml@embed.me.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 05:32:53PM +0000, Tomasz Figa wrote:
-> Hi Lorenzo,
-> 
-> On 16.01.2014 17:34, Lorenzo Pieralisi wrote:
-> > Hi Tomasz,
-> >
-> > thank you for posting this series. I would like to use the DT bindings
-> > for power domains in the bindings for C-states on ARM:
-> >
-> > http://comments.gmane.org/gmane.linux.power-management.general/41012
-> >
-> > and in particular link a given C-state to a given power domain so that the
-> > kernel will have a way to actually check what devices are lost upon C-state
-> > entry (and for devices I also mean CPU peripheral like PMUs, GIC CPU IF,
-> > caches and possibly cpus, all of them already represented with DT nodes).
-> >
-> > I have a remark:
-> >
-> > -  Can we group device nodes under a single power-domain-parent so that
-> >     all devices defined under that parent won't have to re-define a
-> >     power-domain property (a property like interrupt-parent, so to speak)
-> >
-> > What do you think ?
-> 
-> Hmm, I can see potential benefits of such construct on platforms with 
-> clear hierarchy of devices, but to make sure I'm getting it correctly, 
-> is the following what you have in mind?
-> 
-> soc-domain-x at 12340000 {
-> 	compatible = "...";
-> 	reg = <...>;
-> 	power-domain-parent = <&power_domains DOMAIN_X>;
-> 
-> 	device at 1000 {
-> 		compatible = "...";
-> 		// inherits power-domain = <&power_domains DOMAIN_X>
-> 	};
-> 
-> 	device at 2000 {
-> 		compatible = "...";
-> 		// inherits power-domain = <&power_domains DOMAIN_X>
-> 	};
-> };
+From: Jack Mitchell <jack@embed.me.uk>
 
-Yes, exactly, it could avoid duplicated data. I still have an issue
-with nodes that are per-cpu but define just one node (eg PMU), since
-a CPU might belong in a power-domain on its own (ie one power domain
-per-CPU) and basically this means that arch-timers, PMU & company should
-link to multiple power domains, ie one per CPU or we find a way to define
-a power domain as "banked".
+Devicetree include file for setting up the am335x mcasp bus, i2c-2
+bus, and audio codec required for a functioning BeagleBone Audio Cape.
 
-I need to think about this a bit more, thanks for your feedback.
+Signed-off-by: Jack Mitchell <jack@embed.me.uk>
+Signed-off-by: Matt Porter <mporter@linaro.org>
+---
+ arch/arm/boot/dts/am335x-bone-audio-cape-reva.dtsi | 124 +++++++++++++++++++++
+ arch/arm/boot/dts/am335x-bone-common.dtsi          |  14 +++
+ 2 files changed, 138 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-bone-audio-cape-reva.dtsi
 
-Lorenzo
+diff --git a/arch/arm/boot/dts/am335x-bone-audio-cape-reva.dtsi b/arch/arm/boot/dts/am335x-bone-audio-cape-reva.dtsi
+new file mode 100644
+index 0000000..b8ec3dc
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-bone-audio-cape-reva.dtsi
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2014 Jack Mitchell <jack@embed.me.uk>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * In order to enable the BeagleBone Audio Cape this dtsi must be
++ * incuded in the top level dts. On BeagleBone Black hardware the
++ * status of the HDMI dts node must also be set to "disabled".
++ *
++ * --- a/arch/arm/boot/dts/am335x-bone.dts
++ * +++ b/arch/arm/boot/dts/am335x-bone.dts
++ * @@ -9,6 +9,7 @@
++ *
++ *  #include "am33xx.dtsi"
++ *  #include "am335x-bone-common.dtsi"
++ * +#include "am335x-bone-audio-cape-reva.dtsi"
++ *
++ *  &ldo3_reg {
++ *  	regulator-min-microvolt = <1800000>;
++ *
++ * On BeagleBone Black hardware the status of the HDMI dts node must
++ * also be set to "disabled"
++ *
++ * --- a/arch/arm/boot/dts/am335x-boneblack.dts
++ * +++ b/arch/arm/boot/dts/am335x-boneblack.dts
++ * @@ -73,6 +74,6 @@
++ *  		pinctrl-names = "default", "off";
++ *  		pinctrl-0 = <&nxp_hdmi_bonelt_pins>;
++ *  		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
++ * -		status = "okay";
++ * +		status = "disabled";
++ *  	};
++ *  };
++ */
++
++/ {
++	sound {
++		compatible = "ti,da830-evm-audio";
++		ti,model = "AM335x BeagleBone Audio Cape Rev. A";
++		ti,audio-codec = <&tlv320aic3106>;
++		ti,mcasp-controller = <&mcasp0>;
++		ti,codec-clock-rate = <12000000>;
++		ti,audio-routing =
++			"Headphone Jack",       "HPLOUT",
++			"Headphone Jack",       "HPROUT",
++			"LINE1L",               "Line In",
++			"LINE1R",               "Line In";
++	};
++
++	audio-cape-gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bone_audio_cape_led_pins>;
++
++		audio-led0 {
++			label = "audio:green:usr0";
++			gpios = <&gpio1 18 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
++		};
++
++		audio-led1 {
++			label = "audio:green:usr1";
++			gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "mmc0";
++			default-state = "off";
++		};
++	};
++};
++
++&am33xx_pinmux {
++	bone_audio_cape_led_pins: pinmux_bone_audio_cape_led_pins {
++		pinctrl-single,pins = <
++			0x48 (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpmc_a2.gpio1_18 */
++			0x4c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpmc_a3.gpio1_19 */
++		>;
++	};
++
++	bone_audio_cape_pins: bone_audio_cape_pins {
++		pinctrl-single,pins = <
++			0x190 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mcasp0_aclkx.mcasp0_aclkx */
++			0x194 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mcasp0_fsx.mcasp0_fsx */
++			0x19c (PIN_INPUT_PULLUP | MUX_MODE2)	/* mcasp0_ahclkr.mcasp0_axr2 */
++			0x1ac (PIN_INPUT_PULLUP | MUX_MODE2)	/* mcasp0_ahclkx.mcasp0_axr3 */
++		>;
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
++
++	status = "okay";
++	clock-frequency = <100000>;
++
++	tlv320aic3106: tlv320aic3106 at 1b {
++		compatible = "ti,tlv320aic3106";
++		reg = <0x1b>;
++		status = "okay";
++
++		/* Regulators */
++		AVDD-supply = <&vmmcsd_fixed>;
++		IOVDD-supply = <&vmmcsd_fixed>;
++		DRVDD-supply = <&vmmcsd_fixed>;
++		DVDD-supply = <&vdd1v8_fixed>;
++	};
++};
++
++&mcasp0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&bone_audio_cape_pins>;
++
++	status = "okay";
++
++	op-mode = <0>;      /* MCASP_IIS_MODE */
++	tdm-slots = <2>;
++	serial-dir = <      /* 0: INACTIVE, 1: TX, 2: RX */
++		0 0 2 1
++	>;
++	tx-num-evt = <1>;
++	rx-num-evt = <1>;
++};
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index e3f27ec..c1c0f74 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -62,12 +62,26 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 	};
++
++	vdd1v8_fixed: fixedregulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd1v8_fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
+ };
+ 
+ &am33xx_pinmux {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&clkout2_pin>;
+ 
++	i2c2_pins: pinmux_i2c2_pins {
++		pinctrl-single,pins = <
++			0x178 (PIN_INPUT_PULLUP | MUX_MODE3)  /* uart1_ctsn.i2c2_sda */
++			0x17c (PIN_INPUT_PULLUP | MUX_MODE3)  /* uart1_rtsn.i2c2_scl */
++		>;
++	};
++
+ 	user_leds_s0: user_leds_s0 {
+ 		pinctrl-single,pins = <
+ 			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
+-- 
+1.8.5.2
