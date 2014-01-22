@@ -1,63 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jan 2014 10:35:53 +0000
-Subject: mutual exculsion between clk_prepare_enable
- /clk_disable_unprepare and clk_set_parent
-In-Reply-To: <CAFgnuDdOKxzFSDCBQTGw=p_t0CvKfjVEudttOCP_wrzyA2K1Og@mail.gmail.com>
-References: <CAFgnuDdOKxzFSDCBQTGw=p_t0CvKfjVEudttOCP_wrzyA2K1Og@mail.gmail.com>
-Message-ID: <20140122103553.GY15937@n2100.arm.linux.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 22 Jan 2014 11:46:47 +0100
+Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
+ audio support for TDA998x trough McASP I2S bus
+In-Reply-To: <20140122111953.238349a5@armhf>
+References: <cover.1387535299.git.jsarha@ti.com>
+ <d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>
+ <20131231132555.GA31886@sirena.org.uk> <52D67099.1040904@ti.com>
+ <20140115165100.3bfab96f@armhf> <52DF8D60.9020505@ti.com>
+ <20140122111953.238349a5@armhf>
+Message-ID: <20140122114647.20f75d0d@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:02:57PM +0800, Xiaoguang Chen wrote:
-> Hi, Mike
-> 
-> We met a issue between clk_prepare_enable /clk_disable_unprepare and
-> clk_set_parent.
+On Wed, 22 Jan 2014 11:19:53 +0100
+Jean-Francois Moine <moinejf@free.fr> wrote:
 
-clk_prepare_enable/disable_unprepare are perfectly fine in themselves.
-You're looking at the problem wrongly - because drivers can perfectly
-well call clk_prepare() and clk_unprepare() themselves.  There's no
-requirement for the enable and prepare to be paired together under any
-kind of lock.
+> As both I2S and S/PDIF may be used for HDMI output in the Cubox,
+> I wrote a tda998x CODEC which gets the audio ports from the DT and
+> dynamically sets these ports and the audio type (i2s / spdif) on audio
+> streaming start. I have not submitted yet this codec and the associated
+> changes in tda998x, because I am waiting for a first patch series on the
+> tda998x to be applied
+> (http://lists.freedesktop.org/archives/dri-devel/2014-January/051552.html).
 
-> and if below condition occurs, there will be problem
->
-> thread1                                                 thread 2
-> call clk_disable_unprepare
+Sorry, the last patch request is
 
-Okay, if we're calling clk_disable_unprepare(), then the clock
-must already have been prepared and enabled - which means that
-the current parent is already prepared and enabled.
-
-> 1) clk_disable
-> get enable lock
-> ...............
-> release enable lock
-
-This may result in the parent being disabled too.
-
-> 
->                                                      call clk_set_parent
->                                                      get prepare lock
->                                                      set clock's
-> parent to another parent
-
-At this point, the existing parent clock should be disabled if this
-clock was enabled, and unprepared if this clock was prepared.  The
-new parent should be prepared and enabled as appropriate too so that
-everything is kept balanced.
-
->                                                      release prepare lock
-> 
-> 2) clk_unprepare
-> get prepare lock
-> unprepare parent clock <<--------------
-> release prepare lock
-
-And with the above guarantee - which is required in any case to make
-reparenting safe - there's no problem here.
+http://lists.freedesktop.org/archives/dri-devel/2014-January/052201.html
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
