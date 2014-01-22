@@ -1,40 +1,63 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 21 Jan 2014 16:35:37 -0700
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140121233537.GS18269@obsidianresearch.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 21 Jan 2014 16:59:35 -0800
+Subject: [PATCH] pinctrl: Rename Broadcom Capri pinctrl driver
+In-Reply-To: <1390343886-25852-1-git-send-email-syin@broadcom.com>
+References: <1390343886-25852-1-git-send-email-syin@broadcom.com>
+Message-ID: <CAOesGMj7wXJ+DfXzk0U1pusKqZShq+KJdPY8hh=Ffj7KDti4_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 06:12:32AM -0300, Ezequiel Garcia wrote:
-> After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
-> bridge interrupt controller. There's no longer a need to do it in the watchdog
-> driver, so we can simply remove it.
+Hi,
 
-When we talked about this before I pointed out that sequence here is
-important:
 
-- Disable WDT
-- Clear bridge
-- Enable WDT
+On Tue, Jan 21, 2014 at 2:38 PM, Sherman Yin <syin@broadcom.com> wrote:
+> To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
+> driver and its related CONFIG option are renamed to bcm281xx.
+>
+> Devicetree compatible string and binding documentation use
+> "brcm,bcm11351-pinctrl" to match the machine binding here:
+> Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>
+> This driver supports pinctrl on BCM11130, BCM11140, BCM11351, BCM28145
+> and BCM28155 SoCs.
+>
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Matt Porter <mporter@linaro.org>
+> ---
+>  ...capri-pinctrl.txt => brcm,bcm11351-pinctrl.txt} |    8 +-
+>  arch/arm/boot/dts/bcm11351.dtsi                    |    2 +-
+>  arch/arm/configs/bcm_defconfig                     |    2 +-
+>  drivers/pinctrl/Kconfig                            |    8 +-
+>  drivers/pinctrl/Makefile                           |    2 +-
+>  .../{pinctrl-capri.c => pinctrl-bcm281xx.c}        | 1521 ++++++++++----------
+>  6 files changed, 775 insertions(+), 768 deletions(-)
+>  rename Documentation/devicetree/bindings/pinctrl/{brcm,capri-pinctrl.txt => brcm,bcm11351-pinctrl.txt} (98%)
+>  rename drivers/pinctrl/{pinctrl-capri.c => pinctrl-bcm281xx.c} (25%)
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
+> similarity index 98%
+> rename from Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
+> rename to Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
+> index 9e9e9ef..c119deb 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/brcm,capri-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
+> @@ -1,4 +1,4 @@
+> -Broadcom Capri Pin Controller
+> +Broadcom BCM281xx Pin Controller
+>
+>  This is a pin controller for the Broadcom BCM281xx SoC family, which includes
+>  BCM11130, BCM11140, BCM11351, BCM28145, and BCM28155 SoCs.
+> @@ -7,14 +7,14 @@ BCM11130, BCM11140, BCM11351, BCM28145, and BCM28155 SoCs.
+>
+>  Required Properties:
+>
+> -- compatible:  Must be "brcm,capri-pinctrl".
+> +- compatible:  Must be "brcm,bcm11351-pinctrl"
 
-Looking at this patch in isolation it looks to me like the clear
-bridge lines should be replaced with a request_irq (as that does the
-clear) - is the request_irq in the wrong spot?
+Since the original binding is queued for 3.14 (I believe?), if this
+rename isn't merged for 3.14 then you will still need to accept the
+old compatible string (binding). You can document it as deprecated,
+but the driver needs to still probe with it.
 
-> @@ -68,9 +66,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
->  	/* Set watchdog duration */
->  	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
->  
-> -	/* Clear watchdog timer interrupt */
-> -	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
-> -
->  	/* Enable watchdog timer */
->  	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
->  
 
-Regards,
-Jason
+-Olof
