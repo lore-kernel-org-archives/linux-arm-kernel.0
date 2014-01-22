@@ -1,74 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jan 2014 14:56:34 +0000
-Subject: [PATCH v2 02/10] arm64: KVM: allows discrimination of AArch32 sysreg
- access
+Date: Wed, 22 Jan 2014 14:56:33 +0000
+Subject: [PATCH v2 01/10] arm64: KVM: force cache clean on page fault when
+ caches are off
 In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1390402602-22777-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1390402602-22777-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current handling of AArch32 trapping is slightly less than
-perfect, as it is not possible (from a handler point of view)
-to distinguish it from an AArch64 access, nor to tell a 32bit
-from a 64bit access either.
+In order for the guest with caches off to observe data written
+contained in a given page, we need to make sure that page is
+committed to memory, and not just hanging in the cache (as
+guest accesses are completely bypassing the cache until it
+decides to enable it).
 
-Fix this by introducing two additional flags:
-- is_aarch32: true if the access was made in AArch32 mode
-- is_32bit: true if is_aarch32 == true and a MCR/MRC instruction
-  was used to perform the access (as opposed to MCRR/MRRC).
-
-This allows a handler to cover all the possible conditions in which
-a system register gets trapped.
+For this purpose, hook into the coherent_icache_guest_page
+function and flush the region if the guest SCTLR_EL1
+register doesn't show the MMU  and caches as being enabled.
+The function also get renamed to coherent_cache_guest_page.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 5 +++++
- arch/arm64/kvm/sys_regs.h | 2 ++
- 2 files changed, 7 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h   |  4 ++--
+ arch/arm/kvm/mmu.c               |  4 ++--
+ arch/arm64/include/asm/kvm_mmu.h | 11 +++++++----
+ 3 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 02e9d09..f063750 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -437,6 +437,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
- 	int Rt2 = (hsr >> 10) & 0xf;
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 77de4a4..f997b9e 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
  
-+	params.is_aarch32 = true;
-+	params.is_32bit = false;
- 	params.CRm = (hsr >> 1) & 0xf;
- 	params.Rt = (hsr >> 5) & 0xf;
- 	params.is_write = ((hsr & 1) == 0);
-@@ -480,6 +482,8 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	struct sys_reg_params params;
- 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ struct kvm;
  
-+	params.is_aarch32 = true;
-+	params.is_32bit = true;
- 	params.CRm = (hsr >> 1) & 0xf;
- 	params.Rt  = (hsr >> 5) & 0xf;
- 	params.is_write = ((hsr & 1) == 0);
-@@ -549,6 +553,7 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	struct sys_reg_params params;
- 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
+ {
+ 	/*
+ 	 * If we are going to insert an instruction page and the icache is
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 5809069..415fd63 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -713,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pmd_writable(&new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
++		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+@@ -721,7 +721,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
++		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+ 	}
  
-+	params.is_aarch32 = false;
- 	params.Op0 = (esr >> 20) & 3;
- 	params.Op1 = (esr >> 14) & 0x7;
- 	params.CRn = (esr >> 10) & 0xf;
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index d50d372..d411e25 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -30,6 +30,8 @@ struct sys_reg_params {
- 	u8	Op2;
- 	u8	Rt;
- 	bool	is_write;
-+	bool	is_aarch32;
-+	bool	is_32bit;	/* Only valid if is_aarch32 is true */
- };
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 680f74e..2232dd0 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+ 	return true;
+ }
  
- struct sys_reg_desc {
+-static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
+@@ -124,9 +123,14 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 
+ struct kvm;
+ 
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
+ {
++	if ((vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) != 0b101)
++		kvm_flush_dcache_to_poc((void *)hva, size);
++
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+ 		flush_icache_range(hva, hva + size);
+ 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+@@ -135,7 +139,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+ 	}
+ }
+ 
+-#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
 -- 
 1.8.3.4
