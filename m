@@ -1,42 +1,41 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Wed, 22 Jan 2014 09:56:10 -0800
-Subject: Internal error: Oops: 17 [#1] ARM
-In-Reply-To: <20140122164100.GE15937@n2100.arm.linux.org.uk>
-References: <CACUGKYPXficVuqDgy6_Tnh9b-VOXDNK=+nqb6U5O6NpcZOGGpQ@mail.gmail.com>
- <20140122164100.GE15937@n2100.arm.linux.org.uk>
-Message-ID: <CACUGKYP-AJ673573_6Hb49g44EEMS32SLSm1uKQztMg9yvx7NA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 22 Jan 2014 09:59:31 -0800
+Subject: [PATCH] clk: export __clk_get_hw for re-use in others
+In-Reply-To: <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
+References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
+ <20140119173712.GA26481@kroah.com>
+ <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
+ <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
+ <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
+ <20140122045937.GB23869@kroah.com>
+ <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
+Message-ID: <52E00703.5080001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I ran the kernel in our custom board and I've seen the error after
-(sometimes 10 minutes after) the reboot and sometimes my board ran for
-an hour or so before it happened.
-I will try the 3.13-rc8 today and will see if the said bug still exist or not.
-
-Regards,
-
-john
-
-On Wed, Jan 22, 2014 at 8:41 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 22, 2014 at 08:23:36AM -0800, John Tobias wrote:
->> Hello all,
->>
->> I am using 3.13-rc1 kernel on iMX6SL processor. My filesystem is in
->> eMMC running SDR50.
->> Is anyone here encountered these problem and if there's any existing
->> patch that I can get?.
+On 01/21/14 21:23, SeongJae Park wrote:
+> On Wed, Jan 22, 2014 at 1:59 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>> On Wed, Jan 22, 2014 at 12:05:57PM +0900, SeongJae Park wrote:
+>>> Dear Greg, Mike,
+>>>
+>>> May I ask your answer or other opinion, please?
+>> It's the middle of the merge window, it's not time for new development,
+>> or much time for free-time for me, sorry.  Feel free to fix it the best
+>> way you know how.
+> Oops, I've forgot about the merge window. Thank you very much for your
+> kind answer.
+> Sorry if I bothered you while you're in busy time.
+> Because the build problem is not a big deal because it exists only in
+> -next tree,
+> I will wait until merge window be closed and then fix it again if it
+> still exist.
 >
-> How reproducable is this?  I notice you're using 3.13-rc1 too, it could
-> be the bug has already been fixed in a later kernel version.  -rc1
-> kernels are really the "fresh after lots of new feature merging" kernels
-> which should always be expected to be rather buggy.
->
-> Linux kernel "release candidates" are not "we think this is going to be
-> a final kernel, please test it" but -rc1 marks the end of the new
-> feature merging and the beginning of the stablisation phase.
->
-> --
-> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-> Estimate before purchase was "up to 13.2Mbit".
+
+I've already sent a patch that exports this and other clock provider
+functions. Please use this one:
+
+https://patchwork.kernel.org/patch/3507921/
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
