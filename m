@@ -1,39 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Jan 2014 11:42:32 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140121133148.GB28801@e102568-lin.cambridge.arm.com>
-Message-ID: <20140122114232.GB20247@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Jan 2014 11:45:37 +0000
+Subject: [PATCH 18/20] clocksource / acpi: Add macro
+ CLOCKSOURCE_ACPI_DECLARE
+In-Reply-To: <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
+ <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
+Message-ID: <20140122114537.GA15591@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 01:31:48PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 21, 2014 at 11:16:46AM +0000, Vincent Guittot wrote:
+On Wed, Jan 22, 2014 at 08:26:50AM +0000, Linus Walleij wrote:
+> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> 
+> > From: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >
+> > This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
+> > name from the ACPI timer table is matched with all the registered
+> > timer controllers and matching initialisation routine is invoked.
+> >
+> > Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
+> to TIMER_OF_DECLARE() and I think this macro, if needed, should
+> be named TIMER_ACPI_DECLARE().
+> 
+> The reason is that "clocksource" is a Linux-internal name and this
+> macro pertains to the hardware name in respective system
+> description type.
+> 
+> > +#ifdef CONFIG_ACPI
+> > +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
+> > +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
+> > +               __used __section(__clksrc_acpi_table)                   \
+> > +                = { .id = compat,                              \
+> > +                    .driver_data = (kernel_ulong_t)fn }
+> > +#else
+> > +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
+> > +#endif
+> 
+> This hammers down the world to compile one binary for ACPI
+> and one binary for device tree. Maybe that's fine, I don't know.
 
-> > > +       - psci-power-state
-> > > +               Usage: Required if entry-method property value is set to
-> > > +                      "psci".
-> > > +               Value type: <u32>
-> > > +               Definition: power_state parameter to pass to the PSCI
-> > > +                           suspend call to enter the C-state.
+How does it do that?
 
-> > Why psci has got a dedicated field and not vendor methods ? can't you
-> > make that more generic ?
+As far as I could tell CONFIG_ACPI and CONFIG_OF are not mutually
+exclusive, and this just means that we only build the datastructures for
+matching from ACPI when CONFIG_ACPI is enabled.
 
-> If anyone provides me with an example usage why not, for now I know I
-> need that parameter for PSCI, I can call it differently, define it for PSCI
-> and leave it as optional for other methods.
+Have I missed something?
 
-Would it not be sensible to define a PSCI binding that extends this and
-other bindings - ISTR some other properties getting scattered into
-bindings for it?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140122/08080b74/attachment.sig>
+I definitely don't want to see mutually exclusive ACPI and DT support.
+
+Cheers,
+Mark.
