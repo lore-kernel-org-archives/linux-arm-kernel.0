@@ -1,54 +1,48 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 22 Jan 2014 12:35:44 +0100
-Subject: [PATCH] ARM: imx: enable delaytimer on the imx timer
-Message-ID: <1390390544-10319-1-git-send-email-bigeasy@linutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Jan 2014 11:38:55 +0000
+Subject: [PATCH 1/3] ARM: Premit ioremap() to map reserved pages
+In-Reply-To: <1390389916-8711-2-git-send-email-wangnan0@huawei.com>
+References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
+ <1390389916-8711-2-git-send-email-wangnan0@huawei.com>
+Message-ID: <20140122113855.GH1621@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx can support timer-based delays, so implement this.
-Skips past jiffy calibration.
+On Wed, Jan 22, 2014 at 11:25:14AM +0000, Wang Nan wrote:
+> This patch relaxes the restriction set by commit 309caa9cc, which
+> prohibit ioremap() on all kernel managed pages.
+> 
+> Other architectures, such as x86 and (some specific platforms of) powerpc,
+> allow such mapping.
+> 
+> ioremap() pages is an efficient way to avoid arm's mysterious cache control.
+> This feature will be used for arm kexec support to ensure copied data goes into
+> RAM even without cache flushing, because we found that flush_cache_xxx can't
+> reliably flush code to memory.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Cc: <stable@vger.kernel.org> # 3.4+
+> Cc: Eric Biederman <ebiederm@xmission.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Geng Hui <hui.geng@huawei.com>
+> ---
+>  arch/arm/mm/ioremap.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index f123d6e..98b1c10 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -298,7 +298,7 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+>  	/*
+>  	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
+>  	 */
+> -	if (WARN_ON(pfn_valid(pfn)))
+> +	if (WARN_ON(pfn_valid(pfn) && !PageReserved(pfn_to_page(pfn))))
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-Tested on imx51.
+Since reserved pages can still be mapped, how does this avoid the cacheable
+alias issue fixed by 309caa9cc6ff ("ARM: Prohibit ioremap() on kernel
+managed RAM")?
 
- arch/arm/mach-imx/time.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index cd46529..19c5cf9 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -25,6 +25,7 @@
- #include <linux/irq.h>
- #include <linux/clockchips.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/sched_clock.h>
- 
-@@ -116,11 +117,22 @@ static u32 notrace mxc_read_sched_clock(void)
- 	return sched_clock_reg ? __raw_readl(sched_clock_reg) : 0;
- }
- 
-+static struct delay_timer imx_delay_timer;
-+
-+static unsigned long imx_read_current_timer(void)
-+{
-+	return __raw_readl(sched_clock_reg);
-+}
-+
- static int __init mxc_clocksource_init(struct clk *timer_clk)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
- 	void __iomem *reg = timer_base + (timer_is_v2() ? V2_TCN : MX1_2_TCN);
- 
-+	imx_delay_timer.read_current_timer = &imx_read_current_timer;
-+	imx_delay_timer.freq = c;
-+	register_current_timer_delay(&imx_delay_timer);
-+
- 	sched_clock_reg = reg;
- 
- 	setup_sched_clock(mxc_read_sched_clock, 32, c);
--- 
-1.8.5.2
+Will
