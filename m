@@ -1,39 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jan 2014 15:56:05 +0100
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <20140122114616.GB15591@e106331-lin.cambridge.arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <52DCE790.6080809@linaro.org>
- <20140122114616.GB15591@e106331-lin.cambridge.arm.com>
-Message-ID: <3140612.0s75qS6VKb@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jan 2014 14:56:34 +0000
+Subject: [PATCH v2 02/10] arm64: KVM: allows discrimination of AArch32 sysreg
+ access
+In-Reply-To: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
+References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1390402602-22777-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 January 2014 11:46:16 Mark Rutland wrote:
-> On Mon, Jan 20, 2014 at 09:08:32AM +0000, Hanjun Guo wrote:
-> > On 2014-1-17 22:21, Arnd Bergmann wrote:
-> > > On Friday 17 January 2014, Hanjun Guo wrote:
-> > >>
-> > >> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > >>
-> > >> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
-> > >> name from the ACPI timer table is matched with all the registered
-> > >> timer controllers and matching initialisation routine is invoked.
-> > > 
-> > > I wouldn't anticipate this infrastructure to be required. Shouldn't all
-> > > ARMv8 machines have an architected timer?
-> > 
-> > I not sure of this, could anyone can give some guidance? if only arch
-> > timer is available for ARM64, this will make thing very simple.
-> 
-> All ARMv8 systems should have an architected timer.
-> 
-> However, they may also have other timers (e.g. global timers for use
-> when CPUs are in low power states and their local architected timers
-> aren't active).
+The current handling of AArch32 trapping is slightly less than
+perfect, as it is not possible (from a handler point of view)
+to distinguish it from an AArch64 access, nor to tell a 32bit
+from a 64bit access either.
 
-But all other timers could be regular platform drivers I suppose. No
-need for special infrastructure for those.
+Fix this by introducing two additional flags:
+- is_aarch32: true if the access was made in AArch32 mode
+- is_32bit: true if is_aarch32 == true and a MCR/MRC instruction
+  was used to perform the access (as opposed to MCRR/MRRC).
 
-	Arnd
+This allows a handler to cover all the possible conditions in which
+a system register gets trapped.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 5 +++++
+ arch/arm64/kvm/sys_regs.h | 2 ++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 02e9d09..f063750 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -437,6 +437,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 	int Rt2 = (hsr >> 10) & 0xf;
+ 
++	params.is_aarch32 = true;
++	params.is_32bit = false;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -480,6 +482,8 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = true;
++	params.is_32bit = true;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt  = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -549,6 +553,7 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = false;
+ 	params.Op0 = (esr >> 20) & 3;
+ 	params.Op1 = (esr >> 14) & 0x7;
+ 	params.CRn = (esr >> 10) & 0xf;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index d50d372..d411e25 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -30,6 +30,8 @@ struct sys_reg_params {
+ 	u8	Op2;
+ 	u8	Rt;
+ 	bool	is_write;
++	bool	is_aarch32;
++	bool	is_32bit;	/* Only valid if is_aarch32 is true */
+ };
+ 
+ struct sys_reg_desc {
+-- 
+1.8.3.4
