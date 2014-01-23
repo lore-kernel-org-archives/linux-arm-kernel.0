@@ -1,48 +1,154 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 23 Jan 2014 11:12:54 +0530
-Subject: [PATCH] [media] s5p-mfc: Add Horizontal and Vertical search range
- for Video Macro Blocks
-In-Reply-To: <DA6097ED98694425932A6AF93513371A@sisodomain.com>
-References: <1388400186-22045-1-git-send-email-amit.grover@samsung.com>
- <DA6097ED98694425932A6AF93513371A@sisodomain.com>
-Message-ID: <CA+V-a8uQAeY1zM+YVWi7QXPSPwAEhD=Gds-15sk+e9VbaNN98g@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 23 Jan 2014 19:28:47 +1300
+Subject: [PATCH] arm: vt8500: Fix gpio mux setup in vt8500_init()
+Message-ID: <1390458527-30068-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Swaminathan,
+With the switch to a pinctrl driver, and the dropping of the gpio driver,
+the code in vt8500_init now always fails, and drops back to LEGACY mode.
 
-On Thu, Jan 23, 2014 at 10:49 AM, swaminathan <swaminath.p@samsung.com> wrote:
-> Hi All,
-> Is there any review Comments for the patch "[PATCH] [media] s5p-mfc: Add
-> Horizontal and Vertical search range for Video Macro Blocks"
-> posted on 30-Dec-2013 ?
->
->
-Just a side note, please don?t top post and always reply as plain text.
+Update the gpio mux init code, and removing the #ifdef's and the LEGACY
+mode fallback.
 
-[Snip]
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ arch/arm/mach-vt8500/vt8500.c |   91 ++++++++++++++---------------------------
+ 1 file changed, 30 insertions(+), 61 deletions(-)
 
-> Subject: [PATCH] [media] s5p-mfc: Add Horizontal and Vertical search range
-> for Video Macro Blocks
->
->
->> This patch adds Controls to set Horizontal and Vertical search range
->> for Motion Estimation block for Samsung MFC video Encoders.
->>
->> Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
->> Signed-off-by: Amit Grover <amit.grover@samsung.com>
->> ---
->> Documentation/DocBook/media/v4l/controls.xml    |   14 +++++++++++++
->> drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 ++
->> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |   24
->> +++++++++++++++++++++++
->> drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    8 ++------
->> drivers/media/v4l2-core/v4l2-ctrls.c            |   14 +++++++++++++
->> include/uapi/linux/v4l2-controls.h              |    2 ++
->> 6 files changed, 58 insertions(+), 6 deletions(-)
->>
-This patch from the outset looks OK,  but you need to split up
-into two, first adding a v4l control and second one using it up in the driver.
-
-Regards,
---Prabhakar Lad
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 4a73464..fe5243e 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -32,9 +32,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
+-#define LEGACY_GPIO_BASE	0xD8110000
+-#define LEGACY_PMC_BASE		0xD8130000
+-
+ /* Registers in GPIO Controller */
+ #define VT8500_GPIO_MUX_REG	0x200
+ 
+@@ -75,89 +72,61 @@ static void vt8500_power_off(void)
+ void __init vt8500_init(void)
+ {
+ 	struct device_node *np;
+-#if defined(CONFIG_FB_VT8500) || defined(CONFIG_FB_WM8505)
+ 	struct device_node *fb;
+-	void __iomem *gpio_base;
+-#endif
++	void __iomem *base;
+ 
+-#ifdef CONFIG_FB_VT8500
+ 	fb = of_find_compatible_node(NULL, NULL, "via,vt8500-fb");
+ 	if (fb) {
+-		np = of_find_compatible_node(NULL, NULL, "via,vt8500-gpio");
+-		if (np) {
+-			gpio_base = of_iomap(np, 0);
+-
+-			if (!gpio_base)
+-				pr_err("%s: of_iomap(gpio_mux) failed\n",
+-								__func__);
++		np = of_find_compatible_node(NULL, NULL, "via,vt8500-pinctrl");
++		if (!np) {
++			pr_err("pinctrl node required for framebuffer\n");
++			BUG();
++		}
+ 
+-			of_node_put(np);
++		base = of_iomap(np, 0);
++		if (base) {
++			writel(readl(base + VT8500_GPIO_MUX_REG) | 1,
++			       base + VT8500_GPIO_MUX_REG);
++			iounmap(base);
+ 		} else {
+-			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
+-			if (!gpio_base)
+-				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
+-								__func__);
++			pr_err("%s: of_iomap(gpio_mux) failed\n", __func__);
+ 		}
+-		if (gpio_base) {
+-			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) | 1,
+-				gpio_base + VT8500_GPIO_MUX_REG);
+-			iounmap(gpio_base);
+-		} else
+-			pr_err("%s: Could not remap GPIO mux\n", __func__);
+ 
++		of_node_put(np);
+ 		of_node_put(fb);
+ 	}
+-#endif
+ 
+-#ifdef CONFIG_FB_WM8505
+ 	fb = of_find_compatible_node(NULL, NULL, "wm,wm8505-fb");
+ 	if (fb) {
+-		np = of_find_compatible_node(NULL, NULL, "wm,wm8505-gpio");
+-		if (!np)
+-			np = of_find_compatible_node(NULL, NULL,
+-							"wm,wm8650-gpio");
+-		if (np) {
+-			gpio_base = of_iomap(np, 0);
+-
+-			if (!gpio_base)
+-				pr_err("%s: of_iomap(gpio_mux) failed\n",
+-								__func__);
+-
+-			of_node_put(np);
++		np = of_find_compatible_node(NULL, NULL, "wm,prizm-pinctrl");
++		if (!np) {
++			pr_err("pinctrl node required for framebuffer\n");
++			BUG();
++		}
++
++		base = of_iomap(np, 0);
++		if (base) {
++			writel(readl(base + VT8500_GPIO_MUX_REG) |
++			       0x80000000, base + VT8500_GPIO_MUX_REG);
++			iounmap(base);
+ 		} else {
+-			gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
+-			if (!gpio_base)
+-				pr_err("%s: ioremap(legacy_gpio_mux) failed\n",
+-								__func__);
++			pr_err("%s: of_iomap(gpio_mux) failed\n", __func__);
+ 		}
+-		if (gpio_base) {
+-			writel(readl(gpio_base + VT8500_GPIO_MUX_REG) |
+-				0x80000000, gpio_base + VT8500_GPIO_MUX_REG);
+-			iounmap(gpio_base);
+-		} else
+-			pr_err("%s: Could not remap GPIO mux\n", __func__);
+ 
++		of_node_put(np);
+ 		of_node_put(fb);
+ 	}
+-#endif
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "via,vt8500-pmc");
+ 	if (np) {
+ 		pmc_base = of_iomap(np, 0);
+-
+-		if (!pmc_base)
+-			pr_err("%s:of_iomap(pmc) failed\n", __func__);
++		if (pmc_base)
++			pm_power_off = &vt8500_power_off;
++		else
++			pr_err("%s: of_iomap(pmc) failed\n", __func__);
+ 
+ 		of_node_put(np);
+-	} else {
+-		pmc_base = ioremap(LEGACY_PMC_BASE, 0x1000);
+-		if (!pmc_base)
+-			pr_err("%s:ioremap(power_off) failed\n", __func__);
+ 	}
+-	if (pmc_base)
+-		pm_power_off = &vt8500_power_off;
+-	else
+-		pr_err("%s: PMC Hibernation register could not be remapped, not enabling power off!\n", __func__);
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+-- 
+1.7.9.5
