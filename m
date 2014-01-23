@@ -1,35 +1,47 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 23 Jan 2014 11:21:04 +0100
-Subject: [PATCH] [media] s5p-mfc: Add Horizontal and Vertical search range
- for Video Macro Blocks
-In-Reply-To: <019f01cf1823$7e020fa0$7a062ee0$%debski@samsung.com>
-References: <1388400186-22045-1-git-send-email-amit.grover@samsung.com>
- <019f01cf1823$7e020fa0$7a062ee0$%debski@samsung.com>
-Message-ID: <52E0ED10.2020901@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jan 2014 10:30:48 +0000
+Subject: [PATCH RESEND v4 00/37] mtd: st_spi_fsm: Add new driver
+Message-ID: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Version 4:
+  Tended to Brian's review comments
+    - Checkpatch acceptance
+    - MODULE_DEVICE_TABLE() name slip correction
+    - Timeout issue(s) resolved
+    - Potential infinite loop mitigated
+    - Code clarity suggests heeded
+    - Duplication with MTD core code removed
+    - Upgraded to using ROUND_UP() helper
+    - Moved non-shared header code into main driver
+    - Relocated dynamic msg sequence stores into main struct
+    - Averted adaption of static (table) data
+    - Basic whitespace/spelling/data type/dev_err suggestions applied
+  
+Version 3:
+  Okay, this thing should be fully functional now. Identify a chip
+  based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+  Support for various chip quirks added too.
 
-On 23/01/14 11:11, Kamil Debski wrote:
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
->> > b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
->> > index 4ff3b6c..a02e7b8 100644
->> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
->> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
->> > @@ -208,6 +208,24 @@ static struct mfc_control controls[] = {
->> >  		.default_value = 0,
->> >  	},
->> >  	{
->> > +		.id = V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE,
->> > +		.type = V4L2_CTRL_TYPE_INTEGER,
->> > +		.name = "horizontal search range of video macro block",
->
-> This too should be property capitalised. Please mention the motion vectors
-> too. 
+Version 2:
+  The first bunch of these patches have been on the MLs before, but
+  didn't receive a great deal of attention for the most part. We are
+  a little more featureful this time however. We can now successfully
+  setup and configure the N25Q256. We still can't read/write/erase
+  it though. I'll start work on that next week and will provide it in
+  the next instalment.
 
-And additionally length of the name string should not exceed 31 characters.
+Version 1:
+  First stab at getting this thing Mainlined. It doesn't do a great deal
+  yet, but we are able to initialise the device and dynamically set it up
+  correctly based on an extracted JEDEC ID.
 
---
-Thanks,
-Sylwester
+ Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+ arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+ drivers/mtd/devices/Kconfig                      |    8 +
+ drivers/mtd/devices/Makefile                     |    1 +
+ drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
+ drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+7 files changed, 2266 insertions(+)
