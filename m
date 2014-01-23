@@ -1,94 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:30:58 +0000
-Subject: [PATCH RESEND v4 10/37] mtd: st_spi_fsm: Dynamically setup flash
- device based on JEDEC ID
+Date: Thu, 23 Jan 2014 10:31:04 +0000
+Subject: [PATCH RESEND v4 16/37] mtd: st_spi_fsm: Provide the erase one sector
+ sequence
 In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using previously added infrastructure we can now extract a device's JEDEC
-ID, compare it to a list of known and supported devices and make assumptions
-based on known characteristics of a given chip.
+The FSM Serial Flash Controller is driven by issuing a standard set of
+register writes we call a message sequence. This patch supplies a method
+to prepare the message sequence responsible for erasing a single sector.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ drivers/mtd/devices/st_spi_fsm.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 455deef..a70e916 100644
+index 94840b5..5ee6d08 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -240,6 +240,7 @@ struct stfsm {
- 	struct resource		*region;
- 	struct mtd_info		mtd;
- 	struct mutex		lock;
-+	struct flash_info       *info;
- 
- 	uint32_t                fifo_dir_delay;
+@@ -425,6 +425,28 @@ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 		    SEQ_CFG_STARTSEQ),
  };
-@@ -508,6 +509,7 @@ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
  
- static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
- {
-+	struct flash_info	*info;
- 	u16                     ext_jedec;
- 	u32			jedec;
- 	u8			id[5];
-@@ -525,6 +527,15 @@ static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
- 	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
- 		jedec, id[0], id[1], id[2], id[3], id[4]);
- 
-+	for (info = flash_types; info->name; info++) {
-+		if (info->jedec_id == jedec) {
-+			if (info->ext_id && info->ext_id != ext_jedec)
-+				continue;
-+			return info;
-+		}
-+	}
-+	dev_err(fsm->dev, "Unrecognized JEDEC id %06x\n", jedec);
++static struct stfsm_seq stfsm_seq_erase_sector = {
++	/* 'addr_cfg' configured during initialisation */
++	.seq_opc = {
++		(SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++		 SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
 +
- 	return NULL;
- }
- 
-@@ -619,6 +630,7 @@ static int stfsm_init(struct stfsm *fsm)
- static int stfsm_probe(struct platform_device *pdev)
++		(SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++		 SEQ_OPC_OPCODE(FLASH_CMD_SE)),
++	},
++	.seq = {
++		STFSM_INST_CMD1,
++		STFSM_INST_CMD2,
++		STFSM_INST_ADD1,
++		STFSM_INST_ADD2,
++		STFSM_INST_STOP,
++	},
++	.seq_cfg = (SEQ_CFG_PADS_1 |
++		    SEQ_CFG_READNOTWRITE |
++		    SEQ_CFG_CSDEASSERT |
++		    SEQ_CFG_STARTSEQ),
++};
++
+ static inline int stfsm_is_idle(struct stfsm *fsm)
  {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct flash_info *info;
- 	struct resource *res;
- 	struct stfsm *fsm;
- 	int ret;
-@@ -665,7 +677,11 @@ static int stfsm_probe(struct platform_device *pdev)
+ 	return readl(fsm->base + SPI_FAST_SEQ_STA) & 0x10;
+@@ -508,6 +530,19 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
  	}
- 
- 	/* Detect SPI FLASH device */
--	stfsm_jedec_probe(fsm);
-+	info = stfsm_jedec_probe(fsm);
-+	if (!info)
-+		return -ENODEV;
-+
-+	fsm->info = info;
- 
- 	platform_set_drvdata(pdev, fsm);
- 
-@@ -674,6 +690,15 @@ static int stfsm_probe(struct platform_device *pdev)
- 	fsm->mtd.writesize	= 4;
- 	fsm->mtd.writebufsize	= fsm->mtd.writesize;
- 	fsm->mtd.flags		= MTD_CAP_NORFLASH;
-+	fsm->mtd.size		= info->sector_size * info->n_sectors;
-+	fsm->mtd.erasesize	= info->sector_size;
-+
-+	dev_err(&pdev->dev,
-+		"Found serial flash device: %s\n"
-+		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
-+		info->name,
-+		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
-+		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
- 
- 	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
  }
+ 
++/* Configure 'addr_cfg' according to addressing mode */
++static void stfsm_prepare_erasesec_seq(struct stfsm *fsm,
++				       struct stfsm_seq *seq)
++{
++	int addr1_cycles = fsm->info->flags & FLASH_FLAG_32BIT_ADDR ? 16 : 8;
++
++	seq->addr_cfg = (ADR_CFG_CYCLES_ADD1(addr1_cycles) |
++			 ADR_CFG_PADS_1_ADD1 |
++			 ADR_CFG_CYCLES_ADD2(16) |
++			 ADR_CFG_PADS_1_ADD2 |
++			 ADR_CFG_CSDEASSERT_ADD2);
++}
++
+ /* Search for preferred configuration based on available flags */
+ static struct seq_rw_config *
+ stfsm_search_seq_rw_configs(struct stfsm *fsm,
 -- 
 1.8.3.2
