@@ -1,7 +1,7 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Jan 2014 21:55:04 +1300
-Subject: [PATCH v2] vt8500: pinctrl: Change devicetree data parsing
-Message-ID: <1390467304-8701-1-git-send-email-linux@prisktech.co.nz>
+Date: Thu, 23 Jan 2014 21:57:33 +1300
+Subject: [PATCH v2 RESEND] vt8500: pinctrl: Change devicetree data parsing
+Message-ID: <1390467453-8841-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,6 +21,9 @@ v2:
 Minor change in commit message to indicate time since problem occurred.
 Change assigned variable to configs[0] rather than reassigning to pull.
 Add a default case to the switch to prevent static checker errors.
+
+v2 resend:
+Correct Linus' email address
 
  drivers/pinctrl/vt8500/pinctrl-wmt.c |   15 ++++++++++++++-
  1 file changed, 14 insertions(+), 1 deletion(-)
