@@ -1,102 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:01 +0000
-Subject: [PATCH RESEND v4 13/37] mtd: st_spi_fsm: Prepare the read/write FSM
- message sequence(s)
-In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-14-git-send-email-lee.jones@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Jan 2014 12:04:44 +0100
+Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
+In-Reply-To: <20140123115632.6d3f1a58@ipc1.ka-ro>
+References: <20140123083714.3c6e86ae@ipc1.ka-ro>
+ <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
+ <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
+ <20140123115632.6d3f1a58@ipc1.ka-ro>
+Message-ID: <20140123110444.GI16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare read/write FSM message sequence(s) based on chip capability
-and configuration.
+On Thu, Jan 23, 2014 at 11:56:32AM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Sascha Hauer wrote:
+> > of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
+> > but it is only ever used by the of_xlate handler itsel. Remove
+> > of_pwm_n_cells from struct pwm_chip and let the handler do the argument
+> > count checking to simplify the code.
+> > 
+> This still does not make the PWM_POLARITY flag in the pwms node
+> optional as was the goal because of_parse_phandle_with_args() requires
+> at least #pwm-cells arguments in the node.
+> 
+> So, with a DT configuration like:
+> pwm0: pwm at 0 {
+> 	#pwm-cells = <3>;
+> };
+> backlight {
+> 	pwms = <&pwm0 0 100000>;
+> };
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 69 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+We misunderstood each other. My goal was to allow the driver to also
+work with old devicetrees which specify #pwm-cells = <2>, not to allow
+inconsistent devicetrees like the snippet above.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 1803f94..961abfd 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -520,6 +520,75 @@ stfsm_search_seq_rw_configs(struct stfsm *fsm,
- 	return NULL;
- }
- 
-+/* Prepare a READ/WRITE sequence according to configuration parameters */
-+static void stfsm_prepare_rw_seq(struct stfsm *fsm,
-+				 struct stfsm_seq *seq,
-+				 struct seq_rw_config *cfg)
-+{
-+	int addr1_cycles, addr2_cycles;
-+	int i = 0;
-+
-+	memset(seq, 0, sizeof(*seq));
-+
-+	/* Add READ/WRITE OPC  */
-+	seq->seq_opc[i++] = (SEQ_OPC_PADS_1 |
-+			     SEQ_OPC_CYCLES(8) |
-+			     SEQ_OPC_OPCODE(cfg->cmd));
-+
-+	/* Add WREN OPC for a WRITE sequence */
-+	if (cfg->write)
-+		seq->seq_opc[i++] = (SEQ_OPC_PADS_1 |
-+				     SEQ_OPC_CYCLES(8) |
-+				     SEQ_OPC_OPCODE(FLASH_CMD_WREN) |
-+				     SEQ_OPC_CSDEASSERT);
-+
-+	/* Address configuration (24 or 32-bit addresses) */
-+	addr1_cycles  = (fsm->info->flags & FLASH_FLAG_32BIT_ADDR) ? 16 : 8;
-+	addr1_cycles /= cfg->addr_pads;
-+	addr2_cycles  = 16 / cfg->addr_pads;
-+	seq->addr_cfg = ((addr1_cycles & 0x3f) << 0 |	/* ADD1 cycles */
-+			 (cfg->addr_pads - 1) << 6 |	/* ADD1 pads */
-+			 (addr2_cycles & 0x3f) << 16 |	/* ADD2 cycles */
-+			 ((cfg->addr_pads - 1) << 22));	/* ADD2 pads */
-+
-+	/* Data/Sequence configuration */
-+	seq->seq_cfg = ((cfg->data_pads - 1) << 16 |
-+			SEQ_CFG_STARTSEQ |
-+			SEQ_CFG_CSDEASSERT);
-+	if (!cfg->write)
-+		seq->seq_cfg |= SEQ_CFG_READNOTWRITE;
-+
-+	/* Mode configuration (no. of pads taken from addr cfg) */
-+	seq->mode = ((cfg->mode_data & 0xff) << 0 |	/* data */
-+		     (cfg->mode_cycles & 0x3f) << 16 |	/* cycles */
-+		     (cfg->addr_pads - 1) << 22);	/* pads */
-+
-+	/* Dummy configuration (no. of pads taken from addr cfg) */
-+	seq->dummy = ((cfg->dummy_cycles & 0x3f) << 16 |	/* cycles */
-+		      (cfg->addr_pads - 1) << 22);		/* pads */
-+
-+
-+	/* Instruction sequence */
-+	i = 0;
-+	if (cfg->write)
-+		seq->seq[i++] = STFSM_INST_CMD2;
-+
-+	seq->seq[i++] = STFSM_INST_CMD1;
-+
-+	seq->seq[i++] = STFSM_INST_ADD1;
-+	seq->seq[i++] = STFSM_INST_ADD2;
-+
-+	if (cfg->mode_cycles)
-+		seq->seq[i++] = STFSM_INST_MODE;
-+
-+	if (cfg->dummy_cycles)
-+		seq->seq[i++] = STFSM_INST_DUMMY;
-+
-+	seq->seq[i++] =
-+		cfg->write ? STFSM_INST_DATA_WRITE : STFSM_INST_DATA_READ;
-+	seq->seq[i++] = STFSM_INST_STOP;
-+}
-+
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
- {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+Sascha
+
 -- 
-1.8.3.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
