@@ -1,41 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Jan 2014 18:03:35 +0000
-Subject: [PATCH 03/20] ARM64 / ACPI: Introduce the skeleton of _PDC
- related for ARM64
-In-Reply-To: <1389961514-13562-4-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140123180335.GK27520@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 23 Jan 2014 19:09:22 +0100
+Subject: [PATCH 1/5] dt-bindings: document the s3c24xx software-reset
+ register
+In-Reply-To: <2635551.Gy9A9uhyAA@phil>
+References: <3105326.uFdOVLyXH8@phil> <2635551.Gy9A9uhyAA@phil>
+Message-ID: <52E15AD2.7000602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 12:24:57PM +0000, Hanjun Guo wrote:
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + *  Copyright (C) 2013, Al Stone <al.stone@linaro.org>
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; either version 2 of the License, or
-> + *  (at your option) any later version.
-> + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + */
-> +
-> +#ifndef _ASM_ARM64_ACPI_H
-> +#define _ASM_ARM64_ACPI_H
+Hi Heiko,
 
-Nitpick: please use __ASM_ACPI_H as a guard for consistency (the same
-for all the other patches introducing new header files).
+On 06.01.2014 19:37, Heiko St?bner wrote:
+> The S3C2412/S3C2413 as well as the S3C2443 and following contain a special
+> register that restarts the system when written to. This adds a simple
+> binding, so that it gets accessible on dt systems too.
+>
+> We distinguish between the two types (s3c2412, s3c2443) because the
+> handling of the swrst register on the s3c2412 also needs to take care
+> of a hardware glitch at reset time.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   .../devicetree/bindings/arm/samsung/s3c24xx-swrst.txt  |   16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/samsung/s3c24xx-swrst.txt
 
--- 
-Catalin
+Is there really a need to have separate bindings for this?
+
+As far as I can see, the swreset register is a part of the clock 
+controller, so restart function could be provided by clock driver and 
+there would be no need to change anything in DT.
+
+Best regards,
+Tomasz
