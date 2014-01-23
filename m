@@ -1,65 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jan 2014 16:32:19 -0800
-Subject: [PATCH RFC 04/10] base: power: Add generic OF-based power
- domain look-up
-In-Reply-To: <52DD4DB1.2050200@samsung.com>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
- <87r48a8t99.fsf@linaro.org> <52DD4DB1.2050200@samsung.com>
-Message-ID: <20140123003219.GG13785@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 23 Jan 2014 01:35:02 +0100
+Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
+ clear
+In-Reply-To: <20140123001934.GY18269@obsidianresearch.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233537.GS18269@obsidianresearch.com>
+ <20140122164904.GB27273@localhost>
+ <20140122173417.GT18269@obsidianresearch.com> <52E02AB6.7040104@gmail.com>
+ <20140122205213.GW18269@obsidianresearch.com>
+ <20140122221237.GA30763@localhost>
+ <20140122223117.GX18269@obsidianresearch.com> <52E05C4E.9060709@gmail.com>
+ <20140123001934.GY18269@obsidianresearch.com>
+Message-ID: <52E063B6.3070704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20, Tomasz Figa wrote:
-> Hi Kevin,
-> 
-> On 14.01.2014 16:42, Kevin Hilman wrote:
-> >Tomasz Figa <tomasz.figa@gmail.com> writes:
-> >
-> >>This patch introduces generic code to perform power domain look-up using
-> >>device tree and automatically bind devices to their power domains.
-> >>Generic device tree binding is introduced to specify power domains of
-> >>devices in their device tree nodes.
-> >>
-> >>Backwards compatibility with legacy Samsung-specific power domain
-> >>bindings is provided, but for now the new code is not compiled when
-> >>CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
-> >>will change as soon as Exynos power domain code gets converted to use
-> >>the generic framework in further patch.
-> >>
-> >>Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> >
-> >I haven't read through this in detail yet, but wanted to make sure that
-> >the DT representation can handle nested power domains.  At least
-> >SH-mobile has a hierarchy of power domains and the genpd code can handle
-> >that, so wanted to make sure that the DT representation can handle it as
-> >well.
-> 
-> The representation of power domains themselves as implied by this
-> patch is fully platform-specific. The only generic part is the
-> #power-domain-cells property, which defines the number of cells
-> needed to identify the power domain of given provider. You are free
-> to have any platform-specific properties (or even generic ones,
-> added on top of this patch) to let you specify the hierarchy in DT.
-> 
+On 01/23/2014 01:19 AM, Jason Gunthorpe wrote:
+> On Thu, Jan 23, 2014 at 01:03:26AM +0100, Sebastian Hesselbarth wrote:
+>>> Sebastian:
+>>> I looked at the irq-orion driver a bit more and noticed this:
+>>>
+>>>          ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
+>>>                               handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+>>>                             ^^^^^^^^^^^^^^^^^^^^^
+>>> Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
+>>> does this work at all? :)
+>>
+>> I can tell you that it comes from arch/arm/plat-orion/irq.c and I
+>> blindly copied it. I never really checked the differences in handling
+>> level/edge irqs. Besides, if it wasn't working, we wouldn't get far
+>> in booting the kernel without timer irqs.
+>
+> Ezequiel found the ack call I missed, so it makes sense it works.
+>
+> I think the difference in routines only starts to matter when you can
+> get another incoming edge IRQ while already handling one (due to SMP?
+> threaded interrupts? RealTime? not sure)
+>
+>> It also remains asserted if you clear the actual cause of the interrupt
+>> and is only asserted again on the next low-to-high transition.
+>
+> Which is why Ezequiel's patch is the right approach: we need to clear
+> the interrupt latched in the cause register after the watchdog driver
+> disable but before enabling/unmasking the interrupt.
+>
+> Remember, the BRIDGE_MASK register has no effect on the BRIDGE_CAUSE,
+> it only effects which bits propogate to the main cause register.
 
-(Semi-related to this thread, but not really the patchset)
+Yeah, I know. But you don't get new ones if mask them. At least for
+edge triggered irqs, you can also clear them without clearing the
+cause of the interrupt. Nevertheless, I think we agree here.
 
-I'd like to have a way to say that this power domain is a
-subdomain of another domain provided by a different power domain
-provider driver. From what I can tell, the only way to reparent
-domains as of today is by name or reference and you have to make
-a function call to do it (pm_genpd_add_subdomain_names() or
-pm_genpd_add_subdomain()). This is annoying in the case where all
-the power domains are not regsitered within the same driver
-because we don't know which driver comes first.
+>> *BUT*, I will double-check how Linux deals with level/edge irqs and if
+>> Orion SoCs have edge or level triggered cause registers. That should
+>> reveal, if it is more sane to use handle_edge_irq here and possibly in
+>> the main interrupt controller, too.
+>
+> There is a mixture.
+>
+> Any cause bit documented to be clearable is edge triggered, all others
+> are level.
+>
+> On Kirkwood this means all of the main interrupt controller bits are
+> level and all the bridge bits are edge. Which means edge is
+> definitely correct for the bridge handler, and level correct for the
+> main handler.
 
-It would be great if there was a way to specify this relationship
-explicitly when initializing a power domain so that the
-reparenting is done automatically without requiring any explicit
-function call. Perhaps DT could specify this? Or we could add
-another field to the generic_power_domain struct like parent_name?
+Just checked that for Dove, it is the same there. Main IRQ_CAUSE is
+RO, BRIDGE_CAUSE is RW0C, and PMU_CAUSE is RW *sigh*.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I need to remember that when Dove moves over to mach-mvebu, as we need
+a different chained irq handler for PMU that deals with that broken RW
+register.
+
+Sebastian
