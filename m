@@ -1,52 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:00 +0000
-Subject: [PATCH RESEND v4 12/37] mtd: st_spi_fsm: Fetch platform specific
- configurations
+Date: Thu, 23 Jan 2014 10:31:08 +0000
+Subject: [PATCH RESEND v4 20/37] mtd: st_spi_fsm: Provide a method to put the
+ chip into 32bit addressing mode
 In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All supported platforms are able to pass specific configurations via
-the Device Tree on boot. Here we add a function which is to be called
-during the probing process which will extract them, or make other
-assumptions based on capabilities provided.
+Most Serial Flash chips support 24bit addressing as a default but more
+recent incarnations can support 32bit. Based on information provided
+though platform specific data and capabilities we can determine whether
+or not our current chip can. This patch provides a means to setup the
+FSM message sequence to put the chip into 32bit mode.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index efd8fdb..1803f94 100644
+index b21929b..e74513d 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -654,6 +654,16 @@ static int stfsm_init(struct stfsm *fsm)
- 	return 0;
+@@ -411,6 +411,8 @@ static struct flash_info flash_types[] = {
+ 	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
+ };
+ 
++static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
++
+ static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	.data_size = TRANSFER_SIZE(8),
+ 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
+@@ -554,6 +556,23 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
+ 	}
  }
  
-+static void stfsm_fetch_platform_configs(struct platform_device *pdev)
++static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
 +{
-+	struct stfsm *fsm = platform_get_drvdata(pdev);
-+	struct flash_info *info = fsm->info;
++	struct stfsm_seq *seq = &stfsm_seq_en_32bit_addr;
++	uint32_t cmd = enter ? FLASH_CMD_EN4B_ADDR : FLASH_CMD_EX4B_ADDR;
 +
-+	/* Use device size to determine address width */
-+	if (info->sector_size * info->n_sectors > 0xFFFFFF)
-+		info->flags |= FLASH_FLAG_32BIT_ADDR;
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(cmd) |
++			   SEQ_OPC_CSDEASSERT);
++
++	stfsm_load_seq(fsm, seq);
++
++	stfsm_wait_seq(fsm);
++
++	return 0;
 +}
 +
- static int stfsm_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -712,6 +722,8 @@ static int stfsm_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, fsm);
- 
-+	stfsm_fetch_platform_configs(pdev);
-+
- 	fsm->mtd.dev.parent	= &pdev->dev;
- 	fsm->mtd.type		= MTD_NORFLASH;
- 	fsm->mtd.writesize	= 4;
+ /*
+  * SoC reset on 'boot-from-spi' systems
+  *
 -- 
 1.8.3.2
