@@ -1,77 +1,60 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 23 Jan 2014 01:35:02 +0100
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140123001934.GY18269@obsidianresearch.com>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com> <52E02AB6.7040104@gmail.com>
- <20140122205213.GW18269@obsidianresearch.com>
- <20140122221237.GA30763@localhost>
- <20140122223117.GX18269@obsidianresearch.com> <52E05C4E.9060709@gmail.com>
- <20140123001934.GY18269@obsidianresearch.com>
-Message-ID: <52E063B6.3070704@gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 22 Jan 2014 19:38:39 -0500
+Subject: [PATCH RFC 00/73] tree-wide: clean up some no longer required
+ #include <linux/init.h>
+In-Reply-To: <20140122180023.dd90d34cba38d9f9ac516349@canb.auug.org.au>
+References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
+ <20140122180023.dd90d34cba38d9f9ac516349@canb.auug.org.au>
+Message-ID: <20140123003838.GA10182@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2014 01:19 AM, Jason Gunthorpe wrote:
-> On Thu, Jan 23, 2014 at 01:03:26AM +0100, Sebastian Hesselbarth wrote:
->>> Sebastian:
->>> I looked at the irq-orion driver a bit more and noticed this:
->>>
->>>          ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
->>>                               handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
->>>                             ^^^^^^^^^^^^^^^^^^^^^
->>> Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
->>> does this work at all? :)
->>
->> I can tell you that it comes from arch/arm/plat-orion/irq.c and I
->> blindly copied it. I never really checked the differences in handling
->> level/edge irqs. Besides, if it wasn't working, we wouldn't get far
->> in booting the kernel without timer irqs.
->
-> Ezequiel found the ack call I missed, so it makes sense it works.
->
-> I think the difference in routines only starts to matter when you can
-> get another incoming edge IRQ while already handling one (due to SMP?
-> threaded interrupts? RealTime? not sure)
->
->> It also remains asserted if you clear the actual cause of the interrupt
->> and is only asserted again on the next low-to-high transition.
->
-> Which is why Ezequiel's patch is the right approach: we need to clear
-> the interrupt latched in the cause register after the watchdog driver
-> disable but before enabling/unmasking the interrupt.
->
-> Remember, the BRIDGE_MASK register has no effect on the BRIDGE_CAUSE,
-> it only effects which bits propogate to the main cause register.
+[Re: [PATCH RFC 00/73] tree-wide: clean up some no longer required #include <linux/init.h>] On 22/01/2014 (Wed 18:00) Stephen Rothwell wrote:
 
-Yeah, I know. But you don't get new ones if mask them. At least for
-edge triggered irqs, you can also clear them without clearing the
-cause of the interrupt. Nevertheless, I think we agree here.
+> Hi Paul,
+> 
+> On Tue, 21 Jan 2014 16:22:03 -0500 Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> >
+> > Where: This work exists as a queue of patches that I apply to
+> > linux-next; since the changes are fixing some things that currently
+> > can only be found there.  The patch series can be found at:
+> > 
+> >    http://git.kernel.org/cgit/linux/kernel/git/paulg/init.git
+> >    git://git.kernel.org/pub/scm/linux/kernel/git/paulg/init.git
+> > 
+> > I've avoided annoying Stephen with another queue of patches for
+> > linux-next while the development content was in flux, but now that
+> > the merge window has opened, and new additions are fewer, perhaps he
+> > wouldn't mind tacking it on the end...  Stephen?
+> 
+> OK, I have added this to the end of linux-next today - we will see how we
+> go.  It is called "init".
 
->> *BUT*, I will double-check how Linux deals with level/edge irqs and if
->> Orion SoCs have edge or level triggered cause registers. That should
->> reveal, if it is more sane to use handle_edge_irq here and possibly in
->> the main interrupt controller, too.
->
-> There is a mixture.
->
-> Any cause bit documented to be clearable is edge triggered, all others
-> are level.
->
-> On Kirkwood this means all of the main interrupt controller bits are
-> level and all the bridge bits are edge. Which means edge is
-> definitely correct for the bridge handler, and level correct for the
-> main handler.
+Thanks, it was a great help as it uncovered a few issues in fringe arch
+that I didn't have toolchains for, and I've fixed all of those up.
 
-Just checked that for Dove, it is the same there. Main IRQ_CAUSE is
-RO, BRIDGE_CAUSE is RW0C, and PMU_CAUSE is RW *sigh*.
+I've noticed that powerpc has been un-buildable for a while now; I have
+used this hack patch locally so I could run the ppc defconfigs to check
+that I didn't break anything.  Maybe useful for linux-next in the
+interim?  It is a hack patch -- Not-Signed-off-by: Paul Gortmaker.  :)
 
-I need to remember that when Dove moves over to mach-mvebu, as we need
-a different chained irq handler for PMU that deals with that broken RW
-register.
+Paul.
+--
 
-Sebastian
+diff --git a/arch/powerpc/include/asm/pgtable-ppc64.h b/arch/powerpc/include/asm/pgtable-ppc64.h
+index d27960c89a71..d0f070a2b395 100644
+--- a/arch/powerpc/include/asm/pgtable-ppc64.h
++++ b/arch/powerpc/include/asm/pgtable-ppc64.h
+@@ -560,9 +560,9 @@ extern void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
+ 			    pmd_t *pmdp);
+ 
+ #define pmd_move_must_withdraw pmd_move_must_withdraw
+-typedef struct spinlock spinlock_t;
+-static inline int pmd_move_must_withdraw(spinlock_t *new_pmd_ptl,
+-					 spinlock_t *old_pmd_ptl)
++struct spinlock;
++static inline int pmd_move_must_withdraw(struct spinlock *new_pmd_ptl,
++					 struct spinlock *old_pmd_ptl)
+ {
+ 	/*
+ 	 * Archs like ppc64 use pgtable to store per pmd
