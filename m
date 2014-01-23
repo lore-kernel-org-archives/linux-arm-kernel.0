@@ -1,44 +1,39 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Jan 2014 19:43:21 +1300
-Subject: [PATCH] MAINTAINERS: vt8500: Update maintained files for arch/vt8500
-Message-ID: <1390459401-30549-1-git-send-email-linux@prisktech.co.nz>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 23 Jan 2014 15:12:27 +0800
+Subject: [PATCH 1/2] clocksource: Remove outdated comments
+Message-ID: <1390461147-36256-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed maintainership of the ehci-platform.c and uhci-platform.c
-drivers. These drivers are not solely used by arch-vt8500 anymore,
-and are captured under Alan Stern's 'USB EHCI DRIVER' and
-'USB UHCI DRIVER' wildcards.
+clocksource_register() and __clocksource_register_scale()
+always return 0, so the comment is just pointless, it's
+outdated, remove it.
 
-Add maintainership for the VT8500's clock, irq and pinctrl drivers
-which were added/migrated quite some time ago.
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- MAINTAINERS |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ kernel/time/clocksource.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6a6e4ac..ac26897 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1341,14 +1341,15 @@ M:	Tony Prisk <linux@prisktech.co.nz>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-vt8500/
-+F:	drivers/clk/clk-vt8500.c
- F:	drivers/clocksource/vt8500_timer.c
- F:	drivers/i2c/busses/i2c-wmt.c
-+F:	drivers/irqchip/irq-vt8500.c
- F:	drivers/mmc/host/wmt-sdmmc.c
-+F:	drivers/pinctrl/vt8500/
- F:	drivers/pwm/pwm-vt8500.c
- F:	drivers/rtc/rtc-vt8500.c
- F:	drivers/tty/serial/vt8500_serial.c
--F:	drivers/usb/host/ehci-platform.c
--F:	drivers/usb/host/uhci-platform.c
- F:	drivers/video/vt8500lcdfb.*
- F:	drivers/video/wm8505fb*
- F:	drivers/video/wmt_ge_rops.*
+diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+index ba3e502..9951575 100644
+--- a/kernel/time/clocksource.c
++++ b/kernel/time/clocksource.c
+@@ -779,8 +779,6 @@ EXPORT_SYMBOL_GPL(__clocksource_updatefreq_scale);
+  * @scale:	Scale factor multiplied against freq to get clocksource hz
+  * @freq:	clocksource frequency (cycles per second) divided by scale
+  *
+- * Returns -EBUSY if registration fails, zero otherwise.
+- *
+  * This *SHOULD NOT* be called directly! Please use the
+  * clocksource_register_hz() or clocksource_register_khz helper functions.
+  */
+@@ -805,7 +803,6 @@ EXPORT_SYMBOL_GPL(__clocksource_register_scale);
+  * clocksource_register - Used to install new clocksources
+  * @cs:		clocksource to be registered
+  *
+- * Returns -EBUSY if registration fails, zero otherwise.
+  */
+ int clocksource_register(struct clocksource *cs)
+ {
 -- 
-1.7.9.5
+1.7.1
