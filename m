@@ -1,59 +1,51 @@
-From: herrmann.der.user@googlemail.com (Andreas Herrmann)
-Date: Thu, 23 Jan 2014 22:50:46 +0100
-Subject: [PATCH 11/11] arm: dma-mapping: Add support to extend DMA IOMMU
- mappings
-In-Reply-To: <20140122161010.GH14108@mudshark.cambridge.arm.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-12-git-send-email-andreas.herrmann@calxeda.com>
- <20140122161010.GH14108@mudshark.cambridge.arm.com>
-Message-ID: <20140123215046.GF26399@alberich>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 23 Jan 2014 15:57:58 -0600
+Subject: [PATCH 0/2] Enable clock controllers on MSM
+In-Reply-To: <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
+References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
+ <878uu6y5im.fsf@paris.lan>
+ <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
+ <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
+Message-ID: <69BE1300-36E8-400B-BD77-DB89740C10D2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 04:10:11PM +0000, Will Deacon wrote:
-> On Thu, Jan 16, 2014 at 12:44:23PM +0000, Andreas Herrmann wrote:
-> > Instead of using just one bitmap to keep track of IO virtual addresses
-> > (handed out for IOMMU use) introduce a list of iova_ranges (each
-> > having its own bitmap). This allows us to extend existing mappings
-> > when running out of iova space for a mapping.
-> > 
-> > If there is not enough space in the mapping to service an IO virtual
-> > address allocation request, __alloc_iova() tries to extend the mapping
-> > -- by allocating another bitmap -- and makes another allocation
-> > attempt using the freshly allocated bitmap.
-> > 
-> > This allows arm iommu drivers to start with a decent initial size when
-> > an dma_iommu_mapping is created and still to avoid running out of IO
-> > virtual addresses for the mapping.
-> > 
-> > Tests were done on Calxeda ECX-2000 with smmu for sata and xgmac.
-> > I've used SZ_512K both for initial mapping size and grow_size.
-> 
-> Aha, I thought grow_size was the *maximum* size, rather than the incremental
-> size. In which case, you probably want to pick the maximum supported IOMMU
-> page size that satisfies a fixed limit on the bitmap size.
-> 
-> > +static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
-> > +{
-> > +	struct dma_iommu_iova_range *iovar;
-> > +	unsigned int count = mapping->grow_size >> (PAGE_SHIFT + mapping->order);
-> > +	unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> > +
-> > +	if (!mapping->grow_size ||
-> > +		(mapping->size + mapping->grow_size) >= mapping->max_size)
-> > +		return -EINVAL;
-> > +
-> > +	iovar = kzalloc(sizeof(struct dma_iommu_iova_range), GFP_ATOMIC);
-> > +	if (!iovar)
-> > +		return -ENOMEM;
-> > +
-> > +	iovar->bitmap = kzalloc(bitmap_size, GFP_ATOMIC);
-> 
-> Do these allocation really need to be atomic? I worry that's going to have
-> severe restrictions on our ability to allocate large address spaces.
 
-Say some code acquired a lock before calling dma_map_single.
-If we have to extend the mapping in such a path we should not s?eep.
+On Jan 23, 2014, at 2:43 PM, Olof Johansson <olof@lixom.net> wrote:
 
+> On Thu, Jan 23, 2014 at 11:59 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>> 
+>> On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> 
+>>> Stephen Boyd <sboyd@codeaurora.org> writes:
+>>> 
+>>>> These patches add the clock controller nodes, enable the clock drivers
+>>>> on MSM based platforms, and hook it up enough to get the serial console
+>>>> working. This is based on the merge of Mike's clk-next branch with
+>>>> linux-next-20140116. The changes need the clk-next branch because that's
+>>>> where the DTS include files landed.
+>>> 
+>>> I forgot to repond to this earlier, but I tested this on top of -next
+>>> and it gets the dragonboard booting w/mainline.  Yay!
+>>> 
+>>>> Perhaps this can be applied after 3.14-rc1 is out?
+>>> 
+>>> Yeah, sounds good.
+>>> 
+>>> Kevin
+>> 
+>> We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
+> 
+> They're queued for this merge window, right? If so, they'll be in -rc1
+> and the dependency will be solved before we apply the patches.
+> 
 
-Andreas
+Yeah, they look like they are in Mike?s pull request for Linus.  So hopefully they?ll show up in -rc1 (wasn?t sure if Mike intended them for 3.14 or not).
+
+What?s the feeling about pushing DT and defconfig changes into 3.14 (or do we just queue them up for 3.15)?
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
