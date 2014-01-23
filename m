@@ -1,39 +1,58 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 23 Jan 2014 15:41:42 +0100
-Subject: [PATCH] usb: at91-udc: fix irq and iomem resource retrieval
-Message-ID: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 23 Jan 2014 15:45:14 +0100
+Subject: [PATCH] tty: uartps: Initialize ports according to aliases
+Message-ID: <c1882ea5f2e45b19cc1930b624254cb1b59b2fe0.1390488303.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using dt resources retrieval (interrupts and reg properties) there is
-no predefined order for these resources in the platform dev resource
-table. Also don't expect the number of resource to be always 2.
+Register port numbers according to order in DT aliases.
+If aliases are not defined, order in DT is used.
+If aliases are defined, register port id based
+on that.
+This patch ensures proper ttyPS0/1 assignment.
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/usb/gadget/at91_udc.c | 10 ----------
- 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 4cc4fd6..dfd2943 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1710,16 +1710,6 @@ static int at91udc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	if (pdev->num_resources != 2) {
--		DBG("invalid num_resources\n");
--		return -ENODEV;
--	}
--	if ((pdev->resource[0].flags != IORESOURCE_MEM)
--			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
--		DBG("invalid resource type\n");
--		return -ENODEV;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
--- 
-1.8.5.2
+ drivers/tty/serial/xilinx_uartps.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 528f16a..8c09a3b 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1038,10 +1038,20 @@ static struct uart_port *xuartps_get_port(void)
+ 	struct uart_port *port;
+ 	int id;
+
+-	/* Find the next unused port */
+-	for (id = 0; id < XUARTPS_NR_PORTS; id++)
+-		if (xuartps_port[id].mapbase == 0)
+-			break;
++	/* Look for a serialN alias */
++	id = of_alias_get_id(pdev->dev.of_node, "serial");
++	if (id < 0) {
++		dev_warn(&pdev->dev, "failed to get alias id, errno %d\n", id);
++		id = 0;
++	}
++
++	/* Try the given port id if failed use default method */
++	if (xuartps_port[id].mapbase != 0) {
++		/* Find the next unused port */
++		for (id = 0; id < XUARTPS_NR_PORTS; id++)
++			if (xuartps_port[id].mapbase == 0)
++				break;
++	}
+
+ 	if (id >= XUARTPS_NR_PORTS)
+ 		return NULL;
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140123/45598a8d/attachment.sig>
