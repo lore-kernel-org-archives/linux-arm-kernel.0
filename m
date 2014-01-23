@@ -1,94 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:03 +0000
-Subject: [PATCH RESEND v4 15/37] mtd: st_spi_fsm: Fetch boot-device from mode
- pins
+Date: Thu, 23 Jan 2014 10:31:19 +0000
+Subject: [PATCH RESEND v4 31/37] mtd: st_spi_fsm: Add the ability to read the
+ FSM's status
 In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-32-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's important for us to determine which device was used to boot from in
-order to make some correct decisions surrounding Power Management. On
-each of the platforms which support the FSM this is communicated via
-a set of mode pins held in the system configuration area. This patch
-determine the boot device and stores the result.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 41 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 961abfd..94840b5 100644
+index eac23df..5f291dc 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -14,7 +14,9 @@
-  */
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/regmap.h>
- #include <linux/platform_device.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/mtd/mtd.h>
- #include <linux/sched.h>
- #include <linux/delay.h>
-@@ -243,6 +245,7 @@ struct stfsm {
- 	struct flash_info       *info;
- 
- 	uint32_t                fifo_dir_delay;
-+	bool                    booted_from_spi;
- };
- 
- struct stfsm_seq {
-@@ -727,10 +730,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
- {
- 	struct stfsm *fsm = platform_get_drvdata(pdev);
- 	struct flash_info *info = fsm->info;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct regmap *regmap;
-+	uint32_t boot_device_reg;
-+	uint32_t boot_device_spi;
-+	uint32_t boot_device;     /* Value we read from *boot_device_reg */
-+	int ret;
-+
-+	/* Booting from SPI NOR Flash is the default */
-+	fsm->booted_from_spi = true;
- 
- 	/* Use device size to determine address width */
- 	if (info->sector_size * info->n_sectors > 0xFFFFFF)
- 		info->flags |= FLASH_FLAG_32BIT_ADDR;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (!IS_ERR(regmap)) {
-+		ret = PTR_ERR(regmap);
-+		goto boot_device_fail;
-+	}
-+
-+	/* Where in the syscon the boot device information lives */
-+	ret = of_property_read_u32(np, "st,boot-device-reg", &boot_device_reg);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	/* Boot device value when booted from SPI NOR */
-+	ret = of_property_read_u32(np, "st,boot-device-spi", &boot_device_spi);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	ret = regmap_read(regmap, boot_device_reg, &boot_device);
-+	if (ret)
-+		goto boot_device_fail;
-+
-+	if (boot_device != boot_device_spi)
-+		fsm->booted_from_spi = false;
-+
-+	return;
-+
-+boot_device_fail:
-+	dev_warn(&pdev->dev,
-+		 "failed to fetch boot device, assuming boot from SPI\n");
+@@ -778,6 +778,30 @@ static uint8_t stfsm_wait_busy(struct stfsm *fsm)
+ 	return -EIO;
  }
  
- static int stfsm_probe(struct platform_device *pdev)
++static int stfsm_read_status(struct stfsm *fsm, uint8_t cmd,
++			   uint8_t *status)
++{
++	struct stfsm_seq *seq = &stfsm_seq_read_status_fifo;
++	uint32_t tmp;
++
++	dev_dbg(fsm->dev, "reading STA[%s]\n",
++		(cmd == FLASH_CMD_RDSR) ? "1" : "2");
++
++	seq->seq_opc[0] = (SEQ_OPC_PADS_1 |
++			   SEQ_OPC_CYCLES(8) |
++			   SEQ_OPC_OPCODE(cmd)),
++
++	stfsm_load_seq(fsm, seq);
++
++	stfsm_read_fifo(fsm, &tmp, 4);
++
++	*status = (uint8_t)(tmp >> 24);
++
++	stfsm_wait_seq(fsm);
++
++	return 0;
++}
++
+ static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
+ {
+ 	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
 -- 
 1.8.3.2
