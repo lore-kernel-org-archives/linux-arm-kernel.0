@@ -1,124 +1,130 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Jan 2014 14:51:19 +0000
-Subject: [PATCH v3] audit: Add generic compat syscall support
-In-Reply-To: <1389945795-4255-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
- <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
- <1389945795-4255-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140123145119.GE27520@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 23 Jan 2014 17:48:21 +0200
+Subject: [PATCH] ARM: OMAP4+: move errata initialization to
+ omap4_pm_init_early
+In-Reply-To: <1390248397-14112-1-git-send-email-nm@ti.com>
+References: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
+ <1390248397-14112-1-git-send-email-nm@ti.com>
+Message-ID: <52E139C5.3090207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 08:03:15AM +0000, AKASHI Takahiro wrote:
-> lib/audit.c provides a generic definition for auditing system calls.
-> This patch extends it for compat syscall support on bi-architectures
-> (32/64-bit) by adding lib/compat_audit.c when CONFIG_COMPAT enabled.
+On 01/20/2014 10:06 PM, Nishanth Menon wrote:
+> Move all OMAP4 PM errata initializations to centralized location in
+> omap4_pm_init_early. This allows for users to utilize the erratas
+> in various submodules as needed.
 > 
-> Each architecture that wants to use this must define audit_is_compat()
-> in asm/audit.h.
+Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+This patch fixes build failure caused by patch 
+https://patchwork.kernel.org/patch/3084521/ 
+in case if SMP is not enabled.
+
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Reported by Tony here: https://patchwork.kernel.org/patch/3084521/
+> Reproduced with .config: http://slexy.org/view/s2EEdvTGXV on next-20140120 tag (based on omap2plus_defconfig)
+> Applies on v3.13 tag and on next-20140120
+> Tested to boot on next-20140120 along with https://patchwork.kernel.org/patch/3084521/
+> on PandaBoard-ES with multi_v7_defconfig: http://slexy.org/view/s27n0BWrPf
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-
-I'm not familiar with the audit subsystem but I have some (cosmetic)
-comments below.
-
-> diff --git a/include/linux/audit.h b/include/linux/audit.h
-> index bf1ef22..3d71949 100644
-> --- a/include/linux/audit.h
-> +++ b/include/linux/audit.h
-> @@ -78,6 +78,15 @@ extern int is_audit_feature_set(int which);
->  extern int __init audit_register_class(int class, unsigned *list);
->  extern int audit_classify_syscall(int abi, unsigned syscall);
->  extern int audit_classify_arch(int arch);
-> +#if defined(CONFIG_AUDIT_GENERIC) && defined(CONFIG_COMPAT)
-> +extern unsigned compat_write_class[];
-> +extern unsigned compat_read_class[];
-> +extern unsigned compat_dir_class[];
-> +extern unsigned compat_chattr_class[];
-> +extern unsigned compat_signal_class[];
+>   arch/arm/mach-omap2/common.h   |    6 ++++++
+>   arch/arm/mach-omap2/io.c       |    1 +
+>   arch/arm/mach-omap2/omap-smp.c |    6 +-----
+>   arch/arm/mach-omap2/pm44xx.c   |   15 +++++++++++++++
+>   4 files changed, 23 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index 3adaa1d..a6aae30 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -62,11 +62,17 @@ static inline int omap3_pm_init(void)
+>   
+>   #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+>   int omap4_pm_init(void);
+> +int omap4_pm_init_early(void);
+>   #else
+>   static inline int omap4_pm_init(void)
+>   {
+>   	return 0;
+>   }
 > +
-> +extern int audit_classify_compat_syscall(int abi, unsigned syscall);
-> +#endif
->  
->  /* audit_names->type values */
->  #define	AUDIT_TYPE_UNKNOWN	0	/* we don't know yet */
-> diff --git a/lib/Makefile b/lib/Makefile
-> index a459c31..73ea908 100644
-> --- a/lib/Makefile
-> +++ b/lib/Makefile
-> @@ -93,6 +93,9 @@ obj-$(CONFIG_TEXTSEARCH_BM) += ts_bm.o
->  obj-$(CONFIG_TEXTSEARCH_FSM) += ts_fsm.o
->  obj-$(CONFIG_SMP) += percpu_counter.o
->  obj-$(CONFIG_AUDIT_GENERIC) += audit.o
-> +ifeq ($(CONFIG_COMPAT),y)
-> +obj-$(CONFIG_AUDIT_GENERIC) += compat_audit.o
-> +endif
-
-You could use a CONFIG_AUDIT_COMPAT_GENERIC and simplify other #ifdefs
-as well.
-
-> --- a/lib/audit.c
-> +++ b/lib/audit.c
-> @@ -1,6 +1,7 @@
->  #include <linux/init.h>
->  #include <linux/types.h>
->  #include <linux/audit.h>
-> +#include <asm/audit.h>
->  #include <asm/unistd.h>
->  
->  static unsigned dir_class[] = {
-> @@ -30,11 +31,20 @@ static unsigned signal_class[] = {
->  
->  int audit_classify_arch(int arch)
->  {
-> +#ifdef CONFIG_COMPAT
-> +	if (audit_is_compat(arch))
-> +		return 1;
-> +#endif
->  	return 0;
->  }
-
-Here and in other places, just define a default audit_is_compat()
-functions which returns false when !CONFIG_COMPAT to avoid the #ifdefs.
-
-> diff --git a/lib/compat_audit.c b/lib/compat_audit.c
-> new file mode 100644
-> index 0000000..94f6480
-> --- /dev/null
-> +++ b/lib/compat_audit.c
-> @@ -0,0 +1,51 @@
-> +#include <linux/init.h>
-> +#include <linux/types.h>
-> +/* FIXME: this might be architecture dependent */
-> +#include <asm/unistd_32.h>
-
-It most likely is architecture dependent.
-
-> +int audit_classify_compat_syscall(int abi, unsigned syscall)
+> +static inline int omap4_pm_init_early(void)
 > +{
-> +	switch (syscall) {
-> +#ifdef __NR_open
-> +	case __NR_open:
-> +		return 2;
-> +#endif
-> +#ifdef __NR_openat
-> +	case __NR_openat:
-> +		return 3;
-> +#endif
-> +#ifdef __NR_socketcall
-> +	case __NR_socketcall:
-> +		return 4;
-> +#endif
-> +	case __NR_execve:
-> +		return 5;
-> +	default:
-> +		return 1;
-> +	}
+> +	return 0;
 > +}
-
-BTW, since they aren't many, you could get the arch code to define
-__NR_compat_open etc. explicitly and use these. On arm64 we have a few
-of these defined to avoid name collision in signal handling code.
-
--- 
-Catalin
+>   #endif
+>   
+>   #ifdef CONFIG_OMAP_MUX
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index 47381fd..d408b15 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -641,6 +641,7 @@ void __init omap4430_init_early(void)
+>   	omap_cm_base_init();
+>   	omap4xxx_check_revision();
+>   	omap4xxx_check_features();
+> +	omap4_pm_init_early();
+>   	omap44xx_prm_init();
+>   	omap44xx_voltagedomains_init();
+>   	omap44xx_powerdomains_init();
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> index 75e95d4..17550aa 100644
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -39,8 +39,6 @@
+>   
+>   #define OMAP5_CORE_COUNT	0x2
+>   
+> -u16 pm44xx_errata;
+> -
+>   /* SCU base address */
+>   static void __iomem *scu_base;
+>   
+> @@ -217,10 +215,8 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+>   	if (scu_base)
+>   		scu_enable(scu_base);
+>   
+> -	if (cpu_is_omap446x()) {
+> +	if (cpu_is_omap446x())
+>   		startup_addr = omap4460_secondary_startup;
+> -		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
+> -	}
+>   
+>   	/*
+>   	 * Write the address of secondary startup routine into the
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index 82f06989..eefb30c 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -24,6 +24,8 @@
+>   #include "powerdomain.h"
+>   #include "pm.h"
+>   
+> +u16 pm44xx_errata;
+> +
+>   struct power_state {
+>   	struct powerdomain *pwrdm;
+>   	u32 next_state;
+> @@ -199,6 +201,19 @@ static inline int omap4_init_static_deps(void)
+>   }
+>   
+>   /**
+> + * omap4_pm_init_early - Does early initialization necessary for OMAP4+ devices
+> + *
+> + * Initializes basic stuff for power management functionality.
+> + */
+> +int __init omap4_pm_init_early(void)
+> +{
+> +	if (cpu_is_omap446x())
+> +		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+>    * omap4_pm_init - Init routine for OMAP4+ devices
+>    *
+>    * Initializes all powerdomain and clockdomain target states
+> 
