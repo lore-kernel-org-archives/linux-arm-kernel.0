@@ -1,45 +1,48 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 23 Jan 2014 16:50:13 -0600
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <9038342A-D629-479C-819B-EF5F4DB52B50@codeaurora.org>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <201401172349.28229.arnd@arndb.de>
- <20140120225245.GA3530@qualcomm.com> <5548936.L46nLkuVIz@wuerfel>
- <20140121230103.GA3554@qualcomm.com>
- <9038342A-D629-479C-819B-EF5F4DB52B50@codeaurora.org>
-Message-ID: <20140123225013.GA10036@qualcomm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 23 Jan 2014 15:52:08 -0700
+Subject: [PATCH 3/3] irqchip: orion: clear stale interrupts in irq_enable
+In-Reply-To: <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140123225208.GA24778@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 02:17:19PM -0600, Kumar Gala wrote:
-[....]
-> > 
-> > 
-> > Thanks for the clarification.  I think I'll probably do:
-> > ARCH_MSM_DT || (COMPILE_TEST && ARM)
-> 
-> Didn?t you need it to be:
-> 
-> ARCH_MSM_DT || (COMPILE_TEST && OF && ARM)
-> 
-> - k
+On Thu, Jan 23, 2014 at 11:38:06PM +0100, Sebastian Hesselbarth wrote:
+> Bridge IRQ_CAUSE bits are asserted regardless of the corresponding bit in
+> IRQ_MASK register. To avoid interrupt events on stale irqs, we have to clear
+> them before unmask. This installs an .irq_enable callback to ensure stale
+> irqs are cleared before initial unmask.
 
-Yes.  That's the version I am going with.  I might be able to get away without the
-OF if it compiles fine without it, provided it stubs out the OF stuff if the
-config option is not present.
+I'm not sure if putting this in irq_enable is correct. I think this
+should only happen at irq_startup.
 
-> 
-> -- 
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The question boils down to what is supposed to happen with this code
+sequence:
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+disable_irq(..);
+write(.. something to cause an interrupt edge ..);
+.. synchronize ..
+enable_irq(..);
+
+Do we get the interrupt or not?
+
+I found this message from Linus long ago:
+ http://yarchive.net/comp/linux/edge_triggered_interrupts.html
+> Btw, the "disable_irq()/enable_irq()" subsystem has been written so that
+> when you disable an edge-triggered interrupt, and the edge happens while
+> the interrupt is disabled, we will re-play the interrupt at enable time.
+> Exactly so that drivers can have an easier time and don't have to
+> normally worry about whether something is edge or level-triggered.
+
+And found this note in Documentation/DocBook/genericirq.tmpl:
+
+> This prevents losing edge interrupts on hardware which does
+> not store an edge interrupt event while the interrupt is disabled at
+> the hardware level. 
+
+So I think it is very clear that the chip driver should not discard
+edges that happened while the interrupt was disabled.
+
+Regards,
+Jason
