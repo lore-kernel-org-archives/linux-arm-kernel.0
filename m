@@ -1,52 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jan 2014 12:33:41 +0000
-Subject: [PATCHv2 2/2] pwm: imx: support polarity inversion
-In-Reply-To: <20140123115203.GV15937@n2100.arm.linux.org.uk>
-References: <1389859585-14006-1-git-send-email-LW@KARO-electronics.de>
- <1389859585-14006-3-git-send-email-LW@KARO-electronics.de>
- <20140116160356.GY16215@pengutronix.de> <20140123083714.3c6e86ae@ipc1.ka-ro>
- <20140123115203.GV15937@n2100.arm.linux.org.uk>
-Message-ID: <20140123123341.GW15937@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Jan 2014 13:43:14 +0100
+Subject: [PATCH 1/3 RESEND] mfd: tc3589x: Add device tree bindings
+Message-ID: <1390480994-23861-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:52:03AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 23, 2014 at 08:37:14AM +0100, Lothar Wa?mann wrote:
-> > This wouldn't buy much without a material change to of_pwm_get().
-> > The function of_parse_phandle_with_args() called by of_pwm_get()
-> > requires the number of args in the pwms property be greater or equal to
-> > the #pwm-cells property in the pwm node. Thus, the interesting case of
-> > having #pwm-cells = <3> without changing the existing users is
-> > prohibited by of_parse_phandle_with_args().
-> 
-> I really don't think that's a problem we need to be concerned with at
-> the moment.  What we need is for the kernel to be able to parse files
-> with #pwm-cells = <2> with the pwms property containing two arguments,
-> and when they're updated to #pwm-cells = <3> with the pwms property
-> containing three arguments.
-> 
-> Yes, that means all the board dt files need to be updated at the same
-> time to include the additional argument, but I don't see that as a big
-> problem.
-> 
-> What we do need to do is to adjust the PWM parsing code such that it's
-> possible to use either specification without causing any side effects.
-> 
-> I would test this, but as u-boot is rather fscked at the moment and the
-> networking has broken on my cubox-i as a result... and it seems that the
-> u-boot developers have pissed off cubox-i u-boot hackers soo much that
-> they've dropped u-boot in favour of barebox...
+This defines the device tree bindings for the Toshiba TC3589x
+series of multi-purpose expanders. Only the stuff I can test
+is defined: GPIO and keypad. Others may implement more
+subdevices further down the road.
 
-Oh, and another reason... the u-boot video settings are totally and utterly
-buggered to the point that it doesn't produce correct timings, and it seems
-that u-boot people have zero interest in fixing that, so u-boot mainline is
-basically refusing to fix this - another reason to stay away from it.
+This is to complement
+commit a435ae1d51e2f18414f2a87219fdbe068231e692
+"mfd: Enable the tc3589x for Device Tree" which left off
+the definition of the device tree bindings.
 
-(1024x768 @ 60Hz produces 70Hz refresh on iMX6Q here - I've seen it produce
-51Hz on iMX6S, both of which are far enough out that lots of display devices
-will not accept it as a valid signal.)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Fix the keys/rows bindings to be u32 rather than
+  /bits/ 8, inconsistency noted by Mark Rutland.
+ChangeLog v1->v2:
+- Include a verbose example in the DT bindings.
+- Explain why this is a stand-alone bindings patch.
+---
+ Documentation/devicetree/bindings/mfd/tc3589x.txt | 107 ++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/tc3589x.txt
 
+diff --git a/Documentation/devicetree/bindings/mfd/tc3589x.txt b/Documentation/devicetree/bindings/mfd/tc3589x.txt
+new file mode 100644
+index 000000000000..c6ac5bd2ce51
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/tc3589x.txt
+@@ -0,0 +1,107 @@
++* Toshiba TC3589x multi-purpose expander
++
++The Toshiba TC3589x series are I2C-based MFD devices which may expose the
++following built-in devices: gpio, keypad, rotator (vibrator), PWM (for
++e.g. LEDs or vibrators) The included models are:
++
++- TC35890
++- TC35892
++- TC35893
++- TC35894
++- TC35895
++- TC35896
++
++Required properties:
++ - compatible : must be "toshiba,tc35890", "toshiba,tc35892", "toshiba,tc35893",
++   "toshiba,tc35894", "toshiba,tc35895" or "toshiba,tc35896"
++ - reg : I2C address of the device
++ - interrupt-parent : specifies which IRQ controller we're connected to
++ - interrupts : the interrupt on the parent the controller is connected to
++ - interrupt-controller : marks the device node as an interrupt controller
++ - #interrupt-cells : should be <1>, the first cell is the IRQ offset on this
++   TC3589x interrupt controller.
++
++Optional nodes:
++
++- GPIO
++  This GPIO module inside the TC3589x has 24 (TC35890, TC35892) or 20
++  (other models) GPIO lines.
++ - compatible : must be "toshiba,tc3589x-gpio"
++ - interrupts : interrupt on the parent, which must be the tc3589x MFD device
++ - interrupt-controller : marks the device node as an interrupt controller
++ - #interrupt-cells : should be <2>, the first cell is the IRQ offset on this
++   TC3589x GPIO interrupt controller, the second cell is the interrupt flags
++   in accordance with <dt-bindings/interrupt-controller/irq.h>. The following
++   flags are valid:
++   - IRQ_TYPE_LEVEL_LOW
++   - IRQ_TYPE_LEVEL_HIGH
++   - IRQ_TYPE_EDGE_RISING
++   - IRQ_TYPE_EDGE_FALLING
++   - IRQ_TYPE_EDGE_BOTH
++ - gpio-controller : marks the device node as a GPIO controller
++ - #gpio-cells : should be <2>, the first cell is the GPIO offset on this
++   GPIO controller, the second cell is the flags.
++
++- Keypad
++  This keypad is the same on all variants, supporting up to 96 different
++  keys. The linux-specific properties are modeled on those already existing
++  in other input drivers.
++ - compatible : must be "toshiba,tc3589x-keypad"
++ - debounce-delay-ms : debounce interval in milliseconds
++ - keypad,num-rows : number of rows in the matrix, see
++   bindings/input/matrix-keymap.txt
++ - keypad,num-columns : number of columns in the matrix, see
++   bindings/input/matrix-keymap.txt
++ - linux,keymap: the definition can be found in
++   bindings/input/matrix-keymap.txt
++ - linux,no-autorepeat: do no enable autorepeat feature.
++ - linux,wakeup: use any event on keypad as wakeup event.
++
++Example:
++
++tc35893 at 44 {
++	compatible = "toshiba,tc35893";
++	reg = <0x44>;
++	interrupt-parent = <&gpio6>;
++	interrupts = <26 IRQ_TYPE_EDGE_RISING>;
++
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	tc3589x_gpio {
++		compatible = "toshiba,tc3589x-gpio";
++		interrupts = <0>;
++
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++	tc3589x_keypad {
++		compatible = "toshiba,tc3589x-keypad";
++		interrupts = <6>;
++		debounce-delay-ms = <4>;
++		keypad,num-columns = <8>;
++		keypad,num-rows = <8>;
++		linux,no-autorepeat;
++		linux,wakeup;
++		linux,keymap = <0x0301006b
++			        0x04010066
++				0x06040072
++				0x040200d7
++				0x0303006a
++				0x0205000e
++				0x0607008b
++				0x0500001c
++				0x0403000b
++				0x03040034
++				0x05020067
++				0x0305006c
++				0x040500e7
++				0x0005009e
++				0x06020073
++				0x01030039
++				0x07060069
++				0x050500d9>;
++	};
++};
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.4.2
