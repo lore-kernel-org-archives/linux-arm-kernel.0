@@ -1,56 +1,65 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Thu, 23 Jan 2014 10:22:46 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Update EHCI config entry
-In-Reply-To: <000101cf1297$fef674c0$fce35e40$%han@samsung.com>
-References: <1389861264-7305-1-git-send-email-tushar.behera@linaro.org>
- <000101cf1297$fef674c0$fce35e40$%han@samsung.com>
-Message-ID: <023601cf17d9$9f2cf720$dd86e560$@kernel.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Jan 2014 17:46:13 -0800
+Subject: [PATCH v4 00/36] mtd: st_spi_fsm: Add new driver
+In-Reply-To: <20140122125049.GA8586@lee--X1>
+References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
+ <20140108143316.GA14575@lee--X1> <20140122125049.GA8586@lee--X1>
+Message-ID: <20140123014613.GX8919@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo Han wrote:
-> 
-> On Thursday, January 16, 2014 5:34 PM, Tushar Behera wrote:
-> >
-> > Commit 29824c167bea ("USB: host: Rename ehci-s5p to ehci-exynos")
-> > renamed the config entry of EHCI host driver. Similar change needs
-> > to be done in exynos_defconfig as well.
-> >
-> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> 
-> (+cc Vivek Gautam, Yulgon Kim, Julius Werner)
-> 
-> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
-> 
-> Yes, right.
-> I overlooked 'exynos_defconfig', when I changed the name of
-> Exynos EHCI driver. Thank you for sending the patch. :-)
-> 
-> Best regards,
-> Jingoo Han
-> 
-> > ---
-> >  arch/arm/configs/exynos_defconfig |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/configs/exynos_defconfig
-> b/arch/arm/configs/exynos_defconfig
-> > index dbe1f1c..4ce7b70 100644
-> > --- a/arch/arm/configs/exynos_defconfig
-> > +++ b/arch/arm/configs/exynos_defconfig
-> > @@ -94,7 +94,7 @@ CONFIG_FONT_7x14=y
-> >  CONFIG_LOGO=y
-> >  CONFIG_USB=y
-> >  CONFIG_USB_EHCI_HCD=y
-> > -CONFIG_USB_EHCI_S5P=y
-> > +CONFIG_USB_EHCI_EXYNOS=y
-> >  CONFIG_USB_STORAGE=y
-> >  CONFIG_USB_DWC3=y
-> >  CONFIG_USB_PHY=y
-> > --
-> > 1.7.9.5
+Hi Lee,
 
-OK, applied into -fixes.
+On Wed, Jan 22, 2014 at 12:50:49PM +0000, Lee Jones wrote:
+> > Version 4:
+> >   Tended to Brian's previous review comments
+> >     - Checkpatch acceptance
+> >     - MODULE_DEVICE_TABLE() name slip correction
+> >     - Timeout issue(s) resolved
+> >     - Potential infinite loop mitigated
+> >     - Code clarity suggests heeded
+> >     - Duplication with MTD core code removed
+> >     - Upgraded to using ROUND_UP() helper
+> >     - Moved non-shared header code into main driver
+> >     - Relocated dynamic msg sequence stores into main struct
+> >     - Averted adaption of static (table) data
+> >     - Basic whitespace/spelling/data type/dev_err suggestions accepted
+> > 
+> > Version 3:
+> >   Okay, this thing should be fully functional now. Identify a chip
+> >   based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+> >   Support for various chip quirks added too.
+> >  
+> > Version 2:
+> >   The first bunch of these patches have been on the MLs before, but
+> >   didn't receive a great deal of attention for the most part. We are
+> >   a little more featureful this time however. We can now successfully
+> >   setup and configure the N25Q256. We still can't read/write/erase
+> >   it though. I'll start work on that next week and will provide it in
+> >   the next instalment.
+> >  
+> > Version 1:
+> >   First stab at getting this thing Mainlined. It doesn't do a great deal
+> >   yet, but we are able to initialise the device and dynamically set it up
+> >   correctly based on an extracted JEDEC ID.
+> > 
+> >  Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+> >  arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+> >  arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+> >  drivers/mtd/devices/Kconfig                      |    8 +
+> >  drivers/mtd/devices/Makefile                     |    1 +
+> >  drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
+> >  drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  7 files changed, 2266 insertions(+)
+> 
+> Can you confirm receipt of this set, or would you like me to resend?
 
-Thanks,
-Kukjin
+Well, I personally have the patch set but haven't had a chance to review
+it. Can you resend with MTD in the CC, since we haven't had any comments
+anyway? I believe MTD people are much less likely to look at it if you
+forget the CC :)
+
+You can just title it [PATCH RESEND v4 X/Y], possibly with a LKML
+link back to the original v4, if you want to help avoid confusion.
+
+Brian
