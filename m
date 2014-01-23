@@ -1,73 +1,58 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 23 Jan 2014 16:57:13 +0100
-Subject: [PATCH v3 09/15] at91: dt: sam9261: Added support for the LCD display
+Date: Thu, 23 Jan 2014 16:57:15 +0100
+Subject: [PATCH v3 11/15] at91: dt: Adds support for the bus matrix
+ declaration in the device tree
 In-Reply-To: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
 References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1390492639-7299-10-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1390492639-7299-12-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- arch/arm/boot/dts/at91sam9261.dtsi | 39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/mach-at91/setup.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 97e6b62..79d7554 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -57,6 +57,17 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 7d3f7cc..f61638d 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -483,6 +483,28 @@ end:
+ 	of_node_put(np);
+ }
  
-+		fb0: fb at 0x00600000 {
-+			compatible = "atmel,at91sam9261-lcdc";
-+			reg = <0x00600000 0x1000>;
-+			interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_fb>;
-+			clocks = <&lcd_clk>, <&hclk1>;
-+			clock-names = "lcdc_clk", "hclk";
-+			status = "disabled";
-+		};
++static struct of_device_id matrix_ids[] = {
++	{ .compatible = "atmel,at91sam9261-bus-matrix", },
++	{ /*sentinel*/ }
++};
 +
- 		nand0: nand at 40000000 {
- 			compatible = "atmel,at91rm9200-nand";
- 			#address-cells = <1>;
-@@ -432,6 +443,34 @@
- 					};
- 				};
++static void at91_dt_matrix(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, matrix_ids);
++	if (!np) {
++		pr_debug("AT91: unable to find compatible bus matrix controller node in dtb\n");
++		return;
++	}
++
++	at91_matrix_base = of_iomap(np, 0);
++	if (!at91_matrix_base)
++		panic("Impossible to ioremap at91_matrix_base\n");
++
++	of_node_put(np);
++}
++
+ void __init at91rm9200_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
+@@ -502,6 +524,7 @@ void __init at91_dt_initialize(void)
+ 	at91_dt_rstc();
+ 	at91_dt_ramc();
+ 	at91_dt_shdwc();
++	at91_dt_matrix();
  
-+				fb {
-+					pinctrl_fb: fb-0 {
-+						atmel,pins =
-+							<AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 7 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 8 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 9 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 10 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 11 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 18 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 19 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 20 AT91_PERIPH_A AT91_PINCTRL_NONE
-+							 AT91_PIOB 23 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOB 24 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOB 25 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOB 26 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOB 27 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 AT91_PIOB 28 AT91_PERIPH_B AT91_PINCTRL_NONE
-+							 >;
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
+ 	/* Init clock subsystem */
+ 	at91_dt_clock_init();
 -- 
 1.8.5.2
