@@ -1,45 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jan 2014 16:53:50 +0000
-Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
-In-Reply-To: <20140123110444.GI16215@pengutronix.de>
-References: <20140123083714.3c6e86ae@ipc1.ka-ro>
- <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
- <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
- <20140123115632.6d3f1a58@ipc1.ka-ro> <20140123110444.GI16215@pengutronix.de>
-Message-ID: <20140123165349.GY15937@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 23 Jan 2014 09:04:46 -0800
+Subject: [GIT PULL] bcm driver updates for 3.14
+In-Reply-To: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
+ (Christian Daudt's message of "Sun, 5 Jan 2014 22:58:36 -0800")
+References: <CAEPRUYpgHhrVCoRAzF_WbQZGTpwSahQq8G40+9=pf36-n9V_hg@mail.gmail.com>
+Message-ID: <87k3dqy6hd.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 12:04:44PM +0100, Sascha Hauer wrote:
-> On Thu, Jan 23, 2014 at 11:56:32AM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Sascha Hauer wrote:
-> > > of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
-> > > but it is only ever used by the of_xlate handler itsel. Remove
-> > > of_pwm_n_cells from struct pwm_chip and let the handler do the argument
-> > > count checking to simplify the code.
-> > > 
-> > This still does not make the PWM_POLARITY flag in the pwms node
-> > optional as was the goal because of_parse_phandle_with_args() requires
-> > at least #pwm-cells arguments in the node.
-> > 
-> > So, with a DT configuration like:
-> > pwm0: pwm at 0 {
-> > 	#pwm-cells = <3>;
-> > };
-> > backlight {
-> > 	pwms = <&pwm0 0 100000>;
-> > };
-> 
-> We misunderstood each other. My goal was to allow the driver to also
-> work with old devicetrees which specify #pwm-cells = <2>, not to allow
-> inconsistent devicetrees like the snippet above.
+Christian Daudt <bcm@fixthebug.org> writes:
 
-In which case, the patch I've posted seems to do that job too... I'm
-just about to test out the three-cell version.
+> The following changes since commit 319e2e3f63c348a9b66db4667efa73178e18b17d:
+>
+>   Linux 3.13-rc4 (2013-12-15 12:31:33 -0800)
+>
+> are available in the git repository at:
+>
+>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-drivers
+>
+> for you to fetch changes up to e257c5f6e1cad35d15c06d713b2d1a26f883bbcb:
+>
+>   clk: bcm281xx: define U32_MAX conditionally for now (2013-12-31
+> 09:54:45 -0800)
+>
+> ----------------------------------------------------------------
+> Clk driver for bcm mobile SoCs
+>
+> ----------------------------------------------------------------
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Pulled into late/soc.  
+
+Kevin
