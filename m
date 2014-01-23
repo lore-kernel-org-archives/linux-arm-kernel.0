@@ -1,37 +1,21 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Jan 2014 13:52:20 +0100
-Subject: [PATCH] pwm: Remove obsolete HAVE_PWM Kconfig symbol
-In-Reply-To: <1389884494-13729-1-git-send-email-s.hauer@pengutronix.de>
-References: <1389884494-13729-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140123125219.GC28527@ulmo.nvidia.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Thu, 23 Jan 2014 12:54:59 +0000
+Subject: [PATCH v2 1/4] pinctrl: st: Add Interrupt support.
+In-Reply-To: <CACRpkdZV7TBP7Ac1MPVSAgJeqWtDQEuT3dHjUJHgDTeX9_datw@mail.gmail.com>
+References: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
+ <1389886613-31945-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdZV7TBP7Ac1MPVSAgJeqWtDQEuT3dHjUJHgDTeX9_datw@mail.gmail.com>
+Message-ID: <52E11123.3050803@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 04:01:34PM +0100, Sascha Hauer wrote:
-> Before we had the PWM framework we used to have a barebone PWM api. The
-> HAVE_PWM Kconfig symbol used to be selected by the PWM drivers to specify
-> the PWM API is present in the kernel. Since the last legacy driver is gone
-> the HAVE_PWM symbol can go aswell.
+On 23/01/14 07:22, Linus Walleij wrote:
+> I've applied this patch so that it won't just sit idle.
+> Besides you've done a real good job on it Srinivas.
+Thanks Linus W.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
+> It'll be for v3.15 though and I'm still waiting to see if
+> the device tree people say something about it.
 > 
-> I suggest that Thierry as PWM Maintainer takes the patch through his tree.
-> Is that ok for you Thierry?
-
-Yes, that'd be my preference as well. Perhaps you can resend and add a
-few more people on Cc. In particular I'd like at least Russell's (ARM)
-and Ralf's (MIPS) Acked-by. Dmitry was already Cc'ed for input/misc.
-
-The patch is rather minimal, but I'd still like to give them an
-opportunity to object or at least see the patch.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140123/41881aa1/attachment-0001.sig>
+> Yours,
+> Linus Walleij
