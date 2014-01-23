@@ -1,145 +1,94 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:14 +0000
-Subject: [PATCH RESEND v4 26/37] mtd: st_spi_fsm: Add the ability to read from
- a Serial Flash device
+Date: Thu, 23 Jan 2014 10:31:03 +0000
+Subject: [PATCH RESEND v4 15/37] mtd: st_spi_fsm: Fetch boot-device from mode
+ pins
 In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-27-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a read is issued by userspace the MFD framework calls back into
-the driver to conduct the actual command issue and data extraction.
-Here we provide the routines which do exactly that.
+It's important for us to determine which device was used to boot from in
+order to make some correct decisions surrounding Power Management. On
+each of the platforms which support the FSM this is communicated via
+a set of mode pins held in the system configuration area. This patch
+determine the boot device and stores the result.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 99 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 99 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 41 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index a5b9d67..b43fed1 100644
+index 961abfd..94840b5 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -236,6 +236,9 @@
- #define FLASH_CMD_READ4_1_1_4  0x6c
- #define FLASH_CMD_READ4_1_4_4  0xec
- 
-+#define FLASH_PAGESIZE         256			/* In Bytes    */
-+#define FLASH_PAGESIZE_32      (FLASH_PAGESIZE / 4)	/* In uint32_t */
-+
- /*
-  * Flags to tweak operation of default read/write/erase routines
+@@ -14,7 +14,9 @@
   */
-@@ -935,6 +938,100 @@ static int stfsm_n25q_config(struct stfsm *fsm)
- 	return 0;
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/regmap.h>
+ #include <linux/platform_device.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/sched.h>
+ #include <linux/delay.h>
+@@ -243,6 +245,7 @@ struct stfsm {
+ 	struct flash_info       *info;
+ 
+ 	uint32_t                fifo_dir_delay;
++	bool                    booted_from_spi;
+ };
+ 
+ struct stfsm_seq {
+@@ -727,10 +730,48 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+ {
+ 	struct stfsm *fsm = platform_get_drvdata(pdev);
+ 	struct flash_info *info = fsm->info;
++	struct device_node *np = pdev->dev.of_node;
++	struct regmap *regmap;
++	uint32_t boot_device_reg;
++	uint32_t boot_device_spi;
++	uint32_t boot_device;     /* Value we read from *boot_device_reg */
++	int ret;
++
++	/* Booting from SPI NOR Flash is the default */
++	fsm->booted_from_spi = true;
+ 
+ 	/* Use device size to determine address width */
+ 	if (info->sector_size * info->n_sectors > 0xFFFFFF)
+ 		info->flags |= FLASH_FLAG_32BIT_ADDR;
++
++	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
++	if (!IS_ERR(regmap)) {
++		ret = PTR_ERR(regmap);
++		goto boot_device_fail;
++	}
++
++	/* Where in the syscon the boot device information lives */
++	ret = of_property_read_u32(np, "st,boot-device-reg", &boot_device_reg);
++	if (ret)
++		goto boot_device_fail;
++
++	/* Boot device value when booted from SPI NOR */
++	ret = of_property_read_u32(np, "st,boot-device-spi", &boot_device_spi);
++	if (ret)
++		goto boot_device_fail;
++
++	ret = regmap_read(regmap, boot_device_reg, &boot_device);
++	if (ret)
++		goto boot_device_fail;
++
++	if (boot_device != boot_device_spi)
++		fsm->booted_from_spi = false;
++
++	return;
++
++boot_device_fail:
++	dev_warn(&pdev->dev,
++		 "failed to fetch boot device, assuming boot from SPI\n");
  }
  
-+static int stfsm_read(struct stfsm *fsm, uint8_t *buf, uint32_t size,
-+		      uint32_t offset)
-+{
-+	struct stfsm_seq *seq = &stfsm_seq_read;
-+	uint32_t data_pads;
-+	uint32_t read_mask;
-+	uint32_t size_ub;
-+	uint32_t size_lb;
-+	uint32_t size_mop;
-+	uint32_t tmp[4];
-+	uint32_t page_buf[FLASH_PAGESIZE_32];
-+	uint8_t *p;
-+
-+	dev_dbg(fsm->dev, "reading %d bytes from 0x%08x\n", size, offset);
-+
-+	/* Enter 32-bit address mode, if required */
-+	if (fsm->configuration & CFG_READ_TOGGLE_32BIT_ADDR)
-+		stfsm_enter_32bit_addr(fsm, 1);
-+
-+	/* Must read in multiples of 32 cycles (or 32*pads/8 Bytes) */
-+	data_pads = ((seq->seq_cfg >> 16) & 0x3) + 1;
-+	read_mask = (data_pads << 2) - 1;
-+
-+	/* Handle non-aligned buf */
-+	p = ((uint32_t)buf & 0x3) ? (uint8_t *)page_buf : buf;
-+
-+	/* Handle non-aligned size */
-+	size_ub = (size + read_mask) & ~read_mask;
-+	size_lb = size & ~read_mask;
-+	size_mop = size & read_mask;
-+
-+	seq->data_size = TRANSFER_SIZE(size_ub);
-+	seq->addr1 = (offset >> 16) & 0xffff;
-+	seq->addr2 = offset & 0xffff;
-+
-+	stfsm_load_seq(fsm, seq);
-+
-+	if (size_lb)
-+		stfsm_read_fifo(fsm, (uint32_t *)p, size_lb);
-+
-+	if (size_mop) {
-+		stfsm_read_fifo(fsm, tmp, read_mask + 1);
-+		memcpy(p + size_lb, &tmp, size_mop);
-+	}
-+
-+	/* Handle non-aligned buf */
-+	if ((uint32_t)buf & 0x3)
-+		memcpy(buf, page_buf, size);
-+
-+	/* Wait for sequence to finish */
-+	stfsm_wait_seq(fsm);
-+
-+	stfsm_clear_fifo(fsm);
-+
-+	/* Exit 32-bit address mode, if required */
-+	if (fsm->configuration & CFG_READ_TOGGLE_32BIT_ADDR)
-+		stfsm_enter_32bit_addr(fsm, 0);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Read an address range from the flash chip. The address range
-+ * may be any size provided it is within the physical boundaries.
-+ */
-+static int stfsm_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
-+			  size_t *retlen, u_char *buf)
-+{
-+	struct stfsm *fsm = dev_get_drvdata(mtd->dev.parent);
-+	uint32_t bytes;
-+
-+	dev_dbg(fsm->dev, "%s from 0x%08x, len %zd\n",
-+		__func__, (u32)from, len);
-+
-+	mutex_lock(&fsm->lock);
-+
-+	while (len > 0) {
-+		bytes = min_t(size_t, len, FLASH_PAGESIZE);
-+
-+		stfsm_read(fsm, buf, bytes, from);
-+
-+		buf += bytes;
-+		from += bytes;
-+		len -= bytes;
-+
-+		if (retlen)
-+			*retlen += bytes;
-+	}
-+
-+	mutex_unlock(&fsm->lock);
-+
-+	return 0;
-+}
-+
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
- {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
-@@ -1203,6 +1300,8 @@ static int stfsm_probe(struct platform_device *pdev)
- 	fsm->mtd.size		= info->sector_size * info->n_sectors;
- 	fsm->mtd.erasesize	= info->sector_size;
- 
-+	fsm->mtd._read  = stfsm_mtd_read;
-+
- 	dev_err(&pdev->dev,
- 		"Found serial flash device: %s\n"
- 		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
+ static int stfsm_probe(struct platform_device *pdev)
 -- 
 1.8.3.2
