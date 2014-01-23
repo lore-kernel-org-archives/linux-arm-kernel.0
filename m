@@ -1,44 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Jan 2014 12:04:44 +0100
-Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
-In-Reply-To: <20140123115632.6d3f1a58@ipc1.ka-ro>
-References: <20140123083714.3c6e86ae@ipc1.ka-ro>
- <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
- <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
- <20140123115632.6d3f1a58@ipc1.ka-ro>
-Message-ID: <20140123110444.GI16215@pengutronix.de>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 23 Jan 2014 12:09:14 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <87sisfjeba.fsf@natisbad.org>
+References: <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
+ <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
+ <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
+ <20140122222641.GD29184@titan.lakedaemon.net> <87mwin4ozf.fsf@natisbad.org>
+ <20140122235620.GC20359@xanatos> <87sisfjeba.fsf@natisbad.org>
+Message-ID: <20140123110914.GA22913@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:56:32AM +0100, Lothar Wa?mann wrote:
-> Hi,
+On Thu, Jan 23, 2014 at 09:24:41AM +0100, Arnaud Ebalard wrote:
+> Hi Sarah,
 > 
-> Sascha Hauer wrote:
-> > of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
-> > but it is only ever used by the of_xlate handler itsel. Remove
-> > of_pwm_n_cells from struct pwm_chip and let the handler do the argument
-> > count checking to simplify the code.
-> > 
-> This still does not make the PWM_POLARITY flag in the pwms node
-> optional as was the goal because of_parse_phandle_with_args() requires
-> at least #pwm-cells arguments in the node.
+> Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
 > 
-> So, with a DT configuration like:
-> pwm0: pwm at 0 {
-> 	#pwm-cells = <3>;
-> };
-> backlight {
-> 	pwms = <&pwm0 0 100000>;
-> };
+> >> > Can you pinpoint the commit that introduced the regression?
+> >> 
+> >> f5182b4155b9d686c5540a6822486400e34ddd98 "xhci: Disable MSI for some Fresco Logic hosts."
+> >> 
+> >> Technically, this is not per se the commit which introduced the
+> >> regression but the one that *partially* fixed it by introducing the XHCI
+> >> quirk to skip MSI enabling for Fresco Logic chips. The thing is it
+> >> should have included the FL1009 in the targets. Sarah, can you confirm
+> >> this?
+> >
+> > I don't know if it should have included FL1009, it was just a guess,
+> > based on the fact that the 0x1000 and 0x1400 devices did need MSI
+> > disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
+> > not sure if/when I'll get a response back.
+> >
+> > That still doesn't necessarily rule out MSI issues in the Marvell PCI
+> > host controller code.  Can you attach another PCI device with MSI
+> > support under the host and see if it works?
+> 
+> The various Armada-based devices I have are NAS which do not have PCIe
+> slots to plug additional devices (everything is soldered). I don't know
+> which device Thomas used for its tests. Just in case, I also added Willy
+> in CC: who have various boards and may also have done more test with
+> additional PCIe devices and CONFIG_PCI_MSI enabled on 3.13 kernel.
 
-We misunderstood each other. My goal was to allow the driver to also
-work with old devicetrees which specify #pwm-cells = <2>, not to allow
-inconsistent devicetrees like the snippet above.
+I've been running an intel i350 dual-port NIC (igb driver) supporting
+MSI on the mirabox, and it used to work in 3.10+many of the patches
+coming from the Free-electrons team. Some recent changes to the PCI
+code introduced a regression preventing this driver from correctly
+registering an MSI interrupt, and I did not have enough time to
+investigate it deep enough to fix it. That said, I know how to hack
+it to work again, so if it can be of any use, I can run a test on
+the mirabox (armada370) and on the XPGP board (armadaXP).
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Willy
