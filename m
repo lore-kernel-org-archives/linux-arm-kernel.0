@@ -1,67 +1,28 @@
-From: marc.ceeeee@gmail.com (Marc C)
-Date: Wed, 22 Jan 2014 17:48:29 -0800
-Subject: [PATCH v5 7/8] ARM: brcmstb: gic: add compatible string for
- Broadcom Brahma15
-In-Reply-To: <CAGVrzcbPyaSe0aEHt157kz=quvsrBCPOUriCVG27fJfasa45jg@mail.gmail.com>
-References: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
- <1390361452-3124-8-git-send-email-marc.ceeeee@gmail.com>
- <CAGVrzcbPyaSe0aEHt157kz=quvsrBCPOUriCVG27fJfasa45jg@mail.gmail.com>
-Message-ID: <52E074ED.5000906@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Jan 2014 17:49:06 -0800
+Subject: [RFC PATCH 1/9] mtd: nand: retrieve ECC requirements from Hynix
+ READ ID byte 4
+In-Reply-To: <1389190924-26226-2-git-send-email-b.brezillon@overkiz.com>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+ <1389190924-26226-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20140123014906.GY8919@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
++ Huang
 
-> Do not we also need to update drivers/irqchip/irq-gic.c to look for
-> this compatible property? Alternatively should the example DTS contain
-> the following:
->
-> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
+Hi Boris,
 
-Patch #8 [1] of this series has the "compatible" string set exactly that way. I was
-following the pattern seen in the other reference DTS files, where "arm,cortex-a15-gic" is
-used as the fall-back.
+On Wed, Jan 08, 2014 at 03:21:56PM +0100, Boris BREZILLON wrote:
+> The Hynix nand flashes store their ECC requirements in byte 4 of its id
+> (returned on READ ID command).
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 
-Thanks,
-Marc C
+I haven't verified yet (perhaps Huang can confirm?), but this may be
+similar to a patch Huang submitted recently. In his case, we found that
+this table is actually quite unreliable and is likely hard to maintain.
 
-[1] https://lkml.org/lkml/2014/1/21/649
+Why do you need this ECC information, for my reference?
 
-On 01/22/2014 02:40 PM, Florian Fainelli wrote:
-> Hi Marc,
-> 
-> 2014/1/21 Marc Carino <marc.ceeeee@gmail.com>:
->> Document the Broadcom Brahma B15 GIC implementation as compatible
->> with the ARM GIC standard.
->>
->> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
->> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Do not we also need to update drivers/irqchip/irq-gic.c to look for
-> this compatible property? Alternatively should the example DTS contain
-> the following:
-> 
-> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
-> 
->> ---
->>  Documentation/devicetree/bindings/arm/gic.txt |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->> index 3dfb0c0..d7409fd 100644
->> --- a/Documentation/devicetree/bindings/arm/gic.txt
->> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->> @@ -15,6 +15,7 @@ Main node required properties:
->>         "arm,cortex-a9-gic"
->>         "arm,cortex-a7-gic"
->>         "arm,arm11mp-gic"
->> +       "brcm,brahma-b15-gic"
->>  - interrupt-controller : Identifies the node as an interrupt controller
->>  - #interrupt-cells : Specifies the number of cells needed to encode an
->>    interrupt source.  The type shall be a <u32> and the value shall be 3.
->> --
->> 1.7.1
->>
-> 
-> 
-> 
+Brian
