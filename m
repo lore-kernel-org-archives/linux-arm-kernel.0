@@ -1,47 +1,59 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 23 Jan 2014 09:24:41 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <20140122235620.GC20359@xanatos> (Sarah Sharp's message of "Wed,
- 22 Jan 2014 15:56:20 -0800")
-References: <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
- <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
- <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
- <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
- <20140122222641.GD29184@titan.lakedaemon.net>
- <87mwin4ozf.fsf@natisbad.org> <20140122235620.GC20359@xanatos>
-Message-ID: <87sisfjeba.fsf@natisbad.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 23 Jan 2014 16:17:33 +0800
+Subject: [PATCH 2/2] clocksource: Make clocksource register functions void
+In-Reply-To: <52E0CD18.5080104@prisktech.co.nz>
+References: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>	<52E0C889.6000106@prisktech.co.nz>
+ <CAMuHMdUcKb8m71Z7dUo86MQ_KZgPujxsduUUt3Mz8Oke+DLSVw@mail.gmail.com>
+ <52E0CD18.5080104@prisktech.co.nz>
+Message-ID: <52E0D01D.3080403@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sarah,
+On 2014/1/23 16:04, Tony Prisk wrote:
+> On 23/01/14 20:58, Geert Uytterhoeven wrote:
+>> On Thu, Jan 23, 2014 at 8:45 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>>>>    -static inline int clocksource_register_hz(struct clocksource *cs, u32
+>>>> hz)
+>>>> +static inline void clocksource_register_hz(struct clocksource *cs, u32
+>>>> hz)
+>>>>    {
+>>>>          return __clocksource_register_scale(cs, 1, hz);
+>>>>    }
+>>>
+>>> This doesn't make sense - you are still returning a value on a function
+>>> declared void, and the return is now from a function that doesn't return
+>>> anything either ?!?!
+>>> Doesn't this throw a compile-time warning??
+>> No, passing on void in functions returning void doesn't cause compiler
+>> warnings.
+>>
+>> Gr{oetje,eeting}s,
+>>
+>>                          Geert
+>>
+>> -- 
+>> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>>
+>> In personal conversations with technical people, I call myself a hacker. But
+>> when I'm talking to journalists I just say "programmer" or something like that.
+>>                                  -- Linus Torvalds
+> Doesn't seem right to me (even if there is no warning) but that's probably because I used to program in Pascal where functions with no return were 'procedures' :)
+> Whether it needs to be changed or not:
+> 
+> For the vt8500 part -
+> Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
+Thanks!
 
->> > Can you pinpoint the commit that introduced the regression?
->> 
->> f5182b4155b9d686c5540a6822486400e34ddd98 "xhci: Disable MSI for some Fresco Logic hosts."
->> 
->> Technically, this is not per se the commit which introduced the
->> regression but the one that *partially* fixed it by introducing the XHCI
->> quirk to skip MSI enabling for Fresco Logic chips. The thing is it
->> should have included the FL1009 in the targets. Sarah, can you confirm
->> this?
->
-> I don't know if it should have included FL1009, it was just a guess,
-> based on the fact that the 0x1000 and 0x1400 devices did need MSI
-> disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
-> not sure if/when I'll get a response back.
->
-> That still doesn't necessarily rule out MSI issues in the Marvell PCI
-> host controller code.  Can you attach another PCI device with MSI
-> support under the host and see if it works?
+> 
+> Regards
+> Tony Prisk
+> 
+> 
+> .
+> 
 
-The various Armada-based devices I have are NAS which do not have PCIe
-slots to plug additional devices (everything is soldered). I don't know
-which device Thomas used for its tests. Just in case, I also added Willy
-in CC: who have various boards and may also have done more test with
-additional PCIe devices and CONFIG_PCI_MSI enabled on 3.13 kernel.
 
-Cheers,
-
-a+
+-- 
+Thanks!
+Yijing
