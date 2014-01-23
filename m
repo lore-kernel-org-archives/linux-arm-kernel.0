@@ -1,65 +1,67 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 22 Jan 2014 17:46:13 -0800
-Subject: [PATCH v4 00/36] mtd: st_spi_fsm: Add new driver
-In-Reply-To: <20140122125049.GA8586@lee--X1>
-References: <1389188840-14306-1-git-send-email-lee.jones@linaro.org>
- <20140108143316.GA14575@lee--X1> <20140122125049.GA8586@lee--X1>
-Message-ID: <20140123014613.GX8919@ld-irv-0074>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Wed, 22 Jan 2014 17:48:29 -0800
+Subject: [PATCH v5 7/8] ARM: brcmstb: gic: add compatible string for
+ Broadcom Brahma15
+In-Reply-To: <CAGVrzcbPyaSe0aEHt157kz=quvsrBCPOUriCVG27fJfasa45jg@mail.gmail.com>
+References: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
+ <1390361452-3124-8-git-send-email-marc.ceeeee@gmail.com>
+ <CAGVrzcbPyaSe0aEHt157kz=quvsrBCPOUriCVG27fJfasa45jg@mail.gmail.com>
+Message-ID: <52E074ED.5000906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Florian,
 
-On Wed, Jan 22, 2014 at 12:50:49PM +0000, Lee Jones wrote:
-> > Version 4:
-> >   Tended to Brian's previous review comments
-> >     - Checkpatch acceptance
-> >     - MODULE_DEVICE_TABLE() name slip correction
-> >     - Timeout issue(s) resolved
-> >     - Potential infinite loop mitigated
-> >     - Code clarity suggests heeded
-> >     - Duplication with MTD core code removed
-> >     - Upgraded to using ROUND_UP() helper
-> >     - Moved non-shared header code into main driver
-> >     - Relocated dynamic msg sequence stores into main struct
-> >     - Averted adaption of static (table) data
-> >     - Basic whitespace/spelling/data type/dev_err suggestions accepted
-> > 
-> > Version 3:
-> >   Okay, this thing should be fully functional now. Identify a chip
-> >   based on it's JEDEC ID, Read, Write, Erase (all or by sector).
-> >   Support for various chip quirks added too.
-> >  
-> > Version 2:
-> >   The first bunch of these patches have been on the MLs before, but
-> >   didn't receive a great deal of attention for the most part. We are
-> >   a little more featureful this time however. We can now successfully
-> >   setup and configure the N25Q256. We still can't read/write/erase
-> >   it though. I'll start work on that next week and will provide it in
-> >   the next instalment.
-> >  
-> > Version 1:
-> >   First stab at getting this thing Mainlined. It doesn't do a great deal
-> >   yet, but we are able to initialise the device and dynamically set it up
-> >   correctly based on an extracted JEDEC ID.
-> > 
-> >  Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
-> >  arch/arm/boot/dts/stih416-b2105.dts              |   14 +
-> >  arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
-> >  drivers/mtd/devices/Kconfig                      |    8 +
-> >  drivers/mtd/devices/Makefile                     |    1 +
-> >  drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
-> >  drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  7 files changed, 2266 insertions(+)
+> Do not we also need to update drivers/irqchip/irq-gic.c to look for
+> this compatible property? Alternatively should the example DTS contain
+> the following:
+>
+> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
+
+Patch #8 [1] of this series has the "compatible" string set exactly that way. I was
+following the pattern seen in the other reference DTS files, where "arm,cortex-a15-gic" is
+used as the fall-back.
+
+Thanks,
+Marc C
+
+[1] https://lkml.org/lkml/2014/1/21/649
+
+On 01/22/2014 02:40 PM, Florian Fainelli wrote:
+> Hi Marc,
 > 
-> Can you confirm receipt of this set, or would you like me to resend?
-
-Well, I personally have the patch set but haven't had a chance to review
-it. Can you resend with MTD in the CC, since we haven't had any comments
-anyway? I believe MTD people are much less likely to look at it if you
-forget the CC :)
-
-You can just title it [PATCH RESEND v4 X/Y], possibly with a LKML
-link back to the original v4, if you want to help avoid confusion.
-
-Brian
+> 2014/1/21 Marc Carino <marc.ceeeee@gmail.com>:
+>> Document the Broadcom Brahma B15 GIC implementation as compatible
+>> with the ARM GIC standard.
+>>
+>> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+> 
+> Do not we also need to update drivers/irqchip/irq-gic.c to look for
+> this compatible property? Alternatively should the example DTS contain
+> the following:
+> 
+> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
+> 
+>> ---
+>>  Documentation/devicetree/bindings/arm/gic.txt |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>> index 3dfb0c0..d7409fd 100644
+>> --- a/Documentation/devicetree/bindings/arm/gic.txt
+>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>> @@ -15,6 +15,7 @@ Main node required properties:
+>>         "arm,cortex-a9-gic"
+>>         "arm,cortex-a7-gic"
+>>         "arm,arm11mp-gic"
+>> +       "brcm,brahma-b15-gic"
+>>  - interrupt-controller : Identifies the node as an interrupt controller
+>>  - #interrupt-cells : Specifies the number of cells needed to encode an
+>>    interrupt source.  The type shall be a <u32> and the value shall be 3.
+>> --
+>> 1.7.1
+>>
+> 
+> 
+> 
