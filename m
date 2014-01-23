@@ -1,32 +1,36 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Thu, 23 Jan 2014 21:01:37 +0530
-Subject: [PATCH v8 6/6] arm64: KGDB: Add KGDB config
-In-Reply-To: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
-References: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1390491097-25457-5-git-send-email-vijay.kilari@gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 23 Jan 2014 10:46:45 -0500 (EST)
+Subject: [PATCH 2/2] ehci-platform: Add support for controllers with
+ big-endian regs / descriptors
+In-Reply-To: <20140123000330.00002567@openwrt.org>
+Message-ID: <Pine.LNX.4.44L0.1401231044110.1279-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+On Thu, 23 Jan 2014, Jonas Gorski wrote:
 
-Add HAVE_ARCH_KGDB for arm64 Kconfig
+> On Wed, 22 Jan 2014 16:17:42 -0500 (EST)
+> Alan Stern <stern@rowland.harvard.edu> wrote:
+> 
+> > On Wed, 22 Jan 2014, Jonas Gorski wrote:
+> > 
+> > > If it's safe to set ehci->big_endian_{desc,mmio} from the _probe()
+> > > routine, then maybe the pdata sets in _reset() should be moved into here
+> > > instead of adding extra cludges/checks into _reset().
+> > 
+> > Why?  What difference would it make?
+> 
+> Effectivewise none, but to me it seems to be cleaner to set them once in
+> probe() instead of everytime reset() is called.
+> 
+> I admit I don't know the code flow good enough if reset() is called
+> more than once in the lifetime of a hcd device.
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
----
- arch/arm64/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Only once.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6d4dd22..c7a08e0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -28,6 +28,7 @@ config ARM64
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_MEMBLOCK
- 	select HAVE_PERF_EVENTS
-+	select HAVE_ARCH_KGDB
- 	select IRQ_DOMAIN
- 	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
--- 
-1.7.9.5
+> And as I said, it would allow doing the checks the patch adds for both
+> DT and !DT, not just DT only.
+
+That's true.  Or the checks could be moved into the probe routine.
+
+Alan Stern
