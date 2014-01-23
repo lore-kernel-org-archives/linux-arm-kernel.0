@@ -1,59 +1,131 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jan 2014 17:36:42 +0000
-Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
-In-Reply-To: <20140123165349.GY15937@n2100.arm.linux.org.uk>
-References: <20140123083714.3c6e86ae@ipc1.ka-ro>
- <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
- <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
- <20140123115632.6d3f1a58@ipc1.ka-ro> <20140123110444.GI16215@pengutronix.de>
- <20140123165349.GY15937@n2100.arm.linux.org.uk>
-Message-ID: <20140123173642.GZ15937@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Jan 2014 17:50:31 +0000
+Subject: [PATCH 11/20] ARM64 / ACPI: Get the enable method for SMP
+ initialization
+In-Reply-To: <1389961514-13562-12-git-send-email-hanjun.guo@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-12-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140123175031.GJ27520@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 04:53:50PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 23, 2014 at 12:04:44PM +0100, Sascha Hauer wrote:
-> > On Thu, Jan 23, 2014 at 11:56:32AM +0100, Lothar Wa?mann wrote:
-> > > Hi,
-> > > 
-> > > Sascha Hauer wrote:
-> > > > of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
-> > > > but it is only ever used by the of_xlate handler itsel. Remove
-> > > > of_pwm_n_cells from struct pwm_chip and let the handler do the argument
-> > > > count checking to simplify the code.
-> > > > 
-> > > This still does not make the PWM_POLARITY flag in the pwms node
-> > > optional as was the goal because of_parse_phandle_with_args() requires
-> > > at least #pwm-cells arguments in the node.
-> > > 
-> > > So, with a DT configuration like:
-> > > pwm0: pwm at 0 {
-> > > 	#pwm-cells = <3>;
-> > > };
-> > > backlight {
-> > > 	pwms = <&pwm0 0 100000>;
-> > > };
-> > 
-> > We misunderstood each other. My goal was to allow the driver to also
-> > work with old devicetrees which specify #pwm-cells = <2>, not to allow
-> > inconsistent devicetrees like the snippet above.
-> 
-> In which case, the patch I've posted seems to do that job too... I'm
-> just about to test out the three-cell version.
+On Fri, Jan 17, 2014 at 12:25:05PM +0000, Hanjun Guo wrote:
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -48,6 +48,7 @@
+>  #include <asm/sections.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/ptrace.h>
+> +#include <asm/acpi.h>
+>  
+>  /*
+>   * as from 2.5, kernels no longer have an init_tasks structure
+> @@ -280,7 +281,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
+>   * cpu logical map array containing MPIDR values related to logical
+>   * cpus. Assumes that cpu_logical_map(0) has already been initialized.
+>   */
+> -void __init smp_init_cpus(void)
+> +static int __init of_smp_init_cpus(void)
+>  {
+>  	struct device_node *dn = NULL;
+>  	unsigned int i, cpu = 1;
+> @@ -364,6 +365,10 @@ next:
+>  		cpu++;
+>  	}
+>  
+> +	/* No device tree or no CPU node in DT */
+> +	if (cpu == 1 && !bootcpu_valid)
+> +		return -ENODEV;
+> +
+>  	/* sanity check */
+>  	if (cpu > NR_CPUS)
+>  		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+> @@ -371,7 +376,7 @@ next:
+>  
+>  	if (!bootcpu_valid) {
+>  		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
+> -		return;
+> +		return -EINVAL;
+>  	}
+>  
+>  	/*
+> @@ -381,6 +386,39 @@ next:
+>  	for (i = 0; i < NR_CPUS; i++)
+>  		if (cpu_logical_map(i) != INVALID_HWID)
+>  			set_cpu_possible(i, true);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * In ACPI mode, the cpu possible map was enumerated before SMP
+> + * initialization when MADT table was parsed, so we can get the
+> + * possible map here to initialize CPUs.
+> + */
+> +static void __init acpi_smp_init_cpus(void)
+> +{
+> +	int cpu;
+> +	const char *enable_method;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		enable_method = acpi_get_enable_method(cpu);
+> +		if (!enable_method)
+> +			continue;
+> +
+> +		cpu_ops[cpu] = cpu_get_ops(enable_method);
+> +		if (!cpu_ops[cpu])
+> +			continue;
+> +
+> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
+> +	}
+> +}
+> +
+> +void __init smp_init_cpus(void)
+> +{
+> +	if (!of_smp_init_cpus())
+> +		return;
+> +
+> +	acpi_smp_init_cpus();
+>  }
 
-Okay, this works, but there's a problem with pwm-leds.
+With DT we initialise the cpu_ops[0] via cpu_read_bootcpu_ops() called
+from setup_arch(). This is needed because with PSCI we use cpu_ops for
+power management even if it's a UP system. Do you get a some kernel
+warning about device node for the boot cpu not found?
 
-When the duty cycle is set to zero (when you set the brightness to zero)
-pwm-leds decides to disable the PWM after configuring it.  This causes
-the PWM output to be driven low, causing the LED to go to maximum
-brightness.
+> --- a/drivers/acpi/plat/arm-core.c
+> +++ b/drivers/acpi/plat/arm-core.c
+> @@ -367,6 +367,32 @@ static void __init acpi_process_madt(void)
+>  }
+>  
+>  /*
+> + * To see PCSI is enabled or not.
+> + *
+> + * PSCI is not available for ACPI 5.0, return FALSE for now.
+> + *
+> + * FIXME: should we introduce early_param("psci", func) for test purpose?
+> + */
+> +static bool acpi_psci_smp_available(int cpu)
+> +{
+> +	return FALSE;
+> +}
+> +
+> +static const char *enable_method[] = {
+> +	"psci",
+> +	"spin-table",
+> +	NULL
+> +};
+> +
+> +const char *acpi_get_enable_method(int cpu)
+> +{
+> +	if (acpi_psci_smp_available(cpu))
+> +		return enable_method[0];
+> +	else
+> +		return enable_method[1];
+> +}
 
-So, using the inversion at PWM level doesn't work.
-
-To make this work correctly, we really need pwm-leds to do the inversion
-rather than setting the inversion bit in hardware.
+You could just use literal strings here, actually even ignoring PSCI
+until available.
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Catalin
