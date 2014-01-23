@@ -1,162 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 23 Jan 2014 00:13:32 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6sl-evk: Add PFUZE100 support
-Message-ID: <1390443213-14061-1-git-send-email-festevam@gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 23 Jan 2014 10:16:37 +0800
+Subject: [PATCH 2/3] ARM: kexec: copying code to ioremapped area
+In-Reply-To: <20140122132734.GB15937@n2100.arm.linux.org.uk>
+References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
+ <1390389916-8711-3-git-send-email-wangnan0@huawei.com>
+ <20140122132734.GB15937@n2100.arm.linux.org.uk>
+Message-ID: <52E07B85.6030709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 2014/1/22 21:27, Russell King - ARM Linux wrote:
+> On Wed, Jan 22, 2014 at 07:25:15PM +0800, Wang Nan wrote:
+>> ARM's kdump is actually corrupted (at least for omap4460), mainly because of
+>> cache problem: flush_icache_range can't reliably ensure the copied data
+>> correctly goes into RAM.
+> 
+> Quite right too.  You're mistake here is thinking that flush_icache_range()
+> should push it to RAM.  That's incorrect.
+> 
+> flush_icache_range() is there to deal with such things as loadable modules
+> and self modifying code, where the MMU is not being turned off.  Hence, it
+> only flushes to the point of coherency between the I and D caches, and
+> any further levels of cache between that point and memory are not touched.
+> Why should it touch any more levels - it's not the function's purpose.
+> 
+>> After mmu turned off and jump to the trampoline, kexec always failed due
+>> to random undef instructions.
+> 
+> We already have code in the kernel which deals with shutting the MMU off.
+> An instance of how this can be done is illustrated in the soft_restart()
+> code path, and kexec already uses this.
+> 
+> One of the first things soft_restart() does is turn off the outer cache -
+> which OMAP4 does have, but this can only be done if there is a single CPU
+> running.  If there's multiple CPUs running, then the outer cache can't be
+> disabled, and that's the most likely cause of the problem you're seeing.
+> 
 
-imx6sl-evk board has Freescale PFUZE100 regulator, so add support for it.
+You are right, commit b25f3e1c (OMAP4/highbank: Flush L2 cache before disabling)
+solves my problem, it flushes outer cache before disabling. I have tested it in
+UP and SMP situations and it works (actually, omap4 has not ready to support kexec
+in SMP case, I insert an empty cpu_kill() to make it work), so the first 2
+patches are unneeded.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts  | 110 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sl-pingrp.h |   4 ++
- 2 files changed, 114 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index f23b5d1..5ba15ab 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -46,6 +46,112 @@
- 	};
- };
- 
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
- &ecspi1 {
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 11 0>;
-@@ -86,6 +192,10 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX6SL_I2C1_PINGRP1>;
-+		};
-+
- 		pinctrl_ecspi1: ecspi1grp {
- 			fsl,pins = <MX6SL_ECSPI1_PINGRP1>;
- 		};
-diff --git a/arch/arm/boot/dts/imx6sl-pingrp.h b/arch/arm/boot/dts/imx6sl-pingrp.h
-index ead26d4..cada37a 100644
---- a/arch/arm/boot/dts/imx6sl-pingrp.h
-+++ b/arch/arm/boot/dts/imx6sl-pingrp.h
-@@ -15,6 +15,10 @@
- 	MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI		0x100b1 \
- 	MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK		0x100b1
- 
-+#define MX6SL_I2C1_PINGRP1 \
-+	MX6SL_PAD_I2C1_SCL__I2C1_SCL			0x4001b8b1 \
-+	MX6SL_PAD_I2C1_SDA__I2C1_SDA			0x4001b8b1
-+
- #define MX6SL_FEC_PINGRP1 \
- 	MX6SL_PAD_FEC_MDC__FEC_MDC			0x1b0b0 \
- 	MX6SL_PAD_FEC_MDIO__FEC_MDIO			0x1b0b0 \
--- 
-1.8.1.2
+What about the 3rd one (ARM: allow kernel to be loaded in middle of phymem)?
