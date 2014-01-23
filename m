@@ -1,102 +1,128 @@
-From: mlocke@codeaurora.org (Matthew Locke)
-Date: Thu, 23 Jan 2014 13:11:50 -0600
-Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
-In-Reply-To: <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
-References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
- <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
-Message-ID: <174308F1-FFD2-4CB3-AEA2-C423F90FB133@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Jan 2014 14:15:07 -0500 (EST)
+Subject: [PATCH 3/3] ARM: allow kernel to be loaded in middle of phymem
+In-Reply-To: <1390389916-8711-4-git-send-email-wangnan0@huawei.com>
+References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
+ <1390389916-8711-4-git-send-email-wangnan0@huawei.com>
+Message-ID: <alpine.LFD.2.11.1401231357520.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Wed, 22 Jan 2014, Wang Nan wrote:
 
-On Jan 20, 2014, at 8:10 AM, Rob Herring wrote:
+> This patch allows the kernel to be loaded at the middle of kernel awared
+> physical memory. Before this patch, users must use mem= or device tree to cheat
+> kernel about the start address of physical memory.
+> 
+> This feature is useful in some special cases, for example, building a crash
+> dump kernel. Without it, kernel command line, atag and devicetree must be
+> adjusted carefully, sometimes is impossible.
 
-> On Fri, Jan 17, 2014 at 5:03 PM, Bjorn Andersson
-> <bjorn.andersson@sonymobile.com> wrote:
->> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
->> 
->> The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
->> provide input and output FIFO's for it. I2C controller can operate
->> as master with supported bus speeds of 100Kbps and 400Kbps.
->> 
->> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
->> [bjorn: reformulated part of binding description and cleaned up example]
->> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->> ---
-> 
-> Patch history?
-> 
->> .../devicetree/bindings/i2c/qcom,i2c-qup.txt       | 41 ++++++++++++++++++++++
->> 1 file changed, 41 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->> new file mode 100644
->> index 0000000..a99711b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
->> @@ -0,0 +1,41 @@
->> +Qualcomm Universal Peripheral (QUP) I2C controller
->> +
->> +Required properties:
->> + - compatible: Should be "qcom,i2c-qup".
-> 
-> Seems a bit generic. All versions of the IP are exactly the same?
-> "qcom,<chip>-i2c-qup" would be better.
+With CONFIG_PATCH_PHYS_VIRT the value for PHYS_OFFSET is determined 
+dynamically by rounding down the kernel image start address to the 
+previous 16MB boundary.  In the case of a crash kernel, this might be 
+cleaner to simply readjust __pv_phys_offset during early boot and call 
+fixup_pv_table(), and then reserve away the memory from the previous 
+kernel.  That will let you access that memory directly (with gdb for 
+example) and no pointer address translation will be required.
 
-The QUP IP block is the same across chips.  Its possible there could be different versions of the IP block but its pretty stable now. 
 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Cc: <stable@vger.kernel.org> # 3.4+
+> Cc: Eric Biederman <ebiederm@xmission.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Geng Hui <hui.geng@huawei.com>
+> ---
+>  arch/arm/mm/init.c | 21 ++++++++++++++++++++-
+>  arch/arm/mm/mmu.c  | 13 +++++++++++++
+>  mm/page_alloc.c    |  7 +++++--
+>  3 files changed, 38 insertions(+), 3 deletions(-)
 > 
->> + - reg: Should contain QUP register address and length.
->> + - interrupts: Should contain I2C interrupt.
->> +
->> + - clocks: Should contain the core clock and the AHB clock.
->> + - clock-names: Should be "core" for the core clock and "iface" for the
->> +                AHB clock.
->> +
->> + - #address-cells: Should be <1> Address cells for i2c device address
->> + - #size-cells: Should be <0> as i2c addresses have no size component
->> +
->> +Optional properties:
->> + - clock-frequency: Should specify the desired i2c bus clock frequency in Hz,
->> +                    default is 100kHz if omitted.
->> +
->> +Child nodes should conform to i2c bus binding.
->> +
->> +Example:
->> +
->> + i2c2: i2c at f9924000 {
->> +       compatible = "qcom,i2c-qup";
->> +       reg = <0xf9924000 0x1000>;
->> +       interrupts = <0 96 0>;
->> +
->> +       clocks = <&gcc_blsp1_qup2_i2c_apps_clk>, <&gcc_blsp1_ahb_clk>;
->> +       clock-names = "core", "iface";
->> +
->> +       clock-frequency = <355000>;
->> +
->> +       #address-cells = <1>;
->> +       #size-cells = <0>;
->> +
->> +       dummy at 60 {
->> +               compatible = "dummy";
->> +               reg = <0x60>;
->> +       };
->> + };
->> +
->> --
->> 1.8.2.2
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 3e8f106..4952726 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -334,9 +334,28 @@ void __init arm_memblock_init(struct meminfo *mi,
+>  {
+>  	int i;
+>  
+> -	for (i = 0; i < mi->nr_banks; i++)
+> +	for (i = 0; i < mi->nr_banks; i++) {
+>  		memblock_add(mi->bank[i].start, mi->bank[i].size);
+>  
+> +		/*
+> +		 * In some special case, for example, building a crushdump
+> +		 * kernel, we want the kernel to be loaded in the middle of
+> +		 * physical memory. In such case, the physical memory before
+> +		 * PHYS_OFFSET is awkward: it can't get directly mapped
+> +		 * (because its address will be smaller than PAGE_OFFSET,
+> +		 * disturbs user address space) also can't be mapped as
+> +		 * HighMem. We reserve such pages here. The only way to access
+> +		 * those pages is ioremap.
+> +		 */
+> +		if (mi->bank[i].start < PHYS_OFFSET) {
+> +			unsigned long reserv_size = PHYS_OFFSET -
+> +						    mi->bank[i].start;
+> +			if (reserv_size > mi->bank[i].size)
+> +				reserv_size = mi->bank[i].size;
+> +			memblock_reserve(mi->bank[i].start, reserv_size);
+> +		}
+> +	}
+> +
+>  	/* Register the kernel text, kernel data and initrd with memblock. */
+>  #ifdef CONFIG_XIP_KERNEL
+>  	memblock_reserve(__pa(_sdata), _end - _sdata);
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 580ef2d..2a17c24 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1308,6 +1308,19 @@ static void __init map_lowmem(void)
+>  		if (start >= end)
+>  			break;
+>  
+> +		/*
+> +		 * If this memblock contain memory before PAGE_OFFSET, memory
+> +		 * before PAGE_OFFSET should't get directly mapped, see code
+> +		 * in create_mapping(). However, memory after PAGE_OFFSET is
+> +		 * occupyed by kernel and still need to be mapped.
+> +		 */
+> +		if (__phys_to_virt(start) < PAGE_OFFSET) {
+> +			if (__phys_to_virt(end) > PAGE_OFFSET)
+> +				start = __virt_to_phys(PAGE_OFFSET);
+> +			else
+> +				break;
+> +		}
+> +
+>  		map.pfn = __phys_to_pfn(start);
+>  		map.virtual = __phys_to_virt(start);
+>  		map.length = end - start;
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 5248fe0..d2959e3 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -4840,10 +4840,13 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
+>  	 */
+>  	if (pgdat == NODE_DATA(0)) {
+>  		mem_map = NODE_DATA(0)->node_mem_map;
+> -#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+> +		/*
+> +		 * In case of CONFIG_HAVE_MEMBLOCK_NODE_MAP or when kernel
+> +		 * loaded at the middle of physical memory, mem_map should
+> +		 * be adjusted.
+> +		 */
+>  		if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
+>  			mem_map -= (pgdat->node_start_pfn - ARCH_PFN_OFFSET);
+> -#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+>  	}
+>  #endif
+>  #endif /* CONFIG_FLAT_NODE_MEM_MAP */
+> -- 
+> 1.8.4
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
