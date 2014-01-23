@@ -1,47 +1,43 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 23 Jan 2014 13:59:28 -0600
-Subject: [PATCH 0/2] Enable clock controllers on MSM
-In-Reply-To: <878uu6y5im.fsf@paris.lan>
-References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
- <878uu6y5im.fsf@paris.lan>
-Message-ID: <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Jan 2014 15:01:09 -0500 (EST)
+Subject: [PATCH 3/3] ARM: allow kernel to be loaded in middle of phymem
+In-Reply-To: <20140123193137.GA15937@n2100.arm.linux.org.uk>
+References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
+ <1390389916-8711-4-git-send-email-wangnan0@huawei.com>
+ <alpine.LFD.2.11.1401231357520.1652@knanqh.ubzr>
+ <20140123193137.GA15937@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1401231443060.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 23 Jan 2014, Russell King - ARM Linux wrote:
 
-On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
-
-> Stephen Boyd <sboyd@codeaurora.org> writes:
+> On Thu, Jan 23, 2014 at 02:15:07PM -0500, Nicolas Pitre wrote:
+> > On Wed, 22 Jan 2014, Wang Nan wrote:
+> > 
+> > > This patch allows the kernel to be loaded at the middle of kernel awared
+> > > physical memory. Before this patch, users must use mem= or device tree to cheat
+> > > kernel about the start address of physical memory.
+> > > 
+> > > This feature is useful in some special cases, for example, building a crash
+> > > dump kernel. Without it, kernel command line, atag and devicetree must be
+> > > adjusted carefully, sometimes is impossible.
+> > 
+> > With CONFIG_PATCH_PHYS_VIRT the value for PHYS_OFFSET is determined 
+> > dynamically by rounding down the kernel image start address to the 
+> > previous 16MB boundary.  In the case of a crash kernel, this might be 
+> > cleaner to simply readjust __pv_phys_offset during early boot and call 
+> > fixup_pv_table(), and then reserve away the memory from the previous 
+> > kernel.  That will let you access that memory directly (with gdb for 
+> > example) and no pointer address translation will be required.
 > 
->> These patches add the clock controller nodes, enable the clock drivers
->> on MSM based platforms, and hook it up enough to get the serial console
->> working. This is based on the merge of Mike's clk-next branch with
->> linux-next-20140116. The changes need the clk-next branch because that's
->> where the DTS include files landed.
-> 
-> I forgot to repond to this earlier, but I tested this on top of -next
-> and it gets the dragonboard booting w/mainline.  Yay!
-> 
->> Perhaps this can be applied after 3.14-rc1 is out?
-> 
-> Yeah, sounds good.
-> 
-> Kevin
+> We already have support in the kernel to ignore memory below the calculated
+> PHYS_OFFSET.  See 571b14375019c3a66ef70d4d4a7083f4238aca30.
 
-We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
+Sure.  Anyway what I'm suggesting above  would require that the crash 
+kernel be linked at a different virtual address for that to work.  
+That's probably more trouble than simply mapping the otherwise still 
+unmapped memory from the crashed kernel.
 
-> Stephen Boyd (2):
->>  ARM: dts: msm: Add clock controller nodes and hook into uart
->>  ARM: msm_defconfig: Enable MSM clock drivers
->> 
->> arch/arm/boot/dts/qcom-msm8660-surf.dts | 11 +++++++++++
->> arch/arm/boot/dts/qcom-msm8960-cdp.dts  | 18 ++++++++++++++++++
->> arch/arm/boot/dts/qcom-msm8974.dtsi     | 24 ++++++++++++++++++++++++
->> arch/arm/configs/msm_defconfig          |  4 ++++
->> 4 files changed, 57 insertions(+)
 
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Nicolas
