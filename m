@@ -1,39 +1,39 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 23 Jan 2014 12:22:12 -0800
-Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
-In-Reply-To: <174308F1-FFD2-4CB3-AEA2-C423F90FB133@codeaurora.org>
-References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
- <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
- <174308F1-FFD2-4CB3-AEA2-C423F90FB133@codeaurora.org>
-Message-ID: <CAJAp7OhvFdC2OR_YO5Gh6x1q8TPWEDY58d-BQ5jw=B=31i5V2w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 23 Jan 2014 12:43:28 -0800
+Subject: [PATCH 0/2] Enable clock controllers on MSM
+In-Reply-To: <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
+References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
+ <878uu6y5im.fsf@paris.lan>
+ <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
+Message-ID: <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:11 AM, Matthew Locke <mlocke@codeaurora.org> wrote:
-> Rob,
+On Thu, Jan 23, 2014 at 11:59 AM, Kumar Gala <galak@codeaurora.org> wrote:
 >
-> On Jan 20, 2014, at 8:10 AM, Rob Herring wrote:
+> On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
 >
->> On Fri, Jan 17, 2014 at 5:03 PM, Bjorn Andersson
-[...]
->>> +Required properties:
->>> + - compatible: Should be "qcom,i2c-qup".
+>> Stephen Boyd <sboyd@codeaurora.org> writes:
 >>
->> Seems a bit generic. All versions of the IP are exactly the same?
->> "qcom,<chip>-i2c-qup" would be better.
+>>> These patches add the clock controller nodes, enable the clock drivers
+>>> on MSM based platforms, and hook it up enough to get the serial console
+>>> working. This is based on the merge of Mike's clk-next branch with
+>>> linux-next-20140116. The changes need the clk-next branch because that's
+>>> where the DTS include files landed.
+>>
+>> I forgot to repond to this earlier, but I tested this on top of -next
+>> and it gets the dragonboard booting w/mainline.  Yay!
+>>
+>>> Perhaps this can be applied after 3.14-rc1 is out?
+>>
+>> Yeah, sounds good.
+>>
+>> Kevin
 >
-> The QUP IP block is the same across chips.  Its possible there could be different versions of the IP block but its pretty stable now.
+> We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
 
-I have not been able to find any differences in this block between
-8960 and 8074 and I have successfully tested the driver on both
-platforms.
+They're queued for this merge window, right? If so, they'll be in -rc1
+and the dependency will be solved before we apply the patches.
 
-So the reason for making it more specific would be to handle any
-future crazyness. Not sure what to do about this though, I have never
-heard about the version numbers Stephen gave us and I can't find them
-in the documentation available to us, so I wouldn't know which of the
-two to select...
 
-Regards,
-Bjorn
+-Olof
