@@ -1,39 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Jan 2014 12:43:28 -0800
-Subject: [PATCH 0/2] Enable clock controllers on MSM
-In-Reply-To: <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
-References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
- <878uu6y5im.fsf@paris.lan>
- <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
-Message-ID: <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
+From: syin@broadcom.com (Sherman Yin)
+Date: Thu, 23 Jan 2014 12:44:47 -0800
+Subject: [PATCH v2 4/4] Update dtsi with new pinctrl compatible string
+In-Reply-To: <1390509887-19278-1-git-send-email-syin@broadcom.com>
+References: <1390343886-25852-1-git-send-email-syin@broadcom.com>
+ <1390509887-19278-1-git-send-email-syin@broadcom.com>
+Message-ID: <1390509887-19278-5-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:59 AM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
->
->> Stephen Boyd <sboyd@codeaurora.org> writes:
->>
->>> These patches add the clock controller nodes, enable the clock drivers
->>> on MSM based platforms, and hook it up enough to get the serial console
->>> working. This is based on the merge of Mike's clk-next branch with
->>> linux-next-20140116. The changes need the clk-next branch because that's
->>> where the DTS include files landed.
->>
->> I forgot to repond to this earlier, but I tested this on top of -next
->> and it gets the dragonboard booting w/mainline.  Yay!
->>
->>> Perhaps this can be applied after 3.14-rc1 is out?
->>
->> Yeah, sounds good.
->>
->> Kevin
->
-> We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
+This commit updates bcm11351.dtsi with the new compatible string for
+the same driver.
 
-They're queued for this merge window, right? If so, they'll be in -rc1
-and the dependency will be solved before we apply the patches.
+Signed-off-by: Sherman Yin <syin@broadcom.com>
+Reviewed-by: Matt Porter <mporter@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/bcm11351.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
--Olof
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index dd8e878..6c183f3 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -143,7 +143,7 @@
+ 	};
+ 
+ 	pinctrl at 35004800 {
+-		compatible = "brcm,capri-pinctrl";
++		compatible = "brcm,bcm11351-pinctrl";
+ 		reg = <0x35004800 0x430>;
+ 	};
+ };
+-- 
+1.7.9.5
