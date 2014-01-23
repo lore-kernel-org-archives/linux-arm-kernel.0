@@ -1,31 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Jan 2014 14:56:05 +0000
-Subject: [PATCH v2 6/6] arm64: audit: Add audit hook in
- ptrace/syscall_trace
-In-Reply-To: <1389946399-4525-7-git-send-email-takahiro.akashi@linaro.org>
-References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
- <1389946399-4525-7-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140123145605.GG27520@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jan 2014 15:00:39 +0000
+Subject: [PATCH 1/1] openfirmware: trivial: Standardise formatting of 'struct
+ of_device_id' definition
+Message-ID: <1390489239-29001-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 08:13:19AM +0000, AKASHI Takahiro wrote:
-> @@ -1064,6 +1066,16 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->  {
->  	unsigned long saved_reg;
->  
-> +#ifdef CONFIG_AUDITSYSCALL
-> +	if (dir)
-> +		audit_syscall_exit(regs);
-> +	else
-> +		audit_syscall_entry(syscall_get_arch(current, regs),
-> +			(int)regs->syscallno,
-> +			regs->orig_x0, regs->regs[1],
-> +			regs->regs[2], regs->regs[3]);
-> +#endif /* CONFIG_AUDITSYSCALL */
+It's commonly accepted that when defining a struct the '{' is appended
+onto the first line. This helps when searching for the definition using
+syntax similar to 'struct of_device_id {'.
 
-It should work without the #ifdef as audit_syscall_exit/entry are dummy
-static inline functions when !CONFIG_AUDITSYSCALL.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/linux/mod_devicetable.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 45e9214..090e014 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -220,8 +220,7 @@ struct serio_device_id {
+ /*
+  * Struct used for matching a device
+  */
+-struct of_device_id
+-{
++struct of_device_id {
+ 	char	name[32];
+ 	char	type[32];
+ 	char	compatible[128];
 -- 
-Catalin
+1.8.3.2
