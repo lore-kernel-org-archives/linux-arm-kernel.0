@@ -1,120 +1,69 @@
-From: sarah.a.sharp@linux.intel.com (Sarah Sharp)
-Date: Wed, 22 Jan 2014 15:56:20 -0800
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <87mwin4ozf.fsf@natisbad.org>
-References: <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
- <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
- <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
- <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
- <20140122222641.GD29184@titan.lakedaemon.net>
- <87mwin4ozf.fsf@natisbad.org>
-Message-ID: <20140122235620.GC20359@xanatos>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 23 Jan 2014 01:03:26 +0100
+Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
+ clear
+In-Reply-To: <20140122223117.GX18269@obsidianresearch.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233537.GS18269@obsidianresearch.com>
+ <20140122164904.GB27273@localhost>
+ <20140122173417.GT18269@obsidianresearch.com> <52E02AB6.7040104@gmail.com>
+ <20140122205213.GW18269@obsidianresearch.com>
+ <20140122221237.GA30763@localhost>
+ <20140122223117.GX18269@obsidianresearch.com>
+Message-ID: <52E05C4E.9060709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:43:16PM +0100, Arnaud Ebalard wrote:
-> Hi Jason,
-> 
-> Jason Cooper <jason@lakedaemon.net> writes:
-> 
-> > On Wed, Jan 22, 2014 at 11:23:23PM +0100, Arnaud Ebalard wrote:
-> >> With the patch applied on top of 3.13.0 kernel recompiled w/
-> >> CONFIG_PCI_MSI enabled, I cannot reproduce the bug. I guess
-> >> you can add my:
-> >> 
-> >>  Reported-and-tested-By: Arnaud Ebalard <arno@natisbad.org>
-> >> 
-> >> Since you'll have to push the patch to -stable team at least for 3.13,
-> >> I wonder if it would not make sense to extend that at least to 3.12.
-> >> and possibly 3.10 (3.2 is still widely used but I wonder if it makes
-> >> sense to go that far).
-> >
-> > Can you pinpoint the commit that introduced the regression?
-> 
-> f5182b4155b9d686c5540a6822486400e34ddd98 "xhci: Disable MSI for some Fresco Logic hosts."
-> 
-> Technically, this is not per se the commit which introduced the
-> regression but the one that *partially* fixed it by introducing the XHCI
-> quirk to skip MSI enabling for Fresco Logic chips. The thing is it
-> should have included the FL1009 in the targets. Sarah, can you confirm
-> this?
+On 01/22/2014 11:31 PM, Jason Gunthorpe wrote:
+> On Wed, Jan 22, 2014 at 07:12:38PM -0300, Ezequiel Garcia wrote:
+>> On Wed, Jan 22, 2014 at 01:52:13PM -0700, Jason Gunthorpe wrote:
+>>>> Clearing BRIDGE_CAUSE will only clear all currently pending upstream
+>>>> IRQs, of course. If WDT IRQ will be re-raised right after that in
+>>>> BRIDGE_CAUSE depends on the actual HW implementation, i.e. we do no
+>>>> clear the causing IRQ itself but just what it raised in BRIDGE_CAUSE.
+>>>
+>>> Which is why it makes no sense to clear it one time at kernel start.
+>>>
+>>
+>> So, it seems we need to handle irq_startup(), as you suggested.
+>> I've just tested the attached patch, and it's working fine: the driver's
+>> probe() fully stops the watchdog, and then request_irq() acks and
+>> pending interrupts, through the added irq_startup().
+>>
+>> How does it look?
+>
+> Looks sane to me.
+>
+> I looked some more and there are other drivers (eg irq-metag-ext) that
+> take this same approach.
+>
+> Sebastian:
+> I looked at the irq-orion driver a bit more and noticed this:
+>
+>          ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
+>                               handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+>                             ^^^^^^^^^^^^^^^^^^^^^
+> Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
+> does this work at all? :)
 
-I don't know if it should have included FL1009, it was just a guess,
-based on the fact that the 0x1000 and 0x1400 devices did need MSI
-disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
-not sure if/when I'll get a response back.
+I can tell you that it comes from arch/arm/plat-orion/irq.c and I
+blindly copied it. I never really checked the differences in handling
+level/edge irqs. Besides, if it wasn't working, we wouldn't get far
+in booting the kernel without timer irqs.
 
-That still doesn't necessarily rule out MSI issues in the Marvell PCI
-host controller code.  Can you attach another PCI device with MSI
-support under the host and see if it works?
+ From a HW point-of-view, I'd say the difference is that an
+edge-triggered irq samples level transitions from e.g. low to high.
+It also remains asserted if you clear the actual cause of the interrupt
+and is only asserted again on the next low-to-high transition.
 
-Sarah Sharp
+A level-triggered irq will be asserted as long as the cause of the irq
+is asserted. If you clear the cause, you'll also clear that bit in the
+upstream controller.
 
-> Jason, the logic is summarized here, AFAICT:
-> 
-> commit 455f58925247e8a1a1941e159f3636ad6ee4c90b
-> Author: Oliver Neukum <oneukum@suse.de>
-> Date:   Mon Sep 30 15:50:54 2013 +0200
-> 
->     xhci: quirk for extra long delay for S4
->     
->     It has been reported that this chipset really cannot
->     sleep without this extraordinary delay.
->     
->     This patch should be backported, in order to ensure this host functions
->     under stable kernels.  The last quirk for Fresco Logic hosts (commit
->     bba18e33f25072ebf70fd8f7f0cdbf8cdb59a746 "xhci: Extend Fresco Logic MSI
->     quirk.") was backported to stable kernels as old as 2.6.36.
->     
->     Signed-off-by: Oliver Neukum <oneukum@suse.de>
->     Signed-off-by: Sarah Sharp <sarah.a.sharp@linux.intel.com>
->     Cc: stable at vger.kernel.org
-> 
-> 
-> commit bba18e33f25072ebf70fd8f7f0cdbf8cdb59a746
-> Author: Sarah Sharp <sarah.a.sharp@linux.intel.com>
-> Date:   Wed Oct 17 13:44:06 2012 -0700
-> 
->     xhci: Extend Fresco Logic MSI quirk.
->     
->     Ali reports that plugging a device into the Fresco Logic xHCI host with
->     PCI device ID 1400 produces an IRQ error:
->     
->      do_IRQ: 3.176 No irq handler for vector (irq -1)
->     
->     Other early Fresco Logic host revisions don't support MSI, even though
->     their PCI config space claims they do.  Extend the quirk to disabling
->     MSI to this chipset revision.  Also enable the short transfer quirk,
->     since it's likely this revision also has that quirk, and it should be
->     harmless to enable.
->     
->     <SNIP>
-> 
->     This patch should be backported to stable kernels as old as 2.6.36, that
->     contain the commit f5182b4155b9d686c5540a6822486400e34ddd98 "xhci:
->     Disable MSI for some Fresco Logic hosts."
->     
->     Signed-off-by: Sarah Sharp <sarah.a.sharp@linux.intel.com>
->     Reported-by: A Sh <smr.ash1991@gmail.com>
->     Tested-by: A Sh <smr.ash1991@gmail.com>
->     Cc: stable at vger.kernel.org
-> 
-> 
-> commit f5182b4155b9d686c5540a6822486400e34ddd98
-> Author: Sarah Sharp <sarah.a.sharp@linux.intel.com>
-> Date:   Thu Jun 2 11:33:02 2011 -0700
-> 
->     xhci: Disable MSI for some Fresco Logic hosts.
->     
->     Some Fresco Logic hosts, including those found in the AUAU N533V laptop,
->     advertise MSI, but fail to actually generate MSI interrupts.  Add a new
->     xHCI quirk to skip MSI enabling for the Fresco Logic host controllers.
->     Fresco Logic confirms that all chips with PCI vendor ID 0x1b73 and device
->     ID 0x1000, regardless of PCI revision ID, do not support MSI.
->     
->     This should be backported to stable kernels as far back as 2.6.36, which
->     was the first kernel to support MSI on xHCI hosts.
->     
->     Signed-off-by: Sarah Sharp <sarah.a.sharp@linux.intel.com>
->     Reported-by: Sergey Galanov <sergey.e.galanov@gmail.com>
->     Cc: stable at kernel.org
+*BUT*, I will double-check how Linux deals with level/edge irqs and if
+Orion SoCs have edge or level triggered cause registers. That should
+reveal, if it is more sane to use handle_edge_irq here and possibly in
+the main interrupt controller, too.
+
+Sebastian
