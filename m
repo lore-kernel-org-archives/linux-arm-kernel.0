@@ -1,60 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 15:05:53 +0000
-Subject: [PATCH 1/4] mfd: max8997: Naturalise cross-architecture discrepancies
-Message-ID: <1390489556-9434-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 23 Jan 2014 15:05:55 +0000
+Subject: [PATCH 3/4] mfd: wm8994-core: Naturalise cross-architecture
+ discrepancies
+In-Reply-To: <1390489556-9434-1-git-send-email-lee.jones@linaro.org>
+References: <1390489556-9434-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390489556-9434-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we compile the MAX8997 for a 64bit architecture we receive the following
+If we compile the WM8994 for a 64bit architecture we receive the following
 warnings:
 
-  drivers/mfd/max8997.c: In function ?max8997_i2c_get_driver_data?:
-  drivers/mfd/max8997.c:173:10:
-    warning: cast from pointer to integer of different size
-     return (int)match->data;
-            ^
+drivers/mfd/wm8994-core.c: In function ?wm8994_i2c_probe?:
+drivers/mfd/wm8994-core.c:639:19:
+  warning: cast from pointer to integer of different size
+    wm8994->type = (int)of_id->data;
+                   ^
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/max8997.c               | 6 +++---
- include/linux/mfd/max8997-private.h | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/mfd/wm8994-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/max8997.c b/drivers/mfd/max8997.c
-index be88a3b..5adede0 100644
---- a/drivers/mfd/max8997.c
-+++ b/drivers/mfd/max8997.c
-@@ -164,15 +164,15 @@ static struct max8997_platform_data *max8997_i2c_parse_dt_pdata(
- 	return pd;
- }
- 
--static inline int max8997_i2c_get_driver_data(struct i2c_client *i2c,
-+static inline unsigned long max8997_i2c_get_driver_data(struct i2c_client *i2c,
- 						const struct i2c_device_id *id)
- {
- 	if (IS_ENABLED(CONFIG_OF) && i2c->dev.of_node) {
- 		const struct of_device_id *match;
- 		match = of_match_node(max8997_pmic_dt_match, i2c->dev.of_node);
--		return (int)match->data;
-+		return (unsigned long)match->data;
+diff --git a/drivers/mfd/wm8994-core.c b/drivers/mfd/wm8994-core.c
+index ba04f1b..e6fab94 100644
+--- a/drivers/mfd/wm8994-core.c
++++ b/drivers/mfd/wm8994-core.c
+@@ -636,7 +636,7 @@ static int wm8994_i2c_probe(struct i2c_client *i2c,
+ 	if (i2c->dev.of_node) {
+ 		of_id = of_match_device(wm8994_of_match, &i2c->dev);
+ 		if (of_id)
+-			wm8994->type = (int)of_id->data;
++			wm8994->type = (enum wm8994_type)of_id->data;
+ 	} else {
+ 		wm8994->type = id->driver_data;
  	}
--	return (int)id->driver_data;
-+	return id->driver_data;
- }
- 
- static int max8997_i2c_probe(struct i2c_client *i2c,
-diff --git a/include/linux/mfd/max8997-private.h b/include/linux/mfd/max8997-private.h
-index ad1ae7f..78c76cd 100644
---- a/include/linux/mfd/max8997-private.h
-+++ b/include/linux/mfd/max8997-private.h
-@@ -387,7 +387,7 @@ struct max8997_dev {
- 	struct i2c_client *muic; /* slave addr 0x4a */
- 	struct mutex iolock;
- 
--	int type;
-+	unsigned long type;
- 	struct platform_device *battery; /* battery control (not fuel gauge) */
- 
- 	int irq;
 -- 
 1.8.3.2
