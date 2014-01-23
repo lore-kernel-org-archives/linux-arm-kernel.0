@@ -1,70 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 15:05:56 +0000
-Subject: [PATCH 4/4] mfd: tps65217: Naturalise cross-architecture discrepancies
-In-Reply-To: <1390489556-9434-1-git-send-email-lee.jones@linaro.org>
-References: <1390489556-9434-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390489556-9434-4-git-send-email-lee.jones@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 23 Jan 2014 16:10:54 +0100
+Subject: [PATCH] usb: at91-udc: fix irq and iomem resource retrieval
+In-Reply-To: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52E130FE.1070506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we compile the TPS65217 for a 64bit architecture we receive the following
-warnings:
+On 23/01/2014 15:41, Jean-Jacques Hiblot :
+> When using dt resources retrieval (interrupts and reg properties) there is
+> no predefined order for these resources in the platform dev resource
+> table. Also don't expect the number of resource to be always 2.
+> 
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 
-drivers/mfd/tps65217.c: In function ?tps65217_probe?:
-drivers/mfd/tps65217.c:173:13:
-  warning: cast from pointer to integer of different size
-   chip_id = (unsigned int)match->data;
-             ^
+Yes, indeed.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/tps65217.c       | 4 ++--
- include/linux/mfd/tps65217.h | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
-index 6939ae5..3cc4c70 100644
---- a/drivers/mfd/tps65217.c
-+++ b/drivers/mfd/tps65217.c
-@@ -158,7 +158,7 @@ static int tps65217_probe(struct i2c_client *client,
- {
- 	struct tps65217 *tps;
- 	unsigned int version;
--	unsigned int chip_id = ids->driver_data;
-+	unsigned long chip_id = ids->driver_data;
- 	const struct of_device_id *match;
- 	bool status_off = false;
- 	int ret;
-@@ -170,7 +170,7 @@ static int tps65217_probe(struct i2c_client *client,
- 				"Failed to find matching dt id\n");
- 			return -EINVAL;
- 		}
--		chip_id = (unsigned int)match->data;
-+		chip_id = (unsigned long)match->data;
- 		status_off = of_property_read_bool(client->dev.of_node,
- 					"ti,pmic-shutdown-controller");
- 	}
-diff --git a/include/linux/mfd/tps65217.h b/include/linux/mfd/tps65217.h
-index a5a7f01..54b5458 100644
---- a/include/linux/mfd/tps65217.h
-+++ b/include/linux/mfd/tps65217.h
-@@ -252,7 +252,7 @@ struct tps65217_board {
- struct tps65217 {
- 	struct device *dev;
- 	struct tps65217_board *pdata;
--	unsigned int id;
-+	unsigned long id;
- 	struct regulator_desc desc[TPS65217_NUM_REGULATOR];
- 	struct regulator_dev *rdev[TPS65217_NUM_REGULATOR];
- 	struct regmap *regmap;
-@@ -263,7 +263,7 @@ static inline struct tps65217 *dev_to_tps65217(struct device *dev)
- 	return dev_get_drvdata(dev);
- }
- 
--static inline int tps65217_chip_id(struct tps65217 *tps65217)
-+static inline unsigned long tps65217_chip_id(struct tps65217 *tps65217)
- {
- 	return tps65217->id;
- }
+Maybe we can also add a "stable" tag to it. Looking at the history of
+this file, I think that we can add a pretty old stable limit... But as
+it only makes sense with DT, I would advice something like this, for the
+3.4-ish timeframe:
+
+Cc: stable <stable@vger.kernel.org> # 3.4
+
+Bye,
+
+> ---
+>  drivers/usb/gadget/at91_udc.c | 10 ----------
+>  1 file changed, 10 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> index 4cc4fd6..dfd2943 100644
+> --- a/drivers/usb/gadget/at91_udc.c
+> +++ b/drivers/usb/gadget/at91_udc.c
+> @@ -1710,16 +1710,6 @@ static int at91udc_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> -	if (pdev->num_resources != 2) {
+> -		DBG("invalid num_resources\n");
+> -		return -ENODEV;
+> -	}
+> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+> -		DBG("invalid resource type\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res)
+>  		return -ENXIO;
+> 
+
+
 -- 
-1.8.3.2
+Nicolas Ferre
