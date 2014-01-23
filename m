@@ -1,183 +1,151 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 23 Jan 2014 19:46:03 +0100
-Subject: [PATCH V2 06/10] clk/samsung: add support for pll2650xx
-In-Reply-To: <1389099548-14649-7-git-send-email-rahul.sharma@samsung.com>
-References: <1389099548-14649-1-git-send-email-rahul.sharma@samsung.com>
- <1389099548-14649-7-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <52E1636B.70702@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 23 Jan 2014 10:36:23 -0800
+Subject: [GIT PULL 1/6] ARM: SoC non-critical fixes for 3.14
+In-Reply-To: <1390502188-16896-1-git-send-email-olof@lixom.net>
+References: <1390502188-16896-1-git-send-email-olof@lixom.net>
+Message-ID: <1390502188-16896-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+As usual, we have a batch of fixes that weren't considered significant
+enough to warrant going into the later -rcs for previous release, so
+they are queued up on this branch.
 
-On 07.01.2014 13:59, Rahul Sharma wrote:
-> Add support for pll2650xx in samsung pll file. This pll variant
-> is close to pll36xx but uses CON2 registers instead of CON1.
->
-> Aud_pll in Exynos5260 is pll2650xx and uses this code.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> ---
->   drivers/clk/samsung/clk-pll.c |  101 +++++++++++++++++++++++++++++++++++++++++
->   drivers/clk/samsung/clk-pll.h |    2 +-
->   2 files changed, 102 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-> index 08f85ae..35cbc60 100644
-> --- a/drivers/clk/samsung/clk-pll.c
-> +++ b/drivers/clk/samsung/clk-pll.c
-> @@ -812,6 +812,101 @@ static const struct clk_ops samsung_pll2550xx_clk_min_ops = {
->   	.recalc_rate = samsung_pll2550xx_recalc_rate,
->   };
->
-> +/*
-> + * PLL2650XX Clock Type
-> + */
-> +
-> +/* Maximum lock time can be 3000 * PDIV cycles */
-> +#define PLL2650XX_LOCK_FACTOR (3000)
-> +
-> +#define PLL2650XX_MDIV_SHIFT		(9)
-> +#define PLL2650XX_PDIV_SHIFT		(3)
-> +#define PLL2650XX_SDIV_SHIFT		(0)
-> +#define PLL2650XX_KDIV_SHIFT		(0)
-> +#define PLL2650XX_MDIV_MASK		(0x1ff)
-> +#define PLL2650XX_PDIV_MASK		(0x3f)
-> +#define PLL2650XX_SDIV_MASK		(0x7)
-> +#define PLL2650XX_KDIV_MASK		(0xffff)
-> +#define PLL2650XX_PLL_ENABLE_SHIFT	(23)
-> +#define PLL2650XX_PLL_LOCKTIME_SHIFT	(21)
-> +#define PLL2650XX_PLL_FOUTMASK_SHIFT	(31)
+A handful of these are for various DT fixups for Samsung platforms,
+and a handful of other minor things.
 
-For single bit fields it would be better to use simple definitions, 
-using BIT() macro, such as
+There are also a couple of stable-marked patches for mvebu -- they came in
+quite late and we decided to keep them deferred until the first -stable
+release to get more coverage instead of squeezing them into 3.13.
 
-#define PLL2650XX_PLL_ENABLE		BIT(23)
+----------------------------------------------------------------
 
-and then using it with | or & ~ operators directly.
+The following changes since commit 0dc3fd0249a295863900984e02dd4bb89204205b:
 
-Also there is no need for parentheses around simple integers.
+  Merge tag 'modules-next-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux
 
-> +
-> +static unsigned long samsung_pll2650xx_recalc_rate(struct clk_hw *hw,
-> +				unsigned long parent_rate)
-> +{
-> +	struct samsung_clk_pll *pll = to_clk_pll(hw);
-> +	u32 mdiv, pdiv, sdiv, pll_con0, pll_con2;
-> +	s16 kdiv;
-> +	u64 fvco = parent_rate;
-> +
-> +	pll_con0 = __raw_readl(pll->con_reg);
-> +	pll_con2 = __raw_readl(pll->con_reg + 8);
-> +	mdiv = (pll_con0 >> PLL2650XX_MDIV_SHIFT) & PLL2650XX_MDIV_MASK;
-> +	pdiv = (pll_con0 >> PLL2650XX_PDIV_SHIFT) & PLL2650XX_PDIV_MASK;
-> +	sdiv = (pll_con0 >> PLL2650XX_SDIV_SHIFT) & PLL2650XX_SDIV_MASK;
-> +	kdiv = (s16)(pll_con2 & PLL2650XX_KDIV_MASK);
-> +
-> +	fvco *= (mdiv << 16) + kdiv;
-> +	do_div(fvco, (pdiv << sdiv));
-> +	fvco >>= 16;
-> +
-> +	return (unsigned long)fvco;
-> +}
-> +
-> +static int samsung_pll2650xx_set_rate(struct clk_hw *hw, unsigned long drate,
-> +					unsigned long parent_rate)
-> +{
-> +	struct samsung_clk_pll *pll = to_clk_pll(hw);
-> +	u32 tmp, pll_con0, pll_con2;
-> +	const struct samsung_pll_rate_table *rate;
-> +
-> +	rate = samsung_get_pll_settings(pll, drate);
-> +	if (!rate) {
-> +		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
-> +			drate, __clk_get_name(hw->clk));
-> +		return -EINVAL;
-> +	}
-> +
-> +	pll_con0 = __raw_readl(pll->con_reg);
-> +	pll_con2 = __raw_readl(pll->con_reg + 8);
-> +
-> +	 /* Change PLL PMS values */
-> +	pll_con0 &= ~(PLL2650XX_MDIV_MASK << PLL2650XX_MDIV_SHIFT |
-> +			PLL2650XX_PDIV_MASK << PLL2650XX_PDIV_SHIFT |
-> +			PLL2650XX_SDIV_MASK << PLL2650XX_SDIV_SHIFT);
-> +	pll_con0 |= rate->mdiv << PLL2650XX_MDIV_SHIFT;
-> +	pll_con0 |= rate->pdiv << PLL2650XX_PDIV_SHIFT;
-> +	pll_con0 |= rate->sdiv << PLL2650XX_SDIV_SHIFT;
-> +	pll_con0 |= 1 << PLL2650XX_PLL_ENABLE_SHIFT;
-> +	pll_con0 |= 1 << PLL2650XX_PLL_FOUTMASK_SHIFT;
-> +
-> +	pll_con2 &= ~(PLL2650XX_KDIV_MASK << PLL2650XX_KDIV_SHIFT);
-> +	pll_con2 |= ((~(rate->kdiv) + 1) & PLL2650XX_KDIV_MASK)
-> +			<< PLL2650XX_KDIV_SHIFT;
+are available in the git repository at:
 
-Huh? This looks suspiciously. Why KDIV needs to be negated and increased 
-by 1?
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-nc-for-linus
 
-> +
-> +	/* Set PLL lock time. */
-> +	__raw_writel(PLL2650XX_LOCK_FACTOR * rate->pdiv, pll->lock_reg);
-> +
-> +	__raw_writel(pll_con0, pll->con_reg);
-> +	__raw_writel(pll_con2, pll->con_reg + 8);
-> +
-> +	do {
-> +		tmp = __raw_readl(pll->con_reg);
-> +	} while (!(tmp & (0x1 << PLL2650XX_PLL_LOCKTIME_SHIFT)));
+for you to fetch changes up to 099c2e9ef671519d4c7f9d49782845adc4f54a39:
 
-Is the right bit being checked here? On other PLLs it's 29th bit named 
-LOCK_STAT. Could you confirm this?
+  Merge tag 'omap-for-v3.14/fixes-not-urgent-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/fixes-non-critical
 
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct clk_ops samsung_pll2650xx_clk_ops = {
-> +	.recalc_rate = samsung_pll2650xx_recalc_rate,
-> +	.set_rate = samsung_pll2650xx_set_rate,
-> +	.round_rate = samsung_pll_round_rate,
-> +};
-> +
-> +static const struct clk_ops samsung_pll2650xx_clk_min_ops = {
-> +	.recalc_rate = samsung_pll2650xx_recalc_rate,
-> +};
-> +
->   static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
->   				struct samsung_pll_clock *pll_clk,
->   				void __iomem *base)
-> @@ -895,6 +990,12 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
->   		else
->   			init.ops = &samsung_pll2550xx_clk_ops;
->   		break;
-> +	case pll_2650xx:
-> +		if (!pll->rate_table)
-> +			init.ops = &samsung_pll2650xx_clk_min_ops;
-> +		else
-> +			init.ops = &samsung_pll2650xx_clk_ops;
-> +		break;
->   	default:
->   		pr_warn("%s: Unknown pll type for pll clk %s\n",
->   			__func__, pll_clk->name);
-> diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
-> index e106470..b326e94 100644
-> --- a/drivers/clk/samsung/clk-pll.h
-> +++ b/drivers/clk/samsung/clk-pll.h
-> @@ -26,6 +26,7 @@ enum samsung_pll_type {
->   	pll_6552,
->   	pll_6553,
->   	pll_2550xx,
-> +	pll_2650xx,
->   };
->
->   #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
-> @@ -93,5 +94,4 @@ struct samsung_pll_rate_table {
->   extern struct clk * __init samsung_clk_register_pll2550x(const char *name,
->   			const char *pname, const void __iomem *reg_base,
->   			const unsigned long offset);
-> -
+----------------------------------------------------------------
 
-Not a part of this change.
+Alexander Shiyan (1):
+      ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
 
-Best regards,
-Tomasz
+Barry Song (1):
+      irqchip: sirf: set IRQ_LEVEL status_flags
+
+Doug Anderson (2):
+      ARM: dts: Add the missing "\" key in non-US keyboards for exynos5250-snow
+      ARM: dts: Fix exynos5250-snow's search key to be L_META
+
+Ezequiel Garcia (4):
+      ARM: OMAP2+: Select USB PHY for AM335x SoC
+      ARM: OMAP2+: gpmc: Move initialization outside the gpmc_t condition
+      ARM: OMAP2+: gpmc: Introduce gpmc_set_legacy()
+      ARM: OMAP2+: gpmc: Move legacy GPMC width setting
+
+Gregory CLEMENT (4):
+      ARM: mvebu: Add support to get the ID and the revision of a SoC
+      ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
+      i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
+      i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
+
+Jean-Jacques Hiblot (1):
+      ARM: at91: smc: bug fix in sam9_smc_cs_read()
+
+Josh Cartwright (1):
+      ARM: msm: trout: fix uninit var warning
+
+Jyri Sarha (1):
+      ARM: OMAP2+: enable AM33xx SOC EVM audio
+
+Kevin Hilman (3):
+      Merge branch 'qcom/fixes' into next/fixes-non-critical
+      Merge tag 'mvebu-fixes-3.13' of git://git.infradead.org/linux-mvebu into next/fixes-non-critical
+      Merge tag 'omap-for-v3.14/fixes-not-urgent-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
+
+Lee Jones (1):
+      ARM: u300: Remove '0x's from U300 DTS file
+
+Nishanth Menon (2):
+      Documentation: dt: OMAP: explicitly state SoC compatible strings
+      ARM: OMAP2+: board-generic: update SoC compatibility strings
+
+Olof Johansson (4):
+      Merge tag 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
+      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
+      Merge branch 'qcom/fixes' into next/fixes-non-critical
+      Merge tag 'u300-for-arm-soc-1' of git://git.kernel.org/.../linusw/linux-stericsson into next/fixes-non-critical
+
+Sachin Kamat (4):
+      ARM: dts: Add missing op_mode property to PMIC on Arndale
+      ARM: dts: Add missing frequency property to exynos5250
+      ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
+      ARM: dts: Update display clock frequency for Origen-4412
+
+Seungwon Jeon (1):
+      ARM: dts: add clock provider for mshc node for Exynos4412 SOC
+
+Stefan Weil (1):
+      ARM: bcm2835: Fix grammar in help message
+
+Stephen Boyd (1):
+      ARM: dts: msm: Fix gpio interrupt and reg length
+
+Tomasz Figa (4):
+      ARM: S3C64XX: Correct card detect type for HSMMC1 for MINI6410
+      clk: samsung: exynos4: Fix definition of div_mmc_pre4 divider
+      ARM: dts: Fix definition of MSHC device tree nodes for exynos4x12
+      ARM: dts: Use MSHC controller for eMMC memory for exynos4412-trats2
+
+Tushar Behera (1):
+      ARM: dts: Update display clock frequency for Origen-4210
+
+Uwe Kleine-K?nig (1):
+      ARM: u300: fix timekeeping when periodic mode is used
+
+Wei Yongjun (1):
+      ARM: u300: fix return value check in __u300_init_boardpower()
+
+
+ .../devicetree/bindings/arm/omap/omap.txt       |  53 +++++++++
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt     |   6 +-
+ arch/arm/boot/dts/exynos4210-origen.dts         |   2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |   5 +-
+ arch/arm/boot/dts/exynos4412-origen.dts         |   7 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts         |  20 +++-
+ arch/arm/boot/dts/exynos4412.dtsi               |   7 --
+ arch/arm/boot/dts/exynos4x12.dtsi               |  13 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts        |   2 +
+ arch/arm/boot/dts/exynos5250-snow.dts           |   3 +-
+ arch/arm/boot/dts/exynos5250.dtsi               |   2 +
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi       |   2 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts         |   4 +-
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts          |   2 +-
+ arch/arm/boot/dts/ste-u300.dts                  |   6 +-
+ arch/arm/configs/omap2plus_defconfig            |   3 +
+ arch/arm/mach-at91/sam9_smc.c                   |   2 +-
+ arch/arm/mach-bcm2835/Kconfig                   |   2 +-
+ arch/arm/mach-msm/board-trout.c                 |  12 +-
+ arch/arm/mach-mvebu/Makefile                    |   2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c             |  32 +++++
+ arch/arm/mach-mvebu/mvebu-soc-id.c              | 119 +++++++++++++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h              |  32 +++++
+ arch/arm/mach-omap2/board-generic.c             |   7 ++
+ arch/arm/mach-omap2/gpmc-nand.c                 |  50 ++++----
+ arch/arm/mach-s3c64xx/mach-mini6410.c           |  10 ++
+ arch/arm/mach-u300/regulator.c                  |   4 +-
+ arch/arm/mach-u300/timer.c                      |  38 +++---
+ arch/arm/plat-samsung/include/plat/uncompress.h |   2 +
+ drivers/clk/samsung/clk-exynos4.c               |   3 +-
+ drivers/i2c/busses/i2c-mv64xxx.c                |   5 +
+ drivers/irqchip/irq-sirfsoc.c                   |   3 +-
+ 32 files changed, 381 insertions(+), 79 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
+ create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
