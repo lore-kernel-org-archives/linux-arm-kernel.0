@@ -1,90 +1,56 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 22 Jan 2014 17:01:44 -0800
-Subject: [PATCH 1/1] gic: change access of gicc_ctrl register to read
- modify write.
-In-Reply-To: <1386534157-17366-1-git-send-email-fkan@apm.com>
-References: <1386534157-17366-1-git-send-email-fkan@apm.com>
-Message-ID: <CAL85gmDXy=ZcbZNiQ8GuK4se3AFFo5-iAkBPo3cZJR0W=j=7uw@mail.gmail.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Thu, 23 Jan 2014 10:22:46 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Update EHCI config entry
+In-Reply-To: <000101cf1297$fef674c0$fce35e40$%han@samsung.com>
+References: <1389861264-7305-1-git-send-email-tushar.behera@linaro.org>
+ <000101cf1297$fef674c0$fce35e40$%han@samsung.com>
+Message-ID: <023601cf17d9$9f2cf720$dd86e560$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just checking to see anyone had time to take a look at this and comment.
+Jingoo Han wrote:
+> 
+> On Thursday, January 16, 2014 5:34 PM, Tushar Behera wrote:
+> >
+> > Commit 29824c167bea ("USB: host: Rename ehci-s5p to ehci-exynos")
+> > renamed the config entry of EHCI host driver. Similar change needs
+> > to be done in exynos_defconfig as well.
+> >
+> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> 
+> (+cc Vivek Gautam, Yulgon Kim, Julius Werner)
+> 
+> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> 
+> Yes, right.
+> I overlooked 'exynos_defconfig', when I changed the name of
+> Exynos EHCI driver. Thank you for sending the patch. :-)
+> 
+> Best regards,
+> Jingoo Han
+> 
+> > ---
+> >  arch/arm/configs/exynos_defconfig |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/configs/exynos_defconfig
+> b/arch/arm/configs/exynos_defconfig
+> > index dbe1f1c..4ce7b70 100644
+> > --- a/arch/arm/configs/exynos_defconfig
+> > +++ b/arch/arm/configs/exynos_defconfig
+> > @@ -94,7 +94,7 @@ CONFIG_FONT_7x14=y
+> >  CONFIG_LOGO=y
+> >  CONFIG_USB=y
+> >  CONFIG_USB_EHCI_HCD=y
+> > -CONFIG_USB_EHCI_S5P=y
+> > +CONFIG_USB_EHCI_EXYNOS=y
+> >  CONFIG_USB_STORAGE=y
+> >  CONFIG_USB_DWC3=y
+> >  CONFIG_USB_PHY=y
+> > --
+> > 1.7.9.5
 
-Thanks
+OK, applied into -fixes.
 
-On Sun, Dec 8, 2013 at 12:22 PM, Feng Kan <fkan@apm.com> wrote:
-> This change is made to preserve the GIC v2 releated bits in the
-> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
-> The original code only set the enable/disable group bit in this register.
-> This code will preserve all other bits configured by the bootload except
-> the enable/disable bit. The main reason for this change is to allow the
-> bypass bits specified in the v2 spec to remain untouched by the current
-> GIC code. In the X-Gene platform, the bypass functionality is not used
-> and bypass must be disabled at all time.
->
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Acked-by: Anup Patel <apatel@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  drivers/irqchip/irq-gic.c |   19 ++++++++++++++++---
->  1 files changed, 16 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index d0e9480..6550ac9 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -419,6 +419,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->         void __iomem *dist_base = gic_data_dist_base(gic);
->         void __iomem *base = gic_data_cpu_base(gic);
->         unsigned int cpu_mask, cpu = smp_processor_id();
-> +       unsigned int ctrl_mask;
->         int i;
->
->         /*
-> @@ -450,13 +451,21 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->
->         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
-> -       writel_relaxed(1, base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
-> +       ctrl_mask |= 0x1;
-> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->  }
->
->  void gic_cpu_if_down(void)
->  {
-> +       unsigned int ctrl_mask;
-> +
->         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
-> +       ctrl_mask &= 0xfffffffe;
-> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->
->  #ifdef CONFIG_CPU_PM
-> @@ -567,6 +576,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->  {
->         int i;
->         u32 *ptr;
-> +       unsigned int ctrl_mask;
->         void __iomem *dist_base;
->         void __iomem *cpu_base;
->
-> @@ -591,7 +601,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
->                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
->
->         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
-> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
-> +       ctrl_mask |= 0x1;
-> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->
->  static int gic_notifier(struct notifier_block *self, unsigned long cmd,        void *v)
-> --
-> 1.7.6.1
->
+Thanks,
+Kukjin
