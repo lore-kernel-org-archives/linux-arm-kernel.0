@@ -1,59 +1,119 @@
 From: dave.long@linaro.org (David Long)
-Date: Thu, 23 Jan 2014 15:05:49 -0500
-Subject: [PATCH v5 06/16] ARM: Disable jprobes test when built into thumb-mode
- kernel
+Date: Thu, 23 Jan 2014 15:05:45 -0500
+Subject: [PATCH v5 02/16] ARM: move shared uprobe/kprobe definitions into new
+ include file
 In-Reply-To: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
 References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1390507559-4697-7-git-send-email-dave.long@linaro.org>
+Message-ID: <1390507559-4697-3-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Jon Medhurst (Tixy)" <tixy@linaro.org>
+From: "David A. Long" <dave.long@linaro.org>
 
-For now the jprobes tests fail on ARM for when built into a kernel compiled
-in thumb mode. They work fine for ARM kernels, and when built as a loadable
-module.
+Separate the kprobe-only definitions from the definitions needed by
+both kprobes and uprobes.
 
-Signed-off-by: "Jon Medhurst (Tixy)" <tixy@linaro.org>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm/kernel/kprobes-test.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/include/asm/kprobes.h               | 15 +---------
+ arch/arm/include/asm/{kprobes.h => probes.h} | 44 +++++-----------------------
+ 2 files changed, 8 insertions(+), 51 deletions(-)
+ copy arch/arm/include/asm/{kprobes.h => probes.h} (52%)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 0cd63d0..65230b2 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -221,6 +221,7 @@ static int pre_handler_called;
- static int post_handler_called;
- static int jprobe_func_called;
- static int kretprobe_handler_called;
-+static int tests_failed;
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+index f82ec22..30fc11b 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/kprobes.h
+@@ -28,21 +28,8 @@
+ #define kretprobe_blacklist_size	0
  
- #define FUNC_ARG1 0x12345678
- #define FUNC_ARG2 0xabcdef
-@@ -457,6 +458,13 @@ static int run_api_tests(long (*func)(long, long))
+ typedef u32 kprobe_opcode_t;
+-
+ struct kprobe;
+-typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+-typedef unsigned long (kprobe_check_cc)(unsigned long);
+-typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+-typedef void (kprobe_insn_fn_t)(void);
+-
+-/* Architecture specific copy of original instruction. */
+-struct arch_specific_insn {
+-	kprobe_opcode_t			*insn;
+-	kprobe_insn_handler_t		*insn_handler;
+-	kprobe_check_cc			*insn_check_cc;
+-	kprobe_insn_singlestep_t	*insn_singlestep;
+-	kprobe_insn_fn_t		*insn_fn;
+-};
++#include <asm/probes.h>
  
- 	pr_info("    jprobe\n");
- 	ret = test_jprobe(func);
-+#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
-+	if (ret == -EINVAL) {
-+		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels");
-+		tests_failed = ret;
-+		ret = 0;
-+	}
+ struct prev_kprobe {
+ 	struct kprobe *kp;
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/probes.h
+similarity index 52%
+copy from arch/arm/include/asm/kprobes.h
+copy to arch/arm/include/asm/probes.h
+index f82ec22..90c5f54 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/probes.h
+@@ -1,5 +1,8 @@
+ /*
+- * arch/arm/include/asm/kprobes.h
++ * arch/arm/include/asm/probes.h
++ *
++ * Original contents copied from arch/arm/include/asm/kprobes.h
++ * which contains the following notice...
+  *
+  * Copyright (C) 2006, 2007 Motorola Inc.
+  *
+@@ -13,23 +16,9 @@
+  * General Public License for more details.
+  */
+ 
+-#ifndef _ARM_KPROBES_H
+-#define _ARM_KPROBES_H
+-
+-#include <linux/types.h>
+-#include <linux/ptrace.h>
+-#include <linux/percpu.h>
+-
+-#define __ARCH_WANT_KPROBES_INSN_SLOT
+-#define MAX_INSN_SIZE			2
+-#define MAX_STACK_SIZE			64	/* 32 would probably be OK */
++#ifndef _ASM_PROBES_H
++#define _ASM_PROBES_H
+ 
+-#define flush_insn_slot(p)		do { } while (0)
+-#define kretprobe_blacklist_size	0
+-
+-typedef u32 kprobe_opcode_t;
+-
+-struct kprobe;
+ typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+ typedef unsigned long (kprobe_check_cc)(unsigned long);
+ typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+@@ -44,23 +33,4 @@ struct arch_specific_insn {
+ 	kprobe_insn_fn_t		*insn_fn;
+ };
+ 
+-struct prev_kprobe {
+-	struct kprobe *kp;
+-	unsigned int status;
+-};
+-
+-/* per-cpu kprobe control block */
+-struct kprobe_ctlblk {
+-	unsigned int kprobe_status;
+-	struct prev_kprobe prev_kprobe;
+-	struct pt_regs jprobe_saved_regs;
+-	char jprobes_stack[MAX_STACK_SIZE];
+-};
+-
+-void arch_remove_kprobe(struct kprobe *);
+-int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+-int kprobe_exceptions_notify(struct notifier_block *self,
+-			     unsigned long val, void *data);
+-
+-
+-#endif /* _ARM_KPROBES_H */
 +#endif
- 	if (ret < 0)
- 		return ret;
- 
-@@ -1667,6 +1675,8 @@ static int __init run_all_tests(void)
- 
- out:
- 	if (ret == 0)
-+		ret = tests_failed;
-+	if (ret == 0)
- 		pr_info("Finished kprobe tests OK\n");
- 	else
- 		pr_err("kprobe tests failed\n");
 -- 
 1.8.1.2
