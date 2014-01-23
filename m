@@ -1,57 +1,39 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 23 Jan 2014 14:17:19 -0600
-Subject: [PATCH v2 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <20140121230103.GA3554@qualcomm.com>
-References: <1389380874-22753-1-git-send-email-agross@codeaurora.org>
- <201401172349.28229.arnd@arndb.de> <20140120225245.GA3530@qualcomm.com>
- <5548936.L46nLkuVIz@wuerfel> <20140121230103.GA3554@qualcomm.com>
-Message-ID: <9038342A-D629-479C-819B-EF5F4DB52B50@codeaurora.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 23 Jan 2014 12:22:12 -0800
+Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <174308F1-FFD2-4CB3-AEA2-C423F90FB133@codeaurora.org>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
+ <174308F1-FFD2-4CB3-AEA2-C423F90FB133@codeaurora.org>
+Message-ID: <CAJAp7OhvFdC2OR_YO5Gh6x1q8TPWEDY58d-BQ5jw=B=31i5V2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 23, 2014 at 11:11 AM, Matthew Locke <mlocke@codeaurora.org> wrote:
+> Rob,
+>
+> On Jan 20, 2014, at 8:10 AM, Rob Herring wrote:
+>
+>> On Fri, Jan 17, 2014 at 5:03 PM, Bjorn Andersson
+[...]
+>>> +Required properties:
+>>> + - compatible: Should be "qcom,i2c-qup".
+>>
+>> Seems a bit generic. All versions of the IP are exactly the same?
+>> "qcom,<chip>-i2c-qup" would be better.
+>
+> The QUP IP block is the same across chips.  Its possible there could be different versions of the IP block but its pretty stable now.
 
-On Jan 21, 2014, at 5:01 PM, Andy Gross <agross@codeaurora.org> wrote:
+I have not been able to find any differences in this block between
+8960 and 8074 and I have successfully tested the driver on both
+platforms.
 
-> On Tue, Jan 21, 2014 at 09:03:43AM +0100, Arnd Bergmann wrote:
->> On Monday 20 January 2014 16:52:45 Andy Gross wrote:
->> 
->>>>> +#ifdef CONFIG_OF
->>>>> +static const struct of_device_id bam_of_match[] = {
->>>>> +	{ .compatible = "qcom,bam-v1.4.0", },
->>>>> +	{ .compatible = "qcom,bam-v1.4.1", },
->>>>> +	{}
->>>>> +};
->>>>> +MODULE_DEVICE_TABLE(of, bam_of_match);
->>>>> +#endif
->>>> 
->>>> Also, you can remove the #ifdef here and the of_match_ptr() below.
->>>> 
->>> 
->>> If this is removed, then I'll have to add the OF dependency in the Kconfig,
->>> correct?
->> 
->> I believe it will still compile without the CONFIG_OF dependency, but
->> having the dependency still makes sense as it's impossible to use the
->> driver without CONFIG_OF.
->> 
->> The best dependency line is probably
->> 
->> 	depends on (ARCH_MSM && OF) || COMPILE_TEST"
->> 
->> If you expect the same driver to be used on non-MSM platforms from
->> qualcomm, e.g. some networking or server equipment, you can also just
->> drop the ARCH_MSM dependency.
-> 
-> 
-> Thanks for the clarification.  I think I'll probably do:
-> ARCH_MSM_DT || (COMPILE_TEST && ARM)
+So the reason for making it more specific would be to handle any
+future crazyness. Not sure what to do about this though, I have never
+heard about the version numbers Stephen gave us and I can't find them
+in the documentation available to us, so I wouldn't know which of the
+two to select...
 
-Didn?t you need it to be:
-
-ARCH_MSM_DT || (COMPILE_TEST && OF && ARM)
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+Bjorn
