@@ -1,96 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:23 +0000
-Subject: [PATCH RESEND v4 35/37] mtd: st_spi_fsm: Supply the W25Qxxx chip
- specific configuration call-back
-In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-36-git-send-email-lee.jones@linaro.org>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Thu, 23 Jan 2014 16:02:42 +0530
+Subject: [PATCH V2 2/8] SPEAr13xx: defconfig: Update
+In-Reply-To: <cover.1390471111.git.mohit.kumar@st.com>
+References: <cover.1390471111.git.mohit.kumar@st.com>
+Message-ID: <e60c36509dd5d9a39ae7671f8ac80ad1f4506e29.1390471111.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 47 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 43 insertions(+), 4 deletions(-)
+Enable EABI, OEABI, VFP and NFS configs in default configuration file for
+SPEAr13xx.
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 88017d8..ddfff35 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -339,6 +339,7 @@ struct flash_info {
- static int stfsm_n25q_config(struct stfsm *fsm);
- static int stfsm_mx25_config(struct stfsm *fsm);
- static int stfsm_s25fl_config(struct stfsm *fsm);
-+static int stfsm_w25q_config(struct stfsm *fsm);
- 
- static struct flash_info flash_types[] = {
- 	/*
-@@ -444,10 +445,14 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_READ_1_1_4        |	\
- 		   FLASH_FLAG_READ_1_4_4        |	\
- 		   FLASH_FLAG_WRITE_1_1_4)
--	{ "w25q80",  0xef4014, 0,  64 * 1024,  16, W25Q_FLAG, 80, NULL },
--	{ "w25q16",  0xef4015, 0,  64 * 1024,  32, W25Q_FLAG, 80, NULL },
--	{ "w25q32",  0xef4016, 0,  64 * 1024,  64, W25Q_FLAG, 80, NULL },
--	{ "w25q64",  0xef4017, 0,  64 * 1024, 128, W25Q_FLAG, 80, NULL },
-+	{ "w25q80",  0xef4014, 0,  64 * 1024,  16, W25Q_FLAG, 80,
-+	  stfsm_w25q_config },
-+	{ "w25q16",  0xef4015, 0,  64 * 1024,  32, W25Q_FLAG, 80,
-+	  stfsm_w25q_config },
-+	{ "w25q32",  0xef4016, 0,  64 * 1024,  64, W25Q_FLAG, 80,
-+	  stfsm_w25q_config },
-+	{ "w25q64",  0xef4017, 0,  64 * 1024, 128, W25Q_FLAG, 80,
-+	  stfsm_w25q_config },
- 
- 	/* Sentinel */
- 	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
-@@ -575,6 +580,11 @@ static struct seq_rw_config stfsm_s25fl_write4_configs[] = {
- 	{0x00,                   0,                      0, 0, 0, 0x00, 0, 0},
- };
- 
-+/*
-+ * [W25Qxxx] Configuration
-+ */
-+#define W25Q_STATUS_QE			(0x1 << 9)
-+
- static struct stfsm_seq stfsm_seq_read;		/* Dynamically populated */
- static struct stfsm_seq stfsm_seq_write;	/* Dynamically populated */
- static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
-@@ -1433,6 +1443,35 @@ static int stfsm_s25fl_config(struct stfsm *fsm)
- 	return 0;
- }
- 
-+static int stfsm_w25q_config(struct stfsm *fsm)
-+{
-+	uint32_t data_pads;
-+	uint16_t sta_wr;
-+	uint8_t sta1, sta2;
-+	int ret;
-+
-+	ret = stfsm_prepare_rwe_seqs_default(fsm);
-+	if (ret)
-+		return ret;
-+
-+	/* If using QUAD mode, set QE STATUS bit */
-+	data_pads = ((stfsm_seq_read.seq_cfg >> 16) & 0x3) + 1;
-+	if (data_pads == 4) {
-+		stfsm_read_status(fsm, FLASH_CMD_RDSR, &sta1);
-+		stfsm_read_status(fsm, FLASH_CMD_RDSR2, &sta2);
-+
-+		sta_wr = ((uint16_t)sta2 << 8) | sta1;
-+
-+		sta_wr |= W25Q_STATUS_QE;
-+
-+		stfsm_write_status(fsm, sta_wr, 2);
-+
-+		stfsm_wait_busy(fsm);
-+	}
-+
-+	return 0;
-+}
-+
- static int stfsm_read(struct stfsm *fsm, uint8_t *buf, uint32_t size,
- 		      uint32_t offset)
- {
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Cc: Mohit Kumar <mohit.kumar@st.com>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: spear-devel at list.st.com
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/configs/spear13xx_defconfig |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 82eaa55..0cf87d0 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -14,10 +14,19 @@ CONFIG_MACH_SPEAR1340=y
+ CONFIG_SMP=y
+ # CONFIG_SMP_ON_UP is not set
+ # CONFIG_ARM_CPU_TOPOLOGY is not set
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+ CONFIG_MTD_OF_PARTS=y
+@@ -27,6 +36,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -66,6 +76,7 @@ CONFIG_USB=y
+ # CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+@@ -79,11 +90,14 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
++CONFIG_FUSE_FS=y
+ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=m
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=m
 -- 
-1.8.3.2
+1.7.0.1
