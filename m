@@ -1,51 +1,70 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Thu, 23 Jan 2014 16:02:43 +0530
-Subject: [PATCH V2 3/8] ahci: Add a driver_data field to struct
- ahci_platform_data
-In-Reply-To: <cover.1390471111.git.mohit.kumar@st.com>
-References: <cover.1390471111.git.mohit.kumar@st.com>
-Message-ID: <af75111fb61aebfee6e0233b39dc4cf006906402.1390471111.git.mohit.kumar@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jan 2014 10:31:25 +0000
+Subject: [PATCH RESEND v4 37/37] ARM: STi: Add support for the FSM Serial
+ Flash Controller
+In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
+References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-38-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+Here we add the necessary device nodes required for successful device
+probing and Pinctrl setup for the FSM.
 
-Platform functions passed to the driver may also need some private
-data. Till, now following approaches have been taken to manage these
-data:
--- SPEAr13xx platform keep it locally in the files defining platform
-functions.
--- IMX has created a new ahci platform device as a child of
-platform device created by DT and then attached this data as the
-driver_data of ahci's dev->parent.
-
-Adding a driver_data field helps in using the same platform driver as
-that of created by DT.
-
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Tested-by: Mohit Kumar <mohit.kumar@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/ahci_platform.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/stih416-b2105.dts    | 14 ++++++++++++++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi | 12 ++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 73a2500..76d35e8 100644
---- a/include/linux/ahci_platform.h
-+++ b/include/linux/ahci_platform.h
-@@ -28,6 +28,7 @@ struct ahci_platform_data {
- 	const struct ata_port_info *ata_port_info;
- 	unsigned int force_port_map;
- 	unsigned int mask_port_map;
-+	void *driver_data;
- };
+diff --git a/arch/arm/boot/dts/stih416-b2105.dts b/arch/arm/boot/dts/stih416-b2105.dts
+index e518eb0..dd7ac88 100644
+--- a/arch/arm/boot/dts/stih416-b2105.dts
++++ b/arch/arm/boot/dts/stih416-b2105.dts
+@@ -33,6 +33,20 @@
+ 			status = "okay";
+ 		};
  
- #endif /* _AHCI_PLATFORM_H */
++		/* FSM */
++		spifsm: spifsm at fe902000{
++		        compatible         = "st,spi-fsm";
++		        reg                =  <0xfe902000 0x1000>;
++		        reg-names          = "spi-fsm";
++		        pinctrl-0          = <&pinctrl_fsm>;
++
++			st,syscfg	   = <&syscfg_rear>;
++		        st,boot-device-reg = <0x958>;
++		        st,boot-device-spi = <0x1a>;
++
++		        status = "okay";
++		};
++
+ 		leds {
+ 			compatible	= "gpio-leds";
+ 			fp_led {
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index 10bb4df..9a48710 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -235,6 +235,18 @@
+ 				};
+ 			};
+ 
++			fsm {
++				pinctrl_fsm: fsm {
++					st,pins {
++						spi-fsm-clk     = <&PIO12 2     OUT     ALT1>;
++						spi-fsm-cs      = <&PIO12 3     OUT     ALT1>;
++						spi-fsm-mosi    = <&PIO12 4     OUT     ALT1>;
++						spi-fsm-miso    = <&PIO12 5     IN      ALT1>;
++						spi-fsm-hol     = <&PIO12 6     OUT     ALT1>;
++						spi-fsm-wp      = <&PIO12 7     OUT     ALT1>;
++					};
++				};
++			};
+ 		};
+ 
+ 		pin-controller-rear {
 -- 
-1.7.0.1
+1.8.3.2
