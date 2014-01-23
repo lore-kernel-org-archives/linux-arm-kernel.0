@@ -1,298 +1,252 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Jan 2014 10:36:27 -0800
-Subject: [GIT PULL 5/6] ARM: SoC board updates for 3.14
+Date: Thu, 23 Jan 2014 10:36:28 -0800
+Subject: [GIT PULL 6/6] ARM: driver updates for 3.14
 In-Reply-To: <1390502188-16896-1-git-send-email-olof@lixom.net>
 References: <1390502188-16896-1-git-send-email-olof@lixom.net>
-Message-ID: <1390502188-16896-6-git-send-email-olof@lixom.net>
+Message-ID: <1390502188-16896-7-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch is reducing in size for every release since most board-related
-changes have started happening in devicetrees now. Still, we have some things
-going on here.
+Updates of SoC-near drivers and other driver updates that makes more sense to
+take through our tree.
 
-* Renesas platforms are still adding a bit more legacy device support, something
-that should trail off shortly as they move to full DT.
-* We group most defconfig updates into this branch out of old habits
-* Removal of legacy OMAP2 platforms over to DT continues, and a handful of old
-code is being removed here.
+The largest part of this is a conversion of device registration for some
+renesas shmobile/sh devices over to use resources. This has required
+coordination with the corresponding arch/sh changes, and we've agreed
+to merge the arch/sh changes through our tree.
 
-Conflicts:
+Added in this branch is support for Trusted Foundations secure firmware,
+which is what is used on many of the commercial Nvidia Tegra products
+that are in the market, including the Nvidia Shield. The code is local
+to arch/arm at this time since it's uncertain whether it will be shared
+with arm64 longer-term, if needed we will refactor later.
 
-arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c:                             
+A couple of new RTC drivers used on ARM boards, merged through our tree
+on request by the RTC maintainer.
 
-Bugfix in later -rc conflicts with code removal. Remove both irqs[]
-arrays.
+... plus a bunch of smaller updates across the board, gpio conversions
 
 ----------------------------------------------------------------
 
-The following changes since commit aef07284ff26becdff4ac000f05ab020a5cfe29c:
+The following changes since commit 3ec910bd3c138f8c3a454bc1ee5ff2d4f85ce307:
 
-  Merge branch 'next/dt' into HEAD
+  Merge branch 'next/boards' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-linus
 
-for you to fetch changes up to e41006c22eab8eb7763995e8a0be089b900b620b:
+for you to fetch changes up to cd2f43a1f7400a74a084094502f70df2e169c6e8:
 
-  Merge tag 'omap-for-v3.14/dt-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/boards
+  Merge tag 'davinci-for-v3.14/watchdog' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into next/drivers
 
 ----------------------------------------------------------------
 
-Aaro Koskinen (1):
-      ARM: OMAP2+: dts: add n8x0 onenand
+Alexandre Courbot (7):
+      ARM: add basic support for Trusted Foundations
+      of: add vendor prefix for Trusted Logic Mobility
+      of: add Trusted Foundations bindings documentation
+      ARM: tegra: add support for Trusted Foundations
+      ARM: tegra: split setting of CPU reset handler
+      ARM: tegra: set CPU reset handler using firmware
+      ARM: tegra: support Trusted Foundations by default
 
-Bartlomiej Zolnierkiewicz (1):
-      ARM: exynos_defconfig: increase CONFIG_NR_CPUS value to 8
+Arnaud Ebalard (1):
+      rtc: Add support for Intersil ISL12057 I2C RTC chip
 
-Ezequiel Garcia (2):
-      ARM: mvebu: config: Add GPIO connected LEDs support to defconfig
-      ARM: mvebu: config: Enable NAND support
+Bastian Hecht (1):
+      serial: sh-sci: Add OF support
 
-Hiep Cao Minh (1):
-      ARM: shmobile: Lager:add SPI FLASH support on QSPI
+Carlo Caione (2):
+      ARM: sun4i/sun7i: DT documentation for RTC driver
+      ARM: sun4i/sun7i: RTC driver
 
-Kevin Hilman (1):
-      Merge tag 'omap-for-v3.14/board-removal-safe' of git://git.kernel.org/.../tmlind/linux-omap into next/boards
+Chander Kashyap (1):
+      irqchip: exynos-combiner: remove hard-coded irq_base value
 
-Kuninori Morimoto (9):
-      ARM: shmobile: bockw: enable CONFIG_REGULATOR
-      ARM: shmobile: lager: add gpio regulator support on defconfig
-      ARM: shmobile: lager: fixup I2C device on defconfig
-      ARM: shmobile: bockw: use regulator for MMCIF
-      ARM: shmobile: bockw: fixup FPGA ioremap area
-      ARM: shmobile: bockw: add pin pull-up setting for SDHI
-      ARM: shmobile: armadillo: fixup FSI address size
-      ARM: shmobile: bockw: remove unused RSND_SSI_CLK_FROM_ADG
-      ARM: shmobile: lager: add gpio/fixed regulator for SDHI
+Dan Carpenter (1):
+      bus: mvebu-mbus: potential forever loop in mvebu_mbus_init()
 
-Laurent Pinchart (16):
-      ARM: shmobile: genmai: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-      ARM: shmobile: mackerel: Use pinconf API to configure pin pull-down
-      ARM: Kconfig: Mention Renesas ARM SoCs instead of SH-Mobile
-      ARM: shmobile: armadillo800eva: Enable backlight control in defconfig
-      ARM: shmobile: koelsch: Add DU device
-      ARM: shmobile: armadillo: Set backlight enable GPIO
-      ARM: shmobile: lager-reference: Enable multiplaform kernel support
-      ARM: shmobile: koelsch-reference: Remove duplicate CCF initialization
-      ARM: shmobile: lager-reference: Instantiate clkdevs for SCIF and CMT
-      ARM: shmobile: koelsch-reference: Instantiate clkdevs for SCIF and CMT
-      ARM: shmobile: Remove non-multiplatform Lager reference support
-      ARM: shmobile: Remove non-multiplatform Koelsch reference support
-      ARM: shmobile: Let Lager multiplatform boot with Lager DTB
-      ARM: shmobile: Let Koelsch multiplatform boot with Koelsch DTB
-      ARM: shmobile: mackerel: Fix USBHS pinconf entry
-      ARM: dts: Split omap3 pinmux core device
+Ezequiel Garcia (1):
+      bus: mvebu-mbus: Remove deprecated comment
 
-Magnus Damm (14):
-      ARM: shmobile: Genmai defconfig
-      ARM: shmobile: Enable PFC/GPIO on the Koelsch board
-      ARM: shmobile: Add Koelsch LED6, LED7 and LED8 support
-      ARM: shmobile: Add Koelsch SW2 support
-      ARM: shmobile: r8a7791 Koelsch DT reference C bits
-      ARM: shmobile: Initial r8a7791 and Koelsch multiplatform support
-      ARM: shmobile: r7s72100 Genmai DT reference DTS bits
-      ARM: shmobile: r7s72100 Genmai DT reference C bits
-      ARM: shmobile: r7s72100 Genmai Multiplatform
-      ARM: shmobile: Use ->init_late() on Koelsch
-      ARM: shmobile: koelsch: mark GPIO keys as wake-up sources
-      ARM: shmobile: Hook up SW30-SW36 on Koelsch
-      ARM: shmobile: Use ->init_late() on Lager
-      ARM: shmobile: Add pinctrl_register_mappings() for Koelsch
+Grygorii Strashko (4):
+      gpio: davinci: get rid of DAVINCI_N_GPIO
+      gpio: introduce GPIO_DAVINCI kconfig option
+      gpio: davinci: use chained_irq_enter/chained_irq_exit API
+      gpio: davinci: don't create irq_domain in case of unbanked irqs
 
-Olof Johansson (13):
-      Merge tag 'renesas-defconfig-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'mvebu-defconfig-3.14' of git://git.infradead.org/linux-mvebu into next/boards
-      Merge tag 'samsung-defconfig' of git://git.kernel.org/.../kgene/linux-samsung into next/boards
-      Merge tag 'mvebu-defconfig-3.14-2' of git://git.infradead.org/linux-mvebu into next/boards
-      Merge tag 'tegra-for-3.14-defconfig' of git://git.kernel.org/.../tegra/linux into next/boards
-      Merge tag 'tegra-for-3.14-defconfig-2' of git://git.kernel.org/.../tegra/linux into next/boards
-      Merge tag 'v3.13-rc5' into next/boards
-      Merge tag 'samsung-defconfig-2' of git://git.kernel.org/.../kgene/linux-samsung into next/boards
-      Merge tag 'renesas-boards-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'renesas-defconfig2-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge branch 'qcom/boards' into next/boards
-      Merge tag 'renesas-boards2-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'omap-for-v3.14/dt-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/boards
+Ivan Khoronzhuk (1):
+      watchdog: davinci: rename platform driver to davinci-wdt
 
-Paul Walmsley (1):
-      ARM: shmobile: mackerel: clk_round_rate() can return a zero to indicate an error
+Ivan T. Ivanov (1):
+      usb: phy: msm: Move mach dependent code to platform data
 
-Rohit Vaswani (2):
-      ARM: msm: Add support for APQ8074 Dragonboard
-      defconfig: msm_defconfig: Enable CONFIG_ARCH_MSM8974
+KV Sujith (1):
+      gpio: davinci: add OF support
 
-Sachin Kamat (1):
-      ARM: exynos_defconfig: Enable S2MPS11 voltage regulator
+Kevin Hilman (2):
+      Merge tag 'renesas-usb-r8a66597-hcd-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'davinci-for-v3.14/watchdog' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
 
-Sergei Shtylyov (4):
-      ARM: shmobile: marzen: enable HPB-DMAC in defconfig
-      ARM: shmobile: bockw: enable HPB-DMAC in defconfig
-      ARM: shmobile: Koelsch: enable Ether in defconfig
-      ARM: shmobile: Koelsch: add Ether support
+Lad, Prabhakar (3):
+      gpio: davinci: use {readl|writel}_relaxed() instead of __raw_*
+      gpio: davinci: convert to use irqdomain support.
+      gpio: davinci: remove unused variable intc_irq_num
 
-Shinya Kuribayashi (2):
-      ARM: shmobile: lager: set .debounce_interval
-      ARM: shmobile: lager: mark GPIO keys as wake-up sources
+Laurent Pinchart (7):
+      usb: r8a66597-hcd: Convert to clk_prepare/unprepare
+      sh: Declare SCIF register base and IRQ as resources
+      sh: sh772[34]: Set serial port sampling rate to 8 for SCIFA ports
+      sh: Don't set plat_sci_port scbrr_algo_id field
+      serial: sh-sci: Remove platform data scbrr_algo_id field
+      serial: sh-sci: Remove platform data mapbase and irqs fields
+      serial: sh-sci: Add device tree bindings documentation
 
-Simon Horman (17):
-      ARM: shmobile: bockw: Do not set command line in defconfig
-      ARM: shmobile: marzen: Do not set command line in defconfig
-      ARM: shmobile: bockw: Do not disable CONFIG_INOTIFY_USER in defconfig
-      ARM: shmobile: marzen: Do not disable CONFIG_INOTIFY_USER in defconfig
-      ARM: shmobile: bockw: Enable CONFIG_VFP in defconfig
-      ARM: shmobile: marzen: Enable CONFIG_VFP in defconfig
-      ARM: shmobile: bockw: Do not enable CONFIG_DEVTMPFS defconfig
-      ARM: shmobile: marzen: Do not enable CONFIG_DEVTMPFS defconfig
-      ARM: shmobile: bockw: Enable CONFIG_PACKET in defconfig
-      ARM: shmobile: marzen: Enable CONFIG_PACKET in defconfig
-      ARM: shmobile: marzen: Do not enable CONFIG_SMC911X in defconfig
-      ARM: shmobile: kzm9d: Enable AUTO_ZRELADDR in defconfig
-      Merge tag 'renesas-cleanup-for-v3.14' into boards-base
-      ARM: shmobile: koelsch: set .debounce_interval
-      ARM: shmobile: koelsch: Enable CONFIG_PACKET in defconfig
-      ARM: shmobile: koelsch: Do not disable CONFIG_{INOTIFY_USER,UNIX} in defconfig
-      Merge branch 'heads/soc2' into boards2-base
+Linus Walleij (4):
+      irqchip: versatile FPGA: support cascaded interrupts from DT
+      ARM: integrator: pass parent IRQ to the SIC
+      clk: versatile: pass a name to ICST clock provider
+      clk: versatile: fixup IM-PD1 clock implementation
 
-Srinivas Kandagatla (1):
-      ARM: multi_v7_defconfig: Fix STi support
+Magnus Damm (2):
+      irqchip: renesas-irqc: Use lazy disable
+      irqchip: renesas-irqc: Enable mask on suspend
 
-Stephen Boyd (1):
-      ARM: msm_defconfig: Enable restart driver
+Nicolas Ferre (4):
+      crypto: atmel-aes - add support for Device Tree
+      crypto: atmel-tdes - add support for Device Tree
+      crypto: atmel-sha - add support for Device Tree
+      crypto: atmel-sha - add sha information to the log
 
-Stephen Warren (2):
-      ARM: tegra: tegra_defconfig updates
-      ARM: bcm2835: bcm2835_defconfig updates
+Olof Johansson (16):
+      Merge tag 'mvebu-drivers-3.14' of git://git.infradead.org/linux-mvebu into next/drivers
+      Merge tag 's3c64xx-dmaengine' of git://git.kernel.org/.../broonie/misc into next/drivers
+      Merge branch 'at91/dt' into next/drivers
+      Merge tag 'at91-drivers' of git://github.com/at91linux/linux-at91 into next/drivers
+      Merge tag 'samsung-irq' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
+      Merge tag 'tegra-for-3.14-trusted-foundations' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'sunxi-drivers-for-3.14' of https://github.com/mripard/linux into next/drivers
+      Merge tag 'renesas-irqc-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge branch 'renesas/drivers-sci2' into next/drivers
+      Merge tag 'renesas-sh-soc-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'renesas-sh-sci3-for-v3.14' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'mvebu-drivers-3.14-2' of git://git.infradead.org/linux-mvebu into next/drivers
+      Merge tag 'davinci-for-v3.14/gpio' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
+      Merge tag 'sunxi-core-for-3.14' of https://github.com/mripard/linux into next/drivers
+      Merge tag 'integrator-for-v3.14' of git://git.kernel.org/.../linusw/linux-integrator into next/drivers
+      Merge branch 'qcom/drivers' into next/drivers
 
-Suman Anna (1):
-      ARM: dts: OMAP2: fix interrupt number for rng
+Sergei Shtylyov (1):
+      irq-renesas-irqc: simplify irq_set_type() method
 
-Thierry Reding (1):
-      ARM: tegra: Enable DRM panel support
+Simon Horman (1):
+      Merge branch 'sh-soc' into sh-sci2-base
 
-Thomas Petazzoni (1):
-      ARM: kirkwood: enable HIGHMEM in defconfig
+Stephen Boyd (2):
+      mmc: msm_sdcc: Limit driver to platforms that use it
+      tty: serial: Limit msm_serial_hs driver to platforms that use it
 
-Tony Lindgren (22):
-      mfd: twl-core: Fix passing of platform data in the device tree case
-      Merge branch 'dt-regressions' into omap-for-v3.13/fixes-take4
-      ARM: dts: Add basic device tree support for omap2430 sdp
-      ARM: dts: Add basic Nokia N8X0 support
-      ARM: dts: Add basic support for omap3 LDP zoom1 labrador
-      Merge branch 'omap-for-v3.13/fixes-take4' into omap-for-v3.14/board-removal
-      Merge branch 'omap-for-v3.14/dt' into omap-for-v3.14/board-removal
-      ARM: OMAP2+: Add support for board specific auxdata quirks
-      ARM: OMAP2+: Add device tree compatible revision checks for n8x0
-      ARM: OMAP2+: Make n8x0 behave better with device tree based booting
-      ARM: OMAP2+: Add quirks support for n8x0
-      ARM: OMAP2+: Remove legacy booting support for n8x0
-      ARM: OMAP2+: Remove board file for H4
-      ARM: OMAP2+: Remove legacy board file for 2430sdp
-      ARM: OMAP2+: Remove legacy mux code for omap2
-      ARM: OMAP2+: Remove legacy hwmod entries for omap2
-      Merge branch 'omap-for-v3.14/board-removal' into omap-for-v3.14/omap3-board-removal
-      ARM: OMAP2+: Add support for legacy auxdata for twl
-      ARM: OMAP2+: Use pdata quirks for emac on am3517
-      ARM: dts: Add basic devices on am3517-evm
-      ARM: dts: Add support for sbc-3xxx with cm-t3730
-      ARM: dts: Add omap specific pinctrl defines to use padconf addresses
+panchaxari (1):
+      ARM: integrator: Default enable ARM_PATCH_PHYS_VIRT, AUTO_ZRELADDR
 
 
- arch/arm/Kconfig                                |   7 +-
- arch/arm/boot/dts/Makefile                      |  17 +-
- arch/arm/boot/dts/am3517-evm.dts                |  29 +
- arch/arm/boot/dts/omap2.dtsi                    |   2 +-
- arch/arm/boot/dts/omap2420-n800.dts             |   8 +
- arch/arm/boot/dts/omap2420-n810-wimax.dts       |   8 +
- arch/arm/boot/dts/omap2420-n810.dts             |   8 +
- arch/arm/boot/dts/omap2420-n8x0-common.dtsi     |  99 +++
- arch/arm/boot/dts/omap2430-sdp.dts              |  49 ++
- arch/arm/boot/dts/omap3-beagle-xm.dts           |  40 +-
- arch/arm/boot/dts/omap3-beagle.dts              |  40 +-
- arch/arm/boot/dts/omap3-cm-t3730.dts            | 104 +++
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi           |  95 +++
- arch/arm/boot/dts/omap3-igep.dtsi               |   2 -
- arch/arm/boot/dts/omap3-igep0020.dts            |  52 +-
- arch/arm/boot/dts/omap3-igep0030.dts            |  10 +-
- arch/arm/boot/dts/omap3-ldp.dts                 | 231 ++++++
- arch/arm/boot/dts/omap3-sb-t35.dtsi             |  40 +
- arch/arm/boot/dts/omap3-sbc-t3730.dts           |  30 +
- arch/arm/boot/dts/omap3-zoom3.dts               |  23 +-
- arch/arm/boot/dts/omap3.dtsi                    |   2 +-
- arch/arm/boot/dts/omap34xx.dtsi                 |  13 +
- arch/arm/boot/dts/omap36xx.dtsi                 |  11 +
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts  |   6 +
- arch/arm/boot/dts/r7s72100-genmai-reference.dts |  31 +
- arch/arm/configs/armadillo800eva_defconfig      |   3 +
- arch/arm/configs/bcm2835_defconfig              |  37 +-
- arch/arm/configs/bockw_defconfig                |  10 +-
- arch/arm/configs/exynos_defconfig               |   3 +-
- arch/arm/configs/genmai_defconfig               | 116 +++
- arch/arm/configs/kirkwood_defconfig             |   1 +
- arch/arm/configs/koelsch_defconfig              |  25 +-
- arch/arm/configs/kzm9d_defconfig                |   1 +
- arch/arm/configs/lager_defconfig                |   3 +-
- arch/arm/configs/marzen_defconfig               |  10 +-
- arch/arm/configs/msm_defconfig                  |   3 +
- arch/arm/configs/multi_v7_defconfig             |   3 +
- arch/arm/configs/mvebu_defconfig                |   3 +
- arch/arm/configs/tegra_defconfig                |  22 +-
- arch/arm/mach-msm/board-dt.c                    |   9 +
- arch/arm/mach-omap2/Kconfig                     |  13 -
- arch/arm/mach-omap2/Makefile                    |   4 -
- arch/arm/mach-omap2/board-2430sdp.c             | 273 -------
- arch/arm/mach-omap2/board-h4.c                  | 365 ---------
- arch/arm/mach-omap2/board-n8x0.c                | 234 ++----
- arch/arm/mach-omap2/common-board-devices.h      |   1 +
- arch/arm/mach-omap2/common.h                    |   1 +
- arch/arm/mach-omap2/msdi.c                      |  69 --
- arch/arm/mach-omap2/mux.h                       |   2 -
- arch/arm/mach-omap2/mux2420.c                   | 690 ----------------
- arch/arm/mach-omap2/mux2420.h                   | 282 -------
- arch/arm/mach-omap2/mux2430.c                   | 793 -------------------
- arch/arm/mach-omap2/mux2430.h                   | 370 ---------
- arch/arm/mach-omap2/omap_device.c               |   2 +
- arch/arm/mach-omap2/omap_hwmod_2420_data.c      | 137 ----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c      | 266 -------
- .../omap_hwmod_2xxx_interconnect_data.c         | 165 +---
- .../mach-omap2/omap_hwmod_2xxx_ipblock_data.c   |  72 +-
- arch/arm/mach-omap2/omap_hwmod_common_data.h    |   5 -
- arch/arm/mach-omap2/pdata-quirks.c              | 138 +++-
- arch/arm/mach-shmobile/Kconfig                  |  63 +-
- arch/arm/mach-shmobile/Makefile                 |   5 +-
- arch/arm/mach-shmobile/Makefile.boot            |   4 +-
- arch/arm/mach-shmobile/board-armadillo800eva.c  |   7 +-
- arch/arm/mach-shmobile/board-bockw-reference.c  |  19 +-
- arch/arm/mach-shmobile/board-bockw.c            |  17 +-
- arch/arm/mach-shmobile/board-genmai-reference.c |  49 ++
- .../arm/mach-shmobile/board-koelsch-reference.c |  79 ++
- arch/arm/mach-shmobile/board-koelsch.c          | 190 ++++-
- arch/arm/mach-shmobile/board-lager-reference.c  |  34 +
- arch/arm/mach-shmobile/board-lager.c            | 151 +++-
- arch/arm/mach-shmobile/board-mackerel.c         |  21 +-
- arch/arm/mach-shmobile/sh-gpio.h                |  19 -
- include/dt-bindings/pinctrl/omap.h              |  20 +
- include/sound/rcar_snd.h                        |   1 -
- 75 files changed, 1899 insertions(+), 3868 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap2420-n800.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810-wimax.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n810.dts
- create mode 100644 arch/arm/boot/dts/omap2420-n8x0-common.dtsi
- create mode 100644 arch/arm/boot/dts/omap2430-sdp.dts
- create mode 100644 arch/arm/boot/dts/omap3-cm-t3730.dts
- create mode 100644 arch/arm/boot/dts/omap3-cm-t3x30.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-ldp.dts
- create mode 100644 arch/arm/boot/dts/omap3-sb-t35.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-sbc-t3730.dts
- create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
- create mode 100644 arch/arm/boot/dts/r7s72100-genmai-reference.dts
- create mode 100644 arch/arm/configs/genmai_defconfig
- delete mode 100644 arch/arm/mach-omap2/board-2430sdp.c
- delete mode 100644 arch/arm/mach-omap2/board-h4.c
- delete mode 100644 arch/arm/mach-omap2/mux2420.c
- delete mode 100644 arch/arm/mach-omap2/mux2420.h
- delete mode 100644 arch/arm/mach-omap2/mux2430.c
- delete mode 100644 arch/arm/mach-omap2/mux2430.h
- create mode 100644 arch/arm/mach-shmobile/board-genmai-reference.c
- create mode 100644 arch/arm/mach-shmobile/board-koelsch-reference.c
+ .../arm/firmware/tlm,trusted-foundations.txt    |  20 +
+ Documentation/devicetree/bindings/arm/tegra.txt |   5 +
+ .../bindings/arm/versatile-fpga-irq.txt         |   5 +
+ .../devicetree/bindings/crypto/atmel-crypto.txt |  68 +++
+ .../devicetree/bindings/gpio/gpio-davinci.txt   |  41 ++
+ .../devicetree/bindings/i2c/trivial-devices.txt |   1 +
+ .../devicetree/bindings/rtc/sunxi-rtc.txt       |  17 +
+ .../bindings/serial/renesas,sci-serial.txt      |  46 ++
+ .../devicetree/bindings/vendor-prefixes.txt     |   2 +
+ arch/arm/Kconfig                                |   4 +
+ arch/arm/Makefile                               |   1 +
+ arch/arm/boot/dts/integratorcp.dts              |   3 +
+ arch/arm/configs/tegra_defconfig                |   1 +
+ arch/arm/firmware/Kconfig                       |  28 +
+ arch/arm/firmware/Makefile                      |   1 +
+ arch/arm/firmware/trusted_foundations.c         |  81 +++
+ arch/arm/include/asm/trusted_foundations.h      |  67 +++
+ arch/arm/mach-davinci/da830.c                   |   3 +-
+ arch/arm/mach-davinci/da850.c                   |   3 +-
+ arch/arm/mach-davinci/da8xx-dt.c                |   2 +-
+ arch/arm/mach-davinci/devices-da8xx.c           |   4 +-
+ arch/arm/mach-davinci/devices.c                 |   2 +-
+ arch/arm/mach-davinci/dm355.c                   |   3 +-
+ arch/arm/mach-davinci/dm365.c                   |   3 +-
+ arch/arm/mach-davinci/dm644x.c                  |   3 +-
+ arch/arm/mach-davinci/dm646x.c                  |   3 +-
+ arch/arm/mach-msm/board-msm7x30.c               |  35 ++
+ arch/arm/mach-msm/board-qsd8x50.c               |  35 ++
+ arch/arm/mach-tegra/Kconfig                     |   1 +
+ arch/arm/mach-tegra/reset.c                     |  40 +-
+ arch/arm/mach-tegra/tegra.c                     |   2 +
+ arch/sh/kernel/cpu/sh2/setup-sh7619.c           |  30 +-
+ arch/sh/kernel/cpu/sh2a/setup-mxg.c             |  10 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7201.c          |  80 ++-
+ arch/sh/kernel/cpu/sh2a/setup-sh7203.c          |  40 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7206.c          |  40 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7264.c          | 104 +++-
+ arch/sh/kernel/cpu/sh2a/setup-sh7269.c          | 104 +++-
+ arch/sh/kernel/cpu/sh3/setup-sh7705.c           |  20 +-
+ arch/sh/kernel/cpu/sh3/setup-sh770x.c           |  30 +-
+ arch/sh/kernel/cpu/sh3/setup-sh7710.c           |  20 +-
+ arch/sh/kernel/cpu/sh3/setup-sh7720.c           |  20 +-
+ arch/sh/kernel/cpu/sh4/setup-sh4-202.c          |  16 +-
+ arch/sh/kernel/cpu/sh4/setup-sh7750.c           |  20 +-
+ arch/sh/kernel/cpu/sh4/setup-sh7760.c           |  62 ++-
+ arch/sh/kernel/cpu/sh4a/setup-sh7343.c          |  40 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7366.c          |  10 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7722.c          |  30 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7723.c          |  63 ++-
+ arch/sh/kernel/cpu/sh4a/setup-sh7724.c          |  63 ++-
+ arch/sh/kernel/cpu/sh4a/setup-sh7734.c          |  72 ++-
+ arch/sh/kernel/cpu/sh4a/setup-sh7757.c          |  30 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7763.c          |  30 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7770.c          | 100 ++--
+ arch/sh/kernel/cpu/sh4a/setup-sh7780.c          |  22 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7785.c          |  60 ++-
+ arch/sh/kernel/cpu/sh4a/setup-sh7786.c          |  88 +++-
+ arch/sh/kernel/cpu/sh4a/setup-shx3.c            |  48 +-
+ arch/sh/kernel/cpu/sh5/setup-sh5.c              |  12 +-
+ drivers/bus/mvebu-mbus.c                        |  10 +-
+ drivers/clk/versatile/clk-icst.c                |   3 +-
+ drivers/clk/versatile/clk-icst.h                |   1 +
+ drivers/clk/versatile/clk-impd1.c               |  88 +++-
+ drivers/clk/versatile/clk-integrator.c          |   2 +-
+ drivers/clk/versatile/clk-realview.c            |   6 +-
+ drivers/crypto/atmel-aes.c                      | 143 +++--
+ drivers/crypto/atmel-sha.c                      | 103 +++-
+ drivers/crypto/atmel-tdes.c                     | 143 +++--
+ drivers/gpio/Kconfig                            |   7 +
+ drivers/gpio/Makefile                           |   2 +-
+ drivers/gpio/gpio-davinci.c                     | 185 +++++--
+ drivers/irqchip/exynos-combiner.c               |  15 +-
+ drivers/irqchip/irq-renesas-irqc.c              |  21 +-
+ drivers/irqchip/irq-versatile-fpga.c            |  15 +-
+ drivers/mmc/host/Kconfig                        |   2 +-
+ drivers/rtc/Kconfig                             |  18 +
+ drivers/rtc/Makefile                            |   2 +
+ drivers/rtc/rtc-isl12057.c                      | 310 +++++++++++
+ drivers/rtc/rtc-sunxi.c                         | 523 +++++++++++++++++++
+ drivers/tty/serial/Kconfig                      |   2 +-
+ drivers/tty/serial/sh-sci.c                     | 187 +++++--
+ drivers/usb/host/r8a66597-hcd.c                 |   4 +-
+ drivers/usb/phy/phy-msm-usb.c                   |  35 +-
+ drivers/watchdog/davinci_wdt.c                  |   4 +-
+ include/linux/platform_data/gpio-davinci.h      |   3 +-
+ include/linux/serial_sci.h                      |  36 --
+ include/linux/usb/msm_hsusb.h                   |   3 +
+ 87 files changed, 2914 insertions(+), 753 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt
+ create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/sunxi-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
+ create mode 100644 drivers/rtc/rtc-isl12057.c
+ create mode 100644 drivers/rtc/rtc-sunxi.c
