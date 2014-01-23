@@ -1,32 +1,38 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 23 Jan 2014 16:57:18 +0100
-Subject: [PATCH v3 14/15] at91: dt: at91sam9261ek: Enabled the USB host port
- (OHCI)
-In-Reply-To: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1390492639-7299-15-git-send-email-jjhiblot@traphandler.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jan 2014 15:55:45 +0000
+Subject: [PATCH RESEND v4 01/37] mtd: st_spi_fsm: Allocate resources and
+ register with MTD framework
+In-Reply-To: <52E12434.7030000@st.com>
+References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
+ <1390473085-24626-2-git-send-email-lee.jones@linaro.org>
+ <52E12434.7030000@st.com>
+Message-ID: <20140123155545.GH8586@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- arch/arm/boot/dts/at91sam9261ek.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+> >+	fsm->region = devm_request_mem_region(&pdev->dev, res->start,
+> >+					      resource_size(res), pdev->name);
+> >+	if (!fsm->region) {
+> >+		dev_err(&pdev->dev,
+> >+			"Failed to reserve memory region [0x%08x-0x%08x]\n",
+> >+			res->start, res->end);
+> >+		return -EBUSY;
+> >+	}
+> >+
+> >+	fsm->base = devm_ioremap_nocache(&pdev->dev,
+> >+					 res->start, resource_size(res));
+> >+	if (!fsm->base) {
+> >+		dev_err(&pdev->dev, "Failed to ioremap [0x%08x]\n", res->start);
+> >+		return -EINVAL;
+> >+	}
+> >+
+> you can replace  "devm_request_mem_region" & "devm_ioremap_nocache"
+> by "devm_ioremap_resource"
 
-diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-index 287b283..8bdbed9 100644
---- a/arch/arm/boot/dts/at91sam9261ek.dts
-+++ b/arch/arm/boot/dts/at91sam9261ek.dts
-@@ -32,6 +32,10 @@
- 	};
- 
- 	ahb {
-+		usb0: ohci at 00500000 {
-+			status = "okay";
-+		};
-+
- 		fb0: fb at 0x00600000 {
- 			display = <&display0>;
- 			atmel,power-control-gpio = <&pioA 12 GPIO_ACTIVE_LOW>;
+Yes, that looks entirely reasonable, thanks.
+
 -- 
-1.8.5.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
