@@ -1,60 +1,88 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 22 Jan 2014 19:38:39 -0500
-Subject: [PATCH RFC 00/73] tree-wide: clean up some no longer required
- #include <linux/init.h>
-In-Reply-To: <20140122180023.dd90d34cba38d9f9ac516349@canb.auug.org.au>
-References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
- <20140122180023.dd90d34cba38d9f9ac516349@canb.auug.org.au>
-Message-ID: <20140123003838.GA10182@windriver.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 22 Jan 2014 16:59:37 -0800
+Subject: [PATCH 1/1] gic: change access of gicc_ctrl register to read
+ modify write.
+In-Reply-To: <1386534157-17366-1-git-send-email-fkan@apm.com>
+References: <1386534157-17366-1-git-send-email-fkan@apm.com>
+Message-ID: <CAL85gmBaV9_9J3Td1FZxsFii+AO338-8PXgbXZoUEaO+ozHUmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH RFC 00/73] tree-wide: clean up some no longer required #include <linux/init.h>] On 22/01/2014 (Wed 18:00) Stephen Rothwell wrote:
+Just checking to see anyone had time to take a look at this and comment.
 
-> Hi Paul,
-> 
-> On Tue, 21 Jan 2014 16:22:03 -0500 Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> >
-> > Where: This work exists as a queue of patches that I apply to
-> > linux-next; since the changes are fixing some things that currently
-> > can only be found there.  The patch series can be found at:
-> > 
-> >    http://git.kernel.org/cgit/linux/kernel/git/paulg/init.git
-> >    git://git.kernel.org/pub/scm/linux/kernel/git/paulg/init.git
-> > 
-> > I've avoided annoying Stephen with another queue of patches for
-> > linux-next while the development content was in flux, but now that
-> > the merge window has opened, and new additions are fewer, perhaps he
-> > wouldn't mind tacking it on the end...  Stephen?
-> 
-> OK, I have added this to the end of linux-next today - we will see how we
-> go.  It is called "init".
-
-Thanks, it was a great help as it uncovered a few issues in fringe arch
-that I didn't have toolchains for, and I've fixed all of those up.
-
-I've noticed that powerpc has been un-buildable for a while now; I have
-used this hack patch locally so I could run the ppc defconfigs to check
-that I didn't break anything.  Maybe useful for linux-next in the
-interim?  It is a hack patch -- Not-Signed-off-by: Paul Gortmaker.  :)
-
-Paul.
---
-
-diff --git a/arch/powerpc/include/asm/pgtable-ppc64.h b/arch/powerpc/include/asm/pgtable-ppc64.h
-index d27960c89a71..d0f070a2b395 100644
---- a/arch/powerpc/include/asm/pgtable-ppc64.h
-+++ b/arch/powerpc/include/asm/pgtable-ppc64.h
-@@ -560,9 +560,9 @@ extern void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
- 			    pmd_t *pmdp);
- 
- #define pmd_move_must_withdraw pmd_move_must_withdraw
--typedef struct spinlock spinlock_t;
--static inline int pmd_move_must_withdraw(spinlock_t *new_pmd_ptl,
--					 spinlock_t *old_pmd_ptl)
-+struct spinlock;
-+static inline int pmd_move_must_withdraw(struct spinlock *new_pmd_ptl,
-+					 struct spinlock *old_pmd_ptl)
- {
- 	/*
- 	 * Archs like ppc64 use pgtable to store per pmd
+On Sun, Dec 8, 2013 at 12:22 PM, Feng Kan <fkan@apm.com> wrote:
+> This change is made to preserve the GIC v2 releated bits in the
+> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+> The original code only set the enable/disable group bit in this register.
+> This code will preserve all other bits configured by the bootload except
+> the enable/disable bit. The main reason for this change is to allow the
+> bypass bits specified in the v2 spec to remain untouched by the current
+> GIC code. In the X-Gene platform, the bypass functionality is not used
+> and bypass must be disabled at all time.
+>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Acked-by: Anup Patel <apatel@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  drivers/irqchip/irq-gic.c |   19 ++++++++++++++++---
+>  1 files changed, 16 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d0e9480..6550ac9 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -419,6 +419,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>         void __iomem *dist_base = gic_data_dist_base(gic);
+>         void __iomem *base = gic_data_cpu_base(gic);
+>         unsigned int cpu_mask, cpu = smp_processor_id();
+> +       unsigned int ctrl_mask;
+>         int i;
+>
+>         /*
+> @@ -450,13 +451,21 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>
+>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+> -       writel_relaxed(1, base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
+> +       ctrl_mask |= 0x1;
+> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+>  }
+>
+>  void gic_cpu_if_down(void)
+>  {
+> +       unsigned int ctrl_mask;
+> +
+>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
+> +       ctrl_mask &= 0xfffffffe;
+> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>
+>  #ifdef CONFIG_CPU_PM
+> @@ -567,6 +576,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  {
+>         int i;
+>         u32 *ptr;
+> +       unsigned int ctrl_mask;
+>         void __iomem *dist_base;
+>         void __iomem *cpu_base;
+>
+> @@ -591,7 +601,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>
+>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
+> +       ctrl_mask |= 0x1;
+> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>
+>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,        void *v)
+> --
+> 1.7.6.1
+>
