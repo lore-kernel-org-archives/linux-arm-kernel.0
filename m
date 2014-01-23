@@ -1,14 +1,16 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed, 22 Jan 2014 16:59:37 -0800
+Date: Wed, 22 Jan 2014 17:01:44 -0800
 Subject: [PATCH 1/1] gic: change access of gicc_ctrl register to read
  modify write.
 In-Reply-To: <1386534157-17366-1-git-send-email-fkan@apm.com>
 References: <1386534157-17366-1-git-send-email-fkan@apm.com>
-Message-ID: <CAL85gmBaV9_9J3Td1FZxsFii+AO338-8PXgbXZoUEaO+ozHUmg@mail.gmail.com>
+Message-ID: <CAL85gmDXy=ZcbZNiQ8GuK4se3AFFo5-iAkBPo3cZJR0W=j=7uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Just checking to see anyone had time to take a look at this and comment.
+
+Thanks
 
 On Sun, Dec 8, 2013 at 12:22 PM, Feng Kan <fkan@apm.com> wrote:
 > This change is made to preserve the GIC v2 releated bits in the
