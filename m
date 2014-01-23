@@ -1,37 +1,54 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 23 Jan 2014 16:39:32 +0900
-Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
-In-Reply-To: <52E02DCC.1000404@wwwdotorg.org>
-References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
- <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
- <52E02DCC.1000404@wwwdotorg.org>
-Message-ID: <CAAVeFuKLtC62+bujY4724hMV_6M8Ow0s=6zRn_M87VX4PHQgxA@mail.gmail.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Thu, 23 Jan 2014 08:40:01 +0100
+Subject: [PATCH 2/2] clocksource: Make clocksource register functions void
+In-Reply-To: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
+References: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20140123074001.GA3080@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 5:45 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/21/2014 03:10 AM, Alexandre Courbot wrote:
->> Invoke the do_idle() firmware call before suspending a CPU so that the
->> underlying firmware (if any) can take necessary action.
->
->> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
->
->> @@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
->>
->>       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
->>
->> +     call_firmware_op(do_idle);
->> +
->>       cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
->>
->>       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
->
-> Don't you need to have the kernel also *not* do something when entering
-> idle; doesn't the FW op replace some of the register writes that the
-> kernel would otherwise be doing?
+Around Thu 23 Jan 2014 15:12:46 +0800 or thereabout, Yijing Wang wrote:
+> Currently, clocksource_register() and __clocksource_register_scale()
+> functions always return 0, it's pointless, make functions void.
+> And remove the dead code that check the clocksource_register_hz()
+> return value.
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 
-It seems like the operation is actually to inform the firmware that we
-are going to suspend the CPU. Downstream kernel also uses it that way.
-But you are right in that we should expect do_idle() to actually
-perform the suspend operation. Maybe a prepare_idle() operation should
-be added to the firmware interface for this purpose?
+For the avr32 related change
+
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+
+> ---
+>  arch/arm/mach-davinci/time.c                    |    5 ++---
+>  arch/arm/mach-msm/timer.c                       |    4 +---
+>  arch/arm/mach-omap2/timer.c                     |    8 +++-----
+>  arch/avr32/kernel/time.c                        |    4 +---
+>  arch/blackfin/kernel/time-ts.c                  |    6 ++----
+>  arch/microblaze/kernel/timer.c                  |    3 +--
+>  arch/mips/jz4740/time.c                         |    6 +-----
+>  arch/mips/loongson/common/cs5536/cs5536_mfgpt.c |    3 ++-
+>  arch/openrisc/kernel/time.c                     |    3 +--
+>  arch/powerpc/kernel/time.c                      |    6 +-----
+>  arch/um/kernel/time.c                           |    6 +-----
+>  arch/x86/platform/uv/uv_time.c                  |   14 ++++++--------
+>  drivers/clocksource/acpi_pm.c                   |    3 ++-
+>  drivers/clocksource/cadence_ttc_timer.c         |    6 +-----
+>  drivers/clocksource/exynos_mct.c                |    4 +---
+>  drivers/clocksource/i8253.c                     |    3 ++-
+>  drivers/clocksource/mmio.c                      |    3 ++-
+>  drivers/clocksource/samsung_pwm_timer.c         |    5 +----
+>  drivers/clocksource/scx200_hrt.c                |    3 ++-
+>  drivers/clocksource/tcb_clksrc.c                |    8 +-------
+>  drivers/clocksource/timer-marco.c               |    2 +-
+>  drivers/clocksource/timer-prima2.c              |    2 +-
+>  drivers/clocksource/vt8500_timer.c              |    4 +---
+>  include/linux/clocksource.h                     |    8 ++++----
+>  kernel/time/clocksource.c                       |    6 ++----
+>  kernel/time/jiffies.c                           |    3 ++-
+>  26 files changed, 45 insertions(+), 83 deletions(-)
+
+<snipp diffs>
+
+-- 
+HcE
