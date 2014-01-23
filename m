@@ -1,151 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Jan 2014 10:36:23 -0800
-Subject: [GIT PULL 1/6] ARM: SoC non-critical fixes for 3.14
-In-Reply-To: <1390502188-16896-1-git-send-email-olof@lixom.net>
-References: <1390502188-16896-1-git-send-email-olof@lixom.net>
-Message-ID: <1390502188-16896-2-git-send-email-olof@lixom.net>
+Date: Thu, 23 Jan 2014 10:36:22 -0800
+Subject: [GIT PULL 0/6] ARM: SoC changes for 3.14
+Message-ID: <1390502188-16896-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As usual, we have a batch of fixes that weren't considered significant
-enough to warrant going into the later -rcs for previous release, so
-they are queued up on this branch.
+Here are the main branches for arm-soc for the 3.14 merge window. We'll have a
+few more patches towards the end, but this is the bulk of it.
 
-A handful of these are for various DT fixups for Samsung platforms,
-and a handful of other minor things.
+Nothing too surprising in any of it, and we've been able to stay away
+from too much conflicts this release cycle, I think the total was around
+3 and none of them are messy (proposed resolution in each pull request)
 
-There are also a couple of stable-marked patches for mvebu -- they came in
-quite late and we decided to keep them deferred until the first -stable
-release to get more coverage instead of squeezing them into 3.13.
+I've pushed up a "resolved-for-linus" branch in case you want to compare
+resolutions.
 
-----------------------------------------------------------------
-
-The following changes since commit 0dc3fd0249a295863900984e02dd4bb89204205b:
-
-  Merge tag 'modules-next-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-nc-for-linus
-
-for you to fetch changes up to 099c2e9ef671519d4c7f9d49782845adc4f54a39:
-
-  Merge tag 'omap-for-v3.14/fixes-not-urgent-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/fixes-non-critical
-
-----------------------------------------------------------------
-
-Alexander Shiyan (1):
-      ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
-
-Barry Song (1):
-      irqchip: sirf: set IRQ_LEVEL status_flags
-
-Doug Anderson (2):
-      ARM: dts: Add the missing "\" key in non-US keyboards for exynos5250-snow
-      ARM: dts: Fix exynos5250-snow's search key to be L_META
-
-Ezequiel Garcia (4):
-      ARM: OMAP2+: Select USB PHY for AM335x SoC
-      ARM: OMAP2+: gpmc: Move initialization outside the gpmc_t condition
-      ARM: OMAP2+: gpmc: Introduce gpmc_set_legacy()
-      ARM: OMAP2+: gpmc: Move legacy GPMC width setting
-
-Gregory CLEMENT (4):
-      ARM: mvebu: Add support to get the ID and the revision of a SoC
-      ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board
-      i2c: mv64xxx: Fix bus hang on A0 version of the Armada XP SoCs
-      i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible
-
-Jean-Jacques Hiblot (1):
-      ARM: at91: smc: bug fix in sam9_smc_cs_read()
-
-Josh Cartwright (1):
-      ARM: msm: trout: fix uninit var warning
-
-Jyri Sarha (1):
-      ARM: OMAP2+: enable AM33xx SOC EVM audio
-
-Kevin Hilman (3):
-      Merge branch 'qcom/fixes' into next/fixes-non-critical
-      Merge tag 'mvebu-fixes-3.13' of git://git.infradead.org/linux-mvebu into next/fixes-non-critical
-      Merge tag 'omap-for-v3.14/fixes-not-urgent-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
-
-Lee Jones (1):
-      ARM: u300: Remove '0x's from U300 DTS file
-
-Nishanth Menon (2):
-      Documentation: dt: OMAP: explicitly state SoC compatible strings
-      ARM: OMAP2+: board-generic: update SoC compatibility strings
-
-Olof Johansson (4):
-      Merge tag 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
-      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
-      Merge branch 'qcom/fixes' into next/fixes-non-critical
-      Merge tag 'u300-for-arm-soc-1' of git://git.kernel.org/.../linusw/linux-stericsson into next/fixes-non-critical
-
-Sachin Kamat (4):
-      ARM: dts: Add missing op_mode property to PMIC on Arndale
-      ARM: dts: Add missing frequency property to exynos5250
-      ARM: dts: Fix a typo in exynos5420-pinctrl.dtsi
-      ARM: dts: Update display clock frequency for Origen-4412
-
-Seungwon Jeon (1):
-      ARM: dts: add clock provider for mshc node for Exynos4412 SOC
-
-Stefan Weil (1):
-      ARM: bcm2835: Fix grammar in help message
-
-Stephen Boyd (1):
-      ARM: dts: msm: Fix gpio interrupt and reg length
-
-Tomasz Figa (4):
-      ARM: S3C64XX: Correct card detect type for HSMMC1 for MINI6410
-      clk: samsung: exynos4: Fix definition of div_mmc_pre4 divider
-      ARM: dts: Fix definition of MSHC device tree nodes for exynos4x12
-      ARM: dts: Use MSHC controller for eMMC memory for exynos4412-trats2
-
-Tushar Behera (1):
-      ARM: dts: Update display clock frequency for Origen-4210
-
-Uwe Kleine-K?nig (1):
-      ARM: u300: fix timekeeping when periodic mode is used
-
-Wei Yongjun (1):
-      ARM: u300: fix return value check in __u300_init_boardpower()
+Please pull. Thanks!
 
 
- .../devicetree/bindings/arm/omap/omap.txt       |  53 +++++++++
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt     |   6 +-
- arch/arm/boot/dts/exynos4210-origen.dts         |   2 +-
- arch/arm/boot/dts/exynos4412-odroidx.dts        |   5 +-
- arch/arm/boot/dts/exynos4412-origen.dts         |   7 +-
- arch/arm/boot/dts/exynos4412-trats2.dts         |  20 +++-
- arch/arm/boot/dts/exynos4412.dtsi               |   7 --
- arch/arm/boot/dts/exynos4x12.dtsi               |  13 ++
- arch/arm/boot/dts/exynos5250-arndale.dts        |   2 +
- arch/arm/boot/dts/exynos5250-snow.dts           |   3 +-
- arch/arm/boot/dts/exynos5250.dtsi               |   2 +
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi       |   2 +-
- arch/arm/boot/dts/qcom-msm8660-surf.dts         |   4 +-
- arch/arm/boot/dts/qcom-msm8960-cdp.dts          |   2 +-
- arch/arm/boot/dts/ste-u300.dts                  |   6 +-
- arch/arm/configs/omap2plus_defconfig            |   3 +
- arch/arm/mach-at91/sam9_smc.c                   |   2 +-
- arch/arm/mach-bcm2835/Kconfig                   |   2 +-
- arch/arm/mach-msm/board-trout.c                 |  12 +-
- arch/arm/mach-mvebu/Makefile                    |   2 +-
- arch/arm/mach-mvebu/armada-370-xp.c             |  32 +++++
- arch/arm/mach-mvebu/mvebu-soc-id.c              | 119 +++++++++++++++++++
- arch/arm/mach-mvebu/mvebu-soc-id.h              |  32 +++++
- arch/arm/mach-omap2/board-generic.c             |   7 ++
- arch/arm/mach-omap2/gpmc-nand.c                 |  50 ++++----
- arch/arm/mach-s3c64xx/mach-mini6410.c           |  10 ++
- arch/arm/mach-u300/regulator.c                  |   4 +-
- arch/arm/mach-u300/timer.c                      |  38 +++---
- arch/arm/plat-samsung/include/plat/uncompress.h |   2 +
- drivers/clk/samsung/clk-exynos4.c               |   3 +-
- drivers/i2c/busses/i2c-mv64xxx.c                |   5 +
- drivers/irqchip/irq-sirfsoc.c                   |   3 +-
- 32 files changed, 381 insertions(+), 79 deletions(-)
- create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.c
- create mode 100644 arch/arm/mach-mvebu/mvebu-soc-id.h
+-Olof
