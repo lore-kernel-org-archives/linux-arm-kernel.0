@@ -1,7 +1,7 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 23 Jan 2014 15:40:40 +0100
+Date: Thu, 23 Jan 2014 15:41:42 +0100
 Subject: [PATCH] usb: at91-udc: fix irq and iomem resource retrieval
-Message-ID: <1390488040-8482-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
