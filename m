@@ -1,49 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:06 +0000
-Subject: [PATCH RESEND v4 18/37] mtd: st_spi_fsm: Prepare read/write sequences
- according to configuration
+Date: Thu, 23 Jan 2014 10:31:00 +0000
+Subject: [PATCH RESEND v4 12/37] mtd: st_spi_fsm: Fetch platform specific
+ configurations
 In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
 References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1390473085-24626-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Firstly we search for our preference read/write configuration based on a
-given chip's capabilities. Then we actually set up the message sequence
-accordingly.
+All supported platforms are able to pass specific configurations via
+the Device Tree on boot. Here we add a function which is to be called
+during the probing process which will extract them, or make other
+assumptions based on capabilities provided.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 02718ae..fc23354 100644
+index efd8fdb..1803f94 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -649,6 +649,23 @@ static void stfsm_prepare_rw_seq(struct stfsm *fsm,
- 	seq->seq[i++] = STFSM_INST_STOP;
+@@ -654,6 +654,16 @@ static int stfsm_init(struct stfsm *fsm)
+ 	return 0;
  }
  
-+static int stfsm_search_prepare_rw_seq(struct stfsm *fsm,
-+				       struct stfsm_seq *seq,
-+				       struct seq_rw_config *cfgs)
++static void stfsm_fetch_platform_configs(struct platform_device *pdev)
 +{
-+	struct seq_rw_config *config;
++	struct stfsm *fsm = platform_get_drvdata(pdev);
++	struct flash_info *info = fsm->info;
 +
-+	config = stfsm_search_seq_rw_configs(fsm, cfgs);
-+	if (!config) {
-+		dev_err(fsm->dev, "failed to find suitable config\n");
-+		return -EINVAL;
-+	}
-+
-+	stfsm_prepare_rw_seq(fsm, seq, config);
-+
-+	return 0;
++	/* Use device size to determine address width */
++	if (info->sector_size * info->n_sectors > 0xFFFFFF)
++		info->flags |= FLASH_FLAG_32BIT_ADDR;
 +}
 +
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ static int stfsm_probe(struct platform_device *pdev)
  {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -712,6 +722,8 @@ static int stfsm_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, fsm);
+ 
++	stfsm_fetch_platform_configs(pdev);
++
+ 	fsm->mtd.dev.parent	= &pdev->dev;
+ 	fsm->mtd.type		= MTD_NORFLASH;
+ 	fsm->mtd.writesize	= 4;
 -- 
 1.8.3.2
