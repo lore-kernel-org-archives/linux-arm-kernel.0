@@ -1,53 +1,38 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Jan 2014 20:45:13 +1300
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Jan 2014 08:58:09 +0100
 Subject: [PATCH 2/2] clocksource: Make clocksource register functions void
-In-Reply-To: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
+In-Reply-To: <52E0C889.6000106@prisktech.co.nz>
 References: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <52E0C889.6000106@prisktech.co.nz>
+ <52E0C889.6000106@prisktech.co.nz>
+Message-ID: <CAMuHMdUcKb8m71Z7dUo86MQ_KZgPujxsduUUt3Mz8Oke+DLSVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/14 20:12, Yijing Wang wrote:
-> Currently, clocksource_register() and __clocksource_register_scale()
-> functions always return 0, it's pointless, make functions void.
-> And remove the dead code that check the clocksource_register_hz()
-> return value.
+On Thu, Jan 23, 2014 at 8:45 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>>   -static inline int clocksource_register_hz(struct clocksource *cs, u32
+>> hz)
+>> +static inline void clocksource_register_hz(struct clocksource *cs, u32
+>> hz)
+>>   {
+>>         return __clocksource_register_scale(cs, 1, hz);
+>>   }
 >
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-......
-> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-> index 67301a4..5a17c5e 100644
-> --- a/include/linux/clocksource.h
-> +++ b/include/linux/clocksource.h
-> @@ -282,7 +282,7 @@ static inline s64 clocksource_cyc2ns(cycle_t cycles, u32 mult, u32 shift)
->   }
->   
->   
-> -extern int clocksource_register(struct clocksource*);
-> +extern void clocksource_register(struct clocksource *);
->   extern int clocksource_unregister(struct clocksource*);
->   extern void clocksource_touch_watchdog(void);
->   extern struct clocksource* clocksource_get_next(void);
-> @@ -301,17 +301,17 @@ clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec);
->    * Don't call __clocksource_register_scale directly, use
->    * clocksource_register_hz/khz
->    */
-> -extern int
-> +extern void
->   __clocksource_register_scale(struct clocksource *cs, u32 scale, u32 freq);
->   extern void
->   __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq);
->   
-> -static inline int clocksource_register_hz(struct clocksource *cs, u32 hz)
-> +static inline void clocksource_register_hz(struct clocksource *cs, u32 hz)
->   {
->   	return __clocksource_register_scale(cs, 1, hz);
->   }
+>
+> This doesn't make sense - you are still returning a value on a function
+> declared void, and the return is now from a function that doesn't return
+> anything either ?!?!
+> Doesn't this throw a compile-time warning??
 
-This doesn't make sense - you are still returning a value on a function 
-declared void, and the return is now from a function that doesn't return 
-anything either ?!?!
-Doesn't this throw a compile-time warning??
+No, passing on void in functions returning void doesn't cause compiler
+warnings.
 
-Regards
-Tony Prisk
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
