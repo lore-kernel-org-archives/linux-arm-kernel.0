@@ -1,48 +1,106 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 23 Jan 2014 15:52:08 -0700
-Subject: [PATCH 3/3] irqchip: orion: clear stale interrupts in irq_enable
-In-Reply-To: <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140123225208.GA24778@obsidianresearch.com>
+From: marc.ceeeee@gmail.com (Marc C)
+Date: Thu, 23 Jan 2014 14:57:23 -0800
+Subject: [PATCH v5 7/8] ARM: brcmstb: gic: add compatible string for
+ Broadcom Brahma15
+In-Reply-To: <CAGVrzcauDKeNM-Tqxt67Km6r6sjqvwe9_ki_GLc9_ZiXOauN8Q@mail.gmail.com>
+References: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
+ <1390361452-3124-8-git-send-email-marc.ceeeee@gmail.com>
+ <CAGVrzcbPyaSe0aEHt157kz=quvsrBCPOUriCVG27fJfasa45jg@mail.gmail.com>
+ <52E074ED.5000906@gmail.com>
+ <CAGVrzcauDKeNM-Tqxt67Km6r6sjqvwe9_ki_GLc9_ZiXOauN8Q@mail.gmail.com>
+Message-ID: <52E19E53.40409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:38:06PM +0100, Sebastian Hesselbarth wrote:
-> Bridge IRQ_CAUSE bits are asserted regardless of the corresponding bit in
-> IRQ_MASK register. To avoid interrupt events on stale irqs, we have to clear
-> them before unmask. This installs an .irq_enable callback to ensure stale
-> irqs are cleared before initial unmask.
+Hi Florian,
 
-I'm not sure if putting this in irq_enable is correct. I think this
-should only happen at irq_startup.
+>> Patch #8 [1] of this series has the "compatible" string set exactly that way. I was
+>> following the pattern seen in the other reference DTS files, where "arm,cortex-a15-gic" is
+>> used as the fall-back.
+>
+> Ah, I missed that, thanks! How about the CPU compatible property?
+> AFAIK it is only used by arch/arm/kernel/topology.c, I am not sure if
+> we have the exact same number to use as the "vanilla" Cortex-A15 here,
+> or if we should have another number match against "brcm,brahma-b15".
+> What do you think?
 
-The question boils down to what is supposed to happen with this code
-sequence:
+I think we should let the code fall-through to use the "SCHED_POWER_SCALE" defaults for
+now, and not have an entry in the efficiency table. There are currently no BCM7xxx
+platforms architected with heterogeneous multi-processing or multiple disparate CPU
+clusters (like big.LITTLE).
 
-disable_irq(..);
-write(.. something to cause an interrupt edge ..);
-.. synchronize ..
-enable_irq(..);
+Thanks,
+Marc
 
-Do we get the interrupt or not?
-
-I found this message from Linus long ago:
- http://yarchive.net/comp/linux/edge_triggered_interrupts.html
-> Btw, the "disable_irq()/enable_irq()" subsystem has been written so that
-> when you disable an edge-triggered interrupt, and the edge happens while
-> the interrupt is disabled, we will re-play the interrupt at enable time.
-> Exactly so that drivers can have an easier time and don't have to
-> normally worry about whether something is edge or level-triggered.
-
-And found this note in Documentation/DocBook/genericirq.tmpl:
-
-> This prevents losing edge interrupts on hardware which does
-> not store an edge interrupt event while the interrupt is disabled at
-> the hardware level. 
-
-So I think it is very clear that the chip driver should not discard
-edges that happened while the interrupt was disabled.
-
-Regards,
-Jason
+On 01/23/2014 10:26 AM, Florian Fainelli wrote:
+> Hi Marc,
+> 
+> 2014/1/22 Marc C <marc.ceeeee@gmail.com>:
+>> Hi Florian,
+>>
+>>> Do not we also need to update drivers/irqchip/irq-gic.c to look for
+>>> this compatible property? Alternatively should the example DTS contain
+>>> the following:
+>>>
+>>> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
+>>
+>> Patch #8 [1] of this series has the "compatible" string set exactly that way. I was
+>> following the pattern seen in the other reference DTS files, where "arm,cortex-a15-gic" is
+>> used as the fall-back.
+> 
+> Ah, I missed that, thanks! How about the CPU compatible property?
+> AFAIK it is only used by arch/arm/kernel/topology.c, I am not sure if
+> we have the exact same number to use as the "vanilla" Cortex-A15 here,
+> or if we should have another number match against "brcm,brahma-b15".
+> What do you think?
+> 
+>>
+>> Thanks,
+>> Marc C
+>>
+>> [1] https://lkml.org/lkml/2014/1/21/649
+>>
+>> On 01/22/2014 02:40 PM, Florian Fainelli wrote:
+>>> Hi Marc,
+>>>
+>>> 2014/1/21 Marc Carino <marc.ceeeee@gmail.com>:
+>>>> Document the Broadcom Brahma B15 GIC implementation as compatible
+>>>> with the ARM GIC standard.
+>>>>
+>>>> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+>>>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>>>
+>>> Do not we also need to update drivers/irqchip/irq-gic.c to look for
+>>> this compatible property? Alternatively should the example DTS contain
+>>> the following:
+>>>
+>>> compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic"?
+>>>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/arm/gic.txt |    1 +
+>>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>>>> index 3dfb0c0..d7409fd 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/gic.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>>>> @@ -15,6 +15,7 @@ Main node required properties:
+>>>>         "arm,cortex-a9-gic"
+>>>>         "arm,cortex-a7-gic"
+>>>>         "arm,arm11mp-gic"
+>>>> +       "brcm,brahma-b15-gic"
+>>>>  - interrupt-controller : Identifies the node as an interrupt controller
+>>>>  - #interrupt-cells : Specifies the number of cells needed to encode an
+>>>>    interrupt source.  The type shall be a <u32> and the value shall be 3.
+>>>> --
+>>>> 1.7.1
+>>>>
+>>>
+>>>
+>>>
+>>
+>>
+>>
+> 
+> 
+> 
