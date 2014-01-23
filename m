@@ -1,43 +1,59 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 23 Jan 2014 15:01:09 -0500 (EST)
-Subject: [PATCH 3/3] ARM: allow kernel to be loaded in middle of phymem
-In-Reply-To: <20140123193137.GA15937@n2100.arm.linux.org.uk>
-References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
- <1390389916-8711-4-git-send-email-wangnan0@huawei.com>
- <alpine.LFD.2.11.1401231357520.1652@knanqh.ubzr>
- <20140123193137.GA15937@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1401231443060.1652@knanqh.ubzr>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 23 Jan 2014 15:05:49 -0500
+Subject: [PATCH v5 06/16] ARM: Disable jprobes test when built into thumb-mode
+ kernel
+In-Reply-To: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1390507559-4697-7-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jan 2014, Russell King - ARM Linux wrote:
+From: "Jon Medhurst (Tixy)" <tixy@linaro.org>
 
-> On Thu, Jan 23, 2014 at 02:15:07PM -0500, Nicolas Pitre wrote:
-> > On Wed, 22 Jan 2014, Wang Nan wrote:
-> > 
-> > > This patch allows the kernel to be loaded at the middle of kernel awared
-> > > physical memory. Before this patch, users must use mem= or device tree to cheat
-> > > kernel about the start address of physical memory.
-> > > 
-> > > This feature is useful in some special cases, for example, building a crash
-> > > dump kernel. Without it, kernel command line, atag and devicetree must be
-> > > adjusted carefully, sometimes is impossible.
-> > 
-> > With CONFIG_PATCH_PHYS_VIRT the value for PHYS_OFFSET is determined 
-> > dynamically by rounding down the kernel image start address to the 
-> > previous 16MB boundary.  In the case of a crash kernel, this might be 
-> > cleaner to simply readjust __pv_phys_offset during early boot and call 
-> > fixup_pv_table(), and then reserve away the memory from the previous 
-> > kernel.  That will let you access that memory directly (with gdb for 
-> > example) and no pointer address translation will be required.
-> 
-> We already have support in the kernel to ignore memory below the calculated
-> PHYS_OFFSET.  See 571b14375019c3a66ef70d4d4a7083f4238aca30.
+For now the jprobes tests fail on ARM for when built into a kernel compiled
+in thumb mode. They work fine for ARM kernels, and when built as a loadable
+module.
 
-Sure.  Anyway what I'm suggesting above  would require that the crash 
-kernel be linked at a different virtual address for that to work.  
-That's probably more trouble than simply mapping the otherwise still 
-unmapped memory from the crashed kernel.
+Signed-off-by: "Jon Medhurst (Tixy)" <tixy@linaro.org>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm/kernel/kprobes-test.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-
-Nicolas
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+index 0cd63d0..65230b2 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/kernel/kprobes-test.c
+@@ -221,6 +221,7 @@ static int pre_handler_called;
+ static int post_handler_called;
+ static int jprobe_func_called;
+ static int kretprobe_handler_called;
++static int tests_failed;
+ 
+ #define FUNC_ARG1 0x12345678
+ #define FUNC_ARG2 0xabcdef
+@@ -457,6 +458,13 @@ static int run_api_tests(long (*func)(long, long))
+ 
+ 	pr_info("    jprobe\n");
+ 	ret = test_jprobe(func);
++#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
++	if (ret == -EINVAL) {
++		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels");
++		tests_failed = ret;
++		ret = 0;
++	}
++#endif
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -1667,6 +1675,8 @@ static int __init run_all_tests(void)
+ 
+ out:
+ 	if (ret == 0)
++		ret = tests_failed;
++	if (ret == 0)
+ 		pr_info("Finished kprobe tests OK\n");
+ 	else
+ 		pr_err("kprobe tests failed\n");
+-- 
+1.8.1.2
