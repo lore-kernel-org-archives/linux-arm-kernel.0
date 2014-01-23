@@ -1,48 +1,36 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Thu, 23 Jan 2014 21:01:35 +0530
-Subject: [PATCH v8 4/6] KGDB: make kgdb_breakpoint() as noinline
+Date: Thu, 23 Jan 2014 21:01:36 +0530
+Subject: [PATCH v8 5/6] misc: debug: remove compilation warnings
 In-Reply-To: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
 References: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1390491097-25457-3-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1390491097-25457-4-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-The function kgdb_breakpoint() sets up break point at
-compile time by calling arch_kgdb_breakpoint();
-Though this call is surrounded by wmb() barrier,
-the compile can still re-order the break point,
-because this scheduling barrier is not a code motion
-barrier in gcc.
-
-Making kgdb_breakpoint() as noinline solves this problem
-of code reording around break point instruction and also
-avoids problem of being called as inline function from
-other places
-
-More details about discussion on this can be found here
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
+typecast instruction_pointer macro to unsigned long to
+resolve following compiler warnings like
+warning: format '%lx' expects argument of type 'long unsigned int',
+but argument 2 has type 'u64' [-Wformat]
 
 Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Jason Wessel <jason.wessel@windriver.com>
 ---
- kernel/debug/debug_core.c |    2 +-
+ arch/arm64/include/asm/ptrace.h |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 7d2f35e..cf04798 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -1034,7 +1034,7 @@ int dbg_io_get_char(void)
-  * otherwise as a quick means to stop program execution and "break" into
-  * the debugger.
-  */
--void kgdb_breakpoint(void)
-+noinline void kgdb_breakpoint(void)
- {
- 	atomic_inc(&kgdb_setting_breakpoint);
- 	wmb(); /* Sync point before breakpoint */
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 0e7fa49..5233966 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -164,7 +164,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+ 	return 0;
+ }
+ 
+-#define instruction_pointer(regs)	(regs)->pc
++#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
+ 
+ #ifdef CONFIG_SMP
+ extern unsigned long profile_pc(struct pt_regs *regs);
 -- 
 1.7.9.5
