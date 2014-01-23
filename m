@@ -1,47 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Jan 2014 09:43:07 +0100
-Subject: [PATCH] vt8500: pinctrl: Change devicetree data parsing
-In-Reply-To: <1390458701-30238-1-git-send-email-linux@prisktech.co.nz>
-References: <1390458701-30238-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdaFJphJdf6hyKoYEZ_wXikwRiwzMgtL=hY+3B8WrBnQaw@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 23 Jan 2014 21:55:04 +1300
+Subject: [PATCH v2] vt8500: pinctrl: Change devicetree data parsing
+Message-ID: <1390467304-8701-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 7:31 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+Due to an assumption in the VT8500 pinctrl driver, the value passed
+from devicetree for 'wm,pull' was not explicitly translated before
+being passed to pinconf.
 
-> Due to an assumption in the VT8500 pinctrl driver, the value passed
-> from devicetree for 'wm,pull' was not explicitly translated before
-> being passed to pinconf.
->
-> With changes to 'enum pin_config_param', PIN_CONFIG_BIAS_PULL_(UP/DOWN)
-> no longer map 1-to-1 with the expected values in devicetree.
->
-> This patch adds a small translation between the devicetree values (0..2)
-> and the enum pin_config_param equivalent values.
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Since v3.10, changes to 'enum pin_config_param', PIN_CONFIG_BIAS_PULL_(UP/DOWN)
+no longer map 1-to-1 with the expected values in devicetree.
 
-Isn't this a regression fix for stable?
+This patch adds a small translation between the devicetree values (0..2)
+and the enum pin_config_param equivalent values.
 
-> +       switch (pull) {
-> +       case 0:
-> +               pull = PIN_CONFIG_BIAS_DISABLE;
-> +               break;
-> +       case 1:
-> +               pull = PIN_CONFIG_BIAS_PULL_DOWN;
-> +               break;
-> +       case 2:
-> +               pull = PIN_CONFIG_BIAS_PULL_UP;
-> +               break;
-> +       }
->         configs[0] = pull;
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+v2:
+Minor change in commit message to indicate time since problem occurred.
+Change assigned variable to configs[0] rather than reassigning to pull.
+Add a default case to the switch to prevent static checker errors.
 
-1. You're not adding a default: clause (I bet the static checkers will
-warn about this!)
+ drivers/pinctrl/vt8500/pinctrl-wmt.c |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-2. Please conjure a different variable name for the thing that
-actually gets set in the config so we see we are mapping one
-thing to another and not just altering an existing variable.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c b/drivers/pinctrl/vt8500/pinctrl-wmt.c
+index 39aec08..25ab2ee 100644
+--- a/drivers/pinctrl/vt8500/pinctrl-wmt.c
++++ b/drivers/pinctrl/vt8500/pinctrl-wmt.c
+@@ -276,7 +276,20 @@ static int wmt_pctl_dt_node_to_map_pull(struct wmt_pinctrl_data *data,
+ 	if (!configs)
+ 		return -ENOMEM;
+ 
+-	configs[0] = pull;
++	switch (pull) {
++	case 0:
++		configs[0] = PIN_CONFIG_BIAS_DISABLE;
++		break;
++	case 1:
++		configs[0] = PIN_CONFIG_BIAS_PULL_DOWN;
++		break;
++	case 2:
++		configs[0] = PIN_CONFIG_BIAS_PULL_UP;
++		break;
++	default:
++		configs[0] = PIN_CONFIG_BIAS_DISABLE;
++		dev_err(data->dev, "invalid pull state %d - disabling\n", pull);
++	}
+ 
+ 	map->type = PIN_MAP_TYPE_CONFIGS_PIN;
+ 	map->data.configs.group_or_pin = data->groups[group];
+-- 
+1.7.9.5
