@@ -1,136 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jan 2014 16:18:02 -0800
-Subject: [PATCH RFC 04/10] base: power: Add generic OF-based power
- domain look-up
-In-Reply-To: <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20140123001802.GF13785@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 22 Jan 2014 17:19:34 -0700
+Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
+ clear
+In-Reply-To: <52E05C4E.9060709@gmail.com>
+References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140121233537.GS18269@obsidianresearch.com>
+ <20140122164904.GB27273@localhost>
+ <20140122173417.GT18269@obsidianresearch.com>
+ <52E02AB6.7040104@gmail.com>
+ <20140122205213.GW18269@obsidianresearch.com>
+ <20140122221237.GA30763@localhost>
+ <20140122223117.GX18269@obsidianresearch.com>
+ <52E05C4E.9060709@gmail.com>
+Message-ID: <20140123001934.GY18269@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11, Tomasz Figa wrote:
-> +
-> +/**
-> + * of_genpd_lock() - Lock access to of_genpd_providers list
-> + */
-> +static void of_genpd_lock(void)
-> +{
-> +	mutex_lock(&of_genpd_mutex);
-> +}
-> +
-> +/**
-> + * of_genpd_unlock() - Unlock access to of_genpd_providers list
-> + */
-> +static void of_genpd_unlock(void)
-> +{
-> +	mutex_unlock(&of_genpd_mutex);
-> +}
+On Thu, Jan 23, 2014 at 01:03:26AM +0100, Sebastian Hesselbarth wrote:
+> >Sebastian:
+> >I looked at the irq-orion driver a bit more and noticed this:
+> >
+> >         ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
+> >                              handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
+> >                            ^^^^^^^^^^^^^^^^^^^^^
+> >Shouldn't it be handle_edge_irq? Otherwise who is calling irq_ack? How
+> >does this work at all? :)
+> 
+> I can tell you that it comes from arch/arm/plat-orion/irq.c and I
+> blindly copied it. I never really checked the differences in handling
+> level/edge irqs. Besides, if it wasn't working, we wouldn't get far
+> in booting the kernel without timer irqs.
 
-Why do we need these functions? Can't we just call
-mutex_lock/unlock directly?
+Ezequiel found the ack call I missed, so it makes sense it works.
 
-> +
-> +/**
-> + * of_genpd_add_provider() - Register a domain provider for a node
-> + * @np: Device node pointer associated with domain provider
-> + * @genpd_src_get: callback for decoding domain
-> + * @data: context pointer for @genpd_src_get callback.
+I think the difference in routines only starts to matter when you can
+get another incoming edge IRQ while already handling one (due to SMP?
+threaded interrupts? RealTime? not sure)
 
-These look a little outdated.
+> It also remains asserted if you clear the actual cause of the interrupt
+> and is only asserted again on the next low-to-high transition.
 
-> + */
-> +int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> +			  void *data)
-> +{
-> +	struct of_genpd_provider *cp;
-> +
-> +	cp = kzalloc(sizeof(struct of_genpd_provider), GFP_KERNEL);
+Which is why Ezequiel's patch is the right approach: we need to clear
+the interrupt latched in the cause register after the watchdog driver
+disable but before enabling/unmasking the interrupt.
 
-Please use sizeof(*cp) instead.
+Remember, the BRIDGE_MASK register has no effect on the BRIDGE_CAUSE,
+it only effects which bits propogate to the main cause register.
 
-> +	if (!cp)
-> +		return -ENOMEM;
-> +
-> +	cp->node = of_node_get(np);
-> +	cp->data = data;
-> +	cp->xlate = xlate;
-> +
-> +	of_genpd_lock();
-> +	list_add(&cp->link, &of_genpd_providers);
-> +	of_genpd_unlock();
-> +	pr_debug("Added domain provider from %s\n", np->full_name);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_add_provider);
-> +
-[...]
-> +
-> +/* See of_genpd_get_from_provider(). */
-> +static struct generic_pm_domain *__of_genpd_get_from_provider(
-> +					struct of_phandle_args *genpdspec)
-> +{
-> +	struct of_genpd_provider *provider;
-> +	struct generic_pm_domain *genpd = ERR_PTR(-ENOENT);
+> *BUT*, I will double-check how Linux deals with level/edge irqs and if
+> Orion SoCs have edge or level triggered cause registers. That should
+> reveal, if it is more sane to use handle_edge_irq here and possibly in
+> the main interrupt controller, too.
 
-Can this be -EPROBE_DEFER so that we can defer probe until a
-later time if the power domain provider hasn't registered yet?
+There is a mixture.
 
-> +
-> +	/* Check if we have such a provider in our array */
-> +	list_for_each_entry(provider, &of_genpd_providers, link) {
-> +		if (provider->node == genpdspec->np)
-> +			genpd = provider->xlate(genpdspec, provider->data);
-> +		if (!IS_ERR(genpd))
-> +			break;
-> +	}
-> +
-> +	return genpd;
-> +}
-> +
-[...]
-> +static int of_genpd_notifier_call(struct notifier_block *nb,
-> +				  unsigned long event, void *data)
-> +{
-> +	struct device *dev = data;
-> +	int ret;
-> +
-> +	if (!dev->of_node)
-> +		return NOTIFY_DONE;
-> +
-> +	switch (event) {
-> +	case BUS_NOTIFY_BIND_DRIVER:
-> +		ret = of_genpd_add_to_domain(dev);
-> +		break;
-> +
-> +	case BUS_NOTIFY_UNBOUND_DRIVER:
-> +		ret = of_genpd_del_from_domain(dev);
-> +		break;
-> +
-> +	default:
-> +		return NOTIFY_DONE;
-> +	}
-> +
-> +	return notifier_from_errno(ret);
-> +}
-> +
-> +static struct notifier_block of_genpd_notifier_block = {
-> +	.notifier_call = of_genpd_notifier_call,
-> +};
-> +
-> +static int of_genpd_init(void)
-> +{
-> +	return bus_register_notifier(&platform_bus_type,
-> +					&of_genpd_notifier_block);
-> +}
-> +core_initcall(of_genpd_init);
+Any cause bit documented to be clearable is edge triggered, all others
+are level.
 
-Would it be possible to call the of_genpd_add_to_domain() and
-of_genpd_del_from_domain() functions directly in the driver core,
-similar to how the pinctrl framework has a hook in there? That
-way we're not relying on any initcall ordering for this.
+On Kirkwood this means all of the main interrupt controller bits are
+level and all the bridge bits are edge. Which means edge is
+definitely correct for the bridge handler, and level correct for the
+main handler.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Jason
