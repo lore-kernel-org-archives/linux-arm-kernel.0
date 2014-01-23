@@ -1,38 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Jan 2014 14:18:08 +0000
-Subject: [PATCH v2 1/6] audit: Enable arm64 support
-In-Reply-To: <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
- <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140123141808.GD27520@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 23 Jan 2014 15:20:56 +0100
+Subject: Freescale FEC packet loss
+In-Reply-To: <1288e1f778f74c669ad15b62d32e8859@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <201401222255.29467.marex@denx.de>
+ <1288e1f778f74c669ad15b62d32e8859@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <201401231520.56990.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 08:13:14AM +0000, AKASHI Takahiro wrote:
-> --- a/include/uapi/linux/audit.h
-> +++ b/include/uapi/linux/audit.h
-> @@ -327,6 +327,8 @@ enum {
->  /* distinguish syscall tables */
->  #define __AUDIT_ARCH_64BIT 0x80000000
->  #define __AUDIT_ARCH_LE	   0x40000000
-> +#define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
-> +#define AUDIT_ARCH_AARCH64EB	(EM_AARCH64|__AUDIT_ARCH_64BIT)
->  #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
->  #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
->  #define AUDIT_ARCH_ARMEB	(EM_ARM)
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 79383d3..3aae602 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -284,7 +284,7 @@ config AUDIT
->  
->  config AUDITSYSCALL
->  	bool "Enable system-call auditing support"
-> -	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
-> +	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ARM64)
+On Thursday, January 23, 2014 at 02:49:48 AM, fugang.duan at freescale.com wrote:
+[...]
 
-The usual comment for such changes: could you please clean this up and
-just use something like "depends on HAVE_ARCH_AUDITSYSCALL"?
+> >[  3] 71.0-72.0 sec  23.4 MBytes   196 Mbits/sec
+> >[  3] 72.0-73.0 sec  12.2 MBytes   103 Mbits/sec
+> >[  3] 73.0-74.0 sec  0.00 Bytes  0.00 bits/sec [  3] 74.0-75.0 sec  0.00
+> >Bytes 0.00 bits/sec [  3] 75.0-76.0 sec  10.9 MBytes  91.2 Mbits/sec
+> >[  3] 76.0-77.0 sec  22.4 MBytes   188 Mbits/sec
+> >[  3] 77.0-78.0 sec  23.0 MBytes   193 Mbits/sec
+> 
+> I will debug the issue when I am free, and then report the result to you.
+> Thanks for your reporting the issue.
 
--- 
-Catalin
+Hi Andy,
+
+Thanks for looking into this. Is there any way I can help you with figuring out 
+the issue ? Do you need any more feedback or anything please ?
+
+Thank you!
+
+Best regards,
+Marek Vasut
