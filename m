@@ -1,158 +1,64 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 23 Jan 2014 11:19:58 -0800
-Subject: [PATCH V4 2/5] power: reset: Remove X-Gene reboot driver
-In-Reply-To: <1390504801-24483-1-git-send-email-fkan@apm.com>
-References: <1390504801-24483-1-git-send-email-fkan@apm.com>
-Message-ID: <1390504801-24483-3-git-send-email-fkan@apm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Jan 2014 14:23:43 -0500 (EST)
+Subject: [PATCH] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <52E00AFF.1060701@codeaurora.org>
+References: <1390325166-16840-1-git-send-email-lauraa@codeaurora.org>
+ <20140122112847.GG1621@mudshark.cambridge.arm.com>
+ <52E00AFF.1060701@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove X-Gene reboot driver.
+On Wed, 22 Jan 2014, Laura Abbott wrote:
+> On 1/22/2014 3:28 AM, Will Deacon wrote:
+> > On Tue, Jan 21, 2014 at 05:26:06PM +0000, Laura Abbott wrote:
+> > > @@ -288,6 +294,9 @@ struct task_struct *__switch_to(struct task_struct
+> > > @@ *prev,
+> > >   {
+> > >    struct task_struct *last;
+> > >
+> > > +#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+> > > +	__stack_chk_guard = next->stack_canary;
+> > > +#endif
+> >
+> > I don't get the dependency on !SMP. Assumedly, the update of
+> > __stack_chk_guard would be racy otherwise, but that sounds solvable with
+> > atomics. Is the stack_canary updated periodically somewhere else?
+> >
+> 
+> It has nothing to do with atomics, it's the fact that __stack_chk_guard is a
+> global variable and with SMP you can have n different processes running each
+> with a different canary (see kernel/fork.c, dup_task_struct) . c.f the commit
+> added by Nicolas Pitre:
+> 
+> commit df0698be14c6683606d5df2d83e3ae40f85ed0d9
+> Author: Nicolas Pitre <nico@fluxnic.net>
+> Date:   Mon Jun 7 21:50:33 2010 -0400
+> 
+>     ARM: stack protector: change the canary value per task
+> 
+>     A new random value for the canary is stored in the task struct whenever
+>     a new task is forked.  This is meant to allow for different canary 
+> values
+>     per task.  On ARM, GCC expects the canary value to be found in a global
+>     variable called __stack_chk_guard.  So this variable has to be updated
+>     with the value stored in the task struct whenever a task switch occurs.
+> 
+>     Because the variable GCC expects is global, this cannot work on SMP
+>     unfortunately.  So, on SMP, the same initial canary value is kept
+>     throughout, making this feature a bit less effective although it is 
+> still
+>     useful.
+> 
+>     One way to overcome this GCC limitation would be to locate the
+>     __stack_chk_guard variable into a memory page of its own for each CPU,
+>     and then use TLB locking to have each CPU see its own page at the same
+>     virtual address for each of them.
+> 
+>     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- drivers/power/reset/Kconfig        |    7 ---
- drivers/power/reset/Makefile       |    1 -
- drivers/power/reset/xgene-reboot.c |  103 ------------------------------------
- 3 files changed, 0 insertions(+), 111 deletions(-)
- delete mode 100644 drivers/power/reset/xgene-reboot.c
+Did gcc for Aarch64 replicate the same global variable arrangement?
+That would be unfortunate...
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 4501c02..13a5191 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -45,13 +45,6 @@ config POWER_RESET_VEXPRESS
- 	  Power off and reset support for the ARM Ltd. Versatile
- 	  Express boards.
- 
--config POWER_RESET_XGENE
--	bool "APM SoC X-Gene reset driver"
--	depends on ARM64
--	depends on POWER_RESET
--	help
--	  Reboot support for the APM SoC X-Gene Eval boards.
--
- config POWER_RESET_SYSCON
- 	bool "Generic SYSCON regmap reset driver"
- 	depends on MFD_SYSCON
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index f2c0327..a3137ff 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -3,5 +3,4 @@ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
--obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
- obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
-diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-deleted file mode 100644
-index ecd55f8..0000000
---- a/drivers/power/reset/xgene-reboot.c
-+++ /dev/null
-@@ -1,103 +0,0 @@
--/*
-- * AppliedMicro X-Gene SoC Reboot Driver
-- *
-- * Copyright (c) 2013, Applied Micro Circuits Corporation
-- * Author: Feng Kan <fkan@apm.com>
-- * Author: Loc Ho <lho@apm.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-- * MA 02111-1307 USA
-- *
-- * This driver provides system reboot functionality for APM X-Gene SoC.
-- * For system shutdown, this is board specify. If a board designer
-- * implements GPIO shutdown, use the gpio-poweroff.c driver.
-- */
--#include <linux/io.h>
--#include <linux/of_device.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/stat.h>
--#include <linux/slab.h>
--#include <asm/system_misc.h>
--
--struct xgene_reboot_context {
--	struct platform_device *pdev;
--	void *csr;
--	u32 mask;
--};
--
--static struct xgene_reboot_context *xgene_restart_ctx;
--
--static void xgene_restart(char str, const char *cmd)
--{
--	struct xgene_reboot_context *ctx = xgene_restart_ctx;
--	unsigned long timeout;
--
--	/* Issue the reboot */
--	if (ctx)
--		writel(ctx->mask, ctx->csr);
--
--	timeout = jiffies + HZ;
--	while (time_before(jiffies, timeout))
--		cpu_relax();
--
--	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
--}
--
--static int xgene_reboot_probe(struct platform_device *pdev)
--{
--	struct xgene_reboot_context *ctx;
--
--	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
--	if (!ctx) {
--		dev_err(&pdev->dev, "out of memory for context\n");
--		return -ENODEV;
--	}
--
--	ctx->csr = of_iomap(pdev->dev.of_node, 0);
--	if (!ctx->csr) {
--		devm_kfree(&pdev->dev, ctx);
--		dev_err(&pdev->dev, "can not map resource\n");
--		return -ENODEV;
--	}
--
--	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
--		ctx->mask = 0xFFFFFFFF;
--
--	ctx->pdev = pdev;
--	arm_pm_restart = xgene_restart;
--	xgene_restart_ctx = ctx;
--
--	return 0;
--}
--
--static struct of_device_id xgene_reboot_of_match[] = {
--	{ .compatible = "apm,xgene-reboot" },
--	{}
--};
--
--static struct platform_driver xgene_reboot_driver = {
--	.probe = xgene_reboot_probe,
--	.driver = {
--		.name = "xgene-reboot",
--		.of_match_table = xgene_reboot_of_match,
--	},
--};
--
--static int __init xgene_reboot_init(void)
--{
--	return platform_driver_register(&xgene_reboot_driver);
--}
--device_initcall(xgene_reboot_init);
--- 
-1.7.6.1
+
+Nicolas
