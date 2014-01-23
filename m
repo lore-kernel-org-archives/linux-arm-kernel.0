@@ -1,36 +1,32 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Thu, 23 Jan 2014 21:01:36 +0530
-Subject: [PATCH v8 5/6] misc: debug: remove compilation warnings
+Date: Thu, 23 Jan 2014 21:01:37 +0530
+Subject: [PATCH v8 6/6] arm64: KGDB: Add KGDB config
 In-Reply-To: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
 References: <1390491097-25457-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1390491097-25457-4-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1390491097-25457-5-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-typecast instruction_pointer macro to unsigned long to
-resolve following compiler warnings like
-warning: format '%lx' expects argument of type 'long unsigned int',
-but argument 2 has type 'u64' [-Wformat]
+Add HAVE_ARCH_KGDB for arm64 Kconfig
 
 Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 ---
- arch/arm64/include/asm/ptrace.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 0e7fa49..5233966 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -164,7 +164,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
- 	return 0;
- }
- 
--#define instruction_pointer(regs)	(regs)->pc
-+#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
- 
- #ifdef CONFIG_SMP
- extern unsigned long profile_pc(struct pt_regs *regs);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6d4dd22..c7a08e0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -28,6 +28,7 @@ config ARM64
+ 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_PERF_EVENTS
++	select HAVE_ARCH_KGDB
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
 -- 
 1.7.9.5
