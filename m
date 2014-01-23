@@ -1,64 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 23 Jan 2014 14:23:43 -0500 (EST)
-Subject: [PATCH] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <52E00AFF.1060701@codeaurora.org>
-References: <1390325166-16840-1-git-send-email-lauraa@codeaurora.org>
- <20140122112847.GG1621@mudshark.cambridge.arm.com>
- <52E00AFF.1060701@codeaurora.org>
-Message-ID: <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 23 Jan 2014 11:19:59 -0800
+Subject: [PATCH V4 3/5] arm64: dts: Add X-Gene reboot driver dts node
+In-Reply-To: <1390504801-24483-1-git-send-email-fkan@apm.com>
+References: <1390504801-24483-1-git-send-email-fkan@apm.com>
+Message-ID: <1390504801-24483-4-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Jan 2014, Laura Abbott wrote:
-> On 1/22/2014 3:28 AM, Will Deacon wrote:
-> > On Tue, Jan 21, 2014 at 05:26:06PM +0000, Laura Abbott wrote:
-> > > @@ -288,6 +294,9 @@ struct task_struct *__switch_to(struct task_struct
-> > > @@ *prev,
-> > >   {
-> > >    struct task_struct *last;
-> > >
-> > > +#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
-> > > +	__stack_chk_guard = next->stack_canary;
-> > > +#endif
-> >
-> > I don't get the dependency on !SMP. Assumedly, the update of
-> > __stack_chk_guard would be racy otherwise, but that sounds solvable with
-> > atomics. Is the stack_canary updated periodically somewhere else?
-> >
-> 
-> It has nothing to do with atomics, it's the fact that __stack_chk_guard is a
-> global variable and with SMP you can have n different processes running each
-> with a different canary (see kernel/fork.c, dup_task_struct) . c.f the commit
-> added by Nicolas Pitre:
-> 
-> commit df0698be14c6683606d5df2d83e3ae40f85ed0d9
-> Author: Nicolas Pitre <nico@fluxnic.net>
-> Date:   Mon Jun 7 21:50:33 2010 -0400
-> 
->     ARM: stack protector: change the canary value per task
-> 
->     A new random value for the canary is stored in the task struct whenever
->     a new task is forked.  This is meant to allow for different canary 
-> values
->     per task.  On ARM, GCC expects the canary value to be found in a global
->     variable called __stack_chk_guard.  So this variable has to be updated
->     with the value stored in the task struct whenever a task switch occurs.
-> 
->     Because the variable GCC expects is global, this cannot work on SMP
->     unfortunately.  So, on SMP, the same initial canary value is kept
->     throughout, making this feature a bit less effective although it is 
-> still
->     useful.
-> 
->     One way to overcome this GCC limitation would be to locate the
->     __stack_chk_guard variable into a memory page of its own for each CPU,
->     and then use TLB locking to have each CPU see its own page at the same
->     virtual address for each of them.
-> 
->     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Add X-Gene platform reboot driver dts node.
 
-Did gcc for Aarch64 replicate the same global variable arrangement?
-That would be unfortunate...
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d37d736..4ef9d26 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -103,6 +103,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		scu: system-clk-controller at 17000000 {
++			compatible = "apm,xgene-scu","syscon";
++			reg = <0x0 0x17000000 0x0 0x400>;
++		};
++
+ 		clocks {
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+@@ -187,5 +192,13 @@
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0x0 0x4c 0x4>;
+ 		};
++
++		reboot at 17000014 {
++			compatible = "syscon-reboot";
++			regmap = <&scu>;
++			offset = <0x14>;
++			mask = <0x1>;
++		};
++
+ 	};
+ };
+-- 
+1.7.6.1
