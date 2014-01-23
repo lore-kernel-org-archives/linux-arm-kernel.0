@@ -1,32 +1,36 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 23 Jan 2014 09:04:59 -0800
-Subject: [GIT PULL] bcm dt updates for 3.14
-In-Reply-To: <CAEPRUYrYNR=63oS91Bq-viYJwXfjtY4+cchY0hMUpaJQAw+NNA@mail.gmail.com>
- (Christian Daudt's message of "Sun, 5 Jan 2014 23:01:50 -0800")
-References: <CAEPRUYrYNR=63oS91Bq-viYJwXfjtY4+cchY0hMUpaJQAw+NNA@mail.gmail.com>
-Message-ID: <87fvoey6h0.fsf@paris.lan>
+Date: Thu, 23 Jan 2014 09:25:37 -0800
+Subject: [PATCH 0/2] Enable clock controllers on MSM
+In-Reply-To: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Thu, 16 Jan 2014 17:25:02 -0800")
+References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <878uu6y5im.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christian Daudt <bcm@fixthebug.org> writes:
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-> The following changes since commit 413541dd66d51f791a0b169d9b9014e4f56be13c:
->
->   Linux 3.13-rc5 (2013-12-22 13:08:32 -0800)
->
-> are available in the git repository at:
->
->   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-dt
->
-> for you to fetch changes up to 30d831156b3a7f249c08cbe457a0d728160db39b:
->
->   clk: bcm281xx: define kona clock binding (2013-12-31 09:08:38 -0800)
->
-> ----------------------------------------------------------------
-> Add i2c, usb and clock DT configuration to bcm mobile.
->
-> ----------------------------------------------------------------
+> These patches add the clock controller nodes, enable the clock drivers
+> on MSM based platforms, and hook it up enough to get the serial console
+> working. This is based on the merge of Mike's clk-next branch with
+> linux-next-20140116. The changes need the clk-next branch because that's
+> where the DTS include files landed.
 
-Pulled into late/dt.
+I forgot to repond to this earlier, but I tested this on top of -next
+and it gets the dragonboard booting w/mainline.  Yay!
+
+> Perhaps this can be applied after 3.14-rc1 is out?
+
+Yeah, sounds good.
 
 Kevin
+
+> Stephen Boyd (2):
+>   ARM: dts: msm: Add clock controller nodes and hook into uart
+>   ARM: msm_defconfig: Enable MSM clock drivers
+>
+>  arch/arm/boot/dts/qcom-msm8660-surf.dts | 11 +++++++++++
+>  arch/arm/boot/dts/qcom-msm8960-cdp.dts  | 18 ++++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi     | 24 ++++++++++++++++++++++++
+>  arch/arm/configs/msm_defconfig          |  4 ++++
+>  4 files changed, 57 insertions(+)
