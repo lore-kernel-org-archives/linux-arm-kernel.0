@@ -1,66 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 24 Jan 2014 00:10:32 +0100
-Subject: [PATCH v2 3/3] irqchip: orion: clear stale interrupts in irq_startup
-In-Reply-To: <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390518632-2576-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 24 Jan 2014 00:23:36 +0100
+Subject: [PATCH] ARM: dts: mxs: Fix the RTC compatible prop on M28EVK
+Message-ID: <1390519416-6760-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bridge IRQ_CAUSE bits are asserted regardless of the corresponding bit in
-IRQ_MASK register. To avoid interrupt events on stale irqs, we have to clear
-them before unmask. This installs an .irq_startup callback to ensure stale
-irqs are cleared before initial unmask.
+The compatible property should be m41t62, not mt41t62, so fix this.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
-Changelog:
-v1->v2:
-- use .irq_startup instead of .irq_enable (Reported by Jason Gunthorpe)
+ arch/arm/boot/dts/imx28-m28evk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/irqchip/irq-orion.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index 1f636f719065..0dfdc5c824a1 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -123,6 +123,19 @@ static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	}
- }
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 8536b0d..f0ad7b9 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -194,7 +194,7 @@
+ 				};
  
-+/*
-+ * Bridge IRQ_CAUSE is asserted regardless of IRQ_MASK register.
-+ * To avoid interrupt events on stale irqs, we clear them before unmask.
-+ */
-+static unsigned int orion_bridge_irq_startup(struct irq_data *d)
-+{
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+
-+	ct->chip.irq_ack(d);
-+	ct->chip.irq_unmask(d);
-+	return 0;
-+}
-+
- static int __init orion_bridge_irq_init(struct device_node *np,
- 					struct device_node *parent)
- {
-@@ -176,6 +189,7 @@ static int __init orion_bridge_irq_init(struct device_node *np,
- 
- 	gc->chip_types[0].regs.ack = ORION_BRIDGE_IRQ_CAUSE;
- 	gc->chip_types[0].regs.mask = ORION_BRIDGE_IRQ_MASK;
-+	gc->chip_types[0].chip.irq_startup = orion_bridge_irq_startup;
- 	gc->chip_types[0].chip.irq_ack = irq_gc_ack_clr_bit;
- 	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
- 	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+ 				rtc: rtc at 68 {
+-					compatible = "stm,mt41t62";
++					compatible = "stm,m41t62";
+ 					reg = <0x68>;
+ 				};
+ 			};
 -- 
 1.8.5.2
