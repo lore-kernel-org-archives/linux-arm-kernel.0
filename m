@@ -1,33 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Jan 2014 10:49:52 -0800
-Subject: [PATCH] ARM: OMAP4+: move errata initialization to
- omap4_pm_init_early
-In-Reply-To: <874n4uy483.fsf@paris.lan>
-References: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
- <1390248397-14112-1-git-send-email-nm@ti.com>
- <52E139C5.3090207@ti.com> <874n4uy483.fsf@paris.lan>
-Message-ID: <20140123184951.GJ7993@atomide.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 23 Jan 2014 19:51:34 +0100
+Subject: [PATCH 4/5] ARM: S3C24XX: convert boards to use common restart
+ function
+In-Reply-To: <7172372.015CdWJg1F@phil>
+References: <3105326.uFdOVLyXH8@phil> <2227259.2cNbl9uzOp@phil>
+ <52E15B74.3040409@samsung.com> <7172372.015CdWJg1F@phil>
+Message-ID: <52E164B6.5070206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [140123 09:55]:
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> 
-> > On 01/20/2014 10:06 PM, Nishanth Menon wrote:
-> >> Move all OMAP4 PM errata initializations to centralized location in
-> >> omap4_pm_init_early. This allows for users to utilize the erratas
-> >> in various submodules as needed.
-> >> 
-> > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >
-> > This patch fixes build failure caused by patch 
-> > https://patchwork.kernel.org/patch/3084521/ 
-> > in case if SMP is not enabled.
-> 
-> So does that mean that that patch can now be applied as is?
-> 
-> We could sure use that fix (or equivalent) for CPUidle breakage on 4460.
+On 23.01.2014 19:36, Heiko St?bner wrote:
+> Am Donnerstag, 23. Januar 2014, 19:12:04 schrieb Tomasz Figa:
+>> Hi Heiko,
+>>
+>> On 06.01.2014 19:40, Heiko St?bner wrote:
+>>> This converts all boards to use the new common restart function instead
+>>> of SoC specific ones.
+>>>
+>>> The mach-s3c2416-dt board now tries to setup either a swrst- or watchdog-
+>>> reset so that it will be able to handle more s3c24xx-SoCs later on.
+>>
+>> [snip]
+>>
+>>> diff --git a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>> b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c index 0a86953..88716fa4 100644
+>>> --- a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>> +++ b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>> @@ -24,6 +24,7 @@
+>>>
+>>>    #include <plat/cpu.h>
+>>>    #include <plat/pm.h>
+>>>
+>>> +#include <plat/watchdog-reset.h>
+>>>
+>>>    #include "common.h"
+>>>
+>>> @@ -34,6 +35,14 @@ static void __init s3c2416_dt_map_io(void)
+>>>
+>>>    static void __init s3c2416_dt_machine_init(void)
+>>>    {
+>>>
+>>> +	s3c24xx_swrst_reset_of_init();
+>>> +
+>>> +#ifdef CONFIG_SAMSUNG_WDT_RESET
+>>> +	/* if no special swrst-device exists try to find a watchdog */
+>>> +	if (!s3c24xx_swrst_reset_available())
+>>> +		samsung_wdt_reset_of_init();
+>>> +#endif
+>>
+>> Hmm... I think it would be safe to assume availability of soft reset,
+>> especially if you could move the restart code to the clock driver.
+>
+> ok, so something like the following:
+>
+> the boards would simply use samsung_watchdog_reset, which should according to
+> the manuals be available on all architectures. And the ccf-driver on
+> appropriate architectures would simple replace the arm_pm_restart callback
+> with its own SoC specific one?
+>
+> For the s3c2412 this also means that the clock-logic would get simplified.
+>
+>
+> Like this, or do I overlook something?
 
-Yeah, seems OK to me, feel free to apply it directly:
+Hmm, this would mean a dependency on CONFIG_SAMSUNG_WDT_RESET then. Is 
+there a need to fall back to it on platforms which support soft reset 
+(assuming that CCF driver would always install its restart handler on 
+applicable platforms)?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Note that you can make the restart field NULL in mach_desc in board files.
+
+Best regards,
+Tomasz
