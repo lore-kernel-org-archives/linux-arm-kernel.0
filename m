@@ -1,99 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 10:31:11 +0000
-Subject: [PATCH RESEND v4 23/37] mtd: st_spi_fsm: Supply the N25Qxxx specific
- read configurations
-In-Reply-To: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1390473085-24626-24-git-send-email-lee.jones@linaro.org>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Thu, 23 Jan 2014 16:02:45 +0530
+Subject: [PATCH V2 5/8] clk: SPEAr13xx: Fix pcie clock name
+In-Reply-To: <cover.1390471111.git.mohit.kumar@st.com>
+References: <cover.1390471111.git.mohit.kumar@st.com>
+Message-ID: <1d96a68894439fa9a571e6234745ab60d4c0f1f5.1390471111.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The N25Qxxx Serial Flash devices required different sequence
-configurations depending on whether they're running in 24bit (3Byte)
-or 32bit (4Byte) mode. We provide those here.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Follow dt clock naming convention for PCIe clocks.
+
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Tested-by: Mohit Kumar <mohit.kumar@st.com>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: spear-devel at list.st.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 53 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ drivers/clk/spear/spear1310_clock.c |    6 +++---
+ drivers/clk/spear/spear1340_clock.c |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 5582df0..3b56b6e 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -236,6 +236,15 @@
- #define FLASH_CMD_READ4_1_1_4  0x6c
- #define FLASH_CMD_READ4_1_4_4  0xec
+diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+index 65894f7..4daa597 100644
+--- a/drivers/clk/spear/spear1310_clock.c
++++ b/drivers/clk/spear/spear1310_clock.c
+@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.0");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
  
-+/*
-+ * Flags to tweak operation of default read/write/erase routines
-+ */
-+#define CFG_READ_TOGGLE_32BIT_ADDR     0x00000001
-+#define CFG_WRITE_TOGGLE_32BIT_ADDR    0x00000002
-+#define CFG_WRITE_EX_32BIT_ADDR_DELAY  0x00000004
-+#define CFG_ERASESEC_TOGGLE_32BIT_ADDR 0x00000008
-+#define CFG_S25FL_CHECK_ERROR_FLAGS    0x00000010
-+
- struct stfsm {
- 	struct device		*dev;
- 	void __iomem		*base;
-@@ -244,6 +253,7 @@ struct stfsm {
- 	struct mutex		lock;
- 	struct flash_info       *info;
+ 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.1");
++	clk_register_clkdev(clk, NULL, "b1800000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
  
-+	uint32_t                configuration;
- 	uint32_t                fifo_dir_delay;
- 	bool                    booted_from_spi;
- 	bool                    reset_signal;
-@@ -438,6 +448,49 @@ static struct seq_rw_config default_write_configs[] = {
- 	{0x00,			 0,			0, 0, 0, 0x00, 0, 0},
- };
+ 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.2");
++	clk_register_clkdev(clk, NULL, "b4000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
  
-+/*
-+ * [N25Qxxx] Configuration
-+ */
-+#define N25Q_VCR_DUMMY_CYCLES(x)	(((x) & 0xf) << 4)
-+#define N25Q_VCR_XIP_DISABLED		((uint8_t)0x1 << 3)
-+#define N25Q_VCR_WRAP_CONT		0x3
-+
-+/* N25Q 3-byte Address READ configurations
-+ *	- 'FAST' variants configured for 8 dummy cycles.
-+ *
-+ * Note, the number of dummy cycles used for 'FAST' READ operations is
-+ * configurable and would normally be tuned according to the READ command and
-+ * operating frequency.  However, this applies universally to all 'FAST' READ
-+ * commands, including those used by the SPIBoot controller, and remains in
-+ * force until the device is power-cycled.  Since the SPIBoot controller is
-+ * hard-wired to use 8 dummy cycles, we must configure the device to also use 8
-+ * cycles.
-+ */
-+static struct seq_rw_config n25q_read3_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,	        0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
-+
-+/* N25Q 4-byte Address READ configurations
-+ *	- use special 4-byte address READ commands (reduces overheads, and
-+ *        reduces risk of hitting watchdog reset issues).
-+ *	- 'FAST' variants configured for 8 dummy cycles (see note above.)
-+ */
-+static struct seq_rw_config n25q_read4_configs[] = {
-+	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ4_1_4_4,	0, 4, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ4_1_1_4,	0, 1, 4, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ4_1_2_2,	0, 2, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ4_1_1_2,	0, 1, 2, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ4_FAST,	0, 1, 1, 0x00, 0, 8},
-+	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ4,	0, 1, 1, 0x00, 0, 0},
-+	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
-+};
-+
- static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index fe835c1..5a5c664 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
+ 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
  
- static struct stfsm_seq stfsm_seq_read_jedec = {
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
 -- 
-1.8.3.2
+1.7.0.1
