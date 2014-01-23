@@ -1,50 +1,58 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 23 Jan 2014 11:56:32 +0100
-Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
-In-Reply-To: <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
-References: <20140123083714.3c6e86ae@ipc1.ka-ro>
- <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
- <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140123115632.6d3f1a58@ipc1.ka-ro>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Thu, 23 Jan 2014 16:26:40 +0530
+Subject: [PATCH V2 0/8] PCI: Add SPEAr13xx PCIe support
+Message-ID: <cover.1390471111.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+First five patches are improvement and fixes for SPEAr13xx support.
 
-Sascha Hauer wrote:
-> of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
-> but it is only ever used by the of_xlate handler itsel. Remove
-> of_pwm_n_cells from struct pwm_chip and let the handler do the argument
-> count checking to simplify the code.
-> 
-This still does not make the PWM_POLARITY flag in the pwms node
-optional as was the goal because of_parse_phandle_with_args() requires
-at least #pwm-cells arguments in the node.
+PCIe driver support for SPEAr1310/40 platform board is added.
+These patches are tested with SPEAr1310 evaluation board:
+	- INTEL PRO 100/100 EP card
+	- USB xhci gen2 card
+ 	- Above cards connected through LeCROY PTC switch
 
-So, with a DT configuration like:
-pwm0: pwm at 0 {
-	#pwm-cells = <3>;
-};
-backlight {
-	pwms = <&pwm0 0 100000>;
-};
-the driver will bail out at of_parse_phandle_with_args() in
-of_pwm_get() with the error message:
-"/backlight: arguments longer than property" and never reach your
-clever xlate function.
+Modifications for SATA are tested with SPEAr1340-evb board
 
-Thus you will still need to replace of_parse_phandle_with_args()
-with different code that copies most but not all of the functionality.
+Changes since v1:
+- Few patches of the series are already accepted and applied to mainline e.g.
+ pcie designware driver improvements,fixes for IO translation bug, PCIe dw
+ driver maintainer. So dropped these from v2.
+- Incorporated comment to move the common/reset PCIe code to the seperate driver
+- PCIe and SATA share common PHY configuration registers, so move SATA
+ platform code to the system config driver
+- Incorporated comments for FUSE_FS option for defconfig 
+- Incorporated comments to move back the SPEAr1340 definations from .h file
 
+Mohit Kumar (3):
+  SPEAr13xx: Set dt field entry <stmmac,phy-addr> for phy probe
+  SPEAr13xx: defconfig: Update
+  MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Pratyush Anand (5):
+  ahci: Add a driver_data field to struct ahci_platform_data
+  SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code to system cfg
+    driver
+  clk: SPEAr13xx: Fix pcie clock name
+  SPEAr13xx: Fix static mapping table
+  pcie: SPEAr13xx: Add designware pcie support
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+ MAINTAINERS                              |    6 +
+ arch/arm/boot/dts/spear13xx.dtsi         |   63 ++++-
+ arch/arm/configs/spear13xx_defconfig     |   16 +
+ arch/arm/mach-spear/Kconfig              |    2 +
+ arch/arm/mach-spear/include/mach/spear.h |    4 +-
+ arch/arm/mach-spear/spear1340.c          |  127 +---------
+ arch/arm/mach-spear/spear13xx.c          |    2 +-
+ drivers/clk/spear/spear1310_clock.c      |    6 +-
+ drivers/clk/spear/spear1340_clock.c      |    2 +-
+ drivers/mfd/Makefile                     |    1 +
+ drivers/mfd/spear13xx-cfg.c              |  444 ++++++++++++++++++++++++++++++
+ drivers/pci/host/Kconfig                 |    5 +
+ drivers/pci/host/Makefile                |    1 +
+ drivers/pci/host/pcie-spear13xx.c        |  394 ++++++++++++++++++++++++++
+ include/linux/ahci_platform.h            |    1 +
+ 15 files changed, 939 insertions(+), 135 deletions(-)
+ create mode 100644 drivers/mfd/spear13xx-cfg.c
+ create mode 100644 drivers/pci/host/pcie-spear13xx.c
