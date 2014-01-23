@@ -1,38 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jan 2014 15:55:45 +0000
-Subject: [PATCH RESEND v4 01/37] mtd: st_spi_fsm: Allocate resources and
- register with MTD framework
-In-Reply-To: <52E12434.7030000@st.com>
-References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
- <1390473085-24626-2-git-send-email-lee.jones@linaro.org>
- <52E12434.7030000@st.com>
-Message-ID: <20140123155545.GH8586@lee--X1>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 23 Jan 2014 16:57:19 +0100
+Subject: [PATCH v3 15/15] at91: dt: at91sam9261ek: Enabled the USB device port
+In-Reply-To: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1390492639-7299-16-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >+	fsm->region = devm_request_mem_region(&pdev->dev, res->start,
-> >+					      resource_size(res), pdev->name);
-> >+	if (!fsm->region) {
-> >+		dev_err(&pdev->dev,
-> >+			"Failed to reserve memory region [0x%08x-0x%08x]\n",
-> >+			res->start, res->end);
-> >+		return -EBUSY;
-> >+	}
-> >+
-> >+	fsm->base = devm_ioremap_nocache(&pdev->dev,
-> >+					 res->start, resource_size(res));
-> >+	if (!fsm->base) {
-> >+		dev_err(&pdev->dev, "Failed to ioremap [0x%08x]\n", res->start);
-> >+		return -EINVAL;
-> >+	}
-> >+
-> you can replace  "devm_request_mem_region" & "devm_ioremap_nocache"
-> by "devm_ioremap_resource"
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ arch/arm/boot/dts/at91sam9261ek.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Yes, that looks entirely reasonable, thanks.
-
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+index 8bdbed9..36cf677 100644
+--- a/arch/arm/boot/dts/at91sam9261ek.dts
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -106,6 +106,11 @@
+ 		};
+ 
+ 		apb {
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioB 29 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.5.2
