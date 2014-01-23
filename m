@@ -1,119 +1,220 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Thu, 23 Jan 2014 10:16:36 +0530
-Subject: [PATCH 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <20140122173117.GJ14108@mudshark.cambridge.arm.com>
-References: <1390401773-12100-1-git-send-email-vijay.kilari@gmail.com>
- <1390401773-12100-2-git-send-email-vijay.kilari@gmail.com>
- <20140122173117.GJ14108@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6sax=SHv2NryhY5QSBtyv-_wbCpPR5hFt9gngD96yP0oQ@mail.gmail.com>
+From: swaminath.p@samsung.com (swaminathan)
+Date: Thu, 23 Jan 2014 10:49:03 +0530
+Subject: [PATCH] [media] s5p-mfc: Add Horizontal and Vertical search range
+ for Video Macro Blocks
+In-Reply-To: <1388400186-22045-1-git-send-email-amit.grover@samsung.com>
+References: <1388400186-22045-1-git-send-email-amit.grover@samsung.com>
+Message-ID: <DA6097ED98694425932A6AF93513371A@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:01 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hello,
->
-> On Wed, Jan 22, 2014 at 02:42:48PM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add macros to enable and disable to manage PSTATE.D
->> for debugging. The macros local_dbg_save and local_dbg_restore
->> are moved to irqflags.h file
->>
->> KGDB boot tests fail because of PSTATE.D is masked.
->> unmask it for debugging support
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/include/asm/debug-monitors.h |   18 ++----------------
->>  arch/arm64/include/asm/irqflags.h       |   22 ++++++++++++++++++++++
->>  arch/arm64/kernel/debug-monitors.c      |    3 ++-
->>  3 files changed, 26 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
->> index 6231479..bc48880 100644
->> --- a/arch/arm64/include/asm/debug-monitors.h
->> +++ b/arch/arm64/include/asm/debug-monitors.h
->> @@ -43,22 +43,8 @@ enum debug_el {
->>  #ifndef __ASSEMBLY__
->>  struct task_struct;
->>
->> -#define local_dbg_save(flags)                                                        \
->> -     do {                                                                    \
->> -             typecheck(unsigned long, flags);                                \
->> -             asm volatile(                                                   \
->> -             "mrs    %0, daif                        // local_dbg_save\n"    \
->> -             "msr    daifset, #8"                                            \
->> -             : "=r" (flags) : : "memory");                                   \
->> -     } while (0)
->> -
->> -#define local_dbg_restore(flags)                                             \
->> -     do {                                                                    \
->> -             typecheck(unsigned long, flags);                                \
->> -             asm volatile(                                                   \
->> -             "msr    daif, %0                        // local_dbg_restore\n" \
->> -             : : "r" (flags) : "memory");                                    \
->> -     } while (0)
->> +#define local_dbg_enable()   asm("msr        daifclr, #8" : : : "memory")
->> +#define local_dbg_disable()  asm("msr        daifset, #8" : : : "memory")
->
-> Any reason not to move these to irqflags.h too?
+Hi All,
+Is there any review Comments for the patch "[PATCH] [media] s5p-mfc: Add 
+Horizontal and Vertical search range for Video Macro Blocks"
+posted on 30-Dec-2013 ?
 
-Can me moved to irqflags.h file
->
->>  #define DBG_ARCH_ID_RESERVED 0       /* In case of ptrace ABI updates. */
->>
->> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
->> index b2fcfbc..f163b11 100644
->> --- a/arch/arm64/include/asm/irqflags.h
->> +++ b/arch/arm64/include/asm/irqflags.h
->> @@ -90,5 +90,27 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
->>       return flags & PSR_I_BIT;
->>  }
->>
->> +/*
->> + * save and restore debug state
->> + */
->> +static inline unsigned long local_dbg_save(void)
->> +{
->> +     unsigned long flags;
->> +     asm volatile(
->> +             "mrs    %0, daif                // local_dbg_save"
->> +             "msr    daifset, #8"
->> +             : "=r" (flags) : : "memory");
->> +     return flags;
->> +}
->> +
->> +static inline void local_dbg_restore(unsigned long flags)
->> +{
->> +     asm volatile(
->> +             "msr    daif, %0        // local_dbg_restore"
->> +             :
->> +             : "r" (flags)
->> +             : "memory");
->> +}
->> +
->>  #endif
->>  #endif
->> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
->> index 23586bd..774ad04 100644
->> --- a/arch/arm64/kernel/debug-monitors.c
->> +++ b/arch/arm64/kernel/debug-monitors.c
->> @@ -51,7 +51,7 @@ u8 debug_monitors_arch(void)
->>  static void mdscr_write(u32 mdscr)
->>  {
->>       unsigned long flags;
->> -     local_dbg_save(flags);
->> +     flags = local_dbg_save();
->
-> Why are you changing the API? This is now pointlessly different to irqs.
 
-To be in line with arch_local_irq_save & arch_local_save_flags in irqflags.h,
-I moved this macros into functions and accordingly changed the caller.
-I could not find any code using this local_dbg_{save, restore} except
-from debug-monitors.c file
+Regards,
+Swaminathan
 
-If required, I can think of renaming local_dbg_{save,restore} as
-local_dbg_{save,restore}_flags
 
+
+
+--------------------------------------------------
+From: "Amit Grover" <amit.grover@samsung.com>
+Sent: Monday, December 30, 2013 4:13 PM
+To: <m.chehab@samsung.com>; <linux-media@vger.kernel.org>; 
+<linux-doc@vger.kernel.org>; <linux-kernel@vger.kernel.org>; 
+<linux-arm-kernel@lists.infradead.org>; <linux-samsung-soc@vger.kernel.org>; 
+<rob@landley.net>; <kyungmin.park@samsung.com>; <k.debski@samsung.com>; 
+<jtp.park@samsung.com>
+Cc: <hans.verkuil@cisco.com>; <andrew.smirnov@gmail.com>; 
+<s.nawrocki@samsung.com>; <arun.kk@samsung.com>; <anatol.pomozov@gmail.com>; 
+<jmccrohan@gmail.com>; <austin.lobo@samsung.com>; "Swami Nathan" 
+<swaminath.p@samsung.com>
+Subject: [PATCH] [media] s5p-mfc: Add Horizontal and Vertical search range 
+for Video Macro Blocks
+
+> This patch adds Controls to set Horizontal and Vertical search range
+> for Motion Estimation block for Samsung MFC video Encoders.
 >
-> Will
+> Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
+> Signed-off-by: Amit Grover <amit.grover@samsung.com>
+> ---
+> Documentation/DocBook/media/v4l/controls.xml    |   14 +++++++++++++
+> drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 ++
+> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |   24 
+> +++++++++++++++++++++++
+> drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    8 ++------
+> drivers/media/v4l2-core/v4l2-ctrls.c            |   14 +++++++++++++
+> include/uapi/linux/v4l2-controls.h              |    2 ++
+> 6 files changed, 58 insertions(+), 6 deletions(-)
+>
+> diff --git a/Documentation/DocBook/media/v4l/controls.xml 
+> b/Documentation/DocBook/media/v4l/controls.xml
+> index 7a3b49b..70a0f6f 100644
+> --- a/Documentation/DocBook/media/v4l/controls.xml
+> +++ b/Documentation/DocBook/media/v4l/controls.xml
+> @@ -2258,6 +2258,20 @@ Applicable to the MPEG1, MPEG2, MPEG4 
+> encoders.</entry>
+> VBV buffer control.</entry>
+>        </row>
+>
+> +   <row><entry></entry></row>
+> +       <row id="v4l2-mpeg-video-horz-search-range">
+> + <entry 
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE</constant>&nbsp;</entry>
+> + <entry>integer</entry>
+> +       </row><row><entry spanname="descr">Sets the Horizontal search 
+> range for Video Macro blocks.</entry>
+> +       </row>
+> +
+> + <row><entry></entry></row>
+> +       <row id="v4l2-mpeg-video-vert-search-range">
+> + <entry 
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE</constant>&nbsp;</entry>
+> + <entry>integer</entry>
+> +       </row><row><entry spanname="descr">Sets the Vertical search range 
+> for Video Macro blocks.</entry>
+> +       </row>
+> +
+>        <row><entry></entry></row>
+>        <row>
+>  <entry 
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&nbsp;</entry>
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h 
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> index 6920b54..f2c13c3 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> @@ -430,6 +430,8 @@ struct s5p_mfc_vp8_enc_params {
+> struct s5p_mfc_enc_params {
+>  u16 width;
+>  u16 height;
+> + u32 horz_range;
+> + u32 vert_range;
+>
+>  u16 gop_size;
+>  enum v4l2_mpeg_video_multi_slice_mode slice_mode;
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c 
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> index 4ff3b6c..a02e7b8 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> @@ -208,6 +208,24 @@ static struct mfc_control controls[] = {
+>  .default_value = 0,
+>  },
+>  {
+> + .id = V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE,
+> + .type = V4L2_CTRL_TYPE_INTEGER,
+> + .name = "horizontal search range of video macro block",
+> + .minimum = 16,
+> + .maximum = 128,
+> + .step = 16,
+> + .default_value = 32,
+> + },
+> + {
+> + .id = V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE,
+> + .type = V4L2_CTRL_TYPE_INTEGER,
+> + .name = "vertical search range of video macro block",
+> + .minimum = 16,
+> + .maximum = 128,
+> + .step = 16,
+> + .default_value = 32,
+> + },
+> + {
+>  .id = V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE,
+>  .type = V4L2_CTRL_TYPE_INTEGER,
+>  .minimum = 0,
+> @@ -1377,6 +1395,12 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl 
+> *ctrl)
+>  case V4L2_CID_MPEG_VIDEO_VBV_SIZE:
+>  p->vbv_size = ctrl->val;
+>  break;
+> + case V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE:
+> + p->horz_range = ctrl->val;
+> + break;
+> + case V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE:
+> + p->vert_range = ctrl->val;
+> + break;
+>  case V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE:
+>  p->codec.h264.cpb_size = ctrl->val;
+>  break;
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c 
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> index 461358c..47e1807 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> @@ -727,14 +727,10 @@ static int s5p_mfc_set_enc_params(struct s5p_mfc_ctx 
+> *ctx)
+>  WRITEL(reg, S5P_FIMV_E_RC_CONFIG_V6);
+>
+>  /* setting for MV range [16, 256] */
+> - reg = 0;
+> - reg &= ~(0x3FFF);
+> - reg = 256;
+> + reg = (p->horz_range & 0x3fff); /* conditional check in app */
+>  WRITEL(reg, S5P_FIMV_E_MV_HOR_RANGE_V6);
+>
+> - reg = 0;
+> - reg &= ~(0x3FFF);
+> - reg = 256;
+> + reg = (p->vert_range & 0x3fff); /* conditional check in app */
+>  WRITEL(reg, S5P_FIMV_E_MV_VER_RANGE_V6);
+>
+>  WRITEL(0x0, S5P_FIMV_E_FRAME_INSERTION_V6);
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c 
+> b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index fb46790..7cf23d5 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  case V4L2_CID_MPEG_VIDEO_DEC_PTS: return "Video Decoder PTS";
+>  case V4L2_CID_MPEG_VIDEO_DEC_FRAME: return "Video Decoder Frame Count";
+>  case V4L2_CID_MPEG_VIDEO_VBV_DELAY: return "Initial Delay for VBV 
+> Control";
+> + case V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE: return "hor search range of 
+> video MB";
+> + case V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE: return "vert search range of 
+> video MB";
+>  case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER: return "Repeat Sequence 
+> Header";
+>
+>  /* VPX controls */
+> @@ -905,6 +907,18 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum 
+> v4l2_ctrl_type *type,
+>  *min = 0;
+>  *max = *step = 1;
+>  break;
+> + case V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE:
+> + *type = V4L2_CTRL_TYPE_INTEGER;
+> + *min = 16;
+> + *max = 128;
+> + *step = 16;
+> + break;
+> + case V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE:
+> + *type = V4L2_CTRL_TYPE_INTEGER;
+> + *min = 16;
+> + *max = 128;
+> + *step = 16;
+> + break;
+>  case V4L2_CID_PAN_RESET:
+>  case V4L2_CID_TILT_RESET:
+>  case V4L2_CID_FLASH_STROBE:
+> diff --git a/include/uapi/linux/v4l2-controls.h 
+> b/include/uapi/linux/v4l2-controls.h
+> index 1666aab..bcce536 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -372,6 +372,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
+> #define V4L2_CID_MPEG_VIDEO_DEC_FRAME (V4L2_CID_MPEG_BASE+224)
+> #define V4L2_CID_MPEG_VIDEO_VBV_DELAY (V4L2_CID_MPEG_BASE+225)
+> #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER (V4L2_CID_MPEG_BASE+226)
+> +#define V4L2_CID_MPEG_VIDEO_HORZ_SEARCH_RANGE (V4L2_CID_MPEG_BASE+227)
+> +#define V4L2_CID_MPEG_VIDEO_VERT_SEARCH_RANGE (V4L2_CID_MPEG_BASE+228)
+>
+> #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP (V4L2_CID_MPEG_BASE+300)
+> #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP (V4L2_CID_MPEG_BASE+301)
+> -- 
+> 1.7.9.5
+> 
