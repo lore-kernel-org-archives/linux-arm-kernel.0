@@ -1,72 +1,45 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 23 Jan 2014 11:32:18 -0800
-Subject: [PATCH] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
-References: <1390325166-16840-1-git-send-email-lauraa@codeaurora.org>
- <20140122112847.GG1621@mudshark.cambridge.arm.com>
- <52E00AFF.1060701@codeaurora.org>
- <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
-Message-ID: <52E16E42.5040000@codeaurora.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 23 Jan 2014 14:32:15 -0500
+Subject: [PATCH-next] drivers/clk: make max77686 driver bool for now
+Message-ID: <1390505535-30229-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/23/2014 11:23 AM, Nicolas Pitre wrote:
-> On Wed, 22 Jan 2014, Laura Abbott wrote:
->> On 1/22/2014 3:28 AM, Will Deacon wrote:
->>> On Tue, Jan 21, 2014 at 05:26:06PM +0000, Laura Abbott wrote:
->>>> @@ -288,6 +294,9 @@ struct task_struct *__switch_to(struct task_struct
->>>> @@ *prev,
->>>>    {
->>>>     struct task_struct *last;
->>>>
->>>> +#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
->>>> +	__stack_chk_guard = next->stack_canary;
->>>> +#endif
->>>
->>> I don't get the dependency on !SMP. Assumedly, the update of
->>> __stack_chk_guard would be racy otherwise, but that sounds solvable with
->>> atomics. Is the stack_canary updated periodically somewhere else?
->>>
->>
->> It has nothing to do with atomics, it's the fact that __stack_chk_guard is a
->> global variable and with SMP you can have n different processes running each
->> with a different canary (see kernel/fork.c, dup_task_struct) . c.f the commit
->> added by Nicolas Pitre:
->>
->> commit df0698be14c6683606d5df2d83e3ae40f85ed0d9
->> Author: Nicolas Pitre <nico@fluxnic.net>
->> Date:   Mon Jun 7 21:50:33 2010 -0400
->>
->>      ARM: stack protector: change the canary value per task
->>
->>      A new random value for the canary is stored in the task struct whenever
->>      a new task is forked.  This is meant to allow for different canary
->> values
->>      per task.  On ARM, GCC expects the canary value to be found in a global
->>      variable called __stack_chk_guard.  So this variable has to be updated
->>      with the value stored in the task struct whenever a task switch occurs.
->>
->>      Because the variable GCC expects is global, this cannot work on SMP
->>      unfortunately.  So, on SMP, the same initial canary value is kept
->>      throughout, making this feature a bit less effective although it is
->> still
->>      useful.
->>
->>      One way to overcome this GCC limitation would be to locate the
->>      __stack_chk_guard variable into a memory page of its own for each CPU,
->>      and then use TLB locking to have each CPU see its own page at the same
->>      virtual address for each of them.
->>
->>      Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> Did gcc for Aarch64 replicate the same global variable arrangement?
-> That would be unfortunate...
->
+Commit 3966c947f45911e093114371462687134d5e8d40 ("clk: max77686:
+Refactor driver data handling") added a call to __clk_get_hw()
+but this function is not exported (as __<name> is typically a
+private/internal thing).
 
-Based on my experiments they did unfortunately do so.
+Hence this driver fails to build modular, and has been causing
+allmodconfig build breakage in arch outside of just ARM.  Since
+the only defconfig that uses it sets it as =y, lets just make
+it non-modular for now.
 
-Laura
+Mike says that changes are pending to export similar functionality
+in the future[1], so at that point in time, it can be returned to
+tristate if desired.
 
+[1] https://lkml.org/lkml/2014/1/20/21
+
+Reported-by: SeongJae Park <sj38.park@gmail.com>
+Cc: SeongJae Park <sj38.park@gmail.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index efb508a..009fb9b 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -40,7 +40,7 @@ config COMMON_CLK_VERSATILE
+ 	  - Versatile Express
+ 
+ config COMMON_CLK_MAX77686
+-	tristate "Clock driver for Maxim 77686 MFD"
++	bool "Clock driver for Maxim 77686 MFD"
+ 	depends on MFD_MAX77686
+ 	---help---
+ 	  This driver supports Maxim 77686 crystal oscillator clock. 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.5.2
