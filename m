@@ -1,37 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jan 2014 19:31:37 +0000
-Subject: [PATCH 3/3] ARM: allow kernel to be loaded in middle of phymem
-In-Reply-To: <alpine.LFD.2.11.1401231357520.1652@knanqh.ubzr>
-References: <1390389916-8711-1-git-send-email-wangnan0@huawei.com>
- <1390389916-8711-4-git-send-email-wangnan0@huawei.com>
- <alpine.LFD.2.11.1401231357520.1652@knanqh.ubzr>
-Message-ID: <20140123193137.GA15937@n2100.arm.linux.org.uk>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 23 Jan 2014 11:32:18 -0800
+Subject: [PATCH] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
+References: <1390325166-16840-1-git-send-email-lauraa@codeaurora.org>
+ <20140122112847.GG1621@mudshark.cambridge.arm.com>
+ <52E00AFF.1060701@codeaurora.org>
+ <alpine.LFD.2.11.1401231419110.1652@knanqh.ubzr>
+Message-ID: <52E16E42.5040000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 02:15:07PM -0500, Nicolas Pitre wrote:
-> On Wed, 22 Jan 2014, Wang Nan wrote:
-> 
-> > This patch allows the kernel to be loaded at the middle of kernel awared
-> > physical memory. Before this patch, users must use mem= or device tree to cheat
-> > kernel about the start address of physical memory.
-> > 
-> > This feature is useful in some special cases, for example, building a crash
-> > dump kernel. Without it, kernel command line, atag and devicetree must be
-> > adjusted carefully, sometimes is impossible.
-> 
-> With CONFIG_PATCH_PHYS_VIRT the value for PHYS_OFFSET is determined 
-> dynamically by rounding down the kernel image start address to the 
-> previous 16MB boundary.  In the case of a crash kernel, this might be 
-> cleaner to simply readjust __pv_phys_offset during early boot and call 
-> fixup_pv_table(), and then reserve away the memory from the previous 
-> kernel.  That will let you access that memory directly (with gdb for 
-> example) and no pointer address translation will be required.
+On 1/23/2014 11:23 AM, Nicolas Pitre wrote:
+> On Wed, 22 Jan 2014, Laura Abbott wrote:
+>> On 1/22/2014 3:28 AM, Will Deacon wrote:
+>>> On Tue, Jan 21, 2014 at 05:26:06PM +0000, Laura Abbott wrote:
+>>>> @@ -288,6 +294,9 @@ struct task_struct *__switch_to(struct task_struct
+>>>> @@ *prev,
+>>>>    {
+>>>>     struct task_struct *last;
+>>>>
+>>>> +#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+>>>> +	__stack_chk_guard = next->stack_canary;
+>>>> +#endif
+>>>
+>>> I don't get the dependency on !SMP. Assumedly, the update of
+>>> __stack_chk_guard would be racy otherwise, but that sounds solvable with
+>>> atomics. Is the stack_canary updated periodically somewhere else?
+>>>
+>>
+>> It has nothing to do with atomics, it's the fact that __stack_chk_guard is a
+>> global variable and with SMP you can have n different processes running each
+>> with a different canary (see kernel/fork.c, dup_task_struct) . c.f the commit
+>> added by Nicolas Pitre:
+>>
+>> commit df0698be14c6683606d5df2d83e3ae40f85ed0d9
+>> Author: Nicolas Pitre <nico@fluxnic.net>
+>> Date:   Mon Jun 7 21:50:33 2010 -0400
+>>
+>>      ARM: stack protector: change the canary value per task
+>>
+>>      A new random value for the canary is stored in the task struct whenever
+>>      a new task is forked.  This is meant to allow for different canary
+>> values
+>>      per task.  On ARM, GCC expects the canary value to be found in a global
+>>      variable called __stack_chk_guard.  So this variable has to be updated
+>>      with the value stored in the task struct whenever a task switch occurs.
+>>
+>>      Because the variable GCC expects is global, this cannot work on SMP
+>>      unfortunately.  So, on SMP, the same initial canary value is kept
+>>      throughout, making this feature a bit less effective although it is
+>> still
+>>      useful.
+>>
+>>      One way to overcome this GCC limitation would be to locate the
+>>      __stack_chk_guard variable into a memory page of its own for each CPU,
+>>      and then use TLB locking to have each CPU see its own page at the same
+>>      virtual address for each of them.
+>>
+>>      Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>
+> Did gcc for Aarch64 replicate the same global variable arrangement?
+> That would be unfortunate...
+>
 
-We already have support in the kernel to ignore memory below the calculated
-PHYS_OFFSET.  See 571b14375019c3a66ef70d4d4a7083f4238aca30.
+Based on my experiments they did unfortunately do so.
+
+Laura
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
