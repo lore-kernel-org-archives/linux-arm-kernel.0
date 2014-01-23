@@ -1,53 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Jan 2014 14:08:11 -0800
-Subject: [PATCH 0/2] Enable clock controllers on MSM
-In-Reply-To: <69BE1300-36E8-400B-BD77-DB89740C10D2@codeaurora.org>
-References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
- <878uu6y5im.fsf@paris.lan>
- <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
- <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
- <69BE1300-36E8-400B-BD77-DB89740C10D2@codeaurora.org>
-Message-ID: <CAOesGMgeGX=3Z6xUpegACere9hZAjNVqZrZxf6DpBUDzPuCc3g@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 23 Jan 2014 23:35:29 +0100
+Subject: [PATCH 4/5] ARM: S3C24XX: convert boards to use common restart
+ function
+In-Reply-To: <3955130.WSqWacB8SI@phil>
+References: <3105326.uFdOVLyXH8@phil> <7172372.015CdWJg1F@phil>
+ <52E164B6.5070206@samsung.com> <3955130.WSqWacB8SI@phil>
+Message-ID: <52E19931.80803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 1:57 PM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Jan 23, 2014, at 2:43 PM, Olof Johansson <olof@lixom.net> wrote:
->
->> On Thu, Jan 23, 2014 at 11:59 AM, Kumar Gala <galak@codeaurora.org> wrote:
+
+
+On 23.01.2014 20:02, Heiko St?bner wrote:
+> Am Donnerstag, 23. Januar 2014, 19:51:34 schrieb Tomasz Figa:
+>> On 23.01.2014 19:36, Heiko St?bner wrote:
+>>> Am Donnerstag, 23. Januar 2014, 19:12:04 schrieb Tomasz Figa:
+>>>> Hi Heiko,
+>>>>
+>>>> On 06.01.2014 19:40, Heiko St?bner wrote:
+>>>>> This converts all boards to use the new common restart function instead
+>>>>> of SoC specific ones.
+>>>>>
+>>>>> The mach-s3c2416-dt board now tries to setup either a swrst- or
+>>>>> watchdog-
+>>>>> reset so that it will be able to handle more s3c24xx-SoCs later on.
+>>>>
+>>>> [snip]
+>>>>
+>>>>> diff --git a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>>>> b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c index 0a86953..88716fa4 100644
+>>>>> --- a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>>>> +++ b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>>>>> @@ -24,6 +24,7 @@
+>>>>>
+>>>>>     #include <plat/cpu.h>
+>>>>>     #include <plat/pm.h>
+>>>>>
+>>>>> +#include <plat/watchdog-reset.h>
+>>>>>
+>>>>>     #include "common.h"
+>>>>>
+>>>>> @@ -34,6 +35,14 @@ static void __init s3c2416_dt_map_io(void)
+>>>>>
+>>>>>     static void __init s3c2416_dt_machine_init(void)
+>>>>>     {
+>>>>>
+>>>>> +	s3c24xx_swrst_reset_of_init();
+>>>>> +
+>>>>> +#ifdef CONFIG_SAMSUNG_WDT_RESET
+>>>>> +	/* if no special swrst-device exists try to find a watchdog */
+>>>>> +	if (!s3c24xx_swrst_reset_available())
+>>>>> +		samsung_wdt_reset_of_init();
+>>>>> +#endif
+>>>>
+>>>> Hmm... I think it would be safe to assume availability of soft reset,
+>>>> especially if you could move the restart code to the clock driver.
 >>>
->>> On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>>> ok, so something like the following:
 >>>
->>>> Stephen Boyd <sboyd@codeaurora.org> writes:
->>>>
->>>>> These patches add the clock controller nodes, enable the clock drivers
->>>>> on MSM based platforms, and hook it up enough to get the serial console
->>>>> working. This is based on the merge of Mike's clk-next branch with
->>>>> linux-next-20140116. The changes need the clk-next branch because that's
->>>>> where the DTS include files landed.
->>>>
->>>> I forgot to repond to this earlier, but I tested this on top of -next
->>>> and it gets the dragonboard booting w/mainline.  Yay!
->>>>
->>>>> Perhaps this can be applied after 3.14-rc1 is out?
->>>>
->>>> Yeah, sounds good.
->>>>
->>>> Kevin
+>>> the boards would simply use samsung_watchdog_reset, which should according
+>>> to the manuals be available on all architectures. And the ccf-driver on
+>>> appropriate architectures would simple replace the arm_pm_restart
+>>> callback with its own SoC specific one?
 >>>
->>> We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
+>>> For the s3c2412 this also means that the clock-logic would get simplified.
+>>>
+>>>
+>>> Like this, or do I overlook something?
 >>
->> They're queued for this merge window, right? If so, they'll be in -rc1
->> and the dependency will be solved before we apply the patches.
->>
+>> Hmm, this would mean a dependency on CONFIG_SAMSUNG_WDT_RESET then. Is
+>> there a need to fall back to it on platforms which support soft reset
+>> (assuming that CCF driver would always install its restart handler on
+>> applicable platforms)?
 >
-> Yeah, they look like they are in Mike?s pull request for Linus.  So hopefully they?ll show up in -rc1 (wasn?t sure if Mike intended them for 3.14 or not).
+> s3c2410, s3c2440 and s3c2442 do not have the swrst facility. They always use
+> samsung_wdt_reset.
 >
-> What?s the feeling about pushing DT and defconfig changes into 3.14 (or do we just queue them up for 3.15)?
+> In general, I want to try establishing some sort of general restart way, as in
+> the future one dt-board should hopefully be enough to cover all s3c24xx soc
+> variants.
 
-I can probably pick them up in a late/* branch and merge for 3.14, no
-promises though.
+If you make SAMSUNG_WDT_RESET always selected on S3C24XX then I guess 
+it's fine.
 
+>
+>
+>> Note that you can make the restart field NULL in mach_desc in board files.
+>
+> As I said above, this is mainly meant for the dt-case. The legacy-board files
+> are more or less only secondary, and the affected boards can of course then
+> have a NULL restart handle :-) .
+>
+> So for this the dt-board could simply use the wdt-reset, which then gets
+> replaced by the ccf-based reset if appropriate.
 
--Olof
+OK. By the way, are there any benefits of using this software reset over 
+watchdog reset? Maybe all S3C24xx could simply use watchdog reset and no 
+special handling of those with swrst would be needed.
+
+Best regards,
+Tomasz
