@@ -1,37 +1,28 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Jan 2014 22:00:10 +1300
-Subject: [PATCH] vt8500: pinctrl: Change devicetree data parsing
-In-Reply-To: <CACRpkdaFJphJdf6hyKoYEZ_wXikwRiwzMgtL=hY+3B8WrBnQaw@mail.gmail.com>
-References: <1390458701-30238-1-git-send-email-linux@prisktech.co.nz>
- <CACRpkdaFJphJdf6hyKoYEZ_wXikwRiwzMgtL=hY+3B8WrBnQaw@mail.gmail.com>
-Message-ID: <52E0DA1A.10108@prisktech.co.nz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Jan 2014 10:04:56 +0100
+Subject: [PATCHv2 2/2] pwm: imx: support polarity inversion
+In-Reply-To: <20140123083714.3c6e86ae@ipc1.ka-ro>
+References: <20140123083714.3c6e86ae@ipc1.ka-ro>
+Message-ID: <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/14 21:43, Linus Walleij wrote:
-> On Thu, Jan 23, 2014 at 7:31 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
->
->> Due to an assumption in the VT8500 pinctrl driver, the value passed
->> from devicetree for 'wm,pull' was not explicitly translated before
->> being passed to pinconf.
->>
->> With changes to 'enum pin_config_param', PIN_CONFIG_BIAS_PULL_(UP/DOWN)
->> no longer map 1-to-1 with the expected values in devicetree.
->>
->> This patch adds a small translation between the devicetree values (0..2)
->> and the enum pin_config_param equivalent values.
->>
->> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> Isn't this a regression fix for stable?
->
-I wasn't sure how to handle this since it's been a problem since 3.10 
-but no one has mentioned it (or patched it).
+I thinking more of the following. I haven't tested it, but it has a negative
+diffstat, so it must be good ;)
 
-I assume this is because:
-a) pinctrl is only used for I2C in mainline - and there is no mainline 
-I2C consumer device drivers for the WonderMedia devices
-b) most  users are using the non-mainline kernel which has more support 
-(as nasty as some of it is).
+Sascha
 
-Regards
-Tony Prisk
+----------------------------------------------------------------
+Sascha Hauer (2):
+      PWM: let of_xlate handlers check args count
+      PWM: handle additional flags in of_pwm_simple_xlate
+
+ drivers/pwm/core.c            | 41 +++++++----------------------------------
+ drivers/pwm/pwm-atmel-tcb.c   |  2 --
+ drivers/pwm/pwm-renesas-tpu.c |  2 --
+ drivers/pwm/pwm-samsung.c     |  3 ---
+ drivers/pwm/pwm-tiecap.c      |  2 --
+ drivers/pwm/pwm-tiehrpwm.c    |  2 --
+ drivers/pwm/pwm-vt8500.c      |  2 --
+ include/linux/pwm.h           |  3 ---
+ 8 files changed, 7 insertions(+), 50 deletions(-)
