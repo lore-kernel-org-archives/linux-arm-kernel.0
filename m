@@ -1,35 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 23 Jan 2014 12:25:19 +0000
-Subject: [PATCH v3 7/7] ARM: brcmstb: dts: add a reference DTS for
- Broadcom 7445
-In-Reply-To: <52E0D9AD.1040409@monstr.eu>
-References: <1389743333-16741-1-git-send-email-marc.ceeeee@gmail.com>
- <201401161219.01038.arnd@arndb.de>
- <20140116134732.GB17314@sirena.org.uk>
- <201401171804.30572.arnd@arndb.de> <52E0D9AD.1040409@monstr.eu>
-Message-ID: <20140123122519.GI17314@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Jan 2014 12:33:41 +0000
+Subject: [PATCHv2 2/2] pwm: imx: support polarity inversion
+In-Reply-To: <20140123115203.GV15937@n2100.arm.linux.org.uk>
+References: <1389859585-14006-1-git-send-email-LW@KARO-electronics.de>
+ <1389859585-14006-3-git-send-email-LW@KARO-electronics.de>
+ <20140116160356.GY16215@pengutronix.de> <20140123083714.3c6e86ae@ipc1.ka-ro>
+ <20140123115203.GV15937@n2100.arm.linux.org.uk>
+Message-ID: <20140123123341.GW15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 09:58:21AM +0100, Michal Simek wrote:
-> On 01/17/2014 06:04 PM, Arnd Bergmann wrote:
+On Thu, Jan 23, 2014 at 11:52:03AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 23, 2014 at 08:37:14AM +0100, Lothar Wa?mann wrote:
+> > This wouldn't buy much without a material change to of_pwm_get().
+> > The function of_parse_phandle_with_args() called by of_pwm_get()
+> > requires the number of args in the pwms property be greater or equal to
+> > the #pwm-cells property in the pwm node. Thus, the interesting case of
+> > having #pwm-cells = <3> without changing the existing users is
+> > prohibited by of_parse_phandle_with_args().
+> 
+> I really don't think that's a problem we need to be concerned with at
+> the moment.  What we need is for the kernel to be able to parse files
+> with #pwm-cells = <2> with the pwms property containing two arguments,
+> and when they're updated to #pwm-cells = <3> with the pwms property
+> containing three arguments.
+> 
+> Yes, that means all the board dt files need to be updated at the same
+> time to include the additional argument, but I don't see that as a big
+> problem.
+> 
+> What we do need to do is to adjust the PWM parsing code such that it's
+> possible to use either specification without causing any side effects.
+> 
+> I would test this, but as u-boot is rather fscked at the moment and the
+> networking has broken on my cubox-i as a result... and it seems that the
+> u-boot developers have pissed off cubox-i u-boot hackers soo much that
+> they've dropped u-boot in favour of barebox...
 
-> >> I thought the solution with deferring registration of the resource for
-> >> dev_get_regmap() until a proper device materialised seemed simple and
-> >> enough, did you folks run into any problems with that?  I had assumed a
-> >> patch was likely to materialise so wasn't worrying about it myself.
+Oh, and another reason... the u-boot video settings are totally and utterly
+buggered to the point that it doesn't produce correct timings, and it seems
+that u-boot people have zero interest in fixing that, so u-boot mainline is
+basically refusing to fix this - another reason to stay away from it.
 
-> > I'm still hoping that Michal will do that patch.
+(1024x768 @ 60Hz produces 70Hz refresh on iMX6Q here - I've seen it produce
+51Hz on iMX6S, both of which are far enough out that lots of display devices
+will not accept it as a valid signal.)
 
-> And what was the resolution/recommendation how to do it?
-
-Split the regmap creation so the managed resource registration could be
-done later on with an already allocated regmap instead of requiring it
-to be done at creation time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140123/722a9d1b/attachment-0001.sig>
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
