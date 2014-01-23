@@ -1,73 +1,84 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 23 Jan 2014 22:15:54 +0100
-Subject: [PATCH v2 06/15] watchdog: orion: Remove unneeded BRIDGE_CAUSE
- clear
-In-Reply-To: <20140123115432.GC6065@localhost>
-References: <1390295561-3466-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390295561-3466-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140121233537.GS18269@obsidianresearch.com>
- <20140122164904.GB27273@localhost>
- <20140122173417.GT18269@obsidianresearch.com> <52E02AB6.7040104@gmail.com>
- <20140122205213.GW18269@obsidianresearch.com> <52E0591E.6030009@gmail.com>
- <20140123111049.GB6065@localhost> <20140123115432.GC6065@localhost>
-Message-ID: <52E1868A.8020208@gmail.com>
+From: herrmann.der.user@googlemail.com (Andreas Herrmann)
+Date: Thu, 23 Jan 2014 22:17:49 +0100
+Subject: [PATCH 05/11] iommu/arm-smmu: Check for duplicate stream IDs
+ when registering master devices
+In-Reply-To: <20140122155302.GF14108@mudshark.cambridge.arm.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-6-git-send-email-andreas.herrmann@calxeda.com>
+ <20140122155302.GF14108@mudshark.cambridge.arm.com>
+Message-ID: <20140123211749.GE26399@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Ezequiel,
+On Wed, Jan 22, 2014 at 03:53:02PM +0000, Will Deacon wrote:
+> On Thu, Jan 16, 2014 at 12:44:17PM +0000, Andreas Herrmann wrote:
+> > Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   25 ++++++++++++++++++++++---
+> >  1 file changed, 22 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 02a871e..a4e0c93 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -56,6 +56,9 @@
+> >  /* Maximum number of stream IDs assigned to a single device */
+> >  #define MAX_MASTER_STREAMIDS		8
+> >  
+> > +/* Maximum stream ID */
+> > +#define ARM_SMMU_MAX_STREAMID		(SZ_64K - 1)
+> > +
+> >  /* Maximum number of context banks per SMMU */
+> >  #define ARM_SMMU_MAX_CBS		128
+> >  
+> > @@ -386,6 +389,8 @@ struct arm_smmu_device {
+> >  	u32				smr_mask_mask;
+> >  	u32				smr_id_mask;
+> >  
+> > +	unsigned long			*sids;
+> 
+> DECLARE_BITMAP instead?
 
-On 01/23/2014 12:54 PM, Ezequiel Garcia wrote:
-> Sebastian,
->
-> On Thu, Jan 23, 2014 at 08:10:49AM -0300, Ezequiel Garcia wrote:
->> On Thu, Jan 23, 2014 at 12:49:50AM +0100, Sebastian Hesselbarth wrote:
->> [..]
->>>> Notice that Ezequiel has added an IRQ handler that just calls panic,
->>>> so a spurious interrupt call is VERY VERY BAD.
->>>
->>> And I understand that he now clears watchdog's register before
->>> requesting an irq. All that is missing is bridge_irq driver clearing
->>> CAUSE register after masking all irqs, right?
->>>
->>
->> Are you sure clearing the CAUSE register after masking the IRQs will be enough?
->>
->> AFAICS, until now nobody unmasks the watchdog IRQ (at least the orion_wdt
->> driver didn't request the interruption) but *still* the CAUSE register is set
->> upon watchdog expiration. So I would guessed a masked interrupt still raises a
->> bit in the CAUSE register.
->>
->
-> Let me add some real information instead of my speculations. Taken from
-> the Kirkwood specification:
->
-> Table 136: Mbus-L to Mbus Bridge Interrupt Mask Register
-> Offset:		0x00020114
-> Field: 		Mask
-> Type/InitVal: 	RW 0x0
-> Description:	There is a mask bit per each cause bit. Mask only affects the
-> 		assertion of interrupt pins. It does not affect the setting of
-> 		bits in the Cause register.
->
-> So I guess this is why Jason has been insisting with the introduction of
-> the irq_startup.
->
-> (Just for reference, the little patch I attached yesterday proved to work here.)
+I wanted to allocate the bitmap which btw allows us to ... [? see end
+of mail]
 
-You guys were so right ;)
+> However, that's an 8k bitmap just for sanity checking, which I'm not
+> too fond of.
 
-I just tested your v4 of the watchdog patches and forced a stale
-watchdog irq. It will cause a watchdog reset as you predicted.
+Yes, I thought the same. But finally I thought it's worth it.
 
-I have some fixes for irq-orion.c's bridge irq that take care of:
-- handle_edge_irq
-- mask _and_ clear irqs on init
-- use irq_enable to ensure stale irqs are acked before unmask
+> Given that the motivation for the checking was your smr allocator,
+> perhaps it's sufficient just to do the checking on a per-master
+> basis, which we can do with the exhaustive search each time.
 
-With the last one, the stale watchdog irq will not raise watchdog's
-irq handler anymore.
+A per-master basis is not sufficient. If you argue that someone could
+have specified the same stream ID twice for one master in DT how are
+chances that the same stream ID shows up twice but for different
+master devices?
 
-BTW, during my test, it looks like RSTOUT wasn't set, so I'll add
-my Tested-by on v4 when I have investigated that.
+I think we have to check this (independent of my smr allocator).
+If two masters accidentially share the/an ID:
 
-Sebastian
+* Stream ID matching (w/o a mask, just use one SMR to map one stream
+  ID): It proably will cause a multi match with undifined behaviour.
+
+* Stream ID indexing: You would overwrite an already used S2CR (if
+  there are no further precautions).
+
+That is why I think a check to reject duplicate stream IDs among all
+masters for one SMMU is required.
+
+If this is needed, exhaustive search doesn't seem to be a good idea,
+because if you have a distributed SMMU -- one TCU (I think that's
+where the SMRs are), and many TBUs -- you might have several master
+devices attached (many more than in current systems). Each master
+potentially has several stream IDs ...  Esp. in this case 8k for doing
+the check isn't an issue.
+
+Maybe a compromise is to 
+
+... free the bitmap after the check is done.
+
+
+Andreas
