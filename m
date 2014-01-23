@@ -1,37 +1,51 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Thu, 23 Jan 2014 16:02:41 +0530
-Subject: [PATCH V2 1/8] SPEAr13xx: Set dt field entry <stmmac,
- phy-addr> for phy probe
+Date: Thu, 23 Jan 2014 16:02:43 +0530
+Subject: [PATCH V2 3/8] ahci: Add a driver_data field to struct
+ ahci_platform_data
 In-Reply-To: <cover.1390471111.git.mohit.kumar@st.com>
 References: <cover.1390471111.git.mohit.kumar@st.com>
-Message-ID: <12754927160d11063aad96c011c4807cb0aa1775.1390471111.git.mohit.kumar@st.com>
+Message-ID: <af75111fb61aebfee6e0233b39dc4cf006906402.1390471111.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT field name for the phy address changed since kernel 3.10. Set the
-snps,phy-addr to 0xffffffff so that the driver probes for the phy.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
-Cc: Pratyush Anand <pratyush.anand@st.com>
+Platform functions passed to the driver may also need some private
+data. Till, now following approaches have been taken to manage these
+data:
+-- SPEAr13xx platform keep it locally in the files defining platform
+functions.
+-- IMX has created a new ahci platform device as a child of
+platform device created by DT and then attached this data as the
+driver_data of ahci's dev->parent.
+
+Adding a driver_data field helps in using the same platform driver as
+that of created by DT.
+
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Tested-by: Mohit Kumar <mohit.kumar@st.com>
 Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: spear-devel at list.st.com
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: Tejun Heo <tj@kernel.org>
+Cc: linux-ide at vger.kernel.org
 Cc: devicetree at vger.kernel.org
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/spear13xx.dtsi |    1 +
+ include/linux/ahci_platform.h |    1 +
  1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-index 4382547..3518803 100644
---- a/arch/arm/boot/dts/spear13xx.dtsi
-+++ b/arch/arm/boot/dts/spear13xx.dtsi
-@@ -155,6 +155,7 @@
+diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
+index 73a2500..76d35e8 100644
+--- a/include/linux/ahci_platform.h
++++ b/include/linux/ahci_platform.h
+@@ -28,6 +28,7 @@ struct ahci_platform_data {
+ 	const struct ata_port_info *ata_port_info;
+ 	unsigned int force_port_map;
+ 	unsigned int mask_port_map;
++	void *driver_data;
+ };
  
- 		gmac0: eth at e2000000 {
- 			compatible = "st,spear600-gmac";
-+			snps,phy-addr = <0xffffffff>;
- 			reg = <0xe2000000 0x8000>;
- 			interrupts = <0 33 0x4
- 				      0 34 0x4>;
+ #endif /* _AHCI_PLATFORM_H */
 -- 
 1.7.0.1
