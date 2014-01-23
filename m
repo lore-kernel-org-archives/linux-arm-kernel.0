@@ -1,65 +1,50 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 23 Jan 2014 11:37:58 +0100
-Subject: [PATCH v2 2/2] at91: pinctrl: use gpiolib API to mark a GPIO used as
- an IRQ
-In-Reply-To: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>
-References: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1390473478-5591-3-git-send-email-jjhiblot@traphandler.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 23 Jan 2014 11:56:32 +0100
+Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
+In-Reply-To: <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
+References: <20140123083714.3c6e86ae@ipc1.ka-ro>
+ <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
+ <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140123115632.6d3f1a58@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
-the gpiolib so we can keep track of the usage centrally.
+Hi,
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- drivers/pinctrl/pinctrl-at91.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Sascha Hauer wrote:
+> of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
+> but it is only ever used by the of_xlate handler itsel. Remove
+> of_pwm_n_cells from struct pwm_chip and let the handler do the argument
+> count checking to simplify the code.
+> 
+This still does not make the PWM_POLARITY flag in the pwms node
+optional as was the goal because of_parse_phandle_with_args() requires
+at least #pwm-cells arguments in the node.
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index e8c8301..e00a4bb 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1299,6 +1299,31 @@ static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
- 	return 0;
- }
- 
-+static unsigned int gpio_irq_startup(struct irq_data *d)
-+{
-+	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-+	unsigned	pin = d->hwirq;
-+	int ret;
-+
-+	ret = gpio_lock_as_irq(&at91_gpio->chip, pin);
-+	if (ret) {
-+		dev_err(at91_gpio->chip.dev, "unable to lock pind %lu IRQ\n",
-+			d->hwirq);
-+		return ret;
-+	}
-+	gpio_irq_unmask(d);
-+	return 0;
-+}
-+
-+static void gpio_irq_shutdown(struct irq_data *d)
-+{
-+	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-+	unsigned	pin = d->hwirq;
-+
-+	gpio_irq_mask(d);
-+	gpio_unlock_as_irq(&at91_gpio->chip, pin);
-+}
-+
- #ifdef CONFIG_PM
- 
- static u32 wakeups[MAX_GPIO_BANKS];
-@@ -1377,6 +1402,8 @@ void at91_pinctrl_gpio_resume(void)
- 
- static struct irq_chip gpio_irqchip = {
- 	.name		= "GPIO",
-+	.irq_startup	= gpio_irq_startup,
-+	.irq_shutdown	= gpio_irq_shutdown,
- 	.irq_disable	= gpio_irq_mask,
- 	.irq_mask	= gpio_irq_mask,
- 	.irq_unmask	= gpio_irq_unmask,
+So, with a DT configuration like:
+pwm0: pwm at 0 {
+	#pwm-cells = <3>;
+};
+backlight {
+	pwms = <&pwm0 0 100000>;
+};
+the driver will bail out at of_parse_phandle_with_args() in
+of_pwm_get() with the error message:
+"/backlight: arguments longer than property" and never reach your
+clever xlate function.
+
+Thus you will still need to replace of_parse_phandle_with_args()
+with different code that copies most but not all of the functionality.
+
+
+Lothar Wa?mann
 -- 
-1.8.5.2
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
