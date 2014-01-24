@@ -1,81 +1,55 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 24 Jan 2014 10:48:40 -0800
-Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
-In-Reply-To: <CAEPRUYpyr2_3pfa3rqYiYPAOwJfA+0AdqyGaf5s7YiWH=zfTeA@mail.gmail.com>
-References: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
- <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
- <CAAYSxhpgJwnq63fUdYBtmneRads_69c2mik8upofvAS1Y25fOA@mail.gmail.com>
- <CAEPRUYpyr2_3pfa3rqYiYPAOwJfA+0AdqyGaf5s7YiWH=zfTeA@mail.gmail.com>
-Message-ID: <CAAYSxhpSz8ZF_urMfQ4xdc1fhFdQC-_=9U1dvNn=EU_OoNsWbw@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 24 Jan 2014 14:12:09 -0500
+Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with
+ PID_NS
+In-Reply-To: <52E2A866.1050400@codeaurora.org>
+References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
+ <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
+ <20140124164343.GJ31040@mudshark.cambridge.arm.com>
+ <CANsc=4UgWrFis6hi-0mXZAfery7YGDJ2F+NdZBzq6afwx_i58A@mail.gmail.com>
+ <20140124171754.GM31040@mudshark.cambridge.arm.com>
+ <52E2A866.1050400@codeaurora.org>
+Message-ID: <52E2BB09.1020008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 8, 2014 at 4:54 PM, Christian Daudt <bcm@fixthebug.org> wrote:
-> On Wed, Jan 8, 2014 at 4:28 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
->> On Wed, Jan 8, 2014 at 3:38 PM, Christian Daudt <bcm@fixthebug.org> wrote:
->>> On Tue, Jan 7, 2014 at 10:53 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
->>>> The board schematic states that the "SD_CARD_DET_N gets pulled to GND
->>>> when card is inserted" so the polarity has been updated to active low.
->>>>
->>>> Polarity is now specified with a GPIO define instead of a magic number.
->>>>
->>>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
->>>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->>>> ---
->>>>  arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
->>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
->>>> index 08e47c2..27dd110 100644
->>>> --- a/arch/arm/boot/dts/bcm28155-ap.dts
->>>> +++ b/arch/arm/boot/dts/bcm28155-ap.dts
->>>> @@ -13,6 +13,8 @@
->>>>
->>>>  /dts-v1/;
->>>>
->>>> +#include <dt-bindings/gpio/gpio.h>
->>>> +
->>>>  #include "bcm11351.dtsi"
->>>>
->>>>  / {
->>>> @@ -40,7 +42,7 @@
->>>>
->>>>         sdio4: sdio at 3f1b0000 {
->>>>                 max-frequency = <48000000>;
->>>> -               cd-gpios = <&gpio 14 0>;
->>>> +               cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
->>>>                 status = "okay";
->>>>         };
->>>>  };
->>>> --
->>>> 1.8.0.1
->>>>
->>> Tim,
->>>  Does bcm11351-brt not also suffer from the same bug? If it does can
->>> you pls update the patch to also fix it?
+On 01/24/2014 12:52 PM, Christopher Covington wrote:
+> On 01/24/2014 12:17 PM, Will Deacon wrote:
+>> On Fri, Jan 24, 2014 at 05:16:28PM +0000, Adrien Verg? wrote:
+>>> 2014/1/24 Will Deacon <will.deacon@arm.com>:
+>>>> Are you sure about this? The value we write is actually task_pid_nr, which I
+>>>> believe to be globally unique.
 >>>
->>>  Thanks,
->>>    csd
+>>> You are right: the task_pid_nr is unique in the system. However when
+>>> using namespaces, the so called "PID" is the virtual number that
+>>> processes in different namespaces can share.
+>>>
+>>> This PID is the one visible by user-space tasks, in particular
+>>> user-space tracers and debuggers. These programs would expect to find
+>>> the PID of the traced process in the Context ID reg, while it is not.
+>>> I think it is better to remove confusion by making PID_IN_CONTEXTIDR
+>>> and PID_NS incompatible.
+>>>
+>>> What do you think?
 >>
->> The BRT and AP boards are similar so it may have the same problem but
->> I don't have a BRT and wouldn't be able to test any changes to its DTS
->> file.
->>
->> -Tim
->
-> [sorry for the resend for those that get it twice]
-> Agreed - it's time that dts file go away. In this case:
-> Acked-by: Christian Daudt <bcm@fixthebug.org>
->
-> Olof - can you pls pull in this patch. This is the bugfix that was
-> discussed in irc earlier today.
->
->  thanks,
->    csd
+>> I think I'd rather have the global ID than disable a potentially useful
+>> feature, especially since this is likely to be consumed by external trace
+>> tools as opposed to user-space tasks.
+> 
+> We've discussed before that the ARM architecture doesn't say what should be
+> written to the CONTEXTIDR, so it's up to us to decide. Will has a use case
+> where the global PID is useful. Adrien's patches present a use case where I
+> think the virtual PID would be useful. I've done work in the past where
+> writing the process group ID was useful. Would it be reasonable to make what's
+> written to the CONTEXTIDR run-time configurable? If so, what would be the best
+> interface for configuring it?
 
-Christian,
+D'oh, I mixed things up. For ETM to work it can only use global PID's in the
+CONTEXTIDR.
 
-I'm not sure Olof saw your reply.  Olof and Kevin are now on CC.
+Christopher
 
-Thanks,
-Tim Kryger
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
