@@ -1,61 +1,70 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 24 Jan 2014 17:39:55 +0000
-Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
-In-Reply-To: <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com> <
- 20140115161224.GH25824@e106331-lin.cambridge.arm.com> <20140120224742.
- EC905C40B12@trevor.secretlab.ca> <
- CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
-Message-ID: <20140124173955.135E1C40A02@trevor.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Jan 2014 17:47:52 +0000
+Subject: [PATCH v3 15/24] drm/i2c: tda998x: use irq for connection
+ status and EDID read
+In-Reply-To: <52E2A2E8.50806@gmail.com>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195843.7ae9753d@armhf>
+ <20140122222705.GL15937@n2100.arm.linux.org.uk> <52E2A2E8.50806@gmail.com>
+Message-ID: <20140124174752.GF15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jan 2014 17:03:23 -0800, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >
-> >> > Another, more invasive option would be extend the dts syntax and teach
-> >> > dtc to handle property appending. Then the soc dts could stay as it is,
-> >> > and the board dts could have something like:
-> >> >
-> >> >     /append-property/ interrupts = <&intc1 6 1>;
-> >> >     /append-property/ interrupt-names = "board-specific-irq";
-> >> >
-> >> > Both these options solve the issue at the source, are general to other
-> >> > properties, and allow more than one level of hierarchy (the proposed
-> >> > interrupts-extended-2 only allows one level).
-> >>
-> >> I've just had a go at implementing the append-property mechanism above
-> >> in dtc, and it was far easier than I expected (patch below).
-> >>
-> >> Does anyone have any issues with the /append-property/ idea?
-> >
-> > I think that is reasonable.
-> 
-> 
-> The main problem with this (same for clocks) is if you need to append
-> something with a name when the original didn't have any.
-> 
-> Reordering entries might not work for interrupts, since the bindings
-> might have requirements on order.
+On Fri, Jan 24, 2014 at 06:29:12PM +0100, Sebastian Hesselbarth wrote:
+> On 01/22/14 23:27, Russell King - ARM Linux wrote:
+>> On Sun, Jan 19, 2014 at 07:58:43PM +0100, Jean-Francois Moine wrote:
+>>> This patch adds the optional treatment of the tda998x IRQ.
+>>>
+>>> The interrupt function is used to know the display connection status
+>>> without polling and to speedup reading the EDID.
+>>>
+>>> The interrupt number may be defined either in the DT or at encoder set
+>>> config time for non-DT boards.
+>>>
+>>> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+>>> ---
+> [...]
+>>> @@ -720,6 +787,10 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
+>>>   		priv->audio_port = p->audio_cfg;
+>>>   		priv->audio_format = p->audio_format;
+>>>   	}
+>>> +
+>>> +	priv->irq = p->irq;
+>>> +	if (p->irq)
+>>> +		tda_irq_init(priv);
+>>
+>> If we're going to do it this way, this should probably release the IRQ if
+>> there was one before re-claiming it, just in case this function gets called
+>> more than once by some driver using it.
+>>
+>> The alternative is, as I said before, to use the infrastructure which is
+>> already there, namely setting the interrupt via struct i2c_client's
+>> irq member.  Yes, that doesn't satisfy Sebastian's comment about using
+>> a GPIO, but there's no sign of GPIO usage in here at the moment anyway.
+>> So we might as well use what's already provided.
+>
+> Russell,
+>
+> I am fine with using an irq instead of gpio here. I remember you telling
+> me on a similar patch, that from the gpio you can derive the irq but
+> not the other way round. Anyway, I also remember reading discussions
+> about DT gpios vs interrupts, and IIRC the outcome was that passing
+> interrupts is fine, too.
 
-Hmmm, yes. to handle that case would need a higher level construct that
-keeps the name and interrupt value together. Maybe something like this?
+Sebastian,
 
-device {
-	add-interrupt(27);
-	add-interrupt(29, 5, controller=&intc1);
-	add-interrupt(2, 4, name="error");
-};
+You can derive the irq from a gpio (using gpio_to_irq()), but you can't
+derive a gpio from an irq.
 
-I'm using python-like syntax here where controller and name are optional
-arguments.
+It's annoying that i2c_client and the i2c board data do not allow a GPIO
+to be specified, but only an IRQ, but that's a separate problem which when
+solved will also get solved here.  So, I'm not too worried about the
+"should this be an IRQ or should it be a GPIO" question here.
 
-We could get DTC to generate the appropriate interrupt-parent,
-interrupts, interrupts-extended and interrupt-names properties as
-needed. Of course the shared context would be lost when the tree is
-compiled, but it would be useful for building up parsing data. It would
-also work for gpio, clocks and similar bindings. Kind of like an
-intelligent macro.
+For us on ARM, it's less of a problem because we can just deal with GPIOs
+or IRQs at the DT level, and so we don't care what's in i2c_client.
 
-g.
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
