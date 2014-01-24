@@ -1,218 +1,120 @@
-From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 11:40:55 -0500
-Subject: [PATCH V2 5/6] ARM CoreSight: ETM: Add PID control support
-In-Reply-To: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-Message-ID: <1390581656-16372-6-git-send-email-adrienverge@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jan 2014 16:39:20 +0000
+Subject: [PATCH 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <1390490948-25386-1-git-send-email-vijay.kilari@gmail.com>
+References: <1390490948-25386-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20140124163920.GI31040@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the same manner as for enabling tracing, an entry is created in
-sysfs to set the PID that triggers tracing. This change is effective
-only if CONFIG_PID_IN_CONTEXTIDR is set, and thus is not compatible
-with PID namespaces.
+Hello,
 
-Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
----
- arch/arm/include/asm/hardware/coresight.h |  5 ++
- arch/arm/kernel/etm.c                     | 82 ++++++++++++++++++++++++++++---
- 2 files changed, 80 insertions(+), 7 deletions(-)
+On Thu, Jan 23, 2014 at 03:29:07PM +0000, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> 
+> Add macros to enable and disable to manage PSTATE.D
+> for debugging. The macros local_dbg_save and local_dbg_restore
+> are moved to irqflags.h file
+> 
+> KGDB boot tests fail because of PSTATE.D is masked.
+> unmask it for debugging support
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/debug-monitors.h |   17 -----------
+>  arch/arm64/include/asm/irqflags.h       |   48 +++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/debug-monitors.c      |    1 +
+>  3 files changed, 49 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index 6231479..ee9f28e 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -43,23 +43,6 @@ enum debug_el {
+>  #ifndef __ASSEMBLY__
+>  struct task_struct;
+>  
+> -#define local_dbg_save(flags)							\
+> -	do {									\
+> -		typecheck(unsigned long, flags);				\
+> -		asm volatile(							\
+> -		"mrs	%0, daif			// local_dbg_save\n"	\
+> -		"msr	daifset, #8"						\
+> -		: "=r" (flags) : : "memory");					\
+> -	} while (0)
+> -
+> -#define local_dbg_restore(flags)						\
+> -	do {									\
+> -		typecheck(unsigned long, flags);				\
+> -		asm volatile(							\
+> -		"msr	daif, %0			// local_dbg_restore\n"	\
+> -		: : "r" (flags) : "memory");					\
+> -	} while (0)
+> -
+>  #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
+>  
+>  #define DBG_HOOK_HANDLED	0
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index b2fcfbc..f9b013e 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -90,5 +90,53 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+>  	return flags & PSR_I_BIT;
+>  }
+>  
+> +/*
+> + * save and restore debug state
+> + */
+> +static inline unsigned long arch_local_dbg_save(void)
+> +{
+> +	unsigned long flags;
+> +	asm volatile(
+> +		"mrs	%0, daif	// arch_local_dbg_save"
+> +		"msr	daifset, #8"
+> +		: "=r" (flags) : : "memory");
+> +	return flags;
+> +}
+> +
+> +static inline void arch_local_dbg_restore(unsigned long flags)
+> +{
+> +	asm volatile(
+> +		"msr	daif, %0	// arch_local_dbg_restore"
+> +		:
+> +		: "r" (flags)
+> +		: "memory");
+> +}
+> +
+> +#define raw_local_dbg_save(flags)			\
+> +	do {						\
+> +		typecheck(unsigned long, flags);	\
+> +		flags = arch_local_dbg_save();		\
+> +	} while (0)
+> +
+> +#define raw_local_dbg_restore(flags)			\
+> +	do {						\
+> +		typecheck(unsigned long, flags);	\
+> +		arch_local_dbg_restore(flags);		\
+> +	} while (0)
+> +
+> +#define local_dbg_save(flags)				\
+> +	do {						\
+> +		raw_local_dbg_save(flags);		\
+> +	} while (0)
+> +
+> +#define local_dbg_restore(flags)			\
+> +	do {						\
+> +		typecheck(unsigned long, flags);	\
+> +		raw_local_dbg_restore(flags);		\
+> +	} while (0)
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 8c50cf6..2051af0 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -98,6 +98,11 @@
- #define ETMR_ADDRCOMP_VAL(x)	(0x40 + (x) * 4)
- #define ETMR_ADDRCOMP_ACC_TYPE(x)	(0x80 + (x) * 4)
- 
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+#define ETMR_CTXIDCOMP_VAL(x)	(0x1b0 + (x) * 4)
-+#define ETMR_CTXIDCOMP_MASK	(0x1bc)
-+#endif
-+
- /* ETM status register, "ETM Architecture", 3.3.2 */
- #define ETMR_STATUS		(0x10)
- #define ETMST_OVERFLOW		BIT(0)
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 4442e5c..54b5128 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -40,12 +40,14 @@ struct tracectx {
- 	void __iomem	*etm_regs;
- 	unsigned long	flags;
- 	int		naddrcmppairs;
-+	int		nctxidcmp;
- 	int		etm_portsz;
- 	struct device	*dev;
- 	struct clk	*emu_clk;
- 	struct mutex	mutex;
- 	unsigned long	addrrange_start;
- 	unsigned long	addrrange_end;
-+	int		pid;
- };
- 
- static struct tracectx tracer;
-@@ -59,14 +61,18 @@ static inline bool trace_isrunning(struct tracectx *t)
-  * Setups ETM to trace only when:
-  *   - address between start and end
-  *     or address not between start and end (if exclude)
-+ *   - in user-space when process id equals pid,
-+ *     in kernel-space (if pid == 0),
-+ *     always (if pid == -1)
-  *   - trace executed instructions
-  *     or trace loads and stores (if data)
-  */
--static int etm_setup_address_range(struct tracectx *t, int n,
--		unsigned long start, unsigned long end, int exclude, int data)
-+static int etm_setup(struct tracectx *t, int n,
-+		     unsigned long start, unsigned long end, int exclude,
-+		     int pid,
-+		     int data)
- {
--	u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
--		    ETMAAT_NOVALCMP;
-+	u32 flags = ETMAAT_ARM | ETMAAT_NSONLY | ETMAAT_NOVALCMP;
- 
- 	if (n < 1 || n > t->naddrcmppairs)
- 		return -EINVAL;
-@@ -75,6 +81,23 @@ static int etm_setup_address_range(struct tracectx *t, int n,
- 	 * to bits in a word */
- 	n--;
- 
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	if (pid < 0) {
-+		/* ignore Context ID */
-+		flags |= ETMAAT_IGNCONTEXTID;
-+	} else {
-+		flags |= ETMAAT_VALUE1;
-+
-+		/* Set up the first Context ID comparator.
-+		   Process ID is found in the 24 first bits of Context ID
-+		   (provided by CONFIG_PID_IN_CONTEXTIDR) */
-+		etm_writel(t, pid << 8, ETMR_CTXIDCOMP_VAL(0));
-+		etm_writel(t, 0xff, ETMR_CTXIDCOMP_MASK);
-+	}
-+#else
-+	flags |= ETMAAT_IGNCONTEXTID;
-+#endif
-+
- 	if (data)
- 		flags |= ETMAAT_DLOADSTORE;
- 	else
-@@ -124,8 +147,10 @@ static int trace_start(struct tracectx *t)
- 		return -EFAULT;
- 	}
- 
--	etm_setup_address_range(t, 1, t->addrrange_start, t->addrrange_end,
--				0, 0);
-+	etm_setup(t, 1,
-+		  t->addrrange_start, t->addrrange_end, 0,
-+		  t->pid,
-+		  0);
- 	etm_writel(t, 0, ETMR_TRACEENCTRL2);
- 	etm_writel(t, 0, ETMR_TRACESSCTRL);
- 	etm_writel(t, 0x6f, ETMR_TRACEENEVT);
-@@ -486,6 +511,7 @@ static ssize_t trace_info_show(struct device *dev,
- 
- 	return sprintf(buf, "Trace buffer len: %d\n"
- 			"Addr comparator pairs: %d\n"
-+			"Ctx ID comparators: %d\n"
- 			"ETBR_WRITEADDR:\t%08x\n"
- 			"ETBR_READADDR:\t%08x\n"
- 			"ETBR_STATUS:\t%08x\n"
-@@ -494,6 +520,7 @@ static ssize_t trace_info_show(struct device *dev,
- 			"ETMR_STATUS:\t%08x\n",
- 			datalen,
- 			tracer.naddrcmppairs,
-+			tracer.nctxidcmp,
- 			etb_wa,
- 			etb_ra,
- 			etb_st,
-@@ -566,6 +593,36 @@ static ssize_t trace_addrrange_store(struct device *dev,
- DEVICE_ATTR(trace_addrrange, S_IRUGO|S_IWUSR,
- 	    trace_addrrange_show, trace_addrrange_store);
- 
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+static ssize_t trace_pid_show(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	return sprintf(buf, "%d\n", tracer.pid);
-+}
-+
-+static ssize_t trace_pid_store(struct device *dev,
-+			       struct device_attribute *attr,
-+			       const char *buf, size_t n)
-+{
-+	int pid;
-+
-+	if (tracer.flags & TRACER_RUNNING)
-+		return -EBUSY;
-+
-+	if (sscanf(buf, "%i", &pid) != 1)
-+		return -EINVAL;
-+
-+	mutex_lock(&tracer.mutex);
-+	tracer.pid = pid;
-+	mutex_unlock(&tracer.mutex);
-+
-+	return n;
-+}
-+
-+DEVICE_ATTR(trace_pid, S_IRUGO|S_IWUSR, trace_pid_show, trace_pid_store);
-+#endif
-+
- static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct tracectx *t = &tracer;
-@@ -595,6 +652,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	t->etm_portsz = 1;
- 	t->addrrange_start = (unsigned long) _stext;
- 	t->addrrange_end = (unsigned long) _etext;
-+	t->pid = -1; /* trace everything */
- 
- 	etm_unlock(t);
- 	(void)etm_readl(t, ETMMR_PDSR);
-@@ -602,6 +660,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	(void)etm_readl(&tracer, ETMMR_OSSRR);
- 
- 	t->naddrcmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
-+	t->nctxidcmp = (etm_readl(t, ETMR_CONFCODE) >> 24) & 0x3;
- 	etm_writel(t, 0x440, ETMR_CTRL);
- 	etm_lock(t);
- 
-@@ -609,7 +668,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret)
- 		goto out_unmap;
- 
--	/* failing to create any of these three is not fatal */
-+	/* failing to create any of these four is not fatal */
- 	ret = device_create_file(&dev->dev, &dev_attr_trace_info);
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_info in sysfs\n");
-@@ -622,6 +681,12 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_addrrange in sysfs\n");
- 
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	ret = device_create_file(&dev->dev, &dev_attr_trace_pid);
-+	if (ret)
-+		dev_dbg(&dev->dev, "Failed to create trace_pid in sysfs\n");
-+#endif
-+
- 	dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
- 
- out:
-@@ -652,6 +717,9 @@ static int etm_remove(struct amba_device *dev)
- 	device_remove_file(&dev->dev, &dev_attr_trace_info);
- 	device_remove_file(&dev->dev, &dev_attr_trace_mode);
- 	device_remove_file(&dev->dev, &dev_attr_trace_addrrange);
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	device_remove_file(&dev->dev, &dev_attr_trace_pid);
-+#endif
- 
- 	return 0;
- }
--- 
-1.8.5.2
+Hehe, I think you took me a bit too literally when I said to follow what we
+do for irqs. This code is arm64-specific, so you don't need to construct it
+in the same way. All you need to do is *move* the existing code from
+debug-monitors.h to irqflags.h. That's it!
+
+> +#define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
+> +#define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
+
+I'm also fine with adding these two.
+
+Will
