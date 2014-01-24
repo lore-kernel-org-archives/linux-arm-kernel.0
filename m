@@ -1,130 +1,162 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jan 2014 13:49:45 +0100
-Subject: [PATCH v3 09/15] ARM: shmobile: koelsch legacy: Add QSPI support
-In-Reply-To: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-References: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1390567791-8988-10-git-send-email-geert@linux-m68k.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 24 Jan 2014 12:53:33 +0000
+Subject: [Linaro-acpi] [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c
+ and its related head file
+In-Reply-To: <52E22DD4.3050807@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
+ <20140122115453.GC24288@e102568-lin.cambridge.arm.com>
+ <52E13BBC.5020005@linaro.org> <52E22DD4.3050807@linaro.org>
+Message-ID: <20140124125332.GA23274@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Hi Hanjun,
 
-Enable support for the Spansion s25fl512s SPI FLASH on the Koelsch board:
-  - Add QSPI platform device, resources, platform data, and pinmux,
-  - Add FLASH data and MTD partitions.
+On Fri, Jan 24, 2014 at 09:09:40AM +0000, Hanjun Guo wrote:
+> On 2014?01?23? 23:56, Tomasz Nowicki wrote:
+> > Hi Lorenzo,
+> >
+> > W dniu 22.01.2014 12:54, Lorenzo Pieralisi pisze:
+> >> On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
+> >>
+> >> [...]
+> >>
+> >>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> >>> index bd9bbd0..2210353 100644
+> >>> --- a/arch/arm64/kernel/setup.c
+> >>> +++ b/arch/arm64/kernel/setup.c
+> >>> @@ -41,6 +41,7 @@
+> >>> #include <linux/memblock.h>
+> >>> #include <linux/of_fdt.h>
+> >>> #include <linux/of_platform.h>
+> >>> +#include <linux/acpi.h>
+> >>>
+> >>> #include <asm/cputype.h>
+> >>> #include <asm/elf.h>
+> >>> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
+> >>>
+> >>> arm64_memblock_init();
+> >>>
+> >>> + /* Parse the ACPI tables for possible boot-time configuration */
+> >>> + acpi_boot_table_init();
+> >>> + early_acpi_boot_init();
+> >>> + acpi_boot_init();
+> >>> +
+> >>> paging_init();
+> >>
+> >> Can I ask you please why we need to parse ACPI tables before
+> >> paging_init() ?
+> > This is for future usage and because of couple of reasons. Mainly SRAT 
+> > table parsing should be done (before paging_init()) for proper NUMA 
+> > initialization and then paging_init().
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
-v3:
-  - Switch to named IRQs
-v2:
-  - Split in 2 groups (qspi_ctrl/qspi_data4)
+Thank you for the explanation. I still have some questions:
 
- arch/arm/mach-shmobile/board-koelsch.c |   64 ++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+1) What are the other reasons ?
+2) NUMA is not supported at the moment and I reckon SRAT needs updating
+   since the only way to associate a CPU to a memory node is through
+   a local APIC id that is non-existent on ARM and at least deserves a
+   new entry.
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 2ab5c75ba2c2..56020d9fa841 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -25,12 +25,17 @@
- #include <linux/input.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/mtd/partitions.h>
- #include <linux/phy.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/rcar-du.h>
- #include <linux/platform_device.h>
- #include <linux/sh_eth.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/rspi.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r8a7791.h>
-@@ -148,6 +153,55 @@ static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
- };
- 
-+/* QSPI */
-+static const struct resource qspi_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe6b10000, 0x1000),
-+	DEFINE_RES_IRQ_NAMED(gic_spi(184), "mux"),
-+};
-+
-+static const struct rspi_plat_data qspi_pdata __initconst = {
-+	.num_chipselect = 1,
-+};
-+
-+/* SPI Flash memory (Spansion S25FL512SAGMFIG11 64 MiB) */
-+static struct mtd_partition spi_flash_part[] = {
-+	{
-+		.name		= "loader",
-+		.offset		= 0x00000000,
-+		.size		= 512 * 1024,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "bootenv",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= 512 * 1024,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "data",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static const struct flash_platform_data spi_flash_data = {
-+	.name		= "m25p80",
-+	.parts		= spi_flash_part,
-+	.nr_parts	= ARRAY_SIZE(spi_flash_part),
-+	.type		= "s25fl512s",
-+};
-+
-+static const struct spi_board_info spi_info[] __initconst = {
-+	{
-+		.modalias	= "m25p80",
-+		.platform_data	= &spi_flash_data,
-+		.mode		= SPI_MODE_0,
-+		.max_speed_hz	= 30000000,
-+		.bus_num	= 0,
-+		.chip_select	= 0,
-+	},
-+};
-+
- /* SATA0 */
- static const struct resource sata0_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xee300000, 0x2000),
-@@ -180,6 +234,11 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 				  "eth_rmii", "eth"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
- 				  "intc_irq0", "intc"),
-+	/* QSPI */
-+	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
-+				  "qspi_ctrl", "qspi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
-+				  "qspi_data4", "qspi"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
- 				  "scif0_data_d", "scif0"),
-@@ -205,6 +264,11 @@ static void __init koelsch_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "gpio-keys", -1,
- 				      &koelsch_keys_pdata,
- 				      sizeof(koelsch_keys_pdata));
-+	platform_device_register_resndata(&platform_bus, "qspi", 0,
-+					  qspi_resources,
-+					  ARRAY_SIZE(qspi_resources),
-+					  &qspi_pdata, sizeof(qspi_pdata));
-+	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
- 
- 	koelsch_add_du_device();
- 
--- 
-1.7.9.5
+I am still not sure that providing a hook for parsing the ACPI tables before
+paging_init() is the main focus at the moment, it is probably best, as we've
+mentioned manifold times, to make sure that the infrastructure to detect
+ACPI vs DT at run-time is in place in the kernel and allows us to boot
+either with ACPI or DT, in a mutual exclusive way (same binary kernel
+supporting both, runtime detection/decision on what data to use, ACPI tables
+vs DT nodes, detection made once for all and NOT on a per property basis).
+
+I will have a look at SRAT and how it is used on x86, and get back to you on
+this.
+
+[...]
+
+> >>> + * acpi_boot_table_init() and acpi_boot_init()
+> >>> + * called from setup_arch(), always.
+> >>> + * 1. checksums all tables
+> >>> + * 2. enumerates lapics
+> >>> + * 3. enumerates io-apics
+> >>> + *
+> >>> + * acpi_table_init() is separated to allow reading SRAT without
+> >>> + * other side effects.
+> >>> + */
+> >>> +void __init acpi_boot_table_init(void)
+> >>> +{
+> >>> + /*
+> >>> + * If acpi_disabled, bail out
+> >>> + */
+> >>> + if (acpi_disabled)
+> >>> + return;
+> >>> +
+> >>> + /*
+> >>> + * Initialize the ACPI boot-time table parser.
+> >>> + */
+> >>> + if (acpi_table_init()) {
+> >>> + disable_acpi();
+> >>> + return;
+> >>> + }
+> >>> +}
+> >>> +
+> >>> +int __init early_acpi_boot_init(void)
+> >>> +{
+> >>> + /*
+> >>> + * If acpi_disabled, bail out
+> >>> + */
+> >>> + if (acpi_disabled)
+> >>> + return -ENODEV;
+> >>> +
+> >>> + /*
+> >>> + * Process the Multiple APIC Description Table (MADT), if present
+> >>> + */
+> >>> + early_acpi_process_madt();
+> >>> +
+> >>> + return 0;
+> >>> +}
+> >>> +
+> >>> +int __init acpi_boot_init(void)
+> >>> +{
+> >>> + /*
+> >>> + * If acpi_disabled, bail out
+> >>> + */
+> >>> + if (acpi_disabled)
+> >>> + return -ENODEV;
+> >>> +
+> >>> + acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+> >>> +
+> >>> + /*
+> >>> + * Process the Multiple APIC Description Table (MADT), if present
+> >>> + */
+> >>> + acpi_process_madt();
+> >>> +
+> >>> + return 0;
+> >>> +}
+> >>
+> >> Well, apart from having three init calls, one returning void and two
+> >> returning proper values, do not understand why, and do not understand
+> >> why we need three calls in the first place...why should we process MADT
+> >> twice in two separate calls ? What is supposed to change in between that
+> >> prevents you from merging the two together ?
+> 
+> Thanks for pointing this out. I can merge acpi_boot_table_init() and
+> early_acpi_boot_init() together, but can not merge early_acpi_boot_init()
+> and acpi_boot_init() together.
+> 
+> early_acpi_boot_init() and acpi_boot_init() was separated intentionally for
+> memory hotplug reasons. memory allocated in this stage can not be migrated
+> and cause memory hot-remove failed, in order to keep memory allocated
+> at base node (general NUMA node 0 in the system) at boot stage, we should
+> parse SRAT first before CPU is enumerated, does this make sense to you?
+
+Are you parsing the SRAT in this series to get memory info or memory is
+still initialized by DT even when system is supposed to be booted with ACPI
+(ie there is a valid ACPI root table ?)
+
+I have a hunch the latter is what's happening (and that's wrong, because
+memory information when kernel is booted through ACPI must be retrieved
+from UEFI - at least that's what has been defined), so I still see an early
+hook to initialize ACPI tables before paging_init() that has no use as the
+current patchset stands, please correct me if I am wrong.
+
+Thank you,
+Lorenzo
