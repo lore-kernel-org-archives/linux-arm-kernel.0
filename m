@@ -1,51 +1,35 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 24 Jan 2014 09:07:24 -0800
-Subject: [PATCH v4 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <CAAYSxhoCrveHd5Wkc7Z0qzpGr41qG6-neYSSsuHQuC7AcuJmZQ@mail.gmail.com>
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
- <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
- <CAAYSxhoCrveHd5Wkc7Z0qzpGr41qG6-neYSSsuHQuC7AcuJmZQ@mail.gmail.com>
-Message-ID: <CAAYSxhrBSv8_Z1SfB-b3iGgq218Gttny4FEgYJnLtSFhJd2UFg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jan 2014 17:17:55 +0000
+Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with
+ PID_NS
+In-Reply-To: <CANsc=4UgWrFis6hi-0mXZAfery7YGDJ2F+NdZBzq6afwx_i58A@mail.gmail.com>
+References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
+ <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
+ <20140124164343.GJ31040@mudshark.cambridge.arm.com>
+ <CANsc=4UgWrFis6hi-0mXZAfery7YGDJ2F+NdZBzq6afwx_i58A@mail.gmail.com>
+Message-ID: <20140124171754.GM31040@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 7, 2014 at 11:37 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> On Sat, Dec 14, 2013 at 12:14 AM, Christian Daudt <bcm@fixthebug.org> wrote:
->> On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
->>> Enable the external clock needed by the host controller during the
->>> probe and disable it during the remove.
->>>
->>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
->>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
->>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->>
->> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
->>
->> Chris,
->>  Are you ok with me pulling this patch along with the rest of the
->> patchset into the bcm tree?
->>
->>  Thanks,
->>    csd
->
-> Chris,
->
-> Can you please provide an answer to csd?
->
-> Thanks,
-> Tim Kryger
+On Fri, Jan 24, 2014 at 05:16:28PM +0000, Adrien Verg? wrote:
+> 2014/1/24 Will Deacon <will.deacon@arm.com>:
+> > Are you sure about this? The value we write is actually task_pid_nr, which I
+> > believe to be globally unique.
+> 
+> You are right: the task_pid_nr is unique in the system. However when
+> using namespaces, the so called "PID" is the virtual number that
+> processes in different namespaces can share.
+> 
+> This PID is the one visible by user-space tasks, in particular
+> user-space tracers and debuggers. These programs would expect to find
+> the PID of the traced process in the Context ID reg, while it is not.
+> I think it is better to remove confusion by making PID_IN_CONTEXTIDR
+> and PID_NS incompatible.
+> 
+> What do you think?
 
-Chris,
+I think I'd rather have the global ID than disable a potentially useful
+feature, especially since this is likely to be consumed by external trace
+tools as opposed to user-space tasks.
 
-I haven't heard back so this patch has been dropped for 3.14 to allow
-the remaining patches in the series to move forward.   As such, I will
-be re-posting this patch for 3.15.  It is essential for the
-bcm28155_ap board to transition away from fake fixed clocks to the
-real clock driver.  This is because the bcm281xx clock driver does not
-set the CLK_IGNORE_UNUSED flag for the SDHCI peripheral clocks and the
-common clock code will shut them off in late init unless the SDHCI
-driver has asked for them to be enabled.
-
-Thanks,
-Tim
+Will
