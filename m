@@ -1,41 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jan 2014 13:11:56 +0000
-Subject: Warning at __kmem_cache_create
-In-Reply-To: <CAOMZO5Cbws-Kj-q63iCAFFOyR7gm24Z+VUZTAdzeOgud3B4cjQ@mail.gmail.com>
-References: <CAOMZO5Cbws-Kj-q63iCAFFOyR7gm24Z+VUZTAdzeOgud3B4cjQ@mail.gmail.com>
-Message-ID: <20140124131156.GE15937@n2100.arm.linux.org.uk>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 24 Jan 2014 14:24:27 +0100
+Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
+References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
+ <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
+ <52E0FC22.8060903@metafoo.de>
+ <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
+Message-ID: <52E2698B.6070001@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 11:01:17AM -0200, Fabio Estevam wrote:
-> Virtual kernel memory layout:
->     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
->     vmalloc : 0xa0800000 - 0xff000000   (1512 MB)
->     lowmem  : 0x80000000 - 0xa0000000   ( 512 MB)
->     pkmap   : 0x7fe00000 - 0x80000000   (   2 MB)
->     modules : 0x7f000000 - 0x7fe00000   (  14 MB)
->       .text : 0x80008000 - 0x807e0edc   (8036 kB)
->       .init : 0x807e1000 - 0x8082e300   ( 309 kB)
->       .data : 0x80830000 - 0x8088b900   ( 367 kB)
->        .bss : 0x8088b908 - 0x80debdb0   (5506 kB)
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 0 at mm/slub.c:1511 __kmem_cache_create+0x24c/0x318()
+On 01/24/2014 12:16 PM, Srikanth Thokala wrote:
+> Hi Lars,
+> 
+> On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
+>> [...]
+>>> +/**
+>>> + * xilinx_vdma_device_control - Configure DMA channel of the device
+>>> + * @dchan: DMA Channel pointer
+>>> + * @cmd: DMA control command
+>>> + * @arg: Channel configuration
+>>> + *
+>>> + * Return: '0' on success and failure value on error
+>>> + */
+>>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
+>>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
+>>> +{
+>>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>> +
+>>> +     switch (cmd) {
+>>> +     case DMA_TERMINATE_ALL:
+>>> +             xilinx_vdma_terminate_all(chan);
+>>> +             return 0;
+>>> +     case DMA_SLAVE_CONFIG:
+>>> +             return xilinx_vdma_slave_config(chan,
+>>> +                                     (struct xilinx_vdma_config *)arg);
+>>
+>> You really shouldn't be overloading the generic API with your own semantics.
+>> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
+> 
+> Ok.  The driver needs few additional configuration from the slave
+> device like Vertical
+> Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
+> suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
+> defined for Freescale drivers?
 
-I don't tend to track linux-next as I don't have the capacity to.
-arm-soc and their autobuilder and autobooter do, but they only provide
-abbreviated results when things actually result in a failure to boot.
-It would be better if that facility had the provision for full boot
-logs as mine does.
+In my opinion it is not a good idea to have driver implement a generic API,
+but at the same time let the driver have custom semantics for those API
+calls. It's a bit like having a gpio driver that expects 23 and 42 as the
+values passed to gpio_set_value instead of 0 and 1. It completely defeats
+the purpose of a generic API, namely that you are able to write generic code
+that makes use of the API without having to know about which implementation
+API it is talking to. The dmaengine framework provides the
+dmaengine_prep_interleaved_dma() function to setup two dimensional
+transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
 
-Just looked in my trees (which includes arm-soc), and 1511 doesn't
-correspond with anything that issues a warning.  I just booted Linus'
-tip on the cubox-i4, and it booted without warning.
-
-So it's some slub change which has yet to hit mainline... I can't say
-much more than that at the moment.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+- Lars
