@@ -1,60 +1,148 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 24 Jan 2014 14:24:27 +0100
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
-Message-ID: <52E2698B.6070001@metafoo.de>
+From: taikyung.yu@gmail.com (taikyung yu)
+Date: Fri, 24 Jan 2014 05:26:35 -0800
+Subject: [PATCH] clk: samsung: pll: bugfix about segmentation fault
+Message-ID: <1390569995-22431-1-git-send-email-taikyung.yu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2014 12:16 PM, Srikanth Thokala wrote:
-> Hi Lars,
-> 
-> On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
->> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
->> [...]
->>> +/**
->>> + * xilinx_vdma_device_control - Configure DMA channel of the device
->>> + * @dchan: DMA Channel pointer
->>> + * @cmd: DMA control command
->>> + * @arg: Channel configuration
->>> + *
->>> + * Return: '0' on success and failure value on error
->>> + */
->>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
->>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
->>> +{
->>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->>> +
->>> +     switch (cmd) {
->>> +     case DMA_TERMINATE_ALL:
->>> +             xilinx_vdma_terminate_all(chan);
->>> +             return 0;
->>> +     case DMA_SLAVE_CONFIG:
->>> +             return xilinx_vdma_slave_config(chan,
->>> +                                     (struct xilinx_vdma_config *)arg);
->>
->> You really shouldn't be overloading the generic API with your own semantics.
->> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
-> 
-> Ok.  The driver needs few additional configuration from the slave
-> device like Vertical
-> Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
-> suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
-> defined for Freescale drivers?
+init has pll initialization information. but it has local variable.
+so it is just valid in samsung_clk_register_pll2550x() function.
 
-In my opinion it is not a good idea to have driver implement a generic API,
-but at the same time let the driver have custom semantics for those API
-calls. It's a bit like having a gpio driver that expects 23 and 42 as the
-values passed to gpio_set_value instead of 0 and 1. It completely defeats
-the purpose of a generic API, namely that you are able to write generic code
-that makes use of the API without having to know about which implementation
-API it is talking to. The dmaengine framework provides the
-dmaengine_prep_interleaved_dma() function to setup two dimensional
-transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
+Signed-off-by: taikyung yu <taikyung.yu@gmail.com>
+---
+ drivers/clk/samsung/clk-pll.c |   61 +++++++++++++++++++++++++----------------
+ 1 file changed, 37 insertions(+), 24 deletions(-)
 
-- Lars
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index 529e11d..c90808c 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -679,7 +679,7 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+ {
+ 	struct samsung_clk_pll2550x *pll;
+ 	struct clk *clk;
+-	struct clk_init_data init;
++	struct clk_init_data *init;
+ 
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+ 	if (!pll) {
+@@ -687,13 +687,19 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+ 		return NULL;
+ 	}
+ 
+-	init.name = name;
+-	init.ops = &samsung_pll2550x_clk_ops;
+-	init.flags = CLK_GET_RATE_NOCACHE;
+-	init.parent_names = &pname;
+-	init.num_parents = 1;
++	init = kzalloc(sizeof(*init), GFP_KERNEL);
++	if (!init) {
++		pr_err("%s: could not allocate pll init clk %s\n", __func__, name);
++		return NULL;
++	}
+ 
+-	pll->hw.init = &init;
++	init->name = name;
++	init->ops = &samsung_pll2550x_clk_ops;
++	init->flags = CLK_GET_RATE_NOCACHE;
++	init->parent_names = &pname;
++	init->num_parents = 1;
++
++	pll->hw.init = init;
+ 	pll->reg_base = reg_base;
+ 	pll->offset = offset;
+ 
+@@ -715,7 +721,7 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ {
+ 	struct samsung_clk_pll *pll;
+ 	struct clk *clk;
+-	struct clk_init_data init;
++	struct clk_init_data *init;
+ 	int ret, len;
+ 
+ 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+@@ -725,10 +731,17 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 		return;
+ 	}
+ 
+-	init.name = pll_clk->name;
+-	init.flags = pll_clk->flags;
+-	init.parent_names = &pll_clk->parent_name;
+-	init.num_parents = 1;
++	init = kzalloc(sizeof(*init), GFP_KERNEL);
++	if (!init) {
++		pr_err("%s: could not allocate pll init clk %s\n",
++			__func__, pll_clk->name);
++		return;
++	}
++
++	init->name = pll_clk->name;
++	init->flags = pll_clk->flags;
++	init->parent_names = &pll_clk->parent_name;
++	init->num_parents = 1;
+ 
+ 	if (pll_clk->rate_table) {
+ 		/* find count of rates in rate_table */
+@@ -750,48 +763,48 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 	case pll_35xx:
+ 	case pll_2550:
+ 		if (!pll->rate_table)
+-			init.ops = &samsung_pll35xx_clk_min_ops;
++			init->ops = &samsung_pll35xx_clk_min_ops;
+ 		else
+-			init.ops = &samsung_pll35xx_clk_ops;
++			init->ops = &samsung_pll35xx_clk_ops;
+ 		break;
+ 	case pll_4500:
+-		init.ops = &samsung_pll45xx_clk_min_ops;
++		init->ops = &samsung_pll45xx_clk_min_ops;
+ 		break;
+ 	case pll_4502:
+ 	case pll_4508:
+ 		if (!pll->rate_table)
+-			init.ops = &samsung_pll45xx_clk_min_ops;
++			init->ops = &samsung_pll45xx_clk_min_ops;
+ 		else
+-			init.ops = &samsung_pll45xx_clk_ops;
++			init->ops = &samsung_pll45xx_clk_ops;
+ 		break;
+ 	/* clk_ops for 36xx and 2650 are similar */
+ 	case pll_36xx:
+ 	case pll_2650:
+ 		if (!pll->rate_table)
+-			init.ops = &samsung_pll36xx_clk_min_ops;
++			init->ops = &samsung_pll36xx_clk_min_ops;
+ 		else
+-			init.ops = &samsung_pll36xx_clk_ops;
++			init->ops = &samsung_pll36xx_clk_ops;
+ 		break;
+ 	case pll_6552:
+-		init.ops = &samsung_pll6552_clk_ops;
++		init->ops = &samsung_pll6552_clk_ops;
+ 		break;
+ 	case pll_6553:
+-		init.ops = &samsung_pll6553_clk_ops;
++		init->ops = &samsung_pll6553_clk_ops;
+ 		break;
+ 	case pll_4600:
+ 	case pll_4650:
+ 	case pll_4650c:
+ 		if (!pll->rate_table)
+-			init.ops = &samsung_pll46xx_clk_min_ops;
++			init->ops = &samsung_pll46xx_clk_min_ops;
+ 		else
+-			init.ops = &samsung_pll46xx_clk_ops;
++			init->ops = &samsung_pll46xx_clk_ops;
+ 		break;
+ 	default:
+ 		pr_warn("%s: Unknown pll type for pll clk %s\n",
+ 			__func__, pll_clk->name);
+ 	}
+ 
+-	pll->hw.init = &init;
++	pll->hw.init = init;
+ 	pll->type = pll_clk->type;
+ 	pll->lock_reg = base + pll_clk->lock_offset;
+ 	pll->con_reg = base + pll_clk->con_offset;
+-- 
+1.7.9.5
