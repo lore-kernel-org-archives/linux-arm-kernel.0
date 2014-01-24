@@ -1,132 +1,103 @@
 From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 11:40:51 -0500
-Subject: [PATCH V2 1/6] ARM CoreSight: ETM: Use device attributes
+Date: Fri, 24 Jan 2014 11:40:52 -0500
+Subject: [PATCH V2 2/6] ARM CoreSight: ETM: Rename 'comparator' to 'address
+ comparator'
 In-Reply-To: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
 References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-Message-ID: <1390581656-16372-2-git-send-email-adrienverge@gmail.com>
+Message-ID: <1390581656-16372-3-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace all kobjects attributes with device attributes.
-User experience isn't changed since the same files are created in sysfs.
+Since there are different types of comparators, and other kinds will
+be used (such as Context ID comparators), rename them properly.
 
 Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
 ---
- arch/arm/kernel/etm.c | 48 +++++++++++++++++++++---------------------------
- 1 file changed, 21 insertions(+), 27 deletions(-)
+ arch/arm/include/asm/hardware/coresight.h |  4 ++--
+ arch/arm/kernel/etm.c                     | 19 ++++++++++---------
+ 2 files changed, 12 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+index ad774f3..8c50cf6 100644
+--- a/arch/arm/include/asm/hardware/coresight.h
++++ b/arch/arm/include/asm/hardware/coresight.h
+@@ -95,8 +95,8 @@
+ #define ETMAAT_NSONLY		(1 << 10)
+ #define ETMAAT_SONLY		(2 << 10)
+ 
+-#define ETMR_COMP_VAL(x)	(0x40 + (x) * 4)
+-#define ETMR_COMP_ACC_TYPE(x)	(0x80 + (x) * 4)
++#define ETMR_ADDRCOMP_VAL(x)	(0x40 + (x) * 4)
++#define ETMR_ADDRCOMP_ACC_TYPE(x)	(0x80 + (x) * 4)
+ 
+ /* ETM status register, "ETM Architecture", 3.3.2 */
+ #define ETMR_STATUS		(0x10)
 diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 8ff0ecd..2b1a307 100644
+index 2b1a307..7f7a0ee 100644
 --- a/arch/arm/kernel/etm.c
 +++ b/arch/arm/kernel/etm.c
-@@ -430,15 +430,14 @@ static struct amba_driver etb_driver = {
- };
+@@ -39,7 +39,7 @@ struct tracectx {
+ 	void __iomem	*etb_regs;
+ 	void __iomem	*etm_regs;
+ 	unsigned long	flags;
+-	int		ncmppairs;
++	int		naddrcmppairs;
+ 	int		etm_portsz;
+ 	struct device	*dev;
+ 	struct clk	*emu_clk;
+@@ -59,7 +59,7 @@ static int etm_setup_address_range(struct tracectx *t, int n,
+ 	u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
+ 		    ETMAAT_NOVALCMP;
  
- /* use a sysfs file "trace_running" to start/stop tracing */
--static ssize_t trace_running_show(struct kobject *kobj,
--				  struct kobj_attribute *attr,
--				  char *buf)
-+static ssize_t trace_running_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf)
- {
- 	return sprintf(buf, "%x\n", trace_isrunning(&tracer));
- }
+-	if (n < 1 || n > t->ncmppairs)
++	if (n < 1 || n > t->naddrcmppairs)
+ 		return -EINVAL;
  
--static ssize_t trace_running_store(struct kobject *kobj,
--				   struct kobj_attribute *attr,
-+static ssize_t trace_running_store(struct device *dev,
-+				   struct device_attribute *attr,
- 				   const char *buf, size_t n)
- {
- 	unsigned int value;
-@@ -454,12 +453,11 @@ static ssize_t trace_running_store(struct kobject *kobj,
- 	return ret ? : n;
- }
+ 	/* comparators and ranges are numbered starting with 1 as opposed
+@@ -72,12 +72,12 @@ static int etm_setup_address_range(struct tracectx *t, int n,
+ 		flags |= ETMAAT_IEXEC;
  
--static struct kobj_attribute trace_running_attr =
--	__ATTR(trace_running, 0644, trace_running_show, trace_running_store);
-+DEVICE_ATTR(trace_running, S_IRUGO|S_IWUSR,
-+	    trace_running_show, trace_running_store);
+ 	/* first comparator for the range */
+-	etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2));
+-	etm_writel(t, start, ETMR_COMP_VAL(n * 2));
++	etm_writel(t, flags, ETMR_ADDRCOMP_ACC_TYPE(n * 2));
++	etm_writel(t, start, ETMR_ADDRCOMP_VAL(n * 2));
  
--static ssize_t trace_info_show(struct kobject *kobj,
--				  struct kobj_attribute *attr,
--				  char *buf)
-+static ssize_t trace_info_show(struct device *dev,
-+			       struct device_attribute *attr, char *buf)
- {
- 	u32 etb_wa, etb_ra, etb_st, etb_fc, etm_ctrl, etm_st;
- 	int datalen;
-@@ -495,21 +493,19 @@ static ssize_t trace_info_show(struct kobject *kobj,
- 			);
- }
+ 	/* second comparator is right next to it */
+-	etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2 + 1));
+-	etm_writel(t, end, ETMR_COMP_VAL(n * 2 + 1));
++	etm_writel(t, flags, ETMR_ADDRCOMP_ACC_TYPE(n * 2 + 1));
++	etm_writel(t, end, ETMR_ADDRCOMP_VAL(n * 2 + 1));
  
--static struct kobj_attribute trace_info_attr =
--	__ATTR(trace_info, 0444, trace_info_show, NULL);
-+DEVICE_ATTR(trace_info, S_IRUGO, trace_info_show, NULL);
+ 	flags = exclude ? ETMTE_INCLEXCL : 0;
+ 	etm_writel(t, flags | (1 << n), ETMR_TRACEENCTRL);
+@@ -475,7 +475,8 @@ static ssize_t trace_info_show(struct device *dev,
+ 	etm_st = etm_readl(&tracer, ETMR_STATUS);
+ 	etm_lock(&tracer);
  
--static ssize_t trace_mode_show(struct kobject *kobj,
--				  struct kobj_attribute *attr,
--				  char *buf)
-+static ssize_t trace_mode_show(struct device *dev,
-+			       struct device_attribute *attr, char *buf)
- {
- 	return sprintf(buf, "%d %d\n",
- 			!!(tracer.flags & TRACER_CYCLE_ACC),
- 			tracer.etm_portsz);
- }
+-	return sprintf(buf, "Trace buffer len: %d\nComparator pairs: %d\n"
++	return sprintf(buf, "Trace buffer len: %d\n"
++			"Addr comparator pairs: %d\n"
+ 			"ETBR_WRITEADDR:\t%08x\n"
+ 			"ETBR_READADDR:\t%08x\n"
+ 			"ETBR_STATUS:\t%08x\n"
+@@ -483,7 +484,7 @@ static ssize_t trace_info_show(struct device *dev,
+ 			"ETMR_CTRL:\t%08x\n"
+ 			"ETMR_STATUS:\t%08x\n",
+ 			datalen,
+-			tracer.ncmppairs,
++			tracer.naddrcmppairs,
+ 			etb_wa,
+ 			etb_ra,
+ 			etb_st,
+@@ -559,7 +560,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+ 	/* dummy first read */
+ 	(void)etm_readl(&tracer, ETMMR_OSSRR);
  
--static ssize_t trace_mode_store(struct kobject *kobj,
--				   struct kobj_attribute *attr,
--				   const char *buf, size_t n)
-+static ssize_t trace_mode_store(struct device *dev,
-+				struct device_attribute *attr,
-+				const char *buf, size_t n)
- {
- 	unsigned int cycacc, portsz;
- 
-@@ -528,8 +524,7 @@ static ssize_t trace_mode_store(struct kobject *kobj,
- 	return n;
- }
- 
--static struct kobj_attribute trace_mode_attr =
--	__ATTR(trace_mode, 0644, trace_mode_show, trace_mode_store);
-+DEVICE_ATTR(trace_mode, S_IRUGO|S_IWUSR, trace_mode_show, trace_mode_store);
- 
- static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- {
-@@ -568,17 +563,16 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+-	t->ncmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
++	t->naddrcmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
  	etm_writel(t, 0x440, ETMR_CTRL);
  	etm_lock(t);
  
--	ret = sysfs_create_file(&dev->dev.kobj,
--			&trace_running_attr.attr);
-+	ret = device_create_file(&dev->dev, &dev_attr_trace_running);
- 	if (ret)
- 		goto out_unmap;
- 
- 	/* failing to create any of these two is not fatal */
--	ret = sysfs_create_file(&dev->dev.kobj, &trace_info_attr.attr);
-+	ret = device_create_file(&dev->dev, &dev_attr_trace_info);
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_info in sysfs\n");
- 
--	ret = sysfs_create_file(&dev->dev.kobj, &trace_mode_attr.attr);
-+	ret = device_create_file(&dev->dev, &dev_attr_trace_mode);
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_mode in sysfs\n");
- 
-@@ -608,9 +602,9 @@ static int etm_remove(struct amba_device *dev)
- 
- 	amba_release_regions(dev);
- 
--	sysfs_remove_file(&dev->dev.kobj, &trace_running_attr.attr);
--	sysfs_remove_file(&dev->dev.kobj, &trace_info_attr.attr);
--	sysfs_remove_file(&dev->dev.kobj, &trace_mode_attr.attr);
-+	device_remove_file(&dev->dev, &dev_attr_trace_running);
-+	device_remove_file(&dev->dev, &dev_attr_trace_info);
-+	device_remove_file(&dev->dev, &dev_attr_trace_mode);
- 
- 	return 0;
- }
 -- 
 1.8.5.2
