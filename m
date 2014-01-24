@@ -1,157 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 24 Jan 2014 17:58:07 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <CAKfTPtDHTs67qvoA6++zo4SZdZJj4T_BV2gVECOu-76-2kLbuw@mail.gmail.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140122192041.GA3709@e102568-lin.cambridge.arm.com>
- <CAKfTPtDHTs67qvoA6++zo4SZdZJj4T_BV2gVECOu-76-2kLbuw@mail.gmail.com>
-Message-ID: <20140124175806.GC23274@e102568-lin.cambridge.arm.com>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 24 Jan 2014 10:03:10 -0800
+Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation for
+ generic SYSCON reboot driver
+In-Reply-To: <20140124113920.GF814@e106331-lin.cambridge.arm.com>
+References: <1390504801-24483-1-git-send-email-fkan@apm.com>
+ <1390504801-24483-6-git-send-email-fkan@apm.com>
+ <20140124113920.GF814@e106331-lin.cambridge.arm.com>
+Message-ID: <CAL85gmDJeUY0zUjkmpMo7g_hLj34RsgU1VEF80wouLzOFGAdqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+On Fri, Jan 24, 2014 at 3:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jan 23, 2014 at 07:20:01PM +0000, Feng Kan wrote:
+>> Add documentation for generic SYSCON reboot driver.
+>>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>>  .../bindings/power/reset/syscon-reboot.txt         |   16 ++++++++++++++++
+>>  1 files changed, 16 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> new file mode 100644
+>> index 0000000..e9eb1fe
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> @@ -0,0 +1,16 @@
+>> +Generic SYSCON mapped register reset driver
+>
+> Bindings should describe hardware, not drivers.
+>
+> What precisely does this binding describe?
+>
+>> +
+>> +Required properties:
+>> +- compatible: should contain "syscon-reboot"
+>> +- regmap: this is phandle to the register map node
+>> +- offset: offset in the register map for the reboot register
+>> +- mask: the reset value written to the reboot register
+>> +
+>> +Examples:
+>> +
+>> +reboot {
+>> +   compatible = "syscon-reboot";
+>> +   regmap = <&regmapnode>;
+>> +   offset = <0x0>;
+>> +   mask = <0x1>;
+>> +};
+>
+> Access size? Endianness?
+FKAN: are you asking for documentation? I don't see alot of example of
+support for these.
 
-On Fri, Jan 24, 2014 at 08:40:40AM +0000, Vincent Guittot wrote:
+>
+> Why can we not have a binding for the register bank this exists in, and
+> have that pass on the appropriate details to a syscon-reboot driver?
 
-[...]
+FKAN: Thats a good idea. But the hardware in this case (SCU) system
+clock unit has a bunch of registers used for different functions. If syscon is
+used alot in this case and we pile more attribute into it. It would get kinda
+messy after a while.
 
-> Hi Lorenzo,
-> 
-> Sorry for the late reply,
-> 
-> 
-> > I had an idea. To simplify things, I think that one possibility is to
-> > add a parameter to the power domain specifier (platform specific, see
-> > Tomasz bindings):
-> 
-> We can't use a simple boolean state (on/off) for defining the
-> powerdomain state associated to a c-state so your proposal of being
-> able to add a parameter that will define the power domain state is
-> interesting.
-> 
-> >
-> > Documentation/devicetree/bindings/power/power_domain.txt
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224928.html
-> >
-> > to represent, when that state is entered the behavior of the power
-> > controller (ie cache RAM retention or cache shutdown or in general any
-> > substate within a power domain). Since it is platform specific, and since
-> > we are able to link caches to the power domain, the power controller will
-> > actually define what happens to the cache when that state is entered
-> > (basically we use the power domain specifier additional parameter to define
-> > a "substate" in that power domain e.g.:
-> >
-> > Example:
-> >
-> > foo_power_controller {
-> >         [...]
-> >         /*
-> >          * first cell is register index, second one is the state index
-> >          * that in turn implies the state behavior - eg cache lost or
-> >          * retained
-> >          */
-> >         #power-domain-cells = <2>;
-> > };
-> >
-> > l1-cache {
-> >         [...]
-> >         /*
-> >          * syntax: power-domains = list of power domain specifiers
-> >                 <[&power_domain_phandle register-index state],[&power_domain_phandle register-index state]>;
-> >                 The syntax is defined by the power controller du jour
-> >                 as described by Tomasz bindings
-> >         */
-> >         power-domains =<&foo_power_controller 0 0 &foo_power_controller 0 1>;
-> 
-> Normally, power-domains describes a list of power domain specifiers
-> that are necessary for the l1-cache to at least retain its state so
-> i'm not sure understand your example above
+FKAN: I still haven't figured out how to generically tie to
+the reset handler? Maybe the next person can use #define to bridge in the
+reset handler they want to use.
 
-> 
-> If we take the example of system that support running, retention and
-> powerdown state described as state 0, 1 and 2 for the power domain, i
-> would have set the l1-cache like:
->        power-domains =<&foo_power_controller 0 1>;
-> 
-> for saying that the state is retained up to state 1
-> 
-> Please look below, i have modified the rest of your example accordingly
-> 
-> >
-> > }:
-> >
-> > and then
-> >
-> > state0 {
-> >         index = <2>;
-> >         compatible = "arm,cpu-power-state";
-> >         latency = <...>;
-> >         /*
-> >          * This means that when the state is entered, the power
-> >          * controller should use register index 0 and state 0,
-> >          * whose meaning is power controller specific. Since we
-> >          * know all components affected (for every component
-> >          * we declare its power domain(s) and states so we
-> >          * know what components are affected by the state entry.
-> >          * Given the cache node above and this phandle, the state
-> >          * implies that the cache is retained, register index == 0 state == 0
-> >          /*
-> >         power-domain =<&foo_power_controller 0 0>;
-> 
-> for retention state we need to set the power domain in state 1
->         power-domain =<&foo_power_controller 0 1>;
-> 
-> > };
-> >
-> > state1 {
-> >         index = <3>;
-> >         compatible = "arm,cpu-power-state";
-> >         latency = <...>;
-> >         /*
-> >          * This means that when the state is entered, the power
-> >          * controller should use register index 0 and state 1,
-> >          * whose meaning is power controller specific. Since we
-> >          * know all components affected (for every component
-> >          * we declare its power domain(s) and states so we
-> >          * know what components are affected by the state entry.
-> >          * Given the cache node above and this phandle, the state
-> >          * implies that the cache is lost, register index == 0 state == 1
-> >          /*
-> >         power-domain =<&foo_power_controller 0 1>;
-> 
-> for power down mode, we need to set thge power domain in state 2
->         power-domain =<&foo_power_controller 0 2>;
-
-Ok, what I meant was not what you got, but your approach looks sensible
-too. What I do not like is that the power-domain specifier is power
-controller specific (that was true even for my example). In theory
-we can achieve something identical by forcing every component in a power
-domain to specify the max C-state index that allows it to retain its
-state (through a specific property). Same logic to your example applies.
-Nice thing is that we do not change the power domain specifiers, bad thing
-is that it adds two properties to each device (c-state index and
-power-domain-specifier - but we can make it hierarchical so that device
-nodes can inherit the maximum operating C-state by inheriting the value
-from a parent node providing a common value).
-
-In my example the third parameter was just a number that the power
-controller would decode (eg 0 = cache retained, 1 = cache lost)
-according to its implementation, it was not a "state index". The
-power controller would know what to do with eg a cache component (that
-declares to be in that power domain) when a C-state with that power
-domain specifier was entered.
-
-Not very different from what you are saying, let's get to the nub:
-
-- Either we define it in a platform specific way through the power
-  domain specifier
-- Or we force a max-c-state-supported property for every device,
-  possibly hierarchical
-
-Thoughts ?
-
-Thank you !
-Lorenzo
+>
+> That way we can change the way we poke things without requiring changes
+> to bindings or dts.
+>
+> Thanks,
+> Mark.
