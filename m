@@ -1,40 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jan 2014 16:35:49 +0000
-Subject: [PATCH v5 0/4] perf: AARCH64 arch support
-In-Reply-To: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
-References: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140124163548.GH31040@mudshark.cambridge.arm.com>
+From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
+Date: Fri, 24 Jan 2014 11:40:50 -0500
+Subject: [PATCH V2 0/6] ARM CoreSight: Enhance ETM tracing control
+Message-ID: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi,
 
-On Wed, Jan 22, 2014 at 02:11:15PM +0000, Jean Pihet wrote:
-> Add AARCH64 specific support. This includes the following:
-> - AARCH64 perf registers definition and hooks,
-> - compat mode registers use, i.e. profiling a 32-bit binary on
->    a 64-bit system,
-> - unwinding using the dwarf information from the .debug_frame
->    section of the ELF binary,
-> - unwinding using the frame pointer information; in 64-bit and
->    compat modes.
-> 
-> Note: support for unwinding using the dwarf information in compat
-> mode requires some changes to the libunwind code. Those changes
-> have been submitted on the libunwind ML and are in discussion.
-> 
-> Tested on ARMv7, ARMv8 and x86_64 platforms. The compat mode has been
-> tested on ARMv8 using statically built 32-bit binaries.
+Different ARM users have shown their interest in this patch, so I made
+a second version that corrects the first mistakes.
 
-This is look alright to me now, but there are still two blockers:
+Mainly, it extends current support of CoreSight ETM, that is currently
+very limited. ETM provides hardware-assisted program tracing, a
+cycle-precise and low-overhead solution that software tools such as
+'perf record' cannot provide.
 
- (1) Getting the libunwind code merged
- (2) Splitting this into an arch/arm64 series and a tools/perf series, so
-     that acme can merge the latter independently (and avoid the mess we had
-     last time).
+Usage of ETM tracing facility is presently limited to start and stop
+tracing. This set of patches enables management of address combinations
+and PIDs that trigger tracing, thus allowing to trace specific
+functions and processes.
 
-Anyway, for the series:
+ETM management was done via sysfs entries (trace_info,
+trace_running...), this code adds trace_addrrange and trace_pid to
+let the user read/write custom values.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Changes in V2:
+- Use device attributes rather than raw kobjects
+- Make PID_IN_CONTEXTIDR incompatible with PID_NS in Kconfig
+- Use int for pid type (not long)
+- During trace fetching, call vmalloc() only if really needed
 
-Will
+This series of patches applies to v3.13.
+
+Adrien Verg? (6):
+  ARM CoreSight: ETM: Use device attributes
+  ARM CoreSight: ETM: Rename 'comparator' to 'address comparator'
+  ARM CoreSight: ETM: Add address control support
+  ARM: Make PID_IN_CONTEXTIDR incompatible with PID_NS
+  ARM CoreSight: ETM: Add PID control support
+  ARM CoreSight: ETM: Allocate a trace buffer only when necessary
+
+ arch/arm/Kconfig.debug                    |   2 +-
+ arch/arm/include/asm/hardware/coresight.h |   9 +-
+ arch/arm/kernel/etm.c                     | 208 +++++++++++++++++++++++-------
+ arch/arm64/Kconfig.debug                  |   1 +
+ 4 files changed, 169 insertions(+), 51 deletions(-)
+
+-- 
+1.8.5.2
