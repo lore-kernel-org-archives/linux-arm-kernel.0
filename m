@@ -1,38 +1,38 @@
 From: pratyush.anand@st.com (Pratyush Anand)
-Date: Fri, 24 Jan 2014 09:07:54 +0530
-Subject: [PATCH V2 3/8] ahci: Add a driver_data field to struct
- ahci_platform_data
-In-Reply-To: <20140123113644.GA28621@htj.dyndns.org>
+Date: Fri, 24 Jan 2014 09:17:47 +0530
+Subject: [PATCH V2 6/8] SPEAr13xx: Fix static mapping table
+In-Reply-To: <201401231312.15885.arnd@arndb.de>
 References: <cover.1390471111.git.mohit.kumar@st.com>
- <af75111fb61aebfee6e0233b39dc4cf006906402.1390471111.git.mohit.kumar@st.com>
- <20140123113644.GA28621@htj.dyndns.org>
-Message-ID: <20140124033754.GA2369@pratyush-vbox>
+ <22d2e7d6fbd5a291cdecf6a4d1e294d9c9ede617.1390471111.git.mohit.kumar@st.com>
+ <201401231312.15885.arnd@arndb.de>
+Message-ID: <20140124034747.GB2369@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 07:36:44PM +0800, Tejun Heo wrote:
-> On Thu, Jan 23, 2014 at 04:02:43PM +0530, Mohit Kumar wrote:
-> > diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-> > index 73a2500..76d35e8 100644
-> > --- a/include/linux/ahci_platform.h
-> > +++ b/include/linux/ahci_platform.h
-> > @@ -28,6 +28,7 @@ struct ahci_platform_data {
-> >  	const struct ata_port_info *ata_port_info;
-> >  	unsigned int force_port_map;
-> >  	unsigned int mask_port_map;
-> > +	void *driver_data;
+On Thu, Jan 23, 2014 at 08:12:15PM +0800, Arnd Bergmann wrote:
+> On Thursday 23 January 2014, Mohit Kumar wrote:
+> > From: Pratyush Anand <pratyush.anand@st.com>
+> > 
+> > SPEAr13xx was using virtual address space 0xFE000000 to map physical address
+> > space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
+> > change 0xFE000000 to 0xF9000000.
+> > 
+> > Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> > Tested-by: Mohit Kumar <mohit.kumar@st.com>
+> > Cc: Viresh Kumar <viresh.linux@gmail.com>
+> > Cc: spear-devel at list.st.com
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Arnd Bergmann <arnd@arndb.de>
 > 
-> Please use private_data instead for consistency with other ata data
-> structures.
+> Surely this is needed in backports, so please add stable at vger.kernel.org
+> to the Cc list in the changeset text. Otherwise
 
-Ok.. ll do that in V3.
+While sending v3 of series will cc stable list.
 
-Thanks for your review.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Thanks :)
 
 Regards
 Pratyush
-> 
-> Thanks.
-> 
-> -- 
-> tejun
