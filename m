@@ -1,43 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jan 2014 11:31:14 +0000
-Subject: [PATCH v4 2/3] serial: fsl_lpuart: add DMA support
-In-Reply-To: <1390363773-24108-3-git-send-email-yao.yuan@freescale.com>
-References: <1390363773-24108-1-git-send-email-yao.yuan@freescale.com>
- <1390363773-24108-3-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20140124113114.GE814@e106331-lin.cambridge.arm.com>
+Date: Fri, 24 Jan 2014 11:39:20 +0000
+Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation
+ for generic SYSCON reboot driver
+In-Reply-To: <1390504801-24483-6-git-send-email-fkan@apm.com>
+References: <1390504801-24483-1-git-send-email-fkan@apm.com>
+ <1390504801-24483-6-git-send-email-fkan@apm.com>
+Message-ID: <20140124113920.GF814@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 04:09:32AM +0000, Yuan Yao wrote:
-> Add dma support for lpuart. This function depend on DMA driver.
-> You can turn on it by write both the dmas and dma-name properties in dts node.
+On Thu, Jan 23, 2014 at 07:20:01PM +0000, Feng Kan wrote:
+> Add documentation for generic SYSCON reboot driver.
 > 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
->  .../devicetree/bindings/serial/fsl-lpuart.txt      |  19 +-
->  drivers/tty/serial/fsl_lpuart.c                    | 430 ++++++++++++++++++++-
->  2 files changed, 433 insertions(+), 16 deletions(-)
+>  .../bindings/power/reset/syscon-reboot.txt         |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> index 6fd1dd1..6e1cbbf 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> @@ -5,10 +5,21 @@ Required properties:
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain uart interrupt
-> 
-> +Optional properties:
-> +- dmas: Generic dma devicetree binding as described
-> +       in Documentation/devicetree/bindings/dma/dma.txt.
-> +- dma-names: Two dmas have to be defined, "rx" and "tx".
-> +       An ordered list of channel names affiliated to the above.
+> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> new file mode 100644
+> index 0000000..e9eb1fe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+> @@ -0,0 +1,16 @@
+> +Generic SYSCON mapped register reset driver
 
-Please describe dmas in terms of dma-names (as with the patch describing
-clocks and clock-names).
+Bindings should describe hardware, not drivers.
 
-It would be nice to describe the type of the dmas property, but I see
-that we have a propblem with inconsistent terminology in the area of
-${THING}-specifiers, so I'll try to get that cleaned up separately.
+What precisely does this binding describe?
 
-Cheers,
+> +
+> +Required properties:
+> +- compatible: should contain "syscon-reboot"
+> +- regmap: this is phandle to the register map node 
+> +- offset: offset in the register map for the reboot register
+> +- mask: the reset value written to the reboot register
+> +
+> +Examples:
+> +
+> +reboot {
+> +   compatible = "syscon-reboot";
+> +   regmap = <&regmapnode>;
+> +   offset = <0x0>;
+> +   mask = <0x1>;
+> +};
+
+Access size? Endianness?
+
+Why can we not have a binding for the register bank this exists in, and
+have that pass on the appropriate details to a syscon-reboot driver?
+
+That way we can change the way we poke things without requiring changes
+to bindings or dts.
+
+Thanks,
 Mark.
