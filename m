@@ -1,57 +1,137 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jan 2014 10:55:39 +0000
-Subject: [PATCH 3/3] irqchip: orion: clear stale interrupts in irq_enable
-In-Reply-To: <20140123225208.GA24778@obsidianresearch.com>
-References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390516686-2224-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140123225208.GA24778@obsidianresearch.com>
-Message-ID: <20140124105539.GD15937@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Jan 2014 11:03:00 +0000
+Subject: [PATCH v5 6/8] ARM: brcmstb: add misc. DT bindings for brcmstb
+In-Reply-To: <1390361452-3124-7-git-send-email-marc.ceeeee@gmail.com>
+References: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
+ <1390361452-3124-7-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <20140124110300.GB814@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 03:52:08PM -0700, Jason Gunthorpe wrote:
-> On Thu, Jan 23, 2014 at 11:38:06PM +0100, Sebastian Hesselbarth wrote:
-> > Bridge IRQ_CAUSE bits are asserted regardless of the corresponding bit in
-> > IRQ_MASK register. To avoid interrupt events on stale irqs, we have to clear
-> > them before unmask. This installs an .irq_enable callback to ensure stale
-> > irqs are cleared before initial unmask.
+On Wed, Jan 22, 2014 at 03:30:50AM +0000, Marc Carino wrote:
+> Document the bindings that the Broadcom STB platform needs
+> for proper bootup.
 > 
-> I'm not sure if putting this in irq_enable is correct. I think this
-> should only happen at irq_startup.
+> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  .../devicetree/bindings/arm/brcm-brcmstb.txt       |   95 ++++++++++++++++++++
+>  1 files changed, 95 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
 > 
-> The question boils down to what is supposed to happen with this code
-> sequence:
-> 
-> disable_irq(..);
-> write(.. something to cause an interrupt edge ..);
-> .. synchronize ..
-> enable_irq(..);
-> 
-> Do we get the interrupt or not?
+> diff --git a/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+> new file mode 100644
+> index 0000000..3c436cc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+> @@ -0,0 +1,95 @@
+> +ARM Broadcom STB platforms Device Tree Bindings
+> +-----------------------------------------------
+> +Boards with Broadcom Brahma15 ARM-based BCMxxxx (generally BCM7xxx variants)
+> +SoC shall have the following DT organization:
+> +
+> +Required root node properties:
+> +    - compatible: "brcm,bcm<chip_id>", "brcm,brcmstb"
+> +
+> +example:
+> +/ {
+> +    #address-cells = <2>;
+> +    #size-cells = <2>;
+> +    model = "Broadcom STB (bcm7445)";
+> +    compatible = "brcm,bcm7445", "brcm,brcmstb";
+> +
+> +Further, syscon nodes that map platform-specific registers used for general
+> +system control is required:
+> +
+> +    - compatible: "brcm,bcm<chip_id>-sun-top-ctrl", "syscon"
+> +    - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
+> +    - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
+> +
+> +example:
+> +    rdb {
+> +        #address-cells = <1>;
+> +        #size-cells = <1>;
+> +        compatible = "simple-bus";
+> +        ranges = <0 0x00 0xf0000000 0x1000000>;
+> +
+> +        sun_top_ctrl: syscon at 404000 {
+> +            compatible = "brcm,bcm7445-sun-top-ctrl", "syscon";
+> +            reg = <0x404000 0x51c>;
+> +        };
+> +
+> +        hif_cpubiuctrl: syscon at 3e2400 {
+> +            compatible = "brcm,bcm7445-hif-cpubiuctrl", "syscon";
+> +            reg = <0x3e2400 0x5b4>;
+> +        };
+> +
+> +        hif_continuation: syscon at 452000 {
+> +            compatible = "brcm,bcm7445-hif-continuation", "syscon";
+> +            reg = <0x452000 0x100>;
+> +        };
+> +    };
+> +
+> +Lastly, nodes that allow for support of SMP initialization and reboot are
+> +required:
+> +
+> +smpboot
+> +-------
+> +Required properties:
+> +
+> +    - compatible
+> +        The string "brcm,brcmstb-smpboot".
+> +
+> +    - syscon-cpu
+> +        A phandle / integer array property which lets the BSP know the location
+> +        of certain CPU power-on registers.
+> +
+> +        The layout of the property is as follows:
+> +            o a phandle to the "hif_cpubiuctrl" syscon node
+> +            o offset to the base CPU power zone register
+> +            o offset to the base CPU reset register
 
-The answer is... yes, the interrupt should be delivered after the
-interrupt is re-enabled.
+How variable are these values?
 
-> I found this message from Linus long ago:
->  http://yarchive.net/comp/linux/edge_triggered_interrupts.html
-> > Btw, the "disable_irq()/enable_irq()" subsystem has been written so that
-> > when you disable an edge-triggered interrupt, and the edge happens while
-> > the interrupt is disabled, we will re-play the interrupt at enable time.
-> > Exactly so that drivers can have an easier time and don't have to
-> > normally worry about whether something is edge or level-triggered.
-> 
-> And found this note in Documentation/DocBook/genericirq.tmpl:
-> 
-> > This prevents losing edge interrupts on hardware which does
-> > not store an edge interrupt event while the interrupt is disabled at
-> > the hardware level. 
-> 
-> So I think it is very clear that the chip driver should not discard
-> edges that happened while the interrupt was disabled.
+> +
+> +    - syscon-cont
+> +        A phandle pointing to the syscon node which describes the CPU boot
+> +        continuation registers.
+> +            o a phandle to the "hif_continuation" syscon node
+> +
+> +example:
+> +    smpboot {
+> +        compatible = "brcm,brcmstb-smpboot";
+> +        syscon-cpu = <&hif_cpubiuctrl 0x88 0x178>;
+> +        syscon-cont = <&hif_continuation>;
+> +    };
 
-Correct.
+This looks odd. This doesn't seem like a device, but rather a grouping
+of disparate devices used for a particular software purpose.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> +
+> +reboot
+> +-------
+> +Required properties
+> +
+> +    - compatible
+> +        The string property "brcm,brcmstb-reboot".
+> +
+> +    - syscon
+> +        A phandle / integer array that points to the syscon node which describes
+> +        the general system reset registers.
+> +            o a phandle to "sun_top_ctrl"
+> +            o offset to the "reset source enable" register
+> +            o offset to the "software master reset" register
+
+How variable are these values?
+
+> +
+> +example:
+> +    reboot {
+> +        compatible = "brcm,brcmstb-reboot";
+> +        syscon = <&sun_top_ctrl 0x304 0x308>;
+> +    };
+
+As with smpboot, this seems odd.
+
+Thanks,
+Mark.
