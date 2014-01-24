@@ -1,32 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Jan 2014 08:28:59 +0000
-Subject: [PATCH v2 2/4] pinctrl: st: Add software edge trigger interrupt
- support.
-In-Reply-To: <CACRpkdaBAnpfHBqkgU2emZrYwHGh9KvDvqfnCvaWdU5jYgxStA@mail.gmail.com>
-References: <1389886545-31498-1-git-send-email-srinivas.kandagatla@st.com>
- <1389886651-31990-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdaBAnpfHBqkgU2emZrYwHGh9KvDvqfnCvaWdU5jYgxStA@mail.gmail.com>
-Message-ID: <20140124082859.GJ8586@lee--X1>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 24 Jan 2014 08:47:03 +0000
+Subject: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+In-Reply-To: <52E0333F.4000400@gmail.com>
+References: <1388409550-10720-1-git-send-email-tomi.valkeinen@ti.com>
+ <1388409550-10720-2-git-send-email-tomi.valkeinen@ti.com>
+ <20140107235951.GH5074@atomide.com> <52CD5D13.9090806@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EDB11F5@DBDE04.ent.ti.com>
+ <52CE5123.9050702@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EDB141E@DBDE04.ent.ti.com>
+ <52D146E8.4090105@gmail.com> <52E0333F.4000400@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EDBF11F@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> > +/*
-> > + * As edge triggers are not supported at hardware level, it is supported by
-> > + * software by exploiting the level trigger support in hardware.
-> 
-> (...)
-> 
-> All this is quite hard to understand. Maybe it's just because
-> it's hard overall. Edge triggers are not supported by hardware
-> so we use the hardware edge trigger support?
-> 
-> That is a bit oxymoronic...
 
-That's not what is says. Read it again. :)
+> -----Original Message-----
+> From: Ivaylo Dimitrov [mailto:ivo.g.dimitrov.75 at gmail.com]
+> Sent: Thursday, January 23, 2014 2:38 AM
+> To: Hiremath, Vaibhav; Ivaylo Dimitrov; Valkeinen, Tomi
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> fbdev at vger.kernel.org
+> Subject: Re: [PATCH 1/2] ARM: omapfb: add coherent dma memory support
+> 
+> Hmm, maybe this https://lkml.org/lkml/2014/1/22/386 will solve our issues
+> 
+Link seems to be coming blank to me :)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Vaibhav
