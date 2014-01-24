@@ -1,46 +1,36 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 24 Jan 2014 12:52:38 -0500
-Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with
- PID_NS
-In-Reply-To: <20140124171754.GM31040@mudshark.cambridge.arm.com>
-References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
- <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
- <20140124164343.GJ31040@mudshark.cambridge.arm.com>
- <CANsc=4UgWrFis6hi-0mXZAfery7YGDJ2F+NdZBzq6afwx_i58A@mail.gmail.com>
- <20140124171754.GM31040@mudshark.cambridge.arm.com>
-Message-ID: <52E2A866.1050400@codeaurora.org>
+Date: Fri, 24 Jan 2014 12:55:13 -0500
+Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation
+ for generic SYSCON reboot driver
+In-Reply-To: <20140124113920.GF814@e106331-lin.cambridge.arm.com>
+References: <1390504801-24483-1-git-send-email-fkan@apm.com>
+ <1390504801-24483-6-git-send-email-fkan@apm.com>
+ <20140124113920.GF814@e106331-lin.cambridge.arm.com>
+Message-ID: <52E2A901.4050707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2014 12:17 PM, Will Deacon wrote:
-> On Fri, Jan 24, 2014 at 05:16:28PM +0000, Adrien Verg? wrote:
->> 2014/1/24 Will Deacon <will.deacon@arm.com>:
->>> Are you sure about this? The value we write is actually task_pid_nr, which I
->>> believe to be globally unique.
+On 01/24/2014 06:39 AM, Mark Rutland wrote:
+> On Thu, Jan 23, 2014 at 07:20:01PM +0000, Feng Kan wrote:
+>> Add documentation for generic SYSCON reboot driver.
 >>
->> You are right: the task_pid_nr is unique in the system. However when
->> using namespaces, the so called "PID" is the virtual number that
->> processes in different namespaces can share.
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>>  .../bindings/power/reset/syscon-reboot.txt         |   16 ++++++++++++++++
+>>  1 files changed, 16 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
 >>
->> This PID is the one visible by user-space tasks, in particular
->> user-space tracers and debuggers. These programs would expect to find
->> the PID of the traced process in the Context ID reg, while it is not.
->> I think it is better to remove confusion by making PID_IN_CONTEXTIDR
->> and PID_NS incompatible.
->>
->> What do you think?
+>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> new file mode 100644
+>> index 0000000..e9eb1fe
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+>> @@ -0,0 +1,16 @@
+>> +Generic SYSCON mapped register reset driver
 > 
-> I think I'd rather have the global ID than disable a potentially useful
-> feature, especially since this is likely to be consumed by external trace
-> tools as opposed to user-space tasks.
+> Bindings should describe hardware, not drivers.
 
-We've discussed before that the ARM architecture doesn't say what should be
-written to the CONTEXTIDR, so it's up to us to decide. Will has a use case
-where the global PID is useful. Adrien's patches present a use case where I
-think the virtual PID would be useful. I've done work in the past where
-writing the process group ID was useful. Would it be reasonable to make what's
-written to the CONTEXTIDR run-time configurable? If so, what would be the best
-interface for configuring it?
+How is this different than what's done for PSCI?
 
 Thanks,
 Christopher
