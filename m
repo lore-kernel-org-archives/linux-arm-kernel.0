@@ -1,27 +1,59 @@
-From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 12:16:28 -0500
-Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with
- PID_NS
-In-Reply-To: <20140124164343.GJ31040@mudshark.cambridge.arm.com>
-References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
- <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
- <20140124164343.GJ31040@mudshark.cambridge.arm.com>
-Message-ID: <CANsc=4UgWrFis6hi-0mXZAfery7YGDJ2F+NdZBzq6afwx_i58A@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 24 Jan 2014 18:29:12 +0100
+Subject: [PATCH v3 15/24] drm/i2c: tda998x: use irq for connection status
+ and EDID read
+In-Reply-To: <20140122222705.GL15937@n2100.arm.linux.org.uk>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195843.7ae9753d@armhf>
+ <20140122222705.GL15937@n2100.arm.linux.org.uk>
+Message-ID: <52E2A2E8.50806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014/1/24 Will Deacon <will.deacon@arm.com>:
-> Are you sure about this? The value we write is actually task_pid_nr, which I
-> believe to be globally unique.
+On 01/22/14 23:27, Russell King - ARM Linux wrote:
+> On Sun, Jan 19, 2014 at 07:58:43PM +0100, Jean-Francois Moine wrote:
+>> This patch adds the optional treatment of the tda998x IRQ.
+>>
+>> The interrupt function is used to know the display connection status
+>> without polling and to speedup reading the EDID.
+>>
+>> The interrupt number may be defined either in the DT or at encoder set
+>> config time for non-DT boards.
+>>
+>> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+>> ---
+[...]
+>> @@ -720,6 +787,10 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
+>>   		priv->audio_port = p->audio_cfg;
+>>   		priv->audio_format = p->audio_format;
+>>   	}
+>> +
+>> +	priv->irq = p->irq;
+>> +	if (p->irq)
+>> +		tda_irq_init(priv);
+>
+> If we're going to do it this way, this should probably release the IRQ if
+> there was one before re-claiming it, just in case this function gets called
+> more than once by some driver using it.
+>
+> The alternative is, as I said before, to use the infrastructure which is
+> already there, namely setting the interrupt via struct i2c_client's
+> irq member.  Yes, that doesn't satisfy Sebastian's comment about using
+> a GPIO, but there's no sign of GPIO usage in here at the moment anyway.
+> So we might as well use what's already provided.
 
-You are right: the task_pid_nr is unique in the system. However when
-using namespaces, the so called "PID" is the virtual number that
-processes in different namespaces can share.
+Russell,
 
-This PID is the one visible by user-space tasks, in particular
-user-space tracers and debuggers. These programs would expect to find
-the PID of the traced process in the Context ID reg, while it is not.
-I think it is better to remove confusion by making PID_IN_CONTEXTIDR
-and PID_NS incompatible.
+I am fine with using an irq instead of gpio here. I remember you telling
+me on a similar patch, that from the gpio you can derive the irq but
+not the other way round. Anyway, I also remember reading discussions
+about DT gpios vs interrupts, and IIRC the outcome was that passing
+interrupts is fine, too.
 
-What do you think?
+We usually have both interrupt-controller; and gpio-controller; set on
+DT gpio controllers, so let's stick with irq.
+
+And: Thanks for reviewing this again, I am still too busy to keep up
+with it.
+
+Sebastian
