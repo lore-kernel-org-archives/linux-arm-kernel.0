@@ -1,78 +1,51 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 24 Jan 2014 12:01:46 -0500
-Subject: [PATCH 2/5] arm64: dts: APM X-Gene SoC Ethernet device tree nodes
-In-Reply-To: <1387597376-29303-3-git-send-email-isubramanian@apm.com>
-References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
- <1387597376-29303-3-git-send-email-isubramanian@apm.com>
-Message-ID: <1390582906.12454.26.camel@deneb.redhat.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 24 Jan 2014 09:07:24 -0800
+Subject: [PATCH v4 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
+In-Reply-To: <CAAYSxhoCrveHd5Wkc7Z0qzpGr41qG6-neYSSsuHQuC7AcuJmZQ@mail.gmail.com>
+References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
+ <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
+ <CAAYSxhoCrveHd5Wkc7Z0qzpGr41qG6-neYSSsuHQuC7AcuJmZQ@mail.gmail.com>
+Message-ID: <CAAYSxhrBSv8_Z1SfB-b3iGgq218Gttny4FEgYJnLtSFhJd2UFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-12-20 at 19:42 -0800, Iyappan Subramanian wrote:
-> Device tree files for APM X-Gene SoC Ethernet.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Ravi Patel <rapatel@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
->  arch/arm64/boot/dts/apm-mustang.dts |    8 ++++++++
->  arch/arm64/boot/dts/apm-storm.dtsi  |   19 +++++++++++++++++++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-> index 1247ca1..ccb2771 100644
-> --- a/arch/arm64/boot/dts/apm-mustang.dts
-> +++ b/arch/arm64/boot/dts/apm-mustang.dts
-> @@ -17,6 +17,10 @@
->  	model = "APM X-Gene Mustang board";
->  	compatible = "apm,mustang", "apm,xgene-storm";
->  
-> +        aliases {
-> +                ethernet0 = &menet;
-> +        };
-> +
->  	chosen { };
->  
->  	memory {
-> @@ -24,3 +28,7 @@
->  		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
->  	};
->  };
-> +
-> +&menet {
-> +        status = "ok";
-> +};
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index f64f946..9c7b8cd 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -204,5 +204,24 @@
->  			#clock-cells = <1>;
->  			clocks = <&qmlclk 0>;
->  		};
-> +
-> +		menet: ethernet at 17020000 {
-> +			compatible = "apm,xgene-enet";
-> +			status = "disabled";
-> +			reg = <0x0 0x17020000 0x0 0x30>,
-> +			      <0x0 0x17020000 0x0 0x10000>,
-> +			      <0x0 0x17020000 0x0 0x20>;
-> +			slave-name = "RGMII";
-> +			interrupts = <0x0 0x38 0x4>,
-> +				     <0x0 0x39 0x4>,
-> +				     <0x0 0x3a 0x4>;
-> +			#clock-cells = <1>;
-> +			clocks = <&eth8clk 0>;
-> +			local-mac-address = <0x0 0x11 0x3a 0x8a 0x5a 0x78>;
+On Tue, Jan 7, 2014 at 11:37 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> On Sat, Dec 14, 2013 at 12:14 AM, Christian Daudt <bcm@fixthebug.org> wrote:
+>> On Thu, Dec 5, 2013 at 11:20 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+>>> Enable the external clock needed by the host controller during the
+>>> probe and disable it during the remove.
+>>>
+>>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>>
+>> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+>>
+>> Chris,
+>>  Are you ok with me pulling this patch along with the rest of the
+>> patchset into the bcm tree?
+>>
+>>  Thanks,
+>>    csd
+>
+> Chris,
+>
+> Can you please provide an answer to csd?
+>
+> Thanks,
+> Tim Kryger
 
-Shouldn't this be a byte string?:
+Chris,
 
-			local-mac-address = [ 00 11 3a 8a 5a 78 ];
+I haven't heard back so this patch has been dropped for 3.14 to allow
+the remaining patches in the series to move forward.   As such, I will
+be re-posting this patch for 3.15.  It is essential for the
+bcm28155_ap board to transition away from fake fixed clocks to the
+real clock driver.  This is because the bcm281xx clock driver does not
+set the CLK_IGNORE_UNUSED flag for the SDHCI peripheral clocks and the
+common clock code will shut them off in late init unless the SDHCI
+driver has asked for them to be enabled.
 
-> +			max-frame-size = <0x233a>;
-> +			devid = <8>;
-> +			phyid = <3>;
-> +			phy-mode = "rgmii";
-> +		};
->  	};
->  };
+Thanks,
+Tim
