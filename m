@@ -1,49 +1,131 @@
 From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 11:40:54 -0500
-Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with PID_NS
+Date: Fri, 24 Jan 2014 11:40:53 -0500
+Subject: [PATCH V2 3/6] ARM CoreSight: ETM: Add address control support
 In-Reply-To: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
 References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-Message-ID: <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
+Message-ID: <1390581656-16372-4-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using namespaces, different processes can have the same PID.
-It makes no sense to store a PID value in the Context ID register
-to track a specific process, when others share the same value.
-
-Consequently, PID_IN_CONTEXTIDR (which is used for tracing and
-debugging processes) should not be compatible with PID_NS.
+In the same manner as for enabling tracing, an entry is created
+in sysfs to set the address range that triggers tracing.
 
 Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
 ---
- arch/arm/Kconfig.debug   | 2 +-
- arch/arm64/Kconfig.debug | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/kernel/etm.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 49 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5765abf..ed46748 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1143,7 +1143,7 @@ config ARM_KPROBES_TEST
+diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
+index 7f7a0ee..4442e5c 100644
+--- a/arch/arm/kernel/etm.c
++++ b/arch/arm/kernel/etm.c
+@@ -44,6 +44,8 @@ struct tracectx {
+ 	struct device	*dev;
+ 	struct clk	*emu_clk;
+ 	struct mutex	mutex;
++	unsigned long	addrrange_start;
++	unsigned long	addrrange_end;
+ };
  
- config PID_IN_CONTEXTIDR
- 	bool "Write the current PID to the CONTEXTIDR register"
--	depends on CPU_COPY_V6
-+	depends on CPU_COPY_V6 && !PID_NS
- 	help
- 	  Enabling this option causes the kernel to write the current PID to
- 	  the PROCID field of the CONTEXTIDR register, at the expense of some
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 835c559..06b2633b 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -17,6 +17,7 @@ config EARLY_PRINTK
+ static struct tracectx tracer;
+@@ -53,6 +55,13 @@ static inline bool trace_isrunning(struct tracectx *t)
+ 	return !!(t->flags & TRACER_RUNNING);
+ }
  
- config PID_IN_CONTEXTIDR
- 	bool "Write the current PID to the CONTEXTIDR register"
-+	depends on !PID_NS
- 	help
- 	  Enabling this option causes the kernel to write the current PID to
- 	  the CONTEXTIDR register, at the expense of some additional
++/*
++ * Setups ETM to trace only when:
++ *   - address between start and end
++ *     or address not between start and end (if exclude)
++ *   - trace executed instructions
++ *     or trace loads and stores (if data)
++ */
+ static int etm_setup_address_range(struct tracectx *t, int n,
+ 		unsigned long start, unsigned long end, int exclude, int data)
+ {
+@@ -115,8 +124,8 @@ static int trace_start(struct tracectx *t)
+ 		return -EFAULT;
+ 	}
+ 
+-	etm_setup_address_range(t, 1, (unsigned long)_stext,
+-			(unsigned long)_etext, 0, 0);
++	etm_setup_address_range(t, 1, t->addrrange_start, t->addrrange_end,
++				0, 0);
+ 	etm_writel(t, 0, ETMR_TRACEENCTRL2);
+ 	etm_writel(t, 0, ETMR_TRACESSCTRL);
+ 	etm_writel(t, 0x6f, ETMR_TRACEENEVT);
+@@ -527,6 +536,36 @@ static ssize_t trace_mode_store(struct device *dev,
+ 
+ DEVICE_ATTR(trace_mode, S_IRUGO|S_IWUSR, trace_mode_show, trace_mode_store);
+ 
++static ssize_t trace_addrrange_show(struct device *dev,
++				    struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%08lx - %08lx\n", tracer.addrrange_start,
++		       tracer.addrrange_end);
++}
++
++static ssize_t trace_addrrange_store(struct device *dev,
++				     struct device_attribute *attr,
++				     const char *buf, size_t n)
++{
++	unsigned long start, end;
++
++	if (tracer.flags & TRACER_RUNNING)
++		return -EBUSY;
++
++	if (sscanf(buf, "%08lx - %08lx", &start, &end) != 2)
++		return -EINVAL;
++
++	mutex_lock(&tracer.mutex);
++	tracer.addrrange_start = start;
++	tracer.addrrange_end = end;
++	mutex_unlock(&tracer.mutex);
++
++	return n;
++}
++
++DEVICE_ATTR(trace_addrrange, S_IRUGO|S_IWUSR,
++	    trace_addrrange_show, trace_addrrange_store);
++
+ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct tracectx *t = &tracer;
+@@ -554,6 +593,8 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+ 	t->dev = &dev->dev;
+ 	t->flags = TRACER_CYCLE_ACC;
+ 	t->etm_portsz = 1;
++	t->addrrange_start = (unsigned long) _stext;
++	t->addrrange_end = (unsigned long) _etext;
+ 
+ 	etm_unlock(t);
+ 	(void)etm_readl(t, ETMMR_PDSR);
+@@ -568,7 +609,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		goto out_unmap;
+ 
+-	/* failing to create any of these two is not fatal */
++	/* failing to create any of these three is not fatal */
+ 	ret = device_create_file(&dev->dev, &dev_attr_trace_info);
+ 	if (ret)
+ 		dev_dbg(&dev->dev, "Failed to create trace_info in sysfs\n");
+@@ -577,6 +618,10 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		dev_dbg(&dev->dev, "Failed to create trace_mode in sysfs\n");
+ 
++	ret = device_create_file(&dev->dev, &dev_attr_trace_addrrange);
++	if (ret)
++		dev_dbg(&dev->dev, "Failed to create trace_addrrange in sysfs\n");
++
+ 	dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
+ 
+ out:
+@@ -606,6 +651,7 @@ static int etm_remove(struct amba_device *dev)
+ 	device_remove_file(&dev->dev, &dev_attr_trace_running);
+ 	device_remove_file(&dev->dev, &dev_attr_trace_info);
+ 	device_remove_file(&dev->dev, &dev_attr_trace_mode);
++	device_remove_file(&dev->dev, &dev_attr_trace_addrrange);
+ 
+ 	return 0;
+ }
 -- 
 1.8.5.2
