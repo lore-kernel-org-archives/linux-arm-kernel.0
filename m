@@ -1,94 +1,56 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jan 2014 23:53:34 +0800
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <20140124151513.GD19052@arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
- <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
- <20140122114537.GA15591@e106331-lin.cambridge.arm.com>
- <52E1B1DE.5050507@linaro.org>
- <20140124120815.GH814@e106331-lin.cambridge.arm.com>
- <20140124151513.GD19052@arm.com>
-Message-ID: <52E28C7E.5070509@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jan 2014 15:57:52 +0000
+Subject: [PATCH] ARM: hw_breakpoint: Add ARMv8 support
+In-Reply-To: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
+References: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
+Message-ID: <20140124155752.GC31040@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?01?24? 23:15, Catalin Marinas wrote:
-> On Fri, Jan 24, 2014 at 12:08:15PM +0000, Mark Rutland wrote:
->> On Fri, Jan 24, 2014 at 12:20:46AM +0000, Hanjun Guo wrote:
->>> On 2014?01?22? 19:45, Mark Rutland wrote:
->>>> On Wed, Jan 22, 2014 at 08:26:50AM +0000, Linus Walleij wrote:
->>>>> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>>>>
->>>>>> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>>>
->>>>>> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
->>>>>> name from the ACPI timer table is matched with all the registered
->>>>>> timer controllers and matching initialisation routine is invoked.
->>>>>>
->>>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
->>>>> to TIMER_OF_DECLARE() and I think this macro, if needed, should
->>>>> be named TIMER_ACPI_DECLARE().
->>>>>
->>>>> The reason is that "clocksource" is a Linux-internal name and this
->>>>> macro pertains to the hardware name in respective system
->>>>> description type.
->>>>>
->>>>>> +#ifdef CONFIG_ACPI
->>>>>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
->>>>>> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
->>>>>> +               __used __section(__clksrc_acpi_table)                   \
->>>>>> +                = { .id = compat,                              \
->>>>>> +                    .driver_data = (kernel_ulong_t)fn }
->>>>>> +#else
->>>>>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
->>>>>> +#endif
->>>>> This hammers down the world to compile one binary for ACPI
->>>>> and one binary for device tree. Maybe that's fine, I don't know.
->>>> How does it do that?
->>>>
->>>> As far as I could tell CONFIG_ACPI and CONFIG_OF are not mutually
->>>> exclusive, and this just means that we only build the datastructures for
->>>> matching from ACPI when CONFIG_ACPI is enabled.
->>>>
->>>> Have I missed something?
->>>>
->>>> I definitely don't want to see mutually exclusive ACPI and DT support.
->>> ACPI and DT did the same job so I think they should mutually exclusive.
->>> if we enable both DT and ACPI in one system, this will leading confusions.
->> ACPI and DT do similar jobs, and we should be mutually exclusive at
->> runtime. However, they should not be mutually exclusive at compile-time.
->>
->> Being mutually exclusive at compile-time is just broken. It creates more
->> work for distributions (who need to ship double the number of kernels),
->> it increases the number of configurations requiring testing, and it
->> makes it easier for bugs to be introduced. It's just painful, and
->> there's no reason for it.
-> I fully agree (IOW, I'll NAK patches that break this assumption; we want
-> single kernel image whether it uses DT or ACPI).
+Hi Christopher,
 
-I will not break this in next version, because I totally agree with Mark 
-too :)
+On Wed, Jan 22, 2014 at 06:29:25PM +0000, Christopher Covington wrote:
+> Add the trivial support necessary to get hardware breakpoints
+> working for GDB on ARMv8 simulators running in AArch32 mode.
+> 
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm/include/asm/hw_breakpoint.h | 1 +
+>  arch/arm/kernel/hw_breakpoint.c      | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+> index eef55ea..8e427c7 100644
+> --- a/arch/arm/include/asm/hw_breakpoint.h
+> +++ b/arch/arm/include/asm/hw_breakpoint.h
+> @@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
+>  #define ARM_DEBUG_ARCH_V7_ECP14	3
+>  #define ARM_DEBUG_ARCH_V7_MM	4
+>  #define ARM_DEBUG_ARCH_V7_1	5
+> +#define ARM_DEBUG_ARCH_V8	6
+>  
+>  /* Breakpoint */
+>  #define ARM_BREAKPOINT_EXECUTE	0
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index 3d44660..45fbcaf 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -257,6 +257,7 @@ static int enable_monitor_mode(void)
+>  		break;
+>  	case ARM_DEBUG_ARCH_V7_ECP14:
+>  	case ARM_DEBUG_ARCH_V7_1:
+> +	case ARM_DEBUG_ARCH_V8:
+>  		ARM_DBG_WRITE(c0, c2, 2, (dscr | ARM_DSCR_MDBGEN));
+>  		isb();
+>  		break;
 
->
->> At boot time the kernel needs to decide which to use for hardware
->> description, and completely ignore the other (which should not be
->> present, but lets not assume that or inevitably someone will break that
->> assumption for a quick hack).
->>
->> The same kernel should boot on a system that has a DTB or a system that
->> has ACPI tables. On a system that's provided both it should use one or
->> the other, but not both.
-> Do we still need the chosen node to be passed via DT for command line,
-> even if the kernel uses ACPI?
+I'm slightly uneasy about this, mainly because I've not spent much time
+looking at the AArch32 side of ARMv8 debug and I know that a fair amount
+has changed since 7.1. Furthermore, the arch/arm/ kernel hasn't grown any v8
+features yet and it's not clear whether that's a road down which people wish
+to take it.
 
-It depends, but I would prefer not. I prefer UEFI+ACPI and then we don't 
-need
+Anyway, assuming this works, can you please update debug_exception_updates_fsr
+to return true for ARMv8 cores?
 
-the chosen node to be passed via DT.
-
-Thanks
-Hanjun
+Will
