@@ -1,59 +1,28 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 24 Jan 2014 18:29:12 +0100
-Subject: [PATCH v3 15/24] drm/i2c: tda998x: use irq for connection status
- and EDID read
-In-Reply-To: <20140122222705.GL15937@n2100.arm.linux.org.uk>
-References: <cover.1390153344.git.moinejf@free.fr>
- <20140119195843.7ae9753d@armhf>
- <20140122222705.GL15937@n2100.arm.linux.org.uk>
-Message-ID: <52E2A2E8.50806@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 24 Jan 2014 15:35:23 -0200
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <20140120164859.GF15937@n2100.arm.linux.org.uk>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+ <20140120164859.GF15937@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/14 23:27, Russell King - ARM Linux wrote:
-> On Sun, Jan 19, 2014 at 07:58:43PM +0100, Jean-Francois Moine wrote:
->> This patch adds the optional treatment of the tda998x IRQ.
->>
->> The interrupt function is used to know the display connection status
->> without polling and to speedup reading the EDID.
->>
->> The interrupt number may be defined either in the DT or at encoder set
->> config time for non-DT boards.
->>
->> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
->> ---
-[...]
->> @@ -720,6 +787,10 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
->>   		priv->audio_port = p->audio_cfg;
->>   		priv->audio_format = p->audio_format;
->>   	}
->> +
->> +	priv->irq = p->irq;
->> +	if (p->irq)
->> +		tda_irq_init(priv);
->
-> If we're going to do it this way, this should probably release the IRQ if
-> there was one before re-claiming it, just in case this function gets called
-> more than once by some driver using it.
->
-> The alternative is, as I said before, to use the infrastructure which is
-> already there, namely setting the interrupt via struct i2c_client's
-> irq member.  Yes, that doesn't satisfy Sebastian's comment about using
-> a GPIO, but there's no sign of GPIO usage in here at the moment anyway.
-> So we might as well use what's already provided.
+On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Russell,
+> So far so good.  Now, what about this external oscillator which has its
+> own separate power control.  My immediate thought is that this can be
+> specified via card_ext_clock - I would simply need to declare a fixed-rate
+> clock with either a regulator (power switch) controlled via a gpio (which
+> would probably be closer to the hardware) or a gpio as an enable... ah,
+> that requires me to write a common clock driver for that bit since this
+> is currently not modelled by CCF...
 
-I am fine with using an irq instead of gpio here. I remember you telling
-me on a similar patch, that from the gpio you can derive the irq but
-not the other way round. Anyway, I also remember reading discussions
-about DT gpios vs interrupts, and IIRC the outcome was that passing
-interrupts is fine, too.
+Jiry Sarha posted a gpio controlled clock proposal:
+http://www.spinics.net/lists/devicetree/msg16651.html
 
-We usually have both interrupt-controller; and gpio-controller; set on
-DT gpio controllers, so let's stick with irq.
+Regards,
 
-And: Thanks for reviewing this again, I am still too busy to keep up
-with it.
-
-Sebastian
+Fabio Estevam
