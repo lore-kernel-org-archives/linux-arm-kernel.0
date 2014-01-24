@@ -1,188 +1,119 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 24 Jan 2014 20:54:04 +0530
-Subject: [PATCH v2 3/7] devicetree: bindings: add cpu clock configuration
- data binding for Exynos4/5
-In-Reply-To: <CAJuA9ai+5+t=WKvvxK7MzriAFd2fBXOVVt9YgZ18XQ5a9mr4Og@mail.gmail.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-4-git-send-email-thomas.ab@samsung.com>
- <CAL_JsqJSSW3DKQvcwzuapAYRbZMP3CP5vne-Bvg7-4z-rDGSxw@mail.gmail.com>
- <CAJuA9ai+5+t=WKvvxK7MzriAFd2fBXOVVt9YgZ18XQ5a9mr4Og@mail.gmail.com>
-Message-ID: <CAJuA9ahqiFih-bR7Ezvx9pwG7i9OKKftwdp11kf4hY0=KyFdtQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 24 Jan 2014 16:31:27 +0100
+Subject: [PATCH] sunxi: dts: add a note that memory size is adjusted by
+ boot loader.
+In-Reply-To: <1390572852-15027-1-git-send-email-ijc@hellion.org.uk>
+References: <1390572852-15027-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <52E2874F.10703@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On Tue, Jan 21, 2014 at 1:01 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> Hi Rob,
->
->
-> On Sat, Jan 18, 2014 at 8:52 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On Sat, Jan 18, 2014 at 6:10 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>
->>> The clk ops of the new Samsung cpu clock provider type requires configuration
->>> data that will be programmed in the multiple clock blocks encapsulated within
->>> the cpu clock provider type. This configuration data is held in the clock
->>> controller node. Update clock binding documentation about this configuration
->>> data format for Samsung Exynos4 and Exynos5 platforms.
->>>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>
->> Please copy all maintainers.
->
-> Okay.
->
->>
->>> Cc: Tomasz Figa <t.figa@samsung.com>
->>> Cc: <devicetree@vger.kernel.org>
->>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>> ---
->>>  .../devicetree/bindings/clock/exynos4-clock.txt    |   30 ++++++++++++++++++++
->>>  .../devicetree/bindings/clock/exynos5250-clock.txt |   21 ++++++++++++++
->>>  2 files changed, 51 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
->>> index a2ac2d9..c28aabd 100644
->>> --- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
->>> +++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
->>> @@ -15,6 +15,29 @@ Required Properties:
->>>
->>>  - #clock-cells: should be 1.
->>>
->>> +- arm-frequency-table: defines the list of arm clock speeds supported and
->>
->> Seems like a Samsung specific property and nothing to do with ARM, so
->> it should be named accordingly.
->
-> Okay.
->
->>
->>> +  the associated configuration values required to setup the clock controller
->>> +  for generating those speeds. The format of each entry included in the
->>> +  arm-frequency-table should be as defined below (#cells per entry = 13)
->>> +
->>> +  - for Exynos4210 and Exynos4212 based platforms:
->>> +      cell #1: arm clock frequency
->>> +      cell #2: expected arm clock parent frequency
->>> +      cell #3 ~ cell 12#: value of clock divider in the following order
->>> +              core_ratio, corem0_ratio, corem1_ratio, periph_ratio,
->>> +              atb_ratio, pclk_dbg_ratio, apll_ratio, core2_ratio,
->>> +              copy_ratio, hpm_ratio.
->>> +      cell #13: reserved (should be zero).
->>> +
->>> +  - for Exynos4412 based platforms:
->>> +      cell #1: arm clock frequency
->>> +      cell #2: expected arm clock parent frequency
->>> +      cell #3 ~ cell #13: value of clock divider in the following order
->>> +              core_ratio, corem0_ratio, corem1_ratio, periph_ratio,
->>> +              atb_ratio, pclk_dbg_ratio, apll_ratio, core2_ratio,
->>> +              copy_ratio, hpm_ratio, cores_ratio
->>
->> You don't need voltages? Are the h/w limitations really ratios or each
->> clock has a max frequency that must be maintained? I would expect the
->> latter and think it would be better to specify maximum frequencies of
->> each clock. Then you can calculate the dividers to keep frequencies in
->> range.
->
-> Voltage is not needed here since the cpu clock speed is managed by the
-> cpufreq driver which will take care of setting appropriate voltage.
-> Any other users apart from cpufreq will have to setup the voltage
-> appropriately.
->
-> About the ratios, yes the user manual lists the optimal clock
-> frequency for these clocks. As suggested, I will remove the ratio list
-> for these clocks.
+On 01/24/2014 03:14 PM, Ian Campbell wrote:
+> I had to spend a couple of minutes proving to myself that this was the case on
+> cubietruck, so add a comment to save the next guy some effort.
 
-I tried the approach of listing the optimal frequencies of these
-clocks in dt and then calculating a divider value. But it turns out
-that the divider values for these clocks is dependent on the frequency
-of the PLL from which they are derived (or the voltage applied to the
-CPU clock domain). During tests, the system is unstable if divider
-values are calculated using the optimal clock speed listed in the SoC
-manual.
+Seems like a good idea to me, one small nitpick though see comments inline.
 
-So the list of divider values as used in this series (and documented
-above) is required. Can I continue to use the binding as documented
-above?
+> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-sunxi at googlegroups.com
+> ---
+> This patch applies cleanly against v3.13 and Hans' sunxi-devel branch.
+>
+> A plausible alternative would be to pull the memory node out of the dtsi files
+> and into the board specific files. I didn't go straight to that since I'd have
+> to research all the various boards ;-)
 
-Thanks,
-Thomas.
+That won't help, some boards ie the original cubieboard and the mele-a1000 come
+in both 512 MB and 1024 MB versions, and I don't think we want to start maintaining
+2 different dts files just for that.
 
 >
->>
->> How will this scale to multi-cluster chips with different frequency ranges?
+> I considered maing it "reg = <0 0>" but decided that having some sort of least
+> common denominator would let things work even if the bootloader were broken.
+> ---
+>   arch/arm/boot/dts/sun4i-a10.dtsi  |    1 +
+>   arch/arm/boot/dts/sun5i-a10s.dtsi |    1 +
+>   arch/arm/boot/dts/sun5i-a13.dtsi  |    1 +
+>   arch/arm/boot/dts/sun6i-a31.dtsi  |    1 +
+>   arch/arm/boot/dts/sun7i-a20.dtsi  |    1 +
+>   5 files changed, 5 insertions(+)
 >
-> Usually, each cluster would have its own independent clock input. So
-> there will be two or more cpu clocks in multi-cluster chips. So the
-> clocks can be independently programmed as required by the cluster.
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 3e60883..9ba0beb 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -30,6 +30,7 @@
+>   	};
 >
->>
->> Rob
->>
+>   	memory {
+> +		/* 1GB by default, will be updated by U-Boot */
+>   		reg = <0x40000000 0x80000000>;
+>   	};
 >
-> Thanks Rob for your review.
+
+The comment says 1GB, but the range says 2GB, note 2GB is consistent with what the
+datasheet claims as max RAM.
+
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 0376c50..d12ed7e 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -27,6 +27,7 @@
+>   	};
 >
-> Thomas.
+>   	memory {
+> +		/* 512MB by default, will be updated by U-Boot */
+>   		reg = <0x40000000 0x20000000>;
+>   	};
 >
->>> +
->>> +
->>>  The following is the list of clocks generated by the controller. Each clock is
->>>  assigned an identifier and client nodes use this identifier to specify the
->>>  clock which they consume. Some of the clocks are available only on a particular
->>> @@ -275,6 +298,13 @@ Example 1: An example of a clock controller node is listed below.
->>>                 compatible = "samsung,exynos4210-clock";
->>>                 reg = <0x10030000 0x20000>;
->>>                 #clock-cells = <1>;
->>> +
->>> +               arm-frequency-table = <1200000 1200000 0 3 7 3 4 1 7 0 5 0>,
->>> +                                     <1000000 1000000 0 3 7 3 4 1 7 0 4 0>,
->>> +                                     < 800000  800000 0 3 7 3 3 1 7 0 3 0>,
->>> +                                     < 500000  500000 0 3 7 3 3 1 7 0 3 0>,
->>> +                                     < 400000  400000 0 3 7 3 3 1 7 0 3 0>,
->>> +                                     < 200000  200000 0 1 3 1 1 1 0 0 3 0>;
->>>         };
->>>
->>>  Example 2: UART controller node that consumes the clock generated by the clock
->>> diff --git a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
->>> index 72ce617..99eae9c 100644
->>> --- a/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
->>> +++ b/Documentation/devicetree/bindings/clock/exynos5250-clock.txt
->>> @@ -13,6 +13,20 @@ Required Properties:
->>>
->>>  - #clock-cells: should be 1.
->>>
->>> +- arm-frequency-table: defines the list of arm clock speeds supported and
->>> +  the associated configuration values required to setup the clock controller
->>> +  for generating those speeds. The format of each entry included in the
->>> +  arm-frequency-table should be as defined below (#cells per entry = 13)
->>> +
->>> +      cell #1: arm clock frequency
->>> +      cell #2: expected arm clock parent frequency
->>> +      cell #3 ~ cell #12: value of clock divider in the following order
->>> +              arm_ratio, cpud_ratio, acp_ratio, periph_ratio,
->>> +              atb_ratio, pclk_dbg_ratio, apll_ratio, arm2_ratio,
->>> +              copy_ratio, hpm_ratio
->>> +      cell #13: reserved (should be zero)
->>> +
->>> +
->>>  The following is the list of clocks generated by the controller. Each clock is
->>>  assigned an identifier and client nodes use this identifier to specify the
->>>  clock which they consume.
->>> @@ -177,6 +191,13 @@ Example 1: An example of a clock controller node is listed below.
->>>                 compatible = "samsung,exynos5250-clock";
->>>                 reg = <0x10010000 0x30000>;
->>>                 #clock-cells = <1>;
->>> +
->>> +               arm-frequency-table = <1700000 1700000 0 3 7 7 7 3 5 0 0 2>,
->>> +                                     <1600000 1600000 0 3 7 7 7 1 4 0 0 2>,
->>> +                                     <1500000 1500000 0 2 7 7 7 1 4 0 0 2>,
->>> +                                     <1400000 1400000 0 2 7 7 6 1 4 0 0 2>,
->>> +                                     <1300000 1300000 0 2 7 7 6 1 3 0 0 2>,
->>> +                                     <1200000 1200000 0 2 7 7 5 1 3 0 0 2>;
->>>         };
->>>
->>>  Example 2: UART controller node that consumes the clock generated by the clock
->>> --
->>> 1.6.6.rc2
->>>
+
+This seems wrong (copy paste from A13 error) I've a10s boards with 1G, and the data
+sheet claims 2GB max RAM.
+
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index b81aeb9..6f8bfd9 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -27,6 +27,7 @@
+>   	};
+>
+>   	memory {
+> +		/* 512MB by default, will be updated by U-Boot */
+>   		reg = <0x40000000 0x20000000>;
+>   	};
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 3f6f07b..bcbef9a 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -46,6 +46,7 @@
+>   	};
+>
+>   	memory {
+> +		/* 2GB by default, will be updated by U-Boot */
+>   		reg = <0x40000000 0x80000000>;
+>   	};
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 907cfcc..658e74b 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -38,6 +38,7 @@
+>   	};
+>
+>   	memory {
+> +		/* 1GB by default, will be updated by U-Boot */
+>   		reg = <0x40000000 0x80000000>;
+>   	};
+
+The comment says 1GB, but the range says 2GB, note 2GB is consistent with what the
+datasheet claims as max RAM.
+
+Regards,
+
+Hans
