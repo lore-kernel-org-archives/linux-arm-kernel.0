@@ -1,67 +1,70 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jan 2014 13:49:39 +0100
-Subject: [PATCH v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary
- RSPI pinmux setup
-In-Reply-To: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-References: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1390567791-8988-4-git-send-email-geert@linux-m68k.org>
+Date: Fri, 24 Jan 2014 13:49:36 +0100
+Subject: [PATCH 00/15] ARM: shmobile: RSPI RZ and QSPI SoC and board
+ integration
+Message-ID: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+	Hi Simon, Magnus,
 
-This does not work yet, as there's no pinmux configuration in
-setup-r7s72100.c
+This patch series contains SoC and board integration for
+  1. RSPI in the r7s72100 aka RZ/A1H SoC on the Genmai reference board,
+  2. QSPI in the r8a7791 aka R-Car M2 SoC on the Koelsch reference board.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
-v4:
-  - The platform device basename was changed from "rspi" to "rspi-rz"
-v3:
-  - No changes
-v2:
-  - New
+It was tested on the r7s72100-based Genmai reference board using loopback
+mode, and on the r8a7791-based Koelsch reference board using the Spansion
+s25fl512s SPI FLASH.
 
- arch/arm/mach-shmobile/board-genmai.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Actual functioning for some parts may depend on the series "[PATCH 0/14]
+spi: rspi: Add support for RZ/A1H, DT, and Quad/Dual on QSPI" I posted
+earlier today.
 
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index 0b01b7f7e240..3d02167967ec 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -19,6 +19,7 @@
-  */
- 
- #include <linux/kernel.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_device.h>
- #include <linux/sh_eth.h>
- #include <linux/spi/rspi.h>
-@@ -77,9 +78,25 @@ static const struct spi_board_info spi_info[] __initconst = {
- 	},
- };
- 
-+static const struct pinctrl_map genmai_pinctrl_map[] = {
-+	/* RSPI4 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
-+				  "rspi4_rspck_p4_0", "rspi4"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
-+				  "rspi4_ssl0_p4_1", "rspi4"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
-+				  "rspi4_mosi_p4_2", "rspi4"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
-+				  "rspi4_miso_p4_3", "rspi4"),
-+};
-+
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
-+	pinctrl_register_mappings(genmai_pinctrl_map,
-+				  ARRAY_SIZE(genmai_pinctrl_map));
-+	/* FIXME there's no pinmux configuration in setup-r7s72100.c yet */
-+	/* r7s72100_pinmux_init(); */
- 	r7s72100_add_dt_devices();
- 
- 	r7s72100_register_rspi(0);
--- 
-1.7.9.5
+Overview:
+    [v4 01/15] ARM: shmobile: r7s72100 clock: Add RSPI clocks
+    [v4 02/15] ARM: shmobile: genmai legacy: Add RSPI support
+    [v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary RSPI
+	       pinmux setup
+    [v2 04/15] ARM: shmobile: genmai defconfig: Enable RSPI
+    [v2 05/15] ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
+    [v4 06/15] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
+    [v4 07/15] ARM: shmobile: genmai reference dts: Add RSPI nodes
+    [v3 08/15] ARM: shmobile: r8a7791 clock: add QSPI clocks
+    [v3 09/15] ARM: shmobile: koelsch legacy: Add QSPI support
+    [v3 10/15] ARM: shmobile: koelsch defconfig: Enable RSPI and MTD_M25P80
+    [v2 11/15] ARM: shmobile: r8a7791 dtsi: Add QSPI node
+    [v2 12/15] ARM: shmobile: koelsch dts: Add QSPI nodes
+    [   13/15] ARM: shmobile: lager legacy: Switch QSPI to named IRQs
+    [   14/15] ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for
+	       the SPI FLASH
+    [   15/15] ARM: shmobile: koelsch dts: Enable Quad SPI transfers
+
+Earlier versions of these have been posted before in:
+    "[PATCH V3 0/5] SoC and board integration for RSPI on r7s72100/genmai"
+    "[PATCH V2 0/4] SoC and board integration for QSPI on r8a7791/koelsch"
+    "[PATCH 0/9] Renesas RSPI/QSPI DT support"
+
+The series is based on renesas-devel-v3.13-20140124, with pinctrl work 
+accepted by Linus, Magnus' pinctrl, Wolfram's riic, Simon's sh_eth,
+Valentine's i2c, and Laurent's SCIF DT work applied on top.
+[Simon: I don't know in which order you will merge these. If you want me
+ to rebase my patches, just ask! Thanks!]
+
+All of these should be safe to apply, without runtime dependencies on other
+parts, except for [14/15] and [15/15]: those must not go in before
+"[14/14] spi: rspi: Add support for Quad and Dual SPI Transfers on QSPI",
+as this would disable SPI FLASH access (the SPI core rejects Quad SPI slaves
+without Quad SPI master support).
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
