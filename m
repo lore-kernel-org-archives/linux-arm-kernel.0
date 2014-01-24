@@ -1,49 +1,93 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 24 Jan 2014 18:41:37 -0300
-Subject: [PATCH 1/3] irqchip: orion: clear bridge cause register on init
-In-Reply-To: <1390516686-2224-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390516686-2224-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140124211528.GA14012@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 24 Jan 2014 23:04:52 +0100
+Subject: [PATCH] ARM-i.MX6Q-dts : Added USB_OTG Support
+In-Reply-To: <1390555724-9779-1-git-send-email-ashutosh.s@phytec.in>
+References: <1390555724-9779-1-git-send-email-ashutosh.s@phytec.in>
+Message-ID: <20140124220452.GL16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 11:38:04PM +0100, Sebastian Hesselbarth wrote:
-> It is good practice to mask and clear pending irqs on init. We already
-> mask all irqs, so also clear the bridge irq cause register.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/irqchip/irq-orion.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-> index e51d40031884..4137c3d15284 100644
-> --- a/drivers/irqchip/irq-orion.c
-> +++ b/drivers/irqchip/irq-orion.c
-> @@ -180,8 +180,9 @@ static int __init orion_bridge_irq_init(struct device_node *np,
->  	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
->  	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
->  
-> -	/* mask all interrupts */
-> +	/* mask and clear all interrupts */
->  	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_MASK);
-> +	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_CAUSE);
->  
+Please add Phytec phyFLEX-i.MX6 to the subject. I assumed some SoC
+specific changes here.
 
-This looks a bit bogus to me, now that we are clearing the cause upon
-irq_startup(). Don't have a strong opinion, it's just that I fail to see
-why we'd want or need this change...
+Sascha
+
+On Fri, Jan 24, 2014 at 02:58:44PM +0530, Ashutosh singh wrote:
+> This patch adds support for USB_OTG on Phytec phyFLEX-i.MX6 Quad module.
+> 
+> Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
+> ---
+>  arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |    4 ++++
+>  arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   22 ++++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+> index 7d37ec6..39e69bd 100644
+> --- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+> +++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+> @@ -32,3 +32,7 @@
+>  &usdhc3 {
+>  	status = "okay";
+>  };
+> +
+> +&usbotg {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> index 1a3b50d..dcb1d59 100644
+> --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+> @@ -18,6 +18,19 @@
+>  	memory {
+>  		reg = <0x10000000 0x80000000>;
+>  	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio4 15 0>;
+> +			enable-active-low;
+> +		};
+> +	};
+>  };
+>  
+>  &ecspi3 {
+> @@ -134,6 +147,7 @@
+>  				MX6QDL_PAD_EIM_D23__GPIO3_IO23 0x80000000
+>  				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
+>  				MX6QDL_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
+> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15   0x80000000 /* USB_OTG_PWR_EN */
+>  			>;
+>  		};
+>  	};
+> @@ -178,3 +192,11 @@
+>          wp-gpios = <&gpio1 29 0>;
+>          status = "disabled";
+>  };
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg_1>;
+> +	disable-over-current;
+> +	status = "disabled";
+> +};
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
