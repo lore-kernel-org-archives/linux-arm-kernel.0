@@ -1,32 +1,53 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 24 Jan 2014 17:23:08 +0900
-Subject: [PATCH] arm64: fix build error if DMA_CMA is enabled
-Message-ID: <1390551788-6138-1-git-send-email-pankaj.dubey@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 24 Jan 2014 10:18:58 +0200
+Subject: [PATCH 0/9] ARM: DTS: OMAP: Audio related cleanups for dtsi and dts
+ files
+Message-ID: <1390551547-12406-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64/include/asm/dma-contiguous.h is trying to include
-<asm-genric/dma-contiguous.h> which does not exist, and thus failing
-build for arm64 if we enable CONFIG_DMA_CMA. This patch fixes build 
-error by removing unwanted header inclusion from arm64's dma-contiguous.h.
+Hi Benoit,
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Signed-off-by: Somraj Mani <somraj.mani@samsung.com>
+OMAP: Put the audio nodes to disabled styate by default and board dts files should
+enable the nodes which is used on the board.
+
+am335x: correct the audio mclk clock. This patch has been marked to go to 3.13
+	stable as well.
+
+Regards,
+Peter
 ---
- arch/arm64/include/asm/dma-contiguous.h |    1 -
- 1 file changed, 1 deletion(-)
+Peter Ujfalusi (9):
+  ARM: DTS: omap4-panda-common: Move audio related pinmux to respective
+    nodes
+  ARM: DTS: omap4-sdp: Move audio related pinmux to respective nodes
+  ARM: DTS: omap4: Set all audio related IP's status to disabled as
+    default
+  ARM: DTS: omap4-panda-common: No need to disable the unused audio
+    nodes
+  ARM: DTS: omap4-sdp: No need to disable mcbsp3 node
+  ARM: DTS: omap5: Set all audio related IP's status to disabled as
+    default
+  ARM: DTS: omap3: Set disabled status for McBSP instances as default
+    state
+  ARM: DTS: omap2: Set disabled status for McBSP instances as default
+    state
+  ARM: DTS: am335x-evmsk: Correct audio clock frequency
 
-diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
-index d6aacb6..14c4c0c 100644
---- a/arch/arm64/include/asm/dma-contiguous.h
-+++ b/arch/arm64/include/asm/dma-contiguous.h
-@@ -18,7 +18,6 @@
- #ifdef CONFIG_DMA_CMA
- 
- #include <linux/types.h>
--#include <asm-generic/dma-contiguous.h>
- 
- static inline void
- dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+ arch/arm/boot/dts/am335x-evmsk.dts        |  2 +-
+ arch/arm/boot/dts/omap2420.dtsi           |  2 ++
+ arch/arm/boot/dts/omap2430.dtsi           |  5 +++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |  4 ++++
+ arch/arm/boot/dts/omap3-beagle.dts        |  4 ++++
+ arch/arm/boot/dts/omap3-devkit8000.dts    | 16 ++-------------
+ arch/arm/boot/dts/omap3-igep.dtsi         |  1 +
+ arch/arm/boot/dts/omap3-overo.dtsi        |  4 ++++
+ arch/arm/boot/dts/omap3.dtsi              |  5 +++++
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 23 ++++++++++-----------
+ arch/arm/boot/dts/omap4-sdp.dts           | 33 ++++++++++++++++++++++++-------
+ arch/arm/boot/dts/omap4.dtsi              |  6 ++++++
+ arch/arm/boot/dts/omap5.dtsi              |  5 +++++
+ 13 files changed, 77 insertions(+), 33 deletions(-)
+
 -- 
-1.7.10.4
+1.8.5.3
