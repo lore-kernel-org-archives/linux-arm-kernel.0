@@ -1,43 +1,67 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jan 2014 13:49:47 +0100
-Subject: [PATCH v2 11/15] ARM: shmobile: r8a7791 dtsi: Add QSPI node
+Date: Fri, 24 Jan 2014 13:49:39 +0100
+Subject: [PATCH v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary
+ RSPI pinmux setup
 In-Reply-To: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
 References: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1390567791-8988-12-git-send-email-geert@linux-m68k.org>
+Message-ID: <1390567791-8988-4-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
+This does not work yet, as there's no pinmux configuration in
+setup-r7s72100.c
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Cc: devicetree at vger.kernel.org
 ---
-v2:
+v4:
+  - The platform device basename was changed from "rspi" to "rspi-rz"
+v3:
   - No changes
+v2:
+  - New
 
- arch/arm/boot/dts/r8a7791.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-shmobile/board-genmai.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index d5cc3626dd60..240c4ece1f0c 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -710,4 +710,16 @@
- 			clock-output-names = "scifa3", "scifa4", "scifa5";
- 		};
- 	};
-+
-+	spi: spi at e6b10000 {
-+		compatible = "renesas,qspi-r8a7791", "renesas,qspi";
-+		reg = <0 0xe6b10000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7791_CLK_QSPI_MOD>;
-+		num-cs = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index 0b01b7f7e240..3d02167967ec 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <linux/sh_eth.h>
+ #include <linux/spi/rspi.h>
+@@ -77,9 +78,25 @@ static const struct spi_board_info spi_info[] __initconst = {
+ 	},
  };
+ 
++static const struct pinctrl_map genmai_pinctrl_map[] = {
++	/* RSPI4 */
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
++				  "rspi4_rspck_p4_0", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
++				  "rspi4_ssl0_p4_1", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
++				  "rspi4_mosi_p4_2", "rspi4"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rspi-rz.4", "pfc-r7s72100",
++				  "rspi4_miso_p4_3", "rspi4"),
++};
++
+ static void __init genmai_add_standard_devices(void)
+ {
+ 	r7s72100_clock_init();
++	pinctrl_register_mappings(genmai_pinctrl_map,
++				  ARRAY_SIZE(genmai_pinctrl_map));
++	/* FIXME there's no pinmux configuration in setup-r7s72100.c yet */
++	/* r7s72100_pinmux_init(); */
+ 	r7s72100_add_dt_devices();
+ 
+ 	r7s72100_register_rspi(0);
 -- 
 1.7.9.5
