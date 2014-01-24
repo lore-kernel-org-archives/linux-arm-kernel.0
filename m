@@ -1,62 +1,79 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jan 2014 11:50:05 +0000
-Subject: [PATCH] ARM-i.MX6Q-dts : Added USB_OTG Support
-In-Reply-To: <1390555724-9779-1-git-send-email-ashutosh.s@phytec.in>
-References: <1390555724-9779-1-git-send-email-ashutosh.s@phytec.in>
-Message-ID: <20140124115005.GG814@e106331-lin.cambridge.arm.com>
+Date: Fri, 24 Jan 2014 12:08:15 +0000
+Subject: [PATCH 18/20] clocksource / acpi: Add macro
+ CLOCKSOURCE_ACPI_DECLARE
+In-Reply-To: <52E1B1DE.5050507@linaro.org>
+References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
+ <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
+ <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
+ <20140122114537.GA15591@e106331-lin.cambridge.arm.com>
+ <52E1B1DE.5050507@linaro.org>
+Message-ID: <20140124120815.GH814@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 09:28:44AM +0000, Ashutosh singh wrote:
-> This patch adds support for USB_OTG on Phytec phyFLEX-i.MX6 Quad module.
+On Fri, Jan 24, 2014 at 12:20:46AM +0000, Hanjun Guo wrote:
+> On 2014?01?22? 19:45, Mark Rutland wrote:
+> > On Wed, Jan 22, 2014 at 08:26:50AM +0000, Linus Walleij wrote:
+> >> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> >>
+> >>> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >>>
+> >>> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
+> >>> name from the ACPI timer table is matched with all the registered
+> >>> timer controllers and matching initialisation routine is invoked.
+> >>>
+> >>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> >>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
+> >> to TIMER_OF_DECLARE() and I think this macro, if needed, should
+> >> be named TIMER_ACPI_DECLARE().
+> >>
+> >> The reason is that "clocksource" is a Linux-internal name and this
+> >> macro pertains to the hardware name in respective system
+> >> description type.
+> >>
+> >>> +#ifdef CONFIG_ACPI
+> >>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
+> >>> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
+> >>> +               __used __section(__clksrc_acpi_table)                   \
+> >>> +                = { .id = compat,                              \
+> >>> +                    .driver_data = (kernel_ulong_t)fn }
+> >>> +#else
+> >>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
+> >>> +#endif
+> >> This hammers down the world to compile one binary for ACPI
+> >> and one binary for device tree. Maybe that's fine, I don't know.
+> > How does it do that?
+> >
+> > As far as I could tell CONFIG_ACPI and CONFIG_OF are not mutually
+> > exclusive, and this just means that we only build the datastructures for
+> > matching from ACPI when CONFIG_ACPI is enabled.
+> >
+> > Have I missed something?
+> >
+> > I definitely don't want to see mutually exclusive ACPI and DT support.
 > 
-> Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
-> ---
->  arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |    4 ++++
->  arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   22 ++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-> index 7d37ec6..39e69bd 100644
-> --- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-> +++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-> @@ -32,3 +32,7 @@
->  &usdhc3 {
->  	status = "okay";
->  };
-> +
-> +&usbotg {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> index 1a3b50d..dcb1d59 100644
-> --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-> @@ -18,6 +18,19 @@
->  	memory {
->  		reg = <0x10000000 0x80000000>;
->  	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
+> ACPI and DT did the same job so I think they should mutually exclusive.
+> if we enable both DT and ACPI in one system, this will leading confusions.
 
-This is _not_ a simple bus. It doesn't have the required ranges
-property.
+ACPI and DT do similar jobs, and we should be mutually exclusive at
+runtime. However, they should not be mutually exclusive at compile-time.
 
-Why do these need to be in a regulators container node? We don't group
-dma controllers under a dmas node, or uarts under a uarts node.
+Being mutually exclusive at compile-time is just broken. It creates more
+work for distributions (who need to ship double the number of kernels),
+it increases the number of configurations requiring testing, and it
+makes it easier for bugs to be introduced. It's just painful, and
+there's no reason for it.
 
-> +
-> +		reg_usb_otg_vbus: usb_otg_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb_otg_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio4 15 0>;
-> +			enable-active-low;
-> +		};
-> +	};
->  };
+At boot time the kernel needs to decide which to use for hardware
+description, and completely ignore the other (which should not be
+present, but lets not assume that or inevitably someone will break that
+assumption for a quick hack).
+
+The same kernel should boot on a system that has a DTB or a system that
+has ACPI tables. On a system that's provided both it should use one or
+the other, but not both.
 
 Thanks,
 Mark.
