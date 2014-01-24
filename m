@@ -1,61 +1,40 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 24 Jan 2014 17:09:53 +0100
-Subject: [PATCH v5 4/4] [media] exynos-scaler: Add DT bindings for SCALER
- driver
-In-Reply-To: <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
-References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
- <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <52E29051.3070906@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jan 2014 16:35:49 +0000
+Subject: [PATCH v5 0/4] perf: AARCH64 arch support
+In-Reply-To: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
+References: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140124163548.GH31040@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik,
+Hi Jean,
 
-On 09.01.2014 04:28, Shaik Ameer Basha wrote:
-> This patch adds the DT binding documentation for the
-> Exynos5420/5410 based SCALER device driver.
->
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->   .../devicetree/bindings/media/exynos5-scaler.txt   |   22 ++++++++++++++++++++
->   1 file changed, 22 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/media/exynos5-scaler.txt
->
-> diff --git a/Documentation/devicetree/bindings/media/exynos5-scaler.txt b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
-> new file mode 100644
-> index 0000000..9328e7d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
-> @@ -0,0 +1,22 @@
-> +* Samsung Exynos5 SCALER device
-> +
-> +SCALER is used for scaling, blending, color fill and color space
-> +conversion on EXYNOS[5420/5410] SoCs.
-> +
-> +Required properties:
-> +- compatible: should be "samsung,exynos5420-scaler" or
-> +			"samsung,exynos5410-scaler"
-> +- reg: should contain SCALER physical address location and length
-> +- interrupts: should contain SCALER interrupt number
+On Wed, Jan 22, 2014 at 02:11:15PM +0000, Jean Pihet wrote:
+> Add AARCH64 specific support. This includes the following:
+> - AARCH64 perf registers definition and hooks,
+> - compat mode registers use, i.e. profiling a 32-bit binary on
+>    a 64-bit system,
+> - unwinding using the dwarf information from the .debug_frame
+>    section of the ELF binary,
+> - unwinding using the frame pointer information; in 64-bit and
+>    compat modes.
+> 
+> Note: support for unwinding using the dwarf information in compat
+> mode requires some changes to the libunwind code. Those changes
+> have been submitted on the libunwind ML and are in discussion.
+> 
+> Tested on ARMv7, ARMv8 and x86_64 platforms. The compat mode has been
+> tested on ARMv8 using statically built 32-bit binaries.
 
-s/number/specifier/
+This is look alright to me now, but there are still two blockers:
 
-> +- clocks: should contain the SCALER clock specifier, from the
-> +			common clock bindings
+ (1) Getting the libunwind code merged
+ (2) Splitting this into an arch/arm64 series and a tools/perf series, so
+     that acme can merge the latter independently (and avoid the mess we had
+     last time).
 
-s/specifier/phandle and specifier pair for each clock listed in 
-clock-names property/
+Anyway, for the series:
 
-s/from/according to/
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-> +- clock-names: should be "scaler"
-
-should contain exactly one entry:
-  - "scaler" - IP bus clock.
-
-Also this patch should be first in the series to let the driver added in 
-further patches use already present bindings.
-
-Best regards,
-Tomasz
+Will
