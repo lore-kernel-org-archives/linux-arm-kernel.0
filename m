@@ -1,144 +1,44 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jan 2014 22:57:33 +0800
-Subject: [PATCH 11/20] ARM64 / ACPI: Get the enable method for SMP
- initialization
-In-Reply-To: <20140123175031.GJ27520@arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-12-git-send-email-hanjun.guo@linaro.org>
- <20140123175031.GJ27520@arm.com>
-Message-ID: <52E27F5D.6070302@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 Jan 2014 23:09:31 +0800
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140119185246.GB28056@quad.lixom.net>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+ <20140119031816.GD16158@S2101-09.ap.freescale.net>
+ <20140119185246.GB28056@quad.lixom.net>
+Message-ID: <20140124150927.GA2780@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Sun, Jan 19, 2014 at 10:52:46AM -0800, Olof Johansson wrote:
+> I'm well aware that the DT branch has not been merged, and that's because
+> there has been no consensus from DT maintainers on the massive rework
+> you did as the base of the branch.
 
-On 2014?01?24? 01:50, Catalin Marinas wrote:
-> On Fri, Jan 17, 2014 at 12:25:05PM +0000, Hanjun Guo wrote:
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -48,6 +48,7 @@
->>   #include <asm/sections.h>
->>   #include <asm/tlbflush.h>
->>   #include <asm/ptrace.h>
->> +#include <asm/acpi.h>
->>   
->>   /*
->>    * as from 2.5, kernels no longer have an init_tasks structure
->> @@ -280,7 +281,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
->>    * cpu logical map array containing MPIDR values related to logical
->>    * cpus. Assumes that cpu_logical_map(0) has already been initialized.
->>    */
->> -void __init smp_init_cpus(void)
->> +static int __init of_smp_init_cpus(void)
->>   {
->>   	struct device_node *dn = NULL;
->>   	unsigned int i, cpu = 1;
->> @@ -364,6 +365,10 @@ next:
->>   		cpu++;
->>   	}
->>   
->> +	/* No device tree or no CPU node in DT */
->> +	if (cpu == 1 && !bootcpu_valid)
->> +		return -ENODEV;
->> +
->>   	/* sanity check */
->>   	if (cpu > NR_CPUS)
->>   		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
->> @@ -371,7 +376,7 @@ next:
->>   
->>   	if (!bootcpu_valid) {
->>   		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
->> -		return;
->> +		return -EINVAL;
->>   	}
->>   
->>   	/*
->> @@ -381,6 +386,39 @@ next:
->>   	for (i = 0; i < NR_CPUS; i++)
->>   		if (cpu_logical_map(i) != INVALID_HWID)
->>   			set_cpu_possible(i, true);
->> +
->> +	return 0;
->> +}
->> +
->> +/*
->> + * In ACPI mode, the cpu possible map was enumerated before SMP
->> + * initialization when MADT table was parsed, so we can get the
->> + * possible map here to initialize CPUs.
->> + */
->> +static void __init acpi_smp_init_cpus(void)
->> +{
->> +	int cpu;
->> +	const char *enable_method;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		enable_method = acpi_get_enable_method(cpu);
->> +		if (!enable_method)
->> +			continue;
->> +
->> +		cpu_ops[cpu] = cpu_get_ops(enable_method);
->> +		if (!cpu_ops[cpu])
->> +			continue;
->> +
->> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
->> +	}
->> +}
->> +
->> +void __init smp_init_cpus(void)
->> +{
->> +	if (!of_smp_init_cpus())
->> +		return;
->> +
->> +	acpi_smp_init_cpus();
->>   }
-> With DT we initialise the cpu_ops[0] via cpu_read_bootcpu_ops() called
-> from setup_arch(). This is needed because with PSCI we use cpu_ops for
-> power management even if it's a UP system. Do you get a some kernel
-> warning about device node for the boot cpu not found?
+I guess the 'massive rework' you're talking about is the patch series
+that begins with 'ARM: dts: imx6qdl: make pinctrl nodes board specific'?
+If so, I hope you would agree that we're trying to solve a real
+problem [1], even though the solution does not look like the best to
+you.
 
-Thanks for pointing this out, actually we didn't find a dts file with
-spin-table method for SMP initialization, and this patch is not fully
-tested (only spin-table method is supported in ACPI now), we are
-working on that and get this patch fully tested.
+So which specific part of the solution are you objecting to?  Those
+MX6QDL_*_PINGRP macros defined in imx6qdl-pingrp.h?  If that's the
+case, I can send a follow-up patch to kill the macros by filling in the
+pin group definitions directly.  The pros is that the pin group
+definitions for given board will be more intuitive, and the cons is that
+the change set will be even more massive, because the same multi-lines
+pin group definitions will be duplicated in multiple board dts files,
+which use the same group of pins for given device.
 
-I will review the code carefully in your comments, and update
-the code accordingly.
+Or any other better idea?
 
->
->> --- a/drivers/acpi/plat/arm-core.c
->> +++ b/drivers/acpi/plat/arm-core.c
->> @@ -367,6 +367,32 @@ static void __init acpi_process_madt(void)
->>   }
->>   
->>   /*
->> + * To see PCSI is enabled or not.
->> + *
->> + * PSCI is not available for ACPI 5.0, return FALSE for now.
->> + *
->> + * FIXME: should we introduce early_param("psci", func) for test purpose?
->> + */
->> +static bool acpi_psci_smp_available(int cpu)
->> +{
->> +	return FALSE;
->> +}
->> +
->> +static const char *enable_method[] = {
->> +	"psci",
->> +	"spin-table",
->> +	NULL
->> +};
->> +
->> +const char *acpi_get_enable_method(int cpu)
->> +{
->> +	if (acpi_psci_smp_available(cpu))
->> +		return enable_method[0];
->> +	else
->> +		return enable_method[1];
->> +}
-> You could just use literal strings here, actually even ignoring PSCI
-> until available.
+> 
+> Given the timing, it's not looking like it will be resolved in time for
+> the 3.14 merge window (which might open today).
 
-Ok.
+That's frustrating and will be surprising a lot of people who expect to
+see their board support in 3.14 release.
 
-Thanks
-Hanjun
+Shawn
+
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
