@@ -1,177 +1,94 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 24 Jan 2014 17:44:27 +0100
-Subject: [Linaro-acpi] [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c
- and its related head file
-In-Reply-To: <20140124125332.GA23274@e102568-lin.cambridge.arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
- <20140122115453.GC24288@e102568-lin.cambridge.arm.com>
- <52E13BBC.5020005@linaro.org> <52E22DD4.3050807@linaro.org>
- <20140124125332.GA23274@e102568-lin.cambridge.arm.com>
-Message-ID: <52E2986B.802@linaro.org>
+From: balajitk@ti.com (Balaji T K)
+Date: Fri, 24 Jan 2014 22:21:56 +0530
+Subject: [PATCH/RFC] dmaengine: omap-dma: split header file
+In-Reply-To: <20140119100235.GN27282@n2100.arm.linux.org.uk>
+References: <20140119100235.GN27282@n2100.arm.linux.org.uk>
+Message-ID: <1390582316-4765-1-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+To Resolve build failure seen with sh-allmodconfig:
+    include/linux/omap-dma.h:171:8: error: expected identifier before numeric constant
+    make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
+due to CCR redefinition, move dmaengine consumer specific function to omap-dmaengine.h
 
-W dniu 24.01.2014 13:53, Lorenzo Pieralisi pisze:
-> Hi Hanjun,
->
-> On Fri, Jan 24, 2014 at 09:09:40AM +0000, Hanjun Guo wrote:
->> On 2014?01?23? 23:56, Tomasz Nowicki wrote:
->>> Hi Lorenzo,
->>>
->>> W dniu 22.01.2014 12:54, Lorenzo Pieralisi pisze:
->>>> On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
->>>>
->>>> [...]
->>>>
->>>>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->>>>> index bd9bbd0..2210353 100644
->>>>> --- a/arch/arm64/kernel/setup.c
->>>>> +++ b/arch/arm64/kernel/setup.c
->>>>> @@ -41,6 +41,7 @@
->>>>> #include <linux/memblock.h>
->>>>> #include <linux/of_fdt.h>
->>>>> #include <linux/of_platform.h>
->>>>> +#include <linux/acpi.h>
->>>>>
->>>>> #include <asm/cputype.h>
->>>>> #include <asm/elf.h>
->>>>> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
->>>>>
->>>>> arm64_memblock_init();
->>>>>
->>>>> + /* Parse the ACPI tables for possible boot-time configuration */
->>>>> + acpi_boot_table_init();
->>>>> + early_acpi_boot_init();
->>>>> + acpi_boot_init();
->>>>> +
->>>>> paging_init();
->>>>
->>>> Can I ask you please why we need to parse ACPI tables before
->>>> paging_init() ?
->>> This is for future usage and because of couple of reasons. Mainly SRAT
->>> table parsing should be done (before paging_init()) for proper NUMA
->>> initialization and then paging_init().
->
-> Thank you for the explanation. I still have some questions:
->
-> 1) What are the other reasons ?
-If we agreed that we need SRAT parsing before paging_init() the second 
-reason is all implications related to that. I mean if we want to make 
-ACPI tables parseable before paging_init(), we need early_ioremap 
-mechanism and __acpi_map_table() fixes. In that case, IMHO, it is better 
-to please it in the right place now. early_ioremap is object of UEFI 
-support patch set.
-> 2) NUMA is not supported at the moment and I reckon SRAT needs updating
->     since the only way to associate a CPU to a memory node is through
->     a local APIC id that is non-existent on ARM and at least deserves a
->     new entry.
-Right, that requires further work on SRAT.
->
-> I am still not sure that providing a hook for parsing the ACPI tables before
-> paging_init() is the main focus at the moment, it is probably best, as we've
-> mentioned manifold times, to make sure that the infrastructure to detect
-> ACPI vs DT at run-time is in place in the kernel and allows us to boot
-> either with ACPI or DT, in a mutual exclusive way (same binary kernel
-> supporting both, runtime detection/decision on what data to use, ACPI tables
-> vs DT nodes, detection made once for all and NOT on a per property basis).
->
-> I will have a look at SRAT and how it is used on x86, and get back to you on
-> this.
->
-> [...]
->
->>>>> + * acpi_boot_table_init() and acpi_boot_init()
->>>>> + * called from setup_arch(), always.
->>>>> + * 1. checksums all tables
->>>>> + * 2. enumerates lapics
->>>>> + * 3. enumerates io-apics
->>>>> + *
->>>>> + * acpi_table_init() is separated to allow reading SRAT without
->>>>> + * other side effects.
->>>>> + */
->>>>> +void __init acpi_boot_table_init(void)
->>>>> +{
->>>>> + /*
->>>>> + * If acpi_disabled, bail out
->>>>> + */
->>>>> + if (acpi_disabled)
->>>>> + return;
->>>>> +
->>>>> + /*
->>>>> + * Initialize the ACPI boot-time table parser.
->>>>> + */
->>>>> + if (acpi_table_init()) {
->>>>> + disable_acpi();
->>>>> + return;
->>>>> + }
->>>>> +}
->>>>> +
->>>>> +int __init early_acpi_boot_init(void)
->>>>> +{
->>>>> + /*
->>>>> + * If acpi_disabled, bail out
->>>>> + */
->>>>> + if (acpi_disabled)
->>>>> + return -ENODEV;
->>>>> +
->>>>> + /*
->>>>> + * Process the Multiple APIC Description Table (MADT), if present
->>>>> + */
->>>>> + early_acpi_process_madt();
->>>>> +
->>>>> + return 0;
->>>>> +}
->>>>> +
->>>>> +int __init acpi_boot_init(void)
->>>>> +{
->>>>> + /*
->>>>> + * If acpi_disabled, bail out
->>>>> + */
->>>>> + if (acpi_disabled)
->>>>> + return -ENODEV;
->>>>> +
->>>>> + acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
->>>>> +
->>>>> + /*
->>>>> + * Process the Multiple APIC Description Table (MADT), if present
->>>>> + */
->>>>> + acpi_process_madt();
->>>>> +
->>>>> + return 0;
->>>>> +}
->>>>
->>>> Well, apart from having three init calls, one returning void and two
->>>> returning proper values, do not understand why, and do not understand
->>>> why we need three calls in the first place...why should we process MADT
->>>> twice in two separate calls ? What is supposed to change in between that
->>>> prevents you from merging the two together ?
->>
->> Thanks for pointing this out. I can merge acpi_boot_table_init() and
->> early_acpi_boot_init() together, but can not merge early_acpi_boot_init()
->> and acpi_boot_init() together.
->>
->> early_acpi_boot_init() and acpi_boot_init() was separated intentionally for
->> memory hotplug reasons. memory allocated in this stage can not be migrated
->> and cause memory hot-remove failed, in order to keep memory allocated
->> at base node (general NUMA node 0 in the system) at boot stage, we should
->> parse SRAT first before CPU is enumerated, does this make sense to you?
->
-> Are you parsing the SRAT in this series to get memory info or memory is
-> still initialized by DT even when system is supposed to be booted with ACPI
-> (ie there is a valid ACPI root table ?)
->
-> I have a hunch the latter is what's happening (and that's wrong, because
-> memory information when kernel is booted through ACPI must be retrieved
-> from UEFI - at least that's what has been defined), so I still see an early
-> hook to initialize ACPI tables before paging_init() that has no use as the
-> current patchset stands, please correct me if I am wrong.
-Yes, currently memory is initialized by DT but getting memory map from 
-UEFI is the matter of time (pending upstream process). Also, SRAT table 
-is not parsing in this series but it will, and I think it plays the main 
-role to put it before paging_init.
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Balaji T K <balajitk@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c  |    2 +-
+ include/linux/omap-dma.h       |   19 +------------------
+ include/linux/omap-dmaengine.h |   21 +++++++++++++++++++++
+ 3 files changed, 23 insertions(+), 19 deletions(-)
+ create mode 100644 include/linux/omap-dmaengine.h
 
-Regards,
-Tomasz
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index dbd32ad..2f57e36 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -31,7 +31,7 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_device.h>
+-#include <linux/omap-dma.h>
++#include <linux/omap-dmaengine.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/core.h>
+ #include <linux/mmc/mmc.h>
+diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
+index 7af25a9..6aa97e5 100644
+--- a/include/linux/omap-dma.h
++++ b/include/linux/omap-dma.h
+@@ -1,23 +1,6 @@
+-/*
+- * OMAP DMA Engine support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+ #ifndef __LINUX_OMAP_DMA_H
+ #define __LINUX_OMAP_DMA_H
+-
+-struct dma_chan;
+-
+-#if defined(CONFIG_DMA_OMAP) || defined(CONFIG_DMA_OMAP_MODULE)
+-bool omap_dma_filter_fn(struct dma_chan *, void *);
+-#else
+-static inline bool omap_dma_filter_fn(struct dma_chan *c, void *d)
+-{
+-	return false;
+-}
+-#endif
++#include <linux/omap-dmaengine.h>
+ 
+ /*
+  *  Legacy OMAP DMA handling defines and functions
+diff --git a/include/linux/omap-dmaengine.h b/include/linux/omap-dmaengine.h
+new file mode 100644
+index 0000000..2b0b6aa
+--- /dev/null
++++ b/include/linux/omap-dmaengine.h
+@@ -0,0 +1,21 @@
++/*
++ * OMAP DMA Engine support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __LINUX_OMAP_DMAENGINE_H
++#define __LINUX_OMAP_DMAENGINE_H
++
++struct dma_chan;
++
++#if defined(CONFIG_DMA_OMAP) || defined(CONFIG_DMA_OMAP_MODULE)
++bool omap_dma_filter_fn(struct dma_chan *, void *);
++#else
++static inline bool omap_dma_filter_fn(struct dma_chan *c, void *d)
++{
++	return false;
++}
++#endif
++#endif /* __LINUX_OMAP_DMAENGINE_H */
+-- 
+1.7.5.4
