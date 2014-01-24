@@ -1,70 +1,91 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jan 2014 13:49:36 +0100
-Subject: [PATCH 00/15] ARM: shmobile: RSPI RZ and QSPI SoC and board
- integration
-Message-ID: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
+Date: Fri, 24 Jan 2014 13:49:44 +0100
+Subject: [PATCH v3 08/15] ARM: shmobile: r8a7791 clock: add QSPI clocks
+In-Reply-To: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
+References: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1390567791-8988-9-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This patch series contains SoC and board integration for
-  1. RSPI in the r7s72100 aka RZ/A1H SoC on the Genmai reference board,
-  2. QSPI in the r8a7791 aka R-Car M2 SoC on the Koelsch reference board.
+The QSPI clock divider value depends on the MD1, MD2, and MD3 mode
+switches.
 
-It was tested on the r7s72100-based Genmai reference board using loopback
-mode, and on the r8a7791-based Koelsch reference board using the Spansion
-s25fl512s SPI FLASH.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+v3:
+  - No changes
+v2:
+  - No changes
 
-Actual functioning for some parts may depend on the series "[PATCH 0/14]
-spi: rspi: Add support for RZ/A1H, DT, and Quad/Dual on QSPI" I posted
-earlier today.
+ arch/arm/mach-shmobile/clock-r8a7791.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Overview:
-    [v4 01/15] ARM: shmobile: r7s72100 clock: Add RSPI clocks
-    [v4 02/15] ARM: shmobile: genmai legacy: Add RSPI support
-    [v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary RSPI
-	       pinmux setup
-    [v2 04/15] ARM: shmobile: genmai defconfig: Enable RSPI
-    [v2 05/15] ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
-    [v4 06/15] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
-    [v4 07/15] ARM: shmobile: genmai reference dts: Add RSPI nodes
-    [v3 08/15] ARM: shmobile: r8a7791 clock: add QSPI clocks
-    [v3 09/15] ARM: shmobile: koelsch legacy: Add QSPI support
-    [v3 10/15] ARM: shmobile: koelsch defconfig: Enable RSPI and MTD_M25P80
-    [v2 11/15] ARM: shmobile: r8a7791 dtsi: Add QSPI node
-    [v2 12/15] ARM: shmobile: koelsch dts: Add QSPI nodes
-    [   13/15] ARM: shmobile: lager legacy: Switch QSPI to named IRQs
-    [   14/15] ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for
-	       the SPI FLASH
-    [   15/15] ARM: shmobile: koelsch dts: Enable Quad SPI transfers
-
-Earlier versions of these have been posted before in:
-    "[PATCH V3 0/5] SoC and board integration for RSPI on r7s72100/genmai"
-    "[PATCH V2 0/4] SoC and board integration for QSPI on r8a7791/koelsch"
-    "[PATCH 0/9] Renesas RSPI/QSPI DT support"
-
-The series is based on renesas-devel-v3.13-20140124, with pinctrl work 
-accepted by Linus, Magnus' pinctrl, Wolfram's riic, Simon's sh_eth,
-Valentine's i2c, and Laurent's SCIF DT work applied on top.
-[Simon: I don't know in which order you will merge these. If you want me
- to rebase my patches, just ask! Thanks!]
-
-All of these should be safe to apply, without runtime dependencies on other
-parts, except for [14/15] and [15/15]: those must not go in before
-"[14/14] spi: rspi: Add support for Quad and Dual SPI Transfers on QSPI",
-as this would disable SPI FLASH access (the SPI core rejects Quad SPI slaves
-without Quad SPI master support).
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index 0f4f500e6e1c..fc9248d0b9d0 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -101,6 +101,7 @@ static struct clk main_clk = {
+  */
+ SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
++SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+ 
+ /* fixed ratio clock */
+ SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
+@@ -124,6 +125,7 @@ static struct clk *main_clks[] = {
+ 	&pll3_clk,
+ 	&hp_clk,
+ 	&p_clk,
++	&qspi_clk,
+ 	&rclk_clk,
+ 	&mp_clk,
+ 	&cp_clk,
+@@ -135,6 +137,7 @@ static struct clk *main_clks[] = {
+ /* MSTP */
+ enum {
+ 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
++	MSTP917,
+ 	MSTP815, MSTP814,
+ 	MSTP813,
+ 	MSTP811, MSTP810, MSTP809,
+@@ -154,6 +157,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
+ 	[MSTP927] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 27, MSTPSR9, 0), /* I2C4 */
+ 	[MSTP925] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 25, MSTPSR9, 0), /* I2C5 */
++	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
+ 	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
+ 	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
+ 	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
+@@ -195,6 +199,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("zs",		&zs_clk),
+ 	CLKDEV_CON_ID("hp",		&hp_clk),
+ 	CLKDEV_CON_ID("p",		&p_clk),
++	CLKDEV_CON_ID("qspi",		&qspi_clk),
+ 	CLKDEV_CON_ID("rclk",		&rclk_clk),
+ 	CLKDEV_CON_ID("mp",		&mp_clk),
+ 	CLKDEV_CON_ID("cp",		&cp_clk),
+@@ -220,6 +225,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
++	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+ 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
+@@ -271,6 +277,11 @@ void __init r8a7791_clock_init(void)
+ 		break;
+ 	}
+ 
++	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
++		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
++	else
++		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
++
+ 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+ 		ret = clk_register(main_clks[k]);
+ 
+-- 
+1.7.9.5
