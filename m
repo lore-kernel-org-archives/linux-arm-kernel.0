@@ -1,56 +1,33 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jan 2014 08:12:24 +0800
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
- <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
-Message-ID: <52E1AFE8.40601@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 23 Jan 2014 17:16:46 -0700
+Subject: [PATCH] ARM: multi_v7: copy most options from tegra_defconfig
+In-Reply-To: <CAOesGMj-nvMZhoX4fCe-mf0pBS27=EsS0o2bX7MgmZzjWhYVzQ@mail.gmail.com>
+References: <1387569848-16563-1-git-send-email-swarren@wwwdotorg.org>	<CAOesGMh4PkdTh8EP1WS9-_5cVe1NWuNQPbkskk7hJhtbBEPWBg@mail.gmail.com>	<52B4A7E9.9090900@wwwdotorg.org>	<20131222200549.GA11575@quad.lixom.net>
+ <CAOesGMj-nvMZhoX4fCe-mf0pBS27=EsS0o2bX7MgmZzjWhYVzQ@mail.gmail.com>
+Message-ID: <52E1B0EE.6080808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 12/23/2013 10:37 AM, Olof Johansson wrote:
+> On Sun, Dec 22, 2013 at 12:05 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Dec 20, 2013 at 01:26:17PM -0700, Stephen Warren wrote:
+>>> On 12/20/2013 01:16 PM, Olof Johansson wrote:
+>>>> On Fri, Dec 20, 2013 at 12:04 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> multi_v7_defconfig was missing a large number of options that were in
+>>>> tegra_defconfig. This patch adds them. The changes fall into the
+>>>> following categories:
+...
+>> Ok, fair enough. Applied.
+> 
+> Actually, this one ended up getting messy. We've had
+> multi_v7_defconfig updates in several branches so this doesn't apply
+> cleanly anywhere.
+> 
+> I'll apply it on top of for-next where the various branches are
+> merged. It means we'll have to merge it late. Not a big deal, but
+> please help me remember it in case it for some reason gets lost in the
+> shuffle.
 
-Sorry for the late reply.
-
-On 2014?01?22? 16:26, Linus Walleij wrote:
-> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->
->> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>
->> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
->> name from the ACPI timer table is matched with all the registered
->> timer controllers and matching initialisation routine is invoked.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
-> to TIMER_OF_DECLARE() and I think this macro, if needed, should
-> be named TIMER_ACPI_DECLARE().
->
-> The reason is that "clocksource" is a Linux-internal name and this
-> macro pertains to the hardware name in respective system
-> description type.
-
-That make sense to me too, I will update in next version if
-this patch is still needed.
-
->
->> +#ifdef CONFIG_ACPI
->> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
->> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
->> +               __used __section(__clksrc_acpi_table)                   \
->> +                = { .id = compat,                              \
->> +                    .driver_data = (kernel_ulong_t)fn }
->> +#else
->> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
->> +#endif
-> This hammers down the world to compile one binary for ACPI
-> and one binary for device tree. Maybe that's fine, I don't know.
-
-This is a problem we can have some discussion on it.
-I prefer mutually exclusive ACPI and DT support.
-
-Thanks
-Hanjun
+I guess this is the correct time to remind you about this? That said,
+the patch is in linux-next, so perhaps that counts as not having been
+lost:-)
