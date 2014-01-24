@@ -1,47 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 24 Jan 2014 09:03:37 +0100
-Subject: [PATCH 4/5] ARM: S3C24XX: convert boards to use common restart
- function
-In-Reply-To: <52E19931.80803@gmail.com>
-References: <3105326.uFdOVLyXH8@phil> <3955130.WSqWacB8SI@phil>
- <52E19931.80803@gmail.com>
-Message-ID: <1873916.c2IkPH5hCW@phil>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 24 Jan 2014 17:23:08 +0900
+Subject: [PATCH] arm64: fix build error if DMA_CMA is enabled
+Message-ID: <1390551788-6138-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 January 2014 23:35:29 Tomasz Figa wrote:
-> On 23.01.2014 20:02, Heiko St?bner wrote:
-> > Am Donnerstag, 23. Januar 2014, 19:51:34 schrieb Tomasz Figa:
-> >> On 23.01.2014 19:36, Heiko St?bner wrote:
-> > In general, I want to try establishing some sort of general restart way,
-> > as in the future one dt-board should hopefully be enough to cover all
-> > s3c24xx soc variants.
-> 
-> If you make SAMSUNG_WDT_RESET always selected on S3C24XX then I guess
-> it's fine.
-> 
-> >> Note that you can make the restart field NULL in mach_desc in board
-> >> files.
-> > 
-> > As I said above, this is mainly meant for the dt-case. The legacy-board
-> > files are more or less only secondary, and the affected boards can of
-> > course then have a NULL restart handle :-) .
-> > 
-> > So for this the dt-board could simply use the wdt-reset, which then gets
-> > replaced by the ccf-based reset if appropriate.
-> 
-> OK. By the way, are there any benefits of using this software reset over
-> watchdog reset? Maybe all S3C24xx could simply use watchdog reset and no
-> special handling of those with swrst would be needed.
+arm64/include/asm/dma-contiguous.h is trying to include
+<asm-genric/dma-contiguous.h> which does not exist, and thus failing
+build for arm64 if we enable CONFIG_DMA_CMA. This patch fixes build 
+error by removing unwanted header inclusion from arm64's dma-contiguous.h.
 
-According to the manuals I looked at, all S3C24XX SoCs seem to support the 
-watchdog reset - I'm not sure why the swrst variant was choosen for the newer 
-ones when they were added initially. So yes in theory all of them seem to be 
-able to use the watchdog reset.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Somraj Mani <somraj.mani@samsung.com>
+---
+ arch/arm64/include/asm/dma-contiguous.h |    1 -
+ 1 file changed, 1 deletion(-)
 
-But in any case the s3c2412 will need its own handling, due to the apparent 
-clock problem during resets (mentioned in the code and the manuals of 
-s3c2412/s3c2413).
-
-
-Heiko
+diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
+index d6aacb6..14c4c0c 100644
+--- a/arch/arm64/include/asm/dma-contiguous.h
++++ b/arch/arm64/include/asm/dma-contiguous.h
+@@ -18,7 +18,6 @@
+ #ifdef CONFIG_DMA_CMA
+ 
+ #include <linux/types.h>
+-#include <asm-generic/dma-contiguous.h>
+ 
+ static inline void
+ dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
+-- 
+1.7.10.4
