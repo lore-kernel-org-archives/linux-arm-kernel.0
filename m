@@ -1,72 +1,144 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 24 Jan 2014 10:19:01 +0200
-Subject: [PATCH 3/9] ARM: DTS: omap4: Set all audio related IP's status to
- disabled as default
+Date: Fri, 24 Jan 2014 10:19:05 +0200
+Subject: [PATCH 7/9] ARM: DTS: omap3: Set disabled status for McBSP instances
+ as default state
 In-Reply-To: <1390551547-12406-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1390551547-12406-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1390551547-12406-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1390551547-12406-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Board dts files will need to enable the IP nodes which they are using and
-does not have to care about the not used ones (to disable them).
+In omap3.dtsi disable all mcbsp nodes and board dts files can explicitly
+enable the mcbsp they are using.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/omap3-beagle-xm.dts  |  4 ++++
+ arch/arm/boot/dts/omap3-beagle.dts     |  4 ++++
+ arch/arm/boot/dts/omap3-devkit8000.dts | 16 ++--------------
+ arch/arm/boot/dts/omap3-igep.dtsi      |  1 +
+ arch/arm/boot/dts/omap3-overo.dtsi     |  4 ++++
+ arch/arm/boot/dts/omap3.dtsi           |  5 +++++
+ 6 files changed, 20 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index a1e05853afcd..78c19e30eca0 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -426,6 +426,7 @@
- 			dmas = <&sdma 65>,
- 			       <&sdma 66>;
- 			dma-names = "up_link", "dn_link";
-+			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index df33a50bc070..d9ae3f4d0aa4 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -222,3 +222,7 @@
+ 	regulator-max-microvolt = <1800000>;
+ 	regulator-always-on;
+ };
++
++&mcbsp2 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 3ba4a625ea5b..c13449773def 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -199,3 +199,7 @@
+ 	regulator-max-microvolt = <1800000>;
+ 	regulator-always-on;
+ };
++
++&mcbsp2 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index 4665421bb7bc..bf5a515a3247 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -101,20 +101,8 @@
+ 	status = "disabled";
+ };
  
- 		dmic: dmic at 4012e000 {
-@@ -437,6 +438,7 @@
- 			ti,hwmods = "dmic";
- 			dmas = <&sdma 67>;
- 			dma-names = "up_link";
-+			status = "disabled";
- 		};
+-&mcbsp1 {
+-	status = "disabled";
+-};
+-
+-&mcbsp3 {
+-	status = "disabled";
+-};
+-
+-&mcbsp4 {
+-	status = "disabled";
+-};
+-
+-&mcbsp5 {
+-	status = "disabled";
++&mcbsp2 {
++	status = "okay";
+ };
  
- 		mcbsp1: mcbsp at 40122000 {
-@@ -451,6 +453,7 @@
- 			dmas = <&sdma 33>,
- 			       <&sdma 34>;
- 			dma-names = "tx", "rx";
-+			status = "disabled";
- 		};
+ &gpmc {
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index 165aaf7591ba..ced7aa0e503c 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -172,6 +172,7 @@
+ &mcbsp2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mcbsp2_pins>;
++	status = "okay";
+ };
  
- 		mcbsp2: mcbsp at 40124000 {
-@@ -465,6 +468,7 @@
- 			dmas = <&sdma 17>,
- 			       <&sdma 18>;
- 			dma-names = "tx", "rx";
-+			status = "disabled";
- 		};
- 
- 		mcbsp3: mcbsp at 40126000 {
-@@ -479,6 +483,7 @@
- 			dmas = <&sdma 19>,
- 			       <&sdma 20>;
- 			dma-names = "tx", "rx";
-+			status = "disabled";
- 		};
- 
- 		mcbsp4: mcbsp at 48096000 {
-@@ -492,6 +497,7 @@
+ &mmc1 {
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a461d2fd1fb0..b08142f755fd 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -95,3 +95,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
++
++&mcbsp2 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index daabf99d402a..50767f339e2d 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -397,6 +397,7 @@
  			dmas = <&sdma 31>,
  			       <&sdma 32>;
  			dma-names = "tx", "rx";
 +			status = "disabled";
  		};
  
- 		keypad: keypad at 4a31c000 {
+ 		mcbsp2: mcbsp at 49022000 {
+@@ -414,6 +415,7 @@
+ 			dmas = <&sdma 33>,
+ 			       <&sdma 34>;
+ 			dma-names = "tx", "rx";
++			status = "disabled";
+ 		};
+ 
+ 		mcbsp3: mcbsp at 49024000 {
+@@ -431,6 +433,7 @@
+ 			dmas = <&sdma 17>,
+ 			       <&sdma 18>;
+ 			dma-names = "tx", "rx";
++			status = "disabled";
+ 		};
+ 
+ 		mcbsp4: mcbsp at 49026000 {
+@@ -446,6 +449,7 @@
+ 			dmas = <&sdma 19>,
+ 			       <&sdma 20>;
+ 			dma-names = "tx", "rx";
++			status = "disabled";
+ 		};
+ 
+ 		mcbsp5: mcbsp at 48096000 {
+@@ -461,6 +465,7 @@
+ 			dmas = <&sdma 21>,
+ 			       <&sdma 22>;
+ 			dma-names = "tx", "rx";
++			status = "disabled";
+ 		};
+ 
+ 		sham: sham at 480c3000 {
 -- 
 1.8.5.3
