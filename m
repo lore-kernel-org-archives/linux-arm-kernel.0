@@ -1,87 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jan 2014 15:15:13 +0000
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <20140124120815.GH814@e106331-lin.cambridge.arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
- <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
- <20140122114537.GA15591@e106331-lin.cambridge.arm.com>
- <52E1B1DE.5050507@linaro.org>
- <20140124120815.GH814@e106331-lin.cambridge.arm.com>
-Message-ID: <20140124151513.GD19052@arm.com>
+Date: Fri, 24 Jan 2014 15:23:08 +0000
+Subject: [PATCH] arm64: delete non-required instances of <linux/init.h>
+In-Reply-To: <1390501611-31691-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1390501611-31691-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20140124152308.GE19052@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 12:08:15PM +0000, Mark Rutland wrote:
-> On Fri, Jan 24, 2014 at 12:20:46AM +0000, Hanjun Guo wrote:
-> > On 2014?01?22? 19:45, Mark Rutland wrote:
-> > > On Wed, Jan 22, 2014 at 08:26:50AM +0000, Linus Walleij wrote:
-> > >> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > >>
-> > >>> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > >>>
-> > >>> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
-> > >>> name from the ACPI timer table is matched with all the registered
-> > >>> timer controllers and matching initialisation routine is invoked.
-> > >>>
-> > >>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > >>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > >> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
-> > >> to TIMER_OF_DECLARE() and I think this macro, if needed, should
-> > >> be named TIMER_ACPI_DECLARE().
-> > >>
-> > >> The reason is that "clocksource" is a Linux-internal name and this
-> > >> macro pertains to the hardware name in respective system
-> > >> description type.
-> > >>
-> > >>> +#ifdef CONFIG_ACPI
-> > >>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
-> > >>> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
-> > >>> +               __used __section(__clksrc_acpi_table)                   \
-> > >>> +                = { .id = compat,                              \
-> > >>> +                    .driver_data = (kernel_ulong_t)fn }
-> > >>> +#else
-> > >>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
-> > >>> +#endif
-> > >> This hammers down the world to compile one binary for ACPI
-> > >> and one binary for device tree. Maybe that's fine, I don't know.
-> > > How does it do that?
-> > >
-> > > As far as I could tell CONFIG_ACPI and CONFIG_OF are not mutually
-> > > exclusive, and this just means that we only build the datastructures for
-> > > matching from ACPI when CONFIG_ACPI is enabled.
-> > >
-> > > Have I missed something?
-> > >
-> > > I definitely don't want to see mutually exclusive ACPI and DT support.
-> > 
-> > ACPI and DT did the same job so I think they should mutually exclusive.
-> > if we enable both DT and ACPI in one system, this will leading confusions.
+On Thu, Jan 23, 2014 at 06:26:51PM +0000, Paul Gortmaker wrote:
+> None of these files are actually using any __init type directives
+> and hence don't need to include <linux/init.h>.  Most are just a
+> left over from __devinit and __cpuinit removal, or simply due to
+> code getting copied from one place to the next.
 > 
-> ACPI and DT do similar jobs, and we should be mutually exclusive at
-> runtime. However, they should not be mutually exclusive at compile-time.
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
 > 
-> Being mutually exclusive at compile-time is just broken. It creates more
-> work for distributions (who need to ship double the number of kernels),
-> it increases the number of configurations requiring testing, and it
-> makes it easier for bugs to be introduced. It's just painful, and
-> there's no reason for it.
+> [Build tested on today's linux-next ; thanks to Will for the pointer
+>  to a prebuilt toolchain.  Patch to be added to init cleanup series:
+>    http://git.kernel.org/cgit/linux/kernel/git/paulg/init.git   ]
 
-I fully agree (IOW, I'll NAK patches that break this assumption; we want
-single kernel image whether it uses DT or ACPI).
+I assume you are pushing this upstream as part of your cleanup series.
 
-> At boot time the kernel needs to decide which to use for hardware
-> description, and completely ignore the other (which should not be
-> present, but lets not assume that or inevitably someone will break that
-> assumption for a quick hack).
-> 
-> The same kernel should boot on a system that has a DTB or a system that
-> has ACPI tables. On a system that's provided both it should use one or
-> the other, but not both.
-
-Do we still need the chosen node to be passed via DT for command line,
-even if the kernel uses ACPI?
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
