@@ -1,162 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 24 Jan 2014 12:53:33 +0000
-Subject: [Linaro-acpi] [PATCH 04/20] ARM64 / ACPI: Introduce arm_core.c
- and its related head file
-In-Reply-To: <52E22DD4.3050807@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-5-git-send-email-hanjun.guo@linaro.org>
- <20140122115453.GC24288@e102568-lin.cambridge.arm.com>
- <52E13BBC.5020005@linaro.org> <52E22DD4.3050807@linaro.org>
-Message-ID: <20140124125332.GA23274@e102568-lin.cambridge.arm.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Fri, 24 Jan 2014 14:57:09 +0200
+Subject: [alsa-devel] [PATCH RFC v2 REPOST 3/8] ASoC: davinci-evm: HDMI
+ audio support for TDA998x trough McASP I2S bus
+In-Reply-To: <20140122114647.20f75d0d@armhf>
+References: <cover.1387535299.git.jsarha@ti.com>	<d3c3f645d39338df0ee9686cb030255ce36a249d.1387535302.git.jsarha@ti.com>	<20131231132555.GA31886@sirena.org.uk>	<52D67099.1040904@ti.com>	<20140115165100.3bfab96f@armhf>	<52DF8D60.9020505@ti.com>	<20140122111953.238349a5@armhf>
+ <20140122114647.20f75d0d@armhf>
+Message-ID: <52E26325.4040203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On 01/22/2014 12:46 PM, Jean-Francois Moine wrote:
+> On Wed, 22 Jan 2014 11:19:53 +0100
+> Jean-Francois Moine <moinejf@free.fr> wrote:
+>
+>> As both I2S and S/PDIF may be used for HDMI output in the Cubox,
+>> I wrote a tda998x CODEC which gets the audio ports from the DT and
+>> dynamically sets these ports and the audio type (i2s / spdif) on audio
+>> streaming start. I have not submitted yet this codec and the associated
+>> changes in tda998x, because I am waiting for a first patch series on the
+>> tda998x to be applied
+>> (http://lists.freedesktop.org/archives/dri-devel/2014-January/051552.html).
+>
+> Sorry, the last patch request is
+>
+> http://lists.freedesktop.org/archives/dri-devel/2014-January/052201.html
+>
 
-On Fri, Jan 24, 2014 at 09:09:40AM +0000, Hanjun Guo wrote:
-> On 2014?01?23? 23:56, Tomasz Nowicki wrote:
-> > Hi Lorenzo,
-> >
-> > W dniu 22.01.2014 12:54, Lorenzo Pieralisi pisze:
-> >> On Fri, Jan 17, 2014 at 12:24:58PM +0000, Hanjun Guo wrote:
-> >>
-> >> [...]
-> >>
-> >>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> >>> index bd9bbd0..2210353 100644
-> >>> --- a/arch/arm64/kernel/setup.c
-> >>> +++ b/arch/arm64/kernel/setup.c
-> >>> @@ -41,6 +41,7 @@
-> >>> #include <linux/memblock.h>
-> >>> #include <linux/of_fdt.h>
-> >>> #include <linux/of_platform.h>
-> >>> +#include <linux/acpi.h>
-> >>>
-> >>> #include <asm/cputype.h>
-> >>> #include <asm/elf.h>
-> >>> @@ -225,6 +226,11 @@ void __init setup_arch(char **cmdline_p)
-> >>>
-> >>> arm64_memblock_init();
-> >>>
-> >>> + /* Parse the ACPI tables for possible boot-time configuration */
-> >>> + acpi_boot_table_init();
-> >>> + early_acpi_boot_init();
-> >>> + acpi_boot_init();
-> >>> +
-> >>> paging_init();
-> >>
-> >> Can I ask you please why we need to parse ACPI tables before
-> >> paging_init() ?
-> > This is for future usage and because of couple of reasons. Mainly SRAT 
-> > table parsing should be done (before paging_init()) for proper NUMA 
-> > initialization and then paging_init().
+I checked the sample format support again with and without your patches.
 
-Thank you for the explanation. I still have some questions:
+On my other TV all the formats produce something that sounds Ok if you 
+do not listen too carefully or use sine sweep etc. make the short 
+comings audible. The other TV is completely silent when playing the "non 
+supported" formats.
 
-1) What are the other reasons ?
-2) NUMA is not supported at the moment and I reckon SRAT needs updating
-   since the only way to associate a CPU to a memory node is through
-   a local APIC id that is non-existent on ARM and at least deserves a
-   new entry.
+Could you give me a link to a git repo with your tda998x codec code so I 
+could prepare to use that too?
 
-I am still not sure that providing a hook for parsing the ACPI tables before
-paging_init() is the main focus at the moment, it is probably best, as we've
-mentioned manifold times, to make sure that the infrastructure to detect
-ACPI vs DT at run-time is in place in the kernel and allows us to boot
-either with ACPI or DT, in a mutual exclusive way (same binary kernel
-supporting both, runtime detection/decision on what data to use, ACPI tables
-vs DT nodes, detection made once for all and NOT on a per property basis).
-
-I will have a look at SRAT and how it is used on x86, and get back to you on
-this.
-
-[...]
-
-> >>> + * acpi_boot_table_init() and acpi_boot_init()
-> >>> + * called from setup_arch(), always.
-> >>> + * 1. checksums all tables
-> >>> + * 2. enumerates lapics
-> >>> + * 3. enumerates io-apics
-> >>> + *
-> >>> + * acpi_table_init() is separated to allow reading SRAT without
-> >>> + * other side effects.
-> >>> + */
-> >>> +void __init acpi_boot_table_init(void)
-> >>> +{
-> >>> + /*
-> >>> + * If acpi_disabled, bail out
-> >>> + */
-> >>> + if (acpi_disabled)
-> >>> + return;
-> >>> +
-> >>> + /*
-> >>> + * Initialize the ACPI boot-time table parser.
-> >>> + */
-> >>> + if (acpi_table_init()) {
-> >>> + disable_acpi();
-> >>> + return;
-> >>> + }
-> >>> +}
-> >>> +
-> >>> +int __init early_acpi_boot_init(void)
-> >>> +{
-> >>> + /*
-> >>> + * If acpi_disabled, bail out
-> >>> + */
-> >>> + if (acpi_disabled)
-> >>> + return -ENODEV;
-> >>> +
-> >>> + /*
-> >>> + * Process the Multiple APIC Description Table (MADT), if present
-> >>> + */
-> >>> + early_acpi_process_madt();
-> >>> +
-> >>> + return 0;
-> >>> +}
-> >>> +
-> >>> +int __init acpi_boot_init(void)
-> >>> +{
-> >>> + /*
-> >>> + * If acpi_disabled, bail out
-> >>> + */
-> >>> + if (acpi_disabled)
-> >>> + return -ENODEV;
-> >>> +
-> >>> + acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
-> >>> +
-> >>> + /*
-> >>> + * Process the Multiple APIC Description Table (MADT), if present
-> >>> + */
-> >>> + acpi_process_madt();
-> >>> +
-> >>> + return 0;
-> >>> +}
-> >>
-> >> Well, apart from having three init calls, one returning void and two
-> >> returning proper values, do not understand why, and do not understand
-> >> why we need three calls in the first place...why should we process MADT
-> >> twice in two separate calls ? What is supposed to change in between that
-> >> prevents you from merging the two together ?
-> 
-> Thanks for pointing this out. I can merge acpi_boot_table_init() and
-> early_acpi_boot_init() together, but can not merge early_acpi_boot_init()
-> and acpi_boot_init() together.
-> 
-> early_acpi_boot_init() and acpi_boot_init() was separated intentionally for
-> memory hotplug reasons. memory allocated in this stage can not be migrated
-> and cause memory hot-remove failed, in order to keep memory allocated
-> at base node (general NUMA node 0 in the system) at boot stage, we should
-> parse SRAT first before CPU is enumerated, does this make sense to you?
-
-Are you parsing the SRAT in this series to get memory info or memory is
-still initialized by DT even when system is supposed to be booted with ACPI
-(ie there is a valid ACPI root table ?)
-
-I have a hunch the latter is what's happening (and that's wrong, because
-memory information when kernel is booted through ACPI must be retrieved
-from UEFI - at least that's what has been defined), so I still see an early
-hook to initialize ACPI tables before paging_init() that has no use as the
-current patchset stands, please correct me if I am wrong.
-
-Thank you,
-Lorenzo
+Best regards,
+Jyri
