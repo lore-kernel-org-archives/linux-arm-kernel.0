@@ -1,219 +1,41 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 24 Jan 2014 09:40:40 +0100
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140122192041.GA3709@e102568-lin.cambridge.arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
- <20140122192041.GA3709@e102568-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtDHTs67qvoA6++zo4SZdZJj4T_BV2gVECOu-76-2kLbuw@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 24 Jan 2014 14:37:59 +0530
+Subject: [PATCH 2/2] clk: exynos4: Fix spacing related checkpatch errors
+In-Reply-To: <52DD1182.80200@samsung.com>
+References: <1389780070-4959-1-git-send-email-sachin.kamat@linaro.org>
+ <1389780070-4959-2-git-send-email-sachin.kamat@linaro.org>
+ <52DD1182.80200@samsung.com>
+Message-ID: <CAK9yfHwx+8=xr8=95UJmewO-rtydhqP7s5bzayDwNULPrir5Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2014 20:20, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> Hi Vincent,
+Hi Tomasz,
+
+On 20 January 2014 17:37, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
 >
-> On Tue, Jan 21, 2014 at 11:16:46AM +0000, Vincent Guittot wrote:
->> Hi Lorenzo,
+>
+> On 15.01.2014 11:01, Sachin Kamat wrote:
 >>
->> On 20 January 2014 18:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > ARM based platforms implement a variety of power management schemes that
->> > allow processors to enter at run-time low-power states, aka C-states
->> > in ACPI jargon. The parameters defining these C-states vary on a per-platform
->> > basis forcing the OS to hardcode the state parameters in platform
->> > specific static tables whose size grows as the number of platforms supported
->> > in the kernel increases and hampers device drivers standardization.
->> >
->> > Therefore, this patch aims at standardizing C-state device tree bindings for
->> > ARM platforms. Bindings define C-state parameters inclusive of entry methods
->> > and state latencies, to allow operating systems to retrieve the
->> > configuration entries from the device tree and initialize the related
->> > power management drivers, paving the way for common code in the kernel
->> > to deal with power states and removing the need for static data in current
->> > and previous kernel versions.
->> >
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> > ---
->> >  Documentation/devicetree/bindings/arm/c-states.txt | 774 +++++++++++++++++++++
->> >  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
->> >  2 files changed, 784 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/arm/c-states.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/c-states.txt b/Documentation/devicetree/bindings/arm/c-states.txt
->> > new file mode 100644
->> > index 0000000..0b5617b
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/arm/c-states.txt
->> > @@ -0,0 +1,774 @@
->> > +==========================================
->> > +ARM C-states binding description
->> > +==========================================
->> > +
->> > +==========================================
->> > +1 - Introduction
->> > +==========================================
->> > +
->> > +ARM systems contain HW capable of managing power consumption dynamically,
->> > +where cores can be put in different low-power states (ranging from simple
->> > +wfi to power gating) according to OSPM policies. Borrowing concepts
->> > +from the ACPI specification[1], the CPU states representing the range of
->> > +dynamic states that a processor can enter at run-time, aka C-state, can be
->> > +specified through device tree bindings representing the parameters required to
->> > +enter/exit specific C-states on a given processor.
->> > +
->> > +The state an ARM CPU can be put into is loosely identified by one of the
->> > +following operating modes:
->> > +
->> > +- Running:
->> > +        # Processor core is executing instructions
->> > +
->> > +- Wait for Interrupt:
->> > +       # An ARM processor enters wait for interrupt (WFI) low power
->> > +         state by executing a wfi instruction. When a processor enters
->> > +         wfi state it disables most of the clocks while keeping the processor
->> > +         powered up. This state is standard on all ARM processors and it is
->> > +         defined as C1 in the remainder of this document.
->> > +
+>> Silences the following type of checkpatch errors:
+>> ERROR: space prohibited after that open parenthesis '('
 >>
->> > +- Dormant:
->> > +       # Dormant mode is entered by executing wfi instructions and by sending
->> > +         platform specific commands to the platform power controller (coupled
->> > +         with processor specific SW/HW control sequences).
->> > +         In dormant mode, most of the processor control and debug logic is
->> > +         powered up but cache RAM can be put in retention state, providing
->>
->> Base on your description, it's not clear for me what is on, what is
->> lost and what is power down ?
->> My understand of the dormant mode that you described above is : the
->> cache is preserved (and especially the cache RAM) but the processor
->> state is lost (registers ...). Do I understand correctly ?
->>
->> What about retention mode where the contents of processor and cache
->> are preserved but the power consumption is reduced ? it can be seen as
->> a special wfi mode which need specific SW/HW control sequences but i'm
->> not sure to understand how to describe such state with your proposal.
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>   drivers/clk/samsung/clk-exynos4.c |   50
+>> ++++++++++++++++++-------------------
+>>   1 file changed, 25 insertions(+), 25 deletions(-)
 >
-
-Hi Lorenzo,
-
-Sorry for the late reply,
-
-
-> I had an idea. To simplify things, I think that one possibility is to
-> add a parameter to the power domain specifier (platform specific, see
-> Tomasz bindings):
-
-We can't use a simple boolean state (on/off) for defining the
-powerdomain state associated to a c-state so your proposal of being
-able to add a parameter that will define the power domain state is
-interesting.
-
 >
-> Documentation/devicetree/bindings/power/power_domain.txt
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224928.html
->
-> to represent, when that state is entered the behavior of the power
-> controller (ie cache RAM retention or cache shutdown or in general any
-> substate within a power domain). Since it is platform specific, and since
-> we are able to link caches to the power domain, the power controller will
-> actually define what happens to the cache when that state is entered
-> (basically we use the power domain specifier additional parameter to define
-> a "substate" in that power domain e.g.:
->
-> Example:
->
-> foo_power_controller {
->         [...]
->         /*
->          * first cell is register index, second one is the state index
->          * that in turn implies the state behavior - eg cache lost or
->          * retained
->          */
->         #power-domain-cells = <2>;
-> };
->
-> l1-cache {
->         [...]
->         /*
->          * syntax: power-domains = list of power domain specifiers
->                 <[&power_domain_phandle register-index state],[&power_domain_phandle register-index state]>;
->                 The syntax is defined by the power controller du jour
->                 as described by Tomasz bindings
->         */
->         power-domains =<&foo_power_controller 0 0 &foo_power_controller 0 1>;
+> I believe this is a false warning. In this special case the spaces greatly
+> improve readability of static data in the driver, which I believe is
+> preferred over the strict rules of checkpatch.
 
-Normally, power-domains describes a list of power domain specifiers
-that are necessary for the l1-cache to at least retain its state so
-i'm not sure understand your example above
+I agree that the existing pattern looks good to eyes :)
+But then you will keep getting many such fix patches. The intention was to
+bring this to your notice.
+What say about the other patch in this series?
 
-If we take the example of system that support running, retention and
-powerdown state described as state 0, 1 and 2 for the power domain, i
-would have set the l1-cache like:
-       power-domains =<&foo_power_controller 0 1>;
-
-for saying that the state is retained up to state 1
-
-Please look below, i have modified the rest of your example accordingly
-
->
-> }:
->
-> and then
->
-> state0 {
->         index = <2>;
->         compatible = "arm,cpu-power-state";
->         latency = <...>;
->         /*
->          * This means that when the state is entered, the power
->          * controller should use register index 0 and state 0,
->          * whose meaning is power controller specific. Since we
->          * know all components affected (for every component
->          * we declare its power domain(s) and states so we
->          * know what components are affected by the state entry.
->          * Given the cache node above and this phandle, the state
->          * implies that the cache is retained, register index == 0 state == 0
->          /*
->         power-domain =<&foo_power_controller 0 0>;
-
-for retention state we need to set the power domain in state 1
-        power-domain =<&foo_power_controller 0 1>;
-
-> };
->
-> state1 {
->         index = <3>;
->         compatible = "arm,cpu-power-state";
->         latency = <...>;
->         /*
->          * This means that when the state is entered, the power
->          * controller should use register index 0 and state 1,
->          * whose meaning is power controller specific. Since we
->          * know all components affected (for every component
->          * we declare its power domain(s) and states so we
->          * know what components are affected by the state entry.
->          * Given the cache node above and this phandle, the state
->          * implies that the cache is lost, register index == 0 state == 1
->          /*
->         power-domain =<&foo_power_controller 0 1>;
-
-for power down mode, we need to set thge power domain in state 2
-        power-domain =<&foo_power_controller 0 2>;
-
-
-Vincent
-
-> };
->
-> It is complex but it is probably the cleanest way. And it leaves complexity
-> to power controller implementations (if managed in the kernel....), which
-> actually makes sense because it is up to power controller to define the
-> behavior of certain states.
->
-> All in all it is just an idea, feel free to scotch it, it is complex but
-> we have to sort it out, one way or another.
->
-> Vincent, Tomasz, anyone, thoughts ?
-> Lorenzo
->
+-- 
+With warm regards,
+Sachin
