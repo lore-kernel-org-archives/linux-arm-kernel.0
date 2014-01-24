@@ -1,94 +1,81 @@
-From: fkan@apm.com (Feng Kan)
-Date: Fri, 24 Jan 2014 10:44:37 -0800
-Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation for
- generic SYSCON reboot driver
-In-Reply-To: <20140124182355.GF4758@e106331-lin.cambridge.arm.com>
-References: <1390504801-24483-1-git-send-email-fkan@apm.com>
- <1390504801-24483-6-git-send-email-fkan@apm.com>
- <20140124113920.GF814@e106331-lin.cambridge.arm.com>
- <CAL85gmDJeUY0zUjkmpMo7g_hLj34RsgU1VEF80wouLzOFGAdqQ@mail.gmail.com>
- <20140124182355.GF4758@e106331-lin.cambridge.arm.com>
-Message-ID: <CAL85gmAy+gt-Utj40eDhgpRKcW7L1DhNfdqrHA3LRSLT91VQzw@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 24 Jan 2014 10:48:40 -0800
+Subject: [RESEND PATCH] ARM: dts: bcm28155-ap: Fix Card Detection GPIO
+In-Reply-To: <CAEPRUYpyr2_3pfa3rqYiYPAOwJfA+0AdqyGaf5s7YiWH=zfTeA@mail.gmail.com>
+References: <1389120821-12007-1-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYo0r5YcRTYdgSNLqedVV4D0bsor7USBoxRRpBXRs7wpbw@mail.gmail.com>
+ <CAAYSxhpgJwnq63fUdYBtmneRads_69c2mik8upofvAS1Y25fOA@mail.gmail.com>
+ <CAEPRUYpyr2_3pfa3rqYiYPAOwJfA+0AdqyGaf5s7YiWH=zfTeA@mail.gmail.com>
+Message-ID: <CAAYSxhpSz8ZF_urMfQ4xdc1fhFdQC-_=9U1dvNn=EU_OoNsWbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 10:23 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jan 24, 2014 at 06:03:10PM +0000, Feng Kan wrote:
->> On Fri, Jan 24, 2014 at 3:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Jan 23, 2014 at 07:20:01PM +0000, Feng Kan wrote:
->> >> Add documentation for generic SYSCON reboot driver.
->> >>
->> >> Signed-off-by: Feng Kan <fkan@apm.com>
->> >> ---
->> >>  .../bindings/power/reset/syscon-reboot.txt         |   16 ++++++++++++++++
->> >>  1 files changed, 16 insertions(+), 0 deletions(-)
->> >>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >> new file mode 100644
->> >> index 0000000..e9eb1fe
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
->> >> @@ -0,0 +1,16 @@
->> >> +Generic SYSCON mapped register reset driver
->> >
->> > Bindings should describe hardware, not drivers.
->> >
->> > What precisely does this binding describe?
->> >
->> >> +
->> >> +Required properties:
->> >> +- compatible: should contain "syscon-reboot"
->> >> +- regmap: this is phandle to the register map node
->> >> +- offset: offset in the register map for the reboot register
->> >> +- mask: the reset value written to the reboot register
->> >> +
->> >> +Examples:
->> >> +
->> >> +reboot {
->> >> +   compatible = "syscon-reboot";
->> >> +   regmap = <&regmapnode>;
->> >> +   offset = <0x0>;
->> >> +   mask = <0x1>;
->> >> +};
->> >
->> > Access size? Endianness?
->> FKAN: are you asking for documentation? I don't see alot of example of
->> support for these.
->
-> If I used the enippet in the example, what endianness and access size
-> should I expect an OS to perform? That should be documented.
->
-> If this doesn't match the general case, we can add properties later to
-> adjust the access size and/or endianness. We just need to document what
-> the binding actually describes currently, or it's not possible to
-> implement anything based off of the binding documentation.
->
-> I should be able to read a binding document and write a dts. I shouldn't
-> have to read the code to figure out what the binding describes.
->
+On Wed, Jan 8, 2014 at 4:54 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+> On Wed, Jan 8, 2014 at 4:28 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+>> On Wed, Jan 8, 2014 at 3:38 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+>>> On Tue, Jan 7, 2014 at 10:53 AM, Tim Kryger <tim.kryger@linaro.org> wrote:
+>>>> The board schematic states that the "SD_CARD_DET_N gets pulled to GND
+>>>> when card is inserted" so the polarity has been updated to active low.
+>>>>
+>>>> Polarity is now specified with a GPIO define instead of a magic number.
+>>>>
+>>>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>>>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>>>> ---
+>>>>  arch/arm/boot/dts/bcm28155-ap.dts | 4 +++-
+>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+>>>> index 08e47c2..27dd110 100644
+>>>> --- a/arch/arm/boot/dts/bcm28155-ap.dts
+>>>> +++ b/arch/arm/boot/dts/bcm28155-ap.dts
+>>>> @@ -13,6 +13,8 @@
+>>>>
+>>>>  /dts-v1/;
+>>>>
+>>>> +#include <dt-bindings/gpio/gpio.h>
+>>>> +
+>>>>  #include "bcm11351.dtsi"
+>>>>
+>>>>  / {
+>>>> @@ -40,7 +42,7 @@
+>>>>
+>>>>         sdio4: sdio at 3f1b0000 {
+>>>>                 max-frequency = <48000000>;
+>>>> -               cd-gpios = <&gpio 14 0>;
+>>>> +               cd-gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
+>>>>                 status = "okay";
+>>>>         };
+>>>>  };
+>>>> --
+>>>> 1.8.0.1
+>>>>
+>>> Tim,
+>>>  Does bcm11351-brt not also suffer from the same bug? If it does can
+>>> you pls update the patch to also fix it?
+>>>
+>>>  Thanks,
+>>>    csd
 >>
->> >
->> > Why can we not have a binding for the register bank this exists in, and
->> > have that pass on the appropriate details to a syscon-reboot driver?
+>> The BRT and AP boards are similar so it may have the same problem but
+>> I don't have a BRT and wouldn't be able to test any changes to its DTS
+>> file.
 >>
->> FKAN: Thats a good idea. But the hardware in this case (SCU) system
->> clock unit has a bunch of registers used for different functions. If syscon is
->> used alot in this case and we pile more attribute into it. It would get kinda
->> messy after a while.
+>> -Tim
 >
-> Huh?
+> [sorry for the resend for those that get it twice]
+> Agreed - it's time that dts file go away. In this case:
+> Acked-by: Christian Daudt <bcm@fixthebug.org>
 >
-> What's wrong with having a system clock unit binding, that the kernel
-> can decompose as appropriate?
+> Olof - can you pls pull in this patch. This is the bugfix that was
+> discussed in irc earlier today.
 >
-> I don't get your syscon argument.
+>  thanks,
+>    csd
 
-FKAN: I do have a SCU binding, I thought you wanted to move the offset and
-mask to the SCU binding. The only issue I see in that case is when we use
-more such methods, the SCU binding would look rather crowded. If this is not
-the case, I am a bit confused at what I should do next.
+Christian,
 
->
-> Thanks,
-> Mark.
+I'm not sure Olof saw your reply.  Olof and Kevin are now on CC.
+
+Thanks,
+Tim Kryger
