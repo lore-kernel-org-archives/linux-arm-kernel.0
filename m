@@ -1,66 +1,85 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 24 Jan 2014 01:18:41 -0600
-Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
-In-Reply-To: <20140121024007.GE13785@codeaurora.org>
-References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1389999819-10648-2-git-send-email-bjorn.andersson@sonymobile.com>
- <CAL_JsqJBEu8iLzE8-dXniZFytr6cQsprBYiYnJeXS2-80iy1Mw@mail.gmail.com>
- <20140121024007.GE13785@codeaurora.org>
-Message-ID: <20140124071841.GA6113@qualcomm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 24 Jan 2014 08:41:03 +0100
+Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
+In-Reply-To: <20140124064254.0369084d@ipc1.ka-ro>
+References: <20140123083714.3c6e86ae@ipc1.ka-ro>
+ <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
+ <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
+ <20140123115632.6d3f1a58@ipc1.ka-ro>
+ <20140123110444.GI16215@pengutronix.de>
+ <20140123165349.GY15937@n2100.arm.linux.org.uk>
+ <20140123173642.GZ15937@n2100.arm.linux.org.uk>
+ <20140124064254.0369084d@ipc1.ka-ro>
+Message-ID: <20140124074103.GJ16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 06:40:07PM -0800, Stephen Boyd wrote:
-> On 01/20, Rob Herring wrote:
-> > On Fri, Jan 17, 2014 at 5:03 PM, Bjorn Andersson
-> > <bjorn.andersson@sonymobile.com> wrote:
+On Fri, Jan 24, 2014 at 06:42:54AM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> > Okay, this works, but there's a problem with pwm-leds.
 > > 
-> > >  .../devicetree/bindings/i2c/qcom,i2c-qup.txt       | 41 ++++++++++++++++++++++
-> > >  1 file changed, 41 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
-> > > new file mode 100644
-> > > index 0000000..a99711b
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
-> > > @@ -0,0 +1,41 @@
-> > > +Qualcomm Universal Peripheral (QUP) I2C controller
-> > > +
-> > > +Required properties:
-> > > + - compatible: Should be "qcom,i2c-qup".
+> > When the duty cycle is set to zero (when you set the brightness to zero)
+> > pwm-leds decides to disable the PWM after configuring it.  This causes
+> > the PWM output to be driven low, causing the LED to go to maximum
+> > brightness.
 > > 
-> > Seems a bit generic. All versions of the IP are exactly the same?
-> > "qcom,<chip>-i2c-qup" would be better.
+> > So, using the inversion at PWM level doesn't work.
 > > 
+> The problem is that the driver calls pwm_disable() when the duty cycle is 0.
+> This sets the PWM output low independent from the output polarity setting.
 > 
-> There are different versions of the IP in different SoCs. The
-> versions for platforms supported upstream are:
+> > To make this work correctly, we really need pwm-leds to do the inversion
+> > rather than setting the inversion bit in hardware.
+> > 
+> The same holds for the pwm-backlight driver.
 > 
-> 	1.1.1 (MSM8660, MSM8960)
-> 	2.2.1 (MSM8974v2)
-> 
-> so how about one of "qcom,i2c-qup-v1.1.1" or
-> "qcom,i2c-qup-v2.2.1" should be specified as more specific
-> compatible strings in addition to "qcom,i2c-qup"?
-> 
+> The easiest fix would be not to call pwm_disable() even for a zero duty
+> cycle.
 
-This definitely needs two compatible tags.  The v1.1.1 supports the FIFO, block,
-and data mover modes.  The v2.2.1 supports FIFO, block, and BAM DMA.
+IMO that's the right thing to do anyway due to the different PWM
+hardware controllers we have. I'm thinking about the following patch
+for some time.
 
-The BAM patches are currently in review and ideally BAM support can be added to
-the I2C.  We'll need a way to differentiate so BAM can be used.
+Sascha
 
-Otherwise, the register interfaces are interchangeable except for BAM specific
-fields in the registers.
+--------------------8<--------------------------
 
+>From 9ebbc3d72c71bd97d7fc4458f60ae3ecd5876984 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Fri, 24 Jan 2014 08:34:16 +0100
+Subject: [PATCH] PWM: Document disabled PWM output as undefined
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+When disabled PWM hardware reacts differently. Some controllers
+just stop with their current value, others produce a constant high
+or low output, sometimes depending on the output inversion bit. Update
+the documentation to reflect that and request from the PWM consumer
+drivers to set a constant high/low value with duty cycles of 0/100%
+instead of disabling the PWM.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ Documentation/pwm.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index 93cb979..b7e8a31 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -44,6 +44,8 @@ After being requested, a PWM has to be configured using:
+ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+ 
+ To start/stop toggling the PWM output use pwm_enable()/pwm_disable().
++The output of a disabled PWM is undefined. Set the duty cycle to 100%
++for a constant high output and to 0 for constant low output.
+ 
+ Using PWMs with the sysfs interface
+ -----------------------------------
+-- 
+1.8.5.2
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
