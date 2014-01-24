@@ -1,42 +1,73 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jan 2014 08:46:32 +0800
-Subject: [PATCH 18/20] clocksource / acpi: Add macro
- CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <20140122114616.GB15591@e106331-lin.cambridge.arm.com>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
- <201401171521.35940.arnd@arndb.de> <52DCE790.6080809@linaro.org>
- <20140122114616.GB15591@e106331-lin.cambridge.arm.com>
-Message-ID: <52E1B7E8.30300@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 24 Jan 2014 10:14:37 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790.dtsi: ficx i2c[0-3] clock reference
+In-Reply-To: <cover.1390525593.git.horms+renesas@verge.net.au>
+References: <cover.1390525593.git.horms+renesas@verge.net.au>
+Message-ID: <2450badfc19b67340d3570665cc02a22df03dfab.1390525593.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?01?22? 19:46, Mark Rutland wrote:
-> On Mon, Jan 20, 2014 at 09:08:32AM +0000, Hanjun Guo wrote:
->> On 2014-1-17 22:21, Arnd Bergmann wrote:
->>> On Friday 17 January 2014, Hanjun Guo wrote:
->>>> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>>
->>>> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
->>>> name from the ACPI timer table is matched with all the registered
->>>> timer controllers and matching initialisation routine is invoked.
->>> I wouldn't anticipate this infrastructure to be required. Shouldn't all
->>> ARMv8 machines have an architected timer?
->> I not sure of this, could anyone can give some guidance? if only arch
->> timer is available for ARM64, this will make thing very simple.
-> All ARMv8 systems should have an architected timer.
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Thanks for the clarification :)
+The R8A7790's dtsi file i2c0, i2c1, i2c2, and i2c3 nodes have clock
+references to the mstp3_clks clock node, however these clocks are in the
+mstp9_clks node.
 
->
-> However, they may also have other timers (e.g. global timers for use
-> when CPUs are in low power states and their local architected timers
-> aren't active).
+The error was introducted in 72197ca7a1cb1cea5 ("ARM: shmobile: r8a7790:
+ Reference clocks") which is in Simon's current development tree.
 
-Only arch timer (generic timer) is defined as a table in ACPI 5.0
-spec at now, so other timers will not described as table and will
-described as device object in DSDT table, so do you think we need
-this framework or not?
+This patch fixes the following error:
 
-Thanks
-Hanjun
+of_clk_src_onecell_get: invalid clock index 31
+i2c-rcar e6508000.i2c: cannot get clock
+i2c-rcar: probe of e6508000.i2c failed with error -2
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index a179125..46ac214 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -197,7 +197,7 @@
+ 		reg = <0 0xe6508000 0 0x40>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 287 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp3_clks R8A7790_CLK_I2C0>;
++		clocks = <&mstp9_clks R8A7790_CLK_I2C0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -208,7 +208,7 @@
+ 		reg = <0 0xe6518000 0 0x40>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 288 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp3_clks R8A7790_CLK_I2C1>;
++		clocks = <&mstp9_clks R8A7790_CLK_I2C1>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -219,7 +219,7 @@
+ 		reg = <0 0xe6530000 0 0x40>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 286 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp3_clks R8A7790_CLK_I2C2>;
++		clocks = <&mstp9_clks R8A7790_CLK_I2C2>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -230,7 +230,7 @@
+ 		reg = <0 0xe6540000 0 0x40>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 290 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp3_clks R8A7790_CLK_I2C3>;
++		clocks = <&mstp9_clks R8A7790_CLK_I2C3>;
+ 		status = "disabled";
+ 	};
+ 
+-- 
+1.8.4
