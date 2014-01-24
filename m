@@ -1,225 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 24 Jan 2014 08:54:16 +0100
-Subject: [PATCH resend] pwm: Remove obsolete HAVE_PWM Kconfig symbol
-Message-ID: <1390550056-5924-1-git-send-email-s.hauer@pengutronix.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 24 Jan 2014 09:02:09 +0100
+Subject: DT include files
+In-Reply-To: <20140113021912.GB23525@S2101-09.ap.freescale.net>
+References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
+ <201401122121.20084.arnd@arndb.de>
+ <20140113021912.GB23525@S2101-09.ap.freescale.net>
+Message-ID: <2907925.DyxHkYtGr7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we had the PWM framework we used to have a barebone PWM api. The
-HAVE_PWM Kconfig symbol used to be selected by the PWM drivers to specify
-the PWM API is present in the kernel. Since the last legacy driver is gone
-the HAVE_PWM symbol can go aswell.
+Hi Shawn,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-pwm at vger.kernel.orig
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ralf Baechle <ralf@linux-mips.org>
----
+did this topic get any final resolution - especially in terms of the pingrp.h 
+header?
 
-Thierry as PWM maintainer has agreed to take this patch. Would be nice
-to get some Acks from affected architectures. Russell, Ralf?
+As I'm currently preparing two board files (imx50 and imx6sl) this discussion 
+made me unsure if using the pin-group definitions is still the preferred style.
 
- arch/arm/Kconfig           |  4 ----
- arch/arm/mach-pxa/Kconfig  | 15 ---------------
- arch/mips/Kconfig          |  1 -
- drivers/input/misc/Kconfig |  4 ++--
- include/linux/pwm.h        |  2 +-
- 5 files changed, 3 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..1b6f499 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -109,9 +109,6 @@ config ARM_DMA_IOMMU_ALIGNMENT
- 
- endif
- 
--config HAVE_PWM
--	bool
--
- config MIGHT_HAVE_PCI
- 	bool
- 
-@@ -606,7 +603,6 @@ config ARCH_LPC32XX
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_IDE
--	select HAVE_PWM
- 	select USB_ARCH_HAS_OHCI
- 	select USE_OF
- 	help
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 96100db..b96244c 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
- config MACH_PXA3XX_DT
- 	bool "Support PXA3xx platforms from device tree"
- 	select CPU_PXA300
--	select HAVE_PWM
- 	select POWER_SUPPLY
- 	select PXA3xx
- 	select USE_OF
-@@ -23,12 +22,10 @@ config ARCH_LUBBOCK
- 
- config MACH_MAINSTONE
- 	bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_ZYLONITE
- 	bool
--	select HAVE_PWM
- 	select PXA3xx
- 
- config MACH_ZYLONITE300
-@@ -69,7 +66,6 @@ config ARCH_PXA_IDP
- config ARCH_VIPER
- 	bool "Arcom/Eurotech VIPER SBC"
- 	select ARCOM_PCMCIA
--	select HAVE_PWM
- 	select I2C_GPIO
- 	select ISA
- 	select PXA25x
-@@ -120,7 +116,6 @@ config MACH_CM_X300
- 	bool "CompuLab CM-X300 modules"
- 	select CPU_PXA300
- 	select CPU_PXA310
--	select HAVE_PWM
- 	select PXA3xx
- 
- config MACH_CAPC7117
-@@ -211,7 +206,6 @@ config TRIZEPS_PCMCIA
- 
- config MACH_LOGICPD_PXA270
- 	bool "LogicPD PXA270 Card Engine Development Platform"
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_PCM027
-@@ -222,7 +216,6 @@ config MACH_PCM027
- config MACH_PCM990_BASEBOARD
- 	bool "PHYTEC PCM-990 development board"
- 	depends on MACH_PCM027
--	select HAVE_PWM
- 
- choice
- 	prompt "display on pcm990"
-@@ -246,7 +239,6 @@ config MACH_COLIBRI
- config MACH_COLIBRI_PXA270_INCOME
- 	bool "Income s.r.o. PXA270 SBC"
- 	depends on MACH_COLIBRI
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_COLIBRI300
-@@ -275,7 +267,6 @@ comment "End-user Products (sorted by vendor name)"
- 
- config MACH_H4700
- 	bool "HP iPAQ hx4700"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
-@@ -289,14 +280,12 @@ config MACH_HIMALAYA
- 
- config MACH_MAGICIAN
- 	bool "Enable HTC Magician Support"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
- config MACH_MIOA701
- 	bool "Mitac Mio A701 Support"
- 	select GPIO_SYSFS
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 	help
-@@ -306,7 +295,6 @@ config MACH_MIOA701
- 
- config PXA_EZX
- 	bool "Motorola EZX Platform"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
-@@ -346,7 +334,6 @@ config MACH_MP900C
- 
- config ARCH_PXA_PALM
- 	bool "PXA based Palm PDAs"
--	select HAVE_PWM
- 
- config MACH_PALM27X
- 	bool
-@@ -444,7 +431,6 @@ config MACH_TREO680
- config MACH_RAUMFELD_RC
- 	bool "Raumfeld Controller"
- 	select CPU_PXA300
--	select HAVE_PWM
- 	select POWER_SUPPLY
- 	select PXA3xx
- 
-@@ -608,7 +594,6 @@ config MACH_E800
- 
- config MACH_ZIPIT2
- 	bool "Zipit Z2 Handheld"
--	select HAVE_PWM
- 	select PXA27x
- endmenu
- 
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index 650de39..ce62af8 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -233,7 +233,6 @@ config MACH_JZ4740
- 	select IRQ_CPU
- 	select ARCH_REQUIRE_GPIOLIB
- 	select SYS_HAS_EARLY_PRINTK
--	select HAVE_PWM
- 	select HAVE_CLK
- 	select GENERIC_IRQ_CHIP
- 
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 5f4967d..bc6ec8e 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -156,7 +156,7 @@ config INPUT_MAX8925_ONKEY
- 
- config INPUT_MAX8997_HAPTIC
- 	tristate "MAXIM MAX8997 haptic controller support"
--	depends on PWM && HAVE_PWM && MFD_MAX8997
-+	depends on PWM && MFD_MAX8997
- 	select INPUT_FF_MEMLESS
- 	help
- 	  This option enables device driver support for the haptic controller
-@@ -461,7 +461,7 @@ config INPUT_PCF8574
- 
- config INPUT_PWM_BEEPER
- 	tristate "PWM beeper support"
--	depends on PWM && HAVE_PWM
-+	depends on PWM
- 	help
- 	  Say Y here to get support for PWM based beeper devices.
- 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index f0feafd..4717f54 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -7,7 +7,7 @@
- struct pwm_device;
- struct seq_file;
- 
--#if IS_ENABLED(CONFIG_PWM) || IS_ENABLED(CONFIG_HAVE_PWM)
-+#if IS_ENABLED(CONFIG_PWM)
- /*
-  * pwm_request - request a PWM device
-  */
--- 
-1.8.5.2
+Thanks
+Heiko
+
+On Monday 13 January 2014 10:19:14 Shawn Guo wrote:
+> On Sun, Jan 12, 2014 at 09:21:19PM +0100, Arnd Bergmann wrote:
+> > I was under the impression that the generic pinctrl binding was designed
+> > in a way to let you assign labels to each possible (reasonable)
+> > configuration so you didn't have get to this level of detail at the
+> > driver.
+> 
+> The generic part of pinctrl binding only covers the procedure how a
+> client device get its pinctrl state configuration from a pin controller
+> node.  That's what we defined in bindings/pinctrl/pinctrl-bindings.txt
+> and implemented in pinctrl core.  But the details of how a pinctrl state
+> configuration should be interpreted for a particular pin controller is
+> defined by individual pin controller binding like fsl,imx-pinctrl.txt,
+> and implemented in the pin controller driver like
+> drivers/pinctrl/pinctrl-imx.c.
+> 
+> > I'm also surprised that you have to know multiple constants
+> > (mux register, input register, config register offsets) to select a
+> > particular pin. I would have expected that you could have one constant
+> > from which the driver is able to compute the other ones.
+> 
+> That's what we do before.  We define a constant in the binding and have
+> the driver to maintain these data and look up the data using the
+> constant.  See commit below for imx6q example.
+> 
+>   d8fe357 pinctrl: pinctrl-imx: add imx6q pinctrl driver
+> 
+> The biggest problem with that approach is we have huge data to maintain
+> in the driver because of the complexity and flexibility of IMX pin
+> controller design.  And these data can not be init data.  Check that big
+> array of struct imx_pin_reg in commit above for what I'm talking about.
+> So when we build a v7 kernel image for IMX, we will have such big array
+> for each of these SoCs, imx50, imx51, imx53, imx6sl, imx6dl, imx6q, and
+> more to come.
+> 
+> That's why we went through the pain of breaking DT compatibility to move
+> all these data into device tree one year ago with the commit below.
+> 
+>   e164153 pinctrl: imx: move hard-coding data into device tree
+> 
+> Now kernel gets released from the floating and we do not even need to
+> touch kernel to add these data when new SoC support is added.
+> 
+> Shawn
