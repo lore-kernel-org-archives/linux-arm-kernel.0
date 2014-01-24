@@ -1,103 +1,49 @@
 From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 11:40:52 -0500
-Subject: [PATCH V2 2/6] ARM CoreSight: ETM: Rename 'comparator' to 'address
- comparator'
+Date: Fri, 24 Jan 2014 11:40:54 -0500
+Subject: [PATCH V2 4/6] ARM: Make PID_IN_CONTEXTIDR incompatible with PID_NS
 In-Reply-To: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
 References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-Message-ID: <1390581656-16372-3-git-send-email-adrienverge@gmail.com>
+Message-ID: <1390581656-16372-5-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there are different types of comparators, and other kinds will
-be used (such as Context ID comparators), rename them properly.
+When using namespaces, different processes can have the same PID.
+It makes no sense to store a PID value in the Context ID register
+to track a specific process, when others share the same value.
+
+Consequently, PID_IN_CONTEXTIDR (which is used for tracing and
+debugging processes) should not be compatible with PID_NS.
 
 Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
 ---
- arch/arm/include/asm/hardware/coresight.h |  4 ++--
- arch/arm/kernel/etm.c                     | 19 ++++++++++---------
- 2 files changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig.debug   | 2 +-
+ arch/arm64/Kconfig.debug | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index ad774f3..8c50cf6 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -95,8 +95,8 @@
- #define ETMAAT_NSONLY		(1 << 10)
- #define ETMAAT_SONLY		(2 << 10)
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5765abf..ed46748 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1143,7 +1143,7 @@ config ARM_KPROBES_TEST
  
--#define ETMR_COMP_VAL(x)	(0x40 + (x) * 4)
--#define ETMR_COMP_ACC_TYPE(x)	(0x80 + (x) * 4)
-+#define ETMR_ADDRCOMP_VAL(x)	(0x40 + (x) * 4)
-+#define ETMR_ADDRCOMP_ACC_TYPE(x)	(0x80 + (x) * 4)
+ config PID_IN_CONTEXTIDR
+ 	bool "Write the current PID to the CONTEXTIDR register"
+-	depends on CPU_COPY_V6
++	depends on CPU_COPY_V6 && !PID_NS
+ 	help
+ 	  Enabling this option causes the kernel to write the current PID to
+ 	  the PROCID field of the CONTEXTIDR register, at the expense of some
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 835c559..06b2633b 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -17,6 +17,7 @@ config EARLY_PRINTK
  
- /* ETM status register, "ETM Architecture", 3.3.2 */
- #define ETMR_STATUS		(0x10)
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 2b1a307..7f7a0ee 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -39,7 +39,7 @@ struct tracectx {
- 	void __iomem	*etb_regs;
- 	void __iomem	*etm_regs;
- 	unsigned long	flags;
--	int		ncmppairs;
-+	int		naddrcmppairs;
- 	int		etm_portsz;
- 	struct device	*dev;
- 	struct clk	*emu_clk;
-@@ -59,7 +59,7 @@ static int etm_setup_address_range(struct tracectx *t, int n,
- 	u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
- 		    ETMAAT_NOVALCMP;
- 
--	if (n < 1 || n > t->ncmppairs)
-+	if (n < 1 || n > t->naddrcmppairs)
- 		return -EINVAL;
- 
- 	/* comparators and ranges are numbered starting with 1 as opposed
-@@ -72,12 +72,12 @@ static int etm_setup_address_range(struct tracectx *t, int n,
- 		flags |= ETMAAT_IEXEC;
- 
- 	/* first comparator for the range */
--	etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2));
--	etm_writel(t, start, ETMR_COMP_VAL(n * 2));
-+	etm_writel(t, flags, ETMR_ADDRCOMP_ACC_TYPE(n * 2));
-+	etm_writel(t, start, ETMR_ADDRCOMP_VAL(n * 2));
- 
- 	/* second comparator is right next to it */
--	etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2 + 1));
--	etm_writel(t, end, ETMR_COMP_VAL(n * 2 + 1));
-+	etm_writel(t, flags, ETMR_ADDRCOMP_ACC_TYPE(n * 2 + 1));
-+	etm_writel(t, end, ETMR_ADDRCOMP_VAL(n * 2 + 1));
- 
- 	flags = exclude ? ETMTE_INCLEXCL : 0;
- 	etm_writel(t, flags | (1 << n), ETMR_TRACEENCTRL);
-@@ -475,7 +475,8 @@ static ssize_t trace_info_show(struct device *dev,
- 	etm_st = etm_readl(&tracer, ETMR_STATUS);
- 	etm_lock(&tracer);
- 
--	return sprintf(buf, "Trace buffer len: %d\nComparator pairs: %d\n"
-+	return sprintf(buf, "Trace buffer len: %d\n"
-+			"Addr comparator pairs: %d\n"
- 			"ETBR_WRITEADDR:\t%08x\n"
- 			"ETBR_READADDR:\t%08x\n"
- 			"ETBR_STATUS:\t%08x\n"
-@@ -483,7 +484,7 @@ static ssize_t trace_info_show(struct device *dev,
- 			"ETMR_CTRL:\t%08x\n"
- 			"ETMR_STATUS:\t%08x\n",
- 			datalen,
--			tracer.ncmppairs,
-+			tracer.naddrcmppairs,
- 			etb_wa,
- 			etb_ra,
- 			etb_st,
-@@ -559,7 +560,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	/* dummy first read */
- 	(void)etm_readl(&tracer, ETMMR_OSSRR);
- 
--	t->ncmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
-+	t->naddrcmppairs = etm_readl(t, ETMR_CONFCODE) & 0xf;
- 	etm_writel(t, 0x440, ETMR_CTRL);
- 	etm_lock(t);
- 
+ config PID_IN_CONTEXTIDR
+ 	bool "Write the current PID to the CONTEXTIDR register"
++	depends on !PID_NS
+ 	help
+ 	  Enabling this option causes the kernel to write the current PID to
+ 	  the CONTEXTIDR register, at the expense of some additional
 -- 
 1.8.5.2
