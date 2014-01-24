@@ -1,131 +1,61 @@
 From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Fri, 24 Jan 2014 11:40:53 -0500
-Subject: [PATCH V2 3/6] ARM CoreSight: ETM: Add address control support
+Date: Fri, 24 Jan 2014 11:40:56 -0500
+Subject: [PATCH V2 6/6] ARM CoreSight: ETM: Allocate a trace buffer only when
+ necessary
 In-Reply-To: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
 References: <1390581656-16372-1-git-send-email-adrienverge@gmail.com>
-Message-ID: <1390581656-16372-4-git-send-email-adrienverge@gmail.com>
+Message-ID: <1390581656-16372-7-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the same manner as for enabling tracing, an entry is created
-in sysfs to set the address range that triggers tracing.
+Some user applications try to retrieve trace data often, there
+is no need to call vmalloc() when there is 0 byte to fetch.
 
 Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
 ---
- arch/arm/kernel/etm.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 49 insertions(+), 3 deletions(-)
+ arch/arm/kernel/etm.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 7f7a0ee..4442e5c 100644
+index 54b5128..bc97240 100644
 --- a/arch/arm/kernel/etm.c
 +++ b/arch/arm/kernel/etm.c
-@@ -44,6 +44,8 @@ struct tracectx {
- 	struct device	*dev;
- 	struct clk	*emu_clk;
- 	struct mutex	mutex;
-+	unsigned long	addrrange_start;
-+	unsigned long	addrrange_end;
- };
+@@ -309,7 +309,7 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	long length;
+ 	struct tracectx *t = file->private_data;
+ 	u32 first = 0;
+-	u32 *buf;
++	u32 *buf = NULL;
  
- static struct tracectx tracer;
-@@ -53,6 +55,13 @@ static inline bool trace_isrunning(struct tracectx *t)
- 	return !!(t->flags & TRACER_RUNNING);
- }
+ 	mutex_lock(&t->mutex);
  
-+/*
-+ * Setups ETM to trace only when:
-+ *   - address between start and end
-+ *     or address not between start and end (if exclude)
-+ *   - trace executed instructions
-+ *     or trace loads and stores (if data)
-+ */
- static int etm_setup_address_range(struct tracectx *t, int n,
- 		unsigned long start, unsigned long end, int exclude, int data)
- {
-@@ -115,8 +124,8 @@ static int trace_start(struct tracectx *t)
- 		return -EFAULT;
- 	}
+@@ -327,12 +327,14 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	etb_writel(t, first, ETBR_READADDR);
  
--	etm_setup_address_range(t, 1, (unsigned long)_stext,
--			(unsigned long)_etext, 0, 0);
-+	etm_setup_address_range(t, 1, t->addrrange_start, t->addrrange_end,
-+				0, 0);
- 	etm_writel(t, 0, ETMR_TRACEENCTRL2);
- 	etm_writel(t, 0, ETMR_TRACESSCTRL);
- 	etm_writel(t, 0x6f, ETMR_TRACEENEVT);
-@@ -527,6 +536,36 @@ static ssize_t trace_mode_store(struct device *dev,
+ 	length = min(total * 4, (int)len);
+-	buf = vmalloc(length);
++	if (length != 0)
++		buf = vmalloc(length);
  
- DEVICE_ATTR(trace_mode, S_IRUGO|S_IWUSR, trace_mode_show, trace_mode_store);
+ 	dev_dbg(t->dev, "ETB buffer length: %d\n", total);
+ 	dev_dbg(t->dev, "ETB status reg: %x\n", etb_readl(t, ETBR_STATUS));
+-	for (i = 0; i < length / 4; i++)
+-		buf[i] = etb_readl(t, ETBR_READMEM);
++	if (buf)
++		for (i = 0; i < length / 4; i++)
++			buf[i] = etb_readl(t, ETBR_READMEM);
  
-+static ssize_t trace_addrrange_show(struct device *dev,
-+				    struct device_attribute *attr, char *buf)
-+{
-+	return sprintf(buf, "%08lx - %08lx\n", tracer.addrrange_start,
-+		       tracer.addrrange_end);
-+}
-+
-+static ssize_t trace_addrrange_store(struct device *dev,
-+				     struct device_attribute *attr,
-+				     const char *buf, size_t n)
-+{
-+	unsigned long start, end;
-+
-+	if (tracer.flags & TRACER_RUNNING)
-+		return -EBUSY;
-+
-+	if (sscanf(buf, "%08lx - %08lx", &start, &end) != 2)
-+		return -EINVAL;
-+
-+	mutex_lock(&tracer.mutex);
-+	tracer.addrrange_start = start;
-+	tracer.addrrange_end = end;
-+	mutex_unlock(&tracer.mutex);
-+
-+	return n;
-+}
-+
-+DEVICE_ATTR(trace_addrrange, S_IRUGO|S_IWUSR,
-+	    trace_addrrange_show, trace_addrrange_store);
-+
- static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct tracectx *t = &tracer;
-@@ -554,6 +593,8 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	t->dev = &dev->dev;
- 	t->flags = TRACER_CYCLE_ACC;
- 	t->etm_portsz = 1;
-+	t->addrrange_start = (unsigned long) _stext;
-+	t->addrrange_end = (unsigned long) _etext;
+ 	/* the only way to deassert overflow bit in ETB status is this */
+ 	etb_writel(t, 1, ETBR_CTRL);
+@@ -345,7 +347,8 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	etb_lock(t);
  
- 	etm_unlock(t);
- 	(void)etm_readl(t, ETMMR_PDSR);
-@@ -568,7 +609,7 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret)
- 		goto out_unmap;
- 
--	/* failing to create any of these two is not fatal */
-+	/* failing to create any of these three is not fatal */
- 	ret = device_create_file(&dev->dev, &dev_attr_trace_info);
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_info in sysfs\n");
-@@ -577,6 +618,10 @@ static int etm_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_mode in sysfs\n");
- 
-+	ret = device_create_file(&dev->dev, &dev_attr_trace_addrrange);
-+	if (ret)
-+		dev_dbg(&dev->dev, "Failed to create trace_addrrange in sysfs\n");
-+
- 	dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
+ 	length -= copy_to_user(data, buf, length);
+-	vfree(buf);
++	if (buf)
++		vfree(buf);
  
  out:
-@@ -606,6 +651,7 @@ static int etm_remove(struct amba_device *dev)
- 	device_remove_file(&dev->dev, &dev_attr_trace_running);
- 	device_remove_file(&dev->dev, &dev_attr_trace_info);
- 	device_remove_file(&dev->dev, &dev_attr_trace_mode);
-+	device_remove_file(&dev->dev, &dev_attr_trace_addrrange);
- 
- 	return 0;
- }
+ 	mutex_unlock(&t->mutex);
 -- 
 1.8.5.2
