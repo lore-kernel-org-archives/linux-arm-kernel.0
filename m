@@ -1,43 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jan 2014 15:44:17 +0000
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 24 Jan 2014 23:45:03 +0800
 Subject: [PATCH 18/20] clocksource / acpi: Add macro
  CLOCKSOURCE_ACPI_DECLARE
-In-Reply-To: <20140124151513.GD19052@arm.com>
+In-Reply-To: <20140124123259.GI814@e106331-lin.cambridge.arm.com>
 References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
  <1389961514-13562-19-git-send-email-hanjun.guo@linaro.org>
  <CACRpkdYKwaH5DX27irzmcTDAMhQMUhuzz6N7mjKWv9tZchv0Ug@mail.gmail.com>
- <20140122114537.GA15591@e106331-lin.cambridge.arm.com>
- <52E1B1DE.5050507@linaro.org>
- <20140124120815.GH814@e106331-lin.cambridge.arm.com>
- <20140124151513.GD19052@arm.com>
-Message-ID: <20140124154417.GB4758@e106331-lin.cambridge.arm.com>
+ <52E1AFE8.40601@linaro.org>
+ <20140124123259.GI814@e106331-lin.cambridge.arm.com>
+Message-ID: <52E28A7F.2010803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 03:15:13PM +0000, Catalin Marinas wrote:
-> Do we still need the chosen node to be passed via DT for command line,
-> even if the kernel uses ACPI?
+Hi Mark,
 
-It depends on how the kernel is booted.
+On 2014?01?24? 20:32, Mark Rutland wrote:
+> On Fri, Jan 24, 2014 at 12:12:24AM +0000, Hanjun Guo wrote:
+>> Hi Linus,
+>>
+>> Sorry for the late reply.
+>>
+>> On 2014?01?22? 16:26, Linus Walleij wrote:
+>>> On Fri, Jan 17, 2014 at 1:25 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>
+>>>> From: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>
+>>>> This macro does the same job as CLOCKSOURCE_OF_DECLARE. The device
+>>>> name from the ACPI timer table is matched with all the registered
+>>>> timer controllers and matching initialisation routine is invoked.
+>>>>
+>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> Actually I have a fat patch renaming CLOCKSOURCE_OF_DECLARE()
+>>> to TIMER_OF_DECLARE() and I think this macro, if needed, should
+>>> be named TIMER_ACPI_DECLARE().
+>>>
+>>> The reason is that "clocksource" is a Linux-internal name and this
+>>> macro pertains to the hardware name in respective system
+>>> description type.
+>> That make sense to me too, I will update in next version if
+>> this patch is still needed.
+>>
+>>>> +#ifdef CONFIG_ACPI
+>>>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)                     \
+>>>> +       static const struct acpi_device_id __clksrc_acpi_table_##name   \
+>>>> +               __used __section(__clksrc_acpi_table)                   \
+>>>> +                = { .id = compat,                              \
+>>>> +                    .driver_data = (kernel_ulong_t)fn }
+>>>> +#else
+>>>> +#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
+>>>> +#endif
+>>> This hammers down the world to compile one binary for ACPI
+>>> and one binary for device tree. Maybe that's fine, I don't know.
+>> This is a problem we can have some discussion on it.
+>> I prefer mutually exclusive ACPI and DT support.
+> A lot of work has been put into making a single kernel boot everywhere.
+> It's forced duplicated code to be factored out, and it's made the kernel
+> more flexible. While it has been painful, it's forced a far higher
+> quality standard across the board(s).
+>
+> Having a separate ACPI-capable or DT-capable kernels goes completely
+> against that, and it's completely broken:
+>
+> * It doubles the testing effort required for a particular kernel. I can
+>    guarantee that we will miss bugs (even amazingly bad build bugs)
+>    because no-one will be able to test a full suite of kernels.
+>
+> * It introduces the possibility of completely pointles arbitrary
+>    differences between the two. How long until we see the first bug-fix
+>    that only works in one configuration?
+>
+> * It creates additional work for distributions, which need to build more
+>    kernels test them, distribute them, and document which platforms which
+>    kernels are supported on. This creates more pain for end-users too.
+>    
+> Eventually we _will_ get fed up with all of those, and we'll have to do
+> painful invasive work to make the kernel decide at runtime.
+>
+> Having separate kernels is a lazy shortcut. It's painful for everyone,
+> leads to a greater maintenance overhead, it's not what we want now and
+> not what we want in future.
+>
+> No thanks.
+>
+> Either the kernel figures out whether or not to deal with ACPI at
+> runtime, or it doesn't deal with it at all.
 
-If not booted as a UEFI application, then the user would have to provide
-a dtb to pass the command line.
+I fully agree with you for the single kernel image, I didn't notice this 
+before, sorry for
+my noise about the exclusive ACPI and DT support.
 
-If booted as a UEFI application, the kernel can retrieve the commandline
-from UEFI and handle it appropriately (this _might_ involve the EFI stub
-building a dtb with a chosen node and pasing that to the kernel, but
-that could change as it's within the kernel). In that case, the user
-need not build a dtb manually.
+Thank you very much to let things much more clearer :)
 
-However, I'd expect that we use a restricted dtb with only a /chosen
-node for passing additional data as an equivalent to x86's bootargs
-(which would contain the location of ACPI tables and possibly other
-stuff like initrd location if not passed on the command line). That
-makes the very early logic in the kernel much simpler, and it gives us
-an extensible format that should limit headaches in future.
-
-So if booted with ACPI we _might_ have a restricted chosen-only dtb,
-which _might_ be passed to the kernel explicitly by the user.
-
-Thanks,
-Mark.
+Hanjun
