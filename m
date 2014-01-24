@@ -1,38 +1,103 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jan 2014 15:37:56 +0000
-Subject: [PATCH] arm64: fix build error if DMA_CMA is enabled
-In-Reply-To: <1390551788-6138-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1390551788-6138-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20140124153756.GH19052@arm.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 24 Jan 2014 15:41:54 +0000
+Subject: [PATCH] sunxi: dts: add a note that memory size is adjusted by
+ boot loader.
+In-Reply-To: <52E2874F.10703@redhat.com>
+References: <1390572852-15027-1-git-send-email-ijc@hellion.org.uk>
+ <52E2874F.10703@redhat.com>
+Message-ID: <1390578114.13513.13.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 08:23:08AM +0000, Pankaj Dubey wrote:
-> arm64/include/asm/dma-contiguous.h is trying to include
-> <asm-genric/dma-contiguous.h> which does not exist, and thus failing
-> build for arm64 if we enable CONFIG_DMA_CMA. This patch fixes build 
-> error by removing unwanted header inclusion from arm64's dma-contiguous.h.
+On Fri, 2014-01-24 at 16:31 +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Somraj Mani <somraj.mani@samsung.com>
-> ---
->  arch/arm64/include/asm/dma-contiguous.h |    1 -
->  1 file changed, 1 deletion(-)
+> On 01/24/2014 03:14 PM, Ian Campbell wrote:
+> > I had to spend a couple of minutes proving to myself that this was the case on
+> > cubietruck, so add a comment to save the next guy some effort.
 > 
-> diff --git a/arch/arm64/include/asm/dma-contiguous.h b/arch/arm64/include/asm/dma-contiguous.h
-> index d6aacb6..14c4c0c 100644
-> --- a/arch/arm64/include/asm/dma-contiguous.h
-> +++ b/arch/arm64/include/asm/dma-contiguous.h
-> @@ -18,7 +18,6 @@
->  #ifdef CONFIG_DMA_CMA
->  
->  #include <linux/types.h>
-> -#include <asm-generic/dma-contiguous.h>
+> Seems like a good idea to me, one small nitpick though see comments inline.
+> 
+> > Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Hans de Goede <hdegoede@redhat.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-sunxi at googlegroups.com
+> > ---
+> > This patch applies cleanly against v3.13 and Hans' sunxi-devel branch.
+> >
+> > A plausible alternative would be to pull the memory node out of the dtsi files
+> > and into the board specific files. I didn't go straight to that since I'd have
+> > to research all the various boards ;-)
+> 
+> That won't help, some boards ie the original cubieboard and the mele-a1000 come
+> in both 512 MB and 1024 MB versions, and I don't think we want to start maintaining
+> 2 different dts files just for that.
 
-Thanks for this.
+I didn't mean to suggest that u-boot should stop updating the dtb, so
+e.g. I would have put a 512MB reg in the cubieboard dts, with a similar
+comment.
 
-Laura, did you have additional patches adding
-asm-generic/dma-contiguous.h?
+But in cases where there is only one variant (e.g. the cubietruck) I'd
+have put a 2GB reg and no comment, even though u-boot would in reality
+rewrite the 2GB there. 
 
--- 
-Catalin
+> > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> > index 3e60883..9ba0beb 100644
+> > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> > @@ -30,6 +30,7 @@
+> >   	};
+> >
+> >   	memory {
+> > +		/* 1GB by default, will be updated by U-Boot */
+> >   		reg = <0x40000000 0x80000000>;
+> >   	};
+> >
+> 
+> The comment says 1GB, but the range says 2GB, note 2GB is consistent with what the
+> datasheet claims as max RAM.
+
+Oops, I must have missed that.
+
+> 
+> > diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > index 0376c50..d12ed7e 100644
+> > --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > @@ -27,6 +27,7 @@
+> >   	};
+> >
+> >   	memory {
+> > +		/* 512MB by default, will be updated by U-Boot */
+> >   		reg = <0x40000000 0x20000000>;
+> >   	};
+> >
+> 
+> This seems wrong (copy paste from A13 error) I've a10s boards with 1G, and the data
+> sheet claims 2GB max RAM.
+
+I had expected these values to contain the minimum -- i.e. the one which
+would work everywhere, so it would work if for some reason u-boot wasn't
+updating correctly. Better to boot with only some of the RAM than to
+crash randomly.
+
+> > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > index 907cfcc..658e74b 100644
+> > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > @@ -38,6 +38,7 @@
+> >   	};
+> >
+> >   	memory {
+> > +		/* 1GB by default, will be updated by U-Boot */
+> >   		reg = <0x40000000 0x80000000>;
+> >   	};
+> 
+> The comment says 1GB, but the range says 2GB, note 2GB is consistent with what the
+> datasheet claims as max RAM.
+
+Huh, that's the second time I got the wrong one, and I swear I was
+paying attention to it as well!
+
+Ian.
