@@ -1,28 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 24 Jan 2014 15:35:23 -0200
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <20140120164859.GF15937@n2100.arm.linux.org.uk>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <20140120164859.GF15937@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 24 Jan 2014 17:39:55 +0000
+Subject: [RFC PATCH 1/1] of/irq: create interrupts-extended-2 property
+In-Reply-To: <CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
+References: <1389786445-10598-1-git-send-email-plagnioj@jcrosoft.com> <
+ 20140115161224.GH25824@e106331-lin.cambridge.arm.com> <20140120224742.
+ EC905C40B12@trevor.secretlab.ca> <
+ CAOesGMjrLs9eEPurjUpOfgyexnc__FJkRYmAR84_f7C15HH07Q@mail.gmail.com>
+Message-ID: <20140124173955.135E1C40A02@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Mon, 20 Jan 2014 17:03:23 -0800, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jan 20, 2014 at 2:47 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Wed, 15 Jan 2014 16:12:24 +0000, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >
+> >> > Another, more invasive option would be extend the dts syntax and teach
+> >> > dtc to handle property appending. Then the soc dts could stay as it is,
+> >> > and the board dts could have something like:
+> >> >
+> >> >     /append-property/ interrupts = <&intc1 6 1>;
+> >> >     /append-property/ interrupt-names = "board-specific-irq";
+> >> >
+> >> > Both these options solve the issue at the source, are general to other
+> >> > properties, and allow more than one level of hierarchy (the proposed
+> >> > interrupts-extended-2 only allows one level).
+> >>
+> >> I've just had a go at implementing the append-property mechanism above
+> >> in dtc, and it was far easier than I expected (patch below).
+> >>
+> >> Does anyone have any issues with the /append-property/ idea?
+> >
+> > I think that is reasonable.
+> 
+> 
+> The main problem with this (same for clocks) is if you need to append
+> something with a name when the original didn't have any.
+> 
+> Reordering entries might not work for interrupts, since the bindings
+> might have requirements on order.
 
-> So far so good.  Now, what about this external oscillator which has its
-> own separate power control.  My immediate thought is that this can be
-> specified via card_ext_clock - I would simply need to declare a fixed-rate
-> clock with either a regulator (power switch) controlled via a gpio (which
-> would probably be closer to the hardware) or a gpio as an enable... ah,
-> that requires me to write a common clock driver for that bit since this
-> is currently not modelled by CCF...
+Hmmm, yes. to handle that case would need a higher level construct that
+keeps the name and interrupt value together. Maybe something like this?
 
-Jiry Sarha posted a gpio controlled clock proposal:
-http://www.spinics.net/lists/devicetree/msg16651.html
+device {
+	add-interrupt(27);
+	add-interrupt(29, 5, controller=&intc1);
+	add-interrupt(2, 4, name="error");
+};
 
-Regards,
+I'm using python-like syntax here where controller and name are optional
+arguments.
 
-Fabio Estevam
+We could get DTC to generate the appropriate interrupt-parent,
+interrupts, interrupts-extended and interrupt-names properties as
+needed. Of course the shared context would be lost when the tree is
+compiled, but it would be useful for building up parsing data. It would
+also work for gpio, clocks and similar bindings. Kind of like an
+intelligent macro.
+
+g.
