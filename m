@@ -1,76 +1,80 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Fri, 24 Jan 2014 10:57:50 +0530
-Subject: [PATCH V2 6/8] SPEAr13xx: Fix static mapping table
-In-Reply-To: <CAOh2x=nAUxyx+5y4yA=NSEQPTAPLfdxaFjc=k8r1NyRUgZLu8A@mail.gmail.com>
-References: <cover.1390471111.git.mohit.kumar@st.com>
- <22d2e7d6fbd5a291cdecf6a4d1e294d9c9ede617.1390471111.git.mohit.kumar@st.com>
- <CAOh2x=nAUxyx+5y4yA=NSEQPTAPLfdxaFjc=k8r1NyRUgZLu8A@mail.gmail.com>
-Message-ID: <20140124052750.GD2369@pratyush-vbox>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 24 Jan 2014 06:42:54 +0100
+Subject: [PATCH 1/2] PWM: let of_xlate handlers check args count
+In-Reply-To: <20140123173642.GZ15937@n2100.arm.linux.org.uk>
+References: <20140123083714.3c6e86ae@ipc1.ka-ro>
+ <1390467898-9216-1-git-send-email-s.hauer@pengutronix.de>
+ <1390467898-9216-2-git-send-email-s.hauer@pengutronix.de>
+ <20140123115632.6d3f1a58@ipc1.ka-ro>
+ <20140123110444.GI16215@pengutronix.de>
+ <20140123165349.GY15937@n2100.arm.linux.org.uk>
+ <20140123173642.GZ15937@n2100.arm.linux.org.uk>
+Message-ID: <20140124064254.0369084d@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 01:07:38PM +0800, Viresh Kumar wrote:
-> On Thu, Jan 23, 2014 at 4:02 PM, Mohit Kumar <mohit.kumar@st.com> wrote:
-> > From: Pratyush Anand <pratyush.anand@st.com>
-> >
-> > SPEAr13xx was using virtual address space 0xFE000000 to map physical address
-> > space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
-> > change 0xFE000000 to 0xF9000000.
-> >
-> > Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> > Tested-by: Mohit Kumar <mohit.kumar@st.com>
-> > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> > Cc: spear-devel at list.st.com
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  arch/arm/mach-spear/include/mach/spear.h |    4 ++--
-> >  arch/arm/mach-spear/spear13xx.c          |    2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-> > index 5cdc53d..f2d6a01 100644
-> > --- a/arch/arm/mach-spear/include/mach/spear.h
-> > +++ b/arch/arm/mach-spear/include/mach/spear.h
-> > @@ -52,10 +52,10 @@
-> >  #ifdef CONFIG_ARCH_SPEAR13XX
-> >
-> >  #define PERIP_GRP2_BASE                                UL(0xB3000000)
-> > -#define VA_PERIP_GRP2_BASE                     IOMEM(0xFE000000)
-> > +#define VA_PERIP_GRP2_BASE                     IOMEM(0xF9000000)
-> >  #define MCIF_SDHCI_BASE                                UL(0xB3000000)
-> >  #define SYSRAM0_BASE                           UL(0xB3800000)
-> > -#define VA_SYSRAM0_BASE                                IOMEM(0xFE800000)
-> > +#define VA_SYSRAM0_BASE                                IOMEM(0xF9800000)
-> >  #define SYS_LOCATION                           (VA_SYSRAM0_BASE + 0x600)
-> >
-> >  #define PERIP_GRP1_BASE                                UL(0xE0000000)
-> > diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-> > index 7aa6e8c..20ce885 100644
-> > --- a/arch/arm/mach-spear/spear13xx.c
-> > +++ b/arch/arm/mach-spear/spear13xx.c
-> > @@ -52,10 +52,10 @@ void __init spear13xx_l2x0_init(void)
-> >  /*
-> >   * Following will create 16MB static virtual/physical mappings
-> >   * PHYSICAL            VIRTUAL
-> > - * 0xB3000000          0xFE000000
-> >   * 0xE0000000          0xFD000000
-> >   * 0xEC000000          0xFC000000
-> >   * 0xED000000          0xFB000000
-> > + * 0xB3000000          0xF9000000
-> 
-> 
-> Why have you moved this to bottom of list? It was probably kept
-> in increasing order and so please keep the same.
+Hi,
 
-Oh,yes..ll be corrected in v3 of series.
-
+Russell King - ARM Linux wrote:
+> On Thu, Jan 23, 2014 at 04:53:50PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 23, 2014 at 12:04:44PM +0100, Sascha Hauer wrote:
+> > > On Thu, Jan 23, 2014 at 11:56:32AM +0100, Lothar Wa?mann wrote:
+> > > > Hi,
+> > > > 
+> > > > Sascha Hauer wrote:
+> > > > > of_pwm_n_cells for the of_xlate handler is stored in struct pwm_chip,
+> > > > > but it is only ever used by the of_xlate handler itsel. Remove
+> > > > > of_pwm_n_cells from struct pwm_chip and let the handler do the argument
+> > > > > count checking to simplify the code.
+> > > > > 
+> > > > This still does not make the PWM_POLARITY flag in the pwms node
+> > > > optional as was the goal because of_parse_phandle_with_args() requires
+> > > > at least #pwm-cells arguments in the node.
+> > > > 
+> > > > So, with a DT configuration like:
+> > > > pwm0: pwm at 0 {
+> > > > 	#pwm-cells = <3>;
+> > > > };
+> > > > backlight {
+> > > > 	pwms = <&pwm0 0 100000>;
+> > > > };
+> > > 
+> > > We misunderstood each other. My goal was to allow the driver to also
+> > > work with old devicetrees which specify #pwm-cells = <2>, not to allow
+> > > inconsistent devicetrees like the snippet above.
+> > 
+> > In which case, the patch I've posted seems to do that job too... I'm
+> > just about to test out the three-cell version.
 > 
-> Other than that:
+> Okay, this works, but there's a problem with pwm-leds.
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> When the duty cycle is set to zero (when you set the brightness to zero)
+> pwm-leds decides to disable the PWM after configuring it.  This causes
+> the PWM output to be driven low, causing the LED to go to maximum
+> brightness.
+> 
+> So, using the inversion at PWM level doesn't work.
+> 
+The problem is that the driver calls pwm_disable() when the duty cycle is 0.
+This sets the PWM output low independent from the output polarity setting.
 
-Thanks.
+> To make this work correctly, we really need pwm-leds to do the inversion
+> rather than setting the inversion bit in hardware.
+> 
+The same holds for the pwm-backlight driver.
 
-Regards
-Pratyush
+The easiest fix would be not to call pwm_disable() even for a zero duty
+cycle.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
