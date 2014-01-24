@@ -1,81 +1,112 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Jan 2014 13:49:37 +0100
-Subject: [PATCH v4 01/15] ARM: shmobile: r7s72100 clock: Add RSPI clocks
+Date: Fri, 24 Jan 2014 13:49:42 +0100
+Subject: [PATCH v4 06/15] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
 In-Reply-To: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
 References: <1390567791-8988-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1390567791-8988-2-git-send-email-geert@linux-m68k.org>
+Message-ID: <1390567791-8988-7-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Cc: devicetree at vger.kernel.org
 ---
 v4:
-  - The platform device basename was changed from "rspi" to "rspi-rz"
+  - Switch to named IRQs
 v3:
   - No changes
 v2:
-  - Correct platform device names ("rspi%u" -> "rspi.%u")
+  - No changes
 
- arch/arm/mach-shmobile/clock-r7s72100.c |   21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi |   70 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 0242ca5f499a..bf15b63c3d5a 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -22,13 +22,15 @@
- #include <mach/common.h>
- #include <mach/r7s72100.h>
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index ff0bd6be454f..d7013df6bb10 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -34,6 +34,11 @@
+ 		gpio10 = &port10;
+ 		gpio11 = &port11;
+ 		gpio12 = &jtagport0;
++		spi0 = &spi0;
++		spi1 = &spi1;
++		spi2 = &spi2;
++		spi3 = &spi3;
++		spi4 = &spi4;
+ 	};
  
--/* registers */
-+/* Frequency Control Registers */
- #define FRQCR		0xfcfe0010
- #define FRQCR2		0xfcfe0014
-+/* Standby Control Registers */
- #define STBCR3		0xfcfe0420
- #define STBCR4		0xfcfe0424
- #define STBCR7		0xfcfe0430
- #define STBCR9		0xfcfe0438
-+#define STBCR10		0xfcfe043c
- 
- #define PLL_RATE 30
- 
-@@ -146,12 +148,20 @@ struct clk div4_clks[DIV4_NR] = {
- 					| CLK_ENABLE_ON_INIT),
+ 	cpus {
+@@ -289,4 +294,69 @@
+ 		clock-frequency = <100000>;
+ 		status = "disabled";
+ 	};
++
++	spi0: spi at e800c800 {
++		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
++		reg = <0xe800c800 0x24>;
++		interrupts = <0 238 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 239 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error", "rx", "tx";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	spi1: spi at e800d000 {
++		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
++		reg = <0xe800d000 0x24>;
++		interrupts = <0 241 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 242 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error", "rx", "tx";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	spi2: spi at e800d800 {
++		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
++		reg = <0xe800d800 0x24>;
++		interrupts = <0 244 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 245 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error", "rx", "tx";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	spi3: spi at e800e000 {
++		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
++		reg = <0xe800e000 0x24>;
++		interrupts = <0 247 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 248 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error", "rx", "tx";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	spi4: spi at e800e800 {
++		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
++		reg = <0xe800e800 0x24>;
++		interrupts = <0 250 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 251 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error", "rx", "tx";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
  };
- 
--enum {	MSTP97, MSTP96, MSTP95, MSTP94,
-+enum {
-+	MSTP107, MSTP106, MSTP105, MSTP104, MSTP103,
-+	MSTP97, MSTP96, MSTP95, MSTP94,
- 	MSTP74,
- 	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
--	MSTP33,	MSTP_NR };
-+	MSTP33,	MSTP_NR
-+};
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP107] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 7, 0), /* RSPI0 */
-+	[MSTP106] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 6, 0), /* RSPI1 */
-+	[MSTP105] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 5, 0), /* RSPI2 */
-+	[MSTP104] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 4, 0), /* RSPI3 */
-+	[MSTP103] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 3, 0), /* RSPI4 */
- 	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
- 	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
- 	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
-@@ -179,6 +189,11 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
- 
- 	/* MSTP clocks */
-+	CLKDEV_DEV_ID("rspi-rz.0", &mstp_clks[MSTP107]),
-+	CLKDEV_DEV_ID("rspi-rz.1", &mstp_clks[MSTP106]),
-+	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
-+	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
-+	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
- 	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
- 	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
- 	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
 -- 
 1.7.9.5
