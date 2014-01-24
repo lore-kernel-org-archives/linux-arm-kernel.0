@@ -1,61 +1,157 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jan 2014 11:09:10 +0000
-Subject: [PATCH v5 8/8] ARM: brcmstb: dts: add a reference DTS for
- Broadcom 7445
-In-Reply-To: <1390361452-3124-9-git-send-email-marc.ceeeee@gmail.com>
-References: <1390361452-3124-1-git-send-email-marc.ceeeee@gmail.com>
- <1390361452-3124-9-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <20140124110910.GC814@e106331-lin.cambridge.arm.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Fri, 24 Jan 2014 16:46:05 +0530
+Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <52E0FC22.8060903@metafoo.de>
+References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
+ <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
+ <52E0FC22.8060903@metafoo.de>
+Message-ID: <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 03:30:52AM +0000, Marc Carino wrote:
-> Add a sample DTS which will allow bootup of a board populated
-> with the BCM7445 chip.
-> 
-> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/boot/dts/bcm7445.dts |  111 +++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 111 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/bcm7445.dts
-> 
-> diff --git a/arch/arm/boot/dts/bcm7445.dts b/arch/arm/boot/dts/bcm7445.dts
-> new file mode 100644
-> index 0000000..ffa3305
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm7445.dts
-> @@ -0,0 +1,111 @@
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	model = "Broadcom STB (bcm7445)";
-> +	compatible = "brcm,bcm7445", "brcm,brcmstb";
-> +	interrupt-parent = <&gic>;
-> +
-> +	chosen {};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00 0x00000000 0x00 0x40000000>,
-> +		      <0x00 0x40000000 0x00 0x40000000>,
-> +		      <0x00 0x80000000 0x00 0x40000000>;
-> +	};
+Hi Lars,
 
-As I commented on v3 [1], these are contiguous and can be described with
-a single entry:
+On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
+> [...]
+>> +/**
+>> + * xilinx_vdma_device_control - Configure DMA channel of the device
+>> + * @dchan: DMA Channel pointer
+>> + * @cmd: DMA control command
+>> + * @arg: Channel configuration
+>> + *
+>> + * Return: '0' on success and failure value on error
+>> + */
+>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
+>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
+>> +{
+>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>> +
+>> +     switch (cmd) {
+>> +     case DMA_TERMINATE_ALL:
+>> +             xilinx_vdma_terminate_all(chan);
+>> +             return 0;
+>> +     case DMA_SLAVE_CONFIG:
+>> +             return xilinx_vdma_slave_config(chan,
+>> +                                     (struct xilinx_vdma_config *)arg);
+>
+> You really shouldn't be overloading the generic API with your own semantics.
+> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
 
-memory {
-	device_type = "memory";
-	reg = <0x0 0x00000000 0x0 0xc0000000>;
-};
+Ok.  The driver needs few additional configuration from the slave
+device like Vertical
+Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
+suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
+defined for Freescale drivers?
 
-Is there any reason to have three entries?
+>
+>> +     default:
+>> +             return -ENXIO;
+>> +     }
+>> +}
+>> +
+> [...]
+>> +
+>> +     /* Request the interrupt */
+>> +     chan->irq = irq_of_parse_and_map(node, 0);
+>> +     err = devm_request_irq(xdev->dev, chan->irq, xilinx_vdma_irq_handler,
+>> +                            IRQF_SHARED, "xilinx-vdma-controller", chan);
+>
+> This is a clasic example of where to not use devm_request_irq. 'chan' is
+> accessed in the interrupt handler, but if you use devm_request_irq 'chan'
+> will be freed before the interrupt handler has been released, which means
+> there is now a race condition where the interrupt handler can access already
+> freed memory.
 
-Thanks,
-Mark.
+Ok, thank you for the clarification on this thread.  I will fix it in v3.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/225899.html
+>
+>> +     if (err) {
+>> +             dev_err(xdev->dev, "unable to request IRQ\n");
+>> +             return err;
+>> +     }
+>> +
+>> +     /* Initialize the DMA channel and add it to the DMA engine channels
+>> +      * list.
+>> +      */
+>> +     chan->common.device = &xdev->common;
+>> +
+>> +     list_add_tail(&chan->common.device_node, &xdev->common.channels);
+>> +     xdev->chan[chan->id] = chan;
+>> +
+>> +     /* Reset the channel */
+>> +     err = xilinx_vdma_chan_reset(chan);
+>> +     if (err < 0) {
+>> +             dev_err(xdev->dev, "Reset channel failed\n");
+>> +             return err;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +/**
+>> + * struct of_dma_filter_xilinx_args - Channel filter args
+>> + * @dev: DMA device structure
+>> + * @chan_id: Channel id
+>> + */
+>> +struct of_dma_filter_xilinx_args {
+>> +     struct dma_device *dev;
+>> +     u32 chan_id;
+>> +};
+>> +
+>> +/**
+>> + * xilinx_vdma_dt_filter - VDMA channel filter function
+>> + * @chan: DMA channel pointer
+>> + * @param: Filter match value
+>> + *
+>> + * Return: true/false based on the result
+>> + */
+>> +static bool xilinx_vdma_dt_filter(struct dma_chan *chan, void *param)
+>> +{
+>> +     struct of_dma_filter_xilinx_args *args = param;
+>> +
+>> +     return chan->device == args->dev && chan->chan_id == args->chan_id;
+>> +}
+>> +
+>> +/**
+>> + * of_dma_xilinx_xlate - Translation function
+>> + * @dma_spec: Pointer to DMA specifier as found in the device tree
+>> + * @ofdma: Pointer to DMA controller data
+>> + *
+>> + * Return: DMA channel pointer on success and NULL on error
+>> + */
+>> +static struct dma_chan *of_dma_xilinx_xlate(struct of_phandle_args *dma_spec,
+>> +                                             struct of_dma *ofdma)
+>> +{
+>> +     struct of_dma_filter_xilinx_args args;
+>> +     dma_cap_mask_t cap;
+>> +
+>> +     args.dev = ofdma->of_dma_data;
+>> +     if (!args.dev)
+>> +             return NULL;
+>> +
+>> +     if (dma_spec->args_count != 1)
+>> +             return NULL;
+>> +
+>> +     dma_cap_zero(cap);
+>> +     dma_cap_set(DMA_SLAVE, cap);
+>> +
+>> +     args.chan_id = dma_spec->args[0];
+>> +
+>> +     return dma_request_channel(cap, xilinx_vdma_dt_filter, &args);
+>
+> There is a new helper function called dma_get_slave_channel, which makes
+> this much easier. Take a look at the k3dma.c driver for an example.
+
+Ok.  I will check and fix it in v3.
+
+Srikanth
+
+>> +}
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
