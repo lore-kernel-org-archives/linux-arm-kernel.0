@@ -1,70 +1,144 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jan 2014 22:45:03 +0800
-Subject: [PATCH 07/20] ARM64 / ACPI: Enable ARM64 in Kconfig
-In-Reply-To: <20140123163939.GB25927@localhost>
+Date: Fri, 24 Jan 2014 22:57:33 +0800
+Subject: [PATCH 11/20] ARM64 / ACPI: Get the enable method for SMP
+ initialization
+In-Reply-To: <20140123175031.GJ27520@arm.com>
 References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-8-git-send-email-hanjun.guo@linaro.org>
- <20140123163939.GB25927@localhost>
-Message-ID: <52E27C6F.1070503@linaro.org>
+ <1389961514-13562-12-git-send-email-hanjun.guo@linaro.org>
+ <20140123175031.GJ27520@arm.com>
+Message-ID: <52E27F5D.6070302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?01?24? 00:39, Catalin Marinas wrote:
-> On Fri, Jan 17, 2014 at 12:25:01PM +0000, Hanjun Guo wrote:
->> Add Kconfigs to build ACPI on ARM64, and make ACPI runable on ARM64.
->>
->> acpi_idle driver is x86/IA64 dependent now, so make CONFIG_ACPI_PROCESSOR
->> depends on X86 || IA64, and implement it on ARM/ARM64 in the furture.
->>
->> In order to make arm-core.c can both run on ARM and ARM64, introduce
->> CONFIG_ACPI_ARM to support it.
->>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/Kconfig         |    2 ++
->>   drivers/acpi/Kconfig       |   11 ++++++++---
->>   drivers/acpi/plat/Makefile |    2 +-
->>   3 files changed, 11 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 6d4dd22..2b1fb1d 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -279,6 +279,8 @@ source "net/Kconfig"
->>   
->>   source "drivers/Kconfig"
->>   
->> +source "drivers/acpi/Kconfig"
->> +
->>   source "fs/Kconfig"
->>   
->>   source "arch/arm64/kvm/Kconfig"
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index 4770de5..cae5dc9 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -2,13 +2,16 @@
->>   # ACPI Configuration
->>   #
->>   
->> +config ACPI_ARM
->> +	bool
-> Could be better as def_bool ARM64
->
->> +
->>   menuconfig ACPI
->>   	bool "ACPI (Advanced Configuration and Power Interface) Support"
->>   	depends on !IA64_HP_SIM
->> -	depends on IA64 || X86
->> -	depends on PCI
->> +	depends on ((IA64 || X86) && PCI) || ARM64
->>   	select PNP
->> -	default y
->> +	select ACPI_ARM if ARM64
-> And remove this select here.
+Hi Catalin,
 
-Thanks for the guidance, will update in next version.
+On 2014?01?24? 01:50, Catalin Marinas wrote:
+> On Fri, Jan 17, 2014 at 12:25:05PM +0000, Hanjun Guo wrote:
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -48,6 +48,7 @@
+>>   #include <asm/sections.h>
+>>   #include <asm/tlbflush.h>
+>>   #include <asm/ptrace.h>
+>> +#include <asm/acpi.h>
+>>   
+>>   /*
+>>    * as from 2.5, kernels no longer have an init_tasks structure
+>> @@ -280,7 +281,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
+>>    * cpu logical map array containing MPIDR values related to logical
+>>    * cpus. Assumes that cpu_logical_map(0) has already been initialized.
+>>    */
+>> -void __init smp_init_cpus(void)
+>> +static int __init of_smp_init_cpus(void)
+>>   {
+>>   	struct device_node *dn = NULL;
+>>   	unsigned int i, cpu = 1;
+>> @@ -364,6 +365,10 @@ next:
+>>   		cpu++;
+>>   	}
+>>   
+>> +	/* No device tree or no CPU node in DT */
+>> +	if (cpu == 1 && !bootcpu_valid)
+>> +		return -ENODEV;
+>> +
+>>   	/* sanity check */
+>>   	if (cpu > NR_CPUS)
+>>   		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+>> @@ -371,7 +376,7 @@ next:
+>>   
+>>   	if (!bootcpu_valid) {
+>>   		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
+>> -		return;
+>> +		return -EINVAL;
+>>   	}
+>>   
+>>   	/*
+>> @@ -381,6 +386,39 @@ next:
+>>   	for (i = 0; i < NR_CPUS; i++)
+>>   		if (cpu_logical_map(i) != INVALID_HWID)
+>>   			set_cpu_possible(i, true);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * In ACPI mode, the cpu possible map was enumerated before SMP
+>> + * initialization when MADT table was parsed, so we can get the
+>> + * possible map here to initialize CPUs.
+>> + */
+>> +static void __init acpi_smp_init_cpus(void)
+>> +{
+>> +	int cpu;
+>> +	const char *enable_method;
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		enable_method = acpi_get_enable_method(cpu);
+>> +		if (!enable_method)
+>> +			continue;
+>> +
+>> +		cpu_ops[cpu] = cpu_get_ops(enable_method);
+>> +		if (!cpu_ops[cpu])
+>> +			continue;
+>> +
+>> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
+>> +	}
+>> +}
+>> +
+>> +void __init smp_init_cpus(void)
+>> +{
+>> +	if (!of_smp_init_cpus())
+>> +		return;
+>> +
+>> +	acpi_smp_init_cpus();
+>>   }
+> With DT we initialise the cpu_ops[0] via cpu_read_bootcpu_ops() called
+> from setup_arch(). This is needed because with PSCI we use cpu_ops for
+> power management even if it's a UP system. Do you get a some kernel
+> warning about device node for the boot cpu not found?
+
+Thanks for pointing this out, actually we didn't find a dts file with
+spin-table method for SMP initialization, and this patch is not fully
+tested (only spin-table method is supported in ACPI now), we are
+working on that and get this patch fully tested.
+
+I will review the code carefully in your comments, and update
+the code accordingly.
 
 >
+>> --- a/drivers/acpi/plat/arm-core.c
+>> +++ b/drivers/acpi/plat/arm-core.c
+>> @@ -367,6 +367,32 @@ static void __init acpi_process_madt(void)
+>>   }
+>>   
+>>   /*
+>> + * To see PCSI is enabled or not.
+>> + *
+>> + * PSCI is not available for ACPI 5.0, return FALSE for now.
+>> + *
+>> + * FIXME: should we introduce early_param("psci", func) for test purpose?
+>> + */
+>> +static bool acpi_psci_smp_available(int cpu)
+>> +{
+>> +	return FALSE;
+>> +}
+>> +
+>> +static const char *enable_method[] = {
+>> +	"psci",
+>> +	"spin-table",
+>> +	NULL
+>> +};
+>> +
+>> +const char *acpi_get_enable_method(int cpu)
+>> +{
+>> +	if (acpi_psci_smp_available(cpu))
+>> +		return enable_method[0];
+>> +	else
+>> +		return enable_method[1];
+>> +}
+> You could just use literal strings here, actually even ignoring PSCI
+> until available.
+
+Ok.
+
+Thanks
+Hanjun
