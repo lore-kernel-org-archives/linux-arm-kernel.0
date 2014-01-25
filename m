@@ -1,74 +1,56 @@
 From: moinejf@free.fr (Jean-Francois Moine)
 Date: Sat, 25 Jan 2014 18:14:41 +0100
-Subject: [PATCH v4 13/24] drm/i2c: tda998x: add DT support
+Subject: [PATCH v4 09/24] drm/i2c: tda998x: use HDMI constants
 In-Reply-To: <cover.1390646891.git.moinejf@free.fr>
 References: <cover.1390646891.git.moinejf@free.fr>
-Message-ID: <20140125181441.52161a91@armhf>
+Message-ID: <20140125181441.0213e91f@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT support to the tda998x.
+This patch replaces hard coded values by hdmi constants.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index a3ebc08..0231e44 100644
+index 78d324b..978edaf 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1164,6 +1164,8 @@ tda998x_encoder_init(struct i2c_client *client,
- 		    struct drm_encoder_slave *encoder_slave)
+@@ -549,12 +549,12 @@ tda998x_write_if(struct tda998x_priv *priv, uint8_t bit, uint16_t addr,
+ static void
+ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
  {
- 	struct tda998x_priv *priv;
-+	struct device_node *np = client->dev.of_node;
-+	u32 video;
- 	int ret;
+-	uint8_t buf[PB(5) + 1];
++	u8 buf[PB(HDMI_AUDIO_INFOFRAME_SIZE) + 1];
  
- 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-@@ -1232,6 +1234,17 @@ tda998x_encoder_init(struct i2c_client *client,
- 	cec_write(priv, REG_CEC_FRO_IM_CLK_CTRL,
- 			CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
+ 	memset(buf, 0, sizeof(buf));
+-	buf[HB(0)] = 0x84;
++	buf[HB(0)] = HDMI_INFOFRAME_TYPE_AUDIO;
+ 	buf[HB(1)] = 0x01;
+-	buf[HB(2)] = 10;
++	buf[HB(2)] = HDMI_AUDIO_INFOFRAME_SIZE;
+ 	buf[PB(1)] = p->audio_frame[1] & 0x07; /* CC */
+ 	buf[PB(2)] = p->audio_frame[2] & 0x1c; /* SF */
+ 	buf[PB(4)] = p->audio_frame[4];
+@@ -567,12 +567,12 @@ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
+ static void
+ tda998x_write_avi(struct tda998x_priv *priv, struct drm_display_mode *mode)
+ {
+-	uint8_t buf[PB(13) + 1];
++	u8 buf[PB(HDMI_AVI_INFOFRAME_SIZE) + 1];
  
-+	if (!np)
-+		return 0;		/* non-DT */
-+
-+	/* get the optional video properties */
-+	ret = of_property_read_u32(np, "video-ports", &video);
-+	if (ret == 0) {
-+		priv->vip_cntrl_0 = video >> 16;
-+		priv->vip_cntrl_1 = video >> 8;
-+		priv->vip_cntrl_2 = video;
-+	}
-+
- 	return 0;
- 
- fail:
-@@ -1246,6 +1259,14 @@ fail:
- 	return -ENXIO;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id tda998x_dt_ids[] = {
-+	{ .compatible = "nxp,tda998x", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
-+#endif
-+
- static struct i2c_device_id tda998x_ids[] = {
- 	{ "tda998x", 0 },
- 	{ }
-@@ -1258,6 +1279,7 @@ static struct drm_i2c_encoder_driver tda998x_driver = {
- 		.remove = tda998x_remove,
- 		.driver = {
- 			.name = "tda998x",
-+			.of_match_table = of_match_ptr(tda998x_dt_ids),
- 		},
- 		.id_table = tda998x_ids,
- 	},
+ 	memset(buf, 0, sizeof(buf));
+-	buf[HB(0)] = 0x82;
++	buf[HB(0)] = HDMI_INFOFRAME_TYPE_AVI;
+ 	buf[HB(1)] = 0x02;
+-	buf[HB(2)] = 13;
++	buf[HB(2)] = HDMI_AVI_INFOFRAME_SIZE;
+ 	buf[PB(1)] = HDMI_SCAN_MODE_UNDERSCAN;
+ 	buf[PB(3)] = HDMI_QUANTIZATION_RANGE_FULL << 2;
+ 	buf[PB(4)] = drm_match_cea_mode(mode);
 -- 
 1.8.5.3
