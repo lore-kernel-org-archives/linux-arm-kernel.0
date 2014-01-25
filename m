@@ -1,37 +1,33 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Sat, 25 Jan 2014 22:28:56 +0100
-Subject: [PATCH 2/9] ARM: dts: omap3-gta04: Add bma180 accelerometer.
+Date: Sat, 25 Jan 2014 22:28:55 +0100
+Subject: [PATCH 1/9] ARM: dts: omap3-gta04: Fix 'aux' gpio key flags.
 In-Reply-To: <1390685343-11663-1-git-send-email-marek@goldelico.com>
 References: <1390685343-11663-1-git-send-email-marek@goldelico.com>
-Message-ID: <1390685343-11663-3-git-send-email-marek@goldelico.com>
+Message-ID: <1390685343-11663-2-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: NeilBrown <neilb@suse.de>
 
+It should be ACTIVE_HIGH.
+
 Signed-off-by: NeilBrown <neilb@suse.de>
 ---
- arch/arm/boot/dts/omap3-gta04.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-index 9d37184..e315675 100644
+index b9b55c9..9d37184 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dts
 +++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -94,6 +94,14 @@
- 		reg = <0x77>;
+@@ -32,7 +32,7 @@
+ 		aux-button {
+ 			label = "aux";
+ 			linux,code = <169>;
+-			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+ 			gpio-key,wakeup;
+ 		};
  	};
- 
-+	/* accelerometer */
-+	bma180 at 41 {
-+		compatible = "bosch,bma180";
-+		reg = <0x41>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	/* leds */
- 	tca6507 at 45 {
- 		compatible = "ti,tca6507";
 -- 
 1.8.3.2
