@@ -1,115 +1,94 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 25 Jan 2014 19:34:11 +0100
-Subject: [PATCH 06/11] pinctrl: mvebu: dove: request additional resources
+Date: Sat, 25 Jan 2014 19:34:07 +0100
+Subject: [PATCH 02/11] devicetree: bindings: update MVEBU pinctrl binding
+ documentation
 In-Reply-To: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390674856-4993-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390674856-4993-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl also requires additional registers to control all pins.
-This patch requests resources for mpp4 and pmu-mpp register ranges.
-As this changes DT to driver requirements, fallback to hardcoded
-resources, if the corresponding DT regs have not been set.
-Also, WARN about old DT binding usage to encourage users to update
-their DTBs.
+Dove pinctrl binding now requires three different reg properties. This
+updates corresponding binding and example accordingly. While at it, also
+document reg property as required for the other MVEBU SoC pinctrl nodes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-dove.c | 52 +++++++++++++++++++++++++++++++-----
- 1 file changed, 45 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt          | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt      | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt  | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt     | 2 +-
+ 5 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index f4141e60a52b..3f34975c441f 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -22,6 +22,11 @@
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+index 01ef408e205f..adda2a8d1d52 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+@@ -5,6 +5,7 @@ part and usage.
  
- #include "pinctrl-mvebu.h"
+ Required properties:
+ - compatible: "marvell,88f6710-pinctrl"
++- reg: register specifier of MPP registers
  
-+/* Internal registers can be configured at any 1 MiB aligned address */
-+#define INT_REGS_MASK			~(SZ_1M - 1)
-+#define MPP4_REGS_OFFS			0xd0440
-+#define PMU_REGS_OFFS			0xd802c
-+
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
- #define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
-@@ -55,6 +60,10 @@
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+index bfa0a2e5e0cb..373dbccd7ab0 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+@@ -6,6 +6,7 @@ part and usage.
+ Required properties:
+ - compatible: "marvell,mv78230-pinctrl", "marvell,mv78260-pinctrl",
+               "marvell,mv78460-pinctrl"
++- reg: register specifier of MPP registers
  
- #define CONFIG_PMU	BIT(4)
+ This driver supports all Armada XP variants, i.e. mv78230, mv78260, and mv78460.
  
-+static void __iomem *mpp_base;
-+static void __iomem *mpp4_base;
-+static void __iomem *pmu_base;
-+
- static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 				 unsigned long *config)
- {
-@@ -776,13 +785,42 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
--	struct resource *res;
--	void __iomem *base;
-+	struct resource *mpp_res, *res;
-+	struct resource res_fallback;
-+
-+	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
-+	if (IS_ERR(mpp_base))
-+		return PTR_ERR(mpp_base);
-+
-+	/* prepare fallback resource */
-+	memcpy(&res_fallback, mpp_res, sizeof(struct resource));
-+	res_fallback.start = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded MPP4 resource\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + MPP4_REGS_OFFS, 0x4);
-+		res = &res_fallback;
-+	}
-+	mpp4_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp4_base))
-+		return PTR_ERR(mpp4_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded PMU resource\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + PMU_REGS_OFFS, 0x8);
-+		res = &res_fallback;
-+	}
-+	pmu_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pmu_base))
-+		return PTR_ERR(pmu_base);
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+index 50ec3512a292..cf52477cc7ee 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+@@ -6,6 +6,7 @@ part and usage.
+ Required properties:
+ - compatible: "marvell,dove-pinctrl"
+ - clocks: (optional) phandle of pdma clock
++- reg: register specifiers of MPP, MPP4, and PMU MPP registers
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	/* Warn on any missing DT resource */
-+	WARN(res_fallback.start, "Missing pinctrl regs in DTB. Please update your firmware.\n");
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+index 95daf6335c37..730444a9a4de 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+@@ -8,6 +8,7 @@ Required properties:
+               "marvell,88f6190-pinctrl", "marvell,88f6192-pinctrl",
+               "marvell,88f6281-pinctrl", "marvell,88f6282-pinctrl"
+               "marvell,98dx4122-pinctrl"
++- reg: register specifier of MPP registers
  
- 	pdev->dev.platform_data = (void *)match->data;
+ This driver supports all kirkwood variants, i.e. 88f6180, 88f619x, and 88f628x.
+ It also support the 88f6281-based variant in the 98dx412x Bobcat SoCs.
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+index 0a26c3aa4e6d..0c09f4eb2af0 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+@@ -37,7 +37,7 @@ uart1: serial at 12100 {
  
-@@ -797,7 +835,7 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare_enable(clk);
+ pinctrl: pinctrl at d0200 {
+ 	compatible = "marvell,dove-pinctrl";
+-	reg = <0xd0200 0x20>;
++	reg = <0xd0200 0x14>, <0xd0440 0x04>, <0xd802c 0x08>;
  
--	return mvebu_pinctrl_probe(pdev, base);
-+	return mvebu_pinctrl_probe(pdev, mpp_base);
- }
- 
- static int dove_pinctrl_remove(struct platform_device *pdev)
+ 	pmx_uart1_sw: pmx-uart1-sw {
+ 		marvell,pins = "mpp_uart1";
 -- 
 1.8.5.2
