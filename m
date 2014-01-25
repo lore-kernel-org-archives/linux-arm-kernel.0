@@ -1,50 +1,32 @@
 From: moinejf@free.fr (Jean-Francois Moine)
 Date: Sat, 25 Jan 2014 18:14:37 +0100
-Subject: [PATCH v5 15/23] drm/i2c: tda998x: add DT documentation
+Subject: [PATCH v5 16/23] drm/i2c: tda998x: fix the ENABLE_SPACE register
 In-Reply-To: <cover.1390986082.git.moinejf@free.fr>
 References: <cover.1390986082.git.moinejf@free.fr>
-Message-ID: <2fbe4ac9f3f0be5b300191066408379b9565098e.1390986083.git.moinejf@free.fr>
+Message-ID: <5bfabf21196699bf011d7f0cf706315c9da7394b.1390986083.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch fixes the ENABLE_SPACE register, the value of which was
+inverted.
+
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- .../devicetree/bindings/drm/i2c/tda998x.txt        | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/i2c/tda998x.txt
+ drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-new file mode 100644
-index 0000000..d7df01c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -0,0 +1,27 @@
-+Device-Tree bindings for the NXP TDA998x HDMI transmitter
-+
-+Required properties;
-+  - compatible: must be "nxp,tda998x"
-+
-+Optional properties:
-+  - interrupts: interrupt number and trigger type
-+	default: polling
-+
-+  - pinctrl-0: pin control group to be used for
-+	screen plug/unplug interrupt.
-+
-+  - pinctrl-names: must contain a "default" entry.
-+
-+  - video-ports: 24 bits value which defines how the video controller
-+	output is wired to the TDA998x input - default: <0x230145>
-+
-+Example:
-+
-+	tda998x: hdmi-encoder {
-+		compatible = "nxp,tda998x";
-+		reg = <0x70>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <27 2>;		/* falling edge */
-+		pinctrl-0 = <&pmx_camera>;
-+		pinctrl-names = "default";
-+	};
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 7fab61a..36e95b2 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -965,7 +965,7 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 
+ 	if (priv->rev == TDA19988) {
+ 		/* let incoming pixels fill the active space (if any) */
+-		reg_write(priv, REG_ENABLE_SPACE, 0x01);
++		reg_write(priv, REG_ENABLE_SPACE, 0x00);
+ 	}
+ 
+ 	/*
 -- 
 1.9.rc1
