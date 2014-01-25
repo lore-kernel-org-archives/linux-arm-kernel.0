@@ -1,41 +1,21 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 25 Jan 2014 19:19:06 +0100
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-Message-ID: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 25 Jan 2014 19:19:09 +0100
+Subject: [PATCH 3/4] clk: mvebu: dove: maintain clock init order
+In-Reply-To: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390673950-4521-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set fixes clk init order that went upside-down with
-v3.14. I haven't really investigated what caused this, but I assume
-it is related with DT node reordering by addresses.
+Init order of CLK_OF_DECLARE'd drivers depends on compile order.
+Unfortunately, clk_of_init does not allow drivers to return errors,
+e.g. -EPROBE_DEFER if parent clocks have not been registered, yet.
 
-Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-registered before core clocks driver. Unfortunately, we cannot
-return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-init order for our drivers is always core clocks before clock gating,
-we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-init function that will register core clocks before clock gating
-driver.
+To avoid init order woes for MVEBU clock drivers, we take care of
+proper init order ourselves. This patch joins core-clk and gating-clk
+init to maintain proper init order.
 
-This patch is based on pre-v3.14-rc1 mainline and should go in as
-fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-I suggest Jason picks it up as a topic branch.
-
-The patches have been boot tested on Dove and compile-tested only
-for Kirkwood, Armada 370 and XP.
-
-Sebastian Hesselbarth (4):
-  clk: mvebu: armada-370: maintain clock init order
-  clk: mvebu: armada-xp: maintain clock init order
-  clk: mvebu: dove: maintain clock init order
-  clk: mvebu: kirkwood: maintain clock init order
-
- drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
- drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
- drivers/clk/mvebu/dove.c       | 19 +++++++++----------
- drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
- 4 files changed, 44 insertions(+), 50 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
@@ -45,5 +25,45 @@ Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/mvebu/dove.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/clk/mvebu/dove.c b/drivers/clk/mvebu/dove.c
+index 38aee1e3f242..b8c2424ac926 100644
+--- a/drivers/clk/mvebu/dove.c
++++ b/drivers/clk/mvebu/dove.c
+@@ -154,12 +154,6 @@ static const struct coreclk_soc_desc dove_coreclks = {
+ 	.num_ratios = ARRAY_SIZE(dove_coreclk_ratios),
+ };
+ 
+-static void __init dove_coreclk_init(struct device_node *np)
+-{
+-	mvebu_coreclk_setup(np, &dove_coreclks);
+-}
+-CLK_OF_DECLARE(dove_core_clk, "marvell,dove-core-clock", dove_coreclk_init);
+-
+ /*
+  * Clock Gating Control
+  */
+@@ -186,9 +180,14 @@ static const struct clk_gating_soc_desc dove_gating_desc[] __initconst = {
+ 	{ }
+ };
+ 
+-static void __init dove_clk_gating_init(struct device_node *np)
++static void __init dove_clk_init(struct device_node *np)
+ {
+-	mvebu_clk_gating_setup(np, dove_gating_desc);
++	struct device_node *cgnp =
++		of_find_compatible_node(NULL, NULL, "marvell,dove-gating-clock");
++
++	mvebu_coreclk_setup(np, &dove_coreclks);
++
++	if (cgnp)
++		mvebu_clk_gating_setup(cgnp, dove_gating_desc);
+ }
+-CLK_OF_DECLARE(dove_clk_gating, "marvell,dove-gating-clock",
+-	       dove_clk_gating_init);
++CLK_OF_DECLARE(dove_clk, "marvell,dove-core-clock", dove_clk_init);
 -- 
 1.8.5.2
