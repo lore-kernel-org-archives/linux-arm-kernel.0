@@ -1,19 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 25 Jan 2014 19:34:12 +0100
-Subject: [PATCH 07/11] pinctrl: mvebu: dove: request syscon regmap for global
- registers
+Date: Sat, 25 Jan 2014 19:34:10 +0100
+Subject: [PATCH 05/11] pinctrl: mvebu: fix misdesigned resource allocation
 In-Reply-To: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390674856-4993-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390674856-4993-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl uses some global config registers to control pins.
-This patch requests a syscon regmap for those registers. As this
-changes DT to driver requirements, fallback to a self-registered
-regmap with hardcoded resources, if the corresponding syscon DT
-node is missing. Also, WARN about old DT binding usage to encourage
-users to update their DTBs.
+Allocating the pinctrl resource in common pinctrl-mvebu was a misdesign,
+as it does not allow SoC specific parts to access the allocated resource.
+This moves resource allocation from mvebu_pinctrl_probe to SoC specific
+_probe functions and passes the base address to common pinctrl driver
+instead.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -24,88 +22,171 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/Kconfig        |  1 +
- drivers/pinctrl/mvebu/pinctrl-dove.c | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c |  9 ++++++++-
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c  |  9 ++++++++-
+ drivers/pinctrl/mvebu/pinctrl-dove.c       | 10 +++++++++-
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 10 +++++++++-
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 14 ++++++--------
+ drivers/pinctrl/mvebu/pinctrl-mvebu.h      |  2 +-
+ 6 files changed, 41 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 366fa541ee91..8dc4948c1202 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -8,6 +8,7 @@ config PINCTRL_MVEBU
- config PINCTRL_DOVE
- 	bool
- 	select PINCTRL_MVEBU
-+	select MFD_SYSCON
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+index ae1f760cbdd2..4f6a65b32f06 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+@@ -385,6 +385,13 @@ static struct pinctrl_gpio_range mv88f6710_mpp_gpio_ranges[] = {
+ static int armada_370_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pinctrl_soc_info *soc = &armada_370_pinctrl_info;
++	struct resource *res;
++	void __iomem *base;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
  
- config PINCTRL_KIRKWOOD
- 	bool
+ 	soc->variant = 0; /* no variants for Armada 370 */
+ 	soc->controls = mv88f6710_mpp_controls;
+@@ -396,7 +403,7 @@ static int armada_370_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	pdev->dev.platform_data = soc;
+ 
+-	return mvebu_pinctrl_probe(pdev);
++	return mvebu_pinctrl_probe(pdev, base);
+ }
+ 
+ static int armada_370_pinctrl_remove(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+index 843a51f9d129..e4be7ab4c948 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+@@ -399,10 +399,17 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
+ 	struct mvebu_pinctrl_soc_info *soc = &armada_xp_pinctrl_info;
+ 	const struct of_device_id *match =
+ 		of_match_device(armada_xp_pinctrl_of_match, &pdev->dev);
++	struct resource *res;
++	void __iomem *base;
+ 
+ 	if (!match)
+ 		return -ENODEV;
+ 
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
+ 	soc->variant = (unsigned) match->data & 0xff;
+ 
+ 	switch (soc->variant) {
+@@ -443,7 +450,7 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	pdev->dev.platform_data = soc;
+ 
+-	return mvebu_pinctrl_probe(pdev);
++	return mvebu_pinctrl_probe(pdev, base);
+ }
+ 
+ static int armada_xp_pinctrl_remove(struct platform_device *pdev)
 diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 3f34975c441f..d2ad130ba21e 100644
+index 47268393af34..f4141e60a52b 100644
 --- a/drivers/pinctrl/mvebu/pinctrl-dove.c
 +++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -18,7 +18,9 @@
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/pinctrl/pinctrl.h>
-+#include <linux/regmap.h>
- 
- #include "pinctrl-mvebu.h"
- 
-@@ -26,6 +28,7 @@
- #define INT_REGS_MASK			~(SZ_1M - 1)
- #define MPP4_REGS_OFFS			0xd0440
- #define PMU_REGS_OFFS			0xd802c
-+#define GC_REGS_OFFS			0xe802c
- 
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
-@@ -63,6 +66,7 @@
- static void __iomem *mpp_base;
- static void __iomem *mpp4_base;
- static void __iomem *pmu_base;
-+static struct regmap *gconfmap;
- 
- static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 				 unsigned long *config)
-@@ -781,6 +785,13 @@ static struct of_device_id dove_pinctrl_of_match[] = {
- 	{ }
- };
- 
-+static struct regmap_config gc_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.max_register = 5,
-+};
-+
- static int dove_pinctrl_probe(struct platform_device *pdev)
+@@ -776,6 +776,14 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
  {
  	const struct of_device_id *match =
-@@ -819,6 +830,22 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	if (IS_ERR(pmu_base))
- 		return PTR_ERR(pmu_base);
- 
-+	gconfmap = syscon_regmap_lookup_by_compatible("marvell,dove-global-config");
-+	if (IS_ERR(gconfmap)) {
-+		void __iomem *gc_base;
+ 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
++	struct resource *res;
++	void __iomem *base;
 +
-+		dev_warn(&pdev->dev, "falling back to hardcoded global registers\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + GC_REGS_OFFS, 0x14);
-+		gc_base = devm_ioremap_resource(&pdev->dev, &res_fallback);
-+		if (IS_ERR(gc_base))
-+			return PTR_ERR(gc_base);
-+		gconfmap = devm_regmap_init_mmio(&pdev->dev,
-+						 gc_base, &gc_regmap_config);
-+		if (IS_ERR(gconfmap))
-+			return PTR_ERR(gconfmap);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
+ 	pdev->dev.platform_data = (void *)match->data;
+ 
+ 	/*
+@@ -789,7 +797,7 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
+ 	}
+ 	clk_prepare_enable(clk);
+ 
+-	return mvebu_pinctrl_probe(pdev);
++	return mvebu_pinctrl_probe(pdev, base);
+ }
+ 
+ static int dove_pinctrl_remove(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+index 6b504b5935a5..e515288bde35 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
++++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+@@ -458,8 +458,16 @@ static int kirkwood_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match =
+ 		of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
++	struct resource *res;
++	void __iomem *base;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
+ 	pdev->dev.platform_data = (void *)match->data;
+-	return mvebu_pinctrl_probe(pdev);
++	return mvebu_pinctrl_probe(pdev, base);
+ }
+ 
+ static int kirkwood_pinctrl_remove(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 0fd1ad31fbf9..90c35b20a7af 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -590,26 +590,24 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
+-int mvebu_pinctrl_probe(struct platform_device *pdev)
++int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base)
+ {
+ 	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
+-	struct resource *res;
+ 	struct mvebu_pinctrl *pctl;
+-	void __iomem *base;
+ 	struct pinctrl_pin_desc *pdesc;
+ 	unsigned gid, n, k;
+ 	int ret;
+ 
++	if (!base) {
++		dev_err(&pdev->dev, "missing base address\n");
++		return -EINVAL;
 +	}
 +
- 	/* Warn on any missing DT resource */
- 	WARN(res_fallback.start, "Missing pinctrl regs in DTB. Please update your firmware.\n");
+ 	if (!soc || !soc->controls || !soc->modes) {
+ 		dev_err(&pdev->dev, "wrong pinctrl soc info\n");
+ 		return -EINVAL;
+ 	}
  
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
+-
+ 	pctl = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pinctrl),
+ 			GFP_KERNEL);
+ 	if (!pctl) {
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.h b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+index 90bd3beee860..b66949040e0a 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.h
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+@@ -186,7 +186,7 @@ struct mvebu_pinctrl_soc_info {
+ 		.npins = _npins,				\
+ 	}
+ 
+-int mvebu_pinctrl_probe(struct platform_device *pdev);
++int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base);
+ int mvebu_pinctrl_remove(struct platform_device *pdev);
+ 
+ #endif
 -- 
 1.8.5.2
