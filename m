@@ -1,95 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 24 Jan 2014 20:13:28 -0700
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS
-Message-ID: <1390619608-8397-1-git-send-email-swarren@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 Jan 2014 19:44:45 -0800
+Subject: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+In-Reply-To: <20140124150927.GA2780@S2101-09.ap.freescale.net>
+References: <20140116182211.GX15937@n2100.arm.linux.org.uk>
+ <20140119031816.GD16158@S2101-09.ap.freescale.net>
+ <20140119185246.GB28056@quad.lixom.net>
+ <20140124150927.GA2780@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMhp1S-XJjGZQBPmH7RFT_pobSFLTBT+4fSKdZ3zhukEhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi,
 
-DEBUG_FS used to be selected by COMMON_CLK_DEBUG, which was enabled
-by tegra_defconfig. However, this config option no longer exists, so
-no longer selects DEBUG_FS, and nothing else selects it either. So,
-"make tegra_defconfig" no longer enables DEBUG_FS in .config.
+On Fri, Jan 24, 2014 at 7:09 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sun, Jan 19, 2014 at 10:52:46AM -0800, Olof Johansson wrote:
+>> I'm well aware that the DT branch has not been merged, and that's because
+>> there has been no consensus from DT maintainers on the massive rework
+>> you did as the base of the branch.
+>
+> I guess the 'massive rework' you're talking about is the patch series
+> that begins with 'ARM: dts: imx6qdl: make pinctrl nodes board specific'?
+> If so, I hope you would agree that we're trying to solve a real
+> problem [1], even though the solution does not look like the best to
+> you.
+>
+> So which specific part of the solution are you objecting to?  Those
+> MX6QDL_*_PINGRP macros defined in imx6qdl-pingrp.h?  If that's the
+> case, I can send a follow-up patch to kill the macros by filling in the
+> pin group definitions directly.  The pros is that the pin group
+> definitions for given board will be more intuitive, and the cons is that
+> the change set will be even more massive, because the same multi-lines
+> pin group definitions will be duplicated in multiple board dts files,
+> which use the same group of pins for given device.
+>
+> Or any other better idea?
 
-Rebuild tegra_defconfig on top of next-20140424, while manually
-re-enabling DEBUG_FS.
+I haven't heard any other maintainers being positive to this change.
+Not Linus W, as the pinctrl maintainer, and none of the DT
+maintainers. I asked for their review, which should mean acks or
+general approval from them, and I haven't seen any come in. Or did I
+miss it?
 
-Reasons for removed entries are:
-- I2C_MUX: selected by MEDIA_SUBDRV_AUTOSELECT
-- DRM_PANEL: selected by DRM_TEGRA
-- NEW_LEDS: selected by many things; at least VT
-- LEDS_CLASS: selected by many things; at least VT
-- LEDS_TRIGGERS: selected by many things; at least VT
-- COMMON_CLK_DEBUG: no longer exists
+>> Given the timing, it's not looking like it will be resolved in time for
+>> the 3.14 merge window (which might open today).
+>
+> That's frustrating and will be surprising a lot of people who expect to
+> see their board support in 3.14 release.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/tegra_defconfig | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+Yes, it is very unfortunate.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 5fdc9a0..00fe9e9 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -29,11 +29,11 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-+CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_TEGRA=y
- CONFIG_PCIEPORTBUS=y
--CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-@@ -125,7 +125,6 @@ CONFIG_SERIAL_TEGRA=y
- CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_I2C_COMPAT is not set
--CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
-@@ -169,9 +168,8 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_DRM=y
--CONFIG_DRM_PANEL=y
--CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_TEGRA=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- # CONFIG_LCD_CLASS_DEVICE is not set
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
-@@ -206,10 +204,7 @@ CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -235,7 +230,6 @@ CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
--CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_MEMORY=y
-@@ -265,6 +259,7 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_SLAB=y
- CONFIG_DEBUG_VM=y
--- 
-1.8.3.2
+See this as a chance to adjust your process. Next time you send a
+large pull request that gets questions like these, please consider
+splitting off the controversial part in a separate branch so that the
+bulk of the changes can go in. That's what other maintainers tend to
+do. Right now you have chosen to let your pinctrl header file changes
+hold up everything for everyone that merges code through you.
+
+
+-Olof
