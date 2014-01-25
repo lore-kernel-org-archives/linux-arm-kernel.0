@@ -1,47 +1,52 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 25 Jan 2014 18:14:39 +0100
-Subject: [PATCH v4 22/24] drm/i2c: tda998x: change the frequence in the
- audio channel
+Date: Sat, 25 Jan 2014 18:14:38 +0100
+Subject: [PATCH v4 14/24] drm/i2c: tda998x: always enable EDID read IRQ
 In-Reply-To: <cover.1390646891.git.moinejf@free.fr>
 References: <cover.1390646891.git.moinejf@free.fr>
-Message-ID: <20140125181439.1c6b9878@armhf>
+Message-ID: <20140125181438.70217759@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets the frequence as 'not indicated' instead of '48kHz'
-and uses the asound values in the channel status definition.
+There is no need to enable/disable EDID read IRQ at each EDID block
+read. This patch enables the IRQ at init time.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 554c7c7..18461f5 100644
+index 0231e44..967f9ce 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -19,6 +19,7 @@
+@@ -977,9 +977,6 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
+ 	uint8_t offset, segptr;
+ 	int ret, i;
  
- #include <linux/hdmi.h>
- #include <linux/module.h>
-+#include <sound/asoundef.h>
+-	/* enable EDID read irq: */
+-	reg_set(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+-
+ 	offset = (blk & 1) ? 128 : 0;
+ 	segptr = blk / 2;
  
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
-@@ -709,10 +710,11 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_CTS);
+@@ -1014,8 +1011,6 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
+ 		return ret;
+ 	}
  
- 	/* Write the channel status */
--	buf[0] = 0x04;
-+	buf[0] = IEC958_AES0_CON_NOT_COPYRIGHT;
- 	buf[1] = 0x00;
--	buf[2] = 0x00;
--	buf[3] = 0xf1;
-+	buf[2] = IEC958_AES3_CON_FS_NOTID;
-+	buf[3] = IEC958_AES4_CON_ORIGFS_NOTID |
-+			IEC958_AES4_CON_MAX_WORDLEN_24;
- 	reg_write_range(priv, REG_CH_STAT_B(0), buf, 4);
+-	reg_clear(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+-
+ 	return 0;
+ }
  
- 	tda998x_audio_mute(priv, true);
+@@ -1234,6 +1229,9 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	cec_write(priv, REG_CEC_FRO_IM_CLK_CTRL,
+ 			CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
+ 
++	/* enable EDID read irq: */
++	reg_set(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
++
+ 	if (!np)
+ 		return 0;		/* non-DT */
+ 
 -- 
 1.8.5.3
