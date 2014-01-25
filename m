@@ -1,58 +1,48 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 25 Jan 2014 18:14:39 +0100
-Subject: [PATCH v4 23/24] drm/i2c: tda998x: code optimization
+Date: Sat, 25 Jan 2014 18:14:40 +0100
+Subject: [PATCH v4 20/24] drm/i2c: tda998x: remove the unused variable ca_i2s
 In-Reply-To: <cover.1390646891.git.moinejf@free.fr>
 References: <cover.1390646891.git.moinejf@free.fr>
-Message-ID: <20140125181439.04ec8630@armhf>
+Message-ID: <20140125181440.6ac85488@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reduces the number of I2C exchanges by setting many bits in
-one write and removing a useless write.
+ca_i2s is only ever written to, but never read, so let's get rid of it.
 
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 18461f5..b4827c0 100644
+index ebfb653..4cd3dc2 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -668,10 +668,8 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	}
+@@ -637,7 +637,7 @@ static void
+ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		struct drm_display_mode *mode, struct tda998x_encoder_params *p)
+ {
+-	uint8_t buf[6], clksel_aip, clksel_fs, ca_i2s, cts_n, adiv;
++	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
+ 	uint32_t n;
  
- 	reg_write(priv, REG_AIP_CLKSEL, clksel_aip);
--	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_LAYOUT);
--
--	/* Enable automatic CTS generation */
--	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_ACR_MAN);
-+	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_LAYOUT |
-+					AIP_CNTRL_0_ACR_MAN);	/* auto CTS */
- 	reg_write(priv, REG_CTS_N, cts_n);
+ 	/* Enable audio ports */
+@@ -651,7 +651,6 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_aip = AIP_CLKSEL_AIP_SPDIF;
+ 		clksel_fs = AIP_CLKSEL_FS_FS64SPDIF;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
+-		ca_i2s = 0;
+ 		break;
  
- 	/*
-@@ -908,10 +906,10 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 	reg_write(priv, REG_VIP_CNTRL_5, VIP_CNTRL_5_SP_CNT(0));
- 	reg_write(priv, REG_VIP_CNTRL_4, VIP_CNTRL_4_BLANKIT(0) |
- 			VIP_CNTRL_4_BLC(0));
--	reg_clear(priv, REG_PLL_SERIAL_3, PLL_SERIAL_3_SRL_CCIR);
+ 	case AFMT_I2S:
+@@ -659,7 +658,6 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_aip = AIP_CLKSEL_AIP_I2S;
+ 		clksel_fs = AIP_CLKSEL_FS_ACLK;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
+-		ca_i2s = CA_I2S_CA_I2S(0);
+ 		break;
  
- 	reg_clear(priv, REG_PLL_SERIAL_1, PLL_SERIAL_1_SRL_MAN_IZ);
--	reg_clear(priv, REG_PLL_SERIAL_3, PLL_SERIAL_3_SRL_DE);
-+	reg_clear(priv, REG_PLL_SERIAL_3, PLL_SERIAL_3_SRL_CCIR |
-+					  PLL_SERIAL_3_SRL_DE);
- 	reg_write(priv, REG_SERIALIZER, 0);
- 	reg_write(priv, REG_HVF_CNTRL_1, HVF_CNTRL_1_VQR(0));
- 
-@@ -931,8 +929,6 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 	/* set BIAS tmds value: */
- 	reg_write(priv, REG_ANA_GENERAL, 0x09);
- 
--	reg_write(priv, REG_TBG_CNTRL_0, 0);
--
- 	/*
- 	 * Sync on rising HSYNC/VSYNC
- 	 */
+ 	default:
 -- 
 1.8.5.3
