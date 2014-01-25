@@ -1,30 +1,146 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Jan 2014 00:43:08 +0800
-Subject: =?UTF-8?q?=5BPATCH=206/9=5D=20ARM=3A=20dts=3A=20imx35=3A=20remove=20the=20use=20of=20pingrp=20macros?=
+Date: Sun, 26 Jan 2014 00:43:09 +0800
+Subject: =?UTF-8?q?=5BPATCH=207/9=5D=20ARM=3A=20dts=3A=20imx25=3A=20remove=20the=20use=20of=20pingrp=20macros?=
 In-Reply-To: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
 References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1390668191-20289-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1390668191-20289-8-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We created the pingrp macros in imx35-pingrp.h for purpose of less LOC
+We created the pingrp macros in imx25-pingrp.h for purpose of less LOC
 when same pin group is used by multiple boards.  However, DT maintainers
 take it as an abuse of DTC macro support.  So let's get rid of it to
 make the pins used by given device more intuitive.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx35-pingrp.h |  104 --------------------------------------
- arch/arm/boot/dts/imx35.dtsi     |    1 -
- 2 files changed, 105 deletions(-)
- delete mode 100644 arch/arm/boot/dts/imx35-pingrp.h
+ arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |   17 +++-
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   56 ++++++++++++--
+ arch/arm/boot/dts/imx25-pingrp.h                   |   81 --------------------
+ arch/arm/boot/dts/imx25.dtsi                       |    2 +-
+ 4 files changed, 67 insertions(+), 89 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/imx25-pingrp.h
 
-diff --git a/arch/arm/boot/dts/imx35-pingrp.h b/arch/arm/boot/dts/imx35-pingrp.h
+diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+index 8abd45a..d6f2764 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
++++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
+@@ -43,11 +43,24 @@
+ &iomuxc {
+ 	imx25-eukrea-cpuimx25 {
+ 		pinctrl_fec: fecgrp {
+-			fsl,pins = <MX25_FEC_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_FEC_MDC__FEC_MDC		0x80000000
++				MX25_PAD_FEC_MDIO__FEC_MDIO		0x400001e0
++				MX25_PAD_FEC_TDATA0__FEC_TDATA0		0x80000000
++				MX25_PAD_FEC_TDATA1__FEC_TDATA1		0x80000000
++				MX25_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
++				MX25_PAD_FEC_RDATA0__FEC_RDATA0		0x80000000
++				MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x80000000
++				MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x80000000
++				MX25_PAD_FEC_TX_CLK__FEC_TX_CLK		0x1c0
++			>;
+ 		};
+ 
+ 		pinctrl_i2c1: i2c1grp {
+-			fsl,pins = <MX25_I2C1_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_I2C1_CLK__I2C1_CLK		0x80000000
++				MX25_PAD_I2C1_DAT__I2C1_DAT		0x80000000
++			>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index 30073f8..62fb3da 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+@@ -78,11 +78,23 @@
+ &iomuxc {
+ 	imx25-eukrea-mbimxsd25-baseboard {
+ 		pinctrl_audmux: audmuxgrp {
+-			fsl,pins = <MX25_AUDMUX_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_KPP_COL3__AUD5_TXFS		0xe0
++				MX25_PAD_KPP_COL2__AUD5_TXC		0xe0
++				MX25_PAD_KPP_COL1__AUD5_RXD		0xe0
++				MX25_PAD_KPP_COL0__AUD5_TXD		0xe0
++			>;
+ 		};
+ 
+ 		pinctrl_esdhc1: esdhc1grp {
+-			fsl,pins = <MX25_ESDHC1_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_SD1_CMD__SD1_CMD		0x400000c0
++				MX25_PAD_SD1_CLK__SD1_CLK		0x400000c0
++				MX25_PAD_SD1_DATA0__SD1_DATA0		0x400000c0
++				MX25_PAD_SD1_DATA1__SD1_DATA1		0x400000c0
++				MX25_PAD_SD1_DATA2__SD1_DATA2		0x400000c0
++				MX25_PAD_SD1_DATA3__SD1_DATA3		0x400000c0
++			>;
+ 		};
+ 
+ 		pinctrl_gpiokeys: gpiokeysgrp {
+@@ -94,15 +106,49 @@
+ 		};
+ 
+ 		pinctrl_lcdc: lcdcgrp {
+-			fsl,pins = <MX25_LCDC_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_LD0__LD0			0x1
++				MX25_PAD_LD1__LD1			0x1
++				MX25_PAD_LD2__LD2			0x1
++				MX25_PAD_LD3__LD3			0x1
++				MX25_PAD_LD4__LD4			0x1
++				MX25_PAD_LD5__LD5			0x1
++				MX25_PAD_LD6__LD6			0x1
++				MX25_PAD_LD7__LD7			0x1
++				MX25_PAD_LD8__LD8			0x1
++				MX25_PAD_LD9__LD9			0x1
++				MX25_PAD_LD10__LD10			0x1
++				MX25_PAD_LD11__LD11			0x1
++				MX25_PAD_LD12__LD12			0x1
++				MX25_PAD_LD13__LD13			0x1
++				MX25_PAD_LD14__LD14			0x1
++				MX25_PAD_LD15__LD15			0x1
++				MX25_PAD_GPIO_E__LD16			0x1
++				MX25_PAD_GPIO_F__LD17			0x1
++				MX25_PAD_HSYNC__HSYNC			0x80000000
++				MX25_PAD_VSYNC__VSYNC			0x80000000
++				MX25_PAD_LSCLK__LSCLK			0x80000000
++				MX25_PAD_OE_ACD__OE_ACD			0x80000000
++				MX25_PAD_CONTRAST__CONTRAST		0x80000000
++			>;
+ 		};
+ 
+ 		pinctrl_uart1: uart1grp {
+-			fsl,pins = <MX25_UART1_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_UART1_RTS__UART1_RTS		0xe0
++				MX25_PAD_UART1_CTS__UART1_CTS		0xe0
++				MX25_PAD_UART1_TXD__UART1_TXD		0x80000000
++				MX25_PAD_UART1_RXD__UART1_RXD		0xc0
++			>;
+ 		};
+ 
+ 		pinctrl_uart2: uart2grp {
+-			fsl,pins = <MX25_UART2_PINGRP1>;
++			fsl,pins = <
++				MX25_PAD_UART2_RXD__UART2_RXD		0x80000000
++				MX25_PAD_UART2_TXD__UART2_TXD		0x80000000
++				MX25_PAD_UART2_RTS__UART2_RTS		0x80000000
++				MX25_PAD_UART2_CTS__UART2_CTS		0x80000000
++			>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx25-pingrp.h b/arch/arm/boot/dts/imx25-pingrp.h
 deleted file mode 100644
-index 2406e7e..0000000
---- a/arch/arm/boot/dts/imx35-pingrp.h
+index 4a35a63..0000000
+--- a/arch/arm/boot/dts/imx25-pingrp.h
 +++ /dev/null
-@@ -1,104 +0,0 @@
+@@ -1,81 +0,0 @@
 -/*
 - * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
 - *
@@ -34,110 +150,88 @@ index 2406e7e..0000000
 - *
 - */
 -
--#ifndef __DTS_IMX35_PINGRP_H
--#define __DTS_IMX35_PINGRP_H
+-#ifndef __DTS_IMX25_PINGRP_H
+-#define __DTS_IMX25_PINGRP_H
 -
--#define MX35_AUDMUX_PINGRP1 \
--	MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS		0x80000000 \
--	MX35_PAD_STXD4__AUDMUX_AUD4_TXD			0x80000000 \
--	MX35_PAD_SRXD4__AUDMUX_AUD4_RXD			0x80000000 \
--	MX35_PAD_SCK4__AUDMUX_AUD4_TXC			0x80000000
+-#include "imx25-pinfunc.h"
 -
--#define MX35_CAN1_PINGRP1 \
--	MX35_PAD_I2C2_CLK__CAN1_TXCAN			0x1c0 \
--	MX35_PAD_I2C2_DAT__CAN1_RXCAN			0x1c0
+-#define MX25_AUDMUX_PINGRP1 \
+-	MX25_PAD_KPP_COL3__AUD5_TXFS			0xe0 \
+-	MX25_PAD_KPP_COL2__AUD5_TXC			0xe0 \
+-	MX25_PAD_KPP_COL1__AUD5_RXD			0xe0 \
+-	MX25_PAD_KPP_COL0__AUD5_TXD			0xe0
 -
--#define MX35_CAN2_PINGRP1 \
--	MX35_PAD_TX5_RX0__CAN2_TXCAN			0x1c0 \
--	MX35_PAD_TX4_RX1__CAN2_RXCAN			0x1c0
+-#define MX25_ESDHC1_PINGRP1 \
+-	MX25_PAD_SD1_CMD__SD1_CMD			0x400000c0 \
+-	MX25_PAD_SD1_CLK__SD1_CLK			0x400000c0 \
+-	MX25_PAD_SD1_DATA0__SD1_DATA0			0x400000c0 \
+-	MX25_PAD_SD1_DATA1__SD1_DATA1			0x400000c0 \
+-	MX25_PAD_SD1_DATA2__SD1_DATA2			0x400000c0 \
+-	MX25_PAD_SD1_DATA3__SD1_DATA3			0x400000c0
 -
--#define MX35_ESDHC1_PINGRP1 \
--	MX35_PAD_SD1_CMD__ESDHC1_CMD			0x80000000 \
--	MX35_PAD_SD1_CLK__ESDHC1_CLK			0x80000000 \
--	MX35_PAD_SD1_DATA0__ESDHC1_DAT0			0x80000000 \
--	MX35_PAD_SD1_DATA1__ESDHC1_DAT1			0x80000000 \
--	MX35_PAD_SD1_DATA2__ESDHC1_DAT2			0x80000000 \
--	MX35_PAD_SD1_DATA3__ESDHC1_DAT3			0x80000000
+-#define MX25_FEC_PINGRP1 \
+-	MX25_PAD_FEC_MDC__FEC_MDC			0x80000000 \
+-	MX25_PAD_FEC_MDIO__FEC_MDIO			0x400001e0 \
+-	MX25_PAD_FEC_TDATA0__FEC_TDATA0			0x80000000 \
+-	MX25_PAD_FEC_TDATA1__FEC_TDATA1			0x80000000 \
+-	MX25_PAD_FEC_TX_EN__FEC_TX_EN			0x80000000 \
+-	MX25_PAD_FEC_RDATA0__FEC_RDATA0			0x80000000 \
+-	MX25_PAD_FEC_RDATA1__FEC_RDATA1			0x80000000 \
+-	MX25_PAD_FEC_RX_DV__FEC_RX_DV			0x80000000 \
+-	MX25_PAD_FEC_TX_CLK__FEC_TX_CLK			0x1c0
 -
--#define MX35_FEC_PINGRP1 \
--	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK			0x80000000 \
--	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK			0x80000000 \
--	MX35_PAD_FEC_RX_DV__FEC_RX_DV			0x80000000 \
--	MX35_PAD_FEC_COL__FEC_COL			0x80000000 \
--	MX35_PAD_FEC_RDATA0__FEC_RDATA_0		0x80000000 \
--	MX35_PAD_FEC_TDATA0__FEC_TDATA_0		0x80000000 \
--	MX35_PAD_FEC_TX_EN__FEC_TX_EN			0x80000000 \
--	MX35_PAD_FEC_MDC__FEC_MDC			0x80000000 \
--	MX35_PAD_FEC_MDIO__FEC_MDIO			0x80000000 \
--	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR			0x80000000 \
--	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR			0x80000000 \
--	MX35_PAD_FEC_CRS__FEC_CRS			0x80000000 \
--	MX35_PAD_FEC_RDATA1__FEC_RDATA_1		0x80000000 \
--	MX35_PAD_FEC_TDATA1__FEC_TDATA_1		0x80000000 \
--	MX35_PAD_FEC_RDATA2__FEC_RDATA_2		0x80000000 \
--	MX35_PAD_FEC_TDATA2__FEC_TDATA_2		0x80000000 \
--	MX35_PAD_FEC_RDATA3__FEC_RDATA_3		0x80000000 \
--	MX35_PAD_FEC_TDATA3__FEC_TDATA_3		0x80000000
+-#define MX25_I2C1_PINGRP1 \
+-	MX25_PAD_I2C1_CLK__I2C1_CLK			0x80000000 \
+-	MX25_PAD_I2C1_DAT__I2C1_DAT			0x80000000
 -
--#define MX35_I2C1_PINGRP1 \
--	MX35_PAD_I2C1_CLK__I2C1_SCL			0x80000000 \
--	MX35_PAD_I2C1_DAT__I2C1_SDA			0x80000000
+-#define MX25_LCDC_PINGRP1 \
+-	MX25_PAD_LD0__LD0				0x1 \
+-	MX25_PAD_LD1__LD1				0x1 \
+-	MX25_PAD_LD2__LD2				0x1 \
+-	MX25_PAD_LD3__LD3				0x1 \
+-	MX25_PAD_LD4__LD4				0x1 \
+-	MX25_PAD_LD5__LD5				0x1 \
+-	MX25_PAD_LD6__LD6				0x1 \
+-	MX25_PAD_LD7__LD7				0x1 \
+-	MX25_PAD_LD8__LD8				0x1 \
+-	MX25_PAD_LD9__LD9				0x1 \
+-	MX25_PAD_LD10__LD10				0x1 \
+-	MX25_PAD_LD11__LD11				0x1 \
+-	MX25_PAD_LD12__LD12				0x1 \
+-	MX25_PAD_LD13__LD13				0x1 \
+-	MX25_PAD_LD14__LD14				0x1 \
+-	MX25_PAD_LD15__LD15				0x1 \
+-	MX25_PAD_GPIO_E__LD16				0x1 \
+-	MX25_PAD_GPIO_F__LD17				0x1 \
+-	MX25_PAD_HSYNC__HSYNC				0x80000000 \
+-	MX25_PAD_VSYNC__VSYNC				0x80000000 \
+-	MX25_PAD_LSCLK__LSCLK				0x80000000 \
+-	MX25_PAD_OE_ACD__OE_ACD				0x80000000 \
+-	MX25_PAD_CONTRAST__CONTRAST			0x80000000
 -
--#define MX35_I2C3_PINGRP1 \
--	MX35_PAD_ATA_DATA12__I2C3_SCL			0x80000000 \
--	MX35_PAD_ATA_DATA13__I2C3_SDA			0x80000000
+-#define MX25_UART1_PINGRP1 \
+-	MX25_PAD_UART1_RTS__UART1_RTS			0xe0 \
+-	MX25_PAD_UART1_CTS__UART1_CTS			0xe0 \
+-	MX25_PAD_UART1_TXD__UART1_TXD			0x80000000 \
+-	MX25_PAD_UART1_RXD__UART1_RXD			0xc0
 -
--#define MX35_IPU_PINGRP1 \
--	MX35_PAD_LD0__IPU_DISPB_DAT_0			0x80000000 \
--	MX35_PAD_LD1__IPU_DISPB_DAT_1			0x80000000 \
--	MX35_PAD_LD2__IPU_DISPB_DAT_2			0x80000000 \
--	MX35_PAD_LD3__IPU_DISPB_DAT_3			0x80000000 \
--	MX35_PAD_LD4__IPU_DISPB_DAT_4			0x80000000 \
--	MX35_PAD_LD5__IPU_DISPB_DAT_5			0x80000000 \
--	MX35_PAD_LD6__IPU_DISPB_DAT_6			0x80000000 \
--	MX35_PAD_LD7__IPU_DISPB_DAT_7			0x80000000 \
--	MX35_PAD_LD8__IPU_DISPB_DAT_8			0x80000000 \
--	MX35_PAD_LD9__IPU_DISPB_DAT_9			0x80000000 \
--	MX35_PAD_LD10__IPU_DISPB_DAT_10			0x80000000 \
--	MX35_PAD_LD11__IPU_DISPB_DAT_11			0x80000000 \
--	MX35_PAD_LD12__IPU_DISPB_DAT_12			0x80000000 \
--	MX35_PAD_LD13__IPU_DISPB_DAT_13			0x80000000 \
--	MX35_PAD_LD14__IPU_DISPB_DAT_14			0x80000000 \
--	MX35_PAD_LD15__IPU_DISPB_DAT_15			0x80000000 \
--	MX35_PAD_LD16__IPU_DISPB_DAT_16			0x80000000 \
--	MX35_PAD_LD17__IPU_DISPB_DAT_17			0x80000000 \
--	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC		0x80000000 \
--	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK		0x80000000 \
--	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY		0x80000000 \
--	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC		0x80000000 \
--	MX35_PAD_CONTRAST__IPU_DISPB_CONTR		0x80000000
+-#define MX25_UART2_PINGRP1 \
+-	MX25_PAD_UART2_RXD__UART2_RXD			0x80000000 \
+-	MX25_PAD_UART2_TXD__UART2_TXD			0x80000000 \
+-	MX25_PAD_UART2_RTS__UART2_RTS			0x80000000 \
+-	MX25_PAD_UART2_CTS__UART2_CTS			0x80000000
 -
--#define MX35_UART1_PINGRP1 \
--	MX35_PAD_TXD1__UART1_TXD_MUX			0x1c5 \
--	MX35_PAD_RXD1__UART1_RXD_MUX			0x1c5
--
--#define MX35_UART1_RTSCTS_PINGRP1 \
--	MX35_PAD_CTS1__UART1_CTS			0x1c5 \
--	MX35_PAD_RTS1__UART1_RTS			0x1c5
--
--#define MX35_UART2_PINGRP1 \
--	MX35_PAD_RXD2__UART2_RXD_MUX			0x1c5 \
--	MX35_PAD_TXD2__UART2_TXD_MUX			0x1c5
--
--#define MX35_UART2_RTSCTS_PINGRP1 \
--	MX35_PAD_RTS2__UART2_RTS			0x1c5 \
--	MX35_PAD_CTS2__UART2_CTS			0x1c5
--
--#endif /* __DTS_IMX35_PINGRP_H */
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index a198b92..88b218f 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -10,7 +10,6 @@
+-#endif /* __DTS_IMX25_PINGRP_H */
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 9e9e3b8..32f760e 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -10,7 +10,7 @@
+  */
  
  #include "skeleton.dtsi"
- #include "imx35-pinfunc.h"
--#include "imx35-pingrp.h"
+-#include "imx25-pingrp.h"
++#include "imx25-pinfunc.h"
  
  / {
  	aliases {
