@@ -1,49 +1,115 @@
-From: John_Mehaffey@mentor.com (Mehaffey, John)
-Date: Sat, 25 Jan 2014 20:24:33 +0000
-Subject: GPIO triggers kernel reboot
-In-Reply-To: <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0A1@NA-MBX-01.mgc.mentorg.com>
-References: <52E3E031.6040709@denx.de>
- <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0A1@NA-MBX-01.mgc.mentorg.com>
-Message-ID: <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0E1@NA-MBX-01.mgc.mentorg.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 25 Jan 2014 15:32:31 -0500
+Subject: [PATCH v4 01/18] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1390431915-5115-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390431915-5115-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390431915-5115-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140125203231.GG29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-embedded-owner at vger.kernel.org 
-> [mailto:linux-embedded-owner at vger.kernel.org] On Behalf Of Heiko 
-> Schocher
-> Sent: Saturday, January 25, 2014 8:03 AM
-> To: linux-embedded at vger.kernel.org
-> Cc: Wolfgang Denk; linux-arm-kernel at lists.infradead.org
-> Subject: GPIO triggers kernel reboot
-> 
-> Hello all,
-> 
-> is it possible to reboot current mainline kernel triggered from a GPIO in kernel space?
-> 
-> If not, how can be done this, so that it has a chance to go into mainline?
-> 
-> Thanks for any suggestions
-> 
-> bye,
-> Heiko
+Russell,
 
-Hi Heiko,
-Call kexec() from the GPIO driver.
-It will take some effort to get it right :)
+On Wed, Jan 22, 2014 at 08:04:58PM -0300, Ezequiel Garcia wrote:
+> Some SoC have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API.
+> 
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
+> 
+> We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> respectively. The rationale for this is that some users may not require
+> register write completion but only thread-safe access to a register.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/include/asm/io.h |  6 ++++++
+>  arch/arm/kernel/io.c      | 35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 41 insertions(+)
 
-Or if a simple reboot is all that you want, examine the several reboot APIs in kernel/reboot.c
+This has been in your patch tracker for a while:
 
-Sincerely,
-John Mehaffey
-Principal Engineer, Automotive
-Mentor Graphics
+  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7930/1
+
+When you requested Acks, we sent them:
+
+  http://www.spinics.net/lists/arm-kernel/msg300250.html
+
+Is there anything more you need from us?  The rest of this series
+depends on this patch.  Could you place it in a topic branch so we can
+base the rest of the series off of it?  Or, if you prefer, Ack it and
+drop it from your patch tracker?  I'm fine either way.
+
+thx,
+
+Jason.
+
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index fbeb39c..8aa4cca 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -38,6 +38,12 @@
+>  #define isa_bus_to_virt phys_to_virt
+>  
+>  /*
+> + * Atomic MMIO-wide IO modify
+> + */
+> +extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
+> +extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
+> +
+> +/*
+>   * Generic IO read/write.  These perform native-endian accesses.  Note
+>   * that some architectures will want to re-define __raw_{read,write}w.
+>   */
+> diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+> index dcd5b4d..9203cf8 100644
+> --- a/arch/arm/kernel/io.c
+> +++ b/arch/arm/kernel/io.c
+> @@ -1,6 +1,41 @@
+>  #include <linux/export.h>
+>  #include <linux/types.h>
+>  #include <linux/io.h>
+> +#include <linux/spinlock.h>
+> +
+> +static DEFINE_RAW_SPINLOCK(__io_lock);
+> +
+> +/*
+> + * Generic atomic MMIO modify.
+> + *
+> + * Allows thread-safe access to registers shared by unrelated subsystems.
+> + * The access is protected by a single MMIO-wide lock.
+> + */
+> +void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl_relaxed(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel_relaxed(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify_relaxed);
+> +
+> +void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
+> +{
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	raw_spin_lock_irqsave(&__io_lock, flags);
+> +	value = readl_relaxed(reg) & ~mask;
+> +	value |= (set & mask);
+> +	writel(value, reg);
+> +	raw_spin_unlock_irqrestore(&__io_lock, flags);
+> +}
+> +EXPORT_SYMBOL(atomic_io_modify);
+>  
+>  /*
+>   * Copy data from IO memory space to "real" memory space.
 > -- 
-> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-> HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-embedded" in the body of a message to majordomo at vger.kernel.org 
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
---
-To unsubscribe from this list: send the line "unsubscribe linux-embedded" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.8.1.5
+> 
