@@ -1,28 +1,95 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Jan 2014 10:25:22 +0800
-Subject: DT include files
-In-Reply-To: <2907925.DyxHkYtGr7@phil>
-References: <20140103023211.GA25079@S2101-09.ap.freescale.net>
- <201401122121.20084.arnd@arndb.de>
- <20140113021912.GB23525@S2101-09.ap.freescale.net>
- <2907925.DyxHkYtGr7@phil>
-Message-ID: <20140125022519.GA8759@S2101-09.ap.freescale.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 24 Jan 2014 20:13:28 -0700
+Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS
+Message-ID: <1390619608-8397-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 09:02:09AM +0100, Heiko St?bner wrote:
-> Hi Shawn,
-> 
-> did this topic get any final resolution - especially in terms of the pingrp.h 
-> header?
-> 
-> As I'm currently preparing two board files (imx50 and imx6sl) this discussion 
-> made me unsure if using the pin-group definitions is still the preferred style.
+From: Stephen Warren <swarren@nvidia.com>
 
-Yes, we need to get a conclusion ASAP.  The whole imx-dt-3.14 pull
-request has been held for a few weeks because of that, and I'm asking
-for direction there [1].
+DEBUG_FS used to be selected by COMMON_CLK_DEBUG, which was enabled
+by tegra_defconfig. However, this config option no longer exists, so
+no longer selects DEBUG_FS, and nothing else selects it either. So,
+"make tegra_defconfig" no longer enables DEBUG_FS in .config.
 
-Shawn
+Rebuild tegra_defconfig on top of next-20140424, while manually
+re-enabling DEBUG_FS.
 
-[1] http://thread.gmane.org/gmane.linux.drivers.devicetree/58685/focus=296761
+Reasons for removed entries are:
+- I2C_MUX: selected by MEDIA_SUBDRV_AUTOSELECT
+- DRM_PANEL: selected by DRM_TEGRA
+- NEW_LEDS: selected by many things; at least VT
+- LEDS_CLASS: selected by many things; at least VT
+- LEDS_TRIGGERS: selected by many things; at least VT
+- COMMON_CLK_DEBUG: no longer exists
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 5fdc9a0..00fe9e9 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -29,11 +29,11 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
+ CONFIG_ARCH_TEGRA_114_SOC=y
+ CONFIG_ARCH_TEGRA_124_SOC=y
+ CONFIG_TEGRA_EMC_SCALING_ENABLE=y
++CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_PCIEPORTBUS=y
+-CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+@@ -125,7 +125,6 @@ CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_I2C_COMPAT is not set
+-CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+@@ -169,9 +168,8 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_DRM=y
+-CONFIG_DRM_PANEL=y
+-CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_TEGRA=y
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ # CONFIG_LCD_CLASS_DEVICE is not set
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+@@ -206,10 +204,7 @@ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+-CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_ONESHOT=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+@@ -235,7 +230,6 @@ CONFIG_KEYBOARD_NVEC=y
+ CONFIG_SERIO_NVEC_PS2=y
+ CONFIG_NVEC_POWER=y
+ CONFIG_NVEC_PAZ00=y
+-CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_TEGRA_IOMMU_GART=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_MEMORY=y
+@@ -265,6 +259,7 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_SLAB=y
+ CONFIG_DEBUG_VM=y
+-- 
+1.8.3.2
