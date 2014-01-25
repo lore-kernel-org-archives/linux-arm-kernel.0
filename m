@@ -1,42 +1,45 @@
 From: moinejf@free.fr (Jean-Francois Moine)
 Date: Sat, 25 Jan 2014 18:14:36 +0100
-Subject: [PATCH v4 24/24] drm/i2c: tda998x: adjust the audio clock divider
- for S/PDIF
+Subject: [PATCH v4 18/24] drm/i2c: tda998x: set the PLL division factor in
+ range 0..3
 In-Reply-To: <cover.1390646891.git.moinejf@free.fr>
 References: <cover.1390646891.git.moinejf@free.fr>
-Message-ID: <20140125181436.5c443251@armhf>
+Message-ID: <20140125181436.4a225104@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to some tests on the Cubox (Marvell Armada 510 + TDA19988),
-the S/PDIF input asks for a greater audio clock divider.
+The predivider division factor of the register PLL_SERIAL_2 is in the
+range 0..3, the value 0 being used for a division by 1.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index b4827c0..e4dfcb4 100644
+index e172f11..077b954 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -679,10 +679,14 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	 * There is no detailed info in the datasheet, so we just
- 	 * assume 100MHz requires larger divider.
- 	 */
-+	adiv = AUDIO_DIV_SERCLK_8;
- 	if (mode->clock > 100000)
--		adiv = AUDIO_DIV_SERCLK_16;
--	else
--		adiv = AUDIO_DIV_SERCLK_8;
-+		adiv++;			/* AUDIO_DIV_SERCLK_8 */
-+
-+	/* S/PDIF asks for a larger divider */
-+	if (p->audio_format == AFMT_SPDIF)
-+		adiv++;			/* AUDIO_DIV_SERCLK_16 or _32 */
-+
- 	reg_write(priv, REG_AUDIO_DIV, adiv);
+@@ -213,7 +213,7 @@ struct tda998x_priv {
+ # define PLL_SERIAL_1_SRL_IZ(x)   (((x) & 3) << 1)
+ # define PLL_SERIAL_1_SRL_MAN_IZ  (1 << 6)
+ #define REG_PLL_SERIAL_2          REG(0x02, 0x01)     /* read/write */
+-# define PLL_SERIAL_2_SRL_NOSC(x) (((x) & 3) << 0)
++# define PLL_SERIAL_2_SRL_NOSC(x) ((x) << 0)
+ # define PLL_SERIAL_2_SRL_PR(x)   (((x) & 0xf) << 4)
+ #define REG_PLL_SERIAL_3          REG(0x02, 0x02)     /* read/write */
+ # define PLL_SERIAL_3_SRL_CCIR    (1 << 0)
+@@ -886,6 +886,11 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 	}
  
- 	/*
+ 	div = 148500 / adj_mode->clock;
++	if (div != 0) {
++		div--;
++		if (div > 3)
++			div = 3;
++	}
+ 
+ 	/* mute the audio FIFO: */
+ 	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
 -- 
 1.8.5.3
