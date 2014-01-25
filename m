@@ -1,95 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 25 Jan 2014 10:15:57 -0800
-Subject: [PATCH v4 07/18] watchdog: orion: Handle IRQ
-In-Reply-To: <1390431915-5115-8-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1390431915-5115-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390431915-5115-8-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <52E3FF5D.4060505@roeck-us.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 25 Jan 2014 19:19:06 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+Message-ID: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2014 03:05 PM, Ezequiel Garcia wrote:
-> DT-enabled where an irqchip driver for the brigde interrupt controller is
-> available can handle the watchdog IRQ properly. Therefore, we request
-> the interruption and add a dummy handler that merely calls panic().
->
-> This is done in order to have an initial 'ack' of the interruption,
-> which clears the watchdog state.
->
-> Furthermore, since some platforms don't have such IRQ, this commit
-> makes the interruption specification optional.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->   .../devicetree/bindings/watchdog/marvel.txt        |  2 ++
->   drivers/watchdog/orion_wdt.c                       | 24 +++++++++++++++++++++-
->   2 files changed, 25 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-> index 5dc8d30..0731fbd 100644
-> --- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-> @@ -7,6 +7,7 @@ Required Properties:
->
->   Optional properties:
->
-> +- interrupts	: Contains the IRQ for watchdog expiration
->   - timeout-sec	: Contains the watchdog timeout in seconds
->
->   Example:
-> @@ -14,6 +15,7 @@ Example:
->   	wdt at 20300 {
->   		compatible = "marvell,orion-wdt";
->   		reg = <0x20300 0x28>;
-> +		interrupts = <3>;
->   		timeout-sec = <10>;
->   		status = "okay";
->   	};
-> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> index 2dbeee9..f5e7b17 100644
-> --- a/drivers/watchdog/orion_wdt.c
-> +++ b/drivers/watchdog/orion_wdt.c
-> @@ -19,6 +19,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/watchdog.h>
->   #include <linux/init.h>
-> +#include <linux/interrupt.h>
->   #include <linux/io.h>
->   #include <linux/clk.h>
->   #include <linux/err.h>
-> @@ -109,10 +110,16 @@ static struct watchdog_device orion_wdt = {
->   	.min_timeout = 1,
->   };
->
-> +static irqreturn_t orion_wdt_irq(int irq, void *devid)
-> +{
-> +	panic("Watchdog Timeout");
-> +	return IRQ_HANDLED;
-> +}
-> +
->   static int orion_wdt_probe(struct platform_device *pdev)
->   {
->   	struct resource *res;
-> -	int ret;
-> +	int ret, irq;
->
->   	clk = devm_clk_get(&pdev->dev, NULL);
->   	if (IS_ERR(clk)) {
-> @@ -145,6 +152,21 @@ static int orion_wdt_probe(struct platform_device *pdev)
->   	/* Let's make sure the watchdog is fully stopped */
->   	orion_wdt_stop(&orion_wdt);
->
-> +	/* It's important to request the IRQ once the watchdog is disabled */
+This patch set fixes clk init order that went upside-down with
+v3.14. I haven't really investigated what caused this, but I assume
+it is related with DT node reordering by addresses.
 
-s/once/only after/
+Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+registered before core clocks driver. Unfortunately, we cannot
+return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+init order for our drivers is always core clocks before clock gating,
+we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+init function that will register core clocks before clock gating
+driver.
 
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq >= 0) {
-> +		/*
-> +		 * Not all supported platforms specify an interruption for the
+This patch is based on pre-v3.14-rc1 mainline and should go in as
+fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+I suggest Jason picks it up as a topic branch.
 
-s/interruption/interrupt pin/ (or interrupt)
+The patches have been boot tested on Dove and compile-tested only
+for Kirkwood, Armada 370 and XP.
 
-Nitpicks, so
+Sebastian Hesselbarth (4):
+  clk: mvebu: armada-370: maintain clock init order
+  clk: mvebu: armada-xp: maintain clock init order
+  clk: mvebu: dove: maintain clock init order
+  clk: mvebu: kirkwood: maintain clock init order
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+ drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+ drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+ drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+ drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+ 4 files changed, 44 insertions(+), 50 deletions(-)
+
+---
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+-- 
+1.8.5.2
