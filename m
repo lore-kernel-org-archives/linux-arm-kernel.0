@@ -1,69 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 25 Jan 2014 21:11:34 +0100
-Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
-References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
- <CACoXjc=ZT9fEm_KdY4WFSoS8n5FmO+hn9LjsR4m8YZG2iBbt5A@mail.gmail.com>
- <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
-Message-ID: <5086198.ZOWZ5xuyna@wuerfel>
+From: John_Mehaffey@mentor.com (Mehaffey, John)
+Date: Sat, 25 Jan 2014 20:24:33 +0000
+Subject: GPIO triggers kernel reboot
+In-Reply-To: <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0A1@NA-MBX-01.mgc.mentorg.com>
+References: <52E3E031.6040709@denx.de>
+ <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0A1@NA-MBX-01.mgc.mentorg.com>
+Message-ID: <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0E1@NA-MBX-01.mgc.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
-> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
-
-> >>
-> >>> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port, u32 *lanes)
-> >>> +{
-> >>> +     void *csr_base = port->csr_base;
-> >>> +     u32 val32;
-> >>> +     u64 start_time, time;
-> >>> +
-> >>> +     /*
-> >>> +      * A component enters the LTSSM Detect state within
-> >>> +      * 20ms of the end of fundamental core reset.
-> >>> +      */
-> >>> +     msleep(XGENE_LTSSM_DETECT_WAIT);
-> >>> +     port->link_up = 0;
-> >>> +     start_time = jiffies;
-> >>> +     do {
-> >>> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
-> >>> +             if (val32 & LINK_UP_MASK) {
-> >>> +                     port->link_up = 1;
-> >>> +                     port->link_speed = PIPE_PHY_RATE_RD(val32);
-> >>> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
-> >>> +                     *lanes = val32 >> 26;
-> >>> +             }
-> >>> +             time = jiffies_to_msecs(jiffies - start_time);
-> >>> +     } while ((!port->link_up) || (time <= XGENE_LTSSM_L0_WAIT));
-> >>> +}
-> >>
-> >> Maybe another msleep() in the loop? It seems weird to first do an
-> >> unconditional sleep but then busy-wait for the result.
-> >
-> > ok.
+> -----Original Message-----
+> From: linux-embedded-owner at vger.kernel.org 
+> [mailto:linux-embedded-owner at vger.kernel.org] On Behalf Of Heiko 
+> Schocher
+> Sent: Saturday, January 25, 2014 8:03 AM
+> To: linux-embedded at vger.kernel.org
+> Cc: Wolfgang Denk; linux-arm-kernel at lists.infradead.org
+> Subject: GPIO triggers kernel reboot
 > 
-> This loop can execute for maximum 4 msec. So putting msleep(1) won't
-> get us much.
- 
-4 msec is still quite a long time for a busy loop that can be spent doing
-useful work in another thread.
-
-> >>
-> >> Another general note: Your "compatible" strings are rather unspecific.
-> >> Do you have a version number for this IP block? I suppose that it's related
-> >> to one that has been used in other chips before, or will be used in future
-> >> chips, if it's not actually licensed from some other company.
-> >
-> > I will have to check this.
-> >
+> Hello all,
 > 
-> We have decided to stick with current compatible string for now.
+> is it possible to reboot current mainline kernel triggered from a GPIO in kernel space?
+> 
+> If not, how can be done this, so that it has a chance to go into mainline?
+> 
+> Thanks for any suggestions
+> 
+> bye,
+> Heiko
 
-Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
-product and you won't be doing any new chips based on the same hardware
-components?
+Hi Heiko,
+Call kexec() from the GPIO driver.
+It will take some effort to get it right :)
 
-	Arnd
+Or if a simple reboot is all that you want, examine the several reboot APIs in kernel/reboot.c
+
+Sincerely,
+John Mehaffey
+Principal Engineer, Automotive
+Mentor Graphics
+> -- 
+> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> --
+> To unsubscribe from this list: send the line "unsubscribe 
+> linux-embedded" in the body of a message to majordomo at vger.kernel.org 
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+--
+To unsubscribe from this list: send the line "unsubscribe linux-embedded" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
