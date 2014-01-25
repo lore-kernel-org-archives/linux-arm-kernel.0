@@ -1,34 +1,74 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 25 Jan 2014 18:14:43 +0100
-Subject: [PATCH v5 11/23] drm/i2c: tda998x: check the CEC device creation
+Date: Sat, 25 Jan 2014 18:14:41 +0100
+Subject: [PATCH v5 12/23] drm/i2c: tda998x: add DT support
 In-Reply-To: <cover.1390986082.git.moinejf@free.fr>
 References: <cover.1390986082.git.moinejf@free.fr>
-Message-ID: <36aa3d0505bddffe9dfb30e81a06800897c2942f.1390986083.git.moinejf@free.fr>
+Message-ID: <00c290bee957202e291810e295755efc3fecec0f.1390986083.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch checks if the CEC device is well created at intialization
-time.
+This patch adds DT support to the tda998x.
 
 Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 7d8bc22..351da92 100644
+index 351da92..d4074e0 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1177,6 +1177,8 @@ tda998x_encoder_init(struct i2c_client *client,
- 	priv->current_page = 0xff;
- 	priv->hdmi = client;
- 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
-+	if (!priv->cec)
-+		return -ENODEV;
- 	priv->dpms = DRM_MODE_DPMS_OFF;
+@@ -1164,6 +1164,8 @@ tda998x_encoder_init(struct i2c_client *client,
+ 		    struct drm_encoder_slave *encoder_slave)
+ {
+ 	struct tda998x_priv *priv;
++	struct device_node *np = client->dev.of_node;
++	u32 video;
+ 	int ret;
  
- 	encoder_slave->slave_priv = priv;
+ 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+@@ -1232,6 +1234,17 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	cec_write(priv, REG_CEC_FRO_IM_CLK_CTRL,
+ 			CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
+ 
++	if (!np)
++		return 0;		/* non-DT */
++
++	/* get the optional video properties */
++	ret = of_property_read_u32(np, "video-ports", &video);
++	if (ret == 0) {
++		priv->vip_cntrl_0 = video >> 16;
++		priv->vip_cntrl_1 = video >> 8;
++		priv->vip_cntrl_2 = video;
++	}
++
+ 	return 0;
+ 
+ fail:
+@@ -1246,6 +1259,14 @@ fail:
+ 	return -ENXIO;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id tda998x_dt_ids[] = {
++	{ .compatible = "nxp,tda998x", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, tda998x_dt_ids);
++#endif
++
+ static struct i2c_device_id tda998x_ids[] = {
+ 	{ "tda998x", 0 },
+ 	{ }
+@@ -1258,6 +1279,7 @@ static struct drm_i2c_encoder_driver tda998x_driver = {
+ 		.remove = tda998x_remove,
+ 		.driver = {
+ 			.name = "tda998x",
++			.of_match_table = of_match_ptr(tda998x_dt_ids),
+ 		},
+ 		.id_table = tda998x_ids,
+ 	},
 -- 
 1.9.rc1
