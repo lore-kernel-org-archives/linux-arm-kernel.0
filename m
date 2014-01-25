@@ -1,13 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 25 Jan 2014 19:34:09 +0100
-Subject: [PATCH 04/11] ARM: dove: add global-config register node
+Date: Sat, 25 Jan 2014 19:34:08 +0100
+Subject: [PATCH 03/11] ARM: dove: add additional pinctrl registers
 In-Reply-To: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390674856-4993-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390674856-4993-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We share global config registers by syscon node, add it to dove.dtsi.
+Dove pinctrl used additional registers to control MPPs. This patch first
+increases existing pinctrl reg property by one register, and then adds
+two new ranges for MPP4 and PMU MPP registers.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -20,25 +22,23 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/dove.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/dove.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 69405e00f2c8..fb289d83b76d 100644
+index 8de1031233ae..69405e00f2c8 100644
 --- a/arch/arm/boot/dts/dove.dtsi
 +++ b/arch/arm/boot/dts/dove.dtsi
-@@ -618,6 +618,12 @@
- 				interrupts = <5>;
- 			};
+@@ -392,7 +392,9 @@
  
-+			gconf: global-config at e802c {
-+				compatible = "marvell,dove-global-config",
-+				             "syscon";
-+				reg = <0xe802c 0x14>;
-+			};
-+
- 			gpio2: gpio-ctrl at e8400 {
- 				compatible = "marvell,orion-gpio";
- 				#gpio-cells = <2>;
+ 			pinctrl: pin-ctrl at d0200 {
+ 				compatible = "marvell,dove-pinctrl";
+-				reg = <0xd0200 0x10>;
++				reg = <0xd0200 0x14>,
++				      <0xd0440 0x04>,
++				      <0xd802c 0x08>;
+ 				clocks = <&gate_clk 22>;
+ 
+ 				pmx_gpio_0: pmx-gpio-0 {
 -- 
 1.8.5.2
