@@ -1,70 +1,68 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 26 Jan 2014 19:29:33 +0530
+Date: Sun, 26 Jan 2014 19:33:18 +0530
 Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access
  Engine driver support
-In-Reply-To: <52E2698B.6070001@metafoo.de>
+In-Reply-To: <52E12224.9060506@metafoo.de>
 References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
  <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de>
-Message-ID: <20140126135933.GD10628@intel.com>
+ <52E0FC22.8060903@metafoo.de> <1390484317.7619.81.camel@smile>
+ <52E11E39.6090901@metafoo.de> <1390485637.7619.88.camel@smile>
+ <52E12224.9060506@metafoo.de>
+Message-ID: <20140126140318.GE10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 02:24:27PM +0100, Lars-Peter Clausen wrote:
-> On 01/24/2014 12:16 PM, Srikanth Thokala wrote:
-> > Hi Lars,
-> > 
-> > On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> >> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
-> >> [...]
-> >>> +/**
-> >>> + * xilinx_vdma_device_control - Configure DMA channel of the device
-> >>> + * @dchan: DMA Channel pointer
-> >>> + * @cmd: DMA control command
-> >>> + * @arg: Channel configuration
-> >>> + *
-> >>> + * Return: '0' on success and failure value on error
-> >>> + */
-> >>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
-> >>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
-> >>> +{
-> >>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> >>> +
-> >>> +     switch (cmd) {
-> >>> +     case DMA_TERMINATE_ALL:
-> >>> +             xilinx_vdma_terminate_all(chan);
-> >>> +             return 0;
-> >>> +     case DMA_SLAVE_CONFIG:
-> >>> +             return xilinx_vdma_slave_config(chan,
-> >>> +                                     (struct xilinx_vdma_config *)arg);
+On Thu, Jan 23, 2014 at 03:07:32PM +0100, Lars-Peter Clausen wrote:
+> On 01/23/2014 03:00 PM, Andy Shevchenko wrote:
+> > On Thu, 2014-01-23 at 14:50 +0100, Lars-Peter Clausen wrote:
+> >> On 01/23/2014 02:38 PM, Shevchenko, Andriy wrote:
+> >>> On Thu, 2014-01-23 at 12:25 +0100, Lars-Peter Clausen wrote:
+> >>>> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
+> >>>
+> >>> [...]
+> >>>
+> >>>>> +	/* Request the interrupt */
+> >>>>> +	chan->irq = irq_of_parse_and_map(node, 0);
+> >>>>> +	err = devm_request_irq(xdev->dev, chan->irq, xilinx_vdma_irq_handler,
+> >>>>> +			       IRQF_SHARED, "xilinx-vdma-controller", chan);
+> >>>>
+> >>>> This is a clasic example of where to not use devm_request_irq. 'chan' is
+> >>>> accessed in the interrupt handler, but if you use devm_request_irq 'chan'
+> >>>> will be freed before the interrupt handler has been released, which means
+> >>>> there is now a race condition where the interrupt handler can access already
+> >>>> freed memory.ta
+> >>>
+> >>> Could you elaborate this case? As far as I understood managed resources
+> >>> are a kind of stack pile. In this case you have no such condition. Where
+> >>> am I wrong?
 > >>
-> >> You really shouldn't be overloading the generic API with your own semantics.
-> >> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
+> >> The stacked stuff is only ran after the remove() function. Which means that
+> >> you call dma_async_device_unregister() before the interrupt handler is
+> >> freed. Another issue with the interrupt handler is a bit hidden. The driver
+> >> does not call tasklet_kill in the remove function. Which it should though to
+> >> make sure that the tasklet does not race against the freeing of the memory.
+> >> And in order to make sure that the tasklet is not rescheduled you need to
+> >> free the irq before killing the tasklet, since the interrupt handler
+> >> schedules the tasklet.
 > > 
-> > Ok.  The driver needs few additional configuration from the slave
-> > device like Vertical
-> > Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
-> > suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
-> > defined for Freescale drivers?
+> > So, you mean devm_request_irq() will race in any DMA driver?
 > 
-> In my opinion it is not a good idea to have driver implement a generic API,
-> but at the same time let the driver have custom semantics for those API
-> calls. It's a bit like having a gpio driver that expects 23 and 42 as the
-> values passed to gpio_set_value instead of 0 and 1. It completely defeats
-> the purpose of a generic API, namely that you are able to write generic code
-> that makes use of the API without having to know about which implementation
-> API it is talking to. The dmaengine framework provides the
-> dmaengine_prep_interleaved_dma() function to setup two dimensional
-> transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
+> Most likely yes. devm_request_irq() is race condition prone for the majority
+> of device driver. You have to be really careful if you want to use it.
+> 
+> > 
+> > I think the proper solution is to disable all device work in
+> > the .remove() and devm will care about resources.
+> 
+> As long as the interrupt handler is registered it can be called, the only
+> proper solution is to make sure that the order in which resources are torn
+> down is correct.
+Wouldn't it work if we register the irq last in the probe. That wil ensure on
+success the channel is always valid.
 
-The question here i think would be waht this device supports? Is the hardware
-capable of doing interleaved transfers, then would make sense.
-
-While we do try to get users use dma_slave_config, but there will always be
-someone who have specfic params. If we can generalize then we might want to add
-to the dma_slave_config as well
+Also the tasklet is required to be killed not just in your .remove but also in
+drivers .suspend handler, you dont want handler to be invoked after you returned
+from your suspend
 
 --
 ~Vinod
