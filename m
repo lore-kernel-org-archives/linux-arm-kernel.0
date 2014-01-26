@@ -1,157 +1,177 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 31 Jan 2014 20:10:51 -0800
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <2009408.gnUEcoqA3p@phil>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <CAPtuhTj2ZOb+5LDbqghuOhQZfVy8i1xuWotoZ6ocbJFgMxnSMQ@mail.gmail.com>
- <CAJuA9ajLUPtsReomPuuzMpshTEiUz81sc4584DEVQnG=iwGb-g@mail.gmail.com>
- <2009408.gnUEcoqA3p@phil>
-Message-ID: <20140201041051.9977.46568@quantum>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 26 Jan 2014 19:02:37 +0100
+Subject: [PATCH v3 1/5] drm/i2c: tda998x: add a function for dynamic audio
+ input switch
+In-Reply-To: <cover.1391274627.git.moinejf@free.fr>
+References: <cover.1391274627.git.moinejf@free.fr>
+Message-ID: <387a65107f2f2e6ff484768d0424396357067b86.1391274628.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2014-01-30 07:09:04)
-> On Thursday, 30. January 2014 18:23:44 Thomas Abraham wrote:
-> > Hi Mike,
-> > 
-> > On Wed, Jan 29, 2014 at 12:17 AM, Mike Turquette <mturquette@linaro.org> 
-> wrote:
-> > > On Mon, Jan 27, 2014 at 9:30 PM, Thomas Abraham <ta.omasab@gmail.com> 
-> wrote:
-> > >> Hi Mike,
-> > >> 
-> > >> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette <mturquette@linaro.org> 
-> wrote:
-> > >>> Quoting Thomas Abraham (2014-01-18 04:10:51)
-> > >>> 
-> > > As far as I can tell
-> > > the remux does not happen because it is necessary to generate the
-> > > required clock rate, but because we don't want to run the ARM core out
-> > > of spec for a short time while the PLL relocks. Assuming I have that
-> > > part of it right, I prefer for the parent mux operation to be a part
-> > > of the CPUfreq driver's .target callback instead of hidden away in the
-> > > clock driver.
-> > 
-> > The re-parenting is mostly done to keep the ARM CPU clocked while the
-> > PLL is stopped, reprogrammed and restarted. One of the side effects of
-> > that is, the clock speed of the temporary parent could be higher then
-> > what is allowed due to the ARM voltage at the time of re-parenting.
-> > That is the reason to use the safe voltage.
-> 
-> The Rockchip-SoCs use something similar, so I'm following quite closely what 
-> Thomas is trying to do here, as similar solution would also solve this issue 
-> for me.
-> 
-> On some Rockchip-SoCs even stuff like pclk and hclk seems to be sourced from 
-> the divided armclk, creating additional constraints.
-> 
-> But on the RKs (at least in the upstream sources) the armclk is simply equal 
-> to the pll output. A divider exists, but is only used to make sure that the 
-> armclk stays below the original rate when sourced from the temp-parent, like
-> 
->         if (clk_get_rate(temp_parent) > clk_get_rate(main_parent)
->                 set_divider(something so that rate(temp) <= rate(main)
->         clk_set_parent(...)
-> 
-> Isn't there a similar possiblity on your platform, as it would remove the need 
-> for the safe-voltage?
-> 
-> 
-> In general I also like the approach of hiding the rate-change logic inside 
-> this composite clock, as the depending clocks can be easily kept in sync. As 
-> with the Rockchips the depending clocks are different for each of the three 
-> Cortex-A9 SoCs I looked at, it would be "interesting" if all of this would 
-> need to be done in a cpufreq driver.
+When both I2S and S/PDIF are wired from the audio device to the
+TDA998x, the user or some internal mechanism may choose to do audio
+streaming via either inputs.
 
-I wonder if hiding these details inside of the composite clock
-implementation indicates the lack of some needed feature in the clk
-core? I've discussed the idea of "coordinated rate changes" before. E.g:
+This patch adds an exported function in the TDA998x driver which
+initializes the audio input parameters according to the audio
+subsystem.
 
-_________________________________________________________
-|  clk	|  opp-low	|  opp-mid	|  opp-fast	|
-|	|		|		|		|
-|pll	| 300000	|  600000	|  600000	|
-|	|		|		|		|
-|div	| 150000	|  300000	|  600000	|
-|	|		|		|		|
-|mpu_clk| 150000	|  300000       |  600000	|
-|	|		|		|		|
-|periph	| 150000	|  150000	|  300000	|
----------------------------------------------------------
+The audio format values in the encoder configuration interface  are
+changed to non null values so that the value 0 is used in the audio
+function to indicate that audio streaming is stopped.
 
-A call to clk_set_rate() against any of those clocks will result in all
-of their dividers being updated. At the implementation level this might
-look something like this extremely simplified pseudocode:
+As the audio clock depends on the input type, it is set so.
+Then, the configuration value audio_clk_cfg is now ignored.
 
-int clk_set_rate(struct clk* clk, unsigned long rate)
-{
-	/* trap clks that support coordinated rate changes */
-	if (clk->ops->coordinate_rate)
-		return clk->ops->coordinate_rate(clk->hw, rate);
-	...
-}
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 48 ++++++++++++++++++++++++++++++++++++---
+ include/drm/i2c/tda998x.h         |  7 ++++--
+ 2 files changed, 50 insertions(+), 5 deletions(-)
 
-and,
-
-struct coord_rates {
-	struct clk_hw *hw;
-	struct clk *parent;
-	struct clk *rate;
-};
-
-and in the clock driver,
-
-#define PLL 0
-#define DIV 1
-#define MPU 2
-#define PER 3
-
-#define NR_OPP 4
-#define NR_CLK 4
-
-struct coord_rates my_opps[NR_OPP][NR_CLK]; // populated from DT data
-
-int my_coordinate_rate_callback(struct clk_hw *hw, unsigned long rate)
-{
-	struct coord_rate **selected_opp;
-
-	for(i = 0; i < NR_OPP; i++) {
-		for(j = 0; j < NR_CLK; j++) {
-			if (my_opps[i][j]->hw == hw &&
-				my_opps[i][j]->rate == rate)
-				selected_opp = my_opps[i];
-				break;
-		}
-	}
-
-	/*
-	 * order of operations is specific to my hardware and should be
-	 * managed by my clock driver, not generic code
-	 */
-
-	__clk_set_parent(selected_opp[DIV]->hw, temp_parent);
-	__clk_set_rate(selected_opp[PLL]->hw, selected_opp[PLL]->rate);
-	__clk_set_parent(selected_opp[DIV]->hw,
-				selected_opp[PLL]->hw->clk);
-	...
-
-	/*
-	 * note that the above could be handled by a switch-case or
-	 * something else
-	 */
-}
-
-Thoughts? Please forgive any gaps in my logic or abuse of C.
-
-I have long thought that something like the above would someday go into
-a generic dvfs layer instead of the clock framework, but maybe starting
-with the clk framework makes more sense?
-
-Regards,
-Mike
-
-> 
-> 
-> Heiko
-> 
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 2f97290..2643be4 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -35,6 +35,7 @@ struct tda998x_priv {
+ 	struct i2c_client *hdmi;
+ 	uint16_t rev;
+ 	uint8_t current_page;
++	u8 audio_active;
+ 	int dpms;
+ 	bool is_hdmi_sink;
+ 	u8 vip_cntrl_0;
+@@ -640,12 +641,11 @@ static void
+ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		struct drm_display_mode *mode, struct tda998x_encoder_params *p)
+ {
+-	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
++	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv, aclk;
+ 	uint32_t n;
+ 
+ 	/* Enable audio ports */
+ 	reg_write(priv, REG_ENA_AP, p->audio_cfg);
+-	reg_write(priv, REG_ENA_ACLK, p->audio_clk_cfg);
+ 
+ 	/* Set audio input source */
+ 	switch (p->audio_format) {
+@@ -654,6 +654,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_aip = AIP_CLKSEL_AIP_SPDIF;
+ 		clksel_fs = AIP_CLKSEL_FS_FS64SPDIF;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
++		aclk = 0;				/* no clock */
+ 		break;
+ 
+ 	case AFMT_I2S:
+@@ -661,6 +662,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 		clksel_aip = AIP_CLKSEL_AIP_I2S;
+ 		clksel_fs = AIP_CLKSEL_FS_ACLK;
+ 		cts_n = CTS_N_M(3) | CTS_N_K(3);
++		aclk = 1;				/* clock enable */
+ 		break;
+ 
+ 	default:
+@@ -672,6 +674,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 	reg_clear(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_LAYOUT |
+ 					AIP_CNTRL_0_ACR_MAN);	/* auto CTS */
+ 	reg_write(priv, REG_CTS_N, cts_n);
++	reg_write(priv, REG_ENA_ACLK, aclk);
+ 
+ 	/*
+ 	 * Audio input somehow depends on HDMI line rate which is
+@@ -728,6 +731,37 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 	tda998x_write_aif(priv, p);
+ }
+ 
++/* tda998x codec interface */
++void tda998x_audio_update(struct i2c_client *client,
++			int format,
++			int port)
++{
++	struct tda998x_priv *priv = i2c_get_clientdata(client);
++	struct tda998x_encoder_params *p = &priv->params;
++
++	/* if the audio output is active, it may be a second start or a stop */
++	if (format == 0 || priv->audio_active) {
++		if (format == 0) {
++			priv->audio_active = 0;
++			reg_write(priv, REG_ENA_AP, 0);
++		}
++		return;
++	}
++	priv->audio_active = 1;
++
++	p->audio_cfg = port;
++
++	/* don't restart audio if same input format */
++	if (format == p->audio_format) {
++		reg_write(priv, REG_ENA_AP, p->audio_cfg);
++		return;
++	}
++	p->audio_format = format;
++
++	tda998x_configure_audio(priv, &priv->encoder->crtc->hwmode, p);
++}
++EXPORT_SYMBOL_GPL(tda998x_audio_update);
++
+ /* DRM encoder functions */
+ 
+ static void
+@@ -750,6 +784,9 @@ tda998x_encoder_set_config(struct drm_encoder *encoder, void *params)
+ 			    (p->mirr_f ? VIP_CNTRL_2_MIRR_F : 0);
+ 
+ 	priv->params = *p;
++
++	if (p->audio_cfg)
++		priv->audio_active = 1;
+ }
+ 
+ static void
+@@ -999,7 +1036,7 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 
+ 		tda998x_write_avi(priv, adjusted_mode);
+ 
+-		if (priv->params.audio_cfg)
++		if (priv->audio_active)
+ 			tda998x_configure_audio(priv, adjusted_mode,
+ 						&priv->params);
+ 	}
+@@ -1239,10 +1276,15 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	i2c_set_clientdata(client, priv);
++
+ 	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
+ 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
+ 	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
+ 
++	priv->params.audio_frame[1] = 1;		/* channels - 1 */
++	priv->params.audio_sample_rate = 48000;		/* 48kHz */
++
+ 	priv->current_page = 0xff;
+ 	priv->hdmi = client;
+ 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
+diff --git a/include/drm/i2c/tda998x.h b/include/drm/i2c/tda998x.h
+index 3e419d9..7e4806d 100644
+--- a/include/drm/i2c/tda998x.h
++++ b/include/drm/i2c/tda998x.h
+@@ -20,11 +20,14 @@ struct tda998x_encoder_params {
+ 	u8 audio_frame[6];
+ 
+ 	enum {
+-		AFMT_SPDIF,
+-		AFMT_I2S
++		AFMT_I2S = 1,
++		AFMT_SPDIF
+ 	} audio_format;
+ 
+ 	unsigned audio_sample_rate;
+ };
+ 
++void tda998x_audio_update(struct i2c_client *client,
++			int format,
++			int port);
+ #endif
+-- 
+1.9.rc1
