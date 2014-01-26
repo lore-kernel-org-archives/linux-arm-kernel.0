@@ -1,44 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 25 Jan 2014 21:25:01 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <52E4367B.3090608@elopez.com.ar>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <52E42D6A.5050508@elopez.com.ar> <52E43046.1030105@gmail.com>
- <52E4367B.3090608@elopez.com.ar>
-Message-ID: <20140126002500.GA13741@localhost>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 25 Jan 2014 18:54:40 -0800
+Subject: GPIO triggers kernel reboot
+In-Reply-To: <52E3E031.6040709@denx.de>
+References: <52E3E031.6040709@denx.de>
+Message-ID: <52E478F0.60903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+Le 25/01/2014 08:02, Heiko Schocher a ?crit :
+> Hello all,
+>
+> is it possible to reboot current mainline kernel triggered from a
+> GPIO in kernel space?
+>
+> If not, how can be done this, so that it has a chance to go into
+> mainline?
 
-Thanks for your help with this.
+Your GPIO could (should) be bound to a gpio-keys driver which will 
+deliver key presses event; which you can ultimately bind to the action 
+of triggering a system reboot.
 
-On Sat, Jan 25, 2014 at 07:11:07PM -0300, Emilio L?pez wrote:
-[..]
-> >
-> > Ok, I'll look if using of_clk_get_parent_name will help here. But again,
-> > I can see that clk-gating driver gets registered before core-clk driver.
-> > There may be no code to give you the parent name at that time.
-> 
-> After looking at some of the armada*.dtsi, I see you don't list the 
-> clock names on the coreclk node, so of_clk_get_parent_name may not be of 
-> much value after all.
-> 
+Granted, this makes you cross a lot of layers, and requires user-space 
+to implemnt the reboot policy, but what you are asking for is both a 
+mechanism and policy mix, which is usually not accepted.
 
-IIRC, we faced a similar issue with the Core Divider clock and solved it by
-specifying the clock names in the DT.
+You are probably working with HW which won't change, but wiring a reset 
+button to a system reset output is usually much simpler ;)
 
-I meant to complete the core and gating clocks in a similar way
-(providing names on the DT), but apparently (as discussed with Gregory Clement)
-Mike Turquette and others are planning to remove the clock names from
-the DT entirely.
-
-Can you guys explain about this plan a bit further? Or do you think we
-should specify the names on the DT for all the clocks instead?
-
-Notice that the latter would remove lots of strings from the kernel
-itself (right?)
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>
+> Thanks for any suggestions
+>
+> bye,
+> Heiko
