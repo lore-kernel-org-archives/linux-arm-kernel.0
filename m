@@ -1,27 +1,43 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 26 Jan 2014 09:04:12 +0100
-Subject: [PATCH v4 07/18] watchdog: orion: Handle IRQ
-In-Reply-To: <1390431915-5115-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Sun, 26 Jan 2014 09:17:53 +0100
+Subject: [PATCH v4 08/18] watchdog: orion: Make RSTOUT register a
+ separate resource
+In-Reply-To: <1390431915-5115-9-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390431915-5115-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390431915-5115-8-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140126090412.37f4932f@skate>
+ <1390431915-5115-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140126091753.2910a39f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Ezequiel Garcia,
 
-On Wed, 22 Jan 2014 20:05:04 -0300, Ezequiel Garcia wrote:
-> DT-enabled where an irqchip driver for the brigde interrupt controller is
-> available can handle the watchdog IRQ properly. Therefore, we request
-> the interruption and add a dummy handler that merely calls panic().
+On Wed, 22 Jan 2014 20:05:05 -0300, Ezequiel Garcia wrote:
 
-I don't quiite understand the first sentence of this commit log, and
-the commit title looks wrong. Maybe a bad copy/paste or something?
+> +/* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
+> +#define ORION_RSTOUT_MASK_OFFSET	0x20108
+> +
+> +/* Internal registers can be configured at any 1 MiB aligned address */
+> +#define INTERNAL_REGS_MASK		~(SZ_1M - 1)
 
-> 
-> This is done in order to have an initial 'ack' of the interruption,
+I'm not a big fan of hardcoding the internal register window size in a
+driver. I would have preferred to have used the offset between the
+watchdog registers and the rstout register, but since this one is
+*before* the watchdog registers, it would have to be a negative offset.
+Not sure how to handle this.
 
-interruption -> interrupt
+> +/*
+> + * The original devicetree binding for this driver specified only
+> + * one memory resource, so in order to keep DT backwards compatibility
+> + * we try to fallback to a hardcoded register address, if the resource
+> + * is missing from the devicetree.
+> + */
+> +static void __iomem *try_rstout_ioremap(struct platform_device *pdev,
+> +					phys_addr_t internal_regs)
+
+Why is it called "try" ? It actually does the mapping. So I would
+prefer the function to be named:
+
+	orion_wdt_ioremap_rstout()
 
 Thomas
 -- 
