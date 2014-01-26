@@ -1,46 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 26 Jan 2014 09:17:53 +0100
-Subject: [PATCH v4 08/18] watchdog: orion: Make RSTOUT register a
- separate resource
-In-Reply-To: <1390431915-5115-9-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1390431915-5115-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390431915-5115-9-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140126091753.2910a39f@skate>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 26 Jan 2014 16:53:58 +0530
+Subject: [PATCH] dma: fix vchan_cookie_complete() debug print
+In-Reply-To: <20140120132829.GD15937@n2100.arm.linux.org.uk>
+References: <1386344529-25617-1-git-send-email-jonas.jensen@gmail.com>
+ <20140120095917.GZ26823@intel.com>
+ <20140120112822.GA15937@n2100.arm.linux.org.uk>
+ <20140120120301.GE26823@intel.com>
+ <20140120132829.GD15937@n2100.arm.linux.org.uk>
+Message-ID: <20140126112358.GC10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On Mon, Jan 20, 2014 at 01:28:29PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 20, 2014 at 05:33:01PM +0530, Vinod Koul wrote:
+> > On Mon, Jan 20, 2014 at 11:28:22AM +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Jan 20, 2014 at 03:29:17PM +0530, Vinod Koul wrote:
+> > > > On Fri, Dec 06, 2013 at 04:42:09PM +0100, Jonas Jensen wrote:
+> > > > > vd->tx.cookie is set zero on dma_cookie_complete(),
+> > > > > save to local before printing it.
+> > > > > 
+> > > > > Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> > > > > ---
+> > > > > 
+> > > > > Notes:
+> > > > >     dev_vdbg() could also be moved to happen earlier, what do you prefer?
+> > > > This would be preferred IMHO. Also pls cc dmaengine at vger on this
+> > > 
+> > > I prefer this version - it means that the verbose debug printk doesn't
+> > > impact the completion timing when printk is expensive (eg, because its
+> > > outputting via a serial port.)
+> > But if you know your printk is costly, do you want to enable these?
+> 
+> dev_vdbg() is for verbose debugging - you only enable it if you really
+> need to.  Even so, it should have _minimal_ impact where possible.  That's
+> why I prefer the first patch, because we mark the cookie as being
+> complete _before_ we call the verbose debugging, which isn't going to add
+> milliseconds to that.
+Sure this version is better approach in that respect as it makes it debug
+aognostic! Both mine and Dan's comment were trying to simlify by ignoring debug
+option, but yes i do agree to you point here. So this patch will be applied!
 
-On Wed, 22 Jan 2014 20:05:05 -0300, Ezequiel Garcia wrote:
+> If you don't care about debugging, then getting rid of the dev_vdbg().
+> But really, I could pull rank and say that this is *my* file, I get to
+> choose how stuff should be done here - I'd prefer not to but...
+That is not required!
 
-> +/* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
-> +#define ORION_RSTOUT_MASK_OFFSET	0x20108
-> +
-> +/* Internal registers can be configured at any 1 MiB aligned address */
-> +#define INTERNAL_REGS_MASK		~(SZ_1M - 1)
-
-I'm not a big fan of hardcoding the internal register window size in a
-driver. I would have preferred to have used the offset between the
-watchdog registers and the rstout register, but since this one is
-*before* the watchdog registers, it would have to be a negative offset.
-Not sure how to handle this.
-
-> +/*
-> + * The original devicetree binding for this driver specified only
-> + * one memory resource, so in order to keep DT backwards compatibility
-> + * we try to fallback to a hardcoded register address, if the resource
-> + * is missing from the devicetree.
-> + */
-> +static void __iomem *try_rstout_ioremap(struct platform_device *pdev,
-> +					phys_addr_t internal_regs)
-
-Why is it called "try" ? It actually does the mapping. So I would
-prefer the function to be named:
-
-	orion_wdt_ioremap_rstout()
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+--
+~Vinod
