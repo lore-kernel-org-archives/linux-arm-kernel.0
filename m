@@ -1,138 +1,47 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 26 Jan 2014 18:46:11 +0100
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <20140126142436.GF10628@intel.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <20140126142436.GF10628@intel.com>
-Message-ID: <52E549E3.8040300@metafoo.de>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 26 Jan 2014 18:56:30 +0000
+Subject: Freescale FEC packet loss
+In-Reply-To: <201401222255.29467.marex@denx.de>
+References: <201401222255.29467.marex@denx.de>
+Message-ID: <1390762590.2735.39.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2014 03:24 PM, Vinod Koul wrote:
-> On Wed, Jan 22, 2014 at 10:22:45PM +0530, Srikanth Thokala wrote:
->> This is the driver for the AXI Video Direct Memory Access (AXI
->> VDMA) core, which is a soft Xilinx IP core that provides high-
->> bandwidth direct memory access between memory and AXI4-Stream
->> type video target peripherals. The core provides efficient two
->> dimensional DMA operations with independent asynchronous read
-> ok here is tha catch, do you want to support interleaved API rather?
+On Wed, 2014-01-22 at 22:55 +0100, Marek Vasut wrote:
+> Hi guys,
 > 
->> +* DMA client + +Required properties: +- dmas: a list of <[Video DMA device
->> phandle] [Channel ID]> pairs, +	where Channel ID is '0' for write/tx and
->> '1' for read/rx +	channel.  +- dma-names: a list of DMA channel names, one
->> per "dmas" entry + +Example: +++++++++ + +vdmatest_0: vdmatest at 0 { +
->> compatible ="xlnx,axi-vdma-test-1.00.a"; +	dmas = <&axi_vdma_0 0 +
->> &axi_vdma_0 1>; +	dma-names = "vdma0", "vdma1"; +} ;
-> Need ack from DT folks. ALso would be better to split the binding to a separate
-> patch
+> I am running stock Linux 3.13 on i.MX6Q SabreLite board. The CPU is i.MX6Q TO 
+> 1.0 .
 > 
+> I am hitting a WARNING when I use the FEC ethernet to transfer data, thus I 
+> started investigating this problem. TL;DR I am not able to figure this problem 
+> out, so I am not attaching a patch :-(
 > 
->> +/**
->> + * struct xilinx_vdma_chan - Driver specific VDMA channel structure
->> + * @xdev: Driver specific device structure
->> + * @ctrl_offset: Control registers offset
->> + * @desc_offset: TX descriptor registers offset
->> + * @completed_cookie: Maximum cookie completed
->> + * @cookie: The current cookie
->> + * @lock: Descriptor operation lock
->> + * @pending_list: Descriptors waiting
->> + * @active_desc: Active descriptor
->> + * @done_list: Complete descriptors
->> + * @common: DMA common channel
->> + * @desc_pool: Descriptors pool
->> + * @dev: The dma device
->> + * @irq: Channel IRQ
->> + * @id: Channel ID
->> + * @direction: Transfer direction
->> + * @num_frms: Number of frames
->> + * @has_sg: Support scatter transfers
->> + * @genlock: Support genlock mode
->> + * @err: Channel has errors
->> + * @tasklet: Cleanup work after irq
->> + * @config: Device configuration info
->> + * @flush_on_fsync: Flush on Frame sync
->> + */
->> +struct xilinx_vdma_chan {
->> +	struct xilinx_vdma_device *xdev;
->> +	u32 ctrl_offset;
->> +	u32 desc_offset;
->> +	dma_cookie_t completed_cookie;
->> +	dma_cookie_t cookie;
->> +	spinlock_t lock;
->> +	struct list_head pending_list;
->> +	struct xilinx_vdma_tx_descriptor *active_desc;
->> +	struct list_head done_list;
->> +	struct dma_chan common;
->> +	struct dma_pool *desc_pool;
->> +	struct device *dev;
->> +	int irq;
->> +	int id;
->> +	enum dma_transfer_direction direction;
-> why should channel have a direction... descriptor should have direction and not
-> the channel!
-
-The channel only supports transfers in one direction. Either from memory to
-peripheral or from peripheral to memory, that's fixed and can't be changed
-at runtime. The driver needs to know which direction the channel supports so
-it can reject transfers with the wrong direction.
-
+> Steps to reproduce:
+> -------------------
+> 1) Boot stock Linux 3.13 on i.MX6Q SabreLite board
+> 2) Plug in an SD card into one of the SD slots (I use the full-size one)
+> 3) Plug in an USB stick into one of the USB ports (I use the upper one)
+> 4) Plug in an ethernet cable into the board
+>    -> Connect the other side into a gigabit-capable PC
 [...]
->> +
-> 
->> + * xilinx_vdma_tx_status - Get VDMA transaction status
->> + * @dchan: DMA channel
->> + * @cookie: Transaction identifier
->> + * @txstate: Transaction state
->> + *
->> + * Return: DMA transaction status
->> + */
->> +static enum dma_status xilinx_vdma_tx_status(struct dma_chan *dchan,
->> +					dma_cookie_t cookie,
->> +					struct dma_tx_state *txstate)
->> +{
->> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->> +	dma_cookie_t last_used;
->> +	dma_cookie_t last_complete;
->> +
->> +	xilinx_vdma_chan_desc_cleanup(chan);
->> +
->> +	last_used = dchan->cookie;
->> +	last_complete = chan->completed_cookie;
->> +
->> +	dma_set_tx_state(txstate, last_complete, last_used, 0);
->> +
->> +	return dma_async_is_complete(cookie, last_complete, last_used);
-> no residue calculation?
-> 
 
-The hardware doesn't support that.
+I think there are known problems with 1000BASE-T on the Sabre Lite
+board.  Two possible workarounds are to limit the PHY to 100BASE-TX
+(should be doable with ethtool) or force it to be clock master for
+1000BASE-T (requires a driver patch).  The vendor kernel apparently does
+both!  Matthew Garrett has been trying to implement a workaround in a
+clean way.
 
->> +/**
->> + * xilinx_vdma_prep_slave_sg - prepare a descriptor for a DMA_SLAVE transaction
->> + * @dchan: DMA channel
->> + * @sgl: scatterlist to transfer to/from
->> + * @sg_len: number of entries in @sgl
->> + * @dir: DMA direction
->> + * @flags: transfer ack flags
->> + * @context: unused
->> + *
->> + * Return: Async transaction descriptor on success and NULL on failure
->> + */
->> +static struct dma_async_tx_descriptor *
->> +xilinx_vdma_prep_slave_sg(struct dma_chan *dchan, struct scatterlist *sgl,
->> +			  unsigned int sg_len, enum dma_transfer_direction dir,
->> +			  unsigned long flags, void *context)
-> okay now am worried, this is supposed to memcpy DMA so why slave-sg??
+Ben.
 
-The DMA is either from memory to peripheral or from peripheral to memory
-depending on the direction. So slave sg should be fine.
-
-> 
-> Looking at the driver overall, IMHO we need to do:
-> - use the virt-dma to simplfy the cookie handling and perhpasn the descrptors
->   too!
-> - Perhpas use interleaved API..?
-> - I dont think we should use the slave API as this seems memcpy case!
-> 
+-- 
+Ben Hutchings
+If the facts do not conform to your theory, they must be disposed of.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140126/b5b61309/attachment-0001.sig>
