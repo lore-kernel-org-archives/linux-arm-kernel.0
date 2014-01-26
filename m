@@ -1,34 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 25 Jan 2014 18:54:40 -0800
-Subject: GPIO triggers kernel reboot
-In-Reply-To: <52E3E031.6040709@denx.de>
-References: <52E3E031.6040709@denx.de>
-Message-ID: <52E478F0.60903@gmail.com>
+From: js07.lee@samsung.com (Jungseung Lee)
+Date: Sun, 26 Jan 2014 14:13:43 +0900
+Subject: [Q] L1_CACHE_BYTES on flush_pfn_alias function.
+In-Reply-To: <20140124154321.GI19052@arm.com>
+References: <00d501cf136a$24ec49c0$6ec4dd40$@samsung.com>
+ <20140124154321.GI19052@arm.com>
+Message-ID: <003c01cf1a55$623979f0$26ac6dd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/01/2014 08:02, Heiko Schocher a ?crit :
-> Hello all,
->
-> is it possible to reboot current mainline kernel triggered from a
-> GPIO in kernel space?
->
-> If not, how can be done this, so that it has a chance to go into
-> mainline?
+Not to flush some more bytes. In the scenario, they can *omit* to flush last 32 bytes.
 
-Your GPIO could (should) be bound to a gpio-keys driver which will 
-deliver key presses event; which you can ultimately bind to the action 
-of triggering a system reboot.
+L1_CACHE_BYTES = 64 (ARM v7, CA9)
 
-Granted, this makes you cross a lot of layers, and requires user-space 
-to implemnt the reboot policy, but what you are asking for is both a 
-mechanism and policy mix, which is usually not accepted.
+asm(    "mcrr   p15, 0, %1, %0, c14\n"
+    "   mcr p15, 0, %2, c7, c10, 4"
+        :
+        : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+        : "cc");
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Saturday, January 25, 2014 12:43 AM
+Cc: linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk; linux-kernel at vger.kernel.org
+Subject: Re: [Q] L1_CACHE_BYTES on flush_pfn_alias function.
 
-You are probably working with HW which won't change, but wiring a reset 
-button to a system reset output is usually much simpler ;)
+On Fri, Jan 17, 2014 at 09:54:42AM +0000,        wrote:
+> Follow the mailing-list
+> http://comments.gmane.org/gmane.linux.ports.arm.omap/31686
+> 
+> >>Setting the L1 cache line size larger than it actually is should be safe.
+> 
+> the written code expected as L1_CACHE_BYTES should be real cache line 
+> size has bug.
+> It looks like that flush_pfn_alias function should be fixed.
 
->
-> Thanks for any suggestions
->
-> bye,
-> Heiko
+Did you actually notice any problem with flushing some more bytes? It's a clean+invalidate rather than invalidate, I don't see any problem.
+
+--
+Catalin
