@@ -1,72 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jan 2014 09:33:13 +0100
-Subject: [PATCH 5/9] ARM: remove redundant cpuidle_idle_call()
-In-Reply-To: <1390802904-28399-6-git-send-email-nicolas.pitre@linaro.org>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-6-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <52E619C9.4050406@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 27 Jan 2014 09:25:01 +0100
+Subject: GPIO triggers kernel reboot
+In-Reply-To: <8761p5hmni.fsf@lebrac.rtp-net.org>
+References: <52E3E031.6040709@denx.de>
+ <CALLGbRKK_ZcOB6nAiV67njrphXMQXN7Y2s81n5k3PWoSVrsrUw@mail.gmail.com>
+ <52E5FB1A.2020205@denx.de> <8761p5hmni.fsf@lebrac.rtp-net.org>
+Message-ID: <CAMuHMdX-sRhwddcvrS8KSO9hTMc94PyAhaBTef7rckwvnL-OiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 07:08 AM, Nicolas Pitre wrote:
-> The core idle loop now takes care of it.
+On Mon, Jan 27, 2014 at 9:08 AM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
+>>> It's certainly possible, and it's also easily done from user-space.
+>>>   Something like this is more policy than function.  It's also a potential
+>>> security issue.  As such I'd expect it highly unlikely that the kernel
+>>> maintainers would allow it to go upstream. Give it a try though.
+>>
+>> Ok, thats what I also think ...
+>>
+>>> I'd approach this from user-space.  Add in the gpio-keys driver and use the
+>>> input-event-daemon to trigger a reboot.  Super easy.
+>>
+>> Yes, that was also my suggestion, but is there a way to do this without
+>> user space usage in a generic way?
 >
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> I think that you can register an input handler for that. iirc, there was
+> a driver doing something similar for apm.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+According to Documentation/sysctl/kernel.txt, the default for the
+"ctrl-alt-del" input is to just reboot.
 
+Gr{oetje,eeting}s,
 
-> ---
->   arch/arm/kernel/process.c | 16 +++++-----------
->   1 file changed, 5 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 725b8c95e0..34a59b7614 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -30,7 +30,6 @@
->   #include <linux/uaccess.h>
->   #include <linux/random.h>
->   #include <linux/hw_breakpoint.h>
-> -#include <linux/cpuidle.h>
->   #include <linux/leds.h>
->   #include <linux/reboot.h>
->
-> @@ -133,7 +132,11 @@ EXPORT_SYMBOL_GPL(arm_pm_restart);
->
->   void (*arm_pm_idle)(void);
->
-> -static void default_idle(void)
-> +/*
-> + * Called from the core idle loop.
-> + */
-> +
-> +void arch_cpu_idle(void)
->   {
->   	if (arm_pm_idle)
->   		arm_pm_idle();
-> @@ -163,15 +166,6 @@ void arch_cpu_idle_dead(void)
->   #endif
->
->   /*
-> - * Called from the core idle loop.
-> - */
-> -void arch_cpu_idle(void)
-> -{
-> -	if (cpuidle_idle_call())
-> -		default_idle();
-> -}
-> -
-> -/*
->    * Called by kexec, immediately prior to machine_kexec().
->    *
->    * This must completely disable all secondary CPUs; simply causing those CPUs
->
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
