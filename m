@@ -1,26 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jan 2014 20:43:02 +0000
-Subject: [PATCH 3/4] ASoC: tda998x: add DT documentation
-In-Reply-To: <22fafd7e11771ffc25c84ff609d18039f07b7295.1390813481.git.moinejf@free.fr>
-References: <cover.1390813480.git.moinejf@free.fr>
- <22fafd7e11771ffc25c84ff609d18039f07b7295.1390813481.git.moinejf@free.fr>
-Message-ID: <20140127204302.GY11841@sirena.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 27 Jan 2014 12:44:04 -0800
+Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
+In-Reply-To: <2118020.lZAv6IL4Xy@avalon>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+ <1591253.8BzYfubhGS@avalon> <2118020.lZAv6IL4Xy@avalon>
+Message-ID: <20140127204404.4167.6060@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 09:34:49AM +0100, Jean-Francois Moine wrote:
+Quoting Laurent Pinchart (2014-01-21 05:00:28)
+> Hi Mike,
+> 
+> On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
+> > On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
+> > > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
+> > > > Geert, could you please verify that the series fixes your QSPI clock
+> > > > issues with the Koelsch board ?
+> > > > 
+> > > > Laurent Pinchart (2):
+> > > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
+> > > >   clk: shmobile: rcar-gen2: Fix qspi divisor
+> > > 
+> > > Thanks, both:
+> > > 
+> > > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > 
+> > Thank you.
+> > 
+> > Mike, could you please pick those patches up for v3.14 ?
+> 
+> Ping ?
 
-> +	- compatible: must be "nxp,tda998x-codec".
-> +	- audio-ports: one or two values.
-> +		The first value defines the I2S input port.
-> +		The second one, if present, defines the S/PDIF input port.
+Hi Laurent,
 
-I take it these are port numbers on the device and it's not possible to
-do something like having multiple I2S ports?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/d73158a4/attachment.sig>
+I'll send these as part of my fixes tag, probably next week.
+
+Regards,
+Mike
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
