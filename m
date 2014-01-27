@@ -1,38 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Jan 2014 16:02:29 +0100
-Subject: [PATCH 1/4] clk: sunxi: Add support for PLL6 on the A31
-In-Reply-To: <20140117221402.4167.78251@quantum>
-References: <1389892285-11745-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389892285-11745-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140117221402.4167.78251@quantum>
-Message-ID: <20140127150229.GM3867@lukather>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Jan 2014 23:05:11 +0800
+Subject: [PATCH 1/9] ARM: dts: imx6qdl: remove the use of pingrp macros
+In-Reply-To: <20140127143745.GM15937@n2100.arm.linux.org.uk>
+References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
+ <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
+ <20140127143745.GM15937@n2100.arm.linux.org.uk>
+Message-ID: <20140127150509.GD4765@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Fri, Jan 17, 2014 at 02:14:02PM -0800, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-01-16 09:11:22)
-> > The A31 has a slightly different PLL6 clock. Add support for this new clock in
-> > our driver.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Mon, Jan 27, 2014 at 02:37:45PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Jan 26, 2014 at 12:43:03AM +0800, Shawn Guo wrote:
+> >  arch/arm/boot/dts/imx6dl-hummingboard.dts  |    5 +-
+> >  arch/arm/boot/dts/imx6qdl-microsom.dtsi    |    5 +-
 > 
-> This looks good to me. I guess it will be going in for 3.15 based on the
-> comments in the coverletter.
+> I've merged your changes here into my local copy of these just to reduce
+> the conflicts - unfortunately, it's taken soo long to deal with the above
+> that the cubox-i has now been released, which has prompted some
+> reorganisation between the above two files.
+> 
+> I would much rather you dropped these two entirely, and let me push them
+> upstream, rather than having some nasty conflicts which result from this.
 
-Yes, indeed it is 3.15 materials.
+So you're basically asking me to drop patch [1] from imx/dt branch (tag
+imx-dt-3.14), which I have sent to Olof for 3.14 inclusion.  Yes, I
+still hope Olof can pull it with this turn-around series applied on top.
+So please let's wait for Olof's word to see if we can make it.  If it's
+still a NO for some reason, I will be certainly fine with you pushing
+hummingboard stuff upstream, and will drop it from my tree.
 
-Maxime
+Shawn
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/99d8f2d3/attachment.sig>
+[1] https://git.linaro.org/people/shawn.guo/linux-2.6.git/commit/8544f6c92801b1ba70f790cc17f543f7aa13f17f
