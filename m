@@ -1,35 +1,27 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 27 Jan 2014 16:13:56 +0100 (CET)
-Subject: [Q] block / zynq: DMA bouncing
-Message-ID: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 27 Jan 2014 12:14:30 -0300
+Subject: [RFC/PATCH] ARM: dove: Remove UBI support from defconfig
+In-Reply-To: <20140127150040.GH29184@titan.lakedaemon.net>
+References: <1390829189-25073-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140127150040.GH29184@titan.lakedaemon.net>
+Message-ID: <20140127151429.GB3036@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jan 27, 2014 at 10:00:40AM -0500, Jason Cooper wrote:
+> On Mon, Jan 27, 2014 at 10:26:29AM -0300, Ezequiel Garcia wrote:
+> > As NAND support is not enabled by default, it's hard to see
+> > why we'd want to have UBI support. Let's remove it.
+> 
+> I'd rather add support for the nand.
+> 
 
-I'm working on an MMC driver with a DMA capability. All has been working 
-well, until at some point I've got a bus error, when the mmc driver had 
-been handed in a buffer at 0x3000 physical RAM address. The reason is, 
-that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
-my question: how shall I configure this in software?
+Well, there isn't any Dove board (that we currently support) with a NAND
+device. Would you still want to add it?
 
-The way I found was to use ARM-specific struct dmabounce_device_info and 
-implement its .needs_bounce() method to return true for those addresses. 
-Is this the right way or is there a better / more straight-forward one?
-
-To do the above I have to enable CONFIG_DMABOUNCE, which then selects 
-CONFIG_ZONE_DMA. Having done just that I suddenly discover, that 0x3000 
-buffers aren't used any more, so, I cannot actually verify my 
-implementation :) Looking at ZONE_DMA it looks like it is still covering 
-the whole RAM range (/proc/zoneinfo shows start_pfn=0 in zone DMA), so, I 
-don't see why 0x3000 should be excluded now.
-
-So, is using the .needs_bounce() method the correct way to support DMA on 
-this arch or is there a better one?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+In that case, we should consider adding UBIFS as well. Having CONFIG_UBI
+by itself doesn't make any sense.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
