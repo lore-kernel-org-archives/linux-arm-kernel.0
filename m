@@ -1,48 +1,63 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 27 Jan 2014 16:35:18 +0100 (CET)
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <20140127152457.GA1073@trinity.fluff.org>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
- <20140127152457.GA1073@trinity.fluff.org>
-Message-ID: <Pine.LNX.4.64.1401271634470.23931@axis700.grange>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Mon, 27 Jan 2014 17:37:49 +0200
+Subject: [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <y>
+References: <y>
+Message-ID: <cover.1390836773.git.jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Changes since RFC v2 version of the patches:
+- Dropped out already applied:
+  ASoC: hdmi-codec: Add devicetree binding with documentation
+- Addresses Mark's comments here:
+  http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070605.html
+  - ASoC: davinci-evm: Add named clock reference to DT bindings
+    - Get rid of unnecessary castings
+    - Add mclk NULL checks
+    - Use devm_clk_get()
+    - Change clock name from "ti,codec-clock" to "mclk"
+- Address Mark's comments here:
+  http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070606.html  - ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S bus
+    - Get rid of unnecessary castings
+    - Update commit message
+  - Add: ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
+    - Use snd_soc_params_to_bclk()
 
-On Mon, 27 Jan 2014, Ben Dooks wrote:
+Changes since the first RFC version of the patches:
+- Drop out already applied: 
+  ASoC: hdmi-codec: Add SNDRV_PCM_FMTBIT_32_LE playback format
+- Change sound node's compatible property
+  form: "ti,am33xx-beaglebone-black" to "ti,am33xx-beaglebone-black-audio"
+- Some minor style issue fixes from TI internal review
 
-> On Mon, Jan 27, 2014 at 04:13:56PM +0100, Guennadi Liakhovetski wrote:
-> > Hi all,
-> > 
-> > I'm working on an MMC driver with a DMA capability. All has been working 
-> > well, until at some point I've got a bus error, when the mmc driver had 
-> > been handed in a buffer at 0x3000 physical RAM address. The reason is, 
-> > that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
-> > my question: how shall I configure this in software?
-> > 
-> > The way I found was to use ARM-specific struct dmabounce_device_info and 
-> > implement its .needs_bounce() method to return true for those addresses. 
-> > Is this the right way or is there a better / more straight-forward one?
-> > 
-> > To do the above I have to enable CONFIG_DMABOUNCE, which then selects 
-> > CONFIG_ZONE_DMA. Having done just that I suddenly discover, that 0x3000 
-> > buffers aren't used any more, so, I cannot actually verify my 
-> > implementation :) Looking at ZONE_DMA it looks like it is still covering 
-> > the whole RAM range (/proc/zoneinfo shows start_pfn=0 in zone DMA), so, I 
-> > don't see why 0x3000 should be excluded now.
-> > 
-> > So, is using the .needs_bounce() method the correct way to support DMA on 
-> > this arch or is there a better one?
-> 
-> I have a similar issue with Renesas R8A7790 where there is a bus bridge
-> that can only deal with transactions to one half of the available RAM.
+Jyri Sarha (8):
+  clk: add gpio controlled clock
+  ASoC: davinci-evm: Add named clock reference to DT bindings
+  ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
+  ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S
+    bus
+  ASoC: davinci: HDMI audio build for AM33XX and TDA998x
+  drm/tilcdc: Add I2C HDMI audio config for tda998x
+  ARM: OMAP2+: omap2plus_defconfig: Enable tilcdc and TDA998X HDMI
+    support
+  ARM: OMAP2+: omap2plus_defconfig: Enable BeagleBone Black HDMI audio
+    support
 
-Have you tried enabling CONFIG_DMABOUNCE?
+ .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
+ .../bindings/sound/davinci-evm-audio.txt           |   13 +-
+ arch/arm/configs/omap2plus_defconfig               |    5 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-gpio.c                             |  210 +++++++++++++++++++
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c              |   24 ++-
+ include/linux/clk-provider.h                       |   25 +++
+ sound/soc/davinci/Kconfig                          |   12 ++
+ sound/soc/davinci/Makefile                         |    1 +
+ sound/soc/davinci/davinci-evm.c                    |  211 +++++++++++++++++++-
+ sound/soc/davinci/davinci-mcasp.c                  |   20 ++
+ 11 files changed, 534 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
+ create mode 100644 drivers/clk/clk-gpio.c
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+1.7.9.5
