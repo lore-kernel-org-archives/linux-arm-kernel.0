@@ -1,46 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jan 2014 20:36:35 +0000
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <1390854331.23180.22.camel@localhost.localdomain>
-References: <y> <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
- <20140127181836.GH26766@pengutronix.de>
- <1390854331.23180.22.camel@localhost.localdomain>
-Message-ID: <20140127203635.GA15937@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 27 Jan 2014 12:30:42 -0800
+Subject: [PATCH] ARM: OMAP4+: move errata initialization to
+ omap4_pm_init_early
+In-Reply-To: <20140123184951.GJ7993@atomide.com> (Tony Lindgren's message of
+ "Thu, 23 Jan 2014 10:49:52 -0800")
+References: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
+ <1390248397-14112-1-git-send-email-nm@ti.com>
+ <52E139C5.3090207@ti.com> <874n4uy483.fsf@paris.lan>
+ <20140123184951.GJ7993@atomide.com>
+Message-ID: <87fvo9w4jx.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 09:25:31PM +0100, Yann Droneaud wrote:
-> ARM, even AAAAARGH64 [1], doesn't need a special treatement regarding
-> the infamous dma_mask pointer. So perhaps my solution is better.
-> 
-> This solution (adding dma_mask in pdev_archdata) is already in use in
-> powerpc architecture. See arch/powerpc/kernel/setup-common.c
-> 
-> The advantage of this solution is that it makes a dma_mask placeholder
-> available to statically allocated platform_device struct, while mine
-> only address the problem for platform_device struct allocated with
-> platform_device_alloc().
+Tony Lindgren <tony@atomide.com> writes:
 
-As I've already said in this thread, the basic problem comes from DT's
-platform device creation.  It's the responsibility of the device creator
-to set the dma_mask pointer appropriately, and DT doesn't do that.  So,
-DT needs to be fixed rather than everyone introducing their own
-workarounds for this.
+> * Kevin Hilman <khilman@linaro.org> [140123 09:55]:
+>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>> 
+>> > On 01/20/2014 10:06 PM, Nishanth Menon wrote:
+>> >> Move all OMAP4 PM errata initializations to centralized location in
+>> >> omap4_pm_init_early. This allows for users to utilize the erratas
+>> >> in various submodules as needed.
+>> >> 
+>> > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> >
+>> > This patch fixes build failure caused by patch 
+>> > https://patchwork.kernel.org/patch/3084521/ 
+>> > in case if SMP is not enabled.
+>> 
+>> So does that mean that that patch can now be applied as is?
+>> 
+>> We could sure use that fix (or equivalent) for CPUidle breakage on 4460.
+>
+> Yeah, seems OK to me, feel free to apply it directly:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-> I'm also considering using dma_set_mask_and_coherent() in
-> platform_device_register_full() and drivers using
-> platform_device_alloc().
+OK, I've picked up both $SUBJECT patch and the one from the above
+patchworks link and will queue them up for v3.14-rc (and have added your
+Ack to both.)
 
-As the one who introduced dma_set_mask_and_coherent, consider this a
-strong NAK on that.  The reason is dma_set_mask_and_coherent() is
-for drivers to set their requirements, not for the bus requirements
-to be set in the first place.
+Thanks,
 
-It also means that drivers which need no DMA support are subjected to
-DMA restrictions (in that dma_set_mask_and_coherent can error out if
-the platform can't support the DMA mask.)
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Kevin
