@@ -1,51 +1,97 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 26 Jan 2014 22:42:19 -0800
-Subject: [PATCH v3 04/15] watchdog: orion: Handle IRQ
-In-Reply-To: <20140127063040.GA17506@localhost>
-References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390310774-20781-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <52DE84A6.6090909@roeck-us.net> <20140127063040.GA17506@localhost>
-Message-ID: <52E5FFCB.5000802@roeck-us.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 27 Jan 2014 14:55:24 +0800
+Subject: [PATCH v2 1/3] ASoC: atmel_ssc_dai: make option to choose clock
+In-Reply-To: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
+References: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <1390805726-1841-2-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2014 10:30 PM, Ezequiel Garcia wrote:
-> Hi Guenter,
->
-> On Tue, Jan 21, 2014 at 06:31:02AM -0800, Guenter Roeck wrote:
-> [..]
->>> @@ -131,6 +138,19 @@ static int orion_wdt_probe(struct platform_device *pdev)
->>>    	if (!wdt_reg)
->>>    		return -ENOMEM;
->>>
->>> +	irq = platform_get_irq(pdev, 0);
->>> +	if (irq > 0) {
->>
->> 0 is a valid interrupt number, and platform_get_irq returns an error code on errors.
->> Should be >= 0.
->>
->
-> I'm revisiting this one. I believe this is not the hardware interrupt
-> number, but the one mapped into virq space. So, 0 is not a valid
-> interrupt number.
->
-> Right?
->
+When SSC works in slave mode, according to the hardware design, the
+clock can get from TK pin, also can get from RK pin. So, add one
+parameter to choose where the clock from.
 
-Hi,
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+Changes in v2: None
 
-If so, the entire interrupt numbering scheme appears broken. Conceptually it should
-not make a difference where the interrupt is coming from. If the virq system
-returns 0 for invalid (non-configured) interrupts, and non-configured 'real'
-interrupts are reported as -ENXIO, all bets are off. How would a driver know
-what to expect ? And how would one be expected to review such non-deterministic
-code ?
+ sound/soc/atmel/atmel_ssc_dai.c | 16 ++++++++++++----
+ sound/soc/atmel/atmel_ssc_dai.h |  1 +
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-FWIW, platform_get_irq() does return -ENXIO for invalid interrupts. If there
-is an independent notion of "0 is an invalid interrupt", it is well hidden.
-
-Anyway, if you think the driver should treat 0 as invalid interrupt, go ahead.
-Who am I to know. Just please don't use my Reviewed-by in this case.
-
-Thanks,
-Guenter
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 8697ced..03eb0be 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -340,6 +340,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_soc_dai *dai)
+ {
+ 	int id = dai->id;
++	struct snd_soc_card *card = dai->card;
+ 	struct atmel_ssc_info *ssc_p = &ssc_info[id];
+ 	struct atmel_pcm_dma_params *dma_params;
+ 	int dir, channels, bits;
+@@ -347,6 +348,9 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	int start_event;
+ 	int ret;
+ 
++	ssc_p->clk_from_rk_pin =
++		((struct atmel_ssc_info *)(card->drvdata))->clk_from_rk_pin;
++
+ 	/*
+ 	 * Currently, there is only one set of dma params for
+ 	 * each direction.  If more are added, this code will
+@@ -466,7 +470,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(RCMR_START, start_event)
+ 			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
+ 			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
+-			| SSC_BF(RCMR_CKS, SSC_CKS_CLOCK);
++			| SSC_BF(RCMR_CKS, ssc_p->clk_from_rk_pin ?
++					   SSC_CKS_PIN : SSC_CKS_CLOCK);
+ 
+ 		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
+@@ -481,7 +486,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(TCMR_START, start_event)
+ 			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
+ 			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
+-			| SSC_BF(TCMR_CKS, SSC_CKS_PIN);
++			| SSC_BF(TCMR_CKS, ssc_p->clk_from_rk_pin ?
++					   SSC_CKS_CLOCK : SSC_CKS_PIN);
+ 
+ 		tfmr =	  SSC_BF(TFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(TFMR_FSDEN, 0)
+@@ -550,7 +556,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(RCMR_START, SSC_START_RISING_RF)
+ 			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
+ 			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
+-			| SSC_BF(RCMR_CKS, SSC_CKS_PIN);
++			| SSC_BF(RCMR_CKS, ssc_p->clk_from_rk_pin ?
++					   SSC_CKS_PIN : SSC_CKS_CLOCK);
+ 
+ 		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
+@@ -565,7 +572,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 			| SSC_BF(TCMR_START, SSC_START_RISING_RF)
+ 			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
+ 			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
+-			| SSC_BF(TCMR_CKS, SSC_CKS_PIN);
++			| SSC_BF(RCMR_CKS, ssc_p->clk_from_rk_pin ?
++					   SSC_CKS_CLOCK : SSC_CKS_PIN);
+ 
+ 		tfmr =	  SSC_BF(TFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
+ 			| SSC_BF(TFMR_FSDEN, 0)
+diff --git a/sound/soc/atmel/atmel_ssc_dai.h b/sound/soc/atmel/atmel_ssc_dai.h
+index b1f08d5..f147895 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.h
++++ b/sound/soc/atmel/atmel_ssc_dai.h
+@@ -113,6 +113,7 @@ struct atmel_ssc_info {
+ 	unsigned short cmr_div;
+ 	unsigned short tcmr_period;
+ 	unsigned short rcmr_period;
++	bool clk_from_rk_pin;
+ 	struct atmel_pcm_dma_params *dma_params[2];
+ 	struct atmel_ssc_state ssc_state;
+ };
+-- 
+1.8.5.2
