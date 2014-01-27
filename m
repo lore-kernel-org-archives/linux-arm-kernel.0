@@ -1,36 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jan 2014 20:59:25 +0000
-Subject: [PATCH 2/3] ASoC: atmel_wm8904: make it available to choose clock
-In-Reply-To: <52D7366B.1030909@atmel.com>
-References: <1389669956-2304-1-git-send-email-voice.shen@atmel.com>
- <1389669956-2304-3-git-send-email-voice.shen@atmel.com>
- <20140114203650.GX15567@sirena.org.uk> <52D7366B.1030909@atmel.com>
-Message-ID: <20140127205925.GE11841@sirena.org.uk>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Mon, 27 Jan 2014 16:17:17 -0500
+Subject: [RFC] drivers: irq-chip: Enable SGI's for Secure-to-NonSecure
+ communication use-cases
+References: <79CD15C6BA57404B839C016229A409A83EDAD1B8@DBDE04.ent.ti.com>
+ <20140106132536.GA27282@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A83EDAD85E@DBDE04.ent.ti.com>
+Message-ID: <87wqhl15wi.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 16, 2014 at 09:31:23AM +0800, Bo Shen wrote:
 
-> >Shouldn't this code be in the DAI driver?  Otherwise this series looks
-> >fine to me, though the DT folks might have something to say I guess.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
 
->   For audio on Atmel SoC, it depends on three device nodes, one is
-> SSC node, one is the codec node and the sound node.
->   The sound node will parse by machine driver, and machine driver is
-> mainly for hardware connection. As the "clk_from_rk_pin" is decided
-> by hardware, so, I put it here.
->   If I move the code to dai driver, it will parse the sound node in
-> dai driver, I think it will make the code a little bit not explicit.
-> What do you think?
+>> So it seems that your intention is to use the existing infrastructure
+>> for this by directing SGIs through the normal IRQ processing.
+>> To that idea, I say no way.
 
-I think it should just be a property of the DAI device.  It's true that
-the card defines the connections but if something is going to be an
-option that's there for most if not all systems then putting it in the
-device driver means less effort on each integration.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/2940e34c/attachment.sig>
+On  6 Jan 2014, hvaibhav at ti.com wrote:
+
+> You have any other alternative?
+
+I think you need to put Bhupesh Sharma's comment with this.  The typical
+sane mode for GIC with TZ is to have the monitor mode toggle the IRQ/FIQ
+routing bits in the SCR (cp15) bits 1,2.  That is, the IRQ goes direct
+to core and FIQ goes to monitor from the 'Normal' world.  In the
+'Secure' world, the FIQ goes direct to core and IRQ traps to monitor.
+The monitor mode vector table has a gateway from secure to normal for
+IRQ and gateway from normal to secure for FIQ.
+
+Now, consider the 'SMC' instruction and what is present in stuff like
+this,
+
+ http://lwn.net/Articles/513756/
+ mach-omap2/{omap-smc.S,omap-secure.c,omap-secure.h}
+
+Instead of messing around with the GIC, why not use something even more
+generic like the 'SMC' instruction.  It has the same sort of 'end game'
+which is a trap to monitor mode.  The monitor has to be a little smarter
+to determine which world called but this should always be the case;
+really you want to check this.
+
+Btw, the situation is the same no matter which world Linux is in.  I
+don't think Linux can be the recipient of an 'SMC' call.  But I think
+most use cases would put it in the 'normal world' and the SMC is fine.
+
+Fwiw,
+Bill Pringlemeir.
