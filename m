@@ -1,177 +1,171 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 27 Jan 2014 09:48:54 +0100
-Subject: [PATCH 4/4] ASoC: tda998x: adjust the audio hw parameters from EDID
-In-Reply-To: <cover.1390813480.git.moinejf@free.fr>
-References: <cover.1390813480.git.moinejf@free.fr>
-Message-ID: <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 27 Jan 2014 10:42:52 +0100
+Subject: imx6: usbhc2/3 and HSIC
+In-Reply-To: <CAH9NwWckD5Rmr9oW2Gr071V2p0FjRJcttYpB4qQNEWTxDEJ6qw@mail.gmail.com>
+References: <CAH9NwWckD5Rmr9oW2Gr071V2p0FjRJcttYpB4qQNEWTxDEJ6qw@mail.gmail.com>
+Message-ID: <1390815772.4847.9.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The supported audio parameters are described in the EDID which is
-received by the HDMI transmitter from the connected screen.
-Use these ones to adjust the audio stream parameters.
+Hi Christian,
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+Am Montag, den 27.01.2014, 10:22 +0100 schrieb Christian Gmeiner:
+> Hi all...
+> 
+> does anyone used the usbhc2 or usbhc3 in HSIC mode? I am trying my
+> luck but I do not
+> get it to work. Is there anything special I need to take care of?
+> 
+I remember we had this working on a board back in the 3.10 days. The
+only thing I remember which is specific to HSIC is in the attached
+patch. This isn't really clean and should be done in a better way for
+mainline, but maybe it provides some pointers for you.
+
+Regards,
+Lucas
+------------------------------>8------------------------------------
+>From 5af9a0597a329a2c4af012fd0fb54f525b45f625 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Mon, 28 Jan 2013 13:08:08 +0100
+Subject: [PATCH] ARM/USB i.MX6: Add HSIC support
+
+On i.MX6 HOST2 and HOST3 are HSIC only ports. These have the special
+requirement that they need the to set a pullup on the strobe line
+after initialization.
+Fortunately only one routing option for the HSIC ports exist, so we
+can put the pinmux setup completely into the i.MX6 dtsi file.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 15 ++++++++
- include/drm/i2c/tda998x.h         |  1 +
- sound/soc/codecs/tda998x.c        | 79 ++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 94 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6q.dtsi       | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi     |  8 ++++++++
+ drivers/usb/chipidea/ci13xxx_imx.c | 10 ++++++++++
+ drivers/usb/chipidea/usbmisc_imx.c |  5 +++++
+ 4 files changed, 55 insertions(+)
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 186c751..3c8b4d7 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -45,6 +45,8 @@ struct tda998x_priv {
- 	wait_queue_head_t wq_edid;
- 	volatile int wq_edid_wait;
- 	struct drm_encoder *encoder;
-+
-+	u8 *eld;
- };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 21e675848bd1..18ffb5f91439 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -253,6 +253,38 @@
+ 					};
+ 				};
  
- #define to_tda998x_priv(x)  ((struct tda998x_priv *)to_encoder_slave(x)->slave_priv)
-@@ -731,6 +733,14 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- }
++				usbh2 {
++					pinctrl_usbh2: usbh2grp {
++						fsl,pins = <
++							MX6Q_PAD_RGMII_TXC__USB_H2_DATA       0x13030
++							MX6Q_PAD_RGMII_TX_CTL__USB_H2_STROBE  0x13030
++						>;
++					};
++
++					pinctrl_usbh2_enabled: usbh2grp-enabled {
++						fsl,pins = <
++							MX6Q_PAD_RGMII_TXC__USB_H2_DATA       0x13030
++							MX6Q_PAD_RGMII_TX_CTL__USB_H2_STROBE  0x17030
++						>;
++					};
++				};
++
++				usbh3 {
++					pinctrl_usbh3: usbh3grp-1 {
++						fsl,pins = <
++							MX6Q_PAD_RGMII_RX_CTL__USB_H3_DATA    0x13030
++							MX6Q_PAD_RGMII_RXC__USB_H3_STROBE     0x13030
++						>;
++					};
++
++					pinctrl_usbh3_enabled: usbh3grp-enabled {
++						fsl,pins = <
++							MX6Q_PAD_RGMII_RX_CTL__USB_H3_DATA    0x13030
++							MX6Q_PAD_RGMII_RXC__USB_H3_STROBE     0x17030
++						>;
++					};
++				};
++
+ 				usdhc2 {
+ 					pinctrl_usdhc2_1: usdhc2grp-1 {
+ 						fsl,pins = <
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 9e8296e4c343..884c512eff04 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -626,7 +626,11 @@
+ 				interrupts = <0 41 0x04>;
+ 				clocks = <&clks 162>;
+ 				fsl,usbmisc = <&usbmisc 2>;
++				phy_type = "hsic";
+ 				status = "disabled";
++				pinctrl-names = "default", "enabled";
++				pinctrl-0 = <&pinctrl_usbh2>;
++				pinctrl-1 = <&pinctrl_usbh2_enabled>;
+ 			};
  
- /* tda998x codec interface */
-+u8 *tda998x_audio_get_eld(struct i2c_client *client)
-+{
-+	struct tda998x_priv *priv = i2c_get_clientdata(client);
-+
-+	return priv->eld;
-+}
-+EXPORT_SYMBOL_GPL(tda998x_audio_get_eld);
-+
- void tda998x_audio_update(struct i2c_client *client,
- 			int format,
- 			int port)
-@@ -1186,6 +1196,11 @@ tda998x_encoder_get_modes(struct drm_encoder *encoder,
- 		drm_mode_connector_update_edid_property(connector, edid);
- 		n = drm_add_edid_modes(connector, edid);
- 		priv->is_hdmi_sink = drm_detect_hdmi_monitor(edid);
-+
-+		/* keep the EDID as ELD for the audio subsystem */
-+		drm_edid_to_eld(connector, edid);
-+		priv->eld = connector->eld;
-+
- 		kfree(edid);
- 	}
+ 			usbh3: usb at 02184600 {
+@@ -635,7 +639,11 @@
+ 				interrupts = <0 42 0x04>;
+ 				clocks = <&clks 162>;
+ 				fsl,usbmisc = <&usbmisc 3>;
++				phy_type = "hsic";
+ 				status = "disabled";
++				pinctrl-names = "default", "enabled";
++				pinctrl-0 = <&pinctrl_usbh3>;
++				pinctrl-1 = <&pinctrl_usbh3_enabled>;
+ 			};
  
-diff --git a/include/drm/i2c/tda998x.h b/include/drm/i2c/tda998x.h
-index 0459931..64aaaa8 100644
---- a/include/drm/i2c/tda998x.h
-+++ b/include/drm/i2c/tda998x.h
-@@ -26,6 +26,7 @@ struct tda998x_encoder_params {
- 	unsigned audio_sample_rate;
- };
+ 			usbmisc: usbmisc: usbmisc at 02184800 {
+diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+index 2ec9052c7bb7..f770328d4901 100644
+--- a/drivers/usb/chipidea/ci13xxx_imx.c
++++ b/drivers/usb/chipidea/ci13xxx_imx.c
+@@ -99,6 +99,7 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int ret;
+ 	struct usb_phy *phy;
++	struct pinctrl *pinctrl;
  
-+u8 *tda998x_audio_get_eld(struct i2c_client *client);
- void tda998x_audio_update(struct i2c_client *client,
- 			int format,
- 			int port);
-diff --git a/sound/soc/codecs/tda998x.c b/sound/soc/codecs/tda998x.c
-index d724f7d..500ac61 100644
---- a/sound/soc/codecs/tda998x.c
-+++ b/sound/soc/codecs/tda998x.c
-@@ -91,10 +91,79 @@ static int tda_startup(struct snd_pcm_substream *substream,
- 			struct snd_soc_dai *dai)
- {
- 	struct tda_priv *priv = snd_soc_codec_get_drvdata(dai->codec);
-+	u8 *eld = NULL;
-+	static unsigned rates_mask[] = {
-+		SNDRV_PCM_RATE_32000,
-+		SNDRV_PCM_RATE_44100,
-+		SNDRV_PCM_RATE_48000,
-+		SNDRV_PCM_RATE_88200,
-+		SNDRV_PCM_RATE_96000,
-+		SNDRV_PCM_RATE_176400,
-+		SNDRV_PCM_RATE_192000,
-+	};
+ 	if (of_find_property(pdev->dev.of_node, "fsl,usbmisc", NULL)
+ 		&& !usbmisc_ops)
+@@ -197,6 +198,15 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
+ 	pm_runtime_no_callbacks(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
  
- 	/* memorize the used DAI */
- 	priv->dai_id = dai->id;
- 
-+	/* get the ELD from the tda998x driver */
-+	if (!priv->i2c_client)
-+		tda_get_encoder(priv);
-+	if (priv->i2c_client)
-+		eld = tda998x_audio_get_eld(priv->i2c_client);
++	pinctrl = devm_pinctrl_get(&pdev->dev);
++	if (!IS_ERR(pinctrl)) {
++		struct pinctrl_state *state;
 +
-+	/* adjust the hw params from the ELD (EDID) */
-+	if (eld) {
-+		struct snd_soc_dai_driver *dai_drv = dai->driver;
-+		struct snd_soc_pcm_stream *stream = &dai_drv->playback;
-+		u8 *sad;
-+		int sad_count;
-+		unsigned eld_ver, mnl, rates, rate_mask, i;
-+		unsigned max_channels, fmt;
-+		u64 formats;
-+
-+		eld_ver = eld[0] >> 3;
-+		if (eld_ver != 2 && eld_ver != 31)
-+			return 0;
-+
-+		mnl = eld[4] & 0x1f;
-+		if (mnl > 16)
-+			return 0;
-+
-+		sad_count = eld[5] >> 4;
-+		sad = eld + 20 + mnl;
-+
-+		/* Start from the basic audio settings */
-+		max_channels = 2;
-+		rates = 0;
-+		fmt = 0;
-+		while (sad_count--) {
-+			switch (sad[0] & 0x78) {
-+			case 0x08: /* PCM */
-+				max_channels = max(max_channels, (sad[0] & 7) + 1u);
-+				rates |= sad[1];
-+				fmt |= sad[2] & 0x07;
-+				break;
-+			}
-+			sad += 3;
-+		}
-+
-+		for (rate_mask = i = 0; i < ARRAY_SIZE(rates_mask); i++)
-+			if (rates & 1 << i)
-+				rate_mask |= rates_mask[i];
-+		formats = 0;
-+		if (fmt & 1)
-+			formats |= SNDRV_PCM_FMTBIT_S16_LE;
-+		if (fmt & 2)
-+			formats |= SNDRV_PCM_FMTBIT_S20_3LE;
-+		if (fmt & 4)
-+			formats |= SNDRV_PCM_FMTBIT_S24_LE;
-+
-+		/* change the snd_soc_pcm_stream values of the driver */
-+		stream->rates = rate_mask;
-+		stream->channels_max = max_channels;
-+		stream->formats = formats;
++		state = pinctrl_lookup_state(pinctrl, "enabled");
++		if (!IS_ERR(state))
++			pinctrl_select_state(pinctrl, state);
 +	}
 +
- 	/* start the TDA998x audio */
- 	return tda_start_stop(priv, 1);
- }
-@@ -193,9 +262,17 @@ static const struct snd_soc_codec_driver soc_codec_tda998x = {
+ 	return 0;
  
- static int tda998x_dev_probe(struct platform_device *pdev)
- {
-+	struct snd_soc_dai_driver *dai_drv;
+ disable_device:
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index 588bae8eef5e..e29c5aa51b07 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -145,6 +145,11 @@ static int usbmisc_imx6q_init(struct device *dev)
+ 		spin_unlock_irqrestore(&usbmisc->lock, flags);
+ 	}
+ 
++	if (usbdev->index == 2 || usbdev->index == 3) {
++		writel(0x00003000, usbmisc->base + usbdev->index * 4);
++		writel(0x80001842, usbmisc->base + 0x8 + usbdev->index * 4);
++	}
 +
-+	/* copy the DAI driver to a writable area */
-+	dai_drv = devm_kzalloc(&pdev->dev, sizeof(tda998x_dai), GFP_KERNEL);
-+	if (!dai_drv)
-+		return -ENOMEM;
-+	memcpy(dai_drv, tda998x_dai, sizeof(tda998x_dai));
-+
- 	return snd_soc_register_codec(&pdev->dev,
- 				&soc_codec_tda998x,
--				tda998x_dai, ARRAY_SIZE(tda998x_dai));
-+				dai_drv, ARRAY_SIZE(tda998x_dai));
+ 	return 0;
  }
  
- static int tda998x_dev_remove(struct platform_device *pdev)
 -- 
-1.8.5.3
+1.8.5.2
+
+
+
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
