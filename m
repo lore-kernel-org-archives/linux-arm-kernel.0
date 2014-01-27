@@ -1,22 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Jan 2014 14:14:39 +0800
-Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6sl
-In-Reply-To: <c3acb9ee4a574bbaa1cdc5fa77050408@BY2PR03MB315.namprd03.prod.outlook.com>
-References: <CACUGKYOgJDMO-xF9GC4Xh7+t6FDk6DwJ0iYX17Hh6LvqSjVa4Q@mail.gmail.com>
- <30BEA0EF-C7F3-48FB-9B07-2C244788DD38@freescale.com>
- <953bc7807ffe45119eece19c803b047f@BY2PR03MB315.namprd03.prod.outlook.com>
- <CACUGKYOuuPzPHyUSm_zyq1iq1FeaCoQ03Ko4yO8mmM+PDGm5gw@mail.gmail.com>
- <c3acb9ee4a574bbaa1cdc5fa77050408@BY2PR03MB315.namprd03.prod.outlook.com>
-Message-ID: <20140127061434.GA3135@S2101-09.ap.freescale.net>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 27 Jan 2014 07:17:18 +0100
+Subject: GPIO triggers kernel reboot
+In-Reply-To: <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0E1@NA-MBX-01.mgc.mentorg.com>
+References: <52E3E031.6040709@denx.de>
+ <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0A1@NA-MBX-01.mgc.mentorg.com>
+ <371E240E6FC1D44DA5E51EE9DCDCB7845E5EA0E1@NA-MBX-01.mgc.mentorg.com>
+Message-ID: <52E5F9EE.2020707@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 24, 2014 at 02:05:09AM +0000, Anson.Huang at freescale.com wrote:
-> Hi, Tobias
-> 	Yes, the root cause is the reschedule introduced by the usleep, for our internal release, we use busy loop for PLL wait lock, just removing the usleep is not good enough, as the PLL hardware may need about 60~90us to lock, during this period, there will be no clock output in PLL. So, we need to figure out a way to fix this issue, either using busy loop instead of usleep or access the ccm register to adjust ARM divider instead of calling clk APIs. 
-> 
+Hello John,
 
-Yes, since imx6sl_set_wait_clk() is provided by imx6sl clock driver,
-it's reasonable to just access register than going through clk API.
+Am 25.01.2014 21:24, schrieb Mehaffey, John:
+>> -----Original Message-----
+>> From: linux-embedded-owner at vger.kernel.org
+>> [mailto:linux-embedded-owner at vger.kernel.org] On Behalf Of Heiko
+>> Schocher
+>> Sent: Saturday, January 25, 2014 8:03 AM
+>> To: linux-embedded at vger.kernel.org
+>> Cc: Wolfgang Denk; linux-arm-kernel at lists.infradead.org
+>> Subject: GPIO triggers kernel reboot
+>>
+>> Hello all,
+>>
+>> is it possible to reboot current mainline kernel triggered from a GPIO in kernel space?
+>>
+>> If not, how can be done this, so that it has a chance to go into mainline?
+>>
+>> Thanks for any suggestions
+>>
+>> bye,
+>> Heiko
+>
+> Hi Heiko,
+> Call kexec() from the GPIO driver.
+> It will take some effort to get it right :)
 
-Shawn
+Thanks for your answer!
+Hmm.. but has this a chance to go into mainline?
+
+> Or if a simple reboot is all that you want, examine the several reboot APIs in kernel/reboot.c
+
+A current implementation from a customer is for an arm, am335x based board
+to add in board setup code:
+
+         ret = request_irq(OMAP_GPIO_IRQ(RESET_BUTTON_IRQ_GPIO)
+                 , (irq_handler_t)arm_pm_restart, IRQF_TRIGGER_LOW, "reset button", NULL);
+
+and as I want to bring this board to mainline, I think this is not
+an acceptable/good way ... or?
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
