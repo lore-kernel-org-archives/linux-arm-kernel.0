@@ -1,108 +1,156 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 27 Jan 2014 16:36:54 +0530
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <20140126135933.GD10628@intel.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
-Message-ID: <CA+mB=1Jwjn+KSO9yFr=LNVjk3khf0b-LLQamYf+nnSF4bODGPA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jan 2014 11:16:57 +0000
+Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
+In-Reply-To: <20140124233703.GA889@cbox>
+References: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
+ <1388852843-30986-1-git-send-email-christoffer.dall@linaro.org>
+ <20140124233703.GA889@cbox>
+Message-ID: <52E64029.6000201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On Sun, Jan 26, 2014 at 7:29 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Fri, Jan 24, 2014 at 02:24:27PM +0100, Lars-Peter Clausen wrote:
->> On 01/24/2014 12:16 PM, Srikanth Thokala wrote:
->> > Hi Lars,
->> >
->> > On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
->> >> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
->> >> [...]
->> >>> +/**
->> >>> + * xilinx_vdma_device_control - Configure DMA channel of the device
->> >>> + * @dchan: DMA Channel pointer
->> >>> + * @cmd: DMA control command
->> >>> + * @arg: Channel configuration
->> >>> + *
->> >>> + * Return: '0' on success and failure value on error
->> >>> + */
->> >>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
->> >>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
->> >>> +{
->> >>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->> >>> +
->> >>> +     switch (cmd) {
->> >>> +     case DMA_TERMINATE_ALL:
->> >>> +             xilinx_vdma_terminate_all(chan);
->> >>> +             return 0;
->> >>> +     case DMA_SLAVE_CONFIG:
->> >>> +             return xilinx_vdma_slave_config(chan,
->> >>> +                                     (struct xilinx_vdma_config *)arg);
->> >>
->> >> You really shouldn't be overloading the generic API with your own semantics.
->> >> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
->> >
->> > Ok.  The driver needs few additional configuration from the slave
->> > device like Vertical
->> > Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
->> > suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
->> > defined for Freescale drivers?
+On 24/01/14 23:37, Christoffer Dall wrote:
+> On Sat, Jan 04, 2014 at 08:27:23AM -0800, Christoffer Dall wrote:
+>> The stage-2 memory attributes are distinct from the Hyp memory
+>> attributes and the Stage-1 memory attributes.  We were using the stage-1
+>> memory attributes for stage-2 mappings causing device mappings to be
+>> mapped as normal memory.  Add the S2 equivalent defines for memory
+>> attributes and fix the comments explaining the defines while at it.
 >>
->> In my opinion it is not a good idea to have driver implement a generic API,
->> but at the same time let the driver have custom semantics for those API
->> calls. It's a bit like having a gpio driver that expects 23 and 42 as the
->> values passed to gpio_set_value instead of 0 and 1. It completely defeats
->> the purpose of a generic API, namely that you are able to write generic code
->> that makes use of the API without having to know about which implementation
->> API it is talking to. The dmaengine framework provides the
->> dmaengine_prep_interleaved_dma() function to setup two dimensional
->> transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
->
-> The question here i think would be waht this device supports? Is the hardware
-> capable of doing interleaved transfers, then would make sense.
->
-> While we do try to get users use dma_slave_config, but there will always be
-> someone who have specfic params. If we can generalize then we might want to add
-> to the dma_slave_config as well
+>> Add a prot_pte_s2 field to the mem_type struct and fill out the field
+>> for device mappings accordingly.
+>>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>> Changelog[v2]:
+>>  - Guard the use of L_PTE_S2 defines with s2_policy to allow non-LPAE compiles.
+>>
+>>  arch/arm/include/asm/pgtable-3level.h | 20 +++++++++++++-------
+>>  arch/arm/mm/mm.h                      |  1 +
+>>  arch/arm/mm/mmu.c                     | 15 ++++++++++++++-
+>>  3 files changed, 28 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index 4f95039..d5e04d6 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -120,13 +120,19 @@
+>>  /*
+>>   * 2nd stage PTE definitions for LPAE.
+>>   */
+>> -#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+>> -#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+>> -#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+>> -#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>> -#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+>> -
+>> -#define L_PMD_S2_RDWR		 (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>> +#define L_PTE_S2_MT_UNCACHED		(_AT(pteval_t, 0x0) << 2) /* strongly ordered */
+>> +#define L_PTE_S2_MT_WRITETHROUGH	(_AT(pteval_t, 0xa) << 2) /* normal inner write-through */
+>> +#define L_PTE_S2_MT_WRITEBACK		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+>> +#define L_PTE_S2_MT_DEV_SHARED		(_AT(pteval_t, 0x1) << 2) /* device */
+>> +#define L_PTE_S2_MT_DEV_NONSHARED	(_AT(pteval_t, 0x1) << 2) /* device */
+>> +#define L_PTE_S2_MT_DEV_WC		(_AT(pteval_t, 0x5) << 2) /* normal non-cacheable */
+>> +#define L_PTE_S2_MT_DEV_CACHED		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+>> +#define L_PTE_S2_MT_MASK		(_AT(pteval_t, 0xf) << 2)
+>> +
+>> +#define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>> +#define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+>> +
+>> +#define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>>  
+>>  /*
+>>   * Hyp-mode PL2 PTE definitions for LPAE.
+>> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+>> index d5a982d..7ea641b 100644
+>> --- a/arch/arm/mm/mm.h
+>> +++ b/arch/arm/mm/mm.h
+>> @@ -38,6 +38,7 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
+>>  
+>>  struct mem_type {
+>>  	pteval_t prot_pte;
+>> +	pteval_t prot_pte_s2;
+>>  	pmdval_t prot_l1;
+>>  	pmdval_t prot_sect;
+>>  	unsigned int domain;
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 580ef2d..44d571f 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -231,36 +231,48 @@ __setup("noalign", noalign_setup);
+>>  #endif /* ifdef CONFIG_CPU_CP15 / else */
+>>  
+>>  #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+>> +#define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
+>>  #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+>>  
+>>  static struct mem_type mem_types[] = {
+>>  	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
+>>  		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
+>>  				  L_PTE_SHARED,
+>> +		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
+>> +				  s2_policy(L_PTE_S2_MT_DEV_SHARED) |
+>> +				  L_PTE_SHARED,
+>>  		.prot_l1	= PMD_TYPE_TABLE,
+>>  		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
+>>  		.domain		= DOMAIN_IO,
+>>  	},
+>>  	[MT_DEVICE_NONSHARED] = { /* ARMv6 non-shared device */
+>>  		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_NONSHARED,
+>> +		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
+>> +				  s2_policy(L_PTE_S2_MT_DEV_NONSHARED),
+>>  		.prot_l1	= PMD_TYPE_TABLE,
+>>  		.prot_sect	= PROT_SECT_DEVICE,
+>>  		.domain		= DOMAIN_IO,
+>>  	},
+>>  	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
+>>  		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
+>> +		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
+>> +				  s2_policy(L_PTE_S2_MT_DEV_CACHED),
+>>  		.prot_l1	= PMD_TYPE_TABLE,
+>>  		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
+>>  		.domain		= DOMAIN_IO,
+>>  	},
+>>  	[MT_DEVICE_WC] = {	/* ioremap_wc */
+>>  		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
+>> +		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
+>> +				  s2_policy(L_PTE_S2_MT_DEV_WC),
+>>  		.prot_l1	= PMD_TYPE_TABLE,
+>>  		.prot_sect	= PROT_SECT_DEVICE,
+>>  		.domain		= DOMAIN_IO,
+>>  	},
+>>  	[MT_UNCACHED] = {
+>>  		.prot_pte	= PROT_PTE_DEVICE,
+>> +		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
+>> +				  s2_policy(L_PTE_S2_MT_UNCACHED),
+>>  		.prot_l1	= PMD_TYPE_TABLE,
+>>  		.prot_sect	= PMD_TYPE_SECT | PMD_SECT_XN,
+>>  		.domain		= DOMAIN_IO,
+>> @@ -458,7 +470,8 @@ static void __init build_mem_type_table(void)
+>>  	cp = &cache_policies[cachepolicy];
+>>  	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
+>>  	s2_pgprot = cp->pte_s2;
+>> -	hyp_device_pgprot = s2_device_pgprot = mem_types[MT_DEVICE].prot_pte;
+>> +	hyp_device_pgprot = mem_types[MT_DEVICE].prot_pte;
+>> +	s2_device_pgprot = mem_types[MT_DEVICE].prot_pte_s2;
+>>  
+>>  	/*
+>>  	 * ARMv6 and above have extended page tables.
+>> -- 
+>> 1.8.5
+>>
+> 
+> Ping?
 
-There are many configuration parameters which are specific to IP and I
-would like to
-give an overview of some of parameteres here:
+Lost that one in the flurry of endianness bike shedding messages.
 
-1) Park Mode ('cfg->park'): In Park mode, engine will park on frame
-referenced by
-    'cfg->park_frm', so user will have control on each frame in this mode.
+The change makes sense to me. arm64 uses a slightly different approach,
+by using a PTE_S2_MEMATTR macro, but I'm not sure that would work for ARM.
 
-2) Interrupt Coalesce ('cfg->coalesce'):  Used for setting interrupt
-threshold. This value
-   determines the number of frame buffers to process. To use this feature,
-   'cfg->frm_cnt_en' should be set.
+Russell, Catalin: could you please have a look at this?
 
-3) Frame Synchronization Source ('cfg->ext_fsync'):  Can be an
-external/internal frame
-    synchronization source. Used to synchronize one channel (MM2S/S2MM) with
-    another (S2MM/MM2S) channel.
+Thanks,
 
-4) Genlock Synchronization ('cfg->genlock'): Used to avoid mismatch rate between
-    master and slave.  In master mode (cfg->master), frames are not dropped and
-    slave can drop frames to adjust to master frame rate.
-
-And in future, this Engine being a soft IP, we could expect some more additional
-parameters.  Isn't a good idea to have a private member in dma_slave_config for
-sharing additional configuration between slave device and dma engine? Or a new
-dma_ctrl_cmd like FSLDMA_EXTERNAL_START?
-
-Srikanth
-
->
-> --
-> ~Vinod
-> --/EX
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+	M.
+-- 
+Jazz is not dead. It just smells funny...
