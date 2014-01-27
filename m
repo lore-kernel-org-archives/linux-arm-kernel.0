@@ -1,15 +1,74 @@
-From: jouko.haapaluoma@wapice.com (Jouko Haapaluoma)
-Date: Mon, 27 Jan 2014 14:12:28 +0000
-Subject: at_hdmac does not release lock before the callback - deadlock
-In-Reply-To: <C9F8415089354E4FB76F4548B3515AF484286F61@edb1.wapice.localdomain>
-References: <C9F8415089354E4FB76F4548B3515AF484286F61@edb1.wapice.localdomain>
-Message-ID: <C9F8415089354E4FB76F4548B3515AF484286FB7@edb1.wapice.localdomain>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Mon, 27 Jan 2014 19:49:24 +0530
+Subject: [PATCH V7 0/2] Exynos5250 SATA Support
+Message-ID: <1390832366-23454-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After further investigation it seems that the deadlocks  would happen only when CONFIG_SMP is enabled or RT_PREEMPT patch is used. When CONFIG_SMP or RT_PREEMPT is not used, the spinlocks will only disable preemption which does not cause a deadlock. However, with the CONFIG_SMP or the RT_PREEMPT patch spinlocks are actual locks and deadlocks can occur.
+This patch series enable the SATA support on Exynos5250 based boards.
+It incorporates the generic phy framework to deal with sata phy.
 
-This might explain why this problem hasn't been noticed before. At least the Atmel serial driver from linux4sam git causes deadlocks with the RT_PREEMPT because of this issue. 
+This patch depends on the below patches
+	[1]. drivers: phy: add generic PHY framework
+		by Kishon Vijay Abraham I<kishon@ti.com>
+	[2]. ata: ahci_platform: Manage SATA PHY
+		by Roger Quadros <rogerq@ti.com>
+	[3].ARM: dts: Add pmu sysreg node to exynos5250 and
+		exynos5420 dtsi files
+		by Leela Krishna Amudala <l.krishna@samsung.com>
+	[4]. i2c: s3c2410 : Add polling mode support
+		by Vasanth Ananthan <vasanth.a@samsung.com>
 
-BR,
-Jouko Haapaluoma
+Changes from V6:
+	1.Removed phy-exynos5250-sata-i2c.c,as it is not required
+	  after moving to of_find_i2c_device_by_node().
+	2.Changed struct __iomem pmureg tp struct regmap pmureg.
+	3.Changed the wait_for_reg_status() to return 0 or -EFAULT.
+
+Changes from V5:
+	1.Rebased on latest generic PHY framework for-next tree.
+	2.Minor nits such as indentations.
+
+Changes from V4:
+	1.Made Exynos5250 SATA PHY driver by default selects
+	CONFIG_I2C and CONFIG_I2C_S3C2410, as SATA PHY driver
+	depends on I2C.
+	2.Used the new phandle "sata_phy_i2c" in the DT entry. 
+	3.struct i2c_driver sataphy_i2c_driver made static which
+	was earlier global type. 
+
+Changes from V3:
+	1.Moved the devicetree binding documentation
+	from /bindings/ata/ to bindings/phy/ .
+	2.Moved devm_phy_create call before to 
+	the devm_phy_provider_register. 
+
+Changes from V2:
+	1.Removed of_match_table
+	2.Moved to syscon interface for PMU handling.
+
+Changes from V1:
+	1. Dropped the patch 
+	ahci: exynos: add ahci sata support on Exynos platform
+
+	2.Adapt to latest generic PHY framework available in 
+	git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
+Yuvaraj Kumar C D (2):
+  PHY: Exynos: Add Exynos5250 SATA PHY driver
+  ARM: dts: Enable ahci sata and sata phy
+
+ .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 --
+ .../devicetree/bindings/ata/exynos-sata.txt        |   25 +-
+ .../devicetree/bindings/phy/samsung-phy.txt        |   36 +++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |   11 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    8 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   17 +-
+ drivers/phy/Kconfig                                |   13 ++
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-exynos5250-sata.c                  |  244 ++++++++++++++++++++
+ 9 files changed, 336 insertions(+), 33 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+ create mode 100644 drivers/phy/phy-exynos5250-sata.c
+
+-- 
+1.7.9.5
