@@ -1,26 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jan 2014 14:37:45 +0000
-Subject: [PATCH 1/9] ARM: dts: imx6qdl: remove the use of pingrp macros
-In-Reply-To: <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
-References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
- <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140127143745.GM15937@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 27 Jan 2014 15:39:08 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140127153908.4f6f46c2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 26, 2014 at 12:43:03AM +0800, Shawn Guo wrote:
->  arch/arm/boot/dts/imx6dl-hummingboard.dts  |    5 +-
->  arch/arm/boot/dts/imx6qdl-microsom.dtsi    |    5 +-
+Dear Sebastian Hesselbarth,
 
-I've merged your changes here into my local copy of these just to reduce
-the conflicts - unfortunately, it's taken soo long to deal with the above
-that the cubox-i has now been released, which has prompted some
-reorganisation between the above two files.
+On Sat, 25 Jan 2014 19:19:06 +0100, Sebastian Hesselbarth wrote:
+> This patch set fixes clk init order that went upside-down with
+> v3.14. I haven't really investigated what caused this, but I assume
+> it is related with DT node reordering by addresses.
+> 
+> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> registered before core clocks driver. Unfortunately, we cannot
+> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> init order for our drivers is always core clocks before clock gating,
+> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> init function that will register core clocks before clock gating
+> driver.
+> 
+> This patch is based on pre-v3.14-rc1 mainline and should go in as
+> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> I suggest Jason picks it up as a topic branch.
 
-I would much rather you dropped these two entirely, and let me push them
-upstream, rather than having some nasty conflicts which result from this.
+I'm not sure I really like the solution you're proposing here. I'd very
+much prefer to keep one CLK_OF_DECLARE() per clock type, associated to
+one function registering only this clock type.
 
+Instead, shouldn't the clock framework be improved to *not* register a
+clock until its parent have been registered? If the DT you have the
+gatable clocks that depend on the core clocks, then the gatable clocks
+should not be registered if the core clocks have not yet been
+registered.
+
+Do you think this is possible? Am I missing something here?
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
