@@ -1,71 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 27 Jan 2014 12:27:15 -0300
-Subject: [PATCH v5 15/20] ARM: mvebu: Enable Armada 370/XP watchdog in the
- devicetree
+Date: Mon, 27 Jan 2014 12:27:19 -0300
+Subject: [PATCH v5 19/20] ARM: mvebu: Enable watchdog support in defconfig
 In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390836440-12744-16-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390836440-12744-20-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT nodes to enable watchdog support available in Armada 370
-and Armada XP SoCs.
+Now that we have proper support for Armada 370/XP watchdog
+let's enable it in the defconfig.
 
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 4 ++++
- arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
- arch/arm/boot/dts/armada-xp.dtsi     | 6 ++++++
- 3 files changed, 15 insertions(+)
+ arch/arm/configs/mvebu_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 7f10f62..96e0389 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -151,6 +151,10 @@
- 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
- 			};
- 
-+			watchdog at 20300 {
-+				reg = <0x20300 0x34>, <0x20704 0x4>;
-+			};
-+
- 			sata at a0000 {
- 				compatible = "marvell,orion-sata";
- 				reg = <0xa0000 0x5000>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 7a4b82e..aebed9e 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -168,6 +168,11 @@
- 				clocks = <&coreclk 2>;
- 			};
- 
-+			watchdog at 20300 {
-+				compatible = "marvell,armada-370-wdt";
-+				clocks = <&coreclk 2>;
-+			};
-+
- 			coreclk: mvebu-sar at 18230 {
- 				compatible = "marvell,armada-370-core-clock";
- 				reg = <0x18230 0x08>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 281c644..8c6c06c 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -74,6 +74,12 @@
- 				clock-names = "nbclk", "fixed";
- 			};
- 
-+			watchdog at 20300 {
-+				compatible = "marvell,armada-xp-wdt";
-+				clocks = <&coreclk 2>, <&refclk>;
-+				clock-names = "nbclk", "fixed";
-+			};
-+
- 			coreclk: mvebu-sar at 18230 {
- 				compatible = "marvell,armada-xp-core-clock";
- 				reg = <0x18230 0x08>;
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 594d706..84ec924 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -60,6 +60,8 @@ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_ORION_WATCHDOG=y
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
 1.8.1.5
