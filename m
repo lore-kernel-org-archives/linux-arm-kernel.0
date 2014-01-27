@@ -1,42 +1,24 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Jan 2014 09:47:10 -0800
-Subject: [PATCH 0/9] ARM: dts: imx: remove the use of pingrp macros
-In-Reply-To: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
-References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOesGMgV-UPTujzdnb5FWHM7b5X-_f7qCE7awrF4+snB2Tn+9g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jan 2014 17:52:31 +0000
+Subject: [Q] block / zynq: DMA bouncing
+In-Reply-To: <52E69B4E.5010604@monstr.eu>
+References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+ <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
+Message-ID: <20140127175231.GU15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Mon, Jan 27, 2014 at 06:45:50PM +0100, Michal Simek wrote:
+> Why 0x4000? IRC Linux for ARM is using space for any purpose.
+> Russell knows this much better than I.
 
-On Sat, Jan 25, 2014 at 8:43 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Rob,
->
-> In order to solve a pinctrl data efficiency problem, we introduced
-> pingrp macros [1] in this development cycle as the base of board dts
-> support.  The whole imx-dt-3.14 pull request has been held by Olof for
-> a few weeks because he wants to get a general approval from DT folks
-> on this change.  But unfortunately it appears that you are not fond of
-> this change.
->
-> I just spent the day to create a patch series against imx-dt-3.14 to
-> remove these pingrp macros.  May I get your nod on this quick
-> turn-around, so that we do not miss the merge window?
->
-> Hi Olof,
->
-> I guess we do not have to shut the door for imx-dt-3.14 if you and DT
-> folks are happy with this patch series, which is a quite straight
-> forward search&replace change?
+Probably because as the kernel is loaded at 0x8000, it will place the
+swapper page table at 0x4000, thus covering from 0x4000 upwards.
 
-The merge window is halfway over already, the time for us to pick up
-large branches like these are long past.
+Thus, the majority of your un-DMA-able memory will be kernel text or
+swapper page tables.
 
-Please rebase (since this is a partial revert of some of the earlier
-patches in your dt branch, I think?), and resend after -rc1 for 3.15
-inclusion.
-
-
-Thanks,
-
--Olof
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
