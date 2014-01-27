@@ -1,165 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Jan 2014 15:16:59 +0800
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe
- voltage during frequency transitions
-In-Reply-To: <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20140127071656.GB3135@S2101-09.ap.freescale.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 27 Jan 2014 04:18:59 -0300
+Subject: [PATCH v3 04/15] watchdog: orion: Handle IRQ
+In-Reply-To: <52E5FFCB.5000802@roeck-us.net>
+References: <1390310774-20781-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390310774-20781-5-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52DE84A6.6090909@roeck-us.net> <20140127063040.GA17506@localhost>
+ <52E5FFCB.5000802@roeck-us.net>
+Message-ID: <20140127071858.GB17506@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 18, 2014 at 05:40:51PM +0530, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+On Sun, Jan 26, 2014 at 10:42:19PM -0800, Guenter Roeck wrote:
+> On 01/26/2014 10:30 PM, Ezequiel Garcia wrote:
+> > Hi Guenter,
+> >
+> > On Tue, Jan 21, 2014 at 06:31:02AM -0800, Guenter Roeck wrote:
+> > [..]
+> >>> @@ -131,6 +138,19 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> >>>    	if (!wdt_reg)
+> >>>    		return -ENOMEM;
+> >>>
+> >>> +	irq = platform_get_irq(pdev, 0);
+> >>> +	if (irq > 0) {
+> >>
+> >> 0 is a valid interrupt number, and platform_get_irq returns an error code on errors.
+> >> Should be >= 0.
+> >>
+> >
+> > I'm revisiting this one. I believe this is not the hardware interrupt
+> > number, but the one mapped into virq space. So, 0 is not a valid
+> > interrupt number.
+> >
+> > Right?
+> >
 > 
-> On some platforms such as the Samsung Exynos, changing the frequency
-> of the CPU clock requires changing the frequency of the PLL that is
-> supplying the CPU clock. To change the frequency of the PLL, the CPU
-> clock is temporarily reparented to another parent clock.
+> If so, the entire interrupt numbering scheme appears broken. Conceptually it should
+> not make a difference where the interrupt is coming from. If the virq system
+> returns 0 for invalid (non-configured) interrupts, and non-configured 'real'
+> interrupts are reported as -ENXIO, all bets are off. How would a driver know
+> what to expect ? And how would one be expected to review such non-deterministic
+> code ?
 > 
-> The clock frequency of this temporary parent clock could be much higher
-> than the clock frequency of the PLL at the time of reparenting. Due
-> to the temporary increase in the CPU clock speed, the CPU (and any other
-> components in the CPU clock domain such as dividers, mux, etc.) have to
-> to be operated at a higher voltage level, called the safe voltage level.
-> This patch adds optional support to temporarily switch to a safe voltage
-> level during CPU frequency transitions.
+
+I wouldn't know that much. I'm just pointing out that '0' doesn't seem
+to be a valid IRQ number in this context (i.e. virq space).
+
+> FWIW, platform_get_irq() does return -ENXIO for invalid interrupts. If there
+> is an independent notion of "0 is an invalid interrupt", it is well hidden.
 > 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    7 ++++
 
-The devicetree list should be copied for this change.
+Yes, AFAICS platform_get_irq() returns a negative error or a positive
+irq number. I fail to see how it's able return '0' (of course, I can be
+wrong).
 
->  drivers/cpufreq/cpufreq-cpu0.c                     |   37 +++++++++++++++++--
->  2 files changed, 40 insertions(+), 4 deletions(-)
+> Anyway, if you think the driver should treat 0 as invalid interrupt, go ahead.
+> Who am I to know. Just please don't use my Reviewed-by in this case.
 > 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> index f055515..37453ab 100644
-> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> @@ -19,6 +19,12 @@ Optional properties:
->  - cooling-min-level:
->  - cooling-max-level:
->       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
-> +- safe-opp: Certain platforms require that during a opp transition,
-> +  a system should not go below a particular opp level. For such systems,
-> +  this property specifies the minimum opp to be maintained during the
-> +  opp transitions. The safe-opp value is a tuple with first element
-> +  representing the safe frequency and the second element representing the
-> +  safe voltage.
->  
->  Examples:
->  
-> @@ -36,6 +42,7 @@ cpus {
->  			396000  950000
->  			198000  850000
->  		>;
-> +		safe-opp = <396000 950000>
->  		clock-latency = <61036>; /* two CLK32 periods */
->  		#cooling-cells = <2>;
->  		cooling-min-level = <0>;
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> index 0c12ffc..075d3d1 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -27,6 +27,8 @@
->  
->  static unsigned int transition_latency;
->  static unsigned int voltage_tolerance; /* in percentage */
-> +static unsigned long safe_frequency;
-> +static unsigned long safe_voltage;
->  
->  static struct device *cpu_dev;
->  static struct clk *cpu_clk;
-> @@ -64,17 +66,30 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		volt_old = regulator_get_voltage(cpu_reg);
->  	}
->  
-> -	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> +	pr_debug("\n\n%u MHz, %ld mV --> %u MHz, %ld mV\n",
 
-This is an unnecessary change?
+Quite frankly not sure how to handle this best. A quick grep through the
+code doesn't help either: lots of drivers treat 0 as a valid interrupt
+and lots treat it as invalid. So I guess it doesn't really matter...
 
-Otherwise,
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-Shawn
-
->  		 old_freq / 1000, volt_old ? volt_old / 1000 : -1,
->  		 new_freq / 1000, volt ? volt / 1000 : -1);
->  
->  	/* scaling up?  scale voltage before frequency */
-> -	if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
-> +	if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> +				new_freq >= safe_frequency) {
->  		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
->  		if (ret) {
->  			pr_err("failed to scale voltage up: %d\n", ret);
->  			return ret;
->  		}
-> +	} else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
-> +		/*
-> +		 * the scaled up voltage level for the new_freq is lower
-> +		 * than the safe voltage level. so set safe_voltage
-> +		 * as the intermediate voltage level and revert it
-> +		 * back after the frequency has been changed.
-> +		 */
-> +		ret = regulator_set_voltage_tol(cpu_reg, safe_voltage, tol);
-> +		if (ret) {
-> +			pr_err("failed to set safe voltage: %d\n", ret);
-> +			return ret;
-> +		}
->  	}
->  
->  	ret = clk_set_rate(cpu_clk, freq_exact);
-> @@ -86,7 +101,8 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->  	}
->  
->  	/* scaling down?  scale voltage after frequency */
-> -	if (!IS_ERR(cpu_reg) && new_freq < old_freq) {
-> +	if (!IS_ERR(cpu_reg) &&
-> +			(new_freq < old_freq || new_freq < safe_frequency)) {
->  		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
->  		if (ret) {
->  			pr_err("failed to scale voltage down: %d\n", ret);
-> @@ -116,6 +132,8 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
->  
->  static int cpu0_cpufreq_probe(struct platform_device *pdev)
->  {
-> +	const struct property *prop;
-> +	struct dev_pm_opp *opp;
->  	struct device_node *np;
->  	int ret;
->  
-> @@ -165,13 +183,24 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
->  		goto out_put_node;
->  	}
->  
-> +	prop = of_find_property(np, "safe-opp", NULL);
-> +	if (prop) {
-> +		if (prop->value && (prop->length / sizeof(u32)) == 2) {
-> +			const __be32 *val;
-> +			val = prop->value;
-> +			safe_frequency = be32_to_cpup(val++);
-> +			safe_voltage = be32_to_cpup(val);
-> +		} else {
-> +			pr_err("invalid safe-opp level specified\n");
-> +		}
-> +	}
-> +
->  	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
->  
->  	if (of_property_read_u32(np, "clock-latency", &transition_latency))
->  		transition_latency = CPUFREQ_ETERNAL;
->  
->  	if (!IS_ERR(cpu_reg)) {
-> -		struct dev_pm_opp *opp;
->  		unsigned long min_uV, max_uV;
->  		int i;
->  
-> -- 
-> 1.6.6.rc2
-> 
+Can someone shed a light on this?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
