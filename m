@@ -1,52 +1,67 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 27 Jan 2014 12:27:09 -0300
-Subject: [PATCH v5 09/20] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+Date: Mon, 27 Jan 2014 12:27:13 -0300
+Subject: [PATCH v5 13/20] watchdog: orion: Add per-compatible watchdog start
+ implementation
 In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390836440-12744-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390836440-12744-14-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
-bridge interrupt controller. There's no longer a need to do it in the watchdog
-driver, so we can simply remove it.
+To handle differences between SoCs this commit adds per-compatible
+string start() function for the watchdog kick-off. This is preparation
+work and makes no functionality changes to the current driver.
 
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 5 -----
- 1 file changed, 5 deletions(-)
+ drivers/watchdog/orion_wdt.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index fce0ec8..adacfd5 100644
+index 4100d5b..af855c9 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -24,7 +24,6 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/of.h>
--#include <mach/bridge-regs.h>
+@@ -50,6 +50,7 @@ struct orion_watchdog_data {
+ 	int rstout_enable_bit;
+ 	int (*clock_init) (struct platform_device *,
+ 			   struct orion_watchdog *);
++	int (*start) (struct watchdog_device *);
+ };
  
- /* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
- #define ORION_RSTOUT_MASK_OFFSET	0x20108
-@@ -42,7 +41,6 @@
- #define WDT_MAX_CYCLE_COUNT	0xffffffff
+ struct orion_watchdog {
+@@ -86,7 +87,7 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
  
- #define WDT_RESET_OUT_EN	BIT(1)
--#define WDT_INT_REQ		BIT(3)
+-static int orion_wdt_start(struct watchdog_device *wdt_dev)
++static int orion_start(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
  
- static bool nowayout = WATCHDOG_NOWAYOUT;
- static int heartbeat = -1;		/* module parameter (seconds) */
-@@ -64,9 +62,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
- 	/* Set watchdog duration */
- 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
+@@ -105,6 +106,14 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
  
--	/* Clear watchdog timer interrupt */
--	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
--
- 	/* Enable watchdog timer */
- 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
++static int orion_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
++	/* There are some per-SoC quirks to handle */
++	return dev->data->start(wdt_dev);
++}
++
+ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+@@ -183,6 +192,7 @@ static const struct orion_watchdog_data orion_data = {
+ 	.wdt_enable_bit = BIT(4),
+ 	.wdt_counter_offset = 0x24,
+ 	.clock_init = orion_wdt_clock_init,
++	.start = orion_start,
+ };
  
+ static const struct of_device_id orion_wdt_of_match_table[] = {
 -- 
 1.8.1.5
