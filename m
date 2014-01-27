@@ -1,42 +1,130 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Jan 2014 09:25:01 +0100
-Subject: GPIO triggers kernel reboot
-In-Reply-To: <8761p5hmni.fsf@lebrac.rtp-net.org>
-References: <52E3E031.6040709@denx.de>
- <CALLGbRKK_ZcOB6nAiV67njrphXMQXN7Y2s81n5k3PWoSVrsrUw@mail.gmail.com>
- <52E5FB1A.2020205@denx.de> <8761p5hmni.fsf@lebrac.rtp-net.org>
-Message-ID: <CAMuHMdX-sRhwddcvrS8KSO9hTMc94PyAhaBTef7rckwvnL-OiQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 27 Jan 2014 09:35:03 +0100
+Subject: [PATCH 6/9] PPC: remove redundant cpuidle_idle_call()
+In-Reply-To: <1390802904-28399-7-git-send-email-nicolas.pitre@linaro.org>
+References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
+ <1390802904-28399-7-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <52E61A37.1070207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 9:08 AM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
->>> It's certainly possible, and it's also easily done from user-space.
->>>   Something like this is more policy than function.  It's also a potential
->>> security issue.  As such I'd expect it highly unlikely that the kernel
->>> maintainers would allow it to go upstream. Give it a try though.
->>
->> Ok, thats what I also think ...
->>
->>> I'd approach this from user-space.  Add in the gpio-keys driver and use the
->>> input-event-daemon to trigger a reboot.  Super easy.
->>
->> Yes, that was also my suggestion, but is there a way to do this without
->> user space usage in a generic way?
+On 01/27/2014 07:08 AM, Nicolas Pitre wrote:
+> The core idle loop now takes care of it.  However a few things need
+> checking:
 >
-> I think that you can register an input handler for that. iirc, there was
-> a driver doing something similar for apm.
+> - Invocation of cpuidle_idle_call() in pseries_lpar_idle() happened
+>    through arch_cpu_idle() and was therefore always preceded by a call
+>    to ppc64_runlatch_off().  To preserve this property now that
+>    cpuidle_idle_call() is invoked directly from core code, a call to
+>    ppc64_runlatch_off() has been added to idle_loop_prolog() in
+>    platforms/pseries/processor_idle.c.
+>
+> - Similarly, cpuidle_idle_call() was followed by ppc64_runlatch_off()
+>    so a call to the later has been added to idle_loop_epilog().
+>
+> - And since arch_cpu_idle() always made sure to re-enable IRQs if they
+>    were not enabled, this is now
+>    done in idle_loop_epilog() as well.
+>
+> The above was made in order to keep the execution flow close to the
+> original.  I don't know if that was strictly necessary. Someone well
+> aquainted with the platform details might find some room for possible
+> optimizations.
+>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-According to Documentation/sysctl/kernel.txt, the default for the
-"ctrl-alt-del" input is to just reboot.
+Added Preeti U Murthy as recipient.
 
-Gr{oetje,eeting}s,
+> ---
+>   arch/powerpc/platforms/pseries/processor_idle.c |  5 ++++
+>   arch/powerpc/platforms/pseries/setup.c          | 34 ++++++++++---------------
+>   2 files changed, 19 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/powerpc/platforms/pseries/processor_idle.c b/arch/powerpc/platforms/pseries/processor_idle.c
+> index a166e38bd6..72ddfe3d2f 100644
+> --- a/arch/powerpc/platforms/pseries/processor_idle.c
+> +++ b/arch/powerpc/platforms/pseries/processor_idle.c
+> @@ -33,6 +33,7 @@ static struct cpuidle_state *cpuidle_state_table;
+>
+>   static inline void idle_loop_prolog(unsigned long *in_purr)
+>   {
+> +	ppc64_runlatch_off();
+>   	*in_purr = mfspr(SPRN_PURR);
+>   	/*
+>   	 * Indicate to the HV that we are idle. Now would be
+> @@ -49,6 +50,10 @@ static inline void idle_loop_epilog(unsigned long in_purr)
+>   	wait_cycles += mfspr(SPRN_PURR) - in_purr;
+>   	get_lppaca()->wait_state_cycles = cpu_to_be64(wait_cycles);
+>   	get_lppaca()->idle = 0;
+> +
+> +	if (irqs_disabled())
+> +		local_irq_enable();
+> +	ppc64_runlatch_on();
+>   }
+>
+>   static int snooze_loop(struct cpuidle_device *dev,
+> diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
+> index c1f1908587..7604c19d54 100644
+> --- a/arch/powerpc/platforms/pseries/setup.c
+> +++ b/arch/powerpc/platforms/pseries/setup.c
+> @@ -39,7 +39,6 @@
+>   #include <linux/irq.h>
+>   #include <linux/seq_file.h>
+>   #include <linux/root_dev.h>
+> -#include <linux/cpuidle.h>
+>   #include <linux/of.h>
+>   #include <linux/kexec.h>
+>
+> @@ -356,29 +355,24 @@ early_initcall(alloc_dispatch_log_kmem_cache);
+>
+>   static void pseries_lpar_idle(void)
+>   {
+> -	/* This would call on the cpuidle framework, and the back-end pseries
+> -	 * driver to  go to idle states
+> +	/*
+> +	 * Default handler to go into low thread priority and possibly
+> +	 * low power mode by cedeing processor to hypervisor
+>   	 */
+> -	if (cpuidle_idle_call()) {
+> -		/* On error, execute default handler
+> -		 * to go into low thread priority and possibly
+> -		 * low power mode by cedeing processor to hypervisor
+> -		 */
+>
+> -		/* Indicate to hypervisor that we are idle. */
+> -		get_lppaca()->idle = 1;
+> +	/* Indicate to hypervisor that we are idle. */
+> +	get_lppaca()->idle = 1;
+>
+> -		/*
+> -		 * Yield the processor to the hypervisor.  We return if
+> -		 * an external interrupt occurs (which are driven prior
+> -		 * to returning here) or if a prod occurs from another
+> -		 * processor. When returning here, external interrupts
+> -		 * are enabled.
+> -		 */
+> -		cede_processor();
+> +	/*
+> +	 * Yield the processor to the hypervisor.  We return if
+> +	 * an external interrupt occurs (which are driven prior
+> +	 * to returning here) or if a prod occurs from another
+> +	 * processor. When returning here, external interrupts
+> +	 * are enabled.
+> +	 */
+> +	cede_processor();
+>
+> -		get_lppaca()->idle = 0;
+> -	}
+> +	get_lppaca()->idle = 0;
+>   }
+>
+>   /*
+>
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
