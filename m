@@ -1,71 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Jan 2014 11:26:47 +0000
-Subject: [PATCH 17/20] clocksource / arch_timer: Use ACPI GTDT table to
- initialize arch timer
-In-Reply-To: <1389961514-13562-18-git-send-email-hanjun.guo@linaro.org>
-References: <1389961514-13562-1-git-send-email-hanjun.guo@linaro.org>
- <1389961514-13562-18-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140127112647.GC16516@e106331-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 27 Jan 2014 12:28:55 +0100
+Subject: [PATCH v5 07/14] ahci-platform: "Library-ise" ahci_probe
+ functionality
+In-Reply-To: <52E63D08.6080704@ti.com>
+References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+ <1390417489-5354-8-git-send-email-hdegoede@redhat.com>
+ <52E63778.5000509@ti.com> <52E63A1F.6080301@redhat.com>
+ <52E63D08.6080704@ti.com>
+Message-ID: <52E642F7.3000308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 12:25:11PM +0000, Hanjun Guo wrote:
-> ACPI GTDT (Generic Timer Description Table) contains information for
-> arch timer initialization, this patch use this table to probe arm timer.
-> 
-> GTDT table is used for ARM/ARM64 only, please refer to chapter 5.2.24
-> of ACPI 5.0 spec for detailed inforamtion
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c |  100 +++++++++++++++++++++++++++++-----
->  1 file changed, 85 insertions(+), 15 deletions(-)
+Hi,
 
-[...]
+On 01/27/2014 12:03 PM, Roger Quadros wrote:
+> On 01/27/2014 12:51 PM, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 01/27/2014 11:39 AM, Roger Quadros wrote:
+>>> Hi,
+>>>
+>>> On 01/22/2014 09:04 PM, Hans de Goede wrote:
+>>
+>> <snip>
+>>
+>>>> --- a/include/linux/ahci_platform.h
+>>>> +++ b/include/linux/ahci_platform.h
+>>>> @@ -20,7 +20,13 @@
+>>>>    struct device;
+>>>>    struct ata_port_info;
+>>>>    struct ahci_host_priv;
+>>>> +struct platform_device;
+>>>>
+>>>> +/*
+>>>> + * Note ahci_platform_data is deprecated. New drivers which need to override
+>>>> + * any of these, should instead declare there own platform_driver struct, and
+>>>> + * use ahci_platform* functions in their own probe, suspend and resume methods.
+>>>> + */
+>>>>    struct ahci_platform_data {
+>>>>        int (*init)(struct device *dev, struct ahci_host_priv *hpriv);
+>>>>        void (*exit)(struct device *dev);
+>>>> @@ -35,5 +41,13 @@ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
+>>>>    void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
+>>>>    int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
+>>>>    void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
+>>>> +struct ahci_host_priv *ahci_platform_get_resources(
+>>>> +    struct platform_device *pdev);
+>>>
+>>> Why not use 'struct device' as the argument?
+>>
+>> Because of calls to platform_get_resource inside the function.
+>>
+>>>> +void ahci_platform_put_resources(struct ahci_host_priv *hpriv);
+>>>
+>>> Can we have 'struct device' as the argument? Else it becomes
+>>> impossible to get 'struct device' from 'hpriv' if we need to call e.g.
+>>> pm_runtime_*() APIs.
+>>
+>> The plan for is for this function to go away once we have a
+>> devm version of of_clk_get, so if you need to put pm_runtime_calls
+>> somewhere, please don't put them here. This sounds like something which
+>> should go in enable / disable resources instead ?
+>
+> OK. I need to add pm_runtime_enable() + pm_runtime_get_sync() during
+> initialization and pm_runtime_put_sync() + pm_runtime_disable() during cleanup.
 
-> +static void __init register_arch_interrupt(u32 interrupt, u32 flags,
-> +					int *arch_timer_ppi)
-> +{
-> +	int trigger, polarity;
-> +
-> +	if (!interrupt || !arch_timer_ppi)
-> +		return;
-> +
-> +	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
-> +			: ACPI_LEVEL_SENSITIVE;
-> +
-> +	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
-> +			: ACPI_ACTIVE_HIGH;
-> +
-> +	*arch_timer_ppi = acpi_register_gsi(NULL, interrupt, trigger,
-> +						polarity);
-> +}
+Note that enable / disable resources will get called by (the default implementations
+of) suspend / resume too.
 
-Why does this take a pointer to the irq rather than returning the irq
-(as with irq_of_parse_and_map)?
+If that is undesirable then I take back what I said before and
+ahci_platform_put_resources' prototype should be changed to:
 
-This looks awfully generic. Are the timer interrupts encoded specially
-or is this useful for parsing other interrupts?
+void ahci_platform_put_resources(struct device *dev, struct ahci_host_priv *hpriv);
 
-> +
-> +static int __init acpi_parse_gtdt(struct acpi_table_header *table)
-> +{
-> +	struct acpi_table_gtdt *gtdt;
-> +
-> +	gtdt = (struct acpi_table_gtdt *)table;
-> +	if (!gtdt)
-> +		return -EINVAL;
-> +
-> +	arch_timer_rate = arch_timer_get_cntfrq();
-> +
-> +	if (!arch_timer_rate) {
-> +		pr_warn("arch_timer: Could not get frequency from CNTFREG\n");
+And we will need to keep it around even after we get devm_of_clk_get.
 
-s/CNTFREG/CNTFREQ/
+> If ahci_platform_enable/disable_resources is the right place then we must be
+> able to access struct device from there.
 
-This is probably worth a pr_err at least, the system is unlikely to get
-very far if the timers don't work.
+Right, and if not we need to access it from ahci_platform_put_resources(),
+which is in essence the same problem.
 
-Thanks,
-Mark.
+> Is it a good to add 'struct device *dev' into the 'struct ahci_host_priv'?
+> Then you can leave this series as is and i'll add a new patch for that.
+
+Normally we get a device * as argument, and get to hpriv like this:
+
+         struct ata_host *host = dev_get_drvdata(dev);
+         struct ahci_host_priv *hpriv = host->private_data;
+
+So having a dev * in hpriv is normally not useful.
+
+But the ata_host gets allocated after the first ahci_platform_enable_resources
+call, so we cannot use this there. Likewise disable_resources / put_resources
+is used in error handling paths in probe where we don't have an ata_host yet,
+so my vote goes to adding a "struct device *dev" as first argument, like I
+suggested above for ahci_platform_put_resources.
+
+This can be done as an add-on patch (if you do don't forget to also fix
+ahci_sunxi.c and ahci_imx.c), or I can respin my series to have this from
+day one.
+
+If you want me to do a respin, please let me know which fix you'll need
+(the put_resources or the enable/disable one).
+
+Thanks & Regards,
+
+Hans
