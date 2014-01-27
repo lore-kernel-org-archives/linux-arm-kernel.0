@@ -1,104 +1,171 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 27 Jan 2014 12:27:07 -0300
-Subject: [PATCH v5 07/20] watchdog: orion: Handle the interrupt so it's
- properly acked
+Date: Mon, 27 Jan 2014 12:27:11 -0300
+Subject: [PATCH v5 11/20] watchdog: orion: Introduce per-compatible
+ of_device_id data
 In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390836440-12744-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390836440-12744-12-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-enabled plaforms, where the irqchip driver for the brigde interrupt
-controller is available, can handle the watchdog IRQ properly. Therefore,
-request the interrupt and add a dummy handler that merely calls panic().
+This commit adds an orion_watchdog_data structure to hold compatible-data
+information. This allows to remove the driver-wide definition and to
+be able to add support for multiple compatible-strings in the future.
 
-This is done in order to have an initial 'ack' of the interruption,
-which clears the watchdog state.
-
-Furthermore, since some platforms don't have such IRQ, this commit
-makes the interrupt specification optional.
-
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
-Depends on the following irqchip-orion fix (not yet merged):
-https://lkml.org/lkml/2014/1/23/594
+ drivers/watchdog/orion_wdt.c | 58 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 41 insertions(+), 17 deletions(-)
 
- .../devicetree/bindings/watchdog/marvel.txt        |  2 ++
- drivers/watchdog/orion_wdt.c                       | 24 +++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-index 5dc8d30..0731fbd 100644
---- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- Optional properties:
- 
-+- interrupts	: Contains the IRQ for watchdog expiration
- - timeout-sec	: Contains the watchdog timeout in seconds
- 
- Example:
-@@ -14,6 +15,7 @@ Example:
- 	wdt at 20300 {
- 		compatible = "marvell,orion-wdt";
- 		reg = <0x20300 0x28>;
-+		interrupts = <3>;
- 		timeout-sec = <10>;
- 		status = "okay";
- 	};
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 2dbeee9..7c5e94e 100644
+index 1423fd8..540b5c9 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/watchdog.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
+@@ -24,6 +24,7 @@
  #include <linux/clk.h>
  #include <linux/err.h>
-@@ -109,10 +110,16 @@ static struct watchdog_device orion_wdt = {
- 	.min_timeout = 1,
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ /* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
+ #define ORION_RSTOUT_MASK_OFFSET	0x20108
+@@ -35,29 +36,33 @@
+  * Watchdog timer block registers.
+  */
+ #define TIMER_CTRL		0x0000
+-#define WDT_EN			0x0010
+-#define WDT_VAL			0x0024
+ 
+ #define WDT_MAX_CYCLE_COUNT	0xffffffff
+ 
+-#define WDT_RESET_OUT_EN	BIT(1)
+-
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+ 
++struct orion_watchdog_data {
++	int wdt_counter_offset;
++	int wdt_enable_bit;
++	int rstout_enable_bit;
++};
++
+ struct orion_watchdog {
+ 	struct watchdog_device wdt;
+ 	void __iomem *reg;
+ 	void __iomem *rstout;
+ 	unsigned long clk_rate;
+ 	struct clk *clk;
++	const struct orion_watchdog_data *data;
  };
  
-+static irqreturn_t orion_wdt_irq(int irq, void *devid)
-+{
-+	panic("Watchdog Timeout");
-+	return IRQ_HANDLED;
-+}
+ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 	/* Reload watchdog duration */
+-	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
++	writel(dev->clk_rate * wdt_dev->timeout,
++	       dev->reg + dev->data->wdt_counter_offset);
+ 	return 0;
+ }
+ 
+@@ -66,13 +71,16 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 
+ 	/* Set watchdog duration */
+-	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
++	writel(dev->clk_rate * wdt_dev->timeout,
++	       dev->reg + dev->data->wdt_counter_offset);
+ 
+ 	/* Enable watchdog timer */
+-	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, WDT_EN);
++	atomic_io_modify(dev->reg + TIMER_CTRL, dev->data->wdt_enable_bit,
++						dev->data->wdt_enable_bit);
+ 
+ 	/* Enable reset on watchdog */
+-	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
++	atomic_io_modify(dev->rstout, dev->data->rstout_enable_bit,
++				      dev->data->rstout_enable_bit);
+ 
+ 	return 0;
+ }
+@@ -82,10 +90,10 @@ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 
+ 	/* Disable reset on watchdog */
+-	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, 0);
++	atomic_io_modify(dev->rstout, dev->data->rstout_enable_bit, 0);
+ 
+ 	/* Disable watchdog timer */
+-	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, 0);
++	atomic_io_modify(dev->reg + TIMER_CTRL, dev->data->wdt_enable_bit, 0);
+ 
+ 	return 0;
+ }
+@@ -93,7 +101,7 @@ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ static unsigned int orion_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+-	return readl(dev->reg + WDT_VAL) / dev->clk_rate;
++	return readl(dev->reg + dev->data->wdt_counter_offset) / dev->clk_rate;
+ }
+ 
+ static int orion_wdt_set_timeout(struct watchdog_device *wdt_dev,
+@@ -150,9 +158,25 @@ static void __iomem *orion_wdt_ioremap_rstout(struct platform_device *pdev,
+ 	return devm_ioremap(&pdev->dev, rstout, 0x4);
+ }
+ 
++static const struct orion_watchdog_data orion_data = {
++	.rstout_enable_bit = BIT(1),
++	.wdt_enable_bit = BIT(4),
++	.wdt_counter_offset = 0x24,
++};
++
++static const struct of_device_id orion_wdt_of_match_table[] = {
++	{
++		.compatible = "marvell,orion-wdt",
++		.data = &orion_data,
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
 +
  static int orion_wdt_probe(struct platform_device *pdev)
  {
+ 	struct orion_watchdog *dev;
++	const struct of_device_id *match;
+ 	unsigned int wdt_max_duration;	/* (seconds) */
  	struct resource *res;
--	int ret;
-+	int ret, irq;
+ 	int ret, irq;
+@@ -162,9 +186,15 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	if (!dev)
+ 		return -ENOMEM;
  
- 	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
-@@ -145,6 +152,21 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	/* Let's make sure the watchdog is fully stopped */
- 	orion_wdt_stop(&orion_wdt);
- 
-+	/* The IRQ request must be done only after the watchdog is disabled */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		/*
-+		 * Not all supported platforms specify an interrupt for the
-+		 * watchdog, so let's make it optional.
-+		 */
-+		ret = devm_request_irq(&pdev->dev, irq, orion_wdt_irq, 0,
-+				       pdev->name, &orion_wdt);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to request IRQ\n");
-+			goto disable_clk;
-+		}
-+	}
++	match = of_match_device(orion_wdt_of_match_table, &pdev->dev);
++	if (!match)
++		/* Default legacy match */
++		match = &orion_wdt_of_match_table[0];
 +
- 	watchdog_set_nowayout(&orion_wdt, nowayout);
- 	ret = watchdog_register_device(&orion_wdt);
- 	if (ret)
+ 	dev->wdt.info = &orion_wdt_info;
+ 	dev->wdt.ops = &orion_wdt_ops;
+ 	dev->wdt.min_timeout = 1;
++	dev->data = match->data;
+ 
+ 	dev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+@@ -253,12 +283,6 @@ static void orion_wdt_shutdown(struct platform_device *pdev)
+ 	orion_wdt_stop(wdt_dev);
+ }
+ 
+-static const struct of_device_id orion_wdt_of_match_table[] = {
+-	{ .compatible = "marvell,orion-wdt", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
+-
+ static struct platform_driver orion_wdt_driver = {
+ 	.probe		= orion_wdt_probe,
+ 	.remove		= orion_wdt_remove,
 -- 
 1.8.1.5
