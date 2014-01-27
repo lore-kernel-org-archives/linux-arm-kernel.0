@@ -1,24 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jan 2014 18:10:40 +0000
-Subject: [PATCH RFC v3 2/8] ASoC: davinci-evm: Add named clock reference
- to DT bindings
-In-Reply-To: <a16e2a877740942c1742ac0da403013c72ae3727.1390836773.git.jsarha@ti.com>
-References: <cover.1390836773.git.jsarha@ti.com>
- <a16e2a877740942c1742ac0da403013c72ae3727.1390836773.git.jsarha@ti.com>
-Message-ID: <20140127181040.GA11841@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 27 Jan 2014 12:14:49 -0600
+Subject: [PATCH 0/2] Replace /include/ (dtc) with #include
+In-Reply-To: <20140127163111.GA8358@arm.com>
+References: <1389348970-5498-1-git-send-email-pankaj.dubey@samsung.com>
+ <52E63DD8.9070909@samsung.com> <20140127163111.GA8358@arm.com>
+Message-ID: <CAL_JsqLsSFW3JeYYMb2E3Wi68GM_r_BeJmhfom5BnX7EgaenrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 05:37:51PM +0200, Jyri Sarha wrote:
-> The referenced clock is used to get codec clock rate and the clock is
-> disabled and enabled in startup and shutdown snd_soc_ops call
-> backs. The change is also documented in DT bindigs document.
+On Mon, Jan 27, 2014 at 10:31 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, Jan 27, 2014 at 11:07:04AM +0000, Pankaj Dubey wrote:
+>> On 01/10/2014 07:16 PM, Pankaj Dubey wrote:
+>> > Replace /include/ (dtc) with #include (C pre-processor) for all ARM64
+>> > based SoC dts files.
+>> >
+>> > Pankaj Dubey (2):
+>> >    arm64: dts: use #include for all AppliedMicro device tree files
+>> >    arm64: dts: use #include for all ARM fast model device tree file
+>> >
+>> >   arch/arm64/boot/dts/apm-mustang.dts    |    2 +-
+>> >   arch/arm64/boot/dts/rtsm_ve-aemv8a.dts |    2 +-
+>> >   2 files changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> Gentle ping.
+>
+> It would be good to include some rationale behind this change and I'm
+> waiting for the DT guys to ack it.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/e1f5b58d/attachment.sig>
+Change this when you actually need it.
+
+Rob
