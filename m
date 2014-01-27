@@ -1,108 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Jan 2014 15:43:49 +0100
-Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
-In-Reply-To: <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140127144349.GJ3867@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 27 Jan 2014 15:45:32 +0100
+Subject: [PATCH 05/11] pinctrl: mvebu: fix misdesigned resource allocation
+In-Reply-To: <1390674856-4993-6-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390674856-4993-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140127154532.4bc3eeef@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Dear Sebastian Hesselbarth,
 
-Mostly looking good, but I have a few comments below.
-
-On Wed, Jan 22, 2014 at 10:36:24PM +0100, Hans de Goede wrote:
-> From: Roman Byshko <rbyshko@gmail.com>
+On Sat, 25 Jan 2014 19:34:10 +0100, Sebastian Hesselbarth wrote:
+> Allocating the pinctrl resource in common pinctrl-mvebu was a misdesign,
+> as it does not allow SoC specific parts to access the allocated resource.
+> This moves resource allocation from mvebu_pinctrl_probe to SoC specific
+> _probe functions and passes the base address to common pinctrl driver
+> instead.
 > 
-> Add register definitions for the usb-clk register found on sun4i, sun5i and
-> sun7i SoCs.
-> 
-> Signed-off-by: Roman Byshko <rbyshko@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  5 +++++
->  drivers/clk/sunxi/clk-sunxi.c                     | 12 ++++++++++++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 79c7197..8bccb6a 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -37,6 +37,8 @@ Required properties:
->  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->  	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
->  	"allwinner,sun7i-a20-out-clk" - for the external output clocks
-> +	"allwinner,sun4i-usb-gates-clk" - for usb gates + resets on A10 / A20
-> +	"allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Maybe we can just remove the gates from there? Even though they are
-gates, they are also (a bit) more than that.
+I definitely agree with that: I had the same problem several months ago
+when I started doing the pinctrl driver for Orion5x, which has a
+non-linear MPP register set.
 
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> @@ -49,6 +51,9 @@ Required properties for all clocks:
->  Additionally, "allwinner,*-gates-clk" clocks require:
->  - clock-output-names : the corresponding gate names that the clock controls
->  
-> +And "allwinner,*-usb-gates-clk" clocks also require:
-> +- reset-cells : shall be set to 1
-> +
+However, I'd like this to go a little bit further if possible. See
+below.
 
-You should also document what value we should put in the cells, and
-where to refer to to find the right one.
 
->  Clock consumers should specify the desired clocks they use with a
->  "clocks" phandle cell. Consumers that are using a gated clock should
->  provide an additional ID in their clock property. This ID is the
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index f1a147c..18cbc3c 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -813,6 +813,16 @@ static const struct gates_data sun4i_ahb_gates_data __initconst = {
->  	.mask = {0x7F77FFF, 0x14FB3F},
->  };
->  
-> +static const struct gates_data sun4i_usb_gates_data __initconst = {
-> +	.mask = {0x1C0},
-> +	.reset_mask = 0x07,
-> +};
-> +
-> +static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
-> +	.mask = {0x140},
-> +	.reset_mask = 0x03,
-> +};
-> +
+> -	return mvebu_pinctrl_probe(pdev);
+> +	return mvebu_pinctrl_probe(pdev, base);
 
-I guess that means that we will have the OHCI0 gate declared with
-<&...-gates-clk 6>, while it's actually the first gate for this clock?
+I think there is no need to pass "base" to mvebu_pinctrl_probe(). The
+only reason we have this is because the base gets stored in the
+mvebu_pinctrl structure so that the mvebu_common_mpp_get() and
+mvebu_common_mpp_set() functions that are the default behavior
+for mvebu_pinconf_group_get() and mvebu_pinconf_group_set() work
+properly.
 
-Maybe introducing an offset field in the gates_data would be a good
-idea, so that we always start from indexing the gates from 0 in the DT?
+Shouldn't we turn these functions mvebu_common_mpp_get() and
+mvebu_common_mpp_set() into helper functions, accessible from the
+per-SoC pinctrl drivers, so that they can easily implement their
+->mpp_get() and ->mpp_set() callbacks?
 
->  static const struct gates_data sun5i_a10s_ahb_gates_data __initconst = {
->  	.mask = {0x147667e7, 0x185915},
->  };
-> @@ -1159,6 +1169,8 @@ static const struct of_device_id clk_gates_match[] __initconst = {
->  	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
->  	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
->  	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
-> +	{.compatible = "allwinner,sun4i-usb-gates-clk", .data = &sun4i_usb_gates_data,},
-> +	{.compatible = "allwinner,sun5i-a13-usb-gates-clk", .data = &sun5i_a13_usb_gates_data,},
->  	{}
->  };
+This way, the "base" thing is completely owned by the per-SoC driver,
+which would be more logical I believe.
 
-Thanks a lot!
-Maxime
+Thanks!
 
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/3605b147/attachment.sig>
