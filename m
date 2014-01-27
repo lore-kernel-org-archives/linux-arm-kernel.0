@@ -1,51 +1,68 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 27 Jan 2014 23:20:57 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <20140123110914.GA22913@1wt.eu> (Willy Tarreau's message of "Thu,
- 23 Jan 2014 12:09:14 +0100")
-References: <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
- <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
- <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
- <20140122222641.GD29184@titan.lakedaemon.net>
- <87mwin4ozf.fsf@natisbad.org> <20140122235620.GC20359@xanatos>
- <87sisfjeba.fsf@natisbad.org> <20140123110914.GA22913@1wt.eu>
-Message-ID: <87wqhlawxi.fsf@natisbad.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 27 Jan 2014 17:32:19 -0500
+Subject: [PATCH-next] drivers/clk: make max77686 driver bool for now
+In-Reply-To: <20140127215257.4167.26286@quantum>
+References: <1390505535-30229-1-git-send-email-paul.gortmaker@windriver.com>
+ <20140127215257.4167.26286@quantum>
+Message-ID: <52E6DE73.8010205@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
+On 14-01-27 04:52 PM, Mike Turquette wrote:
+> Quoting Paul Gortmaker (2014-01-23 11:32:15)
+>> Commit 3966c947f45911e093114371462687134d5e8d40 ("clk: max77686:
+>> Refactor driver data handling") added a call to __clk_get_hw()
+>> but this function is not exported (as __<name> is typically a
+>> private/internal thing).
+>>
+>> Hence this driver fails to build modular, and has been causing
+>> allmodconfig build breakage in arch outside of just ARM.  Since
+>> the only defconfig that uses it sets it as =y, lets just make
+>> it non-modular for now.
+>>
+>> Mike says that changes are pending to export similar functionality
+>> in the future[1], so at that point in time, it can be returned to
+>> tristate if desired.
+> 
+> Hi Paul,
+> 
+> I've just sent off my 2nd pull request for 3.14 and it includes the
+> export for __clk_get_hw.
 
-Willy Tarreau <w@1wt.eu> writes:
+Sounds good ; I wasn't too partial to how it got fixed, but just
+wanting to see the ARCH != ARM build fallout go away.
 
->> > I don't know if it should have included FL1009, it was just a guess,
->> > based on the fact that the 0x1000 and 0x1400 devices did need MSI
->> > disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
->> > not sure if/when I'll get a response back.
->> >
->> > That still doesn't necessarily rule out MSI issues in the Marvell PCI
->> > host controller code.  Can you attach another PCI device with MSI
->> > support under the host and see if it works?
->> 
->> The various Armada-based devices I have are NAS which do not have PCIe
->> slots to plug additional devices (everything is soldered). I don't know
->> which device Thomas used for its tests. Just in case, I also added Willy
->> in CC: who have various boards and may also have done more test with
->> additional PCIe devices and CONFIG_PCI_MSI enabled on 3.13 kernel.
->
-> I've been running an intel i350 dual-port NIC (igb driver) supporting
-> MSI on the mirabox, and it used to work in 3.10+many of the patches
-> coming from the Free-electrons team. Some recent changes to the PCI
-> code introduced a regression preventing this driver from correctly
-> registering an MSI interrupt, and I did not have enough time to
-> investigate it deep enough to fix it. That said, I know how to hack
-> it to work again, so if it can be of any use, I can run a test on
-> the mirabox (armada370) and on the XPGP board (armadaXP).
+Thanks,
+Paul.
+--
 
-Thanks for the proposal, Willy. I guess Thomas can tell better than me
-what kind of tests would help ruling out a problem in MSI support and
-put the blame on FL chip ;-) Thomas, if you need me to test something on
-some of my platforms, do not hesitate.
-
-Cheers,
-
-a+
+> 
+> Regards,
+> Mike
+> 
+>>
+>> [1] https://lkml.org/lkml/2014/1/20/21
+>>
+>> Reported-by: SeongJae Park <sj38.park@gmail.com>
+>> Cc: SeongJae Park <sj38.park@gmail.com>
+>> Cc: Tomasz Figa <t.figa@samsung.com>
+>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>>
+>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>> index efb508a..009fb9b 100644
+>> --- a/drivers/clk/Kconfig
+>> +++ b/drivers/clk/Kconfig
+>> @@ -40,7 +40,7 @@ config COMMON_CLK_VERSATILE
+>>           - Versatile Express
+>>  
+>>  config COMMON_CLK_MAX77686
+>> -       tristate "Clock driver for Maxim 77686 MFD"
+>> +       bool "Clock driver for Maxim 77686 MFD"
+>>         depends on MFD_MAX77686
+>>         ---help---
+>>           This driver supports Maxim 77686 crystal oscillator clock. 
+>> -- 
+>> 1.8.5.2
+>>
