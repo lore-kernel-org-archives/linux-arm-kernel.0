@@ -1,30 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 27 Jan 2014 16:43:37 +0000
-Subject: [Q] L1_CACHE_BYTES on flush_pfn_alias function.
-In-Reply-To: <003c01cf1a55$623979f0$26ac6dd0$@samsung.com>
-References: <00d501cf136a$24ec49c0$6ec4dd40$@samsung.com>
- <20140124154321.GI19052@arm.com>
- <003c01cf1a55$623979f0$26ac6dd0$@samsung.com>
-Message-ID: <20140127164337.GB8358@arm.com>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Mon, 27 Jan 2014 17:42:49 +0100
+Subject: imx6: usbhc2/3 and HSIC
+In-Reply-To: <1390815772.4847.9.camel@weser.hi.pengutronix.de>
+References: <CAH9NwWckD5Rmr9oW2Gr071V2p0FjRJcttYpB4qQNEWTxDEJ6qw@mail.gmail.com>
+ <1390815772.4847.9.camel@weser.hi.pengutronix.de>
+Message-ID: <CAH9NwWf8rc+PJygNP45x669nyiPqirF_PHOXGEQ_CX7PWaB7pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please do not top-post.
+Hi Lucas
 
-On Sun, Jan 26, 2014 at 05:13:43AM +0000, Jungseung Lee wrote:
-> Not to flush some more bytes. In the scenario, they can *omit* to flush last 32 bytes.
-> 
-> L1_CACHE_BYTES = 64 (ARM v7, CA9)
-> 
-> asm(    "mcrr   p15, 0, %1, %0, c14\n"
->     "   mcr p15, 0, %2, c7, c10, 4"
->         :
->         : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
->         : "cc");
+2014-01-27 Lucas Stach <l.stach@pengutronix.de>:
+> Hi Christian,
+>
+> Am Montag, den 27.01.2014, 10:22 +0100 schrieb Christian Gmeiner:
+>> Hi all...
+>>
+>> does anyone used the usbhc2 or usbhc3 in HSIC mode? I am trying my
+>> luck but I do not
+>> get it to work. Is there anything special I need to take care of?
+>>
+> I remember we had this working on a board back in the 3.10 days. The
+> only thing I remember which is specific to HSIC is in the attached
+> patch. This isn't really clean and should be done in a better way for
+> mainline, but maybe it provides some pointers for you.
+>
 
-Ah, I got it now. I think this should be (to + PAGE_SIZE - 1). My
-reading of the ARM ARM is that the bottom bits of the address are
-ignored by mcrr.
+Thanks for the small patch... I got it almost working - the HSIC
+device seems to have some problems.
+I hope to find some time soon to get this stuff into mainline.
 
--- 
-Catalin
+greets
+--
+Christian Gmeiner, MSc
