@@ -1,48 +1,27 @@
-From: jouko.haapaluoma@wapice.com (Jouko Haapaluoma)
-Date: Mon, 27 Jan 2014 12:58:35 +0000
-Subject: at_hdmac does not release lock before the callback - deadlock
-Message-ID: <C9F8415089354E4FB76F4548B3515AF484286F61@edb1.wapice.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jan 2014 12:58:39 +0000
+Subject: [PATCH RFC v2 1/2] Documentation: arm: add cache DT bindings
+In-Reply-To: <20140121114845.GA2598@e103592.cambridge.arm.com>
+References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1390240079-6495-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140121114845.GA2598@e103592.cambridge.arm.com>
+Message-ID: <20140127125839.GL15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+On Tue, Jan 21, 2014 at 11:49:01AM +0000, Dave Martin wrote:
+> I do have a worry that because the kernel won't normally use this
+> information, by default it will get pasted between .dts files, won't get
+> tested and will be wrong rather often.  It also violates the DT principle
+> that probeable information should not be present in the DT -- ePAPR
+> obviously envisages systems where cache geometry information is not
+> probeable, but that's not the case for architected caches on ARM, except
+> in rare cases where the CLIDR is wrong.
 
-It seems that the at_hdmac driver keeps the atchan->lock even when the device driver callback is called.
-This will cause a deadlock in those cases when the device driver calls certain DMA Engine methods
-from the callback function.
+That statement is wrong.  There are caches on ARM CPUs where there is no
+CLIDR register.  I suggest reading the earlier DDI0100 revisions.
 
-The DMA Engine documentation (https://www.kernel.org/doc/Documentation/dmaengine.txt) states:
-" 
-Although the async_tx API specifies that completion callback
-routines cannot submit any new operations, this is not the
-case for slave/cyclic DMA.
-
-For slave DMA, the subsequent transaction may not be available
-for submission prior to callback function being invoked, so
-slave DMA callbacks are permitted to prepare and submit a new
-transaction.
-
-For cyclic DMA, a callback function may wish to terminate the
-DMA via dmaengine_terminate_all().
-
-Therefore, it is important that DMA engine drivers drop any
-locks before calling the callback function which may cause a
-deadlock.
-"
-
-According to the documentation it seems that the at_hdmac driver violates the DMA Engine API because
-locking is not released before entering the callback function.
-
-One possible deadlock situation:
-
-atc_tasklet()
-spin_lock_irqsave(&atchan->lock)
-atc_handle_cyclic()
-callback()
-dmaengine_terminate_all()
-atc_control()
-spin_lock_irqsave(&atchan->lock) 
-
-
-BR,
-Jouko Haapaluoma
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
