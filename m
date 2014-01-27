@@ -1,222 +1,168 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Jan 2014 10:20:37 +0000
-Subject: [PATCH v10] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
-References: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
- <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20140127102037.GB16516@e106331-lin.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 27 Jan 2014 11:19:16 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <52E54540.8080304@gmail.com>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+ <52DEBDA7.7030200@samsung.com> <52E54540.8080304@gmail.com>
+Message-ID: <CAPDyKFqpOLZiUSDvxVtYrBM8DtrZDLE27LKzyoWaf29Ni2vcFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 12:44:21PM +0000, Jonas Jensen wrote:
-> MOXA ART SoCs allow to determine PLL output and APB frequencies
-> by reading registers holding multiplier and divisor information.
-> 
-> Add a clock driver for this SoC.
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
-> 
-> Notes:
->     Thanks for the reply Sudeep, changes are in v10.
->     
->     Changes since v9:
->     
->     1. rebase drivers/clk/Makefile to next-20140121
->     2. remove unnecessary switch
->     3. use a more elaborate commit message
->     
->     Applies to next-20140121
-> 
->  .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
->  drivers/clk/Makefile                               |  1 +
->  drivers/clk/clk-moxart.c                           | 99 ++++++++++++++++++++++
->  3 files changed, 148 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
->  create mode 100644 drivers/clk/clk-moxart.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-> new file mode 100644
-> index 0000000..242e3fc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-> @@ -0,0 +1,48 @@
-> +Device Tree Clock bindings for arch-moxart
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +MOXA ART SoCs allow to determine PLL output and APB frequencies
-> +by reading registers holding multiplier and divisor information.
-> +
-> +
-> +PLL:
-> +
-> +Required properties:
-> +- compatible : Must be "moxa,moxart-pll-clock"
-> +- #clock-cells : Should be 0
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle to parent clock
+On 26 January 2014 18:26, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 21.01.2014 19:34, Tomasz Figa wrote:
+>>
+>> Hi,
+>>
+>> On 20.01.2014 04:56, Olof Johansson wrote:
+>>>
+>>> This patch enables support for power-on sequencing of SDIO peripherals
+>>> through DT.
+>>>
+>>> In general, it's quite common that wifi modules and other similar
+>>> peripherals have several signals in addition to the SDIO interface that
+>>> needs wiggling before the module will power on. It's common to have a
+>>> reference clock, one or several power rails and one or several lines
+>>> for reset/enable type functions.
+>>>
+>>> The binding as written today introduces a number of reset gpios,
+>>> a regulator and a clock specifier. The code will handle up to 2 gpio
+>>> reset lines, but it's trivial to increase to more than that if needed
+>>> at some point.
+>>>
+>>> Implementation-wise, the MMC core has been changed to handle this during
+>>> host power up, before the host interface is powered on. I have not yet
+>>> implemented the power-down side, I wanted people to have a chance for
+>>> reporting back w.r.t. issues (or comments on the bindings) first.
+>>>
+>>> I have not tested the regulator portion, since the system and module
+>>> I'm working on doesn't need one (Samsung Chromebook with Marvell
+>>> 8797-based wifi). Testing of those portions (and reporting back) would
+>>> be appreciated.
+>>
+>>
+>> While I fully agree that this is an important problem that needs to be
+>> solved, I really don't think this is the right way, because:
+>>
+>> a) power-up sequence is really specific to the MMC device and often it's
+>> not simply a matter of switching on one regulator or one clock, e.g.
+>> specific time constraints need to be met.
+>>
+>> b) you can have WLAN chips in which SDIO is just one of the options to
+>> use as host interface, which may be also HSIC, I2C or UART. Really. See
+>> [1].
+>>
+>> c) this is leaking device specific details to generic host code, which
+>> isn't really elegant.
+>>
+>> Now, to make this a bit more constructive, [2] is a solution that I came
+>> up with (not perfect either), which simply adds a separate platform
+>> device for the low level part of the chip. I believe this is a better
+>> solution because:
+>>
+>> a) you can often see such WLAN/BT combo chip as a set of separate
+>> devices, e.g. SDIO WLAN, UART BT and a simple PMIC or management IC,
+>> which provides power/reset control, out of band signalling and etc. for
+>> the first two, so it isn't that bad to have a separate device node for
+>> the last one,
+>>
+>> b) you have full freedom of defining your DT binding with whatever data
+>> you need, any number of clocks, regulators, GPIOs and even out of band
+>> interrupts (IMHO the most important one).
+>>
+>> c) you can implement power-on, power-off sequences as needed for your
+>> particular device,
+>>
+>> d) you have full separation of device-specific data from MMC core (or
+>> any other subsystem simply used as a way to perform I/O to the chip).
+>>
+>> Now what's missing there is a way to signal the MMC core or any other
+>> transport that a device showed up and the controller should be woken up
+>> out of standby and scan of the bus initialized. This could be done by
+>> explicitly specifying the device as a subnode of the
+>> MMC/UART/USB(HSIC)/I2C or whatever with a link (phandle) to the power
+>> controller of the chip or the other way around - a link to the
+>> MMC/UART/... controller from the power controller node.
+>
+>
+> I've looked a bit around MMC core code and got some basic idea how things
+> look. I will definitely need some guidance, or at least some opinions, from
+> MMC guys, as some MMC core changes are unavoidable.
+>
+> Now, the device-specific code is not really an issue, existing drivers
+> usually already have their ways of powering the chips on and off, based on
+> platform data. Everything needed here is to retrieve needed resources
+> (GPIOs, clocks, regulators) using DT, which should be trivial.
+>
+> The worse part is the interaction between MMC and power controller driver
+> (the platform driver part of WLAN driver, if you look at brcmfmac as an
+> example). I believe that we need following things:
+>
+> a) A way to tell the MMC controller that there is no card detection
+> mechanism available on given slot and it also should not be polling the slot
+> to check card presence. Something like a "manual card detect" that would be
+> triggered by another kernel entity that controls whether the MMC device is
+> present (i.e. WLAN driver). We already have "broken-cd" property, but it
+> only implies the former, wasting time on needless polling.
 
-Nit: clocks are referenced with a clock-specifier (which might be zero
-cells), not just a phandle.
+There is already a host capability that I think we could use to handle
+this. MMC_CAP_NONREMOVABLE, the corresponding DT binding string is
+"non-removable", and it may be set per host device.
 
-How about:
+Using this cap means the mmc_rescan process that runs to detect new
+cards, will only be executed once and during boot. So, we need to make
+sure all resources and powers are provided to the card at this point.
+Otherwise the card will not be detected.
 
-clocks: should contain a phandle + clock-specifier for the parent clock
+In the SDIO case, to save power, the SDIO func driver may use runtime
+PM to tell the mmc core power about whether the card needs to be
+powered. Typically from the WLAN driver's probe() and "interface
+up/down" the runtime PM reference for the SDIO func device, should be
+adjusted with pm_runtime_get|put.
 
-> +
-> +Optional properties:
-> +- clock-output-names : Should contain clock name
-> +
-> +
-> +APB:
-> +
-> +Required properties:
-> +- compatible : Must be "moxa,moxart-apb-clock"
-> +- #clock-cells : Should be 0
-> +- reg : Should contain registers location and length
-> +- clocks : Should contain phandle to parent clock
+>
+> b) A mechanism to bind the power controller to used MMC slot. Something like
+> "mmc-bus = <&mmc2>;" property in device node of the power controller and a
+> function like of_find_mmc_controller_by_node(), which would be an MMC
+> counterpart of I2C's of_find_i2c_adapter_by_node(). To avoid races, it
+> should probably take a reference on MMC host that would have to be dropped
+> explicitly whenever it is not needed anymore.
 
-Likewise.
+I suppose an "MMC slot" can be translated to "MMC host"?
 
-> +
-> +Optional properties:
-> +- clock-output-names : Should contain clock name
-> +
-> +
-> +For example:
-> +
-> +	clk_pll: clk_pll at 98100000 {
-> +		compatible = "moxa,moxart-pll-clock";
-> +		#clock-cells = <0>;
-> +		reg = <0x98100000 0x34>;
-> +	};
-> +
-> +	clk_apb: clk_apb at 98100000 {
-> +		compatible = "moxa,moxart-apb-clock";
-> +		#clock-cells = <0>;
-> +		reg = <0x98100000 0x34>;
-> +		clocks = <&clk_pll>;
-> +	};
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 58b2d72..24361bf 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
->  # SoCs specific
->  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
->  obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
-> +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
->  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
->  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
->  obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
-> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-> new file mode 100644
-> index 0000000..7021748
-> --- /dev/null
-> +++ b/drivers/clk/clk-moxart.c
-> @@ -0,0 +1,99 @@
-> +/*
-> + * MOXA ART SoCs clock driver.
-> + *
-> + * Copyright (C) 2013 Jonas Jensen
-> + *
-> + * Jonas Jensen <jonas.jensen@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clkdev.h>
-> +
-> +void __init moxart_of_pll_clk_init(struct device_node *node)
-> +{
-> +	static void __iomem *base;
-> +	struct clk *clk, *ref_clk;
-> +	unsigned long rate;
-> +	unsigned int mul;
-> +	const char *name = node->name;
-> +
-> +	of_property_read_string(node, "clock-output-names", &name);
-> +
-> +	base = of_iomap(node, 0);
-> +	if (!base) {
-> +		pr_err("%s: of_iomap failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	mul = readl(base + 0x30) >> 3 & 0x3f;
-> +	iounmap(base);
-> +
-> +	ref_clk = of_clk_get(node, 0);
-> +	if (IS_ERR(ref_clk)) {
-> +		pr_err("%s: of_clk_get failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	rate = mul * clk_get_rate(ref_clk);
-> +
-> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+What I am trying to understand is how the mmc core (or if we push it
+to be handled from the mmc host's .set_ios callback) shall be able to
+tell the power controller driver to enable/disable it's resources.
+Somehow we need the struct device available to handle that. Then I
+guess operating on it using runtime PM would be a solution that would
+be quite nice!?
 
-If this clock has a parent, Surely CLK_IS_ROOT is not appropriate by its
-definition:
+>
+> c) A method to notify the MMC subsystem that card presence has changed. We
+> already have something like this in drivers/mmc/core/slot-gpio.c, but used
+> for a simple GPIO-based card detection. If the main part of
+> mmc_gpio_cd_irqt() could be turned into an exported helper, e.g.
+> mmc_force_card_detect(host) then basically we would have everything needed.
 
-#define CLK_IS_ROOT             BIT(4) /* root clk, has no parent */
+I am not sure I understand why this is needed. I think it would be
+more convenient to use MMC_CAP_NONREMOVABLE instead as stated earlier.
+But please elaborate, I might have missed something.
 
-Surely this is a fixed factor clock rather than a fixed rate clock?
+>
+> Unfortunately, I don't have more time left for today to create patches and
+> test them, so for now, I'd like to hear opinion of MMC maintainers about
+> this approach. Do you find this acceptable?
+>
+> By the way, it seems like slot-gpio.c could replace a lot of custom GPIO
+> card detection code used in MMC host drivers, e.g. sdhci-s3c. Is there any
+> reason why it couldn't?
 
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	clk_register_clkdev(clk, NULL, name);
-> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
-> +	       moxart_of_pll_clk_init);
-> +
-> +void __init moxart_of_apb_clk_init(struct device_node *node)
-> +{
-> +	static void __iomem *base;
-> +	struct clk *clk, *pll_clk;
-> +	unsigned long rate;
-> +	unsigned int div, val;
-> +	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
-> +	const char *name = node->name;
-> +
-> +	of_property_read_string(node, "clock-output-names", &name);
-> +
-> +	base = of_iomap(node, 0);
-> +	if (!base) {
-> +		pr_err("%s: of_iomap failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	val = readl(base + 0xc) >> 4 & 0x7;
-> +	iounmap(base);
-> +
-> +	if (val > 4)
-> +		val = 0;
-> +	div = div_idx[val];
-> +
-> +	pll_clk = of_clk_get(node, 0);
-> +	if (IS_ERR(pll_clk)) {
-> +		pr_err("%s: of_clk_get failed\n", node->full_name);
-> +		return;
-> +	}
-> +
-> +	rate = clk_get_rate(pll_clk) / (div * 2);
-> +
-> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+I suppose most host driver's should convert to the slot-gpio API, it's
+is just a matter of someone to send the patches. :-)
 
-Likewise.
+Kind regards
+Ulf Hansson
 
-Thanks,
-Mark.
+>
+> Best regards,
+> Tomasz
