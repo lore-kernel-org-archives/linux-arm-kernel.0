@@ -1,12 +1,12 @@
 From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 27 Jan 2014 01:01:18 +0100
-Subject: [PATCH v2 4/5] ARM: OMAP2+: Add pdata quirk for sys_clkout2 for
- omap3 DBB056
-In-Reply-To: <52E01D01.2010709@ti.com>
+Date: Mon, 27 Jan 2014 01:04:49 +0100
+Subject: [PATCH v2 1/5] ARM: dts: omap3: Add support for INCOstartec a83x
+ module
+In-Reply-To: <52E0207E.3050900@ti.com>
 References: <1390417460-3134-1-git-send-email-chf.fritz@googlemail.com>
- <1390417460-3134-5-git-send-email-chf.fritz@googlemail.com>
- <52E01D01.2010709@ti.com>
-Message-ID: <20140127000118.GA30378@mars>
+ <1390417460-3134-2-git-send-email-chf.fritz@googlemail.com>
+ <52E0207E.3050900@ti.com>
+Message-ID: <20140127000449.GB30378@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,85 +14,175 @@ Hi Nishanth,
 
  thanks for reviewing this patch. Please see my comments below.
 
-On Wed, Jan 22, 2014 at 01:33:21PM -0600, Nishanth Menon wrote:
+On Wed, Jan 22, 2014 at 01:48:14PM -0600, Nishanth Menon wrote:
 > On 01/22/2014 01:04 PM, Christoph Fritz wrote:
-> > Full device tree support for clock control is not yet accomplished. Until
-> > then, configure the 24Mhz of sys_clkout2 to feed an USB-Hub here.
-> > 
-> > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> > ---
-> >  arch/arm/mach-omap2/pdata-quirks.c |   37 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 37 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> > index a58590f..9ef7ca8 100644
-> > --- a/arch/arm/mach-omap2/pdata-quirks.c
-> > +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> > @@ -171,6 +171,43 @@ static void __init am3517_evm_legacy_init(void)
-> >  }
-> >  static void __init omap3_dbb056_legacy_init(void)
-> >  {
-> > +	struct clk *clkout2;
-> > +	struct clk *cm96fck;
-> > +
-> > +	/* Reparent clkout2 to 96M_FCK */
-> > +	pr_info("a83x-quirk: Late Reparent clkout2 to 96M_FCK\n");
-> what'd be a83x?
 
-It's the computer-on-module name. Will get changed to __func__.
-
-> > +	clkout2 = clk_get(NULL, "clkout2_src_ck");
-> > +	if(clkout2 < 0) {
-> > +		pr_err("a83x-quirk: couldn't get clkout2_src_ck\n");
-> > +		return;
-> > +	}
-> > +	cm96fck = clk_get(NULL, "cm_96m_fck");
-> > +	if(cm96fck < 0) {
-> > +		pr_err("a83x-quirk: couldn't get cm_96m_fck\n");
-> > +		return;
-> > +	}
-> > +	if(clk_set_parent(clkout2, cm96fck) < 0) {
-> > +		pr_err("a83x-quirk: couldn't reparent clkout2_src_ck\n");
-> > +		return;
-> > +	}
-> yep - we have bunch of similar code in drivers/clk/ti -> but we'd need
-> a generic property to handle this.
-
-This whole quirk of configuring sys_clkout2 in a platform file will
-go away. Tero is planning to post some RFC patches to configure this
-by DT.
-
-> > +
-> > +	/* Set clkout2 to 24MHz for internal usb hub*/
-> > +	pr_info("a83x-quirk: Set clkout2 to 24MHz for internal usb hub\n");
-> > +	clkout2 = clk_get(NULL, "sys_clkout2");
-> > +	if(clkout2 < 0) {
-> > +		pr_err("a83x-quirk: couldn't get sys_clkout2\n");
-> > +		return;
-> > +	}
-> > +	if(clk_set_rate(clkout2, 24000000) < 0) {
-> same here.
-> > +		printk(KERN_ERR "board-omap3evm: couldn't set sys_clkout2 rate\n");
-> "board-omap3evm:" copy paste?
-> any reason why not pr_err?
+> > +	regulators {
+> > +		compatible = "simple-bus";
+> Shrug, just moving the fixed regulator to root also will do the job,
+> not sure simple-bus much sense here :(
+> 
 
 will get fixed
 
-> > +		return;
-> > +	}
-> > +	if(clk_prepare_enable(clkout2) < 0) {
-> > +		pr_err("a83x-quirk: couldn't enable sys_clkout2\n");
-> > +		return;
-> > +	}
+> > +		reg_vcc3: vcc3 {
+> > +                        compatible = "regulator-fixed";
+> > +                        regulator-name = "VCC3";
+> > +                        regulator-min-microvolt = <3300000>;
+> > +                        regulator-max-microvolt = <3300000>;
+> > +                        regulator-always-on;
+> > +		};
+> > +	};
 > > +
-> > +	/* Initialize display */
-> >  	omap3_dbb056_display_init_of();
-> >  }
-> >  #endif /* CONFIG_ARCH_OMAP3 */
-> > 
-> 
-> looking at the coding style, I assume we'd missed running
-> checkpatch.pl --strict?
+> > +	hsusb1_phy: hsusb1_phy {
+> > +		compatible = "usb-nop-xceiv";
+> > +		vcc-supply = <&reg_vcc3>;
+> > +	};
+> > +};
+> > +
+> > +&omap3_pmx_wkup {
+> > +	pinctrl-names = "default";
+> > +
+> > +	lan9221_pins: pinmux_lan9221_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x5A (PIN_INPUT | MUX_MODE4)   /* gpio_129 */
+> umm.. you might want to follow the convention as you followed later in
+> comments.
+
+My convention was: If pin can be described unique with one name,
+don't use two. But I'll change that to be uniform with all comments.
+
+> > +		>;
+> > +	};
+> > +
+> > +	tsc2048_pins: pinmux_tsc2048_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x16 (PIN_INPUT_PULLUP | MUX_MODE4)   /* gpio_8 */
+> umm.. you might want to follow the convention as you followed later in
+> comments.
+
+will get fixed
+
+> > +		>;
+> > +	};
+> > +
+> > +	mmc1cd_pins: pinmux_mmc1cd_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x56 (PIN_INPUT | MUX_MODE4)   /* gpio_126 */
+> umm.. you might want to follow the convention as you followed later in
+> comments.
+
+will get fixed
+
+> > +		>;
+> > +	};
+> > +};
+> > +
+> > +&omap3_pmx_core {
+> > +	pinctrl-names = "default";
+> > +
+> > +	gpio1_pins: pinmux_gpio1_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x5ca (PIN_OUTPUT_PULLDOWN | MUX_MODE4)   /* gpio_29 */
+> umm.. you might want to follow the convention as you followed later in
+> comments.
+
+will get fixed
+
+> > +		>;
+> > +	};
+> > +
+> > +	uart1_pins: pinmux_uart1_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x14c (PIN_OUTPUT | MUX_MODE0)   /* uart1_tx.uart1_tx */
+> > +			0x14e (PIN_OUTPUT | MUX_MODE0)   /* uart1_rts.uart1_rts */
+> > +			0x150 (PIN_INPUT | MUX_MODE0)    /* uart1_cts.uart1_cts */
+> > +			0x152 (PIN_INPUT | MUX_MODE0)    /* uart1_rx.uart1_rx */
+> > +		>;
+> you may be interested in include/dt-bindings/pinctrl/omap.h
+> OMAP3_CORE1_IOPAD, OMAP3_CORE2_IOPAD as needed here.
+
+will get fixed
+
+> > +	};
+> > +
+> > +	uart2_pins: pinmux_uart2_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x140 (PIN_OUTPUT | MUX_MODE1)   /* mcbsp3_clkx.uart2_tx */
+> > +			0x142 (PIN_INPUT | MUX_MODE1)    /* mcbsp3_fsx.uart2_rx */
+> > +		>;
+> > +	};
+> > +
+> > +	uart3_pins: pinmux_uart3_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x16e (PIN_INPUT | MUX_MODE0)    /* uart3_rx_irrx.uart3_rx_irrx */
+> > +			0x170 (PIN_OUTPUT | MUX_MODE0)   /* uart3_tx_irtx.uart3_tx_irtx */
+> > +		>;
+> > +	};
+> > +
+> > +	i2c1_pins: pinmux_i2c1_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x18a (PIN_INPUT_PULLUP | MUX_MODE0)    /* i2c1_scl */
+> > +			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)    /* i2c1_sda */
+> umm.. you might want to follow the convention as you followed
+> elsewhere in comments.
+
+will get fixed
+
+> > +		>;
+> > +	};
+> > +
+> > +	i2c2_pins: pinmux_i2c2_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x18e (PIN_INPUT | MUX_MODE0)   /* i2c2_scl.i2c2_scl */
+> > +			0x190 (PIN_INPUT | MUX_MODE0)   /* i2c2_sda.i2c2_sda */
+> > +		>;
+> > +	};
+> > +
+> > +	i2c3_pins: pinmux_i2c3_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x192 (PIN_INPUT | MUX_MODE0)   /* i2c3_scl.i2c3_scl */
+> > +			0x194 (PIN_INPUT | MUX_MODE0)   /* i2c3_sda.i2c3_sda */
+> > +		>;
+> > +	};
+> > +
+> > +	hsusb1_pins: pinmux_hsusb1_pins {
+> > +		pinctrl-single,pins = <
+> > +			0x5a8 (PIN_OUTPUT | MUX_MODE3)  /* etk_clk.hsusb1_stp */
+> &omap3_pmx_core2 and OMAP3_CORE2_IOPAD probably here. and probably see
+> similar usage in other board dtsi.
+
+will get fixed
+
+> > +
+> > +#include "twl4030.dtsi"
+> > +#include "twl4030_omap3.dtsi"
+> > +
+> > +&twl {
+> > +	vmmc1: regulator-vmmc1 {
+> > +		regulator-always-on;
+> > +	};
+> > +
+> > +	vdd1: regulator-vdd1 {
+> > +		regulator-always-on;
+> > +	};
+> > +
+> > +	vdd2: regulator-vdd2 {
+> > +		regulator-always-on;
+> > +	};
+> I hope you have covered all required regulators here including the
+> ones you might need for IO.1P8 perhaps?
+
+Yes, I rechecked all and it's fine now. IO.1P8 was low due to a
+hardware error which is now fixed.
+
+> > +
+> > +&mmc1 {
+> > +	reg = <0x4809c000 0x400>;
+> little curious as to why this. is that to override length 0x200 to
+> 0x400? that belongs to soc.dtsi then.
+
+This is a remnant from last year and will get purged.
 
 Let me reroll this patch in a new v3 set.
 
