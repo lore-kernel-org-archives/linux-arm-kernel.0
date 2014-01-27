@@ -1,74 +1,185 @@
-From: ydroneaud@opteya.com (Yann Droneaud)
-Date: Mon, 27 Jan 2014 21:25:31 +0100
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <20140127181836.GH26766@pengutronix.de>
-References: <y> <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
- <20140127181836.GH26766@pengutronix.de>
-Message-ID: <1390854331.23180.22.camel@localhost.localdomain>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 27 Jan 2014 12:25:43 -0800
+Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
+ during frequency transitions
+In-Reply-To: <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
+References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
+ <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20140127202543.4167.83362@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le lundi 27 janvier 2014 ? 19:18 +0100, Uwe Kleine-K?nig a ?crit :
-> On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
-> > The dma_mask for a device structure is a pointer. This pointer
-> > needs to be set up before the dma mask can actually be set. Most
-> > frameworks in the kernel take care of setting this up properly but
-> > platform devices that don't follow a regular bus structure may not
-> > ever have this set. As a result, checks such as dma_capable will
-> > always return false on a raw platform device and dma_set_mask will
-> > always return -EIO. Fix this by adding a dma_mask in the
-> > platform_device archdata and setting it to be the dma_mask. Devices
-> > used in other frameworks can change this as needed.
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Suggested-by: Kumar Gala <galak@codeaurora.org>
-> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> Hello,
+Quoting Thomas Abraham (2014-01-18 04:10:51)
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> there is another non-platform dependant approach available, that might
-> be worth to evaluate:
+> On some platforms such as the Samsung Exynos, changing the frequency
+> of the CPU clock requires changing the frequency of the PLL that is
+> supplying the CPU clock. To change the frequency of the PLL, the CPU
+> clock is temporarily reparented to another parent clock.
 > 
-> 	http://mid.gmane.org/1390817152-30898-1-git-send-email-ydroneaud at opteya.com
+> The clock frequency of this temporary parent clock could be much higher
+> than the clock frequency of the PLL at the time of reparenting. Due
+> to the temporary increase in the CPU clock speed, the CPU (and any other
+> components in the CPU clock domain such as dividers, mux, etc.) have to
+> to be operated at a higher voltage level, called the safe voltage level.
+> This patch adds optional support to temporarily switch to a safe voltage
+> level during CPU frequency transitions.
 > 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 
-ARM, even AAAAARGH64 [1], doesn't need a special treatement regarding
-the infamous dma_mask pointer. So perhaps my solution is better.
+I'm not a fan of this change. This corner case should be abstracted away
+somehow. I had talked to Chander Kayshap previously about handling
+voltage changes in clock notifier callbacks, which then renders any
+voltage change as a trivial part of the clock rate transition. That
+means that this "safe voltage" thing could be handled automagically
+without any additional code in the CPUfreq driver.
 
-This solution (adding dma_mask in pdev_archdata) is already in use in
-powerpc architecture. See arch/powerpc/kernel/setup-common.c
+There are two nice ways to do this with the clock framework. First is
+explicit re-parenting with voltage scaling done in the clock rate-change
+notifiers:
 
-The advantage of this solution is that it makes a dma_mask placeholder
-available to statically allocated platform_device struct, while mine
-only address the problem for platform_device struct allocated with
-platform_device_alloc().
+clk_set_parent(cpu_clk, temp_parent);
+/* implicit voltage scaling to "safe voltage" happens above */
+clk_set_rate(pll, some_rate);
+clk_set_parent(cpu_clk, pll);
+/* implicit voltage scaling to nominal OPP voltage happens above */
 
-A possible drawback of adding dma_mask in pdev_archdata and setting the
-pointer in arch_setup_pdev_archdata() may be that a dma_mask setup prior
-calling platform_device_register() got overwritten.
-For example at91rm9200_usbh_device in
-arch/arm/mach-at91/at91rm9200_devices.c (it's the first occurence
-returned by cscope).
+The above sequence would require a separate exnyos CPUfreq driver, due
+to the added clk_set_parent logic.
 
-So I guess there's not yet a perfect solution (add dma_mask to struct
-platform_device instead of hidding it either in struct pdev_archdata or
-struct platform_object ?).
+The second way to do this is to abstract the clk re-muxing logic out
+into the clk driver, which would allow cpufreq-cpu0 to be used for the
+exynos chips.
 
-BTW, I've started to convert some drivers just to try my first option.
+I'm more a fan of explicitly listing the Exact Steps for the cpu opp
+transition in a separate exynos-specific CPUfreq driver, but that's
+probably an unpopular view.
 
-I'm also considering using dma_set_mask_and_coherent() in
-platform_device_register_full() and drivers using
-platform_device_alloc(). But I'm not sure about it : will it break
-something with the additionals check on the mask, just as the failure
-reported in the message ("dma_set_mask will always return -EIO.") ?
+Regards,
+Mike
 
-[1]
-http://lkml.kernel.org/r/20140124154002.GF31570 at twins.programming.kicks-ass.net
-
-Regards.
-
--- 
-Yann Droneaud
-OPTEYA
+> ---
+>  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    7 ++++
+>  drivers/cpufreq/cpufreq-cpu0.c                     |   37 +++++++++++++++++--
+>  2 files changed, 40 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+> index f055515..37453ab 100644
+> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+> @@ -19,6 +19,12 @@ Optional properties:
+>  - cooling-min-level:
+>  - cooling-max-level:
+>       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
+> +- safe-opp: Certain platforms require that during a opp transition,
+> +  a system should not go below a particular opp level. For such systems,
+> +  this property specifies the minimum opp to be maintained during the
+> +  opp transitions. The safe-opp value is a tuple with first element
+> +  representing the safe frequency and the second element representing the
+> +  safe voltage.
+>  
+>  Examples:
+>  
+> @@ -36,6 +42,7 @@ cpus {
+>                         396000  950000
+>                         198000  850000
+>                 >;
+> +               safe-opp = <396000 950000>
+>                 clock-latency = <61036>; /* two CLK32 periods */
+>                 #cooling-cells = <2>;
+>                 cooling-min-level = <0>;
+> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+> index 0c12ffc..075d3d1 100644
+> --- a/drivers/cpufreq/cpufreq-cpu0.c
+> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+> @@ -27,6 +27,8 @@
+>  
+>  static unsigned int transition_latency;
+>  static unsigned int voltage_tolerance; /* in percentage */
+> +static unsigned long safe_frequency;
+> +static unsigned long safe_voltage;
+>  
+>  static struct device *cpu_dev;
+>  static struct clk *cpu_clk;
+> @@ -64,17 +66,30 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
+>                 volt_old = regulator_get_voltage(cpu_reg);
+>         }
+>  
+> -       pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
+> +       pr_debug("\n\n%u MHz, %ld mV --> %u MHz, %ld mV\n",
+>                  old_freq / 1000, volt_old ? volt_old / 1000 : -1,
+>                  new_freq / 1000, volt ? volt / 1000 : -1);
+>  
+>         /* scaling up?  scale voltage before frequency */
+> -       if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
+> +       if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
+> +                               new_freq >= safe_frequency) {
+>                 ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
+>                 if (ret) {
+>                         pr_err("failed to scale voltage up: %d\n", ret);
+>                         return ret;
+>                 }
+> +       } else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
+> +               /*
+> +                * the scaled up voltage level for the new_freq is lower
+> +                * than the safe voltage level. so set safe_voltage
+> +                * as the intermediate voltage level and revert it
+> +                * back after the frequency has been changed.
+> +                */
+> +               ret = regulator_set_voltage_tol(cpu_reg, safe_voltage, tol);
+> +               if (ret) {
+> +                       pr_err("failed to set safe voltage: %d\n", ret);
+> +                       return ret;
+> +               }
+>         }
+>  
+>         ret = clk_set_rate(cpu_clk, freq_exact);
+> @@ -86,7 +101,8 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
+>         }
+>  
+>         /* scaling down?  scale voltage after frequency */
+> -       if (!IS_ERR(cpu_reg) && new_freq < old_freq) {
+> +       if (!IS_ERR(cpu_reg) &&
+> +                       (new_freq < old_freq || new_freq < safe_frequency)) {
+>                 ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
+>                 if (ret) {
+>                         pr_err("failed to scale voltage down: %d\n", ret);
+> @@ -116,6 +132,8 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
+>  
+>  static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>  {
+> +       const struct property *prop;
+> +       struct dev_pm_opp *opp;
+>         struct device_node *np;
+>         int ret;
+>  
+> @@ -165,13 +183,24 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>                 goto out_put_node;
+>         }
+>  
+> +       prop = of_find_property(np, "safe-opp", NULL);
+> +       if (prop) {
+> +               if (prop->value && (prop->length / sizeof(u32)) == 2) {
+> +                       const __be32 *val;
+> +                       val = prop->value;
+> +                       safe_frequency = be32_to_cpup(val++);
+> +                       safe_voltage = be32_to_cpup(val);
+> +               } else {
+> +                       pr_err("invalid safe-opp level specified\n");
+> +               }
+> +       }
+> +
+>         of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
+>  
+>         if (of_property_read_u32(np, "clock-latency", &transition_latency))
+>                 transition_latency = CPUFREQ_ETERNAL;
+>  
+>         if (!IS_ERR(cpu_reg)) {
+> -               struct dev_pm_opp *opp;
+>                 unsigned long min_uV, max_uV;
+>                 int i;
+>  
+> -- 
+> 1.6.6.rc2
+> 
