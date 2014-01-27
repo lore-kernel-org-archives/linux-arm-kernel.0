@@ -1,62 +1,25 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 27 Jan 2014 11:51:11 +0100
-Subject: [PATCH v5 07/14] ahci-platform: "Library-ise" ahci_probe
- functionality
-In-Reply-To: <52E63778.5000509@ti.com>
-References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
- <1390417489-5354-8-git-send-email-hdegoede@redhat.com>
- <52E63778.5000509@ti.com>
-Message-ID: <52E63A1F.6080301@redhat.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 27 Jan 2014 20:07:04 +0900
+Subject: [PATCH 0/2] Replace /include/ (dtc) with #include
+In-Reply-To: <1389348970-5498-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1389348970-5498-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <52E63DD8.9070909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 01/27/2014 11:39 AM, Roger Quadros wrote:
-> Hi,
+On 01/10/2014 07:16 PM, Pankaj Dubey wrote:
+> Replace /include/ (dtc) with #include (C pre-processor) for all ARM64
+> based SoC dts files.
 >
-> On 01/22/2014 09:04 PM, Hans de Goede wrote:
-
-<snip>
-
->> --- a/include/linux/ahci_platform.h
->> +++ b/include/linux/ahci_platform.h
->> @@ -20,7 +20,13 @@
->>   struct device;
->>   struct ata_port_info;
->>   struct ahci_host_priv;
->> +struct platform_device;
->>
->> +/*
->> + * Note ahci_platform_data is deprecated. New drivers which need to override
->> + * any of these, should instead declare there own platform_driver struct, and
->> + * use ahci_platform* functions in their own probe, suspend and resume methods.
->> + */
->>   struct ahci_platform_data {
->>   	int (*init)(struct device *dev, struct ahci_host_priv *hpriv);
->>   	void (*exit)(struct device *dev);
->> @@ -35,5 +41,13 @@ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
->>   void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
->>   int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
->>   void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
->> +struct ahci_host_priv *ahci_platform_get_resources(
->> +	struct platform_device *pdev);
+> Pankaj Dubey (2):
+>    arm64: dts: use #include for all AppliedMicro device tree files
+>    arm64: dts: use #include for all ARM fast model device tree file
 >
-> Why not use 'struct device' as the argument?
-
-Because of calls to platform_get_resource inside the function.
-
->> +void ahci_platform_put_resources(struct ahci_host_priv *hpriv);
+>   arch/arm64/boot/dts/apm-mustang.dts    |    2 +-
+>   arch/arm64/boot/dts/rtsm_ve-aemv8a.dts |    2 +-
+>   2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> Can we have 'struct device' as the argument? Else it becomes
-> impossible to get 'struct device' from 'hpriv' if we need to call e.g.
-> pm_runtime_*() APIs.
+Gentle ping.
 
-The plan for is for this function to go away once we have a
-devm version of of_clk_get, so if you need to put pm_runtime_calls
-somewhere, please don't put them here. This sounds like something which
-should go in enable / disable resources instead ?
-
-Regards,
-
-Hans
+Best Regards,
+Pankaj Dubey
