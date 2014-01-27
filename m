@@ -1,60 +1,85 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 27 Jan 2014 20:47:23 +0100
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <52E6B613.9050400@ti.com>
-References: <y> <cover.1390836773.git.jsarha@ti.com>
- <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
- <52E68A00.5030207@metafoo.de> <52E6B613.9050400@ti.com>
-Message-ID: <52E6B7CB.7010107@metafoo.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 27 Jan 2014 11:52:54 -0800
+Subject: [PATCH] clk: Export more clk-provider functions
+In-Reply-To: <1390016837-24837-1-git-send-email-sboyd@codeaurora.org>
+References: <1390016837-24837-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140127195254.4167.4380@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 08:40 PM, Jyri Sarha wrote:
-> On 01/27/2014 06:32 PM, Lars-Peter Clausen wrote:
->> On 01/27/2014 05:17 PM, Jyri Sarha wrote:
->>> On 01/27/2014 05:51 PM, Lars-Peter Clausen wrote:
->>>> Hi,
->>>>
->>>> I think you should try to get this in sync with the work Jean-Francois is
->>>> currently doing[1]. Having the HDMI transmitter register a CODEC device is
->>>> definitely the right approach, compared to the rather 'interesting'
->>>> constraints stuff you do in patch 4.
->>>>
->>>
->>> Oh, Jean-Francois's patches are now out. I'll take those into use, but I am
->>> afraid it still does not save me from the constraint stuff.
->>>
->>> The most complex piece of code comes from limited sample-rate availability,
->>> which is coming Beaglebone-Black desing (available i2s master clock), not
->>> from the HDMI encoder itself. It does not help with the stereo only
->>> limitation either, because it comes from the one wire only audio data
->>> connection on BBB.
->>>
->>> Support for S16_LE could maybe be added if the tda998x specific codec would
->>> fiddle with CTS_N predivider-setting (K select) according to the used sample
->>> width. But it appears Cobox plays all the sample formats fine without this
->>> change, so the question is if playing around with CTS_N predivider would
->>> break already working support there (something to be tested).
->>
->> The ASoC core will set the constraints for the audio format/rate to the
->> intersection of what is supported by the CODEC and the CPU DAI. So if the
->> limitation comes from the CPU DAI the constraints should be applied there
->> and not in the machine driver. Similar if the tda998x only supports 32 bit
->> samples it should advertise this and the compound card will only support 32
->> bit samples.
->>
->
-> Yes. I know. But these limitations come from the run time setup of the audio
-> serial bus and those details are not available to the cpu dai at the register
-> time.
->
-> If more of the McASP configuration data would be moved to DT, instead of giving
-> it in set_sysclk, set_fmt, etc. calls it would be possible for the driver code
-> produce more accurate constraints at register time. However that would change
-> McASP driver a lot and would possibly break some of the legacy support.
+Quoting Stephen Boyd (2014-01-17 19:47:17)
+> Allow drivers to be compiled as modules by exporting more clock
+> provider functions.
+> 
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-There is nothing wrong with setting the constraints based on the parameters 
-passed to set_sysclk or set_fmt, etc. In fact this is something that is often 
-done by drivers.
+I've taken this into part 2 of my pull request for 3.14.
 
-- Lars
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clk.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 0b27b543dacf..2e83cf643db0 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -547,16 +547,19 @@ struct clk_hw *__clk_get_hw(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->hw;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_hw);
+>  
+>  u8 __clk_get_num_parents(struct clk *clk)
+>  {
+>         return !clk ? 0 : clk->num_parents;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_num_parents);
+>  
+>  struct clk *__clk_get_parent(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->parent;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_parent);
+>  
+>  struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
+>  {
+> @@ -570,6 +573,7 @@ struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
+>         else
+>                 return clk->parents[index];
+>  }
+> +EXPORT_SYMBOL_GPL(clk_get_parent_by_index);
+>  
+>  unsigned int __clk_get_enable_count(struct clk *clk)
+>  {
+> @@ -601,6 +605,7 @@ unsigned long __clk_get_rate(struct clk *clk)
+>  out:
+>         return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_get_rate);
+>  
+>  unsigned long __clk_get_flags(struct clk *clk)
+>  {
+> @@ -649,6 +654,7 @@ bool __clk_is_enabled(struct clk *clk)
+>  out:
+>         return !!ret;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_is_enabled);
+>  
+>  static struct clk *__clk_lookup_subtree(const char *name, struct clk *clk)
+>  {
+> @@ -740,6 +746,7 @@ out:
+>  
+>         return best;
+>  }
+> +EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
+>  
+>  /***        clk api        ***/
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
