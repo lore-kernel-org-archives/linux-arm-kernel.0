@@ -1,392 +1,127 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Mon, 27 Jan 2014 19:08:25 +0530
-Subject: [PATCH V6 1/2] PHY: Exynos: Add Exynos5250 SATA PHY driver
-In-Reply-To: <52D00C33.4060305@samsung.com>
-References: <1389337208-11325-1-git-send-email-yuvaraj.cd@samsung.com>
- <1389337208-11325-2-git-send-email-yuvaraj.cd@samsung.com>
- <52D00C33.4060305@samsung.com>
-Message-ID: <CAKuRcOJi2Ko4uYS4R1j=ZU=7+7g9L8FXqpFp1T_vq3zPbYyK0Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 27 Jan 2014 08:04:22 -0600
+Subject: [PATCH 0/9] ARM: dts: imx: remove the use of pingrp macros
+In-Reply-To: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
+References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAL_JsqKmHkT0vBtxVTqZrAJQMHqLB5nhH_0RzG_25PMaS+y4sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 10, 2014 at 8:35 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Yuvaraj,
+On Sat, Jan 25, 2014 at 10:43 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Hi Rob,
 >
-> In general this version looks pretty good, but I have some questions inline.
+> In order to solve a pinctrl data efficiency problem, we introduced
+> pingrp macros [1] in this development cycle as the base of board dts
+> support.  The whole imx-dt-3.14 pull request has been held by Olof for
+> a few weeks because he wants to get a general approval from DT folks
+> on this change.  But unfortunately it appears that you are not fond of
+> this change.
 >
-> On 10.01.2014 08:00, Yuvaraj Kumar C D wrote:
-> [snip]
+> I just spent the day to create a patch series against imx-dt-3.14 to
+> remove these pingrp macros.  May I get your nod on this quick
+> turn-around, so that we do not miss the merge window?
+
+I've only skimmed thru some of the patches, but in general it looks fine to me:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
+
+> Hi Olof,
 >
->> diff --git a/drivers/phy/phy-exynos5250-sata-i2c.c
->> b/drivers/phy/phy-exynos5250-sata-i2c.c
->> new file mode 100644
->> index 0000000..206e337
->> --- /dev/null
->> +++ b/drivers/phy/phy-exynos5250-sata-i2c.c
->> @@ -0,0 +1,40 @@
->> +/*
->> + * Copyright (C) 2013 Samsung Electronics Co.Ltd
->> + * Author:
->> + *     Yuvaraj C D <yuvaraj.cd@samsung.com>
->> + *
->> + * This program is free software; you can redistribute  it and/or modify
->> it
->> + * under  the terms of  the GNU General  Public License as published by
->> the
->> + * Free Software Foundation;  either version 2 of the  License, or (at
->> your
->> + * option) any later version.
->> + *
->> + */
->> +
->> +#include <linux/i2c.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +
->> +static int exynos_sata_i2c_probe(struct i2c_client *client,
->> +               const struct i2c_device_id *i2c_id)
->> +{
->> +       return 0;
->> +}
->> +
->> +static const struct i2c_device_id sataphy_i2c_device_match[] = {
->> +       { "exynos-sataphy-i2c", 0 },
->> +};
->> +
->> +static struct i2c_driver sataphy_i2c_driver = {
->> +       .probe          = exynos_sata_i2c_probe,
->> +       .id_table       = sataphy_i2c_device_match,
->> +       .driver   = {
->> +               .name = "exynos-sataphy-i2c",
->> +               .owner = THIS_MODULE,
->> +       },
->> +};
->> +
->> +static int __init exynos5250_phy_i2c_init(void)
->> +{
->> +       return i2c_add_driver(&sataphy_i2c_driver);
->> +}
->> +module_init(exynos5250_phy_i2c_init);
+> I guess we do not have to shut the door for imx-dt-3.14 if you and DT
+> folks are happy with this patch series, which is a quite straight
+> forward search&replace change?
 >
+> Shawn
 >
-> Hmm, is this driver even necessary now?
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
 >
-> Wolfram, would it be possible to use an i2c_client without a driver bound to
-> it?
+> Shawn Guo (9):
+>   ARM: dts: imx6qdl: remove the use of pingrp macros
+>   ARM: dts: imx6sl: remove the use of pingrp macros
+>   ARM: dts: imx53: remove the use of pingrp macros
+>   ARM: dts: imx51: remove the use of pingrp macros
+>   ARM: dts: imx50: remove the use of pingrp macros
+>   ARM: dts: imx35: remove the use of pingrp macros
+>   ARM: dts: imx25: remove the use of pingrp macros
+>   ARM: dts: imx27: remove the use of pingrp macros
+>   ARM: dts: vf610: remove the use of pingrp macros
 >
+>  arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |   17 +-
+>  .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |   56 ++-
+>  arch/arm/boot/dts/imx25-pingrp.h                   |   81 ---
+>  arch/arm/boot/dts/imx25.dtsi                       |    2 +-
+>  arch/arm/boot/dts/imx27-apf27.dts                  |   26 +-
+>  arch/arm/boot/dts/imx27-apf27dev.dts               |   65 ++-
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |   27 +-
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   26 +-
+>  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   23 +-
+>  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    |   38 +-
+>  arch/arm/boot/dts/imx27-pingrp.h                   |  151 ------
+>  arch/arm/boot/dts/imx27.dtsi                       |    2 +-
+>  arch/arm/boot/dts/imx35-pingrp.h                   |  104 ----
+>  arch/arm/boot/dts/imx35.dtsi                       |    1 -
+>  arch/arm/boot/dts/imx50-evk.dts                    |   28 +-
+>  arch/arm/boot/dts/imx50-pingrp.h                   |  146 ------
+>  arch/arm/boot/dts/imx50.dtsi                       |    2 +-
+>  arch/arm/boot/dts/imx51-apf51.dts                  |   26 +-
+>  arch/arm/boot/dts/imx51-apf51dev.dts               |   64 ++-
+>  arch/arm/boot/dts/imx51-babbage.dts                |  142 +++++-
+>  arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |   26 +-
+>  .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |   31 +-
+>  arch/arm/boot/dts/imx51-pingrp.h                   |  249 ---------
+>  arch/arm/boot/dts/imx51.dtsi                       |    2 +-
+>  arch/arm/boot/dts/imx53-ard.dts                    |   18 +-
+>  arch/arm/boot/dts/imx53-evk.dts                    |   51 +-
+>  arch/arm/boot/dts/imx53-m53evk.dts                 |  128 ++++-
+>  arch/arm/boot/dts/imx53-pingrp.h                   |  352 -------------
+>  arch/arm/boot/dts/imx53-qsb.dts                    |   88 +++-
+>  arch/arm/boot/dts/imx53-smd.dts                    |   77 ++-
+>  arch/arm/boot/dts/imx53-tqma53.dtsi                |   89 +++-
+>  arch/arm/boot/dts/imx53-voipac-bsb.dts             |   21 +-
+>  arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi        |   47 +-
+>  arch/arm/boot/dts/imx53.dtsi                       |    2 +-
+>  arch/arm/boot/dts/imx6dl-hummingboard.dts          |    5 +-
+>  arch/arm/boot/dts/imx6dl.dtsi                      |    1 -
+>  arch/arm/boot/dts/imx6q-arm2.dts                   |   81 ++-
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts                 |   44 +-
+>  arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts            |   47 +-
+>  arch/arm/boot/dts/imx6q-gw5400-a.dts               |   75 ++-
+>  arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi         |   53 +-
+>  arch/arm/boot/dts/imx6q-sbc6x.dts                  |   37 +-
+>  arch/arm/boot/dts/imx6q-udoo.dts                   |   33 +-
+>  arch/arm/boot/dts/imx6q.dtsi                       |    1 -
+>  arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              |   77 ++-
+>  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |   88 +++-
+>  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |   93 +++-
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |   93 +++-
+>  arch/arm/boot/dts/imx6qdl-microsom.dtsi            |    5 +-
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          |   56 ++-
+>  arch/arm/boot/dts/imx6qdl-pingrp.h                 |  532 --------------------
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  139 ++++-
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |   56 ++-
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   86 +++-
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |   78 ++-
+>  arch/arm/boot/dts/imx6sl-evk.dts                   |  120 ++++-
+>  arch/arm/boot/dts/imx6sl-pingrp.h                  |  148 ------
+>  arch/arm/boot/dts/imx6sl.dtsi                      |    1 -
+>  arch/arm/boot/dts/vf610-cosmic.dts                 |   17 +-
+>  arch/arm/boot/dts/vf610-pingrp.h                   |  127 -----
+>  arch/arm/boot/dts/vf610-twr.dts                    |   42 +-
+>  arch/arm/boot/dts/vf610.dtsi                       |    2 +-
+>  62 files changed, 2163 insertions(+), 2182 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/imx25-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx27-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx35-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx50-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx51-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx53-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx6qdl-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/imx6sl-pingrp.h
+>  delete mode 100644 arch/arm/boot/dts/vf610-pingrp.h
 >
->> diff --git a/drivers/phy/phy-exynos5250-sata.c
->> b/drivers/phy/phy-exynos5250-sata.c
->> new file mode 100644
->> index 0000000..6e5ff8d
->> --- /dev/null
->> +++ b/drivers/phy/phy-exynos5250-sata.c
->> @@ -0,0 +1,238 @@
->> +/*
->> + * Samsung SATA SerDes(PHY) driver
->> + *
->> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
->> + * Authors: Girish K S <ks.giri@samsung.com>
->> + *         Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/io.h>
->> +#include <linux/i2c.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/mfd/syscon.h>
->> +
->> +#define EXYNOS5_SATA_RESET             0x4
->> +#define RESET_CMN_RST_N                        (1 << 1)
->> +#define LINK_RESET                     0xF0000
->
->
-> nit: Lowercase is preferred in hexadecimal notation.
-> + all other occurrences in this file.
->
->
->> +#define EXYNOS5_SATA_MODE0             0x10
->> +#define EXYNOS5_SATAPHY_PMU_ENABLE     (1 << 0)
->> +#define SATA_SPD_GEN3                  (2 << 0)
->> +#define EXYNOS5_SATA_CTRL0             0x14
->> +#define CTRL0_P0_PHY_CALIBRATED_SEL    (1 << 9)
->> +#define CTRL0_P0_PHY_CALIBRATED                (1 << 8)
->> +#define EXYNOS5_SATA_PHSATA_CTRLM      0xE0
->> +#define PHCTRLM_REF_RATE               (1 << 1)
->> +#define PHCTRLM_HIGH_SPEED             (1 << 0)
->> +#define EXYNOS5_SATA_PHSATA_STATM      0xF0
->> +#define PHSTATM_PLL_LOCKED             (1 << 0)
->> +#define EXYNOS_SATA_PHY_EN             (1 << 0)
->> +#define SATAPHY_CONTROL_OFFSET         0x0724
->> +
->> +struct exynos_sata_phy {
->> +       struct phy *phy;
->> +       struct clk *phyclk;
->> +       void __iomem *regs;
->> +       void __iomem *pmureg;
->> +       struct i2c_client *client;
->> +};
->> +
->> +static bool wait_for_reg_status(void __iomem *base, u32 reg, u32
->> checkbit,
->> +                               u32 status)
->> +{
->> +       unsigned long timeout = jiffies + usecs_to_jiffies(1000);
+> --
+> 1.7.9.5
 >
 >
-> nit: It would be better to define the timeout using a macro to not use magic
-> numbers.
->
->
->> +
->> +       while (time_before(jiffies, timeout)) {
->> +               if ((readl(base + reg) & checkbit) == status)
->> +                       return true;
->> +       }
->> +
->> +       return false;
->> +}
->> +
->> +static int exynos_sata_phy_power_on(struct phy *phy)
->> +{
->> +       struct exynos_sata_phy *sata_phy = phy_get_drvdata(phy);
->> +
->> +       regmap_update_bits(sata_phy->pmureg, SATAPHY_CONTROL_OFFSET,
->> +                       EXYNOS5_SATAPHY_PMU_ENABLE, EXYNOS_SATA_PHY_EN);
->
->
-> regmap_update_bits can return an error. Wouldn't it be better to return it
-> as return value of this function instead of returning 0 all the time? As a
-> side effect, this would make the function smaller by two lines.
->
->
->> +
->> +       return 0;
->> +}
->> +
->> +static int exynos_sata_phy_power_off(struct phy *phy)
->> +{
->> +       struct exynos_sata_phy *sata_phy = phy_get_drvdata(phy);
->> +
->> +       regmap_update_bits(sata_phy->pmureg, SATAPHY_CONTROL_OFFSET,
->> +                       EXYNOS5_SATAPHY_PMU_ENABLE, ~EXYNOS_SATA_PHY_EN);
->
->
-> Same here.
->
->
->> +
->> +       return 0;
->> +}
->> +
->> +static int exynos_sata_phy_init(struct phy *phy)
->> +{
->> +       u32 val = 0;
->> +       int ret = 0;
->> +       u8 buf[] = { 0x3A, 0x0B };
->> +       struct exynos_sata_phy *sata_phy = phy_get_drvdata(phy);
->> +
->> +       regmap_update_bits(sata_phy->pmureg, SATAPHY_CONTROL_OFFSET,
->> +                       EXYNOS5_SATAPHY_PMU_ENABLE, EXYNOS_SATA_PHY_EN);
->
->
-> regmap_update_bits returns an error code.
->
->
->> +
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
->> +       val |= 0xFF;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
->> +       val |= LINK_RESET;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
->> +       val |= RESET_CMN_RST_N;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
->> +       val &= ~PHCTRLM_REF_RATE;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
->> +
->> +       /* High speed enable for Gen3 */
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
->> +       val |= PHCTRLM_HIGH_SPEED;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_PHSATA_CTRLM);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_CTRL0);
->> +       val |= CTRL0_P0_PHY_CALIBRATED_SEL | CTRL0_P0_PHY_CALIBRATED;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_CTRL0);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_MODE0);
->> +       val |= SATA_SPD_GEN3;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_MODE0);
->> +
->> +       ret = i2c_master_send(sata_phy->client, buf, sizeof(buf));
->> +       if (ret < 0)
->> +               return -ENXIO;
->
->
-> Wouldn't it be better to return the same error code as i2c_master_send
-> returned?
->
->
->> +
->> +       /* release cmu reset */
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
->> +       val &= ~RESET_CMN_RST_N;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       val = readl(sata_phy->regs + EXYNOS5_SATA_RESET);
->> +       val |= RESET_CMN_RST_N;
->> +       writel(val, sata_phy->regs + EXYNOS5_SATA_RESET);
->> +
->> +       return (wait_for_reg_status(sata_phy->regs,
->> EXYNOS5_SATA_PHSATA_STATM,
->> +               PHSTATM_PLL_LOCKED, 1)) ? 0 : -EINVAL;
->> +
->
->
-> nit: Stray blank line.
->
-> Also it might be more readable after making wait_for_reg_status() return an
-> integer error code (0 and e.g. -EFAULT) and rewriting the last line to:
->
->         ret = wait_for_reg_status(sata_phy->regs,
->                                         EXYNOS5_SATA_PHSATA_STATM,
->                                         PHSTATM_PLL_LOCKED, 1);
->         if (ret < 0)
->                 dev_err(&sata_phy->client->dev,
->                         "PHY PLL locking failed\n");
->
->         return ret;
->
-> By the way, isn't this initialization really needed whenever the PHY is
-> powered on?
->
->
->> +}
->> +
->> +static struct phy_ops exynos_sata_phy_ops = {
->> +       .init           = exynos_sata_phy_init,
->> +       .power_on       = exynos_sata_phy_power_on,
->> +       .power_off      = exynos_sata_phy_power_off,
->> +       .owner          = THIS_MODULE,
->> +};
->> +
->> +static int exynos_sata_phy_probe(struct platform_device *pdev)
->> +{
->> +       struct exynos_sata_phy *sata_phy;
->> +       struct device *dev = &pdev->dev;
->> +       struct resource *res;
->> +       struct phy_provider *phy_provider;
->> +       struct device_node *node;
->> +       int ret = 0;
->> +
->> +       sata_phy = devm_kzalloc(dev, sizeof(*sata_phy), GFP_KERNEL);
->> +       if (!sata_phy)
->> +               return -ENOMEM;
->> +
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +
->> +       sata_phy->regs = devm_ioremap_resource(dev, res);
->> +       if (IS_ERR(sata_phy->regs))
->> +               return PTR_ERR(sata_phy->regs);
->> +
->> +       sata_phy->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
->> +                                       "samsung,syscon-phandle");
->
->
-> pmureg is defined as (void __iomem *) in struct exynos_sata_phy, but
-> syscon_regmap_lookup_by_phandle() returns (struct regmap *). Moreover it
-> does not return NULL on error, but rather ERR_PTR(). Please correct this.
->
->
->> +       if (!sata_phy->pmureg) {
->> +               dev_err(dev, "syscon regmap lookup failed.\n");
->> +               return PTR_ERR(sata_phy->pmureg);
->> +       }
->> +
->> +       node = of_parse_phandle(dev->of_node,
->> +                       "samsung,exynos-sataphy-i2c-phandle", 0);
->> +       if (!node)
->> +               return -ENODEV;
->
->
-> An error here means that a required DT property was not specified or was
-> specified incorrectly. IMHO -EINVAL would be better here.
->
->
->> +
->> +       sata_phy->client = of_find_i2c_device_by_node(node);
->> +       if (!sata_phy->client)
->> +               return -EPROBE_DEFER;
->> +
->> +       dev_set_drvdata(dev, sata_phy);
->> +
->> +       sata_phy->phyclk = devm_clk_get(dev, "sata_phyctrl");
->> +       if (IS_ERR(sata_phy->phyclk)) {
->> +               dev_err(dev, "failed to get clk for PHY\n");
->> +               return PTR_ERR(sata_phy->phyclk);
->> +       }
->> +
->> +       ret = clk_prepare_enable(sata_phy->phyclk);
->> +       if (ret < 0) {
->> +               dev_err(dev, "failed to enable source clk\n");
->> +               return ret;
->> +       }
->> +
->> +       sata_phy->phy = devm_phy_create(dev, &exynos_sata_phy_ops, NULL);
->> +       if (IS_ERR(sata_phy->phy)) {
->> +               clk_disable_unprepare(sata_phy->phyclk);
->> +               dev_err(dev, "failed to create PHY\n");
->> +               return PTR_ERR(sata_phy->phy);
->> +       }
->> +
->> +       phy_set_drvdata(sata_phy->phy, sata_phy);
->> +
->> +       phy_provider = devm_of_phy_provider_register(dev,
->> +                                       of_phy_simple_xlate);
->> +       if (IS_ERR(phy_provider)) {
->> +               clk_disable_unprepare(sata_phy->phyclk);
->> +               return PTR_ERR(phy_provider);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static const struct of_device_id exynos_sata_phy_of_match[] = {
->> +       { .compatible = "samsung,exynos5250-sata-phy" },
->> +       { },
->> +};
->> +MODULE_DEVICE_TABLE(of, exynos_sata_phy_of_match);
->> +
->> +static struct platform_driver exynos_sata_phy_driver = {
->> +       .probe  = exynos_sata_phy_probe,
->
->
-> If this driver can be compiled as module, don't you also need remove?
-I tried this and found as such there is no resources hold by this
-driver to handle in remove case.
-This driver is used by ahci_platform driver and when load
-phy-exynos5250-sata,driver usage count is 1.
-so if we unload ahci_platform driver first and then
-phy-exynos5250-sata.ko it cleanely unload this module.
->
-> Best regards,
-> Tomasz
