@@ -1,69 +1,51 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 27 Jan 2014 12:41:37 +0800
-Subject: [PATCH] input: pxa27x-keypad: bug fix of getting scan code
-Message-ID: <1390797697-29217-1-git-send-email-chao.xie@marvell.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 27 Jan 2014 14:12:33 +0900
+Subject: [PATCH v2 1/6] audit: Enable arm64 support
+In-Reply-To: <20140123141808.GD27520@arm.com>
+References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140123141808.GD27520@arm.com>
+Message-ID: <52E5EAC1.2070306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+[To audit maintainers]
 
-The rows of pxa27x-keypad used by each boards are not fixed.
-So in the driver, it will get the rows from DT and register
-the keymap as:
-matrix_keypad_build_keymap(keymap_data, NULL,
-                           pdata->matrix_key_rows,
-                           pdata->matrix_key_cols,
-                           keypad->keycodes, input_dev);
+On 01/23/2014 11:18 PM, Catalin Marinas wrote:
+> On Fri, Jan 17, 2014 at 08:13:14AM +0000, AKASHI Takahiro wrote:
+>> --- a/include/uapi/linux/audit.h
+>> +++ b/include/uapi/linux/audit.h
+>> @@ -327,6 +327,8 @@ enum {
+>>   /* distinguish syscall tables */
+>>   #define __AUDIT_ARCH_64BIT 0x80000000
+>>   #define __AUDIT_ARCH_LE	   0x40000000
+>> +#define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+>> +#define AUDIT_ARCH_AARCH64EB	(EM_AARCH64|__AUDIT_ARCH_64BIT)
+>>   #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+>>   #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
+>>   #define AUDIT_ARCH_ARMEB	(EM_ARM)
+>> diff --git a/init/Kconfig b/init/Kconfig
+>> index 79383d3..3aae602 100644
+>> --- a/init/Kconfig
+>> +++ b/init/Kconfig
+>> @@ -284,7 +284,7 @@ config AUDIT
+>>
+>>   config AUDITSYSCALL
+>>   	bool "Enable system-call auditing support"
+>> -	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
+>> +	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ARM64)
+>
+> The usual comment for such changes: could you please clean this up and
+> just use something like "depends on HAVE_ARCH_AUDITSYSCALL"?
 
-But the scan code is gotten as
-MATRIX_SCAN_CODE(row, col, MATRIX_ROW_SHIFT);
-It is not correct. Fix it as
-MATRIX_SCAN_CODE(row, col, keypad->row_shift);
+Do you agree to this change?
 
-row_shift is calculated from pdata->matrix_key_rows.
+If so, I can create a patch, but have some concerns:
+1) I can't verify it on other architectures than (arm &) arm64.
+2) Some architectures (microblaze, mips, openrisc) are not listed here, but
+    their ptrace.c have a call to audit_syscall_entry/exit().
+    (audit_syscall_entry/exit are null if !AUDITSYSCALL, though)
+So I'm afraid that the change might break someone's assumption.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/input/keyboard/pxa27x_keypad.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
-index d8241ba..8da3eb0 100644
---- a/drivers/input/keyboard/pxa27x_keypad.c
-+++ b/drivers/input/keyboard/pxa27x_keypad.c
-@@ -113,6 +113,7 @@ struct pxa27x_keypad {
- 
- 	/* state row bits of each column scan */
- 	uint32_t matrix_key_state[MAX_MATRIX_KEY_COLS];
-+	uint32_t row_shift;
- 	uint32_t direct_key_state;
- 
- 	unsigned int direct_key_mask;
-@@ -139,6 +140,7 @@ static int pxa27x_keypad_matrix_key_parse_dt(struct pxa27x_keypad *keypad,
- 	pdata->matrix_key_rows = rows;
- 	pdata->matrix_key_cols = cols;
- 
-+	keypad->row_shift = get_count_order(pdata->matrix_key_cols);
- 	error = matrix_keypad_build_keymap(NULL, NULL,
- 					   pdata->matrix_key_rows,
- 					   pdata->matrix_key_cols,
-@@ -359,6 +361,7 @@ static int pxa27x_keypad_build_keycode(struct pxa27x_keypad *keypad)
- 	if (error)
- 		return error;
- 
-+	keypad->row_shift = get_count_order(pdata->matrix_key_cols);
- 	/*
- 	 * The keycodes may not only include matrix keys but also the direct
- 	 * or rotary keys.
-@@ -467,7 +470,8 @@ scan:
- 			if ((bits_changed & (1 << row)) == 0)
- 				continue;
- 
--			code = MATRIX_SCAN_CODE(row, col, MATRIX_ROW_SHIFT);
-+			code = MATRIX_SCAN_CODE(row, col, keypad->row_shift);
-+
- 			input_event(input_dev, EV_MSC, MSC_SCAN, code);
- 			input_report_key(input_dev, keypad->keycodes[code],
- 					 new_state[col] & (1 << row));
--- 
-1.8.3.2
+Thanks,
+-Takahiro AKASHI
