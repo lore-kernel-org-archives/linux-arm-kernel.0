@@ -1,42 +1,83 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 27 Jan 2014 23:34:46 +0100 (CET)
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <52E69E1E.3020202@monstr.eu>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
- <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
- <20140127175231.GU15937@n2100.arm.linux.org.uk> <52E69E1E.3020202@monstr.eu>
-Message-ID: <Pine.LNX.4.64.1401272329160.30523@axis700.grange>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Mon, 27 Jan 2014 14:54:25 -0800
+Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <5086198.ZOWZ5xuyna@wuerfel>
+References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
+ <CACoXjc=ZT9fEm_KdY4WFSoS8n5FmO+hn9LjsR4m8YZG2iBbt5A@mail.gmail.com>
+ <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
+ <5086198.ZOWZ5xuyna@wuerfel>
+Message-ID: <CACoXjcnTnhWS-5yOgiHA5yVaBjdH1DVzmSsknEBJLB+CFR0EyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal, Russell,
+On Sat, Jan 25, 2014 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
+>> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+>> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
+>
+>> >>
+>> >>> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port, u32 *lanes)
+>> >>> +{
+>> >>> +     void *csr_base = port->csr_base;
+>> >>> +     u32 val32;
+>> >>> +     u64 start_time, time;
+>> >>> +
+>> >>> +     /*
+>> >>> +      * A component enters the LTSSM Detect state within
+>> >>> +      * 20ms of the end of fundamental core reset.
+>> >>> +      */
+>> >>> +     msleep(XGENE_LTSSM_DETECT_WAIT);
+>> >>> +     port->link_up = 0;
+>> >>> +     start_time = jiffies;
+>> >>> +     do {
+>> >>> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
+>> >>> +             if (val32 & LINK_UP_MASK) {
+>> >>> +                     port->link_up = 1;
+>> >>> +                     port->link_speed = PIPE_PHY_RATE_RD(val32);
+>> >>> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
+>> >>> +                     *lanes = val32 >> 26;
+>> >>> +             }
+>> >>> +             time = jiffies_to_msecs(jiffies - start_time);
+>> >>> +     } while ((!port->link_up) || (time <= XGENE_LTSSM_L0_WAIT));
+>> >>> +}
+>> >>
+>> >> Maybe another msleep() in the loop? It seems weird to first do an
+>> >> unconditional sleep but then busy-wait for the result.
+>> >
+>> > ok.
+>>
+>> This loop can execute for maximum 4 msec. So putting msleep(1) won't
+>> get us much.
+>
+> 4 msec is still quite a long time for a busy loop that can be spent doing
+> useful work in another thread.
+>
 
-On Mon, 27 Jan 2014, Michal Simek wrote:
+Right. If 'msleep(1)' is used, then 'checkpatch' throws a warning
+saying that it can actually sleep for 20ms in some cases. I will check
+if 'usleep_range' is useful here.
 
-> On 01/27/2014 06:52 PM, Russell King - ARM Linux wrote:
-> > On Mon, Jan 27, 2014 at 06:45:50PM +0100, Michal Simek wrote:
-> >> Why 0x4000? IRC Linux for ARM is using space for any purpose.
-> >> Russell knows this much better than I.
-> > 
-> > Probably because as the kernel is loaded at 0x8000, it will place the
-> > swapper page table at 0x4000, thus covering from 0x4000 upwards.
-> 
-> Ah yeah swapper.
-> 
-> > 
-> > Thus, the majority of your un-DMA-able memory will be kernel text or
-> > swapper page tables.
-> 
-> Yes, exactly.
-> 0x0 - 0x4000 - reserving not to be used by DMA
-> 0x4000 - 0x8000 swapper page table
-> 0x8000 - 0x80000 kernel text + up
+>> >>
+>> >> Another general note: Your "compatible" strings are rather unspecific.
+>> >> Do you have a version number for this IP block? I suppose that it's related
+>> >> to one that has been used in other chips before, or will be used in future
+>> >> chips, if it's not actually licensed from some other company.
+>> >
+>> > I will have to check this.
+>> >
+>>
+>> We have decided to stick with current compatible string for now.
+>
+> Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
+> product and you won't be doing any new chips based on the same hardware
+> components?
 
-Good, thanks for the explanations and examples, we'll do the same then!
+The current convention is to key upon the family name - X-Gene. Future
+chips will also be a part of X-Gene family. Right now it is unclear if
+there are any obvious feature additions to be done in Linux PCIe
+driver. Until then same driver is expected to work as is in future
+chips.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+>
+>         Arnd
