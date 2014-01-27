@@ -1,52 +1,30 @@
-From: andy@aeruder.net (Andrew Ruder)
-Date: Mon, 27 Jan 2014 10:39:39 -0600
-Subject: [BUG] reproducable ubifs reboot assert and corruption
-In-Reply-To: <CAFLxGvwmzftdQKSjjjwpFLS8g3EJqMrQ2gU2scBsh2MvG7Wyyw@mail.gmail.com>
-References: <20140122051510.GB17284@gmail.com>
- <CAFLxGvwmzftdQKSjjjwpFLS8g3EJqMrQ2gU2scBsh2MvG7Wyyw@mail.gmail.com>
-Message-ID: <20140127163939.GA27809@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jan 2014 16:43:37 +0000
+Subject: [Q] L1_CACHE_BYTES on flush_pfn_alias function.
+In-Reply-To: <003c01cf1a55$623979f0$26ac6dd0$@samsung.com>
+References: <00d501cf136a$24ec49c0$6ec4dd40$@samsung.com>
+ <20140124154321.GI19052@arm.com>
+ <003c01cf1a55$623979f0$26ac6dd0$@samsung.com>
+Message-ID: <20140127164337.GB8358@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 25, 2014 at 04:02:15PM +0100, Richard Weinberger wrote:
-> So ubifs_bgt0_0 stops and the fun begins.
-> Can you trigger the issue also by unmounting /mnt?
-> I.e umount -l /mnt
-> The background thread should only stop after all io is done...
+Please do not top-post.
 
-Did some experiments last week to see if I could trigger the bug with
-full debug messages enabled.  Biggest problem is that I don't have
-non-volatile memory available, serial logging slows it down too much to
-trigger the bug, and the reboot tends to shut down any attempt to
-offload the log to capture the relevant messages.
+On Sun, Jan 26, 2014 at 05:13:43AM +0000, Jungseung Lee wrote:
+> Not to flush some more bytes. In the scenario, they can *omit* to flush last 32 bytes.
+> 
+> L1_CACHE_BYTES = 64 (ARM v7, CA9)
+> 
+> asm(    "mcrr   p15, 0, %1, %0, c14\n"
+>     "   mcr p15, 0, %2, c7, c10, 4"
+>         :
+>         : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+>         : "cc");
 
-That being said, I was able to trigger the bug with the following:
+Ah, I got it now. I think this should be (to + PAGE_SIZE - 1). My
+reading of the ARM ARM is that the bottom bits of the address are
+ignored by mcrr.
 
-[root at buildroot ~]# (sleep 5 ; while ! mount -o remount,ro /mnt ; do true ; done ; echo remount > /dev/kmsg ; sleep 5 ; echo reboot > /dev/kmsg ; reboot ) &
-[2] 564
-[root at buildroot ~]# fsstress -p 10 -n 10 -X -d /mnt/fsstress -l 0
-
-In my log I can see the "remount" message and 100ms later I can see the
-first ubifs assert.  I've attached the relevant portion of the logs
-below from the first time I see LEB 44 mentioned through the asserts.
-I've put the logs on the web due to concerns of flooding the mailing
-list with 100's of kB in attachments.
-
-https://gist.github.com/aeruder/8651928
-
-ubi_corruption.txt is the kernel log
-afterwards.txt is the console log with the ensuing issue with ubifs
-
-I also have logs of the recovery process in the Linux kernel later on,
-(still takes 2 mounts), an image of the MTD device, and would be happy
-to try anything or enable any additional debug messages.
-
-> Can you also please find out whether fssstress is still running when
-> reboot takes action?
-
-Thanks for taking a look.  I'm reading everything I can find about ubifs
-to see if I can make some headway into understanding what is going on
-but filesytems are definitely not my forte :).
-
-Cheers,
-Andrew Ruder
+-- 
+Catalin
