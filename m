@@ -1,33 +1,38 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 27 Jan 2014 14:01:29 +0800
-Subject: [PATCH] pinctrl: sirf: correct the pin index of ac97_pins group
-Message-ID: <1390802489-2535-1-git-send-email-21cnbao@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 27 Jan 2014 01:08:15 -0500
+Subject: [PATCH 0/9] setting the table for integration of cpuidle with the
+ scheduler
+Message-ID: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+As everyone should know by now, we want to integrate the cpuidle
+governor with the scheduler for a more efficient idling of CPUs.
+In order to help the transition, this small patch series moves the
+existing interaction with cpuidle from architecture code to generic
+core code.  No functional change should have occurred yet.
 
-according to datasheet and ac97_muxmask assignment, ac97_pins should be
-corrected.
+The ARM, PPC, SH and X86 architectures are concerned.  Small cleanups
+to ARM and ARM64 are also included. I don't know yet the best path for
+those patches to get into mainline, but it is probably best if they
+stay together. So ACKs from architecture maintainers would be greatly
+appreciated.
 
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/sirf/pinctrl-prima2.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-prima2.c b/drivers/pinctrl/sirf/pinctrl-prima2.c
-index 37b4265..dde0285 100644
---- a/drivers/pinctrl/sirf/pinctrl-prima2.c
-+++ b/drivers/pinctrl/sirf/pinctrl-prima2.c
-@@ -413,7 +413,7 @@ static const struct sirfsoc_padmux ac97_padmux = {
- 	.funcval = 0,
- };
- 
--static const unsigned ac97_pins[] = { 33, 34, 35, 36 };
-+static const unsigned ac97_pins[] = { 43, 44, 45, 46 };
- 
- static const struct sirfsoc_muxmask spi1_muxmask[] = {
- 	{
--- 
-1.7.5.4
+ arch/arm/kernel/process.c                       | 21 +++---------
+ arch/arm/kernel/setup.c                         |  7 ++++
+ arch/arm64/kernel/process.c                     |  5 ---
+ arch/arm64/kernel/setup.c                       |  7 ++++
+ arch/powerpc/platforms/pseries/processor_idle.c |  5 +++
+ arch/powerpc/platforms/pseries/setup.c          | 34 ++++++++-----------
+ arch/sh/kernel/idle.c                           |  4 +--
+ arch/x86/kernel/process.c                       |  5 +--
+ include/linux/cpu.h                             |  1 -
+ kernel/Makefile                                 |  1 -
+ kernel/cpu/Makefile                             |  1 -
+ kernel/sched/Makefile                           |  2 +-
+ kernel/{cpu => sched}/idle.c                    |  6 ++--
+ 13 files changed, 44 insertions(+), 55 deletions(-)
+
+
+Nicolas
