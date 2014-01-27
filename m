@@ -1,62 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Jan 2014 17:02:25 +0000
-Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
-In-Reply-To: <20140127165730.GC8358@arm.com>
-References: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
- <1388852843-30986-1-git-send-email-christoffer.dall@linaro.org>
- <20140124233703.GA889@cbox> <52E64029.6000201@arm.com>
- <20140127165730.GC8358@arm.com>
-Message-ID: <52E69121.8050500@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jan 2014 17:02:31 +0000
+Subject: [Q] block / zynq: DMA bouncing
+In-Reply-To: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+Message-ID: <20140127170230.GQ15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/14 16:57, Catalin Marinas wrote:
-> On Mon, Jan 27, 2014 at 11:16:57AM +0000, Marc Zyngier wrote:
->> On 24/01/14 23:37, Christoffer Dall wrote:
->>> On Sat, Jan 04, 2014 at 08:27:23AM -0800, Christoffer Dall wrote:
->>>> --- a/arch/arm/include/asm/pgtable-3level.h
->>>> +++ b/arch/arm/include/asm/pgtable-3level.h
->>>> @@ -120,13 +120,19 @@
->>>>  /*
->>>>   * 2nd stage PTE definitions for LPAE.
->>>>   */
->>>> -#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
->>>> -#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
->>>> -#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
->>>> -#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
->>>> -#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
->>>> -
->>>> -#define L_PMD_S2_RDWR		 (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->>>> +#define L_PTE_S2_MT_UNCACHED		(_AT(pteval_t, 0x0) << 2) /* strongly ordered */
->>>> +#define L_PTE_S2_MT_WRITETHROUGH	(_AT(pteval_t, 0xa) << 2) /* normal inner write-through */
->>>> +#define L_PTE_S2_MT_WRITEBACK		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
->>>> +#define L_PTE_S2_MT_DEV_SHARED		(_AT(pteval_t, 0x1) << 2) /* device */
->>>> +#define L_PTE_S2_MT_DEV_NONSHARED	(_AT(pteval_t, 0x1) << 2) /* device */
->>>> +#define L_PTE_S2_MT_DEV_WC		(_AT(pteval_t, 0x5) << 2) /* normal non-cacheable */
->>>> +#define L_PTE_S2_MT_DEV_CACHED		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
->>>> +#define L_PTE_S2_MT_MASK		(_AT(pteval_t, 0xf) << 2)
->>>> +
->>>> +#define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
->>>> +#define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
->>>> +
->>>> +#define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->>>>  
->>>>  /*
->>>>   * Hyp-mode PL2 PTE definitions for LPAE.
->>
->> The change makes sense to me. arm64 uses a slightly different approach,
->> by using a PTE_S2_MEMATTR macro, but I'm not sure that would work for ARM.
->>
->> Russell, Catalin: could you please have a look at this?
-> 
-> Do we actually need more than Normal Cacheable and Device for stage 2?
+On Mon, Jan 27, 2014 at 04:13:56PM +0100, Guennadi Liakhovetski wrote:
+> I'm working on an MMC driver with a DMA capability. All has been working 
+> well, until at some point I've got a bus error, when the mmc driver had 
+> been handed in a buffer at 0x3000 physical RAM address. The reason is, 
+> that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
+> my question: how shall I configure this in software?
 
-Not so far. As long as these two memory types are enforced as a minimum,
-we're quite happy to let the guest use whatever it decides.
+You're going to run into all sorts of problems here.  Normally, the
+DMA-able memory is limited to the first N bytes of memory, not "you must
+avoid the first N bytes of memory".
 
-I suppose Christoffer introduces them all here as a matter of
-completeness, but I don't see them as being useful anytime soon.
+Linux has it hard-coded into the memory subsystems that the DMA zone
+is from the start of memory to N, the normal zone is from N to H, and
+high memory is from H upwards - and allocations for high can fall back
+to normal, which can fall back to DMA but not the other way around.
 
-	M.
+Short of permanently reserving the first 0x80000 bytes of memory, I'm
+not sure that there's much which can be done.  You may wish to talk to
+the MM gurus to see whether there's a modern alternative.
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
