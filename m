@@ -1,74 +1,48 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 27 Jan 2014 16:51:06 +0100
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <cover.1390836773.git.jsarha@ti.com>
-References: <y> <cover.1390836773.git.jsarha@ti.com>
-Message-ID: <52E6806A.2090109@metafoo.de>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 27 Jan 2014 15:52:23 +0000
+Subject: [PATCH] sunxi: dts: add a note that memory size is adjusted by
+ boot loader.
+In-Reply-To: <20140127145714.GL3867@lukather>
+References: <1390572852-15027-1-git-send-email-ijc@hellion.org.uk>
+ <52E2874F.10703@redhat.com>
+ <1390578114.13513.13.camel@kazak.uk.xensource.com>
+ <52E399F4.1040300@redhat.com> <20140127145714.GL3867@lukather>
+Message-ID: <1390837943.12230.45.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I think you should try to get this in sync with the work Jean-Francois is
-currently doing[1]. Having the HDMI transmitter register a CODEC device is
-definitely the right approach, compared to the rather 'interesting'
-constraints stuff you do in patch 4.
-
-- Lars
-
-[1] http://lkml.org/lkml/2014/1/27/85
-
-
-On 01/27/2014 04:37 PM, Jyri Sarha wrote:
-> Changes since RFC v2 version of the patches:
-> - Dropped out already applied:
->   ASoC: hdmi-codec: Add devicetree binding with documentation
-> - Addresses Mark's comments here:
->   http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070605.html
->   - ASoC: davinci-evm: Add named clock reference to DT bindings
->     - Get rid of unnecessary castings
->     - Add mclk NULL checks
->     - Use devm_clk_get()
->     - Change clock name from "ti,codec-clock" to "mclk"
-> - Address Mark's comments here:
->   http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070606.html  - ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S bus
->     - Get rid of unnecessary castings
->     - Update commit message
->   - Add: ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
->     - Use snd_soc_params_to_bclk()
+On Mon, 2014-01-27 at 15:57 +0100, Maxime Ripard wrote:
+> Hi Ian, Hans,
 > 
-> Changes since the first RFC version of the patches:
-> - Drop out already applied: 
->   ASoC: hdmi-codec: Add SNDRV_PCM_FMTBIT_32_LE playback format
-> - Change sound node's compatible property
->   form: "ti,am33xx-beaglebone-black" to "ti,am33xx-beaglebone-black-audio"
-> - Some minor style issue fixes from TI internal review
+> On Sat, Jan 25, 2014 at 12:03:16PM +0100, Hans de Goede wrote:
+> > Hmm, I've no idea what the default / preferred way of handling this is,
+> > I assume Maxime knows, so lets wait for his input on this.
 > 
-> Jyri Sarha (8):
->   clk: add gpio controlled clock
->   ASoC: davinci-evm: Add named clock reference to DT bindings
->   ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
->   ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S
->     bus
->   ASoC: davinci: HDMI audio build for AM33XX and TDA998x
->   drm/tilcdc: Add I2C HDMI audio config for tda998x
->   ARM: OMAP2+: omap2plus_defconfig: Enable tilcdc and TDA998X HDMI
->     support
->   ARM: OMAP2+: omap2plus_defconfig: Enable BeagleBone Black HDMI audio
->     support
+> I got the habit of setting the memory node to the max size the RAM
+> controller can handle from previous work on imx,
+
+I suppose this has the advantage of being static for a given SoC, so
+there is no question of what the smallest possible value is, even if it
+has the disadvantage of not working as a default on many platforms
+(perhaps I'm overestimating the utility of that?).
+
+>  but I don't really
+> have a preferrence here.
 > 
->  .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
->  .../bindings/sound/davinci-evm-audio.txt           |   13 +-
->  arch/arm/configs/omap2plus_defconfig               |    5 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-gpio.c                             |  210 +++++++++++++++++++
->  drivers/gpu/drm/tilcdc/tilcdc_slave.c              |   24 ++-
->  include/linux/clk-provider.h                       |   25 +++
->  sound/soc/davinci/Kconfig                          |   12 ++
->  sound/soc/davinci/Makefile                         |    1 +
->  sound/soc/davinci/davinci-evm.c                    |  211 +++++++++++++++++++-
->  sound/soc/davinci/davinci-mcasp.c                  |   20 ++
->  11 files changed, 534 insertions(+), 9 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
->  create mode 100644 drivers/clk/clk-gpio.c
-> 
+> If that confuses people, we can just remove it from the DTSI
+> altogether. It will be patched by u-boot anyway, and we won't have to
+> create DTS variants this way.
+
+I've occasionally seen issues with u-boot not expanding the fdt itself,
+so the placeholder serves the purpose of letting it update without
+expanding. That was in my more complex Xen boot script which use "fdt
+set" a lot -- probably doesn't apply to properly integrated
+functionality like updating the memory node? (Or if it does that's a
+u-boot bug).
+
+> Just don't do it for the A31 for the moment, since we don't have
+> DT-enabled u-boot for now.
+
+Ack!
+
+Ian.
