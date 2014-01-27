@@ -1,45 +1,78 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 27 Jan 2014 12:30:42 -0800
-Subject: [PATCH] ARM: OMAP4+: move errata initialization to
- omap4_pm_init_early
-In-Reply-To: <20140123184951.GJ7993@atomide.com> (Tony Lindgren's message of
- "Thu, 23 Jan 2014 10:49:52 -0800")
-References: <CAGa+x863_MQ22h+U=KtK++3aG2F_X4x57Xtfe16GYXKNiaWX4A@mail.gmail.com>
- <1390248397-14112-1-git-send-email-nm@ti.com>
- <52E139C5.3090207@ti.com> <874n4uy483.fsf@paris.lan>
- <20140123184951.GJ7993@atomide.com>
-Message-ID: <87fvo9w4jx.fsf@paris.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jan 2014 20:42:03 +0000
+Subject: [PATCH 2/4] ASoC: tda998x: add a codec driver for TDA998x
+In-Reply-To: <a62784e8778d06512d49a24dcf59ff9e45839902.1390813481.git.moinejf@free.fr>
+References: <cover.1390813480.git.moinejf@free.fr>
+ <a62784e8778d06512d49a24dcf59ff9e45839902.1390813481.git.moinejf@free.fr>
+Message-ID: <20140127204203.GX11841@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Sun, Jan 26, 2014 at 07:45:36PM +0100, Jean-Francois Moine wrote:
 
-> * Kevin Hilman <khilman@linaro.org> [140123 09:55]:
->> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->> 
->> > On 01/20/2014 10:06 PM, Nishanth Menon wrote:
->> >> Move all OMAP4 PM errata initializations to centralized location in
->> >> omap4_pm_init_early. This allows for users to utilize the erratas
->> >> in various submodules as needed.
->> >> 
->> > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> >
->> > This patch fixes build failure caused by patch 
->> > https://patchwork.kernel.org/patch/3084521/ 
->> > in case if SMP is not enabled.
->> 
->> So does that mean that that patch can now be applied as is?
->> 
->> We could sure use that fix (or equivalent) for CPUidle breakage on 4460.
->
-> Yeah, seems OK to me, feel free to apply it directly:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+>  	select SND_SOC_STAC9766 if SND_SOC_AC97_BUS
+>  	select SND_SOC_TAS5086 if I2C
+> +	select SND_SOC_TDA998X if I2C
 
-OK, I've picked up both $SUBJECT patch and the one from the above
-patchworks link and will queue them up for v3.14-rc (and have added your
-Ack to both.)
+> +config SND_SOC_TDA998X
+> +	tristate
+> +	depends on OF
+> +	default y if DRM_I2C_NXP_TDA998X=y
+> +	default m if DRM_I2C_NXP_TDA998X=m
+> +
 
-Thanks,
+These two things don't seem to agree with each other, and I expect this
+breaks the build for ALL_CODECS.
 
-Kevin
+> +static void tda_get_encoder(struct tda_priv *priv)
+> +{
+> +	struct snd_soc_codec *codec = priv->codec;
+> +	struct device_node *np;
+> +	struct i2c_client *i2c_client;
+> +	static const struct of_device_id tda_dt[] = {
+> +		{ .compatible = "nxp,tda998x" },
+> +		{ },
+> +	};
+> +
+> +	/* search the tda998x device */
+> +	np = of_find_matching_node_and_match(NULL, tda_dt, NULL);
+> +	if (!np || !of_device_is_available(np)) {
+> +		dev_err(codec->dev, "No tda998x in DT\n");
+> +		return;
+> +	}
+> +	i2c_client = of_find_i2c_device_by_node(np);
+> +	of_node_put(np);
+> +	if (!i2c_client) {
+> +		dev_err(codec->dev, "no tda998x i2c client\n");
+> +		return;
+> +	}
+> +	if (!i2c_get_clientdata(i2c_client)) {
+> +		dev_err(codec->dev, "tda998x not initialized\n");
+> +		return;
+> +	}
+> +
+> +	priv->i2c_client = i2c_client;
+> +}
+
+The normal way of doing this would be to make the device a MFD - that
+way the frameworks make sure probe ordering and so on are sorted out.
+Other than that this looks basically OK, a few small comments below.
+
+> +	/* give the audio input type and ports to the HDMI encoder */
+> +	format = start ? priv->dai_id : 0;
+
+It's not clear to me what the above is doing (I think I know but it
+requires thinking about rather than being clear).
+
+> +static const struct snd_soc_dai_driver tda998x_dai[] = {
+> +    {
+> +	.name = "i2s-hifi",
+
+Coding style, indents are tabs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/f42da9a3/attachment-0001.sig>
