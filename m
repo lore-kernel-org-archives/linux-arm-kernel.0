@@ -1,41 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 27 Jan 2014 10:51:02 -0500 (EST)
-Subject: [PATCH 2/9] ARM64: get rid of arch_cpu_idle_prepare()
-In-Reply-To: <20140127154315.GG32608@arm.com>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-3-git-send-email-nicolas.pitre@linaro.org>
- <20140127154315.GG32608@arm.com>
-Message-ID: <alpine.LFD.2.11.1401271047240.1652@knanqh.ubzr>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 27 Jan 2014 16:51:06 +0100
+Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <cover.1390836773.git.jsarha@ti.com>
+References: <y> <cover.1390836773.git.jsarha@ti.com>
+Message-ID: <52E6806A.2090109@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jan 2014, Catalin Marinas wrote:
+Hi,
 
-> On Mon, Jan 27, 2014 at 06:08:17AM +0000, Nicolas Pitre wrote:
-> > ARM and ARM64 are the only two architectures implementing
-> > arch_cpu_idle_prepare() simply to call local_fiq_enable().
-> > 
-> > We have secondary_start_kernel() already calling local_fiq_enable() and
-> > this is done a second time in arch_cpu_idle_prepare() in that case. And
-> > enabling FIQs has nothing to do with idling the CPU to start with.
-> > 
-> > So let's introduce init_fiq_boot_cpu() to take care of FIQs on the boot
-> > CPU and remove arch_cpu_idle_prepare(). This is now done a bit earlier
-> > at late_initcall time but this shouldn't make a difference in practice
-> > given that FIQs are not currently used on ARM64.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+I think you should try to get this in sync with the work Jean-Francois is
+currently doing[1]. Having the HDMI transmitter register a CODEC device is
+definitely the right approach, compared to the rather 'interesting'
+constraints stuff you do in patch 4.
+
+- Lars
+
+[1] http://lkml.org/lkml/2014/1/27/85
+
+
+On 01/27/2014 04:37 PM, Jyri Sarha wrote:
+> Changes since RFC v2 version of the patches:
+> - Dropped out already applied:
+>   ASoC: hdmi-codec: Add devicetree binding with documentation
+> - Addresses Mark's comments here:
+>   http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070605.html
+>   - ASoC: davinci-evm: Add named clock reference to DT bindings
+>     - Get rid of unnecessary castings
+>     - Add mclk NULL checks
+>     - Use devm_clk_get()
+>     - Change clock name from "ti,codec-clock" to "mclk"
+> - Address Mark's comments here:
+>   http://mailman.alsa-project.org/pipermail/alsa-devel/2013-December/070606.html  - ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S bus
+>     - Get rid of unnecessary castings
+>     - Update commit message
+>   - Add: ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
+>     - Use snd_soc_params_to_bclk()
 > 
-> For arm64, we could simply remove any reference to FIQs. I'm not aware
-> of anyone using them.
-
-OK. What if I sumply remove arch_cpu_idle_prepare() and let you do the 
-remove the rest?
-
-IMHO I'd simply remove local_fiq_{enable/disable}() from 
-arm64/kernel/smp.c and leave the infrastructure in place in case someone 
-needs it eventually.  In which case I could include that into my patch 
-as well.
-
-
-Nicolas
+> Changes since the first RFC version of the patches:
+> - Drop out already applied: 
+>   ASoC: hdmi-codec: Add SNDRV_PCM_FMTBIT_32_LE playback format
+> - Change sound node's compatible property
+>   form: "ti,am33xx-beaglebone-black" to "ti,am33xx-beaglebone-black-audio"
+> - Some minor style issue fixes from TI internal review
+> 
+> Jyri Sarha (8):
+>   clk: add gpio controlled clock
+>   ASoC: davinci-evm: Add named clock reference to DT bindings
+>   ASoC: davinci-mcasp: Set BCLK divider if McASP is BCLK master
+>   ASoC: davinci-evm: HDMI audio support for TDA998x trough McASP I2S
+>     bus
+>   ASoC: davinci: HDMI audio build for AM33XX and TDA998x
+>   drm/tilcdc: Add I2C HDMI audio config for tda998x
+>   ARM: OMAP2+: omap2plus_defconfig: Enable tilcdc and TDA998X HDMI
+>     support
+>   ARM: OMAP2+: omap2plus_defconfig: Enable BeagleBone Black HDMI audio
+>     support
+> 
+>  .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
+>  .../bindings/sound/davinci-evm-audio.txt           |   13 +-
+>  arch/arm/configs/omap2plus_defconfig               |    5 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-gpio.c                             |  210 +++++++++++++++++++
+>  drivers/gpu/drm/tilcdc/tilcdc_slave.c              |   24 ++-
+>  include/linux/clk-provider.h                       |   25 +++
+>  sound/soc/davinci/Kconfig                          |   12 ++
+>  sound/soc/davinci/Makefile                         |    1 +
+>  sound/soc/davinci/davinci-evm.c                    |  211 +++++++++++++++++++-
+>  sound/soc/davinci/davinci-mcasp.c                  |   20 ++
+>  11 files changed, 534 insertions(+), 9 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
+>  create mode 100644 drivers/clk/clk-gpio.c
+> 
