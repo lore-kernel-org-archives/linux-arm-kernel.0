@@ -1,32 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Jan 2014 10:50:37 +0000
-Subject: [PATCH] drivers: bus: fix CCI driver kcalloc call parameters swap
-Message-ID: <1390819837-32196-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 27 Jan 2014 11:51:11 +0100
+Subject: [PATCH v5 07/14] ahci-platform: "Library-ise" ahci_probe
+ functionality
+In-Reply-To: <52E63778.5000509@ti.com>
+References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+ <1390417489-5354-8-git-send-email-hdegoede@redhat.com>
+ <52E63778.5000509@ti.com>
+Message-ID: <52E63A1F.6080301@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a bug/typo in the CCI driver kcalloc usage
-that inadvertently swapped the parameters order in the
-kcalloc call and went unnoticed.
+Hi,
 
-Reported-by: Xia Feng <xiafeng@allwinnertech.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/bus/arm-cci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 01/27/2014 11:39 AM, Roger Quadros wrote:
+> Hi,
+>
+> On 01/22/2014 09:04 PM, Hans de Goede wrote:
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index b6739cb..962fd35 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -979,7 +979,7 @@ static int cci_probe(void)
- 
- 	nb_cci_ports = cci_config->nb_ace + cci_config->nb_ace_lite;
- 
--	ports = kcalloc(sizeof(*ports), nb_cci_ports, GFP_KERNEL);
-+	ports = kcalloc(nb_cci_ports, sizeof(*ports), GFP_KERNEL);
- 	if (!ports)
- 		return -ENOMEM;
- 
--- 
-1.8.2.2
+<snip>
+
+>> --- a/include/linux/ahci_platform.h
+>> +++ b/include/linux/ahci_platform.h
+>> @@ -20,7 +20,13 @@
+>>   struct device;
+>>   struct ata_port_info;
+>>   struct ahci_host_priv;
+>> +struct platform_device;
+>>
+>> +/*
+>> + * Note ahci_platform_data is deprecated. New drivers which need to override
+>> + * any of these, should instead declare there own platform_driver struct, and
+>> + * use ahci_platform* functions in their own probe, suspend and resume methods.
+>> + */
+>>   struct ahci_platform_data {
+>>   	int (*init)(struct device *dev, struct ahci_host_priv *hpriv);
+>>   	void (*exit)(struct device *dev);
+>> @@ -35,5 +41,13 @@ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
+>>   void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
+>>   int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
+>>   void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
+>> +struct ahci_host_priv *ahci_platform_get_resources(
+>> +	struct platform_device *pdev);
+>
+> Why not use 'struct device' as the argument?
+
+Because of calls to platform_get_resource inside the function.
+
+>> +void ahci_platform_put_resources(struct ahci_host_priv *hpriv);
+>
+> Can we have 'struct device' as the argument? Else it becomes
+> impossible to get 'struct device' from 'hpriv' if we need to call e.g.
+> pm_runtime_*() APIs.
+
+The plan for is for this function to go away once we have a
+devm version of of_clk_get, so if you need to put pm_runtime_calls
+somewhere, please don't put them here. This sounds like something which
+should go in enable / disable resources instead ?
+
+Regards,
+
+Hans
