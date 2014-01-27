@@ -1,79 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Jan 2014 19:18:36 +0100
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
-References: <y>
- <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140127181836.GH26766@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 27 Jan 2014 19:21:38 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140127153908.4f6f46c2@skate>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140127153908.4f6f46c2@skate>
+Message-ID: <52E6A3B2.6060301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
-> The dma_mask for a device structure is a pointer. This pointer
-> needs to be set up before the dma mask can actually be set. Most
-> frameworks in the kernel take care of setting this up properly but
-> platform devices that don't follow a regular bus structure may not
-> ever have this set. As a result, checks such as dma_capable will
-> always return false on a raw platform device and dma_set_mask will
-> always return -EIO. Fix this by adding a dma_mask in the
-> platform_device archdata and setting it to be the dma_mask. Devices
-> used in other frameworks can change this as needed.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Suggested-by: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-Hello,
+On 01/27/14 15:39, Thomas Petazzoni wrote:
+> On Sat, 25 Jan 2014 19:19:06 +0100, Sebastian Hesselbarth wrote:
+>> This patch set fixes clk init order that went upside-down with
+>> v3.14. I haven't really investigated what caused this, but I assume
+>> it is related with DT node reordering by addresses.
+>>
+>> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+>> registered before core clocks driver. Unfortunately, we cannot
+>> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+>> init order for our drivers is always core clocks before clock gating,
+>> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+>> init function that will register core clocks before clock gating
+>> driver.
+>>
+>> This patch is based on pre-v3.14-rc1 mainline and should go in as
+>> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+>> I suggest Jason picks it up as a topic branch.
+>
+> I'm not sure I really like the solution you're proposing here. I'd very
+> much prefer to keep one CLK_OF_DECLARE() per clock type, associated to
+> one function registering only this clock type.
 
-there is another non-platform dependant approach available, that might
-be worth to evaluate:
+Have you ever had a look at e.g. clk-imx28.c? Not that I really like
+the approach, but it is common practice to do so.
 
-	http://mid.gmane.org/1390817152-30898-1-git-send-email-ydroneaud at opteya.com
+> Instead, shouldn't the clock framework be improved to *not* register a
+> clock until its parent have been registered? If the DT you have the
+> gatable clocks that depend on the core clocks, then the gatable clocks
+> should not be registered if the core clocks have not yet been
+> registered.
+>
+> Do you think this is possible? Am I missing something here?
 
-> ---
->  arch/arm64/include/asm/device.h |    1 +
->  arch/arm64/kernel/setup.c       |    7 +++++++
->  2 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-> index cf98b36..209d40c 100644
-> --- a/arch/arm64/include/asm/device.h
-> +++ b/arch/arm64/include/asm/device.h
-> @@ -24,6 +24,7 @@ struct dev_archdata {
->  };
->  
->  struct pdev_archdata {
-> +	u64 dma_mask;
->  };
->  
->  #endif
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index bd9bbd0..f164347 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -41,6 +41,7 @@
->  #include <linux/memblock.h>
->  #include <linux/of_fdt.h>
->  #include <linux/of_platform.h>
-> +#include <linux/dma-mapping.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> @@ -337,3 +338,9 @@ const struct seq_operations cpuinfo_op = {
->  	.stop	= c_stop,
->  	.show	= c_show
->  };
-> +
-> +void arch_setup_pdev_archdata(struct platform_device *pdev)
-> +{
-> +	pdev->archdata.dma_mask = DMA_BIT_MASK(32);
-> +	pdev->dev.dma_mask = &pdev->archdata.dma_mask;
-> +}
-Is it save to assume a default of DMA_BIT_MASK(32)?
+As I said, clk_of_init does not care about return values from the
+clock init functions. Without it, it cannot decide if a clock
+driver failed horribly, failed because of missing dependencies, or
+successfully installed all clocks. Also, it is early stuff and I guess
+clk_of_init will have to build its own "defered_list" and loop over
+until done.
 
-Best regards
-Uwe
+BTW, this is a fix not an improvement. We should find an acceptable
+solution soon. But I am still open for suggestions, too.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sebastian
