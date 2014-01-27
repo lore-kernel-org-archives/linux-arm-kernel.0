@@ -1,38 +1,33 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 27 Jan 2014 12:27:17 -0300
-Subject: [PATCH v5 17/20] ARM: dove: Enable Dove watchdog in the devicetree
+Date: Mon, 27 Jan 2014 12:27:18 -0300
+Subject: [PATCH v5 18/20] watchdog: orion: Enable the build on ARCH_MVEBU
 In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1390836440-12744-18-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390836440-12744-19-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree node to enable watchdog support available in Dove SoCs.
+After adding support for Armada 370/XP SoC let's enable the build on
+these platforms.
 
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/dove.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/watchdog/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 113a8bc..14659a8 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -120,6 +120,14 @@
- 				clocks = <&core_clk 0>;
- 			};
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 5be6e91..8b79012 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -282,7 +282,7 @@ config DAVINCI_WATCHDOG
  
-+			watchdog at 20300 {
-+				compatible = "marvell,orion-wdt";
-+				reg = <0x20300 0x28>, <0x20108 0x4>;
-+				interrupt-parent = <&bridge_intc>;
-+				interrupts = <3>;
-+				clocks = <&core_clk 0>;
-+			};
-+
- 			intc: main-interrupt-ctrl at 20200 {
- 				compatible = "marvell,orion-intc";
- 				interrupt-controller;
+ config ORION_WATCHDOG
+ 	tristate "Orion watchdog"
+-	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
++	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
+ 	select WATCHDOG_CORE
+ 	help
+ 	  Say Y here if to include support for the watchdog timer
 -- 
 1.8.1.5
