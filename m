@@ -1,31 +1,38 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 27 Jan 2014 16:19:32 +0900
-Subject: [PATCH] arm64: mm: fix the function name in comment of
- cpu_do_switch_mm
-Message-ID: <000801cf1b30$1ffe8db0$5ffba910$%han@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Jan 2014 15:37:56 +0800
+Subject: [PATCH 2/4] ARM: dts: cm-fx6: add SATA support
+In-Reply-To: <1390320812-25100-3-git-send-email-grinberg@compulab.co.il>
+References: <1390320812-25100-1-git-send-email-grinberg@compulab.co.il>
+ <1390320812-25100-3-git-send-email-grinberg@compulab.co.il>
+Message-ID: <20140127073754.GB4765@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the function name of comment of cpu_do_switch_mm,
-because cpu_do_switch_mm is the correct name.
+On Tue, Jan 21, 2014 at 06:13:30PM +0200, Igor Grinberg wrote:
+> Enable SATA on cm-fx6.
+> 
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index 94cc6b5..07f90a5 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -69,3 +69,7 @@
+>  	pinctrl-0 = <&pinctrl_uart4>;
+>  	status = "okay";
+>  };
+> +
+> +&sata {
+> +	status = "okay";
+> +};
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm64/mm/proc.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please sort these labeled nodes alphabetically.
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index bed1f1d..1333e6f 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -150,7 +150,7 @@ ENDPROC(cpu_do_resume)
- #endif
- 
- /*
-- *	cpu_switch_mm(pgd_phys, tsk)
-+ *	cpu_do_switch_mm(pgd_phys, tsk)
-  *
-  *	Set the translation table base pointer to be pgd_phys.
-  *
--- 
-1.7.10.4
+Shawn
+
+> -- 
+> 1.8.3.2
+> 
