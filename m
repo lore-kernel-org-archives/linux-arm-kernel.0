@@ -1,50 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jan 2014 09:43:12 +0100
-Subject: [PATCH 8/9] X86: remove redundant cpuidle_idle_call()
-In-Reply-To: <1390802904-28399-9-git-send-email-nicolas.pitre@linaro.org>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-9-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <52E61C20.50804@linaro.org>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Mon, 27 Jan 2014 10:43:20 +0200
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through
+ DT
+In-Reply-To: <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>	<1390190215-22700-2-git-send-email-olof@lixom.net>	<20140120164859.GF15937@n2100.arm.linux.org.uk>
+ <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
+Message-ID: <52E61C28.1020207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 07:08 AM, Nicolas Pitre wrote:
-> The core idle loop now takes care of it.
+On 01/24/2014 07:35 PM, Fabio Estevam wrote:
+> On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 >
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-> ---
->   arch/x86/kernel/process.c | 5 +----
->   1 file changed, 1 insertion(+), 4 deletions(-)
+>> So far so good.  Now, what about this external oscillator which has its
+>> own separate power control.  My immediate thought is that this can be
+>> specified via card_ext_clock - I would simply need to declare a fixed-rate
+>> clock with either a regulator (power switch) controlled via a gpio (which
+>> would probably be closer to the hardware) or a gpio as an enable... ah,
+>> that requires me to write a common clock driver for that bit since this
+>> is currently not modelled by CCF...
 >
-> diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
-> index 3fb8d95ab8..4505e2a950 100644
-> --- a/arch/x86/kernel/process.c
-> +++ b/arch/x86/kernel/process.c
-> @@ -298,10 +298,7 @@ void arch_cpu_idle_dead(void)
->    */
->   void arch_cpu_idle(void)
->   {
-> -	if (cpuidle_idle_call())
-> -		x86_idle();
-> -	else
-> -		local_irq_enable();
-
-For the record, it was pointless to enable the local irq here because it 
-is handled by the cpuidle framework when exiting the idle state.
-
-> +	x86_idle();
->   }
->
->   /*
+> Jiry Sarha posted a gpio controlled clock proposal:
+> http://www.spinics.net/lists/devicetree/msg16651.html
 >
 
+I have not received too much feedback to my patch yet. CCF is a bit new 
+territory to me, but I think having a separate stackable clk-gpio would 
+be more flexible than having the gpio property implemented in 
+clk-fixed-rate.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Anyway, I am happy do it either way as long as I can get a gpio 
+-controlled clock implementation into the main line.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Cheers,
+Jyri
