@@ -1,39 +1,98 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Mon, 27 Jan 2014 15:24:57 +0000
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
-Message-ID: <20140127152457.GA1073@trinity.fluff.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 27 Jan 2014 12:27:01 -0300
+Subject: [PATCH v5 01/20] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1390836440-12744-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 04:13:56PM +0100, Guennadi Liakhovetski wrote:
-> Hi all,
-> 
-> I'm working on an MMC driver with a DMA capability. All has been working 
-> well, until at some point I've got a bus error, when the mmc driver had 
-> been handed in a buffer at 0x3000 physical RAM address. The reason is, 
-> that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
-> my question: how shall I configure this in software?
-> 
-> The way I found was to use ARM-specific struct dmabounce_device_info and 
-> implement its .needs_bounce() method to return true for those addresses. 
-> Is this the right way or is there a better / more straight-forward one?
-> 
-> To do the above I have to enable CONFIG_DMABOUNCE, which then selects 
-> CONFIG_ZONE_DMA. Having done just that I suddenly discover, that 0x3000 
-> buffers aren't used any more, so, I cannot actually verify my 
-> implementation :) Looking at ZONE_DMA it looks like it is still covering 
-> the whole RAM range (/proc/zoneinfo shows start_pfn=0 in zone DMA), so, I 
-> don't see why 0x3000 should be excluded now.
-> 
-> So, is using the .needs_bounce() method the correct way to support DMA on 
-> this arch or is there a better one?
+Some SoC have MMIO regions that are shared across orthogonal
+subsystems. This commit implements a possible solution for the
+thread-safe access of such regions through a spinlock-protected API.
 
-I have a similar issue with Renesas R8A7790 where there is a bus bridge
-that can only deal with transactions to one half of the available RAM.
+Concurrent access is protected with a single spinlock for the
+entire MMIO address space. While this protects shared-registers,
+it also serializes access to unrelated/unshared registers.
 
+We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+respectively. The rationale for this is that some users may not require
+register write completion but only thread-safe access to a register.
+
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Russell,
+
+Can you confirm this patch is on its way to v3.14?
+
+ arch/arm/include/asm/io.h |  6 ++++++
+ arch/arm/kernel/io.c      | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index fbeb39c..8aa4cca 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -38,6 +38,12 @@
+ #define isa_bus_to_virt phys_to_virt
+ 
+ /*
++ * Atomic MMIO-wide IO modify
++ */
++extern void atomic_io_modify(void __iomem *reg, u32 mask, u32 set);
++extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
++
++/*
+  * Generic IO read/write.  These perform native-endian accesses.  Note
+  * that some architectures will want to re-define __raw_{read,write}w.
+  */
+diff --git a/arch/arm/kernel/io.c b/arch/arm/kernel/io.c
+index dcd5b4d..9203cf8 100644
+--- a/arch/arm/kernel/io.c
++++ b/arch/arm/kernel/io.c
+@@ -1,6 +1,41 @@
+ #include <linux/export.h>
+ #include <linux/types.h>
+ #include <linux/io.h>
++#include <linux/spinlock.h>
++
++static DEFINE_RAW_SPINLOCK(__io_lock);
++
++/*
++ * Generic atomic MMIO modify.
++ *
++ * Allows thread-safe access to registers shared by unrelated subsystems.
++ * The access is protected by a single MMIO-wide lock.
++ */
++void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set)
++{
++	unsigned long flags;
++	u32 value;
++
++	raw_spin_lock_irqsave(&__io_lock, flags);
++	value = readl_relaxed(reg) & ~mask;
++	value |= (set & mask);
++	writel_relaxed(value, reg);
++	raw_spin_unlock_irqrestore(&__io_lock, flags);
++}
++EXPORT_SYMBOL(atomic_io_modify_relaxed);
++
++void atomic_io_modify(void __iomem *reg, u32 mask, u32 set)
++{
++	unsigned long flags;
++	u32 value;
++
++	raw_spin_lock_irqsave(&__io_lock, flags);
++	value = readl_relaxed(reg) & ~mask;
++	value |= (set & mask);
++	writel(value, reg);
++	raw_spin_unlock_irqrestore(&__io_lock, flags);
++}
++EXPORT_SYMBOL(atomic_io_modify);
+ 
+ /*
+  * Copy data from IO memory space to "real" memory space.
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+1.8.1.5
