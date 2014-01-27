@@ -1,131 +1,75 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Mon, 27 Jan 2014 17:29:51 +0530
-Subject: [PATCH 6/9] PPC: remove redundant cpuidle_idle_call()
-In-Reply-To: <1390802904-28399-7-git-send-email-nicolas.pitre@linaro.org>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-7-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <52E64A37.4090405@linux.vnet.ibm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jan 2014 12:15:05 +0000
+Subject: [PATCH v3] audit: Add generic compat syscall support
+In-Reply-To: <52E5F56F.2030502@linaro.org>
+References: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389945795-4255-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140123145119.GE27520@arm.com> <52E5F56F.2030502@linaro.org>
+Message-ID: <20140127121505.GD32608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Mon, Jan 27, 2014 at 05:58:07AM +0000, AKASHI Takahiro wrote:
+> Catalin and audit maintainers,
+> 
+> On 01/23/2014 11:51 PM, Catalin Marinas wrote:
+> > On Fri, Jan 17, 2014 at 08:03:15AM +0000, AKASHI Takahiro wrote:
+> >> diff --git a/lib/compat_audit.c b/lib/compat_audit.c
+> >> new file mode 100644
+> >> index 0000000..94f6480
+> >> --- /dev/null
+> >> +++ b/lib/compat_audit.c
+> >> @@ -0,0 +1,51 @@
+> >> +#include <linux/init.h>
+> >> +#include <linux/types.h>
+> >> +/* FIXME: this might be architecture dependent */
+> >> +#include <asm/unistd_32.h>
+> >
+> > It most likely is architecture dependent.
+> 
+> I'm wondering what name is the most appropriate in this case.
+> Most archictures have __NR_xyz definitions in "unistd_32.h",
+> but arm64 doesn't have it, instead "unistd32." which contains
+> only __SYSCALL(xyz, NO). Confusing?
 
-On 01/27/2014 11:38 AM, Nicolas Pitre wrote:
-> The core idle loop now takes care of it.  However a few things need
-> checking:
-> 
-> - Invocation of cpuidle_idle_call() in pseries_lpar_idle() happened
->   through arch_cpu_idle() and was therefore always preceded by a call
->   to ppc64_runlatch_off().  To preserve this property now that
->   cpuidle_idle_call() is invoked directly from core code, a call to
->   ppc64_runlatch_off() has been added to idle_loop_prolog() in
->   platforms/pseries/processor_idle.c.
-> 
-> - Similarly, cpuidle_idle_call() was followed by ppc64_runlatch_off()
->   so a call to the later has been added to idle_loop_epilog().
-> 
-> - And since arch_cpu_idle() always made sure to re-enable IRQs if they
->   were not enabled, this is now
->   done in idle_loop_epilog() as well.
-> 
-> The above was made in order to keep the execution flow close to the
-> original.  I don't know if that was strictly necessary. Someone well
-> aquainted with the platform details might find some room for possible
-> optimizations.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  arch/powerpc/platforms/pseries/processor_idle.c |  5 ++++
->  arch/powerpc/platforms/pseries/setup.c          | 34 ++++++++++---------------
->  2 files changed, 19 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/powerpc/platforms/pseries/processor_idle.c b/arch/powerpc/platforms/pseries/processor_idle.c
-> index a166e38bd6..72ddfe3d2f 100644
-> --- a/arch/powerpc/platforms/pseries/processor_idle.c
-> +++ b/arch/powerpc/platforms/pseries/processor_idle.c
-> @@ -33,6 +33,7 @@ static struct cpuidle_state *cpuidle_state_table;
-> 
->  static inline void idle_loop_prolog(unsigned long *in_purr)
->  {
-> +	ppc64_runlatch_off();
->  	*in_purr = mfspr(SPRN_PURR);
->  	/*
->  	 * Indicate to the HV that we are idle. Now would be
-> @@ -49,6 +50,10 @@ static inline void idle_loop_epilog(unsigned long in_purr)
->  	wait_cycles += mfspr(SPRN_PURR) - in_purr;
->  	get_lppaca()->wait_state_cycles = cpu_to_be64(wait_cycles);
->  	get_lppaca()->idle = 0;
-> +
-> +	if (irqs_disabled())
-> +		local_irq_enable();
-> +	ppc64_runlatch_on();
->  }
-> 
->  static int snooze_loop(struct cpuidle_device *dev,
-> diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
-> index c1f1908587..7604c19d54 100644
-> --- a/arch/powerpc/platforms/pseries/setup.c
-> +++ b/arch/powerpc/platforms/pseries/setup.c
-> @@ -39,7 +39,6 @@
->  #include <linux/irq.h>
->  #include <linux/seq_file.h>
->  #include <linux/root_dev.h>
-> -#include <linux/cpuidle.h>
->  #include <linux/of.h>
->  #include <linux/kexec.h>
-> 
-> @@ -356,29 +355,24 @@ early_initcall(alloc_dispatch_log_kmem_cache);
-> 
->  static void pseries_lpar_idle(void)
->  {
-> -	/* This would call on the cpuidle framework, and the back-end pseries
-> -	 * driver to  go to idle states
-> +	/*
-> +	 * Default handler to go into low thread priority and possibly
-> +	 * low power mode by cedeing processor to hypervisor
->  	 */
-> -	if (cpuidle_idle_call()) {
-> -		/* On error, execute default handler
-> -		 * to go into low thread priority and possibly
-> -		 * low power mode by cedeing processor to hypervisor
-> -		 */
-> 
-> -		/* Indicate to hypervisor that we are idle. */
-> -		get_lppaca()->idle = 1;
-> +	/* Indicate to hypervisor that we are idle. */
-> +	get_lppaca()->idle = 1;
-> 
-> -		/*
-> -		 * Yield the processor to the hypervisor.  We return if
-> -		 * an external interrupt occurs (which are driven prior
-> -		 * to returning here) or if a prod occurs from another
-> -		 * processor. When returning here, external interrupts
-> -		 * are enabled.
-> -		 */
-> -		cede_processor();
-> +	/*
-> +	 * Yield the processor to the hypervisor.  We return if
-> +	 * an external interrupt occurs (which are driven prior
-> +	 * to returning here) or if a prod occurs from another
-> +	 * processor. When returning here, external interrupts
-> +	 * are enabled.
-> +	 */
-> +	cede_processor();
-> 
-> -		get_lppaca()->idle = 0;
-> -	}
-> +	get_lppaca()->idle = 0;
->  }
-> 
->  /*
-> 
+I don't think we should introduce a new file (or at least it should be
+named something containing "audit" to make it clearer).
 
-Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+> >> +int audit_classify_compat_syscall(int abi, unsigned syscall)
+> >> +{
+> >> +	switch (syscall) {
+> >> +#ifdef __NR_open
+> >> +	case __NR_open:
+> >> +		return 2;
+> >> +#endif
+> >> +#ifdef __NR_openat
+> >> +	case __NR_openat:
+> >> +		return 3;
+> >> +#endif
+> >> +#ifdef __NR_socketcall
+> >> +	case __NR_socketcall:
+> >> +		return 4;
+> >> +#endif
+> >> +	case __NR_execve:
+> >> +		return 5;
+> >> +	default:
+> >> +		return 1;
+> >> +	}
+> >> +}
+> >
+> > BTW, since they aren't many, you could get the arch code to define
+> > __NR_compat_open etc. explicitly and use these. On arm64 we have a few
+> > of these defined to avoid name collision in signal handling code.
+> 
+> Again, most architecture have their own unistd32.h for compat system calls,
+> and use __NR_open-like naming.
+> It's unlikely for these archs to migrate to "generic compat" auditing,
+> but I believe that '__NR_open'-like naming is better because we may be able to avoid
+> arch-specific changes even for future(?) syscall-related enhancements in audit.
 
-The consequence of this would be for other Power platforms like PowerNV,
-we will need to invoke ppc_runlatch_off() and ppc_runlatch_on() in each
-of the idle routines since the idle_loop_prologue() and
-idle_loop_epilogue() are not invoked by them, but we will take care of this.
+My preference is as above, a few __NR_compat_* (just those required by
+audit) defined in unistd.h but I'm not an audit maintainer.
 
-Regards
-Preeti U Murthy
+-- 
+Catalin
