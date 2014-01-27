@@ -1,87 +1,88 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Jan 2014 10:05:20 -0600
-Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
- returns -ENODEV/-ENXIO
-In-Reply-To: <20140127150855.GA17928@xps8300>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
- <20140121144725.GF30451@saruman.home>
- <20140127150855.GA17928@xps8300>
-Message-ID: <20140127160458.GF13268@saruman.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jan 2014 16:06:54 +0000
+Subject: [PATCH 1/9] ARM: get rid of arch_cpu_idle_prepare()
+In-Reply-To: <alpine.LFD.2.11.1401271004060.1652@knanqh.ubzr>
+References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
+ <1390802904-28399-2-git-send-email-nicolas.pitre@linaro.org>
+ <20140127124511.GK15937@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1401271004060.1652@knanqh.ubzr>
+Message-ID: <20140127160654.GO15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 27, 2014 at 05:08:55PM +0200, Heikki Krogerus wrote:
-> > > Since PHYs for dwc3 is optional (not all SoCs that have DWC3 use PHYs),
-> > > do not return from probe if the USB PHY library returns -ENODEV as that
-> > 
-> > this isn't correct, they all have PHYs, some of them might not be
-> > controllable.
-> > 
-> > > indicates the platform does not have PHY.
-> > 
-> > not really, that indicates the current platform tried to grab a PHY and
-> > the PHY doesn't exist. If there's anybody with a non-controllable PHY
-> > and someone gives me a really good reason for not using the generic
-> > no-op PHY, then we should add a flag and we could:
-> > 
-> > 	if (!likely(dwc->flags & DWC3_USB2PHY_DRIVER_NOT_NEEDED))
-> > 		dwc3_grab_phys(dwc);
+On Mon, Jan 27, 2014 at 10:45:59AM -0500, Nicolas Pitre wrote:
+> On Mon, 27 Jan 2014, Russell King - ARM Linux wrote:
 > 
-> Why would you need to know if the PHY drivers are needed or not
-> explicitly in your controller driver?
-
-because, one way or another, they all do need it. Except for quirky ones
-like AM437x where a USB3 IP was hardwired into USB2-only mode, so it
-really lacks a USB3 PHY.
-
-> > But I really want to see the argument against using no-op. As far as I
-> > could see, everybody needs a PHY driver one way or another, some
-> > platforms just haven't sent any PHY driver upstream and have their own
-> > hacked up solution to avoid using the PHY layer.
+> > On Mon, Jan 27, 2014 at 01:08:16AM -0500, Nicolas Pitre wrote:
+> > > ARM and ARM64 are the only two architectures implementing
+> > > arch_cpu_idle_prepare() simply to call local_fiq_enable().
+> > > 
+> > > We have secondary_start_kernel() already calling local_fiq_enable() and
+> > > this is done a second time in arch_cpu_idle_prepare() in that case. And
+> > > enabling FIQs has nothing to do with idling the CPU to start with.
+> > > 
+> > > So let's introduce init_fiq_boot_cpu() to take care of FIQs on the boot
+> > > CPU and remove arch_cpu_idle_prepare(). This is now done a bit earlier
+> > > at late_initcall time but this shouldn't make a difference in practice
+> > > i.e. when FIQs are actually used.
+> > > 
+> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > ---
+> > >  arch/arm/kernel/process.c | 5 -----
+> > >  arch/arm/kernel/setup.c   | 7 +++++++
+> > >  2 files changed, 7 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > > index 92f7b15dd2..725b8c95e0 100644
+> > > --- a/arch/arm/kernel/process.c
+> > > +++ b/arch/arm/kernel/process.c
+> > > @@ -142,11 +142,6 @@ static void default_idle(void)
+> > >  	local_irq_enable();
+> > >  }
+> > >  
+> > > -void arch_cpu_idle_prepare(void)
+> > > -{
+> > > -	local_fiq_enable();
+> > > -}
+> > > -
+> > >  void arch_cpu_idle_enter(void)
+> > >  {
+> > >  	ledtrig_cpu(CPU_LED_IDLE_START);
+> > > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > > index 987a7f5bce..d027b1a6fe 100644
+> > > --- a/arch/arm/kernel/setup.c
+> > > +++ b/arch/arm/kernel/setup.c
+> > > @@ -789,6 +789,13 @@ static int __init init_machine_late(void)
+> > >  }
+> > >  late_initcall(init_machine_late);
+> > >  
+> > > +static int __init init_fiq_boot_cpu(void)
+> > > +{
+> > > +	local_fiq_enable();
+> > > +	return 0;
+> > > +}
+> > > +late_initcall(init_fiq_boot_cpu);
+> > 
+> > arch_cpu_idle_prepare() gets called from the swapper thread, and changes
+> > the swapper thread's CPSR. init_fiq_boot_cpu() gets called from PID1, the
+> > init thread, and changes the init thread's CPSR, which will already have
+> > FIQs enabled by way of how kernel threads are created.
+> > 
+> > Hence, the above code fragment has no effect what so ever, and those
+> > platforms using FIQs will not have FIQs delivered if they're idle
+> > (because the swapper will have FIQs masked at the CPU.)
 > 
-> Not true in our case. Platforms using Intel's SoCs and chip sets may
-> or may not have controllable USB PHY. Quite often they don't. The
-> Baytrails have usually ULPI PHY for USB2, but that does not mean they
-> provide any vendor specific functions or any need for a driver in any
-> case.
-
-that's different from what I heard.
-
-> Are we talking about the old USB PHY library or the new PHY framework
-> with the no-op PHY driver?
+> You're right.
 > 
-> Well, in any case, I don't understand what is the purpose of the no-op
-> PHY driver. What are you drying to achieve with that?
+> What about moving local_fiq_enable() to trap_init() then?
 
-I'm trying to avoid supporting 500 different combinations for a single
-driver. We already support old USB PHY layer and generic PHY layer, now
-they both need to be made optional. The old USB PHY layer also provides
-a no-op, now called phy-generic, which is actually pretty useful.
-
-On top of all that, I'm sure you'll subscribe to the idea of preventing
-dwc3 from becoming another MUSB which supports several different
-configurations and none work correctly. I much prefer to take baby steps
-which are well thought-out and very well exercised, so I'll be very
-pedantic about proof of testing.
-
-An invasive change such as $subject needs to be very well-tested in
-different architectures with different Kconfig choices before I'd feel
-comfortable applying it.
-
-Also, the assumptions made in $subject are just plain wrong, which
-gets me really iffy about applying it or not.
-
-cheers
+That's potentially unsafe, as we haven't touched any of the IRQ
+controllers at that point - we can't guarantee what state they'd be
+in.  Given that the default FIQ is to just return, a FIQ being raised
+at that point will end up with an infinite loop re-entering the FIQ
+handler.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/afb7097a/attachment.sig>
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
