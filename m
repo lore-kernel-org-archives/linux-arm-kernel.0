@@ -1,62 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 27 Jan 2014 01:08:24 -0500
-Subject: [PATCH 9/9] cpu/idle.c: move to sched/idle.c
-In-Reply-To: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1390802904-28399-10-git-send-email-nicolas.pitre@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 27 Jan 2014 15:13:32 +0900
+Subject: [PATCH v2 5/6] arm64: audit: Add makefile rule to create
+ unistd_32.h for compat syscalls
+In-Reply-To: <20140123145351.GF27520@arm.com>
+References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-6-git-send-email-takahiro.akashi@linaro.org>
+ <20140123145351.GF27520@arm.com>
+Message-ID: <52E5F90C.3000400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Integration of cpuidle with the scheduler requires that the idle loop be
-closely integrated with the scheduler proper. Moving cpu/idle.c into the
-sched directory will allow for a smoother integration, and eliminate a
-subdirectory which contained only one source file.
+Catalin,
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- kernel/Makefile              | 1 -
- kernel/cpu/Makefile          | 1 -
- kernel/sched/Makefile        | 2 +-
- kernel/{cpu => sched}/idle.c | 0
- 4 files changed, 1 insertion(+), 3 deletions(-)
- delete mode 100644 kernel/cpu/Makefile
- rename kernel/{cpu => sched}/idle.c (100%)
+On 01/23/2014 11:53 PM, Catalin Marinas wrote:
+> On Fri, Jan 17, 2014 at 08:13:18AM +0000, AKASHI Takahiro wrote:
+>> generic compat sycall audit (lib/compat_audit.c) requires unistd_32.h
+>> for __NR_xyx compat syscall numbers. This is a different file from unistd32.h
+>> on arm64 and so it must be generated from unistd32.h.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/Makefile                 |    4 ++++
+>>   arch/arm64/kernel/syscalls/Makefile |   20 ++++++++++++++++++++
+>>   2 files changed, 24 insertions(+)
+>>   create mode 100644 arch/arm64/kernel/syscalls/Makefile
+>>
+>> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+>> index 2fceb71..6d24f92 100644
+>> --- a/arch/arm64/Makefile
+>> +++ b/arch/arm64/Makefile
+>> @@ -72,6 +72,10 @@ PHONY += vdso_install
+>>   vdso_install:
+>>   	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
+>>
+>> +# Compat syscall header generation
+>> +archheaders:
+>> +	$(Q)$(MAKE) $(build)=arch/arm64/kernel/syscalls $@
+>
+> See my other post to the lib/compat_audit.c file. I think that's too
+> complex for what you need.
 
-diff --git a/kernel/Makefile b/kernel/Makefile
-index bc010ee272..6f1c7e5cfc 100644
---- a/kernel/Makefile
-+++ b/kernel/Makefile
-@@ -22,7 +22,6 @@ obj-y += sched/
- obj-y += locking/
- obj-y += power/
- obj-y += printk/
--obj-y += cpu/
- obj-y += irq/
- obj-y += rcu/
- 
-diff --git a/kernel/cpu/Makefile b/kernel/cpu/Makefile
-deleted file mode 100644
-index 59ab052ef7..0000000000
---- a/kernel/cpu/Makefile
-+++ /dev/null
-@@ -1 +0,0 @@
--obj-y	= idle.o
-diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index 7b621409cf..ac3e0ea68f 100644
---- a/kernel/sched/Makefile
-+++ b/kernel/sched/Makefile
-@@ -11,7 +11,7 @@ ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
- CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
- endif
- 
--obj-y += core.o proc.o clock.o cputime.o idle_task.o fair.o rt.o stop_task.o
-+obj-y += core.o proc.o clock.o cputime.o idle_task.o idle.o fair.o rt.o stop_task.o
- obj-y += wait.o completion.o
- obj-$(CONFIG_SMP) += cpupri.o
- obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
-diff --git a/kernel/cpu/idle.c b/kernel/sched/idle.c
-similarity index 100%
-rename from kernel/cpu/idle.c
-rename to kernel/sched/idle.c
--- 
-1.8.4.108.g55ea5f6
+Generation script is getting more complexed than I assumed at first
+because some of system call names are a bit inconsistent with native 32-bit
+system calls, for example, fchown16 vs. fchown, fchown vs. fchown32.
+
+Now my tentative sed script looks like:
++quiet_cmd_syshdr = SYSHDR $@
++        cmd_syshdr = cat $< | sed -r \
++        -e 's/compat_//' \
++        -e 's/_wrapper//' \
++        -e 's/(sys_[fl]?chown)(\))/\132\)/' \
++        -e 's/(sys_[gs]et)(|e|fs|re|res)(uid\))/\1\2uid32\)/' \
++        -e 's/(sys_[gs]et)(|e|fs|re|res)(gid\))/\1\2gid32\)/' \
++        -e 's/(sys_[gs]etgroups)(\))/\132\)/' \
++        -e 's/(sys_new)(.*)/sys_\2/' \
++        -e 's/sys_mmap_pgoff/sys_mmap2/' \
++        -e 's/(sys_[_a-z]*)16(.*)/\1\2/' \
++        -e 's/^__SYSCALL\((.*),[ ]*sys_([^)].*)\).*/\#define __NR_\2 \1/p;d' \
++        | grep -v __NR_ni_syscall > $@
+
+So, yeah, I agree with you now.
+
+-Takahiro AKASHI
