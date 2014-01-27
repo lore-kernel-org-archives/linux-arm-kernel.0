@@ -1,56 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jan 2014 17:21:10 +0000
-Subject: [PATCH 1/9] ARM: get rid of arch_cpu_idle_prepare()
-In-Reply-To: <52E69395.9020004@linaro.org>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-2-git-send-email-nicolas.pitre@linaro.org>
- <52E6175F.1050401@linaro.org> <20140127160736.GP15937@n2100.arm.linux.org.uk>
- <52E69395.9020004@linaro.org>
-Message-ID: <20140127172110.GR15937@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jan 2014 17:21:16 +0000
+Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
+In-Reply-To: <52E69121.8050500@arm.com>
+References: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
+ <1388852843-30986-1-git-send-email-christoffer.dall@linaro.org>
+ <20140124233703.GA889@cbox> <52E64029.6000201@arm.com>
+ <20140127165730.GC8358@arm.com> <52E69121.8050500@arm.com>
+Message-ID: <20140127172116.GD8358@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 06:12:53PM +0100, Daniel Lezcano wrote:
-> On 01/27/2014 05:07 PM, Russell King - ARM Linux wrote:
->> On Mon, Jan 27, 2014 at 09:22:55AM +0100, Daniel Lezcano wrote:
->>> On 01/27/2014 07:08 AM, Nicolas Pitre wrote:
->>>> ARM and ARM64 are the only two architectures implementing
->>>> arch_cpu_idle_prepare() simply to call local_fiq_enable().
->>>>
->>>> We have secondary_start_kernel() already calling local_fiq_enable() and
->>>> this is done a second time in arch_cpu_idle_prepare() in that case. And
->>>> enabling FIQs has nothing to do with idling the CPU to start with.
->>>>
->>>> So let's introduce init_fiq_boot_cpu() to take care of FIQs on the boot
->>>> CPU and remove arch_cpu_idle_prepare(). This is now done a bit earlier
->>>> at late_initcall time but this shouldn't make a difference in practice
->>>> i.e. when FIQs are actually used.
->>>>
->>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>
->>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->> What kind of review did you do when giving that attributation?
->
-> I did the review to the best of my knowledge and with good will.
->
-> I read your comment on this patch and I learnt one more thing.
->
-> Today, I am smarter than yesterday and dumber than tomorrow :)
+On Mon, Jan 27, 2014 at 05:02:25PM +0000, Marc Zyngier wrote:
+> On 27/01/14 16:57, Catalin Marinas wrote:
+> > On Mon, Jan 27, 2014 at 11:16:57AM +0000, Marc Zyngier wrote:
+> >> On 24/01/14 23:37, Christoffer Dall wrote:
+> >>> On Sat, Jan 04, 2014 at 08:27:23AM -0800, Christoffer Dall wrote:
+> >>>> --- a/arch/arm/include/asm/pgtable-3level.h
+> >>>> +++ b/arch/arm/include/asm/pgtable-3level.h
+> >>>> @@ -120,13 +120,19 @@
+> >>>>  /*
+> >>>>   * 2nd stage PTE definitions for LPAE.
+> >>>>   */
+> >>>> -#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> >>>> -#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> >>>> -#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+> >>>> -#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> >>>> -#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+> >>>> -
+> >>>> -#define L_PMD_S2_RDWR		 (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+> >>>> +#define L_PTE_S2_MT_UNCACHED		(_AT(pteval_t, 0x0) << 2) /* strongly ordered */
+> >>>> +#define L_PTE_S2_MT_WRITETHROUGH	(_AT(pteval_t, 0xa) << 2) /* normal inner write-through */
+> >>>> +#define L_PTE_S2_MT_WRITEBACK		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+> >>>> +#define L_PTE_S2_MT_DEV_SHARED		(_AT(pteval_t, 0x1) << 2) /* device */
+> >>>> +#define L_PTE_S2_MT_DEV_NONSHARED	(_AT(pteval_t, 0x1) << 2) /* device */
+> >>>> +#define L_PTE_S2_MT_DEV_WC		(_AT(pteval_t, 0x5) << 2) /* normal non-cacheable */
+> >>>> +#define L_PTE_S2_MT_DEV_CACHED		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+> >>>> +#define L_PTE_S2_MT_MASK		(_AT(pteval_t, 0xf) << 2)
+> >>>> +
+> >>>> +#define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> >>>> +#define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+> >>>> +
+> >>>> +#define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+> >>>>  
+> >>>>  /*
+> >>>>   * Hyp-mode PL2 PTE definitions for LPAE.
+> >>
+> >> The change makes sense to me. arm64 uses a slightly different approach,
+> >> by using a PTE_S2_MEMATTR macro, but I'm not sure that would work for ARM.
+> >>
+> >> Russell, Catalin: could you please have a look at this?
+> > 
+> > Do we actually need more than Normal Cacheable and Device for stage 2?
+> 
+> Not so far. As long as these two memory types are enforced as a minimum,
+> we're quite happy to let the guest use whatever it decides.
+> 
+> I suppose Christoffer introduces them all here as a matter of
+> completeness, but I don't see them as being useful anytime soon.
 
-Just be aware that putting a comment along with the reviewed-by tag
-is always a good idea.  I know that's a little more work, but this has
-been raised a number of times by various people over the years.
+That would be useful on arm if you want cachepolicy= argument to force
+the cacheability of guest Normal memory type.
 
-A reviewed-by tag on its own doesn't mean much, as it could mean that
-you've just glanced over the code and decided "yea, it looks okay", or
-it could mean that you've spent all day verifying that the code change
-is indeed correct.
-
-Consequently, some will ignore emails which just contain a reviewed-by
-attributation.
+On arm64, the stage 1 memory type is decided via MAIR and that's how we
+handle cachepolicy for Normal memory. But for stage 2 this won't work,
+the type is explicitly set in the MemAttr encoding. But I don't think we
+need host cachepolicy enforced onto guest.
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Catalin
