@@ -1,47 +1,48 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 27 Jan 2014 09:59:39 -0800
-Subject: [PATCHv2] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <20140127095958.GA6547@mudshark.cambridge.arm.com>
-References: <1390604955-6309-1-git-send-email-lauraa@codeaurora.org>
- <20140127095958.GA6547@mudshark.cambridge.arm.com>
-Message-ID: <52E69E8B.4060200@codeaurora.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 27 Jan 2014 18:57:50 +0100
+Subject: [Q] block / zynq: DMA bouncing
+In-Reply-To: <20140127175231.GU15937@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+ <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
+ <20140127175231.GU15937@n2100.arm.linux.org.uk>
+Message-ID: <52E69E1E.3020202@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/27/2014 1:59 AM, Will Deacon wrote:
-> Hi Laura,
->
-> On Fri, Jan 24, 2014 at 11:09:15PM +0000, Laura Abbott wrote:
->> arm64 currently lacks support for -fstack-protector. Add
->> similar functionality to arm to detect stack corruption.
->
-> [...]
->
->> +/*
->> + * Initialize the stackprotector canary value.
->> + *
->> + * NOTE: this must only be called from functions that never return,
->> + * and it must always be inlined.
->> + */
->> +static __always_inline void boot_init_stack_canary(void)
->> +{
->> +	unsigned long canary;
->> +
->> +	/* Try to get a semi random initial value. */
->> +	get_random_bytes(&canary, sizeof(canary));
->> +	canary ^= LINUX_VERSION_CODE;
->> +
->> +	current->stack_canary = canary;
->
-> Do we actually need this line now?
->
+On 01/27/2014 06:52 PM, Russell King - ARM Linux wrote:
+> On Mon, Jan 27, 2014 at 06:45:50PM +0100, Michal Simek wrote:
+>> Why 0x4000? IRC Linux for ARM is using space for any purpose.
+>> Russell knows this much better than I.
+> 
+> Probably because as the kernel is loaded at 0x8000, it will place the
+> swapper page table at 0x4000, thus covering from 0x4000 upwards.
 
-Probably not but it seems strange to not have anything there for the 
-stack canary. Not sure if 'nothing' is better or worse than a possibly 
-incorrect stack canary that gets automatically created in fork.
+Ah yeah swapper.
 
-Laura
+> 
+> Thus, the majority of your un-DMA-able memory will be kernel text or
+> swapper page tables.
+
+Yes, exactly.
+0x0 - 0x4000 - reserving not to be used by DMA
+0x4000 - 0x8000 swapper page table
+0x8000 - 0x80000 kernel text + up
+
+Thanks,
+Michal
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/f6b2b00c/attachment.sig>
