@@ -1,45 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jan 2014 19:31:50 +0000
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
-References: <y> <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140127193149.GV15937@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jan 2014 19:31:49 +0000
+Subject: [PATCH v2 3/3] Binding: atmel-wm8904: add option to choose clock
+In-Reply-To: <1390805726-1841-4-git-send-email-voice.shen@atmel.com>
+References: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
+ <1390805726-1841-4-git-send-email-voice.shen@atmel.com>
+Message-ID: <20140127193149.GQ11841@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
-> The dma_mask for a device structure is a pointer. This pointer
-> needs to be set up before the dma mask can actually be set. Most
-> frameworks in the kernel take care of setting this up properly but
-> platform devices that don't follow a regular bus structure may not
-> ever have this set. As a result, checks such as dma_capable will
-> always return false on a raw platform device and dma_set_mask will
-> always return -EIO. Fix this by adding a dma_mask in the
-> platform_device archdata and setting it to be the dma_mask. Devices
-> used in other frameworks can change this as needed.
+On Mon, Jan 27, 2014 at 02:55:26PM +0800, Bo Shen wrote:
 
-You shouldn't need to do this.  I went through a lot of the drivers we
-currently have, fixing them up in various manners.  The basic rules
-for this stuff are:
+> diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
+> index 8bbe50c..2d86e2b 100644
+> --- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
+> +++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
+> @@ -33,6 +33,12 @@ Required properties:
+>  
+>  Optional properties:
+>    - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
+> +  - atmel,clk-from-rk-pin: bool property.
+> +     - When SSC works in slave mode, according to the hardware design, the
+> +       clock can get from TK pin, and also can get from RK pin. So, add
+> +       this parameter to choose where the clock from.
+> +     - By default the clock is from TK pin, if the clock from RK pin, this
+> +       property is needed.
 
-- It is the responsibility of the code creating the device to set a
-  reasonable default for the dma mask according to the bus and whether
-  DMA is supportable.
-
-- It is the responsibility of the driver _always_ to make a call to
-  dma_set_mask() and/or dma_set_coherent_mask() according to the
-  driver's needs if the driver is going to be using DMA.
-
-As a work-around for the buggy situation we have in the kernel with DT,
-various buggy workarounds have been incorporated into drivers which
-involve writing directly to the DMA masks, and other such games.  None
-of that is necessary when the dma_coerce_*() functions are used - but
-these are a stop-gap until the DT code gets fixed.
-
-The real answer here is to make DT conform to the first point above
-and not add yet another different hack to the kernel.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Can this be made a property of the SSC device so that it's available for
+all cards using it rather than just this one?  That would also address
+the issue with the way the configuration is passed to the controller
+that Lars-Peter identified.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/89853ba3/attachment.sig>
