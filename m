@@ -1,53 +1,46 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 27 Jan 2014 12:30:14 -0800
-Subject: [PATCH] clk: sunxi: fix overflow when setting up divided factors
-In-Reply-To: <1390613561-28636-1-git-send-email-emilio@elopez.com.ar>
-References: <1390613561-28636-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20140127203014.4167.16146@quantum>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jan 2014 20:36:35 +0000
+Subject: [PATCH] arm64: Add pdev_archdata for dmamask
+In-Reply-To: <1390854331.23180.22.camel@localhost.localdomain>
+References: <y> <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
+ <20140127181836.GH26766@pengutronix.de>
+ <1390854331.23180.22.camel@localhost.localdomain>
+Message-ID: <20140127203635.GA15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2014-01-24 17:32:41)
-> Currently, we are allocating space for two pointers, when we actually
-> may need to store three of them (two divisors plus the original clock).
-> Fix this, and change sizeof(type) to sizeof(*var) to keep checkpatch.pl
-> happy.
+On Mon, Jan 27, 2014 at 09:25:31PM +0100, Yann Droneaud wrote:
+> ARM, even AAAAARGH64 [1], doesn't need a special treatement regarding
+> the infamous dma_mask pointer. So perhaps my solution is better.
 > 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
+> This solution (adding dma_mask in pdev_archdata) is already in use in
+> powerpc architecture. See arch/powerpc/kernel/setup-common.c
 > 
-> Hi Mike,
-> 
-> Is there any chance you can include this oneliner on your second part of
-> the pull request to Linus?
+> The advantage of this solution is that it makes a dma_mask placeholder
+> available to statically allocated platform_device struct, while mine
+> only address the problem for platform_device struct allocated with
+> platform_device_alloc().
 
-Done.
+As I've already said in this thread, the basic problem comes from DT's
+platform device creation.  It's the responsibility of the device creator
+to set the dma_mask pointer appropriately, and DT doesn't do that.  So,
+DT needs to be fixed rather than everyone introducing their own
+workarounds for this.
 
-Regards,
-Mike
+> I'm also considering using dma_set_mask_and_coherent() in
+> platform_device_register_full() and drivers using
+> platform_device_alloc().
 
-> 
-> Cheers,
-> 
-> Emilio
-> 
->  drivers/clk/sunxi/clk-sunxi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 659e4ea..abb6c5a 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -875,7 +875,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->         if (!clk_data)
->                 return;
->  
-> -       clks = kzalloc(SUNXI_DIVS_MAX_QTY * sizeof(struct clk *), GFP_KERNEL);
-> +       clks = kzalloc((SUNXI_DIVS_MAX_QTY+1) * sizeof(*clks), GFP_KERNEL);
->         if (!clks)
->                 goto free_clkdata;
->  
-> -- 
-> 1.8.5.3
-> 
+As the one who introduced dma_set_mask_and_coherent, consider this a
+strong NAK on that.  The reason is dma_set_mask_and_coherent() is
+for drivers to set their requirements, not for the bus requirements
+to be set in the first place.
+
+It also means that drivers which need no DMA support are subjected to
+DMA restrictions (in that dma_set_mask_and_coherent can error out if
+the platform can't support the DMA mask.)
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
