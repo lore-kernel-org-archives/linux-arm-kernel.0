@@ -1,83 +1,73 @@
 From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 27 Jan 2014 14:54:25 -0800
-Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <5086198.ZOWZ5xuyna@wuerfel>
-References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
- <CACoXjc=ZT9fEm_KdY4WFSoS8n5FmO+hn9LjsR4m8YZG2iBbt5A@mail.gmail.com>
- <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
- <5086198.ZOWZ5xuyna@wuerfel>
-Message-ID: <CACoXjcnTnhWS-5yOgiHA5yVaBjdH1DVzmSsknEBJLB+CFR0EyA@mail.gmail.com>
+Date: Mon, 27 Jan 2014 14:58:10 -0800
+Subject: [RFC PATCH V3 0/4] APM X-Gene PCIe controller
+In-Reply-To: <CALdTtnsEo74UeYgoQ0DF7=LN074b_0bL0vg6Bxs02B9nDkRTNA@mail.gmail.com>
+References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
+ <CALdTtnsEo74UeYgoQ0DF7=LN074b_0bL0vg6Bxs02B9nDkRTNA@mail.gmail.com>
+Message-ID: <CACoXjcmwspC58WwELQgfbJ-ye5RR0OQh9QA=sVeRDvFTuAxBUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 25, 2014 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
->> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
->> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
->
->> >>
->> >>> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port, u32 *lanes)
->> >>> +{
->> >>> +     void *csr_base = port->csr_base;
->> >>> +     u32 val32;
->> >>> +     u64 start_time, time;
->> >>> +
->> >>> +     /*
->> >>> +      * A component enters the LTSSM Detect state within
->> >>> +      * 20ms of the end of fundamental core reset.
->> >>> +      */
->> >>> +     msleep(XGENE_LTSSM_DETECT_WAIT);
->> >>> +     port->link_up = 0;
->> >>> +     start_time = jiffies;
->> >>> +     do {
->> >>> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
->> >>> +             if (val32 & LINK_UP_MASK) {
->> >>> +                     port->link_up = 1;
->> >>> +                     port->link_speed = PIPE_PHY_RATE_RD(val32);
->> >>> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
->> >>> +                     *lanes = val32 >> 26;
->> >>> +             }
->> >>> +             time = jiffies_to_msecs(jiffies - start_time);
->> >>> +     } while ((!port->link_up) || (time <= XGENE_LTSSM_L0_WAIT));
->> >>> +}
->> >>
->> >> Maybe another msleep() in the loop? It seems weird to first do an
->> >> unconditional sleep but then busy-wait for the result.
->> >
->> > ok.
+On Sat, Jan 25, 2014 at 8:09 AM, Dann Frazier
+<dann.frazier@canonical.com> wrote:
+> On Fri, Jan 24, 2014 at 2:32 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+>> This patch adds support for AppliedMicro X-Gene PCIe host controller. The
+>> driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
+>> cards.
 >>
->> This loop can execute for maximum 4 msec. So putting msleep(1) won't
->> get us much.
+>> X-Gene PCIe controller driver has depedency on the pcie arch support for
+>> arm64. The arm64 pcie arch support is not yet part of mainline Linux kernel
+>> and approach for arch support is under discussion with arm64 maintainers.
+>> The reference patch can be found here --> https://lkml.org/lkml/2013/10/23/244
 >
-> 4 msec is still quite a long time for a busy loop that can be spent doing
-> useful work in another thread.
+> The reference patch looks corrupted (pcibios.c has no includes, etc),
+> would you mind reposting?
+
+Yes. You are right. I will re-post the patch.
+
 >
-
-Right. If 'msleep(1)' is used, then 'checkpatch' throws a warning
-saying that it can actually sleep for 20ms in some cases. I will check
-if 'usleep_range' is useful here.
-
->> >>
->> >> Another general note: Your "compatible" strings are rather unspecific.
->> >> Do you have a version number for this IP block? I suppose that it's related
->> >> to one that has been used in other chips before, or will be used in future
->> >> chips, if it's not actually licensed from some other company.
->> >
->> > I will have to check this.
->> >
+>   -dann
+>
+>> If someone wishes to test PCIe on X-Gene, arch support patch must be applied
+>> before the patches in this patch set.
 >>
->> We have decided to stick with current compatible string for now.
->
-> Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
-> product and you won't be doing any new chips based on the same hardware
-> components?
-
-The current convention is to key upon the family name - X-Gene. Future
-chips will also be a part of X-Gene family. Right now it is unclear if
-there are any obvious feature additions to be done in Linux PCIe
-driver. Until then same driver is expected to work as is in future
-chips.
-
->
->         Arnd
+>> changes since V2:
+>> 1. redefined each PCI port in different PCI domain correctly.
+>> 2. removed setup_lane and setup_link functions from driver.
+>> 3. removed scan_bus wrapper and set_primary_bus hack.
+>> 4. added pci_ioremap_io for io resources.
+>>
+>> changes since V1:
+>> 1. added PCI domain support
+>> 2. reading cpu and pci addresses from device tree to configure regions.
+>> 3. got rid of unnecessary wrappers for readl and writel.
+>> 4. got rid of endpoint configuration code.
+>> 5. added 'dma-ranges' property support to read inbound region configuration.
+>> 6. renamed host driver file to 'pci-xgene.c' from 'pcie-xgene.c'
+>> 7. dropped 'clock-names' property from bindings
+>> 8. added comments whereever requested.
+>>
+>> Tanmay Inamdar (4):
+>>   pci: APM X-Gene PCIe controller driver
+>>   arm64: dts: APM X-Gene PCIe device tree nodes
+>>   dt-bindings: pci: xgene pcie device tree bindings
+>>   MAINTAINERS: entry for APM X-Gene PCIe host driver
+>>
+>>  .../devicetree/bindings/pci/xgene-pci.txt          |   52 ++
+>>  MAINTAINERS                                        |    7 +
+>>  arch/arm64/boot/dts/apm-mustang.dts                |    8 +
+>>  arch/arm64/boot/dts/apm-storm.dtsi                 |  155 ++++
+>>  drivers/pci/host/Kconfig                           |   10 +
+>>  drivers/pci/host/Makefile                          |    1 +
+>>  drivers/pci/host/pci-xgene.c                       |  784 ++++++++++++++++++++
+>>  7 files changed, 1017 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci.txt
+>>  create mode 100644 drivers/pci/host/pci-xgene.c
+>>
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
