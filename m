@@ -1,57 +1,32 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 27 Jan 2014 20:04:50 +0900
-Subject: [PATCH] arm64: dts:  add <dt-bindings/> symlink
-In-Reply-To: <20140110115432.21fb03af@ipc1.ka-ro>
-References: <1389346197-5127-1-git-send-email-pankaj.dubey@samsung.com>
- <20140110102226.63f5bf30@ipc1.ka-ro> <52CFCFA1.4080405@samsung.com>
- <20140110115432.21fb03af@ipc1.ka-ro>
-Message-ID: <52E63D52.6050600@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 27 Jan 2014 10:50:37 +0000
+Subject: [PATCH] drivers: bus: fix CCI driver kcalloc call parameters swap
+Message-ID: <1390819837-32196-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 07:54 PM, Lothar Wa?mann wrote:
-> Hi,
->
-> Pankaj Dubey wrote:
->> On 01/10/2014 06:22 PM, Lothar Wa?mann wrote:
->>> Hi,
->>>
->>> Pankaj Dubey wrote:
->>>> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
->>>> match the ones in ARM architectures so that preprocessed device
->>>> tree files can include various useful constant definitions.
->>>>
->>>> See commit c58299a (kbuild: create an "include chroot" for DT bindings)
->>>> merged in v3.10-rc1 for details.
->>>>
->>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>> ---
->>>>    arch/arm64/boot/dts/include/dt-bindings |    1 +
->>>>    1 file changed, 1 insertion(+)
->>>>    create mode 120000 arch/arm64/boot/dts/include/dt-bindings
->>>>
->>>> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
->>>> new file mode 120000
->>>> index 0000000..08c00e4
->>>> --- /dev/null
->>>> +++ b/arch/arm64/boot/dts/include/dt-bindings
->>>> @@ -0,0 +1 @@
->>>> +../../../../../include/dt-bindings
->>>> \ No newline at end of file
->>> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->> I just created symlink file to "include/dt-bindings", and when created
->> patch it is showing this line
->> at the end of patch. I do not have much idea why this came in patch? But
->> when I checked similar patches
->> it looks like it is required.
->>
-> I noticed after sending the email, that the file in question was
-> actually only a symlink. The message seems to be a 'feature' of
-> 'patch' when dealing with symlinks.
->
->
-> Lothar Wa?mann
-Gentle Ping.
+This patch fixes a bug/typo in the CCI driver kcalloc usage
+that inadvertently swapped the parameters order in the
+kcalloc call and went unnoticed.
 
-Best Regards,
-Pankaj Dubey
+Reported-by: Xia Feng <xiafeng@allwinnertech.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/bus/arm-cci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index b6739cb..962fd35 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -979,7 +979,7 @@ static int cci_probe(void)
+ 
+ 	nb_cci_ports = cci_config->nb_ace + cci_config->nb_ace_lite;
+ 
+-	ports = kcalloc(sizeof(*ports), nb_cci_ports, GFP_KERNEL);
++	ports = kcalloc(nb_cci_ports, sizeof(*ports), GFP_KERNEL);
+ 	if (!ports)
+ 		return -ENOMEM;
+ 
+-- 
+1.8.2.2
