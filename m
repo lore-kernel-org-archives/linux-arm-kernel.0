@@ -1,38 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Jan 2014 19:31:49 +0000
-Subject: [PATCH v2 3/3] Binding: atmel-wm8904: add option to choose clock
-In-Reply-To: <1390805726-1841-4-git-send-email-voice.shen@atmel.com>
-References: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
- <1390805726-1841-4-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140127193149.GQ11841@sirena.org.uk>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Mon, 27 Jan 2014 21:31:59 +0200
+Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <20140127190641.273890c6@armhf>
+References: <y>	<cover.1390836773.git.jsarha@ti.com>	<52E6806A.2090109@metafoo.de>	<52E686B2.9060806@ti.com>
+ <20140127190641.273890c6@armhf>
+Message-ID: <52E6B42F.4050901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 02:55:26PM +0800, Bo Shen wrote:
+On 01/27/2014 08:06 PM, Jean-Francois Moine wrote:
+> On Mon, 27 Jan 2014 18:17:54 +0200
+> Jyri Sarha <jsarha@ti.com> wrote:
+>
+>> Support for S16_LE could maybe be added if the tda998x specific codec
+>> would fiddle with CTS_N predivider-setting (K select) according to the
+>> used sample width. But it appears Cobox plays all the sample formats
+>> fine without this change, so the question is if playing around with
+>> CTS_N predivider would break already working support there (something to
+>> be tested).
+>
+> Jyri,
+>
+> Setting
+>
+> 	cts_n = CTS_N_M(3) | CTS_N_K(1);
+>
+> instead of K(3) in the I2S sequence of tda998x_configure_audio() in the
+> tda998x driver works fine for me with S16_LE and S24_LE.
+>
+> Does this solve your problem?
+>
 
-> diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> index 8bbe50c..2d86e2b 100644
-> --- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> +++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
-> @@ -33,6 +33,12 @@ Required properties:
->  
->  Optional properties:
->    - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
-> +  - atmel,clk-from-rk-pin: bool property.
-> +     - When SSC works in slave mode, according to the hardware design, the
-> +       clock can get from TK pin, and also can get from RK pin. So, add
-> +       this parameter to choose where the clock from.
-> +     - By default the clock is from TK pin, if the clock from RK pin, this
-> +       property is needed.
+With that setting S16_LE works, but S32_LE does not. S24_LE does not 
+really work at all on BBB, or it works but because the 8 most 
+significant bits are zero the audio output is attenuated by 48 dB.
 
-Can this be made a property of the SSC device so that it's available for
-all cards using it rather than just this one?  That would also address
-the issue with the way the configuration is passed to the controller
-that Lars-Peter identified.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/89853ba3/attachment.sig>
+On the other hand S24_3LE does work, but then the problem is the clock 
+rate support. On BBB the McASP IP is the bit clock master and provides 
+the bit clock by simple divider from 24.576MHz oscillator. With 24 bit 
+samples neither 44100 or 48000Hz sample rate can be supported (on the 
+other hand 32kHz could be supported 24576000 % (24*2*32000) = 0).
+
+The BBB HW price has squeezed so low that it can only implement the most 
+basic use cases.
+
+I would suggest to leave the CTS_N_K to the current setting (3), unless 
+we can change the CTS_N_K on the fly according to the used sample format.
+
+Best regards,
+Jyri
