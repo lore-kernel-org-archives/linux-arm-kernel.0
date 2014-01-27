@@ -1,49 +1,40 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 27 Jan 2014 14:55:25 +0800
-Subject: [PATCH v2 2/3] ASoC: atmel_wm8904: make it available to choose clock
+Date: Mon, 27 Jan 2014 14:55:26 +0800
+Subject: [PATCH v2 3/3] Binding: atmel-wm8904: add option to choose clock
 In-Reply-To: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
 References: <1390805726-1841-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1390805726-1841-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <1390805726-1841-4-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it available to choose the clock from TK pin or RK pin. This
-is hardware design decided.
+Add the option to choose clock on which pin input to SSC (as slave).
+Default is on TK pin to SSC, add "atmel,clk-from-rk-pin" option to
+specify the clock is on RK pin to SSC.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
-Changes in v2: None
+Changes in v2:
+  - using "-" replace "_" in binding document
 
- sound/soc/atmel/atmel_wm8904.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/sound/atmel-wm8904.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/sound/soc/atmel/atmel_wm8904.c b/sound/soc/atmel/atmel_wm8904.c
-index b4e3690..9346410 100644
---- a/sound/soc/atmel/atmel_wm8904.c
-+++ b/sound/soc/atmel/atmel_wm8904.c
-@@ -108,6 +108,7 @@ static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
- 	struct device_node *codec_np, *cpu_np;
- 	struct snd_soc_card *card = &atmel_asoc_wm8904_card;
- 	struct snd_soc_dai_link *dailink = &atmel_asoc_wm8904_dailink;
-+	struct atmel_ssc_info *ssc_info;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
+index 8bbe50c..2d86e2b 100644
+--- a/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
++++ b/Documentation/devicetree/bindings/sound/atmel-wm8904.txt
+@@ -33,6 +33,12 @@ Required properties:
  
- 	if (!np) {
-@@ -115,6 +116,15 @@ static int atmel_asoc_wm8904_dt_init(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+ Optional properties:
+   - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
++  - atmel,clk-from-rk-pin: bool property.
++     - When SSC works in slave mode, according to the hardware design, the
++       clock can get from TK pin, and also can get from RK pin. So, add
++       this parameter to choose where the clock from.
++     - By default the clock is from TK pin, if the clock from RK pin, this
++       property is needed.
  
-+	ssc_info = devm_kzalloc(&pdev->dev, sizeof(*ssc_info), GFP_KERNEL);
-+	if (!ssc_info)
-+		return -ENOMEM;
-+
-+	ssc_info->clk_from_rk_pin =
-+		of_property_read_bool(np, "atmel,clk-from-rk-pin");
-+
-+	card->drvdata = (void *)ssc_info;
-+
- 	ret = snd_soc_of_parse_card_name(card, "atmel,model");
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to parse card name\n");
+ Example:
+ sound {
 -- 
 1.8.5.2
