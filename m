@@ -1,16 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Jan 2014 15:50:27 +0800
-Subject: [PATCH v4 0/3] serial: fsl_lpuart: add DMA support
-In-Reply-To: <1390363773-24108-1-git-send-email-yao.yuan@freescale.com>
-References: <1390363773-24108-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20140127075025.GC4765@S2101-09.ap.freescale.net>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 27 Jan 2014 09:08:49 +0100
+Subject: GPIO triggers kernel reboot
+In-Reply-To: <52E5FB1A.2020205@denx.de> (Heiko Schocher's message of "Mon, 27
+ Jan 2014 07:22:18 +0100")
+References: <52E3E031.6040709@denx.de>
+ <CALLGbRKK_ZcOB6nAiV67njrphXMQXN7Y2s81n5k3PWoSVrsrUw@mail.gmail.com>
+ <52E5FB1A.2020205@denx.de>
+Message-ID: <8761p5hmni.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 12:09:30PM +0800, Yuan Yao wrote:
-> Changed in v4:
-> - Move dma properties from dtsi to dts.
+Heiko Schocher <hs@denx.de> writes:
 
-Why this change?  DMA is a SoC level resource rather than board one.
+> Hello Steve,
+>
+> Thanks for your answer!
+>
+> Am 25.01.2014 20:39, schrieb Steve deRosier:
+>> Hi Heiko,
+>>
+>> It's certainly possible, and it's also easily done from user-space.
+>>   Something like this is more policy than function.  It's also a potential
+>> security issue.  As such I'd expect it highly unlikely that the kernel
+>> maintainers would allow it to go upstream. Give it a try though.
+>
+> Ok, thats what I also think ...
+>
+>> I'd approach this from user-space.  Add in the gpio-keys driver and use the
+>> input-event-daemon to trigger a reboot.  Super easy.
+>
+> Yes, that was also my suggestion, but is there a way to do this without
+> user space usage in a generic way?
 
-Shawn
+I think that you can register an input handler for that. iirc, there was
+a driver doing something similar for apm.
+
+Arnaud
