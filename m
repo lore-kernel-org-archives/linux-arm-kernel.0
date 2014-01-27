@@ -1,27 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jan 2014 12:58:39 +0000
-Subject: [PATCH RFC v2 1/2] Documentation: arm: add cache DT bindings
-In-Reply-To: <20140121114845.GA2598@e103592.cambridge.arm.com>
-References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1390240079-6495-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20140121114845.GA2598@e103592.cambridge.arm.com>
-Message-ID: <20140127125839.GL15937@n2100.arm.linux.org.uk>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 27 Jan 2014 18:42:36 +0530
+Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
+ driver support
+In-Reply-To: <52E54849.2000208@metafoo.de>
+References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
+ <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
+ <52E0FC22.8060903@metafoo.de>
+ <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
+ <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
+ <52E54849.2000208@metafoo.de>
+Message-ID: <CA+mB=1JvnTcyRnuvdnW1BCeiMLSTMrrAbKwVKgwFUmWrVuXzSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 21, 2014 at 11:49:01AM +0000, Dave Martin wrote:
-> I do have a worry that because the kernel won't normally use this
-> information, by default it will get pasted between .dts files, won't get
-> tested and will be wrong rather often.  It also violates the DT principle
-> that probeable information should not be present in the DT -- ePAPR
-> obviously envisages systems where cache geometry information is not
-> probeable, but that's not the case for architected caches on ARM, except
-> in rare cases where the CLIDR is wrong.
+Hi Lars/Vinod,
 
-That statement is wrong.  There are caches on ARM CPUs where there is no
-CLIDR register.  I suggest reading the earlier DDI0100 revisions.
+On Sun, Jan 26, 2014 at 11:09 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 01/26/2014 02:59 PM, Vinod Koul wrote:
+>> On Fri, Jan 24, 2014 at 02:24:27PM +0100, Lars-Peter Clausen wrote:
+>>> On 01/24/2014 12:16 PM, Srikanth Thokala wrote:
+>>>> Hi Lars,
+>>>>
+>>>> On Thu, Jan 23, 2014 at 4:55 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>>>>> On 01/22/2014 05:52 PM, Srikanth Thokala wrote:
+>>>>> [...]
+>>>>>> +/**
+>>>>>> + * xilinx_vdma_device_control - Configure DMA channel of the device
+>>>>>> + * @dchan: DMA Channel pointer
+>>>>>> + * @cmd: DMA control command
+>>>>>> + * @arg: Channel configuration
+>>>>>> + *
+>>>>>> + * Return: '0' on success and failure value on error
+>>>>>> + */
+>>>>>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
+>>>>>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
+>>>>>> +{
+>>>>>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>>>>>> +
+>>>>>> +     switch (cmd) {
+>>>>>> +     case DMA_TERMINATE_ALL:
+>>>>>> +             xilinx_vdma_terminate_all(chan);
+>>>>>> +             return 0;
+>>>>>> +     case DMA_SLAVE_CONFIG:
+>>>>>> +             return xilinx_vdma_slave_config(chan,
+>>>>>> +                                     (struct xilinx_vdma_config *)arg);
+>>>>>
+>>>>> You really shouldn't be overloading the generic API with your own semantics.
+>>>>> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
+>>>>
+>>>> Ok.  The driver needs few additional configuration from the slave
+>>>> device like Vertical
+>>>> Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
+>>>> suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
+>>>> defined for Freescale drivers?
+>>>
+>>> In my opinion it is not a good idea to have driver implement a generic API,
+>>> but at the same time let the driver have custom semantics for those API
+>>> calls. It's a bit like having a gpio driver that expects 23 and 42 as the
+>>> values passed to gpio_set_value instead of 0 and 1. It completely defeats
+>>> the purpose of a generic API, namely that you are able to write generic code
+>>> that makes use of the API without having to know about which implementation
+>>> API it is talking to. The dmaengine framework provides the
+>>> dmaengine_prep_interleaved_dma() function to setup two dimensional
+>>> transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
+>>
+>> The question here i think would be waht this device supports? Is the hardware
+>> capable of doing interleaved transfers, then would make sense.
+>
+> The hardware does 2D transfers. The parameters for a transfer are height,
+> width and stride. That's only a subset of what interleaved transfers can be
+> (xt->num_frames must be one for 2d transfers). But if I remember correctly
+> there has been some discussion on this in the past and the result of that
+> discussion was that using interleaved transfers for 2D transfers is
+> preferred over adding a custom API for 2D transfers.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+I went through the prep_interleaved_dma API and I see only one descriptor
+is prepared per API call (i.e. per frame).  As our IP supports upto 16 frame
+buffers (can be more in future), isn't it less efficient compared to the
+prep_slave_sg where we get a single sg list and can prepare all the descriptors
+(of non-contiguous buffers) in one go?  Correct me, if am wrong and let me
+know your opinions.
+
+Srikanth
+
+>
+> - Lars
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
