@@ -1,69 +1,47 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 27 Jan 2014 01:33:17 +0100
-Subject: [PATCH 4/4] ARM: OMAP2+: Add pdata quirk for sys_clkout2 for omap3
- DBB056
-In-Reply-To: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
-References: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <1390782797-24105-5-git-send-email-chf.fritz@googlemail.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Mon, 27 Jan 2014 09:44:07 +0800
+Subject: [PATCH] dma: mmp_pdma: add IRQF_SHARED when request irq
+Message-ID: <1390787047-11507-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Full device tree support for clock control, especially to set frequencies,
-is not yet accomplished. Until then, configure the 24Mhz of sys_clkout2 to
-feed an USB-Hub here.
+From: Chao Xie <chao.xie@marvell.com>
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+For some SOCes use mmp_pdma, they have several dma controllers
+sharing same irq.
+So add IRQF_SHARED to flag when request irq. It can make multiple
+controllers share the same irq.
+
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c |   37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/dma/mmp_pdma.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 435a823..e36ac3f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -172,6 +172,43 @@ static void __init am3517_evm_legacy_init(void)
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index 32e58ee..b86415b 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -866,8 +866,8 @@ static int mmp_pdma_chan_init(struct mmp_pdma_device *pdev, int idx, int irq)
+ 	phy->base = pdev->base;
  
- static void __init omap3_dbb056_legacy_init(void)
- {
-+	struct clk *clkout2;
-+	struct clk *cm96fck;
-+
-+	/* Reparent clkout2 to 96M_FCK */
-+	pr_info("%s: Late Reparent clkout2 to 96M_FCK\n", __func__);
-+	clkout2 = clk_get(NULL, "clkout2_src_ck");
-+	if (clkout2 < 0) {
-+		pr_err("a83x-quirk: couldn't get clkout2_src_ck\n");
-+		return;
-+	}
-+	cm96fck = clk_get(NULL, "cm_96m_fck");
-+	if (cm96fck < 0) {
-+		pr_err("a83x-quirk: couldn't get cm_96m_fck\n");
-+		return;
-+	}
-+	if (clk_set_parent(clkout2, cm96fck) < 0) {
-+		pr_err("a83x-quirk: couldn't reparent clkout2_src_ck\n");
-+		return;
-+	}
-+
-+	/* Set clkout2 to 24MHz for internal usb hub*/
-+	pr_info("%s: Set clkout2 to 24MHz for internal usb hub\n", __func__);
-+	clkout2 = clk_get(NULL, "sys_clkout2");
-+	if (clkout2 < 0) {
-+		pr_err("%s: couldn't get sys_clkout2\n", __func__);
-+		return;
-+	}
-+	if (clk_set_rate(clkout2, 24000000) < 0) {
-+		pr_err("%s: couldn't set sys_clkout2 rate\n", __func__);
-+		return;
-+	}
-+	if (clk_prepare_enable(clkout2) < 0) {
-+		pr_err("%s: couldn't enable sys_clkout2\n", __func__);
-+		return;
-+	}
-+
-+	/* Initialize display */
- 	omap3_dbb056_display_init_of();
- }
- #endif /* CONFIG_ARCH_OMAP3 */
+ 	if (irq) {
+-		ret = devm_request_irq(pdev->dev, irq, mmp_pdma_chan_handler, 0,
+-				       "pdma", phy);
++		ret = devm_request_irq(pdev->dev, irq, mmp_pdma_chan_handler,
++				       IRQF_SHARED, "pdma", phy);
+ 		if (ret) {
+ 			dev_err(pdev->dev, "channel request irq fail!\n");
+ 			return ret;
+@@ -964,8 +964,8 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 	if (irq_num != dma_channels) {
+ 		/* all chan share one irq, demux inside */
+ 		irq = platform_get_irq(op, 0);
+-		ret = devm_request_irq(pdev->dev, irq, mmp_pdma_int_handler, 0,
+-				       "pdma", pdev);
++		ret = devm_request_irq(pdev->dev, irq, mmp_pdma_int_handler,
++				       IRQF_SHARED, "pdma", pdev);
+ 		if (ret)
+ 			return ret;
+ 	}
 -- 
-1.7.10.4
+1.8.3.2
