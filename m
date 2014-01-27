@@ -1,65 +1,21 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Jan 2014 18:30:46 +0100
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 27 Jan 2014 18:35:57 +0100
 Subject: [PATCH 1/9] ARM: get rid of arch_cpu_idle_prepare()
 In-Reply-To: <20140127172110.GR15937@n2100.arm.linux.org.uk>
 References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
  <1390802904-28399-2-git-send-email-nicolas.pitre@linaro.org>
- <52E6175F.1050401@linaro.org> <20140127160736.GP15937@n2100.arm.linux.org.uk>
- <52E69395.9020004@linaro.org> <20140127172110.GR15937@n2100.arm.linux.org.uk>
-Message-ID: <52E697C6.10809@linaro.org>
+ <52E6175F.1050401@linaro.org>
+ <20140127160736.GP15937@n2100.arm.linux.org.uk>
+ <52E69395.9020004@linaro.org>
+ <20140127172110.GR15937@n2100.arm.linux.org.uk>
+Message-ID: <20140127173557.GE4941@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 06:21 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 27, 2014 at 06:12:53PM +0100, Daniel Lezcano wrote:
->> On 01/27/2014 05:07 PM, Russell King - ARM Linux wrote:
->>> On Mon, Jan 27, 2014 at 09:22:55AM +0100, Daniel Lezcano wrote:
->>>> On 01/27/2014 07:08 AM, Nicolas Pitre wrote:
->>>>> ARM and ARM64 are the only two architectures implementing
->>>>> arch_cpu_idle_prepare() simply to call local_fiq_enable().
->>>>>
->>>>> We have secondary_start_kernel() already calling local_fiq_enable() and
->>>>> this is done a second time in arch_cpu_idle_prepare() in that case. And
->>>>> enabling FIQs has nothing to do with idling the CPU to start with.
->>>>>
->>>>> So let's introduce init_fiq_boot_cpu() to take care of FIQs on the boot
->>>>> CPU and remove arch_cpu_idle_prepare(). This is now done a bit earlier
->>>>> at late_initcall time but this shouldn't make a difference in practice
->>>>> i.e. when FIQs are actually used.
->>>>>
->>>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>>
->>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>
->>> What kind of review did you do when giving that attributation?
->>
->> I did the review to the best of my knowledge and with good will.
->>
->> I read your comment on this patch and I learnt one more thing.
->>
->> Today, I am smarter than yesterday and dumber than tomorrow :)
->
-> Just be aware that putting a comment along with the reviewed-by tag
-> is always a good idea.  I know that's a little more work, but this has
-> been raised a number of times by various people over the years.
->
+On Mon, Jan 27, 2014 at 05:21:10PM +0000, Russell King - ARM Linux wrote:
 > A reviewed-by tag on its own doesn't mean much, as it could mean that
 > you've just glanced over the code and decided "yea, it looks okay", or
 > it could mean that you've spent all day verifying that the code change
 > is indeed correct.
->
-> Consequently, some will ignore emails which just contain a reviewed-by
-> attributation.
 
-Thanks for the clarification. I will take care of giving a comment next 
-time.
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+One should use Acked-by for the 'yea, it looks okay' thing.
