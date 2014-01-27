@@ -1,46 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Jan 2014 23:22:55 +0800
-Subject: [PATCH 1/9] ARM: dts: imx6qdl: remove the use of pingrp macros
-In-Reply-To: <20140127151638.GN15937@n2100.arm.linux.org.uk>
-References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
- <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
- <20140127143745.GM15937@n2100.arm.linux.org.uk>
- <20140127150509.GD4765@S2101-09.ap.freescale.net>
- <20140127151638.GN15937@n2100.arm.linux.org.uk>
-Message-ID: <20140127152253.GE4765@S2101-09.ap.freescale.net>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Mon, 27 Jan 2014 15:24:57 +0000
+Subject: [Q] block / zynq: DMA bouncing
+In-Reply-To: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+Message-ID: <20140127152457.GA1073@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 03:16:39PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 27, 2014 at 11:05:11PM +0800, Shawn Guo wrote:
-> > On Mon, Jan 27, 2014 at 02:37:45PM +0000, Russell King - ARM Linux wrote:
-> > > On Sun, Jan 26, 2014 at 12:43:03AM +0800, Shawn Guo wrote:
-> > > >  arch/arm/boot/dts/imx6dl-hummingboard.dts  |    5 +-
-> > > >  arch/arm/boot/dts/imx6qdl-microsom.dtsi    |    5 +-
-> > > 
-> > > I've merged your changes here into my local copy of these just to reduce
-> > > the conflicts - unfortunately, it's taken soo long to deal with the above
-> > > that the cubox-i has now been released, which has prompted some
-> > > reorganisation between the above two files.
-> > > 
-> > > I would much rather you dropped these two entirely, and let me push them
-> > > upstream, rather than having some nasty conflicts which result from this.
-> > 
-> > So you're basically asking me to drop patch [1] from imx/dt branch (tag
-> > imx-dt-3.14), which I have sent to Olof for 3.14 inclusion.  Yes, I
-> > still hope Olof can pull it with this turn-around series applied on top.
-> > So please let's wait for Olof's word to see if we can make it.  If it's
-> > still a NO for some reason, I will be certainly fine with you pushing
-> > hummingboard stuff upstream, and will drop it from my tree.
+On Mon, Jan 27, 2014 at 04:13:56PM +0100, Guennadi Liakhovetski wrote:
+> Hi all,
 > 
-> My point is that the DT files I _now_ have are quite different in
-> organisation to the ones I submitted to you, so there's going to be
-> conflicts if your version goes in.
+> I'm working on an MMC driver with a DMA capability. All has been working 
+> well, until at some point I've got a bus error, when the mmc driver had 
+> been handed in a buffer at 0x3000 physical RAM address. The reason is, 
+> that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
+> my question: how shall I configure this in software?
 > 
-> Moreover, I don't want the old ones in 3.14 as-is, because I don't want
-> declarations which should not have been in the microsom file but in the
-> hummingboard file being in a final release of the mainline kernel.
+> The way I found was to use ARM-specific struct dmabounce_device_info and 
+> implement its .needs_bounce() method to return true for those addresses. 
+> Is this the right way or is there a better / more straight-forward one?
+> 
+> To do the above I have to enable CONFIG_DMABOUNCE, which then selects 
+> CONFIG_ZONE_DMA. Having done just that I suddenly discover, that 0x3000 
+> buffers aren't used any more, so, I cannot actually verify my 
+> implementation :) Looking at ZONE_DMA it looks like it is still covering 
+> the whole RAM range (/proc/zoneinfo shows start_pfn=0 in zone DMA), so, I 
+> don't see why 0x3000 should be excluded now.
+> 
+> So, is using the .needs_bounce() method the correct way to support DMA on 
+> this arch or is there a better one?
 
-We can take care of them with incremental patches during early -rc.
+I have a similar issue with Renesas R8A7790 where there is a bus bridge
+that can only deal with transactions to one half of the available RAM.
 
-Shawn
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
