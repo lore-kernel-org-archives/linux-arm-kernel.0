@@ -1,57 +1,35 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 27 Jan 2014 17:08:55 +0200
-Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
- returns -ENODEV/-ENXIO
-In-Reply-To: <20140121144725.GF30451@saruman.home>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
- <20140121144725.GF30451@saruman.home>
-Message-ID: <20140127150855.GA17928@xps8300>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 27 Jan 2014 16:13:56 +0100 (CET)
+Subject: [Q] block / zynq: DMA bouncing
+Message-ID: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Hi all,
 
-On Tue, Jan 21, 2014 at 08:47:25AM -0600, Felipe Balbi wrote:
-> On Tue, Jan 21, 2014 at 03:41:38PM +0530, Kishon Vijay Abraham I wrote:
-> > Since PHYs for dwc3 is optional (not all SoCs that have DWC3 use PHYs),
-> > do not return from probe if the USB PHY library returns -ENODEV as that
-> 
-> this isn't correct, they all have PHYs, some of them might not be
-> controllable.
-> 
-> > indicates the platform does not have PHY.
-> 
-> not really, that indicates the current platform tried to grab a PHY and
-> the PHY doesn't exist. If there's anybody with a non-controllable PHY
-> and someone gives me a really good reason for not using the generic
-> no-op PHY, then we should add a flag and we could:
-> 
-> 	if (!likely(dwc->flags & DWC3_USB2PHY_DRIVER_NOT_NEEDED))
-> 		dwc3_grab_phys(dwc);
+I'm working on an MMC driver with a DMA capability. All has been working 
+well, until at some point I've got a bus error, when the mmc driver had 
+been handed in a buffer at 0x3000 physical RAM address. The reason is, 
+that on Zynq arch bus masters cannot access RAM below 0x80000. Therefore 
+my question: how shall I configure this in software?
 
-Why would you need to know if the PHY drivers are needed or not
-explicitly in your controller driver?
+The way I found was to use ARM-specific struct dmabounce_device_info and 
+implement its .needs_bounce() method to return true for those addresses. 
+Is this the right way or is there a better / more straight-forward one?
 
-> But I really want to see the argument against using no-op. As far as I
-> could see, everybody needs a PHY driver one way or another, some
-> platforms just haven't sent any PHY driver upstream and have their own
-> hacked up solution to avoid using the PHY layer.
+To do the above I have to enable CONFIG_DMABOUNCE, which then selects 
+CONFIG_ZONE_DMA. Having done just that I suddenly discover, that 0x3000 
+buffers aren't used any more, so, I cannot actually verify my 
+implementation :) Looking at ZONE_DMA it looks like it is still covering 
+the whole RAM range (/proc/zoneinfo shows start_pfn=0 in zone DMA), so, I 
+don't see why 0x3000 should be excluded now.
 
-Not true in our case. Platforms using Intel's SoCs and chip sets may
-or may not have controllable USB PHY. Quite often they don't. The
-Baytrails have usually ULPI PHY for USB2, but that does not mean they
-provide any vendor specific functions or any need for a driver in any
-case.
+So, is using the .needs_bounce() method the correct way to support DMA on 
+this arch or is there a better one?
 
-Are we talking about the old USB PHY library or the new PHY framework
-with the no-op PHY driver?
-
-Well, in any case, I don't understand what is the purpose of the no-op
-PHY driver. What are you drying to achieve with that?
-
-
-Thanks,
-
--- 
-heikki
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
