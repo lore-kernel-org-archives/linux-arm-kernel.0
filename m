@@ -1,36 +1,222 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Jan 2014 09:59:58 +0000
-Subject: [PATCHv2] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <1390604955-6309-1-git-send-email-lauraa@codeaurora.org>
-References: <1390604955-6309-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140127095958.GA6547@mudshark.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jan 2014 10:20:37 +0000
+Subject: [PATCH v10] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
+References: <1389971035-17781-1-git-send-email-jonas.jensen@gmail.com>
+ <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20140127102037.GB16516@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Tue, Jan 21, 2014 at 12:44:21PM +0000, Jonas Jensen wrote:
+> MOXA ART SoCs allow to determine PLL output and APB frequencies
+> by reading registers holding multiplier and divisor information.
+> 
+> Add a clock driver for this SoC.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> ---
+> 
+> Notes:
+>     Thanks for the reply Sudeep, changes are in v10.
+>     
+>     Changes since v9:
+>     
+>     1. rebase drivers/clk/Makefile to next-20140121
+>     2. remove unnecessary switch
+>     3. use a more elaborate commit message
+>     
+>     Applies to next-20140121
+> 
+>  .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
+>  drivers/clk/Makefile                               |  1 +
+>  drivers/clk/clk-moxart.c                           | 99 ++++++++++++++++++++++
+>  3 files changed, 148 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+>  create mode 100644 drivers/clk/clk-moxart.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+> new file mode 100644
+> index 0000000..242e3fc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+> @@ -0,0 +1,48 @@
+> +Device Tree Clock bindings for arch-moxart
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +MOXA ART SoCs allow to determine PLL output and APB frequencies
+> +by reading registers holding multiplier and divisor information.
+> +
+> +
+> +PLL:
+> +
+> +Required properties:
+> +- compatible : Must be "moxa,moxart-pll-clock"
+> +- #clock-cells : Should be 0
+> +- reg : Should contain registers location and length
+> +- clocks : Should contain phandle to parent clock
 
-On Fri, Jan 24, 2014 at 11:09:15PM +0000, Laura Abbott wrote:
-> arm64 currently lacks support for -fstack-protector. Add
-> similar functionality to arm to detect stack corruption.
+Nit: clocks are referenced with a clock-specifier (which might be zero
+cells), not just a phandle.
 
-[...]
+How about:
 
+clocks: should contain a phandle + clock-specifier for the parent clock
+
+> +
+> +Optional properties:
+> +- clock-output-names : Should contain clock name
+> +
+> +
+> +APB:
+> +
+> +Required properties:
+> +- compatible : Must be "moxa,moxart-apb-clock"
+> +- #clock-cells : Should be 0
+> +- reg : Should contain registers location and length
+> +- clocks : Should contain phandle to parent clock
+
+Likewise.
+
+> +
+> +Optional properties:
+> +- clock-output-names : Should contain clock name
+> +
+> +
+> +For example:
+> +
+> +	clk_pll: clk_pll at 98100000 {
+> +		compatible = "moxa,moxart-pll-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x98100000 0x34>;
+> +	};
+> +
+> +	clk_apb: clk_apb at 98100000 {
+> +		compatible = "moxa,moxart-apb-clock";
+> +		#clock-cells = <0>;
+> +		reg = <0x98100000 0x34>;
+> +		clocks = <&clk_pll>;
+> +	};
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 58b2d72..24361bf 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+>  # SoCs specific
+>  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+>  obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
+> +obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+>  obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+>  obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+>  obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
+> diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+> new file mode 100644
+> index 0000000..7021748
+> --- /dev/null
+> +++ b/drivers/clk/clk-moxart.c
+> @@ -0,0 +1,99 @@
 > +/*
-> + * Initialize the stackprotector canary value.
+> + * MOXA ART SoCs clock driver.
 > + *
-> + * NOTE: this must only be called from functions that never return,
-> + * and it must always be inlined.
+> + * Copyright (C) 2013 Jonas Jensen
+> + *
+> + * Jonas Jensen <jonas.jensen@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 > + */
-> +static __always_inline void boot_init_stack_canary(void)
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clkdev.h>
+> +
+> +void __init moxart_of_pll_clk_init(struct device_node *node)
 > +{
-> +	unsigned long canary;
+> +	static void __iomem *base;
+> +	struct clk *clk, *ref_clk;
+> +	unsigned long rate;
+> +	unsigned int mul;
+> +	const char *name = node->name;
 > +
-> +	/* Try to get a semi random initial value. */
-> +	get_random_bytes(&canary, sizeof(canary));
-> +	canary ^= LINUX_VERSION_CODE;
+> +	of_property_read_string(node, "clock-output-names", &name);
 > +
-> +	current->stack_canary = canary;
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	mul = readl(base + 0x30) >> 3 & 0x3f;
+> +	iounmap(base);
+> +
+> +	ref_clk = of_clk_get(node, 0);
+> +	if (IS_ERR(ref_clk)) {
+> +		pr_err("%s: of_clk_get failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	rate = mul * clk_get_rate(ref_clk);
+> +
+> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
 
-Do we actually need this line now?
+If this clock has a parent, Surely CLK_IS_ROOT is not appropriate by its
+definition:
 
-Will
+#define CLK_IS_ROOT             BIT(4) /* root clk, has no parent */
+
+Surely this is a fixed factor clock rather than a fixed rate clock?
+
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: clk_register_fixed_rate failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	clk_register_clkdev(clk, NULL, name);
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
+> +	       moxart_of_pll_clk_init);
+> +
+> +void __init moxart_of_apb_clk_init(struct device_node *node)
+> +{
+> +	static void __iomem *base;
+> +	struct clk *clk, *pll_clk;
+> +	unsigned long rate;
+> +	unsigned int div, val;
+> +	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
+> +	const char *name = node->name;
+> +
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +
+> +	base = of_iomap(node, 0);
+> +	if (!base) {
+> +		pr_err("%s: of_iomap failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	val = readl(base + 0xc) >> 4 & 0x7;
+> +	iounmap(base);
+> +
+> +	if (val > 4)
+> +		val = 0;
+> +	div = div_idx[val];
+> +
+> +	pll_clk = of_clk_get(node, 0);
+> +	if (IS_ERR(pll_clk)) {
+> +		pr_err("%s: of_clk_get failed\n", node->full_name);
+> +		return;
+> +	}
+> +
+> +	rate = clk_get_rate(pll_clk) / (div * 2);
+> +
+> +	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
+
+Likewise.
+
+Thanks,
+Mark.
