@@ -1,43 +1,52 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 27 Jan 2014 17:32:00 +0100
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <52E686B2.9060806@ti.com>
-References: <y> <cover.1390836773.git.jsarha@ti.com>
- <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
-Message-ID: <52E68A00.5030207@metafoo.de>
+From: andy@aeruder.net (Andrew Ruder)
+Date: Mon, 27 Jan 2014 10:39:39 -0600
+Subject: [BUG] reproducable ubifs reboot assert and corruption
+In-Reply-To: <CAFLxGvwmzftdQKSjjjwpFLS8g3EJqMrQ2gU2scBsh2MvG7Wyyw@mail.gmail.com>
+References: <20140122051510.GB17284@gmail.com>
+ <CAFLxGvwmzftdQKSjjjwpFLS8g3EJqMrQ2gU2scBsh2MvG7Wyyw@mail.gmail.com>
+Message-ID: <20140127163939.GA27809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 05:17 PM, Jyri Sarha wrote:
-> On 01/27/2014 05:51 PM, Lars-Peter Clausen wrote:
->> Hi,
->>
->> I think you should try to get this in sync with the work Jean-Francois is
->> currently doing[1]. Having the HDMI transmitter register a CODEC device is
->> definitely the right approach, compared to the rather 'interesting'
->> constraints stuff you do in patch 4.
->>
-> 
-> Oh, Jean-Francois's patches are now out. I'll take those into use, but I am
-> afraid it still does not save me from the constraint stuff.
-> 
-> The most complex piece of code comes from limited sample-rate availability,
-> which is coming Beaglebone-Black desing (available i2s master clock), not
-> from the HDMI encoder itself. It does not help with the stereo only
-> limitation either, because it comes from the one wire only audio data
-> connection on BBB.
-> 
-> Support for S16_LE could maybe be added if the tda998x specific codec would
-> fiddle with CTS_N predivider-setting (K select) according to the used sample
-> width. But it appears Cobox plays all the sample formats fine without this
-> change, so the question is if playing around with CTS_N predivider would
-> break already working support there (something to be tested).
+On Sat, Jan 25, 2014 at 04:02:15PM +0100, Richard Weinberger wrote:
+> So ubifs_bgt0_0 stops and the fun begins.
+> Can you trigger the issue also by unmounting /mnt?
+> I.e umount -l /mnt
+> The background thread should only stop after all io is done...
 
-The ASoC core will set the constraints for the audio format/rate to the
-intersection of what is supported by the CODEC and the CPU DAI. So if the
-limitation comes from the CPU DAI the constraints should be applied there
-and not in the machine driver. Similar if the tda998x only supports 32 bit
-samples it should advertise this and the compound card will only support 32
-bit samples.
+Did some experiments last week to see if I could trigger the bug with
+full debug messages enabled.  Biggest problem is that I don't have
+non-volatile memory available, serial logging slows it down too much to
+trigger the bug, and the reboot tends to shut down any attempt to
+offload the log to capture the relevant messages.
 
-- Lars
+That being said, I was able to trigger the bug with the following:
+
+[root at buildroot ~]# (sleep 5 ; while ! mount -o remount,ro /mnt ; do true ; done ; echo remount > /dev/kmsg ; sleep 5 ; echo reboot > /dev/kmsg ; reboot ) &
+[2] 564
+[root at buildroot ~]# fsstress -p 10 -n 10 -X -d /mnt/fsstress -l 0
+
+In my log I can see the "remount" message and 100ms later I can see the
+first ubifs assert.  I've attached the relevant portion of the logs
+below from the first time I see LEB 44 mentioned through the asserts.
+I've put the logs on the web due to concerns of flooding the mailing
+list with 100's of kB in attachments.
+
+https://gist.github.com/aeruder/8651928
+
+ubi_corruption.txt is the kernel log
+afterwards.txt is the console log with the ensuing issue with ubifs
+
+I also have logs of the recovery process in the Linux kernel later on,
+(still takes 2 mounts), an image of the MTD device, and would be happy
+to try anything or enable any additional debug messages.
+
+> Can you also please find out whether fssstress is still running when
+> reboot takes action?
+
+Thanks for taking a look.  I'm reading everything I can find about ubifs
+to see if I can make some headway into understanding what is going on
+but filesytems are definitely not my forte :).
+
+Cheers,
+Andrew Ruder
