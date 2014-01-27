@@ -1,48 +1,36 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 27 Jan 2014 18:57:50 +0100
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <20140127175231.GU15937@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
- <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
- <20140127175231.GU15937@n2100.arm.linux.org.uk>
-Message-ID: <52E69E1E.3020202@monstr.eu>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 27 Jan 2014 19:06:41 +0100
+Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <52E686B2.9060806@ti.com>
+References: <y> <cover.1390836773.git.jsarha@ti.com>
+ <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
+Message-ID: <20140127190641.273890c6@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 06:52 PM, Russell King - ARM Linux wrote:
-> On Mon, Jan 27, 2014 at 06:45:50PM +0100, Michal Simek wrote:
->> Why 0x4000? IRC Linux for ARM is using space for any purpose.
->> Russell knows this much better than I.
-> 
-> Probably because as the kernel is loaded at 0x8000, it will place the
-> swapper page table at 0x4000, thus covering from 0x4000 upwards.
+On Mon, 27 Jan 2014 18:17:54 +0200
+Jyri Sarha <jsarha@ti.com> wrote:
 
-Ah yeah swapper.
+> Support for S16_LE could maybe be added if the tda998x specific codec 
+> would fiddle with CTS_N predivider-setting (K select) according to the 
+> used sample width. But it appears Cobox plays all the sample formats 
+> fine without this change, so the question is if playing around with 
+> CTS_N predivider would break already working support there (something to 
+> be tested).
 
-> 
-> Thus, the majority of your un-DMA-able memory will be kernel text or
-> swapper page tables.
+Jyri,
 
-Yes, exactly.
-0x0 - 0x4000 - reserving not to be used by DMA
-0x4000 - 0x8000 swapper page table
-0x8000 - 0x80000 kernel text + up
+Setting
 
-Thanks,
-Michal
+	cts_n = CTS_N_M(3) | CTS_N_K(1);
+
+instead of K(3) in the I2S sequence of tda998x_configure_audio() in the
+tda998x driver works fine for me with S16_LE and S24_LE.
+
+Does this solve your problem?
+
+Russell, do you see any problem about this change?
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140127/f6b2b00c/attachment.sig>
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
