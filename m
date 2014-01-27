@@ -1,64 +1,30 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Mon, 27 Jan 2014 17:37:55 +0200
-Subject: [PATCH RFC v3 6/8] drm/tilcdc: Add I2C HDMI audio config for tda998x
-In-Reply-To: <cover.1390836773.git.jsarha@ti.com>
-References: <cover.1390836773.git.jsarha@ti.com>
-Message-ID: <bb2c6e93d40e1290c5015d190ae02ae77e8b81c9.1390836773.git.jsarha@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jan 2014 15:43:15 +0000
+Subject: [PATCH 2/9] ARM64: get rid of arch_cpu_idle_prepare()
+In-Reply-To: <1390802904-28399-3-git-send-email-nicolas.pitre@linaro.org>
+References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
+ <1390802904-28399-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20140127154315.GG32608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The configuration is needed for HDMI audio. The "swap" and "mirr"
-parameters have to be correctly set in the configuration in order to
-have proper colors in the HDMI picture.
+On Mon, Jan 27, 2014 at 06:08:17AM +0000, Nicolas Pitre wrote:
+> ARM and ARM64 are the only two architectures implementing
+> arch_cpu_idle_prepare() simply to call local_fiq_enable().
+> 
+> We have secondary_start_kernel() already calling local_fiq_enable() and
+> this is done a second time in arch_cpu_idle_prepare() in that case. And
+> enabling FIQs has nothing to do with idling the CPU to start with.
+> 
+> So let's introduce init_fiq_boot_cpu() to take care of FIQs on the boot
+> CPU and remove arch_cpu_idle_prepare(). This is now done a bit earlier
+> at late_initcall time but this shouldn't make a difference in practice
+> given that FIQs are not currently used on ARM64.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
-cc: airlied at linux.ie
----
- drivers/gpu/drm/tilcdc/tilcdc_slave.c |   24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+For arm64, we could simply remove any reference to FIQs. I'm not aware
+of anyone using them.
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_slave.c b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-index 595068b..e43240a 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-@@ -19,6 +19,7 @@
- #include <linux/pinctrl/pinmux.h>
- #include <linux/pinctrl/consumer.h>
- #include <drm/drm_encoder_slave.h>
-+#include <drm/i2c/tda998x.h>
- 
- #include "tilcdc_drv.h"
- 
-@@ -111,8 +112,29 @@ static const struct drm_encoder_helper_funcs slave_encoder_helper_funcs = {
- 		.restore        = drm_i2c_encoder_restore,
- };
- 
-+static struct tda998x_encoder_params tda998x_pdata = {
-+	.swap_b = 0x3,
-+	.mirr_b = 0x0,
-+	.swap_a = 0x2,
-+	.mirr_a = 0x0,
-+	.swap_d = 0x1,
-+	.mirr_d = 0x0,
-+	.swap_c = 0x0,
-+	.mirr_c = 0x0,
-+	.swap_f = 0x5,
-+	.mirr_f = 0x0,
-+	.swap_e = 0x4,
-+	.mirr_e = 0x0,
-+	.audio_cfg = 0x3,	/* I2S mode */
-+	.audio_clk_cfg = 1,	/* select clock pin */
-+	.audio_frame[1] = 1,	/* channels - 1 */
-+	.audio_format = AFMT_I2S,
-+	.audio_sample_rate = 48000,
-+};
-+
- static const struct i2c_board_info info = {
--		I2C_BOARD_INFO("tda998x", 0x70)
-+		I2C_BOARD_INFO("tda998x", 0x70),
-+		.platform_data = &tda998x_pdata,
- };
- 
- static struct drm_encoder *slave_encoder_create(struct drm_device *dev,
 -- 
-1.7.9.5
+Catalin
