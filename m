@@ -1,60 +1,58 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 27 Jan 2014 13:52:53 -0800
-Subject: [PATCH 0/2] Enable clock controllers on MSM
-In-Reply-To: <69BE1300-36E8-400B-BD77-DB89740C10D2@codeaurora.org>
-References: <1389921904-3777-1-git-send-email-sboyd@codeaurora.org>
- <878uu6y5im.fsf@paris.lan>
- <DBC6E587-D188-4DA7-B898-D1DF34613320@codeaurora.org>
- <CAOesGMgDg5KyvV9Gj0NeDnWYPQN+EZBzm18mSTku+VZOApVxyA@mail.gmail.com>
- <69BE1300-36E8-400B-BD77-DB89740C10D2@codeaurora.org>
-Message-ID: <20140127215253.4167.94988@quantum>
+Date: Mon, 27 Jan 2014 13:52:57 -0800
+Subject: [PATCH-next] drivers/clk: make max77686 driver bool for now
+In-Reply-To: <1390505535-30229-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1390505535-30229-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20140127215257.4167.26286@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kumar Gala (2014-01-23 13:57:58)
+Quoting Paul Gortmaker (2014-01-23 11:32:15)
+> Commit 3966c947f45911e093114371462687134d5e8d40 ("clk: max77686:
+> Refactor driver data handling") added a call to __clk_get_hw()
+> but this function is not exported (as __<name> is typically a
+> private/internal thing).
 > 
-> On Jan 23, 2014, at 2:43 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hence this driver fails to build modular, and has been causing
+> allmodconfig build breakage in arch outside of just ARM.  Since
+> the only defconfig that uses it sets it as =y, lets just make
+> it non-modular for now.
 > 
-> > On Thu, Jan 23, 2014 at 11:59 AM, Kumar Gala <galak@codeaurora.org> wrote:
-> >> 
-> >> On Jan 23, 2014, at 11:25 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> >> 
-> >>> Stephen Boyd <sboyd@codeaurora.org> writes:
-> >>> 
-> >>>> These patches add the clock controller nodes, enable the clock drivers
-> >>>> on MSM based platforms, and hook it up enough to get the serial console
-> >>>> working. This is based on the merge of Mike's clk-next branch with
-> >>>> linux-next-20140116. The changes need the clk-next branch because that's
-> >>>> where the DTS include files landed.
-> >>> 
-> >>> I forgot to repond to this earlier, but I tested this on top of -next
-> >>> and it gets the dragonboard booting w/mainline.  Yay!
-> >>> 
-> >>>> Perhaps this can be applied after 3.14-rc1 is out?
-> >>> 
-> >>> Yeah, sounds good.
-> >>> 
-> >>> Kevin
-> >> 
-> >> We?ll need arm-soc to pull in the clk changes from Mike?s tree for that.
-> > 
-> > They're queued for this merge window, right? If so, they'll be in -rc1
-> > and the dependency will be solved before we apply the patches.
-> > 
-> 
-> Yeah, they look like they are in Mike?s pull request for Linus.  So hopefully they?ll show up in -rc1 (wasn?t sure if Mike intended them for 3.14 or not).
+> Mike says that changes are pending to export similar functionality
+> in the future[1], so at that point in time, it can be returned to
+> tristate if desired.
 
-They are in the second pull request which I just sent today.
+Hi Paul,
+
+I've just sent off my 2nd pull request for 3.14 and it includes the
+export for __clk_get_hw.
 
 Regards,
 Mike
 
 > 
-> What?s the feeling about pushing DT and defconfig changes into 3.14 (or do we just queue them up for 3.15)?
+> [1] https://lkml.org/lkml/2014/1/20/21
 > 
-> - k
+> Reported-by: SeongJae Park <sj38.park@gmail.com>
+> Cc: SeongJae Park <sj38.park@gmail.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 > 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index efb508a..009fb9b 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -40,7 +40,7 @@ config COMMON_CLK_VERSATILE
+>           - Versatile Express
+>  
+>  config COMMON_CLK_MAX77686
+> -       tristate "Clock driver for Maxim 77686 MFD"
+> +       bool "Clock driver for Maxim 77686 MFD"
+>         depends on MFD_MAX77686
+>         ---help---
+>           This driver supports Maxim 77686 crystal oscillator clock. 
 > -- 
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 1.8.5.2
 > 
