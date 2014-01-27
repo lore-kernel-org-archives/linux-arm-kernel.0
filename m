@@ -1,39 +1,36 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Mon, 27 Jan 2014 11:48:55 +0200
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through
- DT
-In-Reply-To: <CAGb2v64RbXZS_5nvXf9_t=Q=+zrBa=eF-f-xcZTxaMLYSQkNrw@mail.gmail.com>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <20140120164859.GF15937@n2100.arm.linux.org.uk>
- <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
- <52E61C28.1020207@ti.com>
- <CAGb2v64RbXZS_5nvXf9_t=Q=+zrBa=eF-f-xcZTxaMLYSQkNrw@mail.gmail.com>
-Message-ID: <52E62B87.8010103@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Jan 2014 09:59:58 +0000
+Subject: [PATCHv2] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <1390604955-6309-1-git-send-email-lauraa@codeaurora.org>
+References: <1390604955-6309-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140127095958.GA6547@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2014 10:54 AM, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Mon, Jan 27, 2014 at 4:43 PM, Jyri Sarha <jsarha@ti.com> wrote:
->> On 01/24/2014 07:35 PM, Fabio Estevam wrote:
-...
->> I have not received too much feedback to my patch yet. CCF is a bit new
->> territory to me, but I think having a separate stackable clk-gpio would be
->> more flexible than having the gpio property implemented in clk-fixed-rate.
->
-> Not sure where stacking external clocks would be used, but sounds like a
-> fixed factor clock? Maybe you should add DT support to that if that's what
-> you need or have.
->
+Hi Laura,
 
-Ah, but then there is also the problem of having to change 
-clk_register_fixed_rate() in the CCF api, which is called from all over 
-the place.
+On Fri, Jan 24, 2014 at 11:09:15PM +0000, Laura Abbott wrote:
+> arm64 currently lacks support for -fstack-protector. Add
+> similar functionality to arm to detect stack corruption.
 
-Of course I could add a new clk_register_fixed_rate_gpio(), but still it 
-does not look to me like the way to go.
+[...]
 
-Cheers,
-Jyri
+> +/*
+> + * Initialize the stackprotector canary value.
+> + *
+> + * NOTE: this must only be called from functions that never return,
+> + * and it must always be inlined.
+> + */
+> +static __always_inline void boot_init_stack_canary(void)
+> +{
+> +	unsigned long canary;
+> +
+> +	/* Try to get a semi random initial value. */
+> +	get_random_bytes(&canary, sizeof(canary));
+> +	canary ^= LINUX_VERSION_CODE;
+> +
+> +	current->stack_canary = canary;
+
+Do we actually need this line now?
+
+Will
