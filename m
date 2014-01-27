@@ -1,49 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 27 Jan 2014 16:54:30 +0800
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <52E61C28.1020207@ti.com>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <20140120164859.GF15937@n2100.arm.linux.org.uk>
- <CAOMZO5DdTP0gimwdsBUZK3wXrnUd2FN3w-FszLQkvCwM8gvPpg@mail.gmail.com>
- <52E61C28.1020207@ti.com>
-Message-ID: <CAGb2v64RbXZS_5nvXf9_t=Q=+zrBa=eF-f-xcZTxaMLYSQkNrw@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 27 Jan 2014 11:06:47 +0200
+Subject: [PATCH 2/4] ARM: dts: cm-fx6: add SATA support
+In-Reply-To: <20140127073754.GB4765@S2101-09.ap.freescale.net>
+References: <1390320812-25100-1-git-send-email-grinberg@compulab.co.il>
+ <1390320812-25100-3-git-send-email-grinberg@compulab.co.il>
+ <20140127073754.GB4765@S2101-09.ap.freescale.net>
+Message-ID: <52E621A7.7030201@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 27, 2014 at 4:43 PM, Jyri Sarha <jsarha@ti.com> wrote:
-> On 01/24/2014 07:35 PM, Fabio Estevam wrote:
+On 01/27/14 09:37, Shawn Guo wrote:
+> On Tue, Jan 21, 2014 at 06:13:30PM +0200, Igor Grinberg wrote:
+>> Enable SATA on cm-fx6.
 >>
->> On Mon, Jan 20, 2014 at 2:48 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> ---
+>>  arch/arm/boot/dts/imx6q-cm-fx6.dts | 4 ++++
+>>  1 file changed, 4 insertions(+)
 >>
->>> So far so good.  Now, what about this external oscillator which has its
->>> own separate power control.  My immediate thought is that this can be
->>> specified via card_ext_clock - I would simply need to declare a
->>> fixed-rate
->>> clock with either a regulator (power switch) controlled via a gpio (which
->>> would probably be closer to the hardware) or a gpio as an enable... ah,
->>> that requires me to write a common clock driver for that bit since this
->>> is currently not modelled by CCF...
->>
->>
->> Jiry Sarha posted a gpio controlled clock proposal:
->> http://www.spinics.net/lists/devicetree/msg16651.html
->>
->
-> I have not received too much feedback to my patch yet. CCF is a bit new
-> territory to me, but I think having a separate stackable clk-gpio would be
-> more flexible than having the gpio property implemented in clk-fixed-rate.
+>> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> index 94cc6b5..07f90a5 100644
+>> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> @@ -69,3 +69,7 @@
+>>  	pinctrl-0 = <&pinctrl_uart4>;
+>>  	status = "okay";
+>>  };
+>> +
+>> +&sata {
+>> +	status = "okay";
+>> +};
+> 
+> Please sort these labeled nodes alphabetically.
 
-Not sure where stacking external clocks would be used, but sounds like a
-fixed factor clock? Maybe you should add DT support to that if that's what
-you need or have.
+Ok.
 
-> Anyway, I am happy do it either way as long as I can get a gpio -controlled
-> clock implementation into the main line.
+I'll wait for the "pingrp macros" to settle down and resend.
 
+Thanks!
 
-Cheers,
-ChenYu
+-- 
+Regards,
+Igor.
