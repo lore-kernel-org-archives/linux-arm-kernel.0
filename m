@@ -1,145 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Jan 2014 01:05:29 +0000
-Subject: [PATCH] ARM: multi_v7: add mvebu and drivers to defconfig
-Message-ID: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
+From: chris@printf.net (Chris Ball)
+Date: Tue, 28 Jan 2014 01:08:32 +0000
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <52E700F0.7040708@gmail.com> (Tomasz Figa's message of "Tue, 28
+ Jan 2014 01:59:28 +0100")
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1390190215-22700-2-git-send-email-olof@lixom.net>
+ <52DEBDA7.7030200@samsung.com> <52E54540.8080304@gmail.com>
+ <CAPDyKFqpOLZiUSDvxVtYrBM8DtrZDLE27LKzyoWaf29Ni2vcFQ@mail.gmail.com>
+ <52E700F0.7040708@gmail.com>
+Message-ID: <861tzs29rj.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-boot farms testing is highlighting some errors in mvebu.  Let's get some
-more coverage for multi_v7_defconfig kernels.
+Hi,
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-Kevin,
+On Tue, Jan 28 2014, Tomasz Figa wrote:
+>> I am not sure I understand why this is needed. I think it would be
+>> more convenient to use MMC_CAP_NONREMOVABLE instead as stated earlier.
+>> But please elaborate, I might have missed something.
+>
+> See above. I'm not quite convinced that state of MMC interface should
+> determine power state of the chip. I can easily imagine a situation
+> where the MMC link is powered down (link power management) but the
+> WLAN chip keeps operation. Keep in mind that those are usually
+> complete SoCs that can keep processing network traffic autonomously
+> and wake-up the application processor whenever anything interesting
+> happens using extra out of bounds signalling, which might trigger
+> re-enabling the MMC link.
 
-This is against tonight's master.  Feel free to take it directly.
+For what it's worth, we did this using upstream code (libertas-sd8686
+WLAN with sdhci-pxav3) at OLPC.  We set the SDIO device to 1-bit mode
+on system suspend, using MMC_CAP_NONREMOVABLE, MMC_PM_KEEP_POWER and
+MMC_PM_WAKE_SDIO_IRQ, and tell the PMU to wake on the 1-bit data line.
+When it wakes the system, the system sees the SDIO interrupt and
+processes the waiting network traffic.
 
-thx,
+So this use case is already supported using the current interfaces.
+If this interface doesn't work for your use case, could you talk a
+little more about what you're trying to achieve?
 
-Jason.
+Thanks,
 
- arch/arm/configs/multi_v7_defconfig | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 687e4e811b2a..13e7d649230b 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -38,7 +38,6 @@ CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_TEGRA_2x_SOC=y
- CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
--CONFIG_TEGRA_PCI=y
- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
-@@ -49,7 +48,9 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
--CONFIG_SMP=y
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCI_MVEBU=y
- CONFIG_HIGHPTE=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-@@ -69,12 +70,14 @@ CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_MVNETA=y
- CONFIG_KS8851=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
--CONFIG_ICPLUS_PHY=y
--CONFIG_MDIO_SUN4I=y
- CONFIG_TI_CPSW=y
-+CONFIG_MARVELL_PHY=y
-+CONFIG_ICPLUS_PHY=y
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_SPEAR=y
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
-@@ -99,25 +102,27 @@ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_SERIAL_ST_ASC=y
- CONFIG_SERIAL_ST_ASC_CONSOLE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
-+CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SLINK=y
--CONFIG_PINCTRL_SINGLE=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_TWL4030=y
--CONFIG_REGULATOR_GPIO=y
-+CONFIG_THERMAL=y
-+CONFIG_ARMADA_THERMAL=y
- CONFIG_REGULATOR_AB8500=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_VEXPRESS=y
- CONFIG_DRM=y
--CONFIG_TEGRA_HOST1X=y
- CONFIG_DRM_TEGRA=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
-@@ -132,8 +137,6 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_AB8500_USB=y
--CONFIG_NOP_USB_XCEIV=y
--CONFIG_OMAP_USB2=y
- CONFIG_OMAP_USB3=y
- CONFIG_SAMSUNG_USB2PHY=y
- CONFIG_SAMSUNG_USB3PHY=y
-@@ -144,13 +147,13 @@ CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
--CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_MMC_MVSDIO=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
-@@ -159,20 +162,23 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
-+CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
-+CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
--CONFIG_TI_EDMA=y
- CONFIG_PL330_DMA=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
- CONFIG_MXS_DMA=y
- CONFIG_DMA_OMAP=y
-+CONFIG_MEMORY=y
- CONFIG_PWM=y
- CONFIG_PWM_VT8500=y
-+CONFIG_OMAP_USB2=y
- CONFIG_EXT4_FS=y
- CONFIG_TMPFS=y
- CONFIG_NFS_FS=y
+- Chris.
 -- 
-1.8.5.3
+Chris Ball   <chris@printf.net>   <http://printf.net/>
