@@ -1,15 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:21 +0100
-Subject: [PATCH v2 09/21] pinctrl: mvebu: dove: provide generic mpp callbacks
+Date: Tue, 28 Jan 2014 01:39:25 +0100
+Subject: [PATCH v2 13/21] pinctrl: mvebu: remove unused macros and functions
 In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-10-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-14-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to get rid of passing register addresses to common pinctrl
-driver, so provide set/get callbacks for generic mpp pins.
+With each SoC providing callbacks for every mpp pin, we can now remove
+common set/get functions and unused MPP macro that cannot pass callbacks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -21,52 +21,105 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-dove.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 48 ++---------------------------------
+ drivers/pinctrl/mvebu/pinctrl-mvebu.h | 12 ---------
+ 2 files changed, 2 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 4d051ba17fee..cd55f2ca4e8a 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -57,6 +57,30 @@
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 2bec4ef30b48..dd65b8c44b26 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -138,43 +138,6 @@ static struct mvebu_pinctrl_function *mvebu_pinctrl_find_function_by_name(
+ 	return NULL;
+ }
  
- static void __iomem *mpp_base;
- 
-+static int dove_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-+			     unsigned long *config)
-+{
-+	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+
-+	*config = (readl(mpp_base + off) >> shift) & MVEBU_MPP_MASK;
-+
-+	return 0;
-+}
-+
-+static int dove_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
-+			     unsigned long config)
-+{
-+	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned long reg;
-+
-+	reg = readl(mpp_base + off) & ~(MVEBU_MPP_MASK << shift);
-+	writel(reg | (config << shift), mpp_base + off);
-+
-+	return 0;
-+}
-+
- static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 				 unsigned long *config)
+-/*
+- * Common mpp pin configuration registers on MVEBU are
+- * registers of eight 4-bit values for each mpp setting.
+- * Register offset and bit mask are calculated accordingly below.
+- */
+-static int mvebu_common_mpp_get(struct mvebu_pinctrl *pctl,
+-				struct mvebu_pinctrl_group *grp,
+-				unsigned long *config)
+-{
+-	unsigned pin = grp->gid;
+-	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
+-
+-	*config = readl(pctl->base + off);
+-	*config >>= shift;
+-	*config &= MPP_MASK;
+-
+-	return 0;
+-}
+-
+-static int mvebu_common_mpp_set(struct mvebu_pinctrl *pctl,
+-				struct mvebu_pinctrl_group *grp,
+-				unsigned long config)
+-{
+-	unsigned pin = grp->gid;
+-	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
+-	unsigned long reg;
+-
+-	reg = readl(pctl->base + off);
+-	reg &= ~(MPP_MASK << shift);
+-	reg |= (config << shift);
+-	writel(reg, pctl->base + off);
+-
+-	return 0;
+-}
+-
+ static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
+ 				unsigned gid, unsigned long *config)
  {
-@@ -374,7 +398,7 @@ static struct mvebu_mpp_ctrl dove_mpp_controls[] = {
- 	MPP_FUNC_CTRL(13, 13, "mpp13", dove_pmu_mpp_ctrl),
- 	MPP_FUNC_CTRL(14, 14, "mpp14", dove_pmu_mpp_ctrl),
- 	MPP_FUNC_CTRL(15, 15, "mpp15", dove_pmu_mpp_ctrl),
--	MPP_REG_CTRL(16, 23),
-+	MPP_FUNC_CTRL(16, 23, NULL, dove_mpp_ctrl),
- 	MPP_FUNC_CTRL(24, 39, "mpp_camera", dove_mpp4_ctrl),
- 	MPP_FUNC_CTRL(40, 45, "mpp_sdio0", dove_mpp4_ctrl),
- 	MPP_FUNC_CTRL(46, 51, "mpp_sdio1", dove_mpp4_ctrl),
+@@ -184,10 +147,7 @@ static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
+ 	if (!grp->ctrl)
+ 		return -EINVAL;
+ 
+-	if (grp->ctrl->mpp_get)
+-		return grp->ctrl->mpp_get(grp->ctrl, config);
+-
+-	return mvebu_common_mpp_get(pctl, grp, config);
++	return grp->ctrl->mpp_get(grp->ctrl, config);
+ }
+ 
+ static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
+@@ -202,11 +162,7 @@ static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
+ 		return -EINVAL;
+ 
+ 	for (i = 0; i < num_configs; i++) {
+-		if (grp->ctrl->mpp_set)
+-			ret = grp->ctrl->mpp_set(grp->ctrl, configs[i]);
+-		else
+-			ret = mvebu_common_mpp_set(pctl, grp, configs[i]);
+-
++		ret = grp->ctrl->mpp_set(grp->ctrl, configs[i]);
+ 		if (ret)
+ 			return ret;
+ 	} /* for each config */
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.h b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+index e81caa964d83..6c8451af95b6 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.h
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
+@@ -114,18 +114,6 @@ struct mvebu_pinctrl_soc_info {
+ 	int ngpioranges;
+ };
+ 
+-#define MPP_REG_CTRL(_idl, _idh)				\
+-	{							\
+-		.name = NULL,					\
+-		.pid = _idl,					\
+-		.npins = _idh - _idl + 1,			\
+-		.pins = (unsigned[_idh - _idl + 1]) { },	\
+-		.mpp_get = NULL,				\
+-		.mpp_set = NULL,				\
+-		.mpp_gpio_req = NULL,				\
+-		.mpp_gpio_dir = NULL,				\
+-	}
+-
+ #define MPP_FUNC_CTRL(_idl, _idh, _name, _func)			\
+ 	{							\
+ 		.name = _name,					\
 -- 
 1.8.5.2
