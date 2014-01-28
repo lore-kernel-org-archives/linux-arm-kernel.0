@@ -1,24 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Jan 2014 16:19:00 +0000
-Subject: [PATCH 01/18] regulator: max14577: Remove unused state container
- definition
-In-Reply-To: <1390911522-28209-2-git-send-email-k.kozlowski@samsung.com>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140128161900.GP11841@sirena.org.uk>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 28 Jan 2014 11:21:44 -0500
+Subject: [PATCH RFC 00/73] tree-wide: clean up some no longer required
+ #include <linux/init.h>
+In-Reply-To: <1390878783.3872.63.camel@pasglop>
+References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>	
+ <20140122180023.dd90d34cba38d9f9ac516349@canb.auug.org.au>	
+ <20140123003838.GA10182@windriver.com> <1390878783.3872.63.camel@pasglop>
+Message-ID: <52E7D918.5020704@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:18:25PM +0100, Krzysztof Kozlowski wrote:
-> Remove the "struct max14577_regulator" because this is not used
-> anywhere. It should be removed earlier along with changing the driver
-> after review on the mailing lists.
+On 14-01-27 10:13 PM, Benjamin Herrenschmidt wrote:
+> On Wed, 2014-01-22 at 19:38 -0500, Paul Gortmaker wrote:
+> 
+>> Thanks, it was a great help as it uncovered a few issues in fringe arch
+>> that I didn't have toolchains for, and I've fixed all of those up.
+>>
+>> I've noticed that powerpc has been un-buildable for a while now; I have
+>> used this hack patch locally so I could run the ppc defconfigs to check
+>> that I didn't break anything.  Maybe useful for linux-next in the
+>> interim?  It is a hack patch -- Not-Signed-off-by: Paul Gortmaker.  :)
+> 
+> Can you and/or Aneesh submit that as a proper patch (with S-O-B
+> etc...) ?
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/f46a547b/attachment.sig>
+I'd updated toolchains and didn't realize it was still broken.  Patch sent.
+
+http://patchwork.ozlabs.org/patch/314749/
+
+Paul.
+--
+
+> 
+> Thanks !
+> 
+> Cheers,
+> Ben.
+> 
+>> Paul.
+>> --
+>>
+>> diff --git a/arch/powerpc/include/asm/pgtable-ppc64.h b/arch/powerpc/include/asm/pgtable-ppc64.h
+>> index d27960c89a71..d0f070a2b395 100644
+>> --- a/arch/powerpc/include/asm/pgtable-ppc64.h
+>> +++ b/arch/powerpc/include/asm/pgtable-ppc64.h
+>> @@ -560,9 +560,9 @@ extern void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
+>>  			    pmd_t *pmdp);
+>>  
+>>  #define pmd_move_must_withdraw pmd_move_must_withdraw
+>> -typedef struct spinlock spinlock_t;
+>> -static inline int pmd_move_must_withdraw(spinlock_t *new_pmd_ptl,
+>> -					 spinlock_t *old_pmd_ptl)
+>> +struct spinlock;
+>> +static inline int pmd_move_must_withdraw(struct spinlock *new_pmd_ptl,
+>> +					 struct spinlock *old_pmd_ptl)
+>>  {
+>>  	/*
+>>  	 * Archs like ppc64 use pgtable to store per pmd
+>>
+>> _______________________________________________
+>> Linuxppc-dev mailing list
+>> Linuxppc-dev at lists.ozlabs.org
+>> https://lists.ozlabs.org/listinfo/linuxppc-dev
+> 
+> 
