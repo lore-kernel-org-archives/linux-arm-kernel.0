@@ -1,72 +1,30 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 28 Jan 2014 15:20:44 +0800
-Subject: [PATCH] pinctrl: single: add low powr mode support
-Message-ID: <1390893644-3458-1-git-send-email-chao.xie@marvell.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Tue, 28 Jan 2014 09:47:13 +0200
+Subject: [PATCH RFC v3 4/8] ASoC: davinci-evm: HDMI audio support for
+ TDA998x trough McASP I2S bus
+In-Reply-To: <20140127204910.GB11841@sirena.org.uk>
+References: <cover.1390836773.git.jsarha@ti.com>
+ <86fcca2ecf302a695e7fd8199a1d635a67bbfcc8.1390836773.git.jsarha@ti.com>
+ <20140127204910.GB11841@sirena.org.uk>
+Message-ID: <52E76081.3030905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On 01/27/2014 10:49 PM, Mark Brown wrote:
+> On Mon, Jan 27, 2014 at 05:37:53PM +0200, Jyri Sarha wrote:
+>> Add machine driver support for BeagleBone-Black and other boards with
+>> tilcdc support and NXP TDA998X HDMI transmitter connected to McASP
+>> port in I2S mode. McASP produces the bit clock for the i2s bus from
+>> the masted clock by a simple divider and the available sample rates
+>
+> I have to say I agree with Lars' comments about where the code to set
+> the constraints is here - I don't doubt that these limitations are valid
+> but it would be better to factor them into the relevant chip drivers so
+> that other systems with similar limitations can be handled correctly
+> too.
+>
 
-For some silicons, the pin configuration register can control
-the output of the pin when the pad including the pin enter
-low power mode.
-For example, the pin can be "Drive 1", "Drive 0", "Float" when
-the pad including the pin enter low power mode.
-It is very useful when you want to control the power leakeage
-when the SOC enter low power mode, and can save more power for
-the low power mode.
+Ok, I'll push them into mcasp driver then.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt | 7 +++++++
- drivers/pinctrl/pinctrl-single.c                             | 3 +++
- 2 files changed, 10 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-index bc0dfdf..66dcaa9 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-@@ -63,6 +63,13 @@ Optional properties:
- 		/* input, enable bits, disable bits, mask */
- 		pinctrl-single,input-schmitt-enable = <0x30 0x40 0 0x70>;
- 
-+- pinctrl-single,low-power-mode : array of value that are used to configure
-+  low power mode of this pin. For some silicons, the low power mode will
-+  control the output of the pin when the pad including the pin enter low
-+  power mode.
-+		/* low power mode value, mask */
-+		pinctrl-single,low-power-mode = <0x288 0x388>;
-+
- - pinctrl-single,gpio-range : list of value that are used to configure a GPIO
-   range. They're value of subnode phandle, pin base in pinctrl device, pin
-   number in this range, GPIO function value of this GPIO range.
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 41f1cfe..18ed6b6 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -661,6 +661,7 @@ static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
- 			break;
- 		case PIN_CONFIG_DRIVE_STRENGTH:
- 		case PIN_CONFIG_SLEW_RATE:
-+		case PIN_CONFIG_LOW_POWER_MODE:
- 		default:
- 			*config = data;
- 			break;
-@@ -698,6 +699,7 @@ static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
- 			case PIN_CONFIG_INPUT_SCHMITT:
- 			case PIN_CONFIG_DRIVE_STRENGTH:
- 			case PIN_CONFIG_SLEW_RATE:
-+			case PIN_CONFIG_LOW_POWER_MODE:
- 				shift = ffs(func->conf[i].mask) - 1;
- 				data &= ~func->conf[i].mask;
- 				data |= (arg << shift) & func->conf[i].mask;
-@@ -1100,6 +1102,7 @@ static int pcs_parse_pinconf(struct pcs_device *pcs, struct device_node *np,
- 		{ "pinctrl-single,drive-strength", PIN_CONFIG_DRIVE_STRENGTH, },
- 		{ "pinctrl-single,slew-rate", PIN_CONFIG_SLEW_RATE, },
- 		{ "pinctrl-single,input-schmitt", PIN_CONFIG_INPUT_SCHMITT, },
-+		{ "pinctrl-single,low-power-mode", PIN_CONFIG_LOW_POWER_MODE, },
- 	};
- 	struct pcs_conf_type prop4[] = {
- 		{ "pinctrl-single,bias-pullup", PIN_CONFIG_BIAS_PULL_UP, },
--- 
-1.8.3.2
+Thanks,
+Jyri
