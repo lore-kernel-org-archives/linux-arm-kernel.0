@@ -1,57 +1,58 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 28 Jan 2014 16:38:46 -0300
-Subject: [linux-sunxi] [PATCH v2 1/5] clk: sunxi: Add support for USB
- clock-register reset bits
-In-Reply-To: <1390426587-16287-2-git-send-email-hdegoede@redhat.com>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <52E80746.9020500@elopez.com.ar>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Tue, 28 Jan 2014 20:41:57 +0100
+Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
+ NMI controller
+In-Reply-To: <52E78E3F.6080902@redhat.com>
+References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
+ <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
+ <20140116123940.GE31779@lukather>
+ <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
+ <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
+Message-ID: <CAOQ7t2bahx_ZEMMmhPm3g7-v6U3MkaXO6-JFGvjoKNWOCrG=ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-El 22/01/14 18:36, Hans de Goede escribi?:
-> The usb-clk register is special in that it not only contains clk gate bits,
-> but also has a few reset bits. This commit adds support for this by allowing
-> gates type sunxi clks to also register a reset controller.
+On Tue, Jan 28, 2014 at 12:02 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-(snip)
->   static const struct gates_data sun4i_axi_gates_data __initconst = {
-> @@ -818,6 +873,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->   					 struct gates_data *data)
->   {
->   	struct clk_onecell_data *clk_data;
-> +	struct gates_reset_data *reset_data;
->   	const char *clk_parent;
->   	const char *clk_name;
->   	void *reg;
-> @@ -861,6 +917,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->   	clk_data->clk_num = i;
+> Hi,
 >
->   	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> +
-> +	/* Register a reset controler for gates with reset bits */
-> +	if (data->reset_mask == 0)
-> +		return;
-> +
-> +	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-> +	if (!reset_data)
-> +		return;
-> +
-> +	reset_data->reg = reg;
-> +	reset_data->lock = &clk_lock;
-> +	reset_data->rcdev.nr_resets = hweight32(data->reset_mask);
+> On 01/28/2014 11:40 AM, Maxime Ripard wrote:
+>
+> Jumping in here to try and clarify things, or so I hope at least :)
 
-I know I made you change this, but after having a second look into 
-nr_resets, I think your original implementation makes more sense. This 
-will break if you use a mask with holes on it. Sorry :(
+Thank you :) I'm sure you will explain this better than me.
 
-> +	reset_data->rcdev.ops = &sunxi_gates_reset_ops;
-> +	reset_data->rcdev.of_node = node;
-> +	reset_controller_register(&reset_data->rcdev);
->   }
+> The PMIC irq line won't go low until an i2c write to its irq status
+> registers write-clears all status bits for which the corresponding
+> bit in the irq-mask register is set.
+>
+> And the only reason the NMI -> GIC also goes low is because the unmask
+> operation writes a second ack to the NMI controller in the unmask
+> callback of the NMI controller driver.
 
-Emilio
+Exactly. PMIC -> NMI is cleared when the irq handler write-clears all
+the IRQs on PMIC while NMI -> GIC is cleared by the ACK in the unmask
+callback.
+
+<snip>
+
+> Hmm, I'm not going to say that using a raw irqchip here is a bad idea, it
+> sounds like it would be better.
+>
+> But I don't think this will solve the need the mask / umask. The problem is
+> we need to do an i2c write to clear the interrupt source, which needs to
+> be done from a thread / workqueue. So when the interrupt handler finishes
+> the source won't be cleared yet, and AFAIK then only way to deal with this
+> is to mask the interrupt until we've cleared the interrupt source.
+
+That's why the driver using the NMI controller has to use IRQF_ONESHOT
+so that the interrupt is not unmasked after the hard interrupt context
+handler but it is unmasked after the thread handler function has been
+executed (calling the unmask callback)
+
+Thank you for explaining this mess you couldn't be clearer than that.
+
+-- 
+Carlo Caione
