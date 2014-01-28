@@ -1,49 +1,208 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 28 Jan 2014 12:12:26 +0100
-Subject: [alsa-devel] [PATCH 4/4] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <20140128110051.GI11841@sirena.org.uk>
-References: <cover.1390813480.git.moinejf@free.fr>
- <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
- <20140127204441.GZ11841@sirena.org.uk>
- <20140127204915.GC15937@n2100.arm.linux.org.uk>
- <20140127205437.GC11841@sirena.org.uk>
- <s5hppncihn6.wl%tiwai@suse.de>
- <20140128110051.GI11841@sirena.org.uk>
-Message-ID: <s5hiot4icmd.wl%tiwai@suse.de>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 28 Jan 2014 12:09:11 +0100
+Subject: [PATCH v11] clk: add MOXA ART SoCs clock driver
+In-Reply-To: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
+References: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1390907351-28426-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Tue, 28 Jan 2014 11:00:51 +0000,
-Mark Brown wrote:
-> 
-> On Tue, Jan 28, 2014 at 10:23:57AM +0100, Takashi Iwai wrote:
-> > Mark Brown wrote:
-> > > On Mon, Jan 27, 2014 at 08:49:15PM +0000, Russell King - ARM Linux wrote:
-> 
-> > > > Yes, preferably as a generic ALSA helper rather than an ASoC helper -
-> > > > I don't see any need for this to be ASoC specific (I have a pure ALSA
-> > > > driver which has very similar code in it.)
-> 
-> > > Indeed, definitely ALSA generic - ideally we could factor a lot of the
-> > > integration with the video side out.
-> 
-> > Yes, indeed.
-> 
-> > OTOH, as discussed recently, we're heading to move from ELD parsing to
-> > more direct communication between video and audio drivers for
-> > HD-audio.  ELD will be still provided to user-space, but not evaluated
-> > any longer in the new scenario.
-> 
-> That sort of refactoring being one of the best reasons to keep things
-> out of individual drivers!  Having said all this I don't know if it's
-> worth blocking Jean-Francois' work on that, it's an improvement in
-> itself.  Splitting the code out a bit would be good to help prepare but
-> having the full refactoring done might be too much of a blocker.
+MOXA ART SoCs allow to determine PLL output and APB frequencies
+by reading registers holding multiplier and divisor information.
 
-I just rather wanted to point out the general direction for the
-further development, didn't mean NAK.  Jean-Francois' patch itself
-looks simple enough, so I see no problem to take it for now as is.
+Add a clock driver for this SoC.
 
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-Takashi
+Notes:
+    Thanks for the replies,
+    
+    Changes since v10:
+    
+    1. add clock-specifier to DT binding description
+    2. remove local variable "rate"
+    3. add local variable "parent_name"
+    4. use clk_register_fixed_factor() instead of clk_register_fixed_rate()
+    5. remove flag CLK_IS_ROOT
+    
+    Applies to next-20140128
+
+ .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
+ drivers/clk/Makefile                               |  1 +
+ drivers/clk/clk-moxart.c                           | 97 ++++++++++++++++++++++
+ 3 files changed, 146 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+ create mode 100644 drivers/clk/clk-moxart.c
+
+diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+new file mode 100644
+index 0000000..fedea84
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
+@@ -0,0 +1,48 @@
++Device Tree Clock bindings for arch-moxart
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++MOXA ART SoCs allow to determine PLL output and APB frequencies
++by reading registers holding multiplier and divisor information.
++
++
++PLL:
++
++Required properties:
++- compatible : Must be "moxa,moxart-pll-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle + clock-specifier for the parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++APB:
++
++Required properties:
++- compatible : Must be "moxa,moxart-apb-clock"
++- #clock-cells : Should be 0
++- reg : Should contain registers location and length
++- clocks : Should contain phandle + clock-specifier for the parent clock
++
++Optional properties:
++- clock-output-names : Should contain clock name
++
++
++For example:
++
++	clk_pll: clk_pll at 98100000 {
++		compatible = "moxa,moxart-pll-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++	};
++
++	clk_apb: clk_apb at 98100000 {
++		compatible = "moxa,moxart-apb-clock";
++		#clock-cells = <0>;
++		reg = <0x98100000 0x34>;
++		clocks = <&clk_pll>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 0faf730..7940d0c 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
++obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
+ obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+new file mode 100644
+index 0000000..30a3b69
+--- /dev/null
++++ b/drivers/clk/clk-moxart.c
+@@ -0,0 +1,97 @@
++/*
++ * MOXA ART SoCs clock driver.
++ *
++ * Copyright (C) 2013 Jonas Jensen
++ *
++ * Jonas Jensen <jonas.jensen@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
++
++void __init moxart_of_pll_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *ref_clk;
++	unsigned int mul;
++	const char *name = node->name;
++	const char *parent_name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	mul = readl(base + 0x30) >> 3 & 0x3f;
++	iounmap(base);
++
++	ref_clk = of_clk_get(node, 0);
++	if (IS_ERR(ref_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, mul, 1);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
++	       moxart_of_pll_clk_init);
++
++void __init moxart_of_apb_clk_init(struct device_node *node)
++{
++	static void __iomem *base;
++	struct clk *clk, *pll_clk;
++	unsigned int div, val;
++	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
++	const char *name = node->name;
++	const char *parent_name;
++
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++
++	val = readl(base + 0xc) >> 4 & 0x7;
++	iounmap(base);
++
++	if (val > 4)
++		val = 0;
++	div = div_idx[val] * 2;
++
++	pll_clk = of_clk_get(node, 0);
++	if (IS_ERR(pll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, 1, div);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
++	       moxart_of_apb_clk_init);
+-- 
+1.8.2.1
