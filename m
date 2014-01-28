@@ -1,75 +1,57 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 28 Jan 2014 10:59:26 -0800
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20131022175414.14753.58063@capellas-linux>
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
- <20131010175010.17870.58060@capellas-linux>
- <20131022175414.14753.58063@capellas-linux>
-Message-ID: <20140128185926.5312.36635@capellas-linux>
+From: detheridge@ti.com (Darren Etheridge)
+Date: Tue, 28 Jan 2014 13:24:00 -0600
+Subject: [PATCH v3 07/24] drm/i2c: tda998x: set the video mode from the
+ adjusted value
+In-Reply-To: <20140128181218.39d1d15e@armhf>
+References: <cover.1390153344.git.moinejf@free.fr>
+ <20140119195840.1ecab03b@armhf> <20140123232907.GA25988@ti.com>
+ <20140128181218.39d1d15e@armhf>
+Message-ID: <20140128192400.GA13187@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2013-10-22 10:54:14)
-> Quoting Sebastian Capella (2013-10-10 10:50:10)
-> > Quoting Sebastian Capella (2013-10-03 16:47:35)
-> > > Quoting Sebastian Capella (2013-10-03 14:42:46)
-> > > I looked into removing the const from the store function, but I'm not sure
-> > > this is the right idea, so I'm going to shelf that for now.
-> > > 
-> > Below are the three options considered thus far.  Do
-> > you have any additional suggestions or preferences?
+Jean-Francois Moine <moinejf@free.fr> wrote on Tue [2014-Jan-28 18:12:18 +0100]:
+> On Thu, 23 Jan 2014 17:29:07 -0600
+> Darren Etheridge <detheridge@ti.com> wrote:
+> 
+> > > @@ -896,9 +897,9 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+> > >  	 * TDA19988 requires high-active sync at input stage,
+> > >  	 * so invert low-active sync provided by master encoder here
+> > >  	 */
+> > > -	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+> > > +	if (adj_mode->flags & DRM_MODE_FLAG_NHSYNC)
+> > >  		reg_set(priv, REG_VIP_CNTRL_3, VIP_CNTRL_3_H_TGL);
+> > > -	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+> > > +	if (adj_mode->flags & DRM_MODE_FLAG_NVSYNC)
+> > >  		reg_set(priv, REG_VIP_CNTRL_3, VIP_CNTRL_3_V_TGL);
+> > >    
 > > 
-> > 1) copy buffer, remove \n.
-> >   - v1 patch did this
-> >   - alternatively could use an array on the stack or a preallocated global
-> >     Pros:
-> >      . cleanest change
-> >      . could use strim() proposed by Andrew
-> >     Cons:
-> >      . adds memcpy
-> > 2) make name_to_dev_t work with readonly buffer to ignore \n
-> >   - v2 and v3 patches do this
-> >     Pros:
-> >      . no memcpy, no big modifications to unrelated code
-> >     Cons:
-> >      . seems more appropriate to harden store functions to user input
-> >        than name_to_dev_t.
-> >      . a little complicated
-> > 3) remove const from buffer and modify contents in place to remove \n
-> >   - remove const from sysfs_ops.store, modify dependent definitions
-> >   - remove const from kobj_attribute.store, modify dependent definitions
-> >     Pros:
-> >      . no memcpy
-> >     Cons:
-> >      . a lot of modifications
-> >      . const contract to not modify the input buffer seems the right way.
+> > Using the adj_mode->flags breaks a workaround I had done on BeagleBone Black
+> > (tilcdc + tda998x) to resolve an issue with out of spec syncs from the
+> > tlcdc.  I invert the HSYNC in adj_mode->flags but don't want the tda998x to
+> > really know that I am doing that so I use adj_mode in the tilcdc driver, and
+> > mode here in the tda998x driver.  The theory being adj_mode contains whatever
+> > workarounds I need to do for the driving device and mode has the pristine
+> > values that I want to send to the monitor.  I would need to look if there is a
+> > different way to solve this as I am guessing you are actually using adj_mode in
+> > the manner it was intended.
 > 
-> Hi Andrew,
+> No. In fact, I just wanted the function to use only one mode.
 > 
-> Do you have any feedback for me on this?
+> Looking at the other drivers, it seems that they don't touch the
+> adjusted_mode, so, for the Cubox, mode and adjusted_mode have same
+> values.
 > 
-> I'm happy do make any changes you think are correct, but I'm unsure if
-> you're asking me for option #3 above.  It's quite an intrusive change,
-> and changes old, established code and I'd like confirmation that's what
-> you'd like before proceeding down that path.
+> I will do an other patch so that you will not have to touch the tilcdc
+> driver.
 > 
-> I've submitted patches with both options #1 and #2 above.
-> 
-> Thanks,
-> 
-> Sebastian
+Thanks, that would certainly be the easiest path to avoid the regression given
+the other drivers that use tda998x don't currently use adj_mode.  However I
+don't disagree with your reasoning, it would make sense to only use values
+from one of the strctures and not a mix and match.  Anybody looking at only
+the tda998x driver would be confused :) I'll work on finding a different
+solution for this.
 
-Ping.
-
-Sorry for the lapse in attention to this.
-
-Could you please clarify what is needed for this to be acceptable?
-I'm a little confused about what is being asked of me.
-
-Thanks!
-
-Sebastian
+> -- 
+> Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+> Jef		|		http://moinejf.free.fr/
