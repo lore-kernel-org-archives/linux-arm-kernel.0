@@ -1,44 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Jan 2014 10:16:53 +0100
-Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
-In-Reply-To: <52E772DF.6000604@metafoo.de>
-References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
- <1390890471-14882-3-git-send-email-agross@codeaurora.org>
- <52E772DF.6000604@metafoo.de>
-Message-ID: <4697306.PPWWh8UGTE@wuerfel>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 28 Jan 2014 10:23:53 +0100
+Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <52E6B42F.4050901@ti.com>
+References: <y> <cover.1390836773.git.jsarha@ti.com>
+ <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
+ <20140127190641.273890c6@armhf> <52E6B42F.4050901@ti.com>
+Message-ID: <20140128102353.48e8fb51@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 January 2014 10:05:35 Lars-Peter Clausen wrote:
-> > +
-> > +Clients must use the format described in the dma.txt file, using a three cell
-> > +specifier for each channel.
-> > +
-> > +The three cells in order are:
-> > +  1. A phandle pointing to the DMA controller
-> > +  2. The channel number
-> > +  3. Direction of the fixed unidirectional channel
-> > +     0 - Memory to Device
-> > +     1 - Device to Memory
-> > +     2 - Device to Device
-> > +
-> 
-> Why does the direction needs to be specified in specifier? I see two
-> options, either the direction per is fixed in hardware. In that case the DMA
-> controller node should describe which channel is which direction. Or the
-> direction is not fixed in hardware and can be changed at runtime in which
-> case it should be set on a per descriptor basis.
+On Mon, 27 Jan 2014 21:31:59 +0200
+Jyri Sarha <jsarha@ti.com> wrote:
 
-Normally the direction is implied by dmaengine_slave_config().
-Note that neither the dma slave API nor the generic DT binding
-can actually support device-to-device transfers, since this
-normally implies using two dma-request lines rather than one.
+> I would suggest to leave the CTS_N_K to the current setting (3), unless 
+> we can change the CTS_N_K on the fly according to the used sample format.
 
-There might be a case where the direction is required in order
-to allocate a channel, because the engine has specialized channels
-per direction, and might connect any of them to any dma request
-line. This does not seem to be the case for "bam", because
-the DMA specifier already contains a specific channel number, not
-a request line or slave ID number.
+Yes, this is possible:
 
-	Arnd
+- the tda998x codec may call the tda998x hdmi in the hw_params()
+  function, i.e. when the sample format is known, and then,
+
+- the tda998x_audio_update() function may have the audio parameters
+  (struct snd_pcm_hw_params) as an argument, and CTS_N_K may be set
+  to either 1, 2 or 3 for SNDRV_PCM_FORMAT_S16_LE / S24_LE and S32_LE.
+
+This is working in my machine. Would it also work for you?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
