@@ -1,168 +1,97 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 28 Jan 2014 07:17:13 -0800
-Subject: [PATCH] ARM: multi_v7: add mvebu and drivers to defconfig
-In-Reply-To: <1390871129-4838-1-git-send-email-jason@lakedaemon.net> (Jason
- Cooper's message of "Tue, 28 Jan 2014 01:05:29 +0000")
-References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <8761p4w2yu.fsf@paris.lan>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Tue, 28 Jan 2014 10:18:16 -0500
+Subject: [RFC] drivers: irq-chip: Enable SGI's for Secure-to-NonSecure
+ communication use-cases
+References: <79CD15C6BA57404B839C016229A409A83EDAD1B8@DBDE04.ent.ti.com>
+ <20140106132536.GA27282@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A83EDAD85E@DBDE04.ent.ti.com>
+ <87wqhl15wi.fsf@nbsps.com>
+ <79CD15C6BA57404B839C016229A409A83EDC1E71@DBDE04.ent.ti.com>
+Message-ID: <877g9k16fb.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
 
-> boot farms testing is highlighting some errors in mvebu.  Let's get some
-> more coverage for multi_v7_defconfig kernels.
->
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Kevin,
->
-> This is against tonight's master.  Feel free to take it directly.
->
+>>> You have any other alternative?
 
-OK, but this one doesn't currently fix any known errors, right?  (the
-pull request you sent yesterday fixes the boot regressions, IIUC.)  The
-goal here is just to get more mvebu coverage in multi_v7_defconfig,
-correct?
+>> From: Bill Pringlemeir [mailto:bpringlemeir at nbsps.com]
 
-That being said, have a closer look at the Kconfig entries that are
-removed by the patch below, many of which will have an impact on other
-platforms.
+>> I think you need to put Bhupesh Sharma's comment with this.  The
+>> typical sane mode for GIC with TZ is to have the monitor mode toggle
+>> the IRQ/FIQ routing bits in the SCR (cp15) bits 1,2.  That is, the
+>> IRQ goes direct to core and FIQ goes to monitor from the 'Normal'
+>> world.  In the 'Secure' world, the FIQ goes direct to core and IRQ
+>> traps to monitor.  The monitor mode vector table has a gateway from
+>> secure to normal for IRQ and gateway from normal to secure for FIQ.
+>>
+>> Now, consider the 'SMC' instruction and what is present in stuff like
+>> this,
+>>
+>> http://lwn.net/Articles/513756/
 
-Kevin
+>> Instead of messing around with the GIC, why not use something even
+>> more generic like the 'SMC' instruction.  It has the same sort of
+>> 'end game' which is a trap to monitor mode.  The monitor has to be a
+>> little smarter to determine which world called but this should always
+>> be the case; really you want to check this.
+>>
+>> Btw, the situation is the same no matter which world Linux is in.  I
+>> don't think Linux can be the recipient of an 'SMC' call.  But I think
+>> most use cases would put it in the 'normal world' and the SMC is
+>> fine.
 
->  arch/arm/configs/multi_v7_defconfig | 28 +++++++++++++++++-----------
->  1 file changed, 17 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 687e4e811b2a..13e7d649230b 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -38,7 +38,6 @@ CONFIG_ARCH_TEGRA=y
->  CONFIG_ARCH_TEGRA_2x_SOC=y
->  CONFIG_ARCH_TEGRA_3x_SOC=y
->  CONFIG_ARCH_TEGRA_114_SOC=y
-> -CONFIG_TEGRA_PCI=y
+On 28 Jan 2014, hvaibhav at ti.com wrote:
 
-huh?
+> May be I am missing something here,
 
->  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
->  CONFIG_ARCH_U8500=y
->  CONFIG_MACH_HREFV60=y
-> @@ -49,7 +48,9 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
->  CONFIG_ARCH_VIRT=y
->  CONFIG_ARCH_WM8850=y
->  CONFIG_ARCH_ZYNQ=y
-> -CONFIG_SMP=y
+> I find your above two statements contradictory,
 
-huh?
+> If we want to use SMC as you mentioned, and assuming Secure Monitor
+> mode is intelligent enough to determine the calling world (whether
+> secure or non-secure), then without Linux being recipient (in any
+> world) of an 'SMC' call how can realtime switch possible from secure
+> world to non-secure world??
 
-> +CONFIG_PCI=y
-> +CONFIG_PCI_MSI=y
-> +CONFIG_PCI_MVEBU=y
->  CONFIG_HIGHPTE=y
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
-> @@ -69,12 +70,14 @@ CONFIG_SATA_MV=y
->  CONFIG_NETDEVICES=y
->  CONFIG_SUN4I_EMAC=y
->  CONFIG_NET_CALXEDA_XGMAC=y
-> +CONFIG_MVNETA=y
->  CONFIG_KS8851=y
->  CONFIG_SMSC911X=y
->  CONFIG_STMMAC_ETH=y
-> -CONFIG_ICPLUS_PHY=y
-> -CONFIG_MDIO_SUN4I=y
->  CONFIG_TI_CPSW=y
-> +CONFIG_MARVELL_PHY=y
-> +CONFIG_ICPLUS_PHY=y
-> +CONFIG_KEYBOARD_GPIO=y
->  CONFIG_KEYBOARD_SPEAR=y
->  CONFIG_SERIO_AMBAKMI=y
->  CONFIG_SERIAL_8250=y
-> @@ -99,25 +102,27 @@ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
->  CONFIG_SERIAL_ST_ASC=y
->  CONFIG_SERIAL_ST_ASC_CONSOLE=y
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
-> +CONFIG_I2C_MV64XXX=y
->  CONFIG_I2C_SIRF=y
->  CONFIG_I2C_TEGRA=y
->  CONFIG_SPI=y
->  CONFIG_SPI_OMAP24XX=y
-> +CONFIG_SPI_ORION=y
->  CONFIG_SPI_PL022=y
->  CONFIG_SPI_SIRF=y
->  CONFIG_SPI_TEGRA114=y
->  CONFIG_SPI_TEGRA20_SLINK=y
-> -CONFIG_PINCTRL_SINGLE=y
->  CONFIG_GPIO_GENERIC_PLATFORM=y
->  CONFIG_GPIO_TWL4030=y
-> -CONFIG_REGULATOR_GPIO=y
-> +CONFIG_THERMAL=y
-> +CONFIG_ARMADA_THERMAL=y
->  CONFIG_REGULATOR_AB8500=y
-> +CONFIG_REGULATOR_GPIO=y
->  CONFIG_REGULATOR_TPS51632=y
->  CONFIG_REGULATOR_TPS62360=y
->  CONFIG_REGULATOR_TWL4030=y
->  CONFIG_REGULATOR_VEXPRESS=y
->  CONFIG_DRM=y
-> -CONFIG_TEGRA_HOST1X=y
+I don't think that using an SMC in either world is any different than
+writing to the GIC distributors SGIR?  So, the generation is the same.
+The monitor switching should be the same.  The only difference is where
+does the world switch ends up.
 
-huh?
+> Just to clarify,
 
->  CONFIG_DRM_TEGRA=y
->  CONFIG_FB_ARMCLCD=y
->  CONFIG_FB_WM8505=y
-> @@ -132,8 +137,6 @@ CONFIG_USB_STORAGE=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_HOST=y
->  CONFIG_AB8500_USB=y
-> -CONFIG_NOP_USB_XCEIV=y
-> -CONFIG_OMAP_USB2=y
+> The need here is, to switch from secure world to non-secure world on
+> any realtime (multiple) hardware events, which in turn gets
+> processed/handled in non-secure world.  In certain cases even we do
+> not want non-secure world know about the hardware event. In this case,
+> the Processing of hardware event completely happens in secure world,
+> and different event/trigger/info/message goes to non-secure world.
 
-huh?
+Ok.  Your needs are backwards to my understanding.  You want the
+'secure/non-linux' to send an SGI to the Linux.  Ie, you want the
+recipient case for the normal world.  The normal world can always issue
+an SMC during boot to register a recipient mechanism.  You can fake
+another interrupt chip or use some other mechanism.
 
->  CONFIG_OMAP_USB3=y
->  CONFIG_SAMSUNG_USB2PHY=y
->  CONFIG_SAMSUNG_USB3PHY=y
-> @@ -144,13 +147,13 @@ CONFIG_MMC=y
->  CONFIG_MMC_BLOCK_MINORS=16
->  CONFIG_MMC_ARMMMCI=y
->  CONFIG_MMC_SDHCI=y
-> -CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_ESDHC_IMX=y
->  CONFIG_MMC_SDHCI_TEGRA=y
->  CONFIG_MMC_SDHCI_SPEAR=y
->  CONFIG_MMC_SDHCI_BCM_KONA=y
->  CONFIG_MMC_OMAP=y
->  CONFIG_MMC_OMAP_HS=y
-> +CONFIG_MMC_MVSDIO=y
->  CONFIG_EDAC=y
->  CONFIG_EDAC_MM_EDAC=y
->  CONFIG_EDAC_HIGHBANK_MC=y
-> @@ -159,20 +162,23 @@ CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_TWL4030=y
->  CONFIG_RTC_DRV_PL031=y
->  CONFIG_RTC_DRV_VT8500=y
-> +CONFIG_RTC_DRV_MV=y
->  CONFIG_RTC_DRV_TEGRA=y
->  CONFIG_DMADEVICES=y
->  CONFIG_DW_DMAC=y
-> +CONFIG_MV_XOR=y
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_STE_DMA40=y
->  CONFIG_SIRF_DMA=y
-> -CONFIG_TI_EDMA=y
->  CONFIG_PL330_DMA=y
->  CONFIG_IMX_SDMA=y
->  CONFIG_IMX_DMA=y
->  CONFIG_MXS_DMA=y
->  CONFIG_DMA_OMAP=y
-> +CONFIG_MEMORY=y
->  CONFIG_PWM=y
->  CONFIG_PWM_VT8500=y
-> +CONFIG_OMAP_USB2=y
->  CONFIG_EXT4_FS=y
->  CONFIG_TMPFS=y
->  CONFIG_NFS_FS=y
+> So just manipulating IRQ/FIQ routing will not solve the need here. :)
+
+I didn't mean this would solve your problem.  I meant this keeps the
+latency to a minimum when using TrustZone.  If an 'interrupt' (FIQ or
+IRQ) source occurs in the destination world, then the path is as per
+usual.  It is only when an 'interrupt' occurs in the opposite world when
+a world switch is needed; this is a fairly expensive operation.
+
+In your case, it sounds like you want the secure world to handle all
+interrupts or at least the majority.  This has a pre-defined destination
+in a jump to the vector table of the opposite world.  This is the
+'recipient' mechanism.  At the very least a 'multi-chip' IRQ could be
+used and you can ldrex/strex with world shareable memory to communicate
+interrupt sources to the other world; the world shareable memory acts as
+a 'IRQ controller register set'.  With the SMC, you have the opportunity
+to transfer some information in registers.  It has a bigger question of
+how the schedulers would inter-act.  Do you have a scheduler in the
+secure world?
+
+I think these are 'alternatives' as you asked?
+
+Regards,
+Bill Pringlemeir.
