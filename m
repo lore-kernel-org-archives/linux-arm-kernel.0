@@ -1,153 +1,152 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Tue, 28 Jan 2014 17:35:52 +0000
-Subject: [Xen-devel] [PATCH] arm/xen: Initialize event channels earlier
-In-Reply-To: <alpine.DEB.2.02.1401281651400.4373@kaball.uk.xensource.com>
-References: <1390920842-21886-1-git-send-email-julien.grall@linaro.org>
- <alpine.DEB.2.02.1401281651400.4373@kaball.uk.xensource.com>
-Message-ID: <52E7EA78.5020305@linaro.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 28 Jan 2014 10:36:20 -0700
+Subject: PCIe trouble on imx6q
+In-Reply-To: <CAM9uW_75p7rt4V82TysSKmVbsYYgWqYwgaecyHMa+q4kSRwzUw@mail.gmail.com>
+References: <CAM9uW_75p7rt4V82TysSKmVbsYYgWqYwgaecyHMa+q4kSRwzUw@mail.gmail.com>
+Message-ID: <CAErSpo472PpApvYf1oV5kyW24u7GJrzMhTtMw3TZ4A2pM7jZ9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2014 05:13 PM, Stefano Stabellini wrote:
-> On Tue, 28 Jan 2014, Julien Grall wrote:
->> Event channels driver needs to be initialized very early. Until now, Xen
->> initialization was done after all CPUs was bring up.
->>
->> We can safely move the initialization to an early initcall.
->>
->> Also use a cpu notifier to:
->>     - Register the VCPU when the CPU is prepared
->>     - Enable event channel IRQ when the CPU is running
->>
->> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> 
-> Did you test this patch in Dom0 as well as in DomUs?
-> 
+[+cc Richard, Shawn, linux-arm-kernel (all from MAINTAINERS)]
 
-Only try dom0. I will try domU.
+On Tue, Jan 28, 2014 at 1:02 AM, Kamel BOUHARA <k.bouhara@gmail.com> wrote:
+> Hello,
+>
+> Im getting trouble with kernel 3.13 at boot time, the pcie link failed
+> to get up with the following log:
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at drivers/gpio/gpiolib.c:159 gpio_to_desc+0x34/0x48()
+> invalid GPIO -2
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.13.0+ #4
+> Backtrace:
+> [<8001217c>] (dump_backtrace) from [<80012460>] (show_stack+0x18/0x1c)
+>  r6:802b9548 r5:00000000 r4:808d3060 r3:00000000
+> [<80012448>] (show_stack) from [<806414fc>] (dump_stack+0x84/0x9c)
+> [<80641478>] (dump_stack) from [<800289f8>] (warn_slowpath_common+0x70/0x94)
+>  r5:00000009 r4:bf05bcb0
+> [<80028988>] (warn_slowpath_common) from [<80028a54>]
+> (warn_slowpath_fmt+0x38/0x40)
+>  r8:01f00000 r7:00000000 r6:0011cc11 r5:808b68c0 r4:bf24fa30
+> [<80028a20>] (warn_slowpath_fmt) from [<802b9548>] (gpio_to_desc+0x34/0x48)
+>  r3:fffffffe r2:807d23fc
+> [<802b9514>] (gpio_to_desc) from [<802d9de0>] (imx6_pcie_host_init+0x174/0x434)
+> [<802d9c6c>] (imx6_pcie_host_init) from [<80886dbc>]
+> (dw_pcie_host_init+0x348/0x41c)
+>  r6:00000000 r5:808d52cc r4:00000020 r3:802d9c6c
+> [<80886a74>] (dw_pcie_host_init) from [<808871d4>] (imx6_pcie_probe+0x320/0x3dc)
+>  r10:00000000 r9:000000c4 r8:808d539c r7:bf7e3384 r6:bf24fa30 r5:bf135810
+>  r4:bf24fa10
+> [<80886eb4>] (imx6_pcie_probe) from [<8034b670>] (platform_drv_probe+0x20/0x50)
+>  r8:808d539c r7:00000000 r6:00000000 r5:808d539c r4:bf135810
+> [<8034b650>] (platform_drv_probe) from [<80349c74>]
+> (driver_probe_device+0x118/0x234)
+>  r5:bf135810 r4:80e526b8
+> [<80349b5c>] (driver_probe_device) from [<80349e78>] (__driver_attach+0x9c/0xa0)
+>  r8:80886e90 r7:00000000 r6:bf135844 r5:808d539c r4:bf135810 r3:00000000
+> [<80349ddc>] (__driver_attach) from [<8034806c>] (bus_for_each_dev+0x68/0x9c)
+>  r6:80349ddc r5:808d539c r4:00000000 r3:00000000
+> [<80348004>] (bus_for_each_dev) from [<8034972c>] (driver_attach+0x20/0x28)
+>  r6:808df6a8 r5:bf1f5e00 r4:808d539c
+> [<8034970c>] (driver_attach) from [<803493b0>] (bus_add_driver+0x148/0x1f4)
+> [<80349268>] (bus_add_driver) from [<8034a4c8>] (driver_register+0x80/0x100)
+>  r7:8090e640 r6:8090e640 r5:00000005 r4:808d539c
+> [<8034a448>] (driver_register) from [<8034b63c>]
+> (__platform_driver_register+0x50/0x64)
+>  r5:00000005 r4:808d5388
+> [<8034b5ec>] (__platform_driver_register) from [<8034b6e0>]
+> (platform_driver_probe+0x28/0xac)
+> [<8034b6b8>] (platform_driver_probe) from [<80886ea8>]
+> (imx6_pcie_init+0x18/0x24)
+>  r5:00000005 r4:808aa104
+> [<80886e90>] (imx6_pcie_init) from [<80008978>] (do_one_initcall+0x100/0x164)
+> [<80008878>] (do_one_initcall) from [<8085ecc0>]
+> (kernel_init_freeable+0x10c/0x1d0)
+>  r10:8089e060 r9:000000c4 r8:8089e050 r7:8090e640 r6:8090e640 r5:00000005
+>  r4:808aa104
+> [<8085ebb4>] (kernel_init_freeable) from [<8063b67c>] (kernel_init+0x10/0x120)
+>  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:8063b66c
+>  r4:00000000
+> [<8063b66c>] (kernel_init) from [<8000e9c8>] (ret_from_fork+0x14/0x2c)
+>  r4:00000000 r3:ffffffff
+> ---[ end trace b5e746dfc2398cd6 ]---
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at drivers/gpio/gpiolib.c:159 gpio_to_desc+0x34/0x48()
+> invalid GPIO -2
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W    3.13.0+ #4
+> Backtrace:
+> [<8001217c>] (dump_backtrace) from [<80012460>] (show_stack+0x18/0x1c)
+>  r6:802b9548 r5:00000000 r4:808d3060 r3:00000000
+> [<80012448>] (show_stack) from [<806414fc>] (dump_stack+0x84/0x9c)
+> [<80641478>] (dump_stack) from [<800289f8>] (warn_slowpath_common+0x70/0x94)
+>  r5:00000009 r4:bf05bcb0
+> [<80028988>] (warn_slowpath_common) from [<80028a54>]
+> (warn_slowpath_fmt+0x38/0x40)
+>  r8:01f00000 r7:00000000 r6:0011cc11 r5:808b68c0 r4:bf24fa30
+> [<80028a20>] (warn_slowpath_fmt) from [<802b9548>] (gpio_to_desc+0x34/0x48)
+>  r3:fffffffe r2:807d23fc
+> [<802b9514>] (gpio_to_desc) from [<802d9df8>] (imx6_pcie_host_init+0x18c/0x434)
+> [<802d9c6c>] (imx6_pcie_host_init) from [<80886dbc>]
+> (dw_pcie_host_init+0x348/0x41c)
+>  r6:00000000 r5:808d52cc r4:00000020 r3:802d9c6c
+> [<80886a74>] (dw_pcie_host_init) from [<808871d4>] (imx6_pcie_probe+0x320/0x3dc)
+>  r10:00000000 r9:000000c4 r8:808d539c r7:bf7e3384 r6:bf24fa30 r5:bf135810
+>  r4:bf24fa10
+> [<80886eb4>] (imx6_pcie_probe) from [<8034b670>] (platform_drv_probe+0x20/0x50)
+>  r8:808d539c r7:00000000 r6:00000000 r5:808d539c r4:bf135810
+> [<8034b650>] (platform_drv_probe) from [<80349c74>]
+> (driver_probe_device+0x118/0x234)
+>  r5:bf135810 r4:80e526b8
+> [<80349b5c>] (driver_probe_device) from [<80349e78>] (__driver_attach+0x9c/0xa0)
+>  r8:80886e90 r7:00000000 r6:bf135844 r5:808d539c r4:bf135810 r3:00000000
+> [<80349ddc>] (__driver_attach) from [<8034806c>] (bus_for_each_dev+0x68/0x9c)
+>  r6:80349ddc r5:808d539c r4:00000000 r3:00000000
+> [<80348004>] (bus_for_each_dev) from [<8034972c>] (driver_attach+0x20/0x28)
+>  r6:808df6a8 r5:bf1f5e00 r4:808d539c
+> [<8034970c>] (driver_attach) from [<803493b0>] (bus_add_driver+0x148/0x1f4)
+> [<80349268>] (bus_add_driver) from [<8034a4c8>] (driver_register+0x80/0x100)
+>  r7:8090e640 r6:8090e640 r5:00000005 r4:808d539c
+> [<8034a448>] (driver_register) from [<8034b63c>]
+> (__platform_driver_register+0x50/0x64)
+>  r5:00000005 r4:808d5388
+> [<8034b5ec>] (__platform_driver_register) from [<8034b6e0>]
+> (platform_driver_probe+0x28/0xac)
+> [<8034b6b8>] (platform_driver_probe) from [<80886ea8>]
+> (imx6_pcie_init+0x18/0x24)
+>  r5:00000005 r4:808aa104
+> [<80886e90>] (imx6_pcie_init) from [<80008978>] (do_one_initcall+0x100/0x164)
+> [<80008878>] (do_one_initcall) from [<8085ecc0>]
+> (kernel_init_freeable+0x10c/0x1d0)
+>  r10:8089e060 r9:000000c4 r8:8089e050 r7:8090e640 r6:8090e640 r5:00000005
+>  r4:808aa104
+> [<8085ebb4>] (kernel_init_freeable) from [<8063b67c>] (kernel_init+0x10/0x120)
+>  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:8063b66c
+>  r4:00000000
+> [<8063b66c>] (kernel_init) from [<8000e9c8>] (ret_from_fork+0x14/0x2c)
+>  r4:00000000 r3:ffffffff
+> ---[ end trace b5e746dfc2398cd7 ]---
+> imx6q-pcie 1ffc000.pcie: phy link never came up
+> PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
 
-> 
->>  arch/arm/xen/enlighten.c |   84 ++++++++++++++++++++++++++++++----------------
->>  1 file changed, 55 insertions(+), 29 deletions(-)
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 293eeea..39b668e 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/of_address.h>
->>  #include <linux/cpuidle.h>
->>  #include <linux/cpufreq.h>
->> +#include <linux/cpu.h>
->>  
->>  #include <linux/mm.h>
->>  
->> @@ -154,12 +155,11 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
->>  }
->>  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
->>  
->> -static void __init xen_percpu_init(void *unused)
->> +static void xen_percpu_init(int cpu)
->>  {
->>  	struct vcpu_register_vcpu_info info;
->>  	struct vcpu_info *vcpup;
->>  	int err;
->> -	int cpu = get_cpu();
->>  
->>  	pr_info("Xen: initializing cpu%d\n", cpu);
->>  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
->> @@ -170,9 +170,11 @@ static void __init xen_percpu_init(void *unused)
->>  	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
->>  	BUG_ON(err);
->>  	per_cpu(xen_vcpu, cpu) = vcpup;
->> +}
->>  
->> +static void xen_interrupt_init(void)
->> +{
->>  	enable_percpu_irq(xen_events_irq, 0);
->> -	put_cpu();
->>  }
->>  
->>  static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
->> @@ -193,6 +195,36 @@ static void xen_power_off(void)
->>  		BUG();
->>  }
->>  
->> +static irqreturn_t xen_arm_callback(int irq, void *arg)
->> +{
->> +	xen_hvm_evtchn_do_upcall();
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int xen_cpu_notification(struct notifier_block *self,
->> +				unsigned long action,
->> +				void *hcpu)
->> +{
->> +	int cpu = (long)hcpu;
->> +
->> +	switch (action) {
->> +	case CPU_UP_PREPARE:
->> +		xen_percpu_init(cpu);
->> +		break;
->> +	case CPU_STARTING:
->> +		xen_interrupt_init();
->> +		break;
-> 
-> Is CPU_STARTING guaranteed to be called on the new cpu only?
+Not related to the GPIO/link problem, but something's wrong here --
+the host bridge driver should be telling us what bus numbers are
+behind the host bridge.  Since it didn't, the PCI core had to guess.
 
-Yes.
-
-> If so, why not call both xen_percpu_init and xen_interrupt_init on
-> CPU_STARTING?
-
-Just in case that xen_vcpu is used somewhere else by a cpu notifier
-callback CPU_STARTING. We don't know which callback is called first.
-
-> As it stands I think you introduced a subtle change (that might be OK
-> but I think is unintentional): xen_percpu_init might not be called from
-> the same cpu as its target anymore.
-
-No, xen_percpu_init and xen_interrupt_init are called on the boot cpu at
-the end of xen_guest_init.
-
-> 
-> 
->> +	default:
->> +		break;
->> +	}
->> +
->> +	return NOTIFY_OK;
->> +}
->> +
->> +static struct notifier_block xen_cpu_notifier = {
->> +	.notifier_call = xen_cpu_notification,
->> +};
->> +
->>  /*
->>   * see Documentation/devicetree/bindings/arm/xen.txt for the
->>   * documentation of the Xen Device Tree format.
->> @@ -209,6 +241,7 @@ static int __init xen_guest_init(void)
->>  	const char *xen_prefix = "xen,xen-";
->>  	struct resource res;
->>  	phys_addr_t grant_frames;
->> +	int cpu;
->>  
->>  	node = of_find_compatible_node(NULL, NULL, "xen,xen");
->>  	if (!node) {
->> @@ -281,9 +314,27 @@ static int __init xen_guest_init(void)
->>  	disable_cpuidle();
->>  	disable_cpufreq();
->>  
->> +	xen_init_IRQ();
->> +
->> +	if (xen_events_irq < 0)
->> +		return -ENODEV;
-> 
-> Since you are moving this code to xen_guest_init, you can check for
-> xen_events_irq earlier on, where we parse the irq from device tree.
-
-Will do.
-
-
--- 
-Julien Grall
+> PCI: bus0: Fast back to back transfers disabled
+> PCI: bus1: Fast back to back transfers enabled
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+>
+> Please, any help is welcome.
+> Regards,
+> Kamel.B
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
