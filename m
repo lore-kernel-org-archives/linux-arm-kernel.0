@@ -1,100 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Jan 2014 18:20:21 +0000
-Subject: [PATCH V2 2/2] ARM: multi_v7_defconfig: add mvebu drivers
-In-Reply-To: <14397edee7978df1d80e048d7cd02c826a91af56.1390932990.git.jason@lakedaemon.net>
-References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
- <14397edee7978df1d80e048d7cd02c826a91af56.1390932990.git.jason@lakedaemon.net>
-Message-ID: <efc85572ea408242a605d4181498b7267f52320a.1390932990.git.jason@lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 28 Jan 2014 10:15:41 -0800
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.13.x/v3.14-rc1
+In-Reply-To: <20140127193434.GN29184@titan.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 27 Jan 2014 14:34:34 -0500")
+References: <20140127193434.GN29184@titan.lakedaemon.net>
+Message-ID: <87y520ug4y.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent boot farm testing has highlighted some issues with mvebu and
-multiplatform kernels.  Increase the test coverage so we can discover
-these issues earlier.
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-v1 -> v2:
- - updating the defconfig is a separate patch from this.
+> Kevin,
+>
+> Here's the pull we discussed earlier.  Sorry my "send pull requests"
+> cron job failed me.
+>
+> As usual, been in -next (a little long this time ;-) ), incremental from
+> tags/mvebu-fixes-3.13 to tags/mvebu-fixes-3.13-2 in the mvebu/fixes
+> branch.
+>
+> thx,
+>
+> Jason.
+>
+> The following changes since commit f8b94beb7e6a374cb0de531b72377c49857b35ca:
+>
+>   i2c: mv64xxx: Document the newly introduced Armada XP A0 compatible (2014-01-14 02:09:17 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.13-2
+>
+> for you to fetch changes up to 19e61d41404fe4094c2d54943dbf883d9bbca864:
+>
+>   ARM: mvebu: fix compilation warning on Armada 370 (i.e. non-SMP) (2014-01-21 00:55:47 +0000)
+>
+> ----------------------------------------------------------------
+> mvebu fixes for v3.13 (incremental #2)
+>
+>  - allow building and booting DT and non-DT plat-orion SoCs
+>  - catch proper return value for kirkwood_pm_init()
+>  - properly check return of of_iomap to solve boot hangs (mirabox, others)
+>  - remove a compile warning on Armada 370 with non-SMP.
+>
+> ----------------------------------------------------------------
 
- arch/arm/configs/multi_v7_defconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Thanks, I've queued these up for v3.14-rc, but they won't show up in any
+builds until -rc1 is out.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 1e37e862baea..37133d9c960b 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -44,6 +44,9 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VIRT=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCI_MVEBU=y
- CONFIG_SMP=y
- CONFIG_HIGHPTE=y
- CONFIG_ARM_APPENDED_DTB=y
-@@ -64,9 +67,11 @@ CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_MVNETA=y
- CONFIG_KS8851=y
- CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_SPEAR=y
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
-@@ -89,10 +94,12 @@ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
-+CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_TEGRA114=y
-@@ -100,6 +107,8 @@ CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_TWL4030=y
-+CONFIG_THERMAL=y
-+CONFIG_ARMADA_THERMAL=y
- CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_TPS51632=y
-@@ -136,6 +145,7 @@ CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_MMC_MVSDIO=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
-@@ -144,9 +154,11 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_VT8500=y
-+CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
-+CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
-@@ -155,6 +167,7 @@ CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
- CONFIG_MXS_DMA=y
- CONFIG_DMA_OMAP=y
-+CONFIG_MEMORY=y
- CONFIG_PWM=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
--- 
-1.8.5.3
+Kevin
