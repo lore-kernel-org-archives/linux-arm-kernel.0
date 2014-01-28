@@ -1,31 +1,39 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 28 Jan 2014 10:23:53 +0100
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <52E6B42F.4050901@ti.com>
-References: <y> <cover.1390836773.git.jsarha@ti.com>
- <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
- <20140127190641.273890c6@armhf> <52E6B42F.4050901@ti.com>
-Message-ID: <20140128102353.48e8fb51@armhf>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 28 Jan 2014 10:23:57 +0100
+Subject: [alsa-devel] [PATCH 4/4] ASoC: tda998x: adjust the audio hw
+ parameters from EDID
+In-Reply-To: <20140127205437.GC11841@sirena.org.uk>
+References: <cover.1390813480.git.moinejf@free.fr>
+ <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
+ <20140127204441.GZ11841@sirena.org.uk>
+ <20140127204915.GC15937@n2100.arm.linux.org.uk>
+ <20140127205437.GC11841@sirena.org.uk>
+Message-ID: <s5hppncihn6.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jan 2014 21:31:59 +0200
-Jyri Sarha <jsarha@ti.com> wrote:
+At Mon, 27 Jan 2014 20:54:37 +0000,
+Mark Brown wrote:
+> 
+> On Mon, Jan 27, 2014 at 08:49:15PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Jan 27, 2014 at 08:44:41PM +0000, Mark Brown wrote:
+> 
+> > > Can this parsing code be factored out - it (or large parts of it) should
+> > > be usable by other HDMI devices shouldn't it?
+> 
+> > Yes, preferably as a generic ALSA helper rather than an ASoC helper -
+> > I don't see any need for this to be ASoC specific (I have a pure ALSA
+> > driver which has very similar code in it.)
+> 
+> Indeed, definitely ALSA generic - ideally we could factor a lot of the
+> integration with the video side out.
 
-> I would suggest to leave the CTS_N_K to the current setting (3), unless 
-> we can change the CTS_N_K on the fly according to the used sample format.
+Yes, indeed.
 
-Yes, this is possible:
+OTOH, as discussed recently, we're heading to move from ELD parsing to
+more direct communication between video and audio drivers for
+HD-audio.  ELD will be still provided to user-space, but not evaluated
+any longer in the new scenario.
 
-- the tda998x codec may call the tda998x hdmi in the hw_params()
-  function, i.e. when the sample format is known, and then,
 
-- the tda998x_audio_update() function may have the audio parameters
-  (struct snd_pcm_hw_params) as an argument, and CTS_N_K may be set
-  to either 1, 2 or 3 for SNDRV_PCM_FORMAT_S16_LE / S24_LE and S32_LE.
-
-This is working in my machine. Would it also work for you?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Takashi
