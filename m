@@ -1,52 +1,30 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 28 Jan 2014 14:54:32 +0100
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <20140128134827.GK15937@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
- <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
- <20140127175231.GU15937@n2100.arm.linux.org.uk> <52E69E1E.3020202@monstr.eu>
- <Pine.LNX.4.64.1401281420580.2714@axis700.grange>
- <20140128134827.GK15937@n2100.arm.linux.org.uk>
-Message-ID: <52E7B698.60401@monstr.eu>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 28 Jan 2014 15:14:37 +0100
+Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
+In-Reply-To: <1385879185-22455-2-git-send-email-ynvich@gmail.com>
+References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
+ <1385879185-22455-2-git-send-email-ynvich@gmail.com>
+Message-ID: <20140128141437.GB8713@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2014 02:48 PM, Russell King - ARM Linux wrote:
-> On Tue, Jan 28, 2014 at 02:28:28PM +0100, Guennadi Liakhovetski wrote:
->> +static void __init zynq_memory_init(void)
->> +{
->> +	/*
->> +	 * Reserve the 0-0x4000 addresses (before page tables and kernel)
->> +	 * which can't be used for DMA
->> +	 */
->> +	if (!__pa(PAGE_OFFSET))
->> +		memblock_reserve(0, 0x4000);
-> 
-> Or maybe this:
-> 
-> 	memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
-> 
-> since that's actually what you mean here.
+Hi!
 
-yep with that if too.
+> PXA serial ports have "standard" UART names (ttyS[0-3]), major
+> device number (4) and first minor device number (64) by default.
+> 
+> If the system has extra 8250 serial port hardware in addition
+> to onboard PXA serial ports, default settings produce a device
+> allocation conflict.
+> 
+> The patch provides a configuration option which can move onboard
+> ports out of the way of 8250_core by assigning a different (204)
+> major number and corresponding device names (ttySA[0-3]).
 
-I will prepare that patch and will send it out.
+Yes, please. I was hitting the same issue with Sharp Zaurus and bluetooth
+CF card... Bluetooth card had 8250 inside...
 
-Thanks,
-Michal
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/a500c3b6/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
