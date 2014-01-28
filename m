@@ -1,46 +1,57 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 28 Jan 2014 07:59:47 -0800
-Subject: [PATCH] ARM: multi_v7: add mvebu and drivers to defconfig
-In-Reply-To: <52E7CF49.8040703@free-electrons.com>
-References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
- <8761p4w2yu.fsf@paris.lan> <52E7CF49.8040703@free-electrons.com>
-Message-ID: <CAGa+x86rOYy8CcYr2eVfwvBta4CJN+_mrWFyft=0Hus_E=DXjA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Jan 2014 16:14:02 +0000
+Subject: [PATCH V2] arm64: add DSB after icache flush in
+ __flush_icache_all()
+In-Reply-To: <1390892813-30407-1-git-send-email-vkale@apm.com>
+References: <1390892813-30407-1-git-send-email-vkale@apm.com>
+Message-ID: <20140128161402.GI2885@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 7:39 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> On 28/01/2014 16:17, Kevin Hilman wrote:
->> Jason Cooper <jason@lakedaemon.net> writes:
->>
->>> boot farms testing is highlighting some errors in mvebu.  Let's get some
->>> more coverage for multi_v7_defconfig kernels.
->>>
->>> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
->>> ---
->>> Kevin,
->>>
->>> This is against tonight's master.  Feel free to take it directly.
->>>
->>
->> OK, but this one doesn't currently fix any known errors, right?  (the
->> pull request you sent yesterday fixes the boot regressions, IIUC.)  The
->> goal here is just to get more mvebu coverage in multi_v7_defconfig,
->> correct?
->>
->> That being said, have a closer look at the Kconfig entries that are
->> removed by the patch below, many of which will have an impact on other
->> platforms.
->
-> Hi Kevin,
->
-> I may be wrong but I suspect this config file was generated with make savedefconfig.
-> this rule only generate the CONFIG that are not implied by other CONFIG,
-> so I wonder if all this changes are just due to of modificatino in the Kconfig
-> themselves.
+On Tue, Jan 28, 2014 at 07:06:53AM +0000, Vinayak Kale wrote:
+> Add DSB after icache flush. It's needed to complete the cache maintenance
+> operation. The function __flush_icache_all() is used only for user space
+> mappings and an ISB is not required because of an exception return before
+> executing user instructions. An exception return would behave like an ISB.
+> 
+> This patch also uses 'memory' clobber for flush operation instruction to 
+> prevent instruction re-ordering by compiler. 
+> 
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> ---
+> 
+> V2: - Add more desciption in the commit message as suggested by Catalin & Will
+>     - Use 'memory' clobber for flush instruction as suggested by Will
 
-Yes, I suspect that as well, which means the changelog needs to have a
-bit more detail justifying those removals that look suspicious when
-just looking through the diff.
+Please can you check and fix other occurrences of this bug too, as I asked
+in v1? For example, a 2 second grep shows problems with data-cache
+maintenance in kvm. I can also see the same problem for system register
+writes followed up with isb.
 
-Kevin
+I also don't buy you not being able to test AArch32 kernels. Does KVM not
+work for you?
+
+Will
+
+> 
+>  arch/arm64/include/asm/cacheflush.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index fea9ee3..bd30f42 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -115,7 +115,8 @@ extern void flush_dcache_page(struct page *);
+>  
+>  static inline void __flush_icache_all(void)
+>  {
+> -	asm("ic	ialluis");
+> +	asm volatile("ic ialluis" : : : "memory");
+> +	dsb();
+>  }
+>  
+>  #define flush_dcache_mmap_lock(mapping) \
+> -- 
+> 1.8.2.1
+> 
+> 
