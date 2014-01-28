@@ -1,47 +1,55 @@
-From: avanbrunt@nvidia.com (Alexander Van Brunt)
-Date: Tue, 28 Jan 2014 09:48:16 -0800
-Subject: [PATCH] arm64: setup: report non-optional CPU features
-In-Reply-To: <20140128172253.GD24617@arm.com>
-References: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
- <20140128172253.GD24617@arm.com>
-Message-ID: <EE746E6E9AE0D14088A85BFB257DF432374EB56044@HQMAIL04.nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Jan 2014 12:49:10 -0500
+Subject: [PATCH] ARM: multi_v7: add mvebu and drivers to defconfig
+In-Reply-To: <CAGa+x86rOYy8CcYr2eVfwvBta4CJN+_mrWFyft=0Hus_E=DXjA@mail.gmail.com>
+References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
+ <8761p4w2yu.fsf@paris.lan> <52E7CF49.8040703@free-electrons.com>
+ <CAGa+x86rOYy8CcYr2eVfwvBta4CJN+_mrWFyft=0Hus_E=DXjA@mail.gmail.com>
+Message-ID: <20140128174910.GU29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a large number of Android applications that read "/proc/cpuinfo" to determine what CPU features are available. These applications are delivered as binaries and cannot be easily recompiled. Another example of code is the Android NDK framework. It will separately read "/proc/cpuinfo" and parse the "Features" list to get the list of CPU features.
-
-Are there other architectures that report different information in "/proc/cpuinfo" depending on the personality? x86 doesn't. The problem I have with making this conditional on the personality is that CPU's "Features" list should be listing the features of the CPU not the features of the kernel mode. For example, the CPU does have the "thumb" feature even if the personality doesn't use it.
-
------Original Message-----
-From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
-Sent: Tuesday, January 28, 2014 9:23 AM
-To: Alexander Van Brunt
-Cc: Will Deacon; Linux ARM Kernel
-Subject: Re: [PATCH] arm64: setup: report non-optional CPU features
-
-On Tue, Jan 28, 2014 at 01:23:41AM +0000, Alex Van Brunt wrote:
-> There are a large number of popular applications compiled for ARMv7-A 
-> that read /proc/cpuinfo to find out what features the CPU has.
-
-ELF_HWCAP should work fine. Which popular applications are these?
-
-> But, when they are run
-> on an arm64 kernel, they fail to run. This is because features that 
-> were optional on ARMv7 or earlier but are not optional on ARMv8-A like 
-> Thumb are not listed as a CPU feature using the arm64 kernel. To make 
-> those applications run, the kernel still needs to print the features in the list.
+On Tue, Jan 28, 2014 at 07:59:47AM -0800, Kevin Hilman wrote:
+> On Tue, Jan 28, 2014 at 7:39 AM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+> > On 28/01/2014 16:17, Kevin Hilman wrote:
+> >> Jason Cooper <jason@lakedaemon.net> writes:
+> >>
+> >>> boot farms testing is highlighting some errors in mvebu.  Let's get some
+> >>> more coverage for multi_v7_defconfig kernels.
+> >>>
+> >>> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> >>> ---
+> >>> Kevin,
+> >>>
+> >>> This is against tonight's master.  Feel free to take it directly.
+> >>>
+> >>
+> >> OK, but this one doesn't currently fix any known errors, right?  (the
+> >> pull request you sent yesterday fixes the boot regressions, IIUC.)  The
+> >> goal here is just to get more mvebu coverage in multi_v7_defconfig,
+> >> correct?
+> >>
+> >> That being said, have a closer look at the Kconfig entries that are
+> >> removed by the patch below, many of which will have an impact on other
+> >> platforms.
+> >
+> > Hi Kevin,
+> >
+> > I may be wrong but I suspect this config file was generated with make savedefconfig.
+> > this rule only generate the CONFIG that are not implied by other CONFIG,
+> > so I wonder if all this changes are just due to of modificatino in the Kconfig
+> > themselves.
 > 
-> This patch changes "cat /proc/cpuinfo" from printing:
-> 
-> Features        : fp asimd
-> 
-> To printing:
-> 
-> Features        : fp asimd wp half thumb fastmult vfp edsp neon vfpv3d16 tlsi vfpv4 idiva idivt
+> Yes, I suspect that as well, which means the changelog needs to have a
+> bit more detail justifying those removals that look suspicious when
+> just looking through the diff.
 
-That's not correct, the features reported are for the AArch64 mode, it doesn't make sense to overlap the AArch32 features here. There is COMPAT_ELF_HWCAP and the bits should be passed correctly to AArch32 binaries.
+Agreed.  I was debating doing two patches, but thought it would be
+overkill.  I'll resend a v2 as two patches.  I'm also going to put it on
+mvebu/defconfig branch so that I can also build and test against it
+throughout the merge window.
 
-A solution would be to add a check for personality(current->personality) == PER_LINUX32 and report cpuinfo in an AArch32 compatible way and based on COMPAT_ELF_HWCAP.
+thx,
 
---
-Catalin
+Jason.
