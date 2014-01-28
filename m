@@ -1,58 +1,27 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 28 Jan 2014 11:05:53 +0100
-Subject: [PATCH] usb: at91-udc: fix irq and iomem resource retrieval
-In-Reply-To: <52E130FE.1070506@atmel.com>
-References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
- <52E130FE.1070506@atmel.com>
-Message-ID: <52E78101.3060102@overkiz.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Jan 2014 18:30:01 +0800
+Subject: [PATCH 1/9] ARM: dts: imx6qdl: remove the use of pingrp macros
+In-Reply-To: <20140127143745.GM15937@n2100.arm.linux.org.uk>
+References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
+ <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
+ <20140127143745.GM15937@n2100.arm.linux.org.uk>
+Message-ID: <20140128102959.GB20583@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/2014 16:10, Nicolas Ferre wrote:
-> On 23/01/2014 15:41, Jean-Jacques Hiblot :
->> When using dt resources retrieval (interrupts and reg properties) there is
->> no predefined order for these resources in the platform dev resource
->> table. Also don't expect the number of resource to be always 2.
->>
->> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Yes, indeed.
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> Maybe we can also add a "stable" tag to it. Looking at the history of
-> this file, I think that we can add a pretty old stable limit... But as
-> it only makes sense with DT, I would advice something like this, for the
-> 3.4-ish timeframe:
->
-> Cc: stable <stable@vger.kernel.org> # 3.4
->
-> Bye,
->
->> ---
->>   drivers/usb/gadget/at91_udc.c | 10 ----------
->>   1 file changed, 10 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
->> index 4cc4fd6..dfd2943 100644
->> --- a/drivers/usb/gadget/at91_udc.c
->> +++ b/drivers/usb/gadget/at91_udc.c
->> @@ -1710,16 +1710,6 @@ static int at91udc_probe(struct platform_device *pdev)
->>   		return -ENODEV;
->>   	}
->>   
->> -	if (pdev->num_resources != 2) {
->> -		DBG("invalid num_resources\n");
->> -		return -ENODEV;
->> -	}
->> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
->> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
->> -		DBG("invalid resource type\n");
->> -		return -ENODEV;
->> -	}
->> -
->>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>   	if (!res)
->>   		return -ENXIO;
->>
->
+On Mon, Jan 27, 2014 at 02:37:45PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Jan 26, 2014 at 12:43:03AM +0800, Shawn Guo wrote:
+> >  arch/arm/boot/dts/imx6dl-hummingboard.dts  |    5 +-
+> >  arch/arm/boot/dts/imx6qdl-microsom.dtsi    |    5 +-
+> 
+> I've merged your changes here into my local copy of these just to reduce
+> the conflicts - unfortunately, it's taken soo long to deal with the above
+> that the cubox-i has now been released, which has prompted some
+> reorganisation between the above two files.
+> 
+> I would much rather you dropped these two entirely, and let me push them
+> upstream, rather than having some nasty conflicts which result from this.
+
+Dropped hummingboard from my tree.
+
+Shawn
