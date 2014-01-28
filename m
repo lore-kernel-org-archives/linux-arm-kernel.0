@@ -1,145 +1,351 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Tue, 28 Jan 2014 22:02:46 +0100
-Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
- NMI controller
-In-Reply-To: <20140128164142.GL3867@lukather>
-References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
- <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
- <20140116123940.GE31779@lukather>
- <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
- <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
- <20140128164142.GL3867@lukather>
-Message-ID: <CAOQ7t2YLv8dNF6i-X6Y1BgvvcBCNt6JhmpGuo23E057xez6+Tg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Jan 2014 13:04:10 -0800
+Subject: [RFC PATCH 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2
+ emulation
+In-Reply-To: <1390309301-28424-3-git-send-email-anup.patel@linaro.org>
+References: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
+ <1390309301-28424-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140128210410.GA26671@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 21, 2014 at 06:31:40PM +0530, Anup Patel wrote:
+> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
+> VCPUs. This patch extends current in-kernel PSCI emulation to provide
+> PSCI v0.2 interface to VCPUs.
+> 
+> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
+> keeping the ABI backward-compatible.
+> 
+> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
+> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
+> init using KVM_ARM_VCPU_INIT ioctl.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |    2 +-
+>  arch/arm/include/uapi/asm/kvm.h   |   39 ++++++++++++++++--
+>  arch/arm/kvm/arm.c                |    6 ++-
+>  arch/arm/kvm/psci.c               |   79 ++++++++++++++++++++++++++++++-------
+>  arch/arm64/include/asm/kvm_host.h |    2 +-
+>  arch/arm64/include/uapi/asm/kvm.h |   39 ++++++++++++++++--
+>  6 files changed, 143 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 8a6f6db..0239ac5 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -36,7 +36,7 @@
+>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+>  #define KVM_HAVE_ONE_REG
+>  
+> -#define KVM_VCPU_MAX_FEATURES 1
+> +#define KVM_VCPU_MAX_FEATURES 2
+>  
+>  #include <kvm/arm_vgic.h>
+>  
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index c498b60..d9eb74c 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -83,6 +83,7 @@ struct kvm_regs {
+>  #define KVM_VGIC_V2_CPU_SIZE		0x2000
+>  
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+> +#define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+>  
+>  struct kvm_vcpu_init {
+>  	__u32 target;
+> @@ -164,7 +165,7 @@ struct kvm_arch_memory_slot {
+>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>  #define KVM_ARM_IRQ_GIC_MAX		127
+>  
+> -/* PSCI interface */
+> +/* PSCI v0.1 interface */
+>  #define KVM_PSCI_FN_BASE		0x95c1ba5e
+>  #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+>  
+> @@ -173,9 +174,41 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+>  #define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
+>  
+> +/* PSCI v0.2 interface */
+> +#define KVM_PSCI_0_2_FN_BASE		0x84000000
+> +#define KVM_PSCI_0_2_FN(n)		(KVM_PSCI_0_2_FN_BASE + (n))
+> +#define KVM_PSCI_0_2_FN64_BASE		0xC4000000
+> +#define KVM_PSCI_0_2_FN64(n)		(KVM_PSCI_0_2_FN64_BASE + (n))
+> +
+> +#define KVM_PSCI_0_2_FN_PSCI_VERSION	KVM_PSCI_0_2_FN(0)
+> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND	KVM_PSCI_0_2_FN(1)
+> +#define KVM_PSCI_0_2_FN_CPU_OFF		KVM_PSCI_0_2_FN(2)
+> +#define KVM_PSCI_0_2_FN_CPU_ON		KVM_PSCI_0_2_FN(3)
+> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO	KVM_PSCI_0_2_FN(4)
+> +#define KVM_PSCI_0_2_FN_MIGRATE		KVM_PSCI_0_2_FN(5)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
+> +					KVM_PSCI_0_2_FN(6)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
+> +					KVM_PSCI_0_2_FN(7)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF	KVM_PSCI_0_2_FN(8)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET	KVM_PSCI_0_2_FN(9)
+> +
+> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND	KVM_PSCI_0_2_FN64(1)
+> +#define KVM_PSCI_0_2_FN64_CPU_ON	KVM_PSCI_0_2_FN64(3)
+> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO	KVM_PSCI_0_2_FN64(4)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE	KVM_PSCI_0_2_FN64(5)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
+> +					KVM_PSCI_0_2_FN64(7)
+> +
+> +/* PSCI return values */
+>  #define KVM_PSCI_RET_SUCCESS		0
+> -#define KVM_PSCI_RET_NI			((unsigned long)-1)
+> -#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
+> +#define KVM_PSCI_RET_NOT_SUPPORTED	((unsigned long)-1)
+> +#define KVM_PSCI_RET_INVALID_PARAMS	((unsigned long)-2)
+>  #define KVM_PSCI_RET_DENIED		((unsigned long)-3)
+> +#define KVM_PSCI_RET_ALREADY_ON		((unsigned long)-4)
+> +#define KVM_PSCI_RET_ON_PENDING		((unsigned long)-5)
+> +#define KVM_PSCI_RET_INTERNAL_FAILURE	((unsigned long)-6)
+> +#define KVM_PSCI_RET_NOT_PRESENT	((unsigned long)-7)
+> +#define KVM_PSCI_RET_DISABLED		((unsigned long)-8)
+>  
+>  #endif /* __ARM_KVM_H__ */
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 2a700e0..0b7817a 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -193,6 +193,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+>  	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+>  	case KVM_CAP_ONE_REG:
+>  	case KVM_CAP_ARM_PSCI:
+> +	case KVM_CAP_ARM_PSCI_0_2:
+>  		r = 1;
+>  		break;
+>  	case KVM_CAP_COALESCED_MMIO:
+> @@ -483,7 +484,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+>  	 * PSCI code.
+>  	 */
+>  	if (test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features)) {
+> -		*vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
+> +		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> +			*vcpu_reg(vcpu, 0) = KVM_PSCI_0_2_FN_CPU_OFF;
+> +		else
+> +			*vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
+>  		kvm_psci_call(vcpu);
 
-On Tue, Jan 28, 2014 at 5:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 28, 2014 at 12:02:23PM +0100, Hans de Goede wrote:
->> -----BEGIN PGP SIGNED MESSAGE-----
->> Hash: SHA1
->>
->> Hi,
->>
->> On 01/28/2014 11:40 AM, Maxime Ripard wrote:
->>
->> Jumping in here to try and clarify things, or so I hope at least :)
->
-> Sure :)
->
->> No, the IRQ from the PMIC is a level sensitive IRQ, so it would look
->> like this:
->
-> Hmm, your mailer seems to have mangled your drawing :(
->
->> The PMIC irq line won't go low until an i2c write to its irq status
->> registers write-clears all status bits for which the corresponding
->> bit in the irq-mask register is set.
->
-> Which makes sense too
->
->> And the only reason the NMI -> GIC also goes low is because the unmask
->> operation writes a second ack to the NMI controller in the unmask
->> callback of the NMI controller driver.
->
-> Yes, and this is exactly what I don't understand. You shouldn't need
-> that ack in first place, since it's been done already right after the
-> unmask.
+Which tree does this patch apply to?  It looks like you'll get a
+conflict with:
+478a823 arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
 
-But the first ack is ignored since the IRQ line is still maintained
-asserted by PMIC.
+>  	}
+>  
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 0881bf1..ee044a3 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -55,13 +55,13 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	}
+>  
+>  	if (!vcpu)
+> -		return KVM_PSCI_RET_INVAL;
+> +		return KVM_PSCI_RET_INVALID_PARAMS;
+>  
+>  	target_pc = *vcpu_reg(source_vcpu, 2);
+>  
+>  	wq = kvm_arch_vcpu_wq(vcpu);
+>  	if (!waitqueue_active(wq))
+> -		return KVM_PSCI_RET_INVAL;
+> +		return KVM_PSCI_RET_INVALID_PARAMS;
+>  
+>  	kvm_reset_vcpu(vcpu);
+>  
+> @@ -84,17 +84,49 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	return KVM_PSCI_RET_SUCCESS;
+>  }
+>  
+> -/**
+> - * kvm_psci_call - handle PSCI call if r0 value is in range
+> - * @vcpu: Pointer to the VCPU struct
+> - *
+> - * Handle PSCI calls from guests through traps from HVC instructions.
+> - * The calling convention is similar to SMC calls to the secure world where
+> - * the function number is placed in r0 and this function returns true if the
+> - * function number specified in r0 is withing the PSCI range, and false
+> - * otherwise.
+> - */
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+> +{
+> +	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+> +	unsigned long val;
+> +
+> +	switch (psci_fn) {
+> +	case KVM_PSCI_0_2_FN_PSCI_VERSION:
+> +		/*
+> +		 * Bits[31:16] = Major Version = 0
+> +		 * Bits[15:0] = Minor Version = 2
+> +		 */
+> +		val = 2;
+> +		break;
+> +	case KVM_PSCI_0_2_FN_CPU_OFF:
+> +		kvm_psci_vcpu_off(vcpu);
+> +		val = KVM_PSCI_RET_SUCCESS;
+> +		break;
+> +	case KVM_PSCI_0_2_FN_CPU_ON:
+> +	case KVM_PSCI_0_2_FN64_CPU_ON:
+> +		val = kvm_psci_vcpu_on(vcpu);
+> +		break;
+> +	case KVM_PSCI_0_2_FN_CPU_SUSPEND:
+> +	case KVM_PSCI_0_2_FN_AFFINITY_INFO:
+> +	case KVM_PSCI_0_2_FN_MIGRATE:
+> +	case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> +	case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> +	case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+> +	case KVM_PSCI_0_2_FN_SYSTEM_RESET:
+> +	case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+> +	case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
+> +	case KVM_PSCI_0_2_FN64_MIGRATE:
+> +	case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+> +		val = KVM_PSCI_RET_NOT_SUPPORTED;
+> +		break;
+> +	default:
+> +		return false;
+> +	}
+> +
+> +	*vcpu_reg(vcpu, 0) = val;
+> +	return true;
+> +}
+> +
+> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>  {
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+> @@ -109,9 +141,8 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>  		break;
+>  	case KVM_PSCI_FN_CPU_SUSPEND:
+>  	case KVM_PSCI_FN_MIGRATE:
+> -		val = KVM_PSCI_RET_NI;
+> +		val = KVM_PSCI_RET_NOT_SUPPORTED;
+>  		break;
+> -
+>  	default:
+>  		return false;
+>  	}
+> @@ -119,3 +150,21 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>  	*vcpu_reg(vcpu, 0) = val;
+>  	return true;
+>  }
+> +
+> +/**
+> + * kvm_psci_call - handle PSCI call if r0 value is in range
+> + * @vcpu: Pointer to the VCPU struct
+> + *
+> + * Handle PSCI calls from guests through traps from HVC instructions.
+> + * The calling convention is similar to SMC calls to the secure world where
+> + * the function number is placed in r0 and this function returns true if the
+> + * function number specified in r0 is withing the PSCI range, and false
+> + * otherwise.
+> + */
+> +bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> +{
+> +	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> +		return kvm_psci_0_2_call(vcpu);
+> +
+> +	return kvm_psci_0_1_call(vcpu);
+> +}
 
->> Note that we cannot use edge triggered interrupts here because the PMIC
->> has the typical setup with multiple irq status bits driving a single
->> irq line, so the irq handler does read irq-status, handle stuff,
->> write-clear irq-status. And if any other irq-status bits get set
->> between the read and write-clear the PMIC -> NMI line will stay
->> high, as it should since there are more interrupts to handle.
->
-> Yep, the edge-thing was just the only case I could think of where it
-> could lead to troubles.
->
-> In what you're saying, which makes total sense, if we don't do the
-> ack, as soon as the irq will be unmasked, since the level is high, the
-> handler will be called again, treat the new interrupts, and so on. I
-> don't see how this is an issue actually.
+Why don't we just try one after the other?  Do they conflict in some
+way?
 
-This is exactly why in unmask callback we first ACK and then unmask.
-So, if the line is still maintained up by PMIC then a new interrupt is
-raised otherwise nothing happens.
+I assume PSCI calls are never going to be in the critical path and calls
+into PSCI are pretty much expected to be slow as a dog anyhow, so if we
+could avoid the extra churn in user space code and potential user
+confusion (providing PSCI 0.2 kernel but too old user space tool for
+example), I think that would be preferred.
 
->> > But in this case, you would have two events coming from your
->> > device (the two rising edges), so you'd expect two interrupts. And
->> > in the case of a level triggered interrupt, the device would keep
->> > the interrupt line active until it's unmasked, so we wouldn't end
->> > up with this either.
->> >
->> >> sunxi_sc_nmi_ack_and_unmask is therefore called (by
->> >> irq_finalize_oneshot) after the IRQ thread has been
->> >> executed. After the IRQ thread has ACKed the IRQs on the
->> >> originating device we can finally ACK and unmask again the NMI.
->> >
->> > And what happens if you get a new interrupt right between the end
->> > of the handler and the unmask?
->>
->> The implicit ack done by the unmask will be ignored if the NMI line
->> is still high, just like the initial ack is ignored (which is why we
->> need the mask), and when the unmask completes the irq will
->> immediately retrigger, as it should.
->
-> Yeah, but why do we need the ack in the first place? I can't think of
-> a case where the ACK would be doing something useful. Either:
->   - there is no new interrupts between the mask/ack and the unmask, so
->     there's no interrupt to ack.
->   - There's a new interrupt between the mask/ack and the
->     unmask. There's two more cases here:
->     * The interrupt came before the device handler kicked in, and the
->       handler will treat it/ack it: No issue
->     * The interrupt comes right after the handler has been acking its
->       interrupt, the level stays high, your handler is called once
->       again, you can treat it: No issue
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 0a1d697..92242ce 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -39,7 +39,7 @@
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+>  
+> -#define KVM_VCPU_MAX_FEATURES 2
+> +#define KVM_VCPU_MAX_FEATURES 3
+>  
+>  struct kvm_vcpu;
+>  int kvm_target_cpu(void);
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index d9f026b..0eb254d 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -77,6 +77,7 @@ struct kvm_regs {
+>  
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+> +#define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+>  
+>  struct kvm_vcpu_init {
+>  	__u32 target;
+> @@ -150,7 +151,7 @@ struct kvm_arch_memory_slot {
+>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>  #define KVM_ARM_IRQ_GIC_MAX		127
+>  
+> -/* PSCI interface */
+> +/* PSCI v0.1 interface */
+>  #define KVM_PSCI_FN_BASE		0x95c1ba5e
+>  #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+>  
+> @@ -159,10 +160,42 @@ struct kvm_arch_memory_slot {
+>  #define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+>  #define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
+>  
+> +/* PSCI v0.2 interface */
+> +#define KVM_PSCI_0_2_FN_BASE		0x84000000
+> +#define KVM_PSCI_0_2_FN(n)		(KVM_PSCI_0_2_FN_BASE + (n))
+> +#define KVM_PSCI_0_2_FN64_BASE		0xC4000000
+> +#define KVM_PSCI_0_2_FN64(n)		(KVM_PSCI_0_2_FN64_BASE + (n))
+> +
+> +#define KVM_PSCI_0_2_FN_PSCI_VERSION	KVM_PSCI_0_2_FN(0)
+> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND	KVM_PSCI_0_2_FN(1)
+> +#define KVM_PSCI_0_2_FN_CPU_OFF		KVM_PSCI_0_2_FN(2)
+> +#define KVM_PSCI_0_2_FN_CPU_ON		KVM_PSCI_0_2_FN(3)
+> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO	KVM_PSCI_0_2_FN(4)
+> +#define KVM_PSCI_0_2_FN_MIGRATE		KVM_PSCI_0_2_FN(5)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
+> +					KVM_PSCI_0_2_FN(6)
+> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
+> +					KVM_PSCI_0_2_FN(7)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF	KVM_PSCI_0_2_FN(8)
+> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET	KVM_PSCI_0_2_FN(9)
+> +
+> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND	KVM_PSCI_0_2_FN64(1)
+> +#define KVM_PSCI_0_2_FN64_CPU_ON	KVM_PSCI_0_2_FN64(3)
+> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO	KVM_PSCI_0_2_FN64(4)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE	KVM_PSCI_0_2_FN64(5)
+> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
+> +					KVM_PSCI_0_2_FN64(7)
+> +
+> +/* PSCI return values */
+>  #define KVM_PSCI_RET_SUCCESS		0
+> -#define KVM_PSCI_RET_NI			((unsigned long)-1)
+> -#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
+> +#define KVM_PSCI_RET_NOT_SUPPORTED	((unsigned long)-1)
+> +#define KVM_PSCI_RET_INVALID_PARAMS	((unsigned long)-2)
+>  #define KVM_PSCI_RET_DENIED		((unsigned long)-3)
+> +#define KVM_PSCI_RET_ALREADY_ON		((unsigned long)-4)
+> +#define KVM_PSCI_RET_ON_PENDING		((unsigned long)-5)
+> +#define KVM_PSCI_RET_INTERNAL_FAILURE	((unsigned long)-6)
+> +#define KVM_PSCI_RET_NOT_PRESENT	((unsigned long)-7)
+> +#define KVM_PSCI_RET_DISABLED		((unsigned long)-8)
+>  
+>  #endif
+>  
+> -- 
+> 1.7.9.5
+> 
 
-AFAIU the problem here is that the only ACK that is able to assert the
-line NMI -> GIC is the ACK by the unmask callback. All the others ACKs
-before that one are ignored by the NMI controller since the line PMIC
--> NMI is still asserted.
-
->> >>> I really wonder whether it makes sense to have a generic chip
->> >>> here. It seems to be much more complicated than it should. It's
->> >>> only about a single interrupt interrupt chip here.
->> >>
->> >> I agree but is there any other way to manage the NMI without the
->> >> driver of the device connected to NMI having to worry about
->> >> acking/masking/unmasking/ etc..?
->> >
->> > Yes, just declare a "raw" irqchip. Pretty much like we do on
->> > irq-sun4i for example.
->>
->> Hmm, I'm not going to say that using a raw irqchip here is a bad
->> idea, it sounds like it would be better.
->
-> There's none. It was a separate comment :)
->
->> But I don't think this will solve the need the mask / umask. The
->> problem is we need to do an i2c write to clear the interrupt source,
->> which needs to be done from a thread / workqueue. So when the
->> interrupt handler finishes the source won't be cleared yet, and
->> AFAIK then only way to deal with this is to mask the interrupt until
->> we've cleared the interrupt source.
->
-> Yes, but the interrupt is still masked during the time between the
-> "hard" handler and the thread, so there's no way you can get an
-> interrupt flood during that time.
-
-agree.
-
-BTW fortunately we can talk about this also during FOSDEM ;)
-
-Thank you,
-
+Thanks,
 -- 
-Carlo Caione
+Christoffer
