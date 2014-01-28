@@ -1,208 +1,38 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 28 Jan 2014 12:09:11 +0100
-Subject: [PATCH v11] clk: add MOXA ART SoCs clock driver
-In-Reply-To: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
-References: <1390308261-4026-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1390907351-28426-1-git-send-email-jonas.jensen@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jan 2014 11:17:57 +0000
+Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <4697306.PPWWh8UGTE@wuerfel>
+References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
+ <1390890471-14882-3-git-send-email-agross@codeaurora.org>
+ <52E772DF.6000604@metafoo.de> <4697306.PPWWh8UGTE@wuerfel>
+Message-ID: <20140128111756.GE15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MOXA ART SoCs allow to determine PLL output and APB frequencies
-by reading registers holding multiplier and divisor information.
+On Tue, Jan 28, 2014 at 10:16:53AM +0100, Arnd Bergmann wrote:
+> On Tuesday 28 January 2014 10:05:35 Lars-Peter Clausen wrote:
+> > Why does the direction needs to be specified in specifier? I see two
+> > options, either the direction per is fixed in hardware. In that case the DMA
+> > controller node should describe which channel is which direction. Or the
+> > direction is not fixed in hardware and can be changed at runtime in which
+> > case it should be set on a per descriptor basis.
+> 
+> Normally the direction is implied by dmaengine_slave_config().
 
-Add a clock driver for this SoC.
+No.  The direction argument in there is deprecated - we've been talking
+about removing it for some time.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+DMA engine drivers should store all parameters of the configuration, and
+then select the appropriate ones when preparing a transfer (which itself
+involves a direction.)
 
-Notes:
-    Thanks for the replies,
-    
-    Changes since v10:
-    
-    1. add clock-specifier to DT binding description
-    2. remove local variable "rate"
-    3. add local variable "parent_name"
-    4. use clk_register_fixed_factor() instead of clk_register_fixed_rate()
-    5. remove flag CLK_IS_ROOT
-    
-    Applies to next-20140128
+Not doing this implies that if you have a half-duplex device, you have to
+repeatedly issue a dmaengine_slave_config() call, a prepare call, and a
+submit call to the DMA engine code for every segment you want to transfer.
+We don't need that kind of DMA engine specific behaviour in DMA engine
+users.
 
- .../bindings/clock/moxa,moxart-clock.txt           | 48 +++++++++++
- drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-moxart.c                           | 97 ++++++++++++++++++++++
- 3 files changed, 146 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
- create mode 100644 drivers/clk/clk-moxart.c
-
-diff --git a/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-new file mode 100644
-index 0000000..fedea84
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/moxa,moxart-clock.txt
-@@ -0,0 +1,48 @@
-+Device Tree Clock bindings for arch-moxart
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+MOXA ART SoCs allow to determine PLL output and APB frequencies
-+by reading registers holding multiplier and divisor information.
-+
-+
-+PLL:
-+
-+Required properties:
-+- compatible : Must be "moxa,moxart-pll-clock"
-+- #clock-cells : Should be 0
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle + clock-specifier for the parent clock
-+
-+Optional properties:
-+- clock-output-names : Should contain clock name
-+
-+
-+APB:
-+
-+Required properties:
-+- compatible : Must be "moxa,moxart-apb-clock"
-+- #clock-cells : Should be 0
-+- reg : Should contain registers location and length
-+- clocks : Should contain phandle + clock-specifier for the parent clock
-+
-+Optional properties:
-+- clock-output-names : Should contain clock name
-+
-+
-+For example:
-+
-+	clk_pll: clk_pll at 98100000 {
-+		compatible = "moxa,moxart-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0x98100000 0x34>;
-+	};
-+
-+	clk_apb: clk_apb at 98100000 {
-+		compatible = "moxa,moxart-apb-clock";
-+		#clock-cells = <0>;
-+		reg = <0x98100000 0x34>;
-+		clocks = <&clk_pll>;
-+	};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 0faf730..7940d0c 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
- obj-$(CONFIG_ARCH_EFM32)	+= clk-efm32gg.o
-+obj-$(CONFIG_ARCH_MOXART)	+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)	+= clk-nomadik.o
- obj-$(CONFIG_ARCH_HIGHBANK)	+= clk-highbank.o
- obj-$(CONFIG_ARCH_HI3xxx)	+= hisilicon/
-diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
-new file mode 100644
-index 0000000..30a3b69
---- /dev/null
-+++ b/drivers/clk/clk-moxart.c
-@@ -0,0 +1,97 @@
-+/*
-+ * MOXA ART SoCs clock driver.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/clkdev.h>
-+
-+void __init moxart_of_pll_clk_init(struct device_node *node)
-+{
-+	static void __iomem *base;
-+	struct clk *clk, *ref_clk;
-+	unsigned int mul;
-+	const char *name = node->name;
-+	const char *parent_name;
-+
-+	of_property_read_string(node, "clock-output-names", &name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+
-+	mul = readl(base + 0x30) >> 3 & 0x3f;
-+	iounmap(base);
-+
-+	ref_clk = of_clk_get(node, 0);
-+	if (IS_ERR(ref_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
-+
-+	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, mul, 1);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
-+	       moxart_of_pll_clk_init);
-+
-+void __init moxart_of_apb_clk_init(struct device_node *node)
-+{
-+	static void __iomem *base;
-+	struct clk *clk, *pll_clk;
-+	unsigned int div, val;
-+	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
-+	const char *name = node->name;
-+	const char *parent_name;
-+
-+	of_property_read_string(node, "clock-output-names", &name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: of_iomap failed\n", node->full_name);
-+		return;
-+	}
-+
-+	val = readl(base + 0xc) >> 4 & 0x7;
-+	iounmap(base);
-+
-+	if (val > 4)
-+		val = 0;
-+	div = div_idx[val] * 2;
-+
-+	pll_clk = of_clk_get(node, 0);
-+	if (IS_ERR(pll_clk)) {
-+		pr_err("%s: of_clk_get failed\n", node->full_name);
-+		return;
-+	}
-+
-+	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, 1, div);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: failed to register clock\n", node->full_name);
-+		return;
-+	}
-+
-+	clk_register_clkdev(clk, NULL, name);
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
-+	       moxart_of_apb_clk_init);
 -- 
-1.8.2.1
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
