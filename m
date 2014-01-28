@@ -1,40 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jan 2014 17:22:53 +0000
-Subject: [PATCH] arm64: setup: report non-optional CPU features
-In-Reply-To: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
-References: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
-Message-ID: <20140128172253.GD24617@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Jan 2014 12:35:31 -0500
+Subject: [GIT PULL] irqchip: dove: drivers for v3.14
+In-Reply-To: <20140110183430.GO19878@titan.lakedaemon.net>
+References: <20131201172914.GV2879@titan.lakedaemon.net>
+ <20131211175037.GY10053@titan.lakedaemon.net>
+ <20140110183430.GO19878@titan.lakedaemon.net>
+Message-ID: <20140128173531.GT29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:23:41AM +0000, Alex Van Brunt wrote:
-> There are a large number of popular applications compiled for ARMv7-A that read
-> /proc/cpuinfo to find out what features the CPU has.
+Thomas,
 
-ELF_HWCAP should work fine. Which popular applications are these?
-
-> But, when they are run
-> on an arm64 kernel, they fail to run. This is because features that were
-> optional on ARMv7 or earlier but are not optional on ARMv8-A like Thumb are not
-> listed as a CPU feature using the arm64 kernel. To make those applications run,
-> the kernel still needs to print the features in the list.
+On Fri, Jan 10, 2014 at 01:34:30PM -0500, Jason Cooper wrote:
+> On Wed, Dec 11, 2013 at 12:50:37PM -0500, Jason Cooper wrote:
+> > On Sun, Dec 01, 2013 at 12:29:14PM -0500, Jason Cooper wrote:
+> > > Here's an mvebu driver we've had on the ML for a while, and it's been in
+> > > -next for 5 days.
+> > 
+> > Just checking to make sure this hasn't slipped off of your plate.
+> > 
 > 
-> This patch changes "cat /proc/cpuinfo" from printing:
-> 
-> Features        : fp asimd
-> 
-> To printing:
-> 
-> Features        : fp asimd wp half thumb fastmult vfp edsp neon vfpv3d16 tlsi vfpv4 idiva idivt
+> I'm not able to see where this one might have been pulled, could you
+> please pull or let me know if it's not acceptable?
 
-That's not correct, the features reported are for the AArch64 mode, it
-doesn't make sense to overlap the AArch32 features here. There is
-COMPAT_ELF_HWCAP and the bits should be passed correctly to AArch32
-binaries.
+I see you pulled in mvebu/irqchip-fixes.  Thanks for that.  It's getting
+near to the end of the merge window and there's been no activity on this
+pull request.
 
-A solution would be to add a check for personality(current->personality)
-== PER_LINUX32 and report cpuinfo in an AArch32 compatible way and based
-on COMPAT_ELF_HWCAP.
+Please let us know if there's anything we can do to assist.
 
--- 
-Catalin
+thx,
+
+Jason.
+
+> > > The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> > > 
+> > >   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
+> > > 
+> > > for you to fetch changes up to 40b367d95fb3d60fc1edb9ba8f6ef52272e48936:
+> > > 
+> > >   irqchip: irq-dove: Add PMU interrupt controller. (2013-11-26 15:04:53 +0000)
+> > > 
+> > > ----------------------------------------------------------------
+> > > mvebu irqchip changes for v3.14
+> > > 
+> > >  - add Dove PMU interrupt controller
+> > > 
+> > > ----------------------------------------------------------------
+> > > Andrew Lunn (1):
+> > >       irqchip: irq-dove: Add PMU interrupt controller.
+> > > 
+> > >  .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
+> > >  drivers/irqchip/Makefile                           |   1 +
+> > >  drivers/irqchip/irq-dove.c                         | 126 +++++++++++++++++++++
+> > >  3 files changed, 144 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
+> > >  create mode 100644 drivers/irqchip/irq-dove.c
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
