@@ -1,39 +1,54 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 28 Jan 2014 10:23:57 +0100
-Subject: [alsa-devel] [PATCH 4/4] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <20140127205437.GC11841@sirena.org.uk>
-References: <cover.1390813480.git.moinejf@free.fr>
- <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
- <20140127204441.GZ11841@sirena.org.uk>
- <20140127204915.GC15937@n2100.arm.linux.org.uk>
- <20140127205437.GC11841@sirena.org.uk>
-Message-ID: <s5hppncihn6.wl%tiwai@suse.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jan 2014 10:44:27 +0100
+Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
+In-Reply-To: <52E67316.5020906@redhat.com>
+References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
+ <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
+ <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
+Message-ID: <20140128094427.GZ3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Mon, 27 Jan 2014 20:54:37 +0000,
-Mark Brown wrote:
+On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
+> >> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
+> > 
+> > Maybe we can just remove the gates from there? Even though they
+> > are gates, they are also (a bit) more than that.
 > 
-> On Mon, Jan 27, 2014 at 08:49:15PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 27, 2014 at 08:44:41PM +0000, Mark Brown wrote:
+> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
+
+Yep, exactly
+
+> > I guess that means that we will have the OHCI0 gate declared with
+> > <&...-gates-clk 6>, while it's actually the first gate for this
+> > clock?
 > 
-> > > Can this parsing code be factored out - it (or large parts of it) should
-> > > be usable by other HDMI devices shouldn't it?
+> Correct.
 > 
-> > Yes, preferably as a generic ALSA helper rather than an ASoC helper -
-> > I don't see any need for this to be ASoC specific (I have a pure ALSA
-> > driver which has very similar code in it.)
+> > Maybe introducing an offset field in the gates_data would be a
+> > good idea, so that we always start from indexing the gates from 0
+> > in the DT?
 > 
-> Indeed, definitely ALSA generic - ideally we could factor a lot of the
-> integration with the video side out.
+> Well for the other "gates" type clks we also have holes in the
+> range, and we always refer to the clk with the bit number in the reg
+> as the clock-cell value.
 
-Yes, indeed.
+Yes, we have holes, but I see two majors differences here:
+  - the other gates are just gates, while the usb clocks are a bit
+    more than that.
+  - the other gates' gating bits thus all start at bit 0, while here,
+    since it's kind of a "mixed" clock, the gating bits start at bit 6
+    (on the A20 at least)
 
-OTOH, as discussed recently, we're heading to move from ELD parsing to
-more direct communication between video and audio drivers for
-HD-audio.  ELD will be still provided to user-space, but not evaluated
-any longer in the new scenario.
 
-
-Takashi
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/4aeec0e2/attachment.sig>
