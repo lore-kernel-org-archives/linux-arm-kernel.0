@@ -1,31 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Jan 2014 22:05:45 +0100
-Subject: iop32x: gpio breakage after "instantiate GPIO from platform device"
-Message-ID: <4202760.m9CxkiIWk3@wuerfel>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 28 Jan 2014 15:05:59 -0600
+Subject: [RFC] arm: vdso: Convert sigpage to vdso implementation
+In-Reply-To: <1390926308-15581-1-git-send-email-steve.capper@linaro.org>
+References: <1390926308-15581-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <52E81BB7.7070201@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7b85b867b9904 "ARM: plat-iop: instantiate GPIO from platform
-device" nicely cleaned up the gpio register access for iop, but
-forgot one board that directly pokes into the gpio registers
-to do a system reset.
+Hi Steve,
 
-That board no longer compiles, and this patch just disables
-the code in question to work around it so I can locally build
-randconfig again, but it needs to be fixed properly.
+On 01/28/2014 10:25 AM, Steve Capper wrote:
+> ARM has a special sigpage that is used for signal return trampolines.
+> Its implementation is very similar to a VDSO conceptually in that it
+> occupies a special mapping in user address space.
+> 
+> One could actually host the trampoline code in a VDSO instead with the
+> added advantage that one could also host specialised routines there.
+> One such routine could be gettimeofday where on ARM we have architected
+> (and some vendor supplied) timers that can be queried entirely in
+> userspace, obviating the need for an expensive syscall.
+> 
+> This patch converts the sigpage implementation to a VDSO. It is mostly
+> a direct port from Will Deacon's arm64 implementation with the ARM
+> signal trampoline plumbed in.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+> As can be inferred from this RFC, I am interested ultimately in
+> implementing a syscall-less gettimeofday for ARM. Whilst researching
+> possible vectors page or VDSO implementations, I came across the
+> sigpage mechanism which is very similar to a VDSO.
+> 
+> The very simple function, __kernel_vdso_doubler, resolved in a test
+> program automatically on my Arndale board (running Fedora 20) without
+> any additional prodding.
+> 
+> IPC stress tests from LTP were executed to test the signal trampoline.
+> 
+> I would appreciate any comments on this approach of converting the
+> sigpage to a VDSO. If this looks sane to people, I will work on the
+> gettimeofday logic in a later patch.
 
-diff --git a/arch/arm/mach-iop32x/em7210.c b/arch/arm/mach-iop32x/em7210.c
-index 177cd07..f3cb8e1 100644
---- a/arch/arm/mach-iop32x/em7210.c
-+++ b/arch/arm/mach-iop32x/em7210.c
-@@ -178,8 +178,10 @@ static struct platform_device em7210_serial_device = {
- 
- void em7210_power_off(void)
- {
-+#if 0
- 	*IOP3XX_GPOE &= 0xfe;
- 	*IOP3XX_GPOD |= 0x01;
-+#endif
- }
- 
- static void __init em7210_init_machine(void)
+As it happens, I've been working on a vDSO implementation of
+gettimeofday/clock_gettime which does not mess with the signal page.
+I'll reply with the patch separately in a moment.
