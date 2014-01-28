@@ -1,17 +1,49 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 28 Jan 2014 10:30:18 -0800
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140128182245.18840.51279@capellas-linux>
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
- <20140128182245.18840.51279@capellas-linux>
-Message-ID: <20140128183018.24540.25278@capellas-linux>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 28 Jan 2014 11:34:24 -0700
+Subject: [Q] block / zynq: DMA bouncing
+In-Reply-To: <20140128134827.GK15937@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
+ <20140127170230.GQ15937@n2100.arm.linux.org.uk>
+ <52E69B4E.5010604@monstr.eu>
+ <20140127175231.GU15937@n2100.arm.linux.org.uk>
+ <52E69E1E.3020202@monstr.eu>
+ <Pine.LNX.4.64.1401281420580.2714@axis700.grange>
+ <20140128134827.GK15937@n2100.arm.linux.org.uk>
+Message-ID: <20140128183424.GB1427@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2014-01-28 10:22:45)
-> Otherwise, I am still looking at how to get this upstream by verifying
-> on omap 5.  In my case, I still have the chicken egg problem, where I'm 
-> trying to verify on omap 5 with out of tree patches.
+On Tue, Jan 28, 2014 at 01:48:27PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 28, 2014 at 02:28:28PM +0100, Guennadi Liakhovetski wrote:
+> > +static void __init zynq_memory_init(void)
+> > +{
+> > +	/*
+> > +	 * Reserve the 0-0x4000 addresses (before page tables and kernel)
+> > +	 * which can't be used for DMA
+> > +	 */
+> > +	if (!__pa(PAGE_OFFSET))
+> > +		memblock_reserve(0, 0x4000);
+> 
+> Or maybe this:
+> 
+> 	memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
+> 
+> since that's actually what you mean here.
 
-Sorry, incorrect, I'm verifying on Beaglebone black not OMAP 5.
+Can you have a non-zero PAGE_OFFSET and swapper_pg_dir != 0x4000?
+Crash dump kernel maybe?
+
+Perhaps:
+	if (__pa(PAGE_OFFSET) < 0x8000)
+ 	   memblock_reserve(__pa(PAGE_OFFSET),
+	                    min(__pa(swapper_pg_dir), 0x8000));
+?
+
+The Zynq TRM, UG585 pg 115, describes this issue. Physical addresses
+below 0x8000 are not accessible to DMA from the AXI interconnect.
+
+Though, how does a crash dump kernel know it needs to bounce buffer
+the swapper if it dumps it via DMA?
+
+Regards,
+Jason
