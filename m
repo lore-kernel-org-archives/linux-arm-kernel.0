@@ -1,60 +1,78 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 27 Jan 2014 17:42:07 -0800
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <20140127193149.GV15937@n2100.arm.linux.org.uk>
-References: <y> <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
- <20140127193149.GV15937@n2100.arm.linux.org.uk>
-Message-ID: <52E70AEF.4060602@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 28 Jan 2014 01:39:19 +0100
+Subject: [PATCH v2 07/21] pinctrl: mvebu: move generic group name generation
+In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/27/2014 11:31 AM, Russell King - ARM Linux wrote:
-> On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
->> The dma_mask for a device structure is a pointer. This pointer
->> needs to be set up before the dma mask can actually be set. Most
->> frameworks in the kernel take care of setting this up properly but
->> platform devices that don't follow a regular bus structure may not
->> ever have this set. As a result, checks such as dma_capable will
->> always return false on a raw platform device and dma_set_mask will
->> always return -EIO. Fix this by adding a dma_mask in the
->> platform_device archdata and setting it to be the dma_mask. Devices
->> used in other frameworks can change this as needed.
->
-> You shouldn't need to do this.  I went through a lot of the drivers we
-> currently have, fixing them up in various manners.  The basic rules
-> for this stuff are:
->
-> - It is the responsibility of the code creating the device to set a
->    reasonable default for the dma mask according to the bus and whether
->    DMA is supportable.
->
-> - It is the responsibility of the driver _always_ to make a call to
->    dma_set_mask() and/or dma_set_coherent_mask() according to the
->    driver's needs if the driver is going to be using DMA.
->
-> As a work-around for the buggy situation we have in the kernel with DT,
-> various buggy workarounds have been incorporated into drivers which
-> involve writing directly to the DMA masks, and other such games.  None
-> of that is necessary when the dma_coerce_*() functions are used - but
-> these are a stop-gap until the DT code gets fixed.
->
-> The real answer here is to make DT conform to the first point above
-> and not add yet another different hack to the kernel.
->
+MVEBU SoC pinctrl allows SoC specific drivers to pass a range of mpp
+pins without a corresponding name. Each pin in this range is then
+translated into a single-pin group with an auto-generated name. To allow
+some redesign of the driver, move name generation for those pin ranges
+down to where the groups are created.
 
-powerpc ran into this exact problem before and fixed it using this 
-method (a77ce8167cc1d0370fcb1d79b367d62e050cb2b0
-"driver core: Add ability for arch code to setup pdev_archdata" and
-  314b02f503c2c219fde0fcf6f086fda415f8a847 "powerpc: implement 
-arch_setup_pdev_archdata") so there is at least some precedent for this 
-method.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-Are there patches/discussion somewhere else on what a proper solution 
-would be in the DT?
-
-Thanks,
-Laura
-
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 90c35b20a7af..375666b0abc3 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -631,7 +631,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base)
+ 	pctl->desc.npins = 0;
+ 	for (n = 0; n < soc->ncontrols; n++) {
+ 		struct mvebu_mpp_ctrl *ctrl = &soc->controls[n];
+-		char *names;
+ 
+ 		pctl->desc.npins += ctrl->npins;
+ 		/* initial control pins */
+@@ -649,14 +648,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base)
+ 		}
+ 
+ 		/* generic mvebu register control */
+-		names = devm_kzalloc(&pdev->dev, ctrl->npins * 8, GFP_KERNEL);
+-		if (!names) {
+-			dev_err(&pdev->dev, "failed to alloc mpp names\n");
+-			return -ENOMEM;
+-		}
+-		for (k = 0; k < ctrl->npins; k++)
+-			sprintf(names + 8*k, "mpp%d", ctrl->pid+k);
+-		ctrl->name = names;
+ 		pctl->num_groups += ctrl->npins;
+ 	}
+ 
+@@ -689,7 +680,18 @@ int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base)
+ 		pctl->groups[gid].npins = ctrl->npins;
+ 
+ 		/* generic mvebu register control maps to a number of groups */
+-		if (!ctrl->mpp_get && !ctrl->mpp_set) {
++		if (!ctrl->name) {
++			char *names = devm_kzalloc(&pdev->dev,
++						   ctrl->npins * 8, GFP_KERNEL);
++			if (!names) {
++				dev_err(&pdev->dev, "failed to alloc mpp names\n");
++				return -ENOMEM;
++			}
++			for (k = 0; k < ctrl->npins; k++)
++				sprintf(names + 8*k, "mpp%d", ctrl->pid+k);
++			ctrl->name = names;
++
++			pctl->groups[gid].name = &ctrl->name[0];
+ 			pctl->groups[gid].npins = 1;
+ 
+ 			for (k = 1; k < ctrl->npins; k++) {
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.5.2
