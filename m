@@ -1,46 +1,106 @@
-From: chris@printf.net (Chris Ball)
-Date: Tue, 28 Jan 2014 01:08:32 +0000
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <52E700F0.7040708@gmail.com> (Tomasz Figa's message of "Tue, 28
- Jan 2014 01:59:28 +0100")
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1390190215-22700-2-git-send-email-olof@lixom.net>
- <52DEBDA7.7030200@samsung.com> <52E54540.8080304@gmail.com>
- <CAPDyKFqpOLZiUSDvxVtYrBM8DtrZDLE27LKzyoWaf29Ni2vcFQ@mail.gmail.com>
- <52E700F0.7040708@gmail.com>
-Message-ID: <861tzs29rj.fsf@void.printf.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 28 Jan 2014 01:39:27 +0100
+Subject: [PATCH v2 15/21] pinctrl: mvebu: dove: request additional resources
+In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-16-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dove pinctrl also requires additional registers to control all pins.
+This patch requests resources for mpp4 and pmu-mpp register ranges.
+As this changes DT to driver requirements, fallback to hardcoded
+resources, if the corresponding DT regs have not been set.
+Also, WARN about old DT binding usage to encourage users to update
+their DTBs.
 
-On Tue, Jan 28 2014, Tomasz Figa wrote:
->> I am not sure I understand why this is needed. I think it would be
->> more convenient to use MMC_CAP_NONREMOVABLE instead as stated earlier.
->> But please elaborate, I might have missed something.
->
-> See above. I'm not quite convinced that state of MMC interface should
-> determine power state of the chip. I can easily imagine a situation
-> where the MMC link is powered down (link power management) but the
-> WLAN chip keeps operation. Keep in mind that those are usually
-> complete SoCs that can keep processing network traffic autonomously
-> and wake-up the application processor whenever anything interesting
-> happens using extra out of bounds signalling, which might trigger
-> re-enabling the MMC link.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- add FW_BUG to WARN message
 
-For what it's worth, we did this using upstream code (libertas-sd8686
-WLAN with sdhci-pxav3) at OLPC.  We set the SDIO device to 1-bit mode
-on system suspend, using MMC_CAP_NONREMOVABLE, MMC_PM_KEEP_POWER and
-MMC_PM_WAKE_SDIO_IRQ, and tell the PMU to wake on the 1-bit data line.
-When it wakes the system, the system sees the SDIO interrupt and
-processes the waiting network traffic.
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 39 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
-So this use case is already supported using the current interfaces.
-If this interface doesn't work for your use case, could you talk a
-little more about what you're trying to achieve?
-
-Thanks,
-
-- Chris.
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index 98f8cae72ace..bb7ff396ddd1 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -22,6 +22,11 @@
+ 
+ #include "pinctrl-mvebu.h"
+ 
++/* Internal registers can be configured at any 1 MiB aligned address */
++#define INT_REGS_MASK			~(SZ_1M - 1)
++#define MPP4_REGS_OFFS			0xd0440
++#define PMU_REGS_OFFS			0xd802c
++
+ #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
+ #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
+ #define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
+@@ -56,6 +61,8 @@
+ #define CONFIG_PMU	BIT(4)
+ 
+ static void __iomem *mpp_base;
++static void __iomem *mpp4_base;
++static void __iomem *pmu_base;
+ 
+ static int dove_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 			     unsigned long *config)
+@@ -802,13 +809,43 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match =
+ 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
+-	struct resource *mpp_res;
++	struct resource *mpp_res, *res;
++	struct resource res_fallback;
+ 
+ 	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
+ 	if (IS_ERR(mpp_base))
+ 		return PTR_ERR(mpp_base);
+ 
++	/* prepare fallback resource */
++	memcpy(&res_fallback, mpp_res, sizeof(struct resource));
++	res_fallback.start = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res) {
++		dev_warn(&pdev->dev, "falling back to hardcoded MPP4 resource\n");
++		adjust_resource(&res_fallback,
++			(mpp_res->start & INT_REGS_MASK) + MPP4_REGS_OFFS, 0x4);
++		res = &res_fallback;
++	}
++	mpp4_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mpp4_base))
++		return PTR_ERR(mpp4_base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	if (!res) {
++		dev_warn(&pdev->dev, "falling back to hardcoded PMU resource\n");
++		adjust_resource(&res_fallback,
++			(mpp_res->start & INT_REGS_MASK) + PMU_REGS_OFFS, 0x8);
++		res = &res_fallback;
++	}
++	pmu_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pmu_base))
++		return PTR_ERR(pmu_base);
++
++	/* Warn on any missing DT resource */
++	WARN(res_fallback.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
++
+ 	pdev->dev.platform_data = (void *)match->data;
+ 
+ 	/*
 -- 
-Chris Ball   <chris@printf.net>   <http://printf.net/>
+1.8.5.2
