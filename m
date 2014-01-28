@@ -1,49 +1,38 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 28 Jan 2014 11:34:24 -0700
-Subject: [Q] block / zynq: DMA bouncing
-In-Reply-To: <20140128134827.GK15937@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
- <20140127170230.GQ15937@n2100.arm.linux.org.uk>
- <52E69B4E.5010604@monstr.eu>
- <20140127175231.GU15937@n2100.arm.linux.org.uk>
- <52E69E1E.3020202@monstr.eu>
- <Pine.LNX.4.64.1401281420580.2714@axis700.grange>
- <20140128134827.GK15937@n2100.arm.linux.org.uk>
-Message-ID: <20140128183424.GB1427@obsidianresearch.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 28 Jan 2014 10:36:51 -0800
+Subject: [GIT PULL] ARM: mvebu: DT boards for v3.14 (incr #6)
+In-Reply-To: <20140120200110.GW29184@titan.lakedaemon.net>
+References: <20140120200110.GW29184@titan.lakedaemon.net>
+Message-ID: <CAOesGMiTSa=ECDiVtgO44At9tqYCb2Ap8KWwG=FBStVEycqKcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:48:27PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 28, 2014 at 02:28:28PM +0100, Guennadi Liakhovetski wrote:
-> > +static void __init zynq_memory_init(void)
-> > +{
-> > +	/*
-> > +	 * Reserve the 0-0x4000 addresses (before page tables and kernel)
-> > +	 * which can't be used for DMA
-> > +	 */
-> > +	if (!__pa(PAGE_OFFSET))
-> > +		memblock_reserve(0, 0x4000);
-> 
-> Or maybe this:
-> 
-> 	memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
-> 
-> since that's actually what you mean here.
+On Mon, Jan 20, 2014 at 12:01 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> All,
+>
+> I had a few boards that came in late in the cycle.  I was holding on to
+> them for the next round, but after Olof's comment this morning:
+>
+>   Re: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+>   http://www.spinics.net/lists/arm-kernel/msg301777.html
+>
+> I figured I'd send them off.  As usual, they've been in -next for a
+> while.  Also, this is an incremental request from tags/mvebu-dt-3.14-5
+> to tags/mvebu-dt-3.14-6 on the mvebu/dt branch.
+>
+> If this is going to be ok for the forseeable future, I'll do a separate
+> branch for new boards next time around.
 
-Can you have a non-zero PAGE_OFFSET and swapper_pg_dir != 0x4000?
-Crash dump kernel maybe?
+I should probably clarify my previous statement. I don't think we want
+a free-for-all on new DT contents all the way up until -rc<lownumber>,
+but what we can allow sometimes is new DT files when there's good
+reason to do so -- for example for platforms where a lot of new code
+has landed and it's been hard to sequence DT updates with the rest,
+etc.
 
-Perhaps:
-	if (__pa(PAGE_OFFSET) < 0x8000)
- 	   memblock_reserve(__pa(PAGE_OFFSET),
-	                    min(__pa(swapper_pg_dir), 0x8000));
-?
+So, if you send these late requests please be prepared to motivate
+them. :) These don't look urgent to me so I think we'll queue them for
+3.15 once -rc1 is out, if that's OK with you.
 
-The Zynq TRM, UG585 pg 115, describes this issue. Physical addresses
-below 0x8000 are not accessible to DMA from the AXI interconnect.
 
-Though, how does a crash dump kernel know it needs to bounce buffer
-the swapper if it dumps it via DMA?
-
-Regards,
-Jason
+-Olof
