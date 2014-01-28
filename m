@@ -1,58 +1,83 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Tue, 28 Jan 2014 20:41:57 +0100
-Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
- NMI controller
-In-Reply-To: <52E78E3F.6080902@redhat.com>
-References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
- <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
- <20140116123940.GE31779@lukather>
- <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
- <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
-Message-ID: <CAOQ7t2bahx_ZEMMmhPm3g7-v6U3MkaXO6-JFGvjoKNWOCrG=ng@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 28 Jan 2014 13:47:29 -0600
+Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <52E772DF.6000604@metafoo.de>
+References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
+ <1390890471-14882-3-git-send-email-agross@codeaurora.org>
+ <52E772DF.6000604@metafoo.de>
+Message-ID: <20140128194729.GA18930@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 12:02 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
->
-> Hi,
->
-> On 01/28/2014 11:40 AM, Maxime Ripard wrote:
->
-> Jumping in here to try and clarify things, or so I hope at least :)
+On Tue, Jan 28, 2014 at 10:05:35AM +0100, Lars-Peter Clausen wrote:
+> On 01/28/2014 07:27 AM, Andy Gross wrote:
+> > Add device tree binding support for the QCOM BAM DMA driver.
+> > 
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  .../devicetree/bindings/dma/qcom_bam_dma.txt       |   52 ++++++++++++++++++++
+> >  1 file changed, 52 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> > new file mode 100644
+> > index 0000000..53fd10a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> > @@ -0,0 +1,52 @@
+> > +QCOM BAM DMA controller
+> > +
+> > +Required properties:
+> > +- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
+> > +		Must be "qcom,bam-v1.4.1" for MSM8974 V2
+> > +- reg: Address range for DMA registers
+> > +- interrupts: single interrupt for this controller
+> > +- #dma-cells: must be <2>
+> > +- clocks: required clock
+> > +- clock-names: name of clock
+> > +- qcom,ee : indicates the active Execution Environment identifier (0-7)
+> > +
+> > +Example:
+> > +
+> > +	uart-bam: dma at f9984000 = {
+> > +		compatible = "qcom,bam-v1.4.1";
+> > +		reg = <0xf9984000 0x15000>;
+> > +		interrupts = <0 94 0>;
+> > +		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
+> > +		clock-names = "bam_clk";
+> > +		#dma-cells = <2>;
+> > +		qcom,ee = <0>;
+> > +	};
+> > +
+> > +Client:
+> > +Required properties:
+> > +- dmas: List of dma channel requests
+> > +- dma-names: Names of aforementioned requested channels
+> > +
+> > +Clients must use the format described in the dma.txt file, using a three cell
+> > +specifier for each channel.
+> > +
+> > +The three cells in order are:
+> > +  1. A phandle pointing to the DMA controller
+> > +  2. The channel number
+> > +  3. Direction of the fixed unidirectional channel
+> > +     0 - Memory to Device
+> > +     1 - Device to Memory
+> > +     2 - Device to Device
+> > +
+> 
+> Why does the direction needs to be specified in specifier? I see two
+> options, either the direction per is fixed in hardware. In that case the DMA
+> controller node should describe which channel is which direction. Or the
+> direction is not fixed in hardware and can be changed at runtime in which
+> case it should be set on a per descriptor basis.
+> 
 
-Thank you :) I'm sure you will explain this better than me.
-
-> The PMIC irq line won't go low until an i2c write to its irq status
-> registers write-clears all status bits for which the corresponding
-> bit in the irq-mask register is set.
->
-> And the only reason the NMI -> GIC also goes low is because the unmask
-> operation writes a second ack to the NMI controller in the unmask
-> callback of the NMI controller driver.
-
-Exactly. PMIC -> NMI is cleared when the irq handler write-clears all
-the IRQs on PMIC while NMI -> GIC is cleared by the ACK in the unmask
-callback.
-
-<snip>
-
-> Hmm, I'm not going to say that using a raw irqchip here is a bad idea, it
-> sounds like it would be better.
->
-> But I don't think this will solve the need the mask / umask. The problem is
-> we need to do an i2c write to clear the interrupt source, which needs to
-> be done from a thread / workqueue. So when the interrupt handler finishes
-> the source won't be cleared yet, and AFAIK then only way to deal with this
-> is to mask the interrupt until we've cleared the interrupt source.
-
-That's why the driver using the NMI controller has to use IRQF_ONESHOT
-so that the interrupt is not unmasked after the hard interrupt context
-handler but it is unmasked after the thread handler function has been
-executed (calling the unmask callback)
-
-Thank you for explaining this mess you couldn't be clearer than that.
+It is specified because the direction is physically set by the hardware.  And
+this can change depending on the attached peripheral.  It probably does make
+more sense to set the direction in the controller.
 
 -- 
-Carlo Caione
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
