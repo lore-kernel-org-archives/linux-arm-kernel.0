@@ -1,69 +1,145 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 28 Jan 2014 02:01:39 +0100
-Subject: Freescale FEC packet loss
-In-Reply-To: <1390772013.2735.47.camel@deadeye.wl.decadent.org.uk>
-References: <201401222255.29467.marex@denx.de>
- <201401262012.13051.marex@denx.de>
- <1390772013.2735.47.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <201401280201.39174.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Jan 2014 01:05:29 +0000
+Subject: [PATCH] ARM: multi_v7: add mvebu and drivers to defconfig
+Message-ID: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, January 26, 2014 at 10:33:33 PM, Ben Hutchings wrote:
-> On Sun, 2014-01-26 at 20:12 +0100, Marek Vasut wrote:
-> > On Sunday, January 26, 2014 at 07:56:30 PM, Ben Hutchings wrote:
-> > > On Wed, 2014-01-22 at 22:55 +0100, Marek Vasut wrote:
-> > > > Hi guys,
-> > > > 
-> > > > I am running stock Linux 3.13 on i.MX6Q SabreLite board. The CPU is
-> > > > i.MX6Q TO 1.0 .
-> > > > 
-> > > > I am hitting a WARNING when I use the FEC ethernet to transfer data,
-> > > > thus I started investigating this problem. TL;DR I am not able to
-> > > > figure this problem out, so I am not attaching a patch :-(
-> > > > 
-> > > > Steps to reproduce:
-> > > > -------------------
-> > > > 1) Boot stock Linux 3.13 on i.MX6Q SabreLite board
-> > > > 2) Plug in an SD card into one of the SD slots (I use the full-size
-> > > > one) 3) Plug in an USB stick into one of the USB ports (I use the
-> > > > upper one) 4) Plug in an ethernet cable into the board
-> > > > 
-> > > >    -> Connect the other side into a gigabit-capable PC
-> > > 
-> > > [...]
-> > > 
-> > > I think there are known problems with 1000BASE-T on the Sabre Lite
-> > > board.
-> > 
-> > This is MX6-wide thing, not sabrelite specific actually.
-> > 
-> > > Two possible workarounds are to limit the PHY to 100BASE-TX
-> > > (should be doable with ethtool) or force it to be clock master for
-> > > 1000BASE-T (requires a driver patch).
-> > 
-> > Can you please elaborate on the later ? I don't quite understand that.
-> 
-> 1000BASE-T uses all 4 pairs in both directions at the same time, which
-> requires that both ends transmit symbols synchronously.  As part of the
-> autonegotiation protocol, they decide which is the clock master (using a
-> local clock generator) and which is the clock slave (generating a clock
-> from the received signal).  A PHY can be configured to support only one
-> of these roles.
+boot farms testing is highlighting some errors in mvebu.  Let's get some
+more coverage for multi_v7_defconfig kernels.
 
-I checked the patch you pointed me to. The patch basically messes with the 
-CTL1000 (0x9) register of the PHY, right ? I did the adjustments to the PHY 
-register manually , but the result is still the same (backtrace).
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Kevin,
 
-I did two different kinds of adjustment:
-1) reg 0x9 |= 0x1800;
-2) reg 0x9 |= 0x1000;
-In both cases, the crash did happen. I verified the PHY register was configured 
-as necessary. The KSZ9021 PHY bit 12 configures the master/slave override, same 
-as the patch does. The bit 11 forces either master or slave mode for the PHY. In 
-both cases the crash was there.
+This is against tonight's master.  Feel free to take it directly.
 
-I think this patch won't help in this case, sorry.
+thx,
 
-Best regards,
-Marek Vasut
+Jason.
+
+ arch/arm/configs/multi_v7_defconfig | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 687e4e811b2a..13e7d649230b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -38,7 +38,6 @@ CONFIG_ARCH_TEGRA=y
+ CONFIG_ARCH_TEGRA_2x_SOC=y
+ CONFIG_ARCH_TEGRA_3x_SOC=y
+ CONFIG_ARCH_TEGRA_114_SOC=y
+-CONFIG_TEGRA_PCI=y
+ CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+ CONFIG_ARCH_U8500=y
+ CONFIG_MACH_HREFV60=y
+@@ -49,7 +48,9 @@ CONFIG_ARCH_VEXPRESS_CA9X4=y
+ CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_WM8850=y
+ CONFIG_ARCH_ZYNQ=y
+-CONFIG_SMP=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_MVEBU=y
+ CONFIG_HIGHPTE=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+@@ -69,12 +70,14 @@ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_MVNETA=y
+ CONFIG_KS8851=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+-CONFIG_ICPLUS_PHY=y
+-CONFIG_MDIO_SUN4I=y
+ CONFIG_TI_CPSW=y
++CONFIG_MARVELL_PHY=y
++CONFIG_ICPLUS_PHY=y
++CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
+@@ -99,25 +102,27 @@ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ CONFIG_SERIAL_ST_ASC=y
+ CONFIG_SERIAL_ST_ASC_CONSOLE=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+ CONFIG_SPI_OMAP24XX=y
++CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_SIRF=y
+ CONFIG_SPI_TEGRA114=y
+ CONFIG_SPI_TEGRA20_SLINK=y
+-CONFIG_PINCTRL_SINGLE=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_GPIO_TWL4030=y
+-CONFIG_REGULATOR_GPIO=y
++CONFIG_THERMAL=y
++CONFIG_ARMADA_THERMAL=y
+ CONFIG_REGULATOR_AB8500=y
++CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_DRM=y
+-CONFIG_TEGRA_HOST1X=y
+ CONFIG_DRM_TEGRA=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_WM8505=y
+@@ -132,8 +137,6 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_AB8500_USB=y
+-CONFIG_NOP_USB_XCEIV=y
+-CONFIG_OMAP_USB2=y
+ CONFIG_OMAP_USB3=y
+ CONFIG_SAMSUNG_USB2PHY=y
+ CONFIG_SAMSUNG_USB3PHY=y
+@@ -144,13 +147,13 @@ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+-CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
++CONFIG_MMC_MVSDIO=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+@@ -159,20 +162,23 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_TWL4030=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_VT8500=y
++CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
++CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_STE_DMA40=y
+ CONFIG_SIRF_DMA=y
+-CONFIG_TI_EDMA=y
+ CONFIG_PL330_DMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_DMA_OMAP=y
++CONFIG_MEMORY=y
+ CONFIG_PWM=y
+ CONFIG_PWM_VT8500=y
++CONFIG_OMAP_USB2=y
+ CONFIG_EXT4_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_NFS_FS=y
+-- 
+1.8.5.3
