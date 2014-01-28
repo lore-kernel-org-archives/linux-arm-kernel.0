@@ -1,113 +1,75 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:28 +0100
-Subject: [PATCH v2 16/21] pinctrl: mvebu: dove: request syscon regmap for
- global registers
-In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-17-git-send-email-sebastian.hesselbarth@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 27 Jan 2014 17:55:25 -0700
+Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <5086198.ZOWZ5xuyna@wuerfel>
+References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
+ <CACoXjc=ZT9fEm_KdY4WFSoS8n5FmO+hn9LjsR4m8YZG2iBbt5A@mail.gmail.com>
+ <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
+ <5086198.ZOWZ5xuyna@wuerfel>
+Message-ID: <CAErSpo5zMd_k407tvzPS85Nub9p2KMQnHJLTqd3eyvjdgfVtLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl uses some global config registers to control pins.
-This patch requests a syscon regmap for those registers. As this
-changes DT to driver requirements, fallback to a self-registered
-regmap with hardcoded resources, if the corresponding syscon DT
-node is missing. Also, WARN about old DT binding usage to encourage
-users to update their DTBs.
+We're only seeing Arnd's side of the conversation on linux-pci.
+Tanmay, are your messages being rejected because they're too "fancy",
+per the definition here: http://vger.kernel.org/majordomo-info.html ?
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/pinctrl/mvebu/Kconfig        |  1 +
- drivers/pinctrl/mvebu/pinctrl-dove.c | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
-
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 366fa541ee91..8dc4948c1202 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -8,6 +8,7 @@ config PINCTRL_MVEBU
- config PINCTRL_DOVE
- 	bool
- 	select PINCTRL_MVEBU
-+	select MFD_SYSCON
- 
- config PINCTRL_KIRKWOOD
- 	bool
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index bb7ff396ddd1..74a50a3d6729 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -18,7 +18,9 @@
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/pinctrl/pinctrl.h>
-+#include <linux/regmap.h>
- 
- #include "pinctrl-mvebu.h"
- 
-@@ -26,6 +28,7 @@
- #define INT_REGS_MASK			~(SZ_1M - 1)
- #define MPP4_REGS_OFFS			0xd0440
- #define PMU_REGS_OFFS			0xd802c
-+#define GC_REGS_OFFS			0xe802c
- 
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
-@@ -63,6 +66,7 @@
- static void __iomem *mpp_base;
- static void __iomem *mpp4_base;
- static void __iomem *pmu_base;
-+static struct regmap *gconfmap;
- 
- static int dove_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 			     unsigned long *config)
-@@ -805,6 +809,13 @@ static struct of_device_id dove_pinctrl_of_match[] = {
- 	{ }
- };
- 
-+static struct regmap_config gc_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.max_register = 5,
-+};
-+
- static int dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
-@@ -843,6 +854,22 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	if (IS_ERR(pmu_base))
- 		return PTR_ERR(pmu_base);
- 
-+	gconfmap = syscon_regmap_lookup_by_compatible("marvell,dove-global-config");
-+	if (IS_ERR(gconfmap)) {
-+		void __iomem *gc_base;
-+
-+		dev_warn(&pdev->dev, "falling back to hardcoded global registers\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + GC_REGS_OFFS, 0x14);
-+		gc_base = devm_ioremap_resource(&pdev->dev, &res_fallback);
-+		if (IS_ERR(gc_base))
-+			return PTR_ERR(gc_base);
-+		gconfmap = devm_regmap_init_mmio(&pdev->dev,
-+						 gc_base, &gc_regmap_config);
-+		if (IS_ERR(gconfmap))
-+			return PTR_ERR(gconfmap);
-+	}
-+
- 	/* Warn on any missing DT resource */
- 	WARN(res_fallback.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
- 
--- 
-1.8.5.2
+On Sat, Jan 25, 2014 at 1:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
+>> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+>> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
+>
+>> >>
+>> >>> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port, u32 *lanes)
+>> >>> +{
+>> >>> +     void *csr_base = port->csr_base;
+>> >>> +     u32 val32;
+>> >>> +     u64 start_time, time;
+>> >>> +
+>> >>> +     /*
+>> >>> +      * A component enters the LTSSM Detect state within
+>> >>> +      * 20ms of the end of fundamental core reset.
+>> >>> +      */
+>> >>> +     msleep(XGENE_LTSSM_DETECT_WAIT);
+>> >>> +     port->link_up = 0;
+>> >>> +     start_time = jiffies;
+>> >>> +     do {
+>> >>> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
+>> >>> +             if (val32 & LINK_UP_MASK) {
+>> >>> +                     port->link_up = 1;
+>> >>> +                     port->link_speed = PIPE_PHY_RATE_RD(val32);
+>> >>> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
+>> >>> +                     *lanes = val32 >> 26;
+>> >>> +             }
+>> >>> +             time = jiffies_to_msecs(jiffies - start_time);
+>> >>> +     } while ((!port->link_up) || (time <= XGENE_LTSSM_L0_WAIT));
+>> >>> +}
+>> >>
+>> >> Maybe another msleep() in the loop? It seems weird to first do an
+>> >> unconditional sleep but then busy-wait for the result.
+>> >
+>> > ok.
+>>
+>> This loop can execute for maximum 4 msec. So putting msleep(1) won't
+>> get us much.
+>
+> 4 msec is still quite a long time for a busy loop that can be spent doing
+> useful work in another thread.
+>
+>> >>
+>> >> Another general note: Your "compatible" strings are rather unspecific.
+>> >> Do you have a version number for this IP block? I suppose that it's related
+>> >> to one that has been used in other chips before, or will be used in future
+>> >> chips, if it's not actually licensed from some other company.
+>> >
+>> > I will have to check this.
+>> >
+>>
+>> We have decided to stick with current compatible string for now.
+>
+> Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
+> product and you won't be doing any new chips based on the same hardware
+> components?
+>
+>         Arnd
