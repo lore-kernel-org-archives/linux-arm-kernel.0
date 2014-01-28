@@ -1,154 +1,63 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 28 Jan 2014 19:55:14 +0000
-Subject: [PATCH v2] arm/xen: Initialize event channels earlier
-In-Reply-To: <1390935264-23155-1-git-send-email-julien.grall@linaro.org>
-References: <1390935264-23155-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <alpine.DEB.2.02.1401281954560.4373@kaball.uk.xensource.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 28 Jan 2014 12:54:42 -0800
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20140128185926.5312.36635@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+ <20131022175414.14753.58063@capellas-linux>
+ <20140128185926.5312.36635@capellas-linux>
+Message-ID: <20140128125442.4bac748945b404179deb58ba@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jan 2014, Julien Grall wrote:
-> Event channels driver needs to be initialized very early. Until now, Xen
-> initialization was done after all CPUs was bring up.
-> 
-> We can safely move the initialization to an early initcall.
-> 
-> Also use a cpu notifier to:
->     - Register the VCPU when the CPU is prepared
->     - Enable event channel IRQ when the CPU is running
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+On Tue, 28 Jan 2014 10:59:26 -0800 Sebastian Capella <sebastian.capella@linaro.org> wrote:
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
-> ---
->     Changes in v2:
->         - Check earlier if the event IRQ is valid
->         - We can safely register the VCPU when the cpu is booting
-> ---
->  arch/arm/xen/enlighten.c |   71 ++++++++++++++++++++++++++++------------------
->  1 file changed, 44 insertions(+), 27 deletions(-)
+> > Do you have any feedback for me on this?
+> > 
+> > I'm happy do make any changes you think are correct, but I'm unsure if
+> > you're asking me for option #3 above.  It's quite an intrusive change,
+> > and changes old, established code and I'd like confirmation that's what
+> > you'd like before proceeding down that path.
+> > 
+> > I've submitted patches with both options #1 and #2 above.
+> > 
+> > Thanks,
+> > 
+> > Sebastian
 > 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 293eeea..b96723e 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -23,6 +23,7 @@
->  #include <linux/of_address.h>
->  #include <linux/cpuidle.h>
->  #include <linux/cpufreq.h>
-> +#include <linux/cpu.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -154,7 +155,7 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
->  }
->  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
->  
-> -static void __init xen_percpu_init(void *unused)
-> +static void xen_percpu_init(void)
->  {
->  	struct vcpu_register_vcpu_info info;
->  	struct vcpu_info *vcpup;
-> @@ -193,6 +194,31 @@ static void xen_power_off(void)
->  		BUG();
->  }
->  
-> +static int xen_cpu_notification(struct notifier_block *self,
-> +				unsigned long action,
-> +				void *hcpu)
-> +{
-> +	switch (action) {
-> +	case CPU_STARTING:
-> +		xen_percpu_init();
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block xen_cpu_notifier = {
-> +	.notifier_call = xen_cpu_notification,
-> +};
-> +
-> +static irqreturn_t xen_arm_callback(int irq, void *arg)
-> +{
-> +	xen_hvm_evtchn_do_upcall();
-> +	return IRQ_HANDLED;
-> +}
-> +
->  /*
->   * see Documentation/devicetree/bindings/arm/xen.txt for the
->   * documentation of the Xen Device Tree format.
-> @@ -229,6 +255,10 @@ static int __init xen_guest_init(void)
->  	xen_events_irq = irq_of_parse_and_map(node, 0);
->  	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
->  			version, xen_events_irq, &grant_frames);
-> +
-> +	if (xen_events_irq < 0)
-> +		return -ENODEV;
-> +
->  	xen_domain_type = XEN_HVM_DOMAIN;
->  
->  	xen_setup_features();
-> @@ -281,9 +311,21 @@ static int __init xen_guest_init(void)
->  	disable_cpuidle();
->  	disable_cpufreq();
->  
-> +	xen_init_IRQ();
-> +
-> +	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-> +			       "events", &xen_vcpu)) {
-> +		pr_err("Error request IRQ %d\n", xen_events_irq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	xen_percpu_init();
-> +
-> +	register_cpu_notifier(&xen_cpu_notifier);
-> +
->  	return 0;
->  }
-> -core_initcall(xen_guest_init);
-> +early_initcall(xen_guest_init);
->  
->  static int __init xen_pm_init(void)
->  {
-> @@ -297,31 +339,6 @@ static int __init xen_pm_init(void)
->  }
->  late_initcall(xen_pm_init);
->  
-> -static irqreturn_t xen_arm_callback(int irq, void *arg)
-> -{
-> -	xen_hvm_evtchn_do_upcall();
-> -	return IRQ_HANDLED;
-> -}
-> -
-> -static int __init xen_init_events(void)
-> -{
-> -	if (!xen_domain() || xen_events_irq < 0)
-> -		return -ENODEV;
-> -
-> -	xen_init_IRQ();
-> -
-> -	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-> -			"events", &xen_vcpu)) {
-> -		pr_err("Error requesting IRQ %d\n", xen_events_irq);
-> -		return -EINVAL;
-> -	}
-> -
-> -	on_each_cpu(xen_percpu_init, NULL, 0);
-> -
-> -	return 0;
-> -}
-> -postcore_initcall(xen_init_events);
-> -
->  /* In the hypervisor.S file. */
->  EXPORT_SYMBOL_GPL(HYPERVISOR_event_channel_op);
->  EXPORT_SYMBOL_GPL(HYPERVISOR_grant_table_op);
-> -- 
-> 1.7.10.4
+> Ping.
 > 
+> Sorry for the lapse in attention to this.
+> 
+> Could you please clarify what is needed for this to be acceptable?
+> I'm a little confused about what is being asked of me.
+
+The problem is that kernel/power/hibernate.c:resume_store() is handed a
+newline-terminated string, yes?  And if it blindly hands that string
+over to name_to_dev_t(), name_to_dev_t() fails because the string is
+wrong.
+
+This is an oddity of the sysfs->kernel interface and altering
+name_to_dev_t doesn't really seem appropriate for this problem - it
+would be better to fix the caller to pass in the correct string.
+
+Something like...
+
+/*
+ * Clean up a string which may have leading and/or trailing whitespace (as
+ * defined by isspace()) by trimming off that whitespace.  Returns an address
+ * which the caller must kfree(), or NULL on error.
+ */
+char *strim_copy(const char *s, gfp_t gfp)
+{
+	char *ret = kstrdup(skip_spaces(s), gfp);
+
+	if (ret)
+		strim(ret);
+	return ret;
+}
+EXPORT_SYMBOL(strim_copy);
