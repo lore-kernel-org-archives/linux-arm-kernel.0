@@ -1,53 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jan 2014 18:38:51 +0000
-Subject: [PATCH v2] ARM: hw_breakpoint: Add ARMv8 support
-In-Reply-To: <1390933583-1278-1-git-send-email-cov@codeaurora.org>
-References: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
- <1390933583-1278-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20140128183851.GK2885@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Jan 2014 13:41:13 -0500
+Subject: [GIT PULL] ARM: mvebu: DT boards for v3.14 (incr #6)
+In-Reply-To: <CAOesGMiTSa=ECDiVtgO44At9tqYCb2Ap8KWwG=FBStVEycqKcQ@mail.gmail.com>
+References: <20140120200110.GW29184@titan.lakedaemon.net>
+ <CAOesGMiTSa=ECDiVtgO44At9tqYCb2Ap8KWwG=FBStVEycqKcQ@mail.gmail.com>
+Message-ID: <20140128184113.GX29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 06:26:23PM +0000, Christopher Covington wrote:
-> Add the trivial support necessary to get hardware breakpoints
-> working for GDB on ARMv8 simulators running in AArch32 mode.
+On Tue, Jan 28, 2014 at 10:36:51AM -0800, Olof Johansson wrote:
+> On Mon, Jan 20, 2014 at 12:01 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > All,
+> >
+> > I had a few boards that came in late in the cycle.  I was holding on to
+> > them for the next round, but after Olof's comment this morning:
+> >
+> >   Re: [PATCH 0/2] DT updates for Hummingboard and new Cubox-i
+> >   http://www.spinics.net/lists/arm-kernel/msg301777.html
+> >
+> > I figured I'd send them off.  As usual, they've been in -next for a
+> > while.  Also, this is an incremental request from tags/mvebu-dt-3.14-5
+> > to tags/mvebu-dt-3.14-6 on the mvebu/dt branch.
+> >
+> > If this is going to be ok for the forseeable future, I'll do a separate
+> > branch for new boards next time around.
 > 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
-> 
->  v2: modify debug_exception_updates_fsr
-> 
->  arch/arm/include/asm/hw_breakpoint.h | 1 +
->  arch/arm/kernel/hw_breakpoint.c      | 3 ++-
->  2 files changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-> index eef55ea..8e427c7 100644
-> --- a/arch/arm/include/asm/hw_breakpoint.h
-> +++ b/arch/arm/include/asm/hw_breakpoint.h
-> @@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
->  #define ARM_DEBUG_ARCH_V7_ECP14	3
->  #define ARM_DEBUG_ARCH_V7_MM	4
->  #define ARM_DEBUG_ARCH_V7_1	5
-> +#define ARM_DEBUG_ARCH_V8	6
->  
->  /* Breakpoint */
->  #define ARM_BREAKPOINT_EXECUTE	0
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index 3d44660..a711b27 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -167,7 +167,7 @@ static int debug_arch_supported(void)
->  /* Can we determine the watchpoint access type from the fsr? */
->  static int debug_exception_updates_fsr(void)
->  {
-> -	return 0;
-> +	return get_debug_arch() == ARM_DEBUG_ARCH_V8;
+> I should probably clarify my previous statement. I don't think we want
+> a free-for-all on new DT contents all the way up until -rc<lownumber>,
+> but what we can allow sometimes is new DT files when there's good
+> reason to do so -- for example for platforms where a lot of new code
+> has landed and it's been hard to sequence DT updates with the rest,
+> etc.
 
-I'd probably make that >= to save on future changes.
+ok, no problem.
 
-With that change:
+> So, if you send these late requests please be prepared to motivate
+> them. :) These don't look urgent to me so I think we'll queue them for
+> 3.15 once -rc1 is out, if that's OK with you.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Yep, I just didn't want to miss the boat. :)  Please drop this request
+and I'll queue these up for post-rc1.
 
-Will
+thx,
+
+Jason.
