@@ -1,26 +1,150 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Jan 2014 16:25:32 +0000
-Subject: [PATCH 15/18] regulator: max14577: Add support for max77836
- regulators
-In-Reply-To: <1390911522-28209-16-git-send-email-k.kozlowski@samsung.com>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-16-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140128162532.GQ11841@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 28 Jan 2014 10:30:36 -0600
+Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
+ returns -ENODEV/-ENXIO
+In-Reply-To: <20140128153230.GA20991@xps8300>
+References: <1385373690-12170-1-git-send-email-kishon@ti.com>
+ <1390299099-14764-1-git-send-email-kishon@ti.com>
+ <20140121144725.GF30451@saruman.home>
+ <20140127150855.GA17928@xps8300>
+ <20140127160458.GF13268@saruman.home>
+ <20140128153230.GA20991@xps8300>
+Message-ID: <20140128163036.GD28546@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:18:39PM +0100, Krzysztof Kozlowski wrote:
-> Add support for MAX77836 chipset and its additional two LDO regulators.
-> These LDO regulators are controlled by the PMIC block with additional
-> regmap (different I2C slave address).
+Hi,
 
-Reviewed-by: Mark Brown <broonie@linaro.org>
+On Tue, Jan 28, 2014 at 05:32:30PM +0200, Heikki Krogerus wrote:
+> On Mon, Jan 27, 2014 at 10:05:20AM -0600, Felipe Balbi wrote:
+> > > Why would you need to know if the PHY drivers are needed or not
+> > > explicitly in your controller driver?
+> > 
+> > because, one way or another, they all do need it. Except for quirky ones
+> > like AM437x where a USB3 IP was hardwired into USB2-only mode, so it
+> > really lacks a USB3 PHY.
+> 
+> The Baytrail board I deal with has completely autonomous PHYs. But my
+> question is, why would you need to care about the PHYs in your
+> controller driver? Why can't you leave the responsibility of them to
+> the upper layers and trust what they tell you?
+> 
+> If there is no USB3 PHY for dwc3 then, the driver gets something like
+> -ENODEV and just continues. There is no need to know about the
+> details.
 
-This should go in with the rest of the changes I guess.
+it's a little more complicated than that. We could get -EPROBE_DEFER
+meaning we should try probing at a later time because the PHY isn't
+available yet.
+
+But sure, if we can very easily differentiate between those two
+conditions in a way that error report from PHY layer (whichever it is),
+then we can certainly do that.
+
+> For the controller drivers the PHYs are just a resource like any
+> other. The controller drivers can't have any responsibility of
+> them. They should not care if PHY drivers are available for them or
+> not, or even if the PHY framework is available or not.
+
+huh? If memory isn't available you don't continue probing, right ? If
+your IORESOURCE_MEM is missing, you also don't continue probing, if your
+IRQ line is missing, you bail too. Those are also nothing but resources
+to the driver, what you're asking here is to treat PHY as a _different_
+resource; which might be fine, but we need to make sure we don't
+continue probing when a PHY is missing in a platform that certainly
+needs a PHY.
+
+> > > > But I really want to see the argument against using no-op. As far as I
+> > > > could see, everybody needs a PHY driver one way or another, some
+> > > > platforms just haven't sent any PHY driver upstream and have their own
+> > > > hacked up solution to avoid using the PHY layer.
+> > > 
+> > > Not true in our case. Platforms using Intel's SoCs and chip sets may
+> > > or may not have controllable USB PHY. Quite often they don't. The
+> > > Baytrails have usually ULPI PHY for USB2, but that does not mean they
+> > > provide any vendor specific functions or any need for a driver in any
+> > > case.
+> > 
+> > that's different from what I heard.
+> 
+> I don't know where you got that impression, but it's not true. The
+> Baytrail SoCs for example don't have internal USB PHYs, which means
+> the manufacturers using it can select what they want. So we have
+> boards where PHY driver(s) is needed and boards where it isn't.
+
+alright, that explains it ;-) So you have external USB2 and USB3 PHYs ?
+You have an external PIPE3 interface ? That's quite an achievement,
+kudos to your HW designers. Getting timing closure on PIPE3 is a
+difficult task.
+
+> The problem is that we just don't always know all the details about
+> the platform. If the PHY is ULPI PHY, we can do runtime detection, but
+> we can't even rely on always having ULPI.
+
+right, we've had that before on n900 ;-)
+
+> > > Are we talking about the old USB PHY library or the new PHY framework
+> > > with the no-op PHY driver?
+> > > 
+> > > Well, in any case, I don't understand what is the purpose of the no-op
+> > > PHY driver. What are you drying to achieve with that?
+> > 
+> > I'm trying to avoid supporting 500 different combinations for a single
+> > driver. We already support old USB PHY layer and generic PHY layer, now
+> > they both need to be made optional.
+> 
+> This is really good to get. We have some projects where we are dealing
+> with more embedded environments, like IVI, where the kernel should be
+> stripped of everything useless. Since the PHYs are autonomous, we
+> should be able to disable the PHY libraries/frameworks.
+
+hmmm, in that case it's a lot easier to treat. We can use
+ERR_PTR(-ENXIO) as an indication that the framework is disabled, or
+something like that.
+
+The difficult is really reliably supporting e.g. OMAP5 (which won't work
+without a PHY) and your BayTrail with autonomous PHYs. What can we use
+as an indication ?
+
+I mean, I need to know that a particular platform depends on a PHY
+driver before I decide to return -EPROBE_DEFER or just assume the PHY
+isn't needed ;-)
+
+> But I still don't understand what is the benefit in the no-op? You
+> really need to explain this. What you have now in dwc3 is expectations
+> regarding the PHY, which put a lot of pressure on upper layers to
+> satisfy the driver. The no-op is just an extra thing that you have to
+> provide when you fail to determine if the system requires a PHY driver
+> or not, or if you know that it doesn't, plus an additional check for
+> the case where the PHY lib/framework is not enabled. I don't see the
+> value in it.
+
+it "solves" the difficulty above. If everybody has to provide a PHY
+driver, the problem is a lot simpler don't you think ? ;-)
+
+> > The old USB PHY layer also provides
+> > a no-op, now called phy-generic, which is actually pretty useful.
+> > 
+> > On top of all that, I'm sure you'll subscribe to the idea of preventing
+> > dwc3 from becoming another MUSB which supports several different
+> > configurations and none work correctly. I much prefer to take baby steps
+> > which are well thought-out and very well exercised, so I'll be very
+> > pedantic about proof of testing.
+> 
+> I think our goals are the same. I just want to also minimize the need
+> for any platform specific extra work from the upper layers regarding
+> the PHYs.
+
+I'll agree to that, but let's not apply patches until we're 100% sure
+there will be no regressions. Looking at $subject, I don't think it
+satisfies that condition ;-)
+
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/84ec92c7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/40c2bd34/attachment.sig>
