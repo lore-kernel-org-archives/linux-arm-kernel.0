@@ -1,69 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jan 2014 21:22:45 +0000
-Subject: [RFC/PATCH] ARM: vDSO gettimeofday using generic timer
- architecture
-In-Reply-To: <1390943213-5698-1-git-send-email-nathan_lynch@mentor.com>
-References: <1390926308-15581-1-git-send-email-steve.capper@linaro.org>
- <1390943213-5698-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140128212245.GQ15937@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Jan 2014 13:24:43 -0800
+Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
+In-Reply-To: <20140127172116.GD8358@arm.com>
+References: <1388816085-21417-1-git-send-email-christoffer.dall@linaro.org>
+ <1388852843-30986-1-git-send-email-christoffer.dall@linaro.org>
+ <20140124233703.GA889@cbox> <52E64029.6000201@arm.com>
+ <20140127165730.GC8358@arm.com> <52E69121.8050500@arm.com>
+ <20140127172116.GD8358@arm.com>
+Message-ID: <20140128212443.GC26671@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 03:06:53PM -0600, Nathan Lynch wrote:
-> +static union {
-> +	struct vdso_data	data;
-> +	u8			page[PAGE_SIZE];
-> +} vdso_data_store __page_aligned_data;
-> +struct vdso_data *vdso_data = &vdso_data_store.data;
-
-So this is in the kernel data segment.
-
-> +void update_vsyscall(struct timekeeper *tk)
-> +{
-> +	struct timespec xtime_coarse;
-> +	struct timespec wall_time = tk_xtime(tk);
-> +	struct timespec *wtm = &tk->wall_to_monotonic;
-> +	u32 use_syscall = strcmp(tk->clock->name, "arch_sys_counter");
-> +
-> +	++vdso_data->tb_seq_count;
-> +	smp_wmb();
-> +
-> +	xtime_coarse = __current_kernel_time();
-> +	vdso_data->use_syscall			= use_syscall;
-> +	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-> +	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-> +
-> +	if (!use_syscall) {
-> +		vdso_data->cs_cycle_last	= tk->clock->cycle_last;
-> +		vdso_data->xtime_clock_sec	= wall_time.tv_sec;
-> +		vdso_data->xtime_clock_nsec	= wall_time.tv_nsec;
-> +		vdso_data->cs_mult		= tk->mult;
-> +		vdso_data->cs_shift		= tk->shift;
-> +		vdso_data->wtm_clock_sec	= wtm->tv_sec;
-> +		vdso_data->wtm_clock_nsec	= wtm->tv_nsec;
-> +	}
-> +
-> +	smp_wmb();
-> +	++vdso_data->tb_seq_count;
-> +}
-> +
-> +void update_vsyscall_tz(void)
-> +{
-> +	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
-> +	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
-> +}
-
-which gets written to directly, and read from userspace.  This won't work
-with aliasing caches, of which we have VIVT caches on all ARMv4 and ARMv5
-CPUs, and VIPT caches on some ARMv6.
-
-Either this needs to be limited to just VIPT nonaliasing caches, or it
-needs cache handling.
-
-The above also looks rather unsafe from the SMP perspective - how does
-vdso_data->tb_seq_count protect this data between CPUs?
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+On Mon, Jan 27, 2014 at 05:21:16PM +0000, Catalin Marinas wrote:
+> On Mon, Jan 27, 2014 at 05:02:25PM +0000, Marc Zyngier wrote:
+> > On 27/01/14 16:57, Catalin Marinas wrote:
+> > > On Mon, Jan 27, 2014 at 11:16:57AM +0000, Marc Zyngier wrote:
+> > >> On 24/01/14 23:37, Christoffer Dall wrote:
+> > >>> On Sat, Jan 04, 2014 at 08:27:23AM -0800, Christoffer Dall wrote:
+> > >>>> --- a/arch/arm/include/asm/pgtable-3level.h
+> > >>>> +++ b/arch/arm/include/asm/pgtable-3level.h
+> > >>>> @@ -120,13 +120,19 @@
+> > >>>>  /*
+> > >>>>   * 2nd stage PTE definitions for LPAE.
+> > >>>>   */
+> > >>>> -#define L_PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> > >>>> -#define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> > >>>> -#define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+> > >>>> -#define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> > >>>> -#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+> > >>>> -
+> > >>>> -#define L_PMD_S2_RDWR		 (_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+> > >>>> +#define L_PTE_S2_MT_UNCACHED		(_AT(pteval_t, 0x0) << 2) /* strongly ordered */
+> > >>>> +#define L_PTE_S2_MT_WRITETHROUGH	(_AT(pteval_t, 0xa) << 2) /* normal inner write-through */
+> > >>>> +#define L_PTE_S2_MT_WRITEBACK		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+> > >>>> +#define L_PTE_S2_MT_DEV_SHARED		(_AT(pteval_t, 0x1) << 2) /* device */
+> > >>>> +#define L_PTE_S2_MT_DEV_NONSHARED	(_AT(pteval_t, 0x1) << 2) /* device */
+> > >>>> +#define L_PTE_S2_MT_DEV_WC		(_AT(pteval_t, 0x5) << 2) /* normal non-cacheable */
+> > >>>> +#define L_PTE_S2_MT_DEV_CACHED		(_AT(pteval_t, 0xf) << 2) /* normal inner write-back */
+> > >>>> +#define L_PTE_S2_MT_MASK		(_AT(pteval_t, 0xf) << 2)
+> > >>>> +
+> > >>>> +#define L_PTE_S2_RDONLY			(_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> > >>>> +#define L_PTE_S2_RDWR			(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+> > >>>> +
+> > >>>> +#define L_PMD_S2_RDWR			(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+> > >>>>  
+> > >>>>  /*
+> > >>>>   * Hyp-mode PL2 PTE definitions for LPAE.
+> > >>
+> > >> The change makes sense to me. arm64 uses a slightly different approach,
+> > >> by using a PTE_S2_MEMATTR macro, but I'm not sure that would work for ARM.
+> > >>
+> > >> Russell, Catalin: could you please have a look at this?
+> > > 
+> > > Do we actually need more than Normal Cacheable and Device for stage 2?
+> > 
+> > Not so far. As long as these two memory types are enforced as a minimum,
+> > we're quite happy to let the guest use whatever it decides.
+> > 
+> > I suppose Christoffer introduces them all here as a matter of
+> > completeness, but I don't see them as being useful anytime soon.
+> 
+> That would be useful on arm if you want cachepolicy= argument to force
+> the cacheability of guest Normal memory type.
+> 
+> On arm64, the stage 1 memory type is decided via MAIR and that's how we
+> handle cachepolicy for Normal memory. But for stage 2 this won't work,
+> the type is explicitly set in the MemAttr encoding. But I don't think we
+> need host cachepolicy enforced onto guest.
+> 
+ok, sent out a V2. Thanks for the comments.
+-Christoffer
