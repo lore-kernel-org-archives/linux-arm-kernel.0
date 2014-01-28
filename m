@@ -1,82 +1,156 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Jan 2014 19:49:34 +0800
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe
- voltage during frequency transitions
-In-Reply-To: <CAJuA9ah1vsgpD04QhM5RApkCe9xcvpPkLvdwzgadKGWvngAt+g@mail.gmail.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
- <20140127202543.4167.83362@quantum>
- <CAJuA9ah1vsgpD04QhM5RApkCe9xcvpPkLvdwzgadKGWvngAt+g@mail.gmail.com>
-Message-ID: <20140128114932.GE20583@S2101-09.ap.freescale.net>
+Date: Tue, 28 Jan 2014 19:51:47 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
+In-Reply-To: <1390250840-24196-1-git-send-email-festevam@gmail.com>
+References: <1390250840-24196-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140128115145.GF20583@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 11:00:29AM +0530, Thomas Abraham wrote:
-> Hi Mike,
+On Mon, Jan 20, 2014 at 06:47:20PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Thomas Abraham (2014-01-18 04:10:51)
-> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>
-> >> On some platforms such as the Samsung Exynos, changing the frequency
-> >> of the CPU clock requires changing the frequency of the PLL that is
-> >> supplying the CPU clock. To change the frequency of the PLL, the CPU
-> >> clock is temporarily reparented to another parent clock.
-> >>
-> >> The clock frequency of this temporary parent clock could be much higher
-> >> than the clock frequency of the PLL at the time of reparenting. Due
-> >> to the temporary increase in the CPU clock speed, the CPU (and any other
-> >> components in the CPU clock domain such as dividers, mux, etc.) have to
-> >> to be operated at a higher voltage level, called the safe voltage level.
-> >> This patch adds optional support to temporarily switch to a safe voltage
-> >> level during CPU frequency transitions.
-> >>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >
-> > I'm not a fan of this change. This corner case should be abstracted away
-> > somehow. I had talked to Chander Kayshap previously about handling
-> > voltage changes in clock notifier callbacks, which then renders any
-> > voltage change as a trivial part of the clock rate transition. That
-> > means that this "safe voltage" thing could be handled automagically
-> > without any additional code in the CPUfreq driver.
-> >
-> > There are two nice ways to do this with the clock framework. First is
-> > explicit re-parenting with voltage scaling done in the clock rate-change
-> > notifiers:
-> >
-> > clk_set_parent(cpu_clk, temp_parent);
-> > /* implicit voltage scaling to "safe voltage" happens above */
-> > clk_set_rate(pll, some_rate);
-> > clk_set_parent(cpu_clk, pll);
-> > /* implicit voltage scaling to nominal OPP voltage happens above */
-> >
-> > The above sequence would require a separate exnyos CPUfreq driver, due
-> > to the added clk_set_parent logic.
-> >
-> > The second way to do this is to abstract the clk re-muxing logic out
-> > into the clk driver, which would allow cpufreq-cpu0 to be used for the
-> > exynos chips.
+> mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
 > 
-> This is the approach this patch series takes (patch 2/7). The clock
-> re-muxing logic is handled by a clock driver code. The difference from
-> what you suggested is that the safe voltage (that may be optionally)
-> required before doing the re-muxing is handled here in cpufreq-cpu0
-> driver.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 110 +++++++++++++++++++++++++++++++
+>  1 file changed, 110 insertions(+)
 > 
-> The safe voltage setup can be done in the notifier as you suggested.
-> But, doing that in cpufreq-cpu0 driver will help other platforms reuse
-> this feature if required. Also, if done here, the regulator handling
-> is localized in this driver which otherwise would need to be handled
-> in two places, cpufreq-cpu0 driver and the clock notifier.
-> 
-> So I tend to prefer the approach in this patch but I am willing to
-> consider any suggestions. Shawn, it would be helpful if you could let
-> us know your thoughts on this. I am almost done with testing the v3 of
-> this series and want to post it so if there are any objections to the
-> changes in this patch, please let me know.
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 47c5a3f..e44ff49 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -63,6 +63,112 @@
+>  	status = "okay";
+>  };
+>  
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +
+> +	pmic: pfuze100 at 08 {
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
+> +
+> +		regulators {
+> +			sw1a_reg: sw1ab {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw1c_reg: sw1c {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw2_reg: sw2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3a_reg: sw3a {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3b_reg: sw3b {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw4_reg: sw4 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +			};
+> +
+> +			swbst_reg: swbst {
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +			};
+> +
+> +			snvs_reg: vsnvs {
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vref_reg: vrefddr {
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen1_reg: vgen1 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +			};
+> +
+> +			vgen2_reg: vgen2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +			};
+> +
+> +			vgen3_reg: vgen3 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +			};
+> +
+> +			vgen4_reg: vgen4 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen5_reg: vgen5 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen6_reg: vgen6 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+>  &iomuxc {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_hog>;
+> @@ -90,6 +196,10 @@
+>  			fsl,pins = <MX6QDL_ENET_PINGRP2_GPIO6>;
+>  		};
+>  
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <MX6QDL_I2C2_PINGRP3>;
 
-To me, it's the best that we reuse cpufreq-cpu0 for exynos without any
-changes on cpufreq-cpu0 driver ;)
+The PINGRP header is gone.  Please rebase it against to my imx/dt
+branch.
 
 Shawn
+
+> +		};
+> +
+>  		pinctrl_gpmi_nand: gpminandgrp {
+>  			fsl,pins = <MX6QDL_GPMI_NAND_PINGRP1>;
+>  		};
+> -- 
+> 1.8.1.2
+> 
