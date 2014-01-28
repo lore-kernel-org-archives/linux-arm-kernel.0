@@ -1,60 +1,147 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 28 Jan 2014 13:51:51 -0500
-Subject: [PATCH v3] ARM: hw_breakpoint: Add ARMv8 support
-In-Reply-To: <20140128183851.GK2885@mudshark.cambridge.arm.com>
-References: <20140128183851.GK2885@mudshark.cambridge.arm.com>
-Message-ID: <1390935112-28465-1-git-send-email-cov@codeaurora.org>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Tue, 28 Jan 2014 18:54:23 +0000
+Subject: [PATCH v2] arm/xen: Initialize event channels earlier
+Message-ID: <1390935264-23155-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the trivial support necessary to get hardware breakpoints
-working for GDB on ARMv8 simulators running in AArch32 mode.
+Event channels driver needs to be initialized very early. Until now, Xen
+initialization was done after all CPUs was bring up.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
+We can safely move the initialization to an early initcall.
+
+Also use a cpu notifier to:
+    - Register the VCPU when the CPU is prepared
+    - Enable event channel IRQ when the CPU is running
+
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
+
 ---
+    Changes in v2:
+        - Check earlier if the event IRQ is valid
+        - We can safely register the VCPU when the cpu is booting
+---
+ arch/arm/xen/enlighten.c |   71 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 44 insertions(+), 27 deletions(-)
 
- v3: assume for now that ARMv9 and later will update FSR
-
- v2: modify debug_exception_updates_fsr
-
- arch/arm/include/asm/hw_breakpoint.h | 1 +
- arch/arm/kernel/hw_breakpoint.c      | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-index eef55ea..8e427c7 100644
---- a/arch/arm/include/asm/hw_breakpoint.h
-+++ b/arch/arm/include/asm/hw_breakpoint.h
-@@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
- #define ARM_DEBUG_ARCH_V7_ECP14	3
- #define ARM_DEBUG_ARCH_V7_MM	4
- #define ARM_DEBUG_ARCH_V7_1	5
-+#define ARM_DEBUG_ARCH_V8	6
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 293eeea..b96723e 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -23,6 +23,7 @@
+ #include <linux/of_address.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpufreq.h>
++#include <linux/cpu.h>
  
- /* Breakpoint */
- #define ARM_BREAKPOINT_EXECUTE	0
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 3d44660..9da35c6 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -167,7 +167,7 @@ static int debug_arch_supported(void)
- /* Can we determine the watchpoint access type from the fsr? */
- static int debug_exception_updates_fsr(void)
+ #include <linux/mm.h>
+ 
+@@ -154,7 +155,7 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+ }
+ EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+ 
+-static void __init xen_percpu_init(void *unused)
++static void xen_percpu_init(void)
  {
--	return 0;
-+	return get_debug_arch() >= ARM_DEBUG_ARCH_V8;
+ 	struct vcpu_register_vcpu_info info;
+ 	struct vcpu_info *vcpup;
+@@ -193,6 +194,31 @@ static void xen_power_off(void)
+ 		BUG();
  }
  
- /* Determine number of WRP registers available. */
-@@ -257,6 +257,7 @@ static int enable_monitor_mode(void)
- 		break;
- 	case ARM_DEBUG_ARCH_V7_ECP14:
- 	case ARM_DEBUG_ARCH_V7_1:
-+	case ARM_DEBUG_ARCH_V8:
- 		ARM_DBG_WRITE(c0, c2, 2, (dscr | ARM_DSCR_MDBGEN));
- 		isb();
- 		break;
++static int xen_cpu_notification(struct notifier_block *self,
++				unsigned long action,
++				void *hcpu)
++{
++	switch (action) {
++	case CPU_STARTING:
++		xen_percpu_init();
++		break;
++	default:
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block xen_cpu_notifier = {
++	.notifier_call = xen_cpu_notification,
++};
++
++static irqreturn_t xen_arm_callback(int irq, void *arg)
++{
++	xen_hvm_evtchn_do_upcall();
++	return IRQ_HANDLED;
++}
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -229,6 +255,10 @@ static int __init xen_guest_init(void)
+ 	xen_events_irq = irq_of_parse_and_map(node, 0);
+ 	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
+ 			version, xen_events_irq, &grant_frames);
++
++	if (xen_events_irq < 0)
++		return -ENODEV;
++
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+ 	xen_setup_features();
+@@ -281,9 +311,21 @@ static int __init xen_guest_init(void)
+ 	disable_cpuidle();
+ 	disable_cpufreq();
+ 
++	xen_init_IRQ();
++
++	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
++			       "events", &xen_vcpu)) {
++		pr_err("Error request IRQ %d\n", xen_events_irq);
++		return -EINVAL;
++	}
++
++	xen_percpu_init();
++
++	register_cpu_notifier(&xen_cpu_notifier);
++
+ 	return 0;
+ }
+-core_initcall(xen_guest_init);
++early_initcall(xen_guest_init);
+ 
+ static int __init xen_pm_init(void)
+ {
+@@ -297,31 +339,6 @@ static int __init xen_pm_init(void)
+ }
+ late_initcall(xen_pm_init);
+ 
+-static irqreturn_t xen_arm_callback(int irq, void *arg)
+-{
+-	xen_hvm_evtchn_do_upcall();
+-	return IRQ_HANDLED;
+-}
+-
+-static int __init xen_init_events(void)
+-{
+-	if (!xen_domain() || xen_events_irq < 0)
+-		return -ENODEV;
+-
+-	xen_init_IRQ();
+-
+-	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
+-			"events", &xen_vcpu)) {
+-		pr_err("Error requesting IRQ %d\n", xen_events_irq);
+-		return -EINVAL;
+-	}
+-
+-	on_each_cpu(xen_percpu_init, NULL, 0);
+-
+-	return 0;
+-}
+-postcore_initcall(xen_init_events);
+-
+ /* In the hypervisor.S file. */
+ EXPORT_SYMBOL_GPL(HYPERVISOR_event_channel_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_grant_table_op);
 -- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+1.7.10.4
