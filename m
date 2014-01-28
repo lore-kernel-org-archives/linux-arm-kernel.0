@@ -1,45 +1,114 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Jan 2014 11:00:51 +0000
-Subject: [alsa-devel] [PATCH 4/4] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <s5hppncihn6.wl%tiwai@suse.de>
-References: <cover.1390813480.git.moinejf@free.fr>
- <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
- <20140127204441.GZ11841@sirena.org.uk>
- <20140127204915.GC15937@n2100.arm.linux.org.uk>
- <20140127205437.GC11841@sirena.org.uk>
- <s5hppncihn6.wl%tiwai@suse.de>
-Message-ID: <20140128110051.GI11841@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 28 Jan 2014 12:02:23 +0100
+Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver
+ for NMI controller
+In-Reply-To: <20140128104044.GC3867@lukather>
+References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
+ <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
+ <20140116123940.GE31779@lukather>
+ <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
+ <20140128104044.GC3867@lukather>
+Message-ID: <52E78E3F.6080902@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 10:23:57AM +0100, Takashi Iwai wrote:
-> Mark Brown wrote:
-> > On Mon, Jan 27, 2014 at 08:49:15PM +0000, Russell King - ARM Linux wrote:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> > > Yes, preferably as a generic ALSA helper rather than an ASoC helper -
-> > > I don't see any need for this to be ASoC specific (I have a pure ALSA
-> > > driver which has very similar code in it.)
+Hi,
 
-> > Indeed, definitely ALSA generic - ideally we could factor a lot of the
-> > integration with the video side out.
+On 01/28/2014 11:40 AM, Maxime Ripard wrote:
 
-> Yes, indeed.
+Jumping in here to try and clarify things, or so I hope at least :)
 
-> OTOH, as discussed recently, we're heading to move from ELD parsing to
-> more direct communication between video and audio drivers for
-> HD-audio.  ELD will be still provided to user-space, but not evaluated
-> any longer in the new scenario.
+> On Fri, Jan 17, 2014 at 09:54:55AM +0100, Carlo Caione wrote:
+>>>> +/* + * Ack level interrupts right before unmask + * + * In case of level-triggered interrupt, IRQ line must be acked before it + * is unmasked or else a double-interrupt is triggered + */ + +static void sunxi_sc_nmi_ack_and_unmask(struct irq_data *d) +{ +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d); +     struct irq_chip_type *ct = irq_data_get_chip_type(d); +     u32 mask = d->mask; + +     if (irqd_get_trigger_type(d) & IRQ_TYPE_LEVEL_MASK) +             ct->chip.irq_ack(d); + +     irq_gc_lock(gc); +     irq_reg_writel(mask, gc->reg_base + ct->regs.mask); +
+>>>> irq_gc_unlock(gc); +}
+>>> 
+>>> Hmmm, handle_level_irq seems to be doing exactly that already. It first masks and acks the interrupts, and then unmask it, so we should be fine, don't we?
+>> 
+>> We don't, or at least handle_level_irq doesn't work for all the cases.
+> 
+> This is what I find weird :)
+> 
+>> Let's say (i.e. this is the cubieboard2 case) that to the irqchip is connected to the IRQ line of a PMIC accessed by I2C. In this case we cannot mask/ack the interrupt on the originating device in the hard interrupt handler (in which handle_level_irq is) since we need to access the I2C bus in an non-interrupt context.
+> 
+> We agree here.
+> 
+>> ACKing the IRQ in handle_level_irq at this point is pretty much useless since we still have to ACK the IRQs on the originating device and this will be done in a IRQ thread started after the hard IRQ handler.
+> 
+> Ok, so what you're saying is that you want to adress this case:
+> 
+> handle_level_irq |          device    device | mask ack handler irq acked unmask |  |    |    |         |       | v  v    v    v         v       v
+> 
+> NMI -> GIC: +--------+     +----------------- ---------------+        +-----+
+> 
+> PMIC -> NMI: +-+           +-+ ------------+ +-----------+ +--------------------
+> 
+> Right?
 
-That sort of refactoring being one of the best reasons to keep things
-out of individual drivers!  Having said all this I don't know if it's
-worth blocking Jean-Francois' work on that, it's an improvement in
-itself.  Splitting the code out a bit would be good to help prepare but
-having the full refactoring done might be too much of a blocker.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/6ec7cfaf/attachment.sig>
+No, the IRQ from the PMIC is a level sensitive IRQ, so it would look like this:
+
+> handle_level_irq |          device    device | mask ack handler irq acked unmask |  |    |    |         |       | v  v    v    v         v       v
+> 
+> NMI -> GIC: +------------------------------+ ---------------+                              +--
+> 
+> PMIC -> NMI: +-------------------------+ ------------+                         +----------
+
+The PMIC irq line won't go low until an i2c write to its irq status
+registers write-clears all status bits for which the corresponding
+bit in the irq-mask register is set.
+
+And the only reason the NMI -> GIC also goes low is because the unmask
+operation writes a second ack to the NMI controller in the unmask
+callback of the NMI controller driver.
+
+Note that we cannot use edge triggered interrupts here because the PMIC
+has the typical setup with multiple irq status bits driving a single
+irq line, so the irq handler does read irq-status, handle stuff,
+write-clear irq-status. And if any other irq-status bits get set
+between the read and write-clear the PMIC -> NMI line will stay
+high, as it should since there are more interrupts to handle.
+
+> But in this case, you would have two events coming from your device (the two rising edges), so you'd expect two interrupts. And in the case of a level triggered interrupt, the device would keep the interrupt line active until it's unmasked, so we wouldn't end up with this either.
+> 
+>> sunxi_sc_nmi_ack_and_unmask is therefore called (by irq_finalize_oneshot) after the IRQ thread has been executed. After the IRQ thread has ACKed the IRQs on the originating device we can finally ACK and unmask again the NMI.
+> 
+> And what happens if you get a new interrupt right between the end of the handler and the unmask?
+
+The implicit ack done by the unmask will be ignored if the NMI line is still
+high, just like the initial ack is ignored (which is why we need the mask),
+and when the unmask completes the irq will immediately retrigger, as it should.
+
+
+<snip>
+
+>>> I really wonder whether it makes sense to have a generic chip here. It seems to be much more complicated than it should. It's only about a single interrupt interrupt chip here.
+>> 
+>> I agree but is there any other way to manage the NMI without the driver of the device connected to NMI having to worry about acking/masking/unmasking/ etc..?
+> 
+> Yes, just declare a "raw" irqchip. Pretty much like we do on irq-sun4i for example.
+
+Hmm, I'm not going to say that using a raw irqchip here is a bad idea, it
+sounds like it would be better.
+
+But I don't think this will solve the need the mask / umask. The problem is
+we need to do an i2c write to clear the interrupt source, which needs to
+be done from a thread / workqueue. So when the interrupt handler finishes
+the source won't be cleared yet, and AFAIK then only way to deal with this
+is to mask the interrupt until we've cleared the interrupt source.
+
+I agree that ideally we would be able to hide all this inside the NMI
+controller driver, but I'm not sure if we can.
+
+Regards,
+
+Hans
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iEYEARECAAYFAlLnjj8ACgkQF3VEtJrzE/skqACgjGLU2QLQUq9o0pU1DuuWIUpx
+YngAoJmbmCGEhkRBy5xFmKuXapilqzmM
+=BoL/
+-----END PGP SIGNATURE-----
