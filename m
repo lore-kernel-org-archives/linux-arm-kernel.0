@@ -1,115 +1,45 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Tue, 28 Jan 2014 11:00:35 +0000
-Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <20140123195718.GC26399@alberich>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
- <20140120222814.GI3471@alberich>
- <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122122550.GA14108@mudshark.cambridge.arm.com>
- <a73ef0128a0141eabf0a3b899f3afdae@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140122134028.GB14108@mudshark.cambridge.arm.com>
- <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122153352.GE14108@mudshark.cambridge.arm.com>
- <3d0a888e122f490ba6bbc80b1aaa977c@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140123195718.GC26399@alberich>
-Message-ID: <991cc0024ea54cdb964f31de89c0b0ea@BL2PR03MB468.namprd03.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Jan 2014 11:00:51 +0000
+Subject: [alsa-devel] [PATCH 4/4] ASoC: tda998x: adjust the audio hw
+ parameters from EDID
+In-Reply-To: <s5hppncihn6.wl%tiwai@suse.de>
+References: <cover.1390813480.git.moinejf@free.fr>
+ <d99e90932aad1a644fa32ff22fd2cb56b830341b.1390813481.git.moinejf@free.fr>
+ <20140127204441.GZ11841@sirena.org.uk>
+ <20140127204915.GC15937@n2100.arm.linux.org.uk>
+ <20140127205437.GC11841@sirena.org.uk>
+ <s5hppncihn6.wl%tiwai@suse.de>
+Message-ID: <20140128110051.GI11841@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 28, 2014 at 10:23:57AM +0100, Takashi Iwai wrote:
+> Mark Brown wrote:
+> > On Mon, Jan 27, 2014 at 08:49:15PM +0000, Russell King - ARM Linux wrote:
 
+> > > Yes, preferably as a generic ALSA helper rather than an ASoC helper -
+> > > I don't see any need for this to be ASoC specific (I have a pure ALSA
+> > > driver which has very similar code in it.)
 
-> -----Original Message-----
-> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> bounces at lists.linux-foundation.org] On Behalf Of Andreas Herrmann
-> Sent: Friday, January 24, 2014 1:27 AM
-> To: Sethi Varun-B16395
-> Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; Will Deacon;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
-> notifier block
-> 
-> On Wed, Jan 22, 2014 at 07:07:40PM +0000, Varun Sethi wrote:
-> > > -----Original Message-----
-> > > From: Will Deacon [mailto:will.deacon at arm.com]
-> > > Sent: Wednesday, January 22, 2014 9:04 PM
-> > > To: Sethi Varun-B16395
-> > > Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; linux-arm-
-> > > kernel at lists.infradead.org; Andreas Herrmann
-> > > Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
-> > > notifier block
-> > >
-> > > On Wed, Jan 22, 2014 at 01:54:11PM +0000, Varun Sethi wrote:
-> > > > > > > Ok, so are you suggesting that we perform the isolation
-> > > > > > > mapping in arm_smmu_add_device and drop the notifier
-> altogether?
-> > > > > > I think that should be fine, until we want to delay mapping
-> > > > > > creation till driver bind time.
-> > > > >
-> > > > > Is there a hard dependency on that?
-> > > > >
-> > > > Not sure, may be Andreas can answer that.
-> > >
-> > > Ok. Andreas? I would have thought doing this *earlier* shouldn't be
-> > > a problem (the DMA ops must be swizzled before the driver is probed).
-> > >
-> > > > > > But the "isolate device" property should dictate iommu group
-> > > creation.
-> > > > >
-> > > > > The reason we added automatic group creation (per-device) is for
-> > > > > VFIO, which expects all devices to be in a group regardless of
-> > > > > the device isolation configuration.
-> > > > >
-> > > > IIUC, with the "isolate devices" property we ensure that there
-> > > > would be independent SMR and S2CR per device. Is that correct?
-> > >
-> > > Yes, as part of giving them independent sets of page tables.
-> > > Initially these tables don't have any valid mappings, but the
-> > > dma-mapping API will populate them in response to
-> dma_map_*/dma_alloc/etc.
-> > >
-> > > Not sure what this has to do with us putting devices into their own
-> > > groups...
-> 
-> > [Sethi Varun-B16395] Devices in an iommu group would share the dma
-> > mapping, so shouldn't they be sharing the SMR and context registers?
-> 
-> I aggree with the context but SMRs won't be shared. I think you just can
-> say that a certain subset of the available SMRs will be used to map all
-> devices in an iommu group to the same context. Depending on what
-> streamIDs each device has you might have to use separate SMRs for each
-> device to map it to the same context.
-[Sethi Varun-B16395] IIUC the SMRs would unique per device, but there is a possibility where the number of context registers are restricted?
-In that case IOMMU groups should correspond to unique stream IDs (and corresponding SMRs).
+> > Indeed, definitely ALSA generic - ideally we could factor a lot of the
+> > integration with the video side out.
 
-> 
-> > In case of the "isolate devices" property, each device would have its
-> > own SMR and context registers, thus allowing the devices to have
-> > independent mappings and allowing them to fall in separate iommu
-> > groups.
-> 
-> I aggree with Varun's view here. (Now that I take iommu groups into
-> consideration.)
-> 
-> But my goal with the "isolate devices" thing was twofold:
-> 
-> 1. actual make use of SMMU for address translation for all master
->   devices (instead of just bypassing the SMMU)
-[Sethi Varun-B16395]  even if masters have to share translation? But from the patch it seemed that we are creating mapping only if we find the isolate devices property.
-> 
-> plus
-> 
-> 2. put each master into it's own domain to isolate it
-> 
-> The latter matches usage of separate iommu groups for devices. If we now
-> use the isolate devices property to just control whether master devices
-> fall into the same or separate iommu groups it seems to me we would need
-> to have another mechanism that triggers the creation of a mapping for a
-> group.
-> 
-> What do you think?
-> 
-[Sethi Varun-B16395] As mentioned before, we should be having iommu group per device (having a unique stream id). Isolate devices property just ensures that each device has a unique context. Now, for the devices for which we don't have the isolate device property, can't we have the multiple devices point to a common mapping. 
+> Yes, indeed.
 
--Varun
+> OTOH, as discussed recently, we're heading to move from ELD parsing to
+> more direct communication between video and audio drivers for
+> HD-audio.  ELD will be still provided to user-space, but not evaluated
+> any longer in the new scenario.
+
+That sort of refactoring being one of the best reasons to keep things
+out of individual drivers!  Having said all this I don't know if it's
+worth blocking Jean-Francois' work on that, it's an improvement in
+itself.  Splitting the code out a bit would be good to help prepare but
+having the full refactoring done might be too much of a blocker.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/6ec7cfaf/attachment.sig>
