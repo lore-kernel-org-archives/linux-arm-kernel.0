@@ -1,16 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:32 +0100
-Subject: [PATCH v2 20/21] pinctrl: mvebu: dove: use global register regmap
+Date: Tue, 28 Jan 2014 01:39:29 +0100
+Subject: [PATCH v2 17/21] pinctrl: mvebu: dove: use remapped mpp base registers
 In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-21-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-18-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a regmap for global registers, get rid of the last
-remaining hardcoded physical addresses. While at it, also remove
-DOVE_ prefix from those macros.
+Now that we have ioremapped mpp base registers, get rid of hardcoded
+physical addresses. While at it, also remove DOVE_ prefix from those
+macros.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -22,220 +22,107 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-dove.c | 128 ++++++++++++++++-------------------
- 1 file changed, 60 insertions(+), 68 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 35 +++++++++++++++++++----------------
+ 1 file changed, 19 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 9126cedec1bc..1823a1a7ec45 100644
+index 74a50a3d6729..43e037cf6db0 100644
 --- a/drivers/pinctrl/mvebu/pinctrl-dove.c
 +++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -30,21 +30,6 @@
- #define PMU_REGS_OFFS			0xd802c
+@@ -31,9 +31,6 @@
  #define GC_REGS_OFFS			0xe802c
  
--#define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
--#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
--#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
--#define  DOVE_TWSI_ENABLE_OPTION1	BIT(7)
--#define DOVE_GLOBAL_CONFIG_2		(DOVE_SB_REGS_VIRT_BASE + 0xe8030)
--#define  DOVE_TWSI_ENABLE_OPTION2	BIT(20)
--#define  DOVE_TWSI_ENABLE_OPTION3	BIT(21)
--#define  DOVE_TWSI_OPTION3_GPIO		BIT(22)
--#define DOVE_SSP_CTRL_STATUS_1		(DOVE_SB_REGS_VIRT_BASE + 0xe8034)
--#define  DOVE_SSP_ON_AU1		BIT(0)
--#define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xe803c)
--#define  DOVE_AU1_SPDIFO_GPIO_EN	BIT(1)
--#define  DOVE_NAND_GPIO_EN		BIT(0)
--#define DOVE_GPIO_LO_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0400)
--
- /* MPP Base registers */
- #define PMU_MPP_GENERAL_CTRL	0x10
- #define  AU0_AC97_SEL		BIT(16)
-@@ -62,6 +47,19 @@
- #define PMU_SIGNAL_SELECT_0	0x00
- #define PMU_SIGNAL_SELECT_1	0x04
+ #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
+-#define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
+-#define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
+-#define  DOVE_AU0_AC97_SEL		BIT(16)
+ #define DOVE_PMU_SIGNAL_SELECT_0	(DOVE_SB_REGS_VIRT_BASE + 0xd802C)
+ #define DOVE_PMU_SIGNAL_SELECT_1	(DOVE_SB_REGS_VIRT_BASE + 0xd8030)
+ #define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
+@@ -57,6 +54,10 @@
+ #define  DOVE_SD1_GPIO_SEL		BIT(1)
+ #define  DOVE_SD0_GPIO_SEL		BIT(0)
  
-+/* Global Config regmap registers */
-+#define GLOBAL_CONFIG_1		0
-+#define  TWSI_ENABLE_OPTION1	BIT(7)
-+#define GLOBAL_CONFIG_2		1
-+#define  TWSI_ENABLE_OPTION2	BIT(20)
-+#define  TWSI_ENABLE_OPTION3	BIT(21)
-+#define  TWSI_OPTION3_GPIO	BIT(22)
-+#define SSP_CTRL_STATUS_1	2
-+#define  SSP_ON_AU1		BIT(0)
-+#define MPP_GENERAL_CONFIG	4
-+#define  AU1_SPDIFO_GPIO_EN	BIT(1)
-+#define  NAND_GPIO_EN		BIT(0)
++/* MPP Base registers */
++#define PMU_MPP_GENERAL_CTRL	0x10
++#define  AU0_AC97_SEL		BIT(16)
 +
- #define CONFIG_PMU	BIT(4)
- 
- static void __iomem *mpp_base;
-@@ -206,9 +204,10 @@ static int dove_mpp4_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
- static int dove_nand_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 			      unsigned long *config)
+ #define MPPS_PER_REG	8
+ #define MPP_BITS	4
+ #define MPP_MASK	0xf
+@@ -97,7 +98,7 @@ static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
  {
--	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-+	unsigned int gmpp;
+ 	unsigned off = (ctrl->pid / MPPS_PER_REG) * MPP_BITS;
+ 	unsigned shift = (ctrl->pid % MPPS_PER_REG) * MPP_BITS;
+-	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
++	unsigned long pmu = readl(mpp_base + PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
  
--	*config = ((gmpp & DOVE_NAND_GPIO_EN) != 0);
-+	regmap_read(gconfmap, MPP_GENERAL_CONFIG, &gmpp);
-+	*config = ((gmpp & NAND_GPIO_EN) != 0);
+ 	if (pmu & (1 << ctrl->pid)) {
+@@ -105,7 +106,7 @@ static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 		*config = (func >> shift) & MPP_MASK;
+ 		*config |= CONFIG_PMU;
+ 	} else {
+-		func = readl(DOVE_MPP_VIRT_BASE + off);
++		func = readl(mpp_base + off);
+ 		*config = (func >> shift) & MPP_MASK;
+ 	}
+ 	return 0;
+@@ -116,21 +117,23 @@ static int dove_pmu_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ {
+ 	unsigned off = (ctrl->pid / MPPS_PER_REG) * MPP_BITS;
+ 	unsigned shift = (ctrl->pid % MPPS_PER_REG) * MPP_BITS;
+-	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
++	unsigned long pmu = readl(mpp_base + PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
  
+ 	if (config & CONFIG_PMU) {
+-		writel(pmu | (1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
++		writel(pmu | (1 << ctrl->pid),
++		       mpp_base + PMU_MPP_GENERAL_CTRL);
+ 		func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
+ 		func &= ~(MPP_MASK << shift);
+ 		func |= (config & MPP_MASK) << shift;
+ 		writel(func, DOVE_PMU_SIGNAL_SELECT_0 + off);
+ 	} else {
+-		writel(pmu & ~(1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
+-		func = readl(DOVE_MPP_VIRT_BASE + off);
++		writel(pmu & ~(1 << ctrl->pid),
++		       mpp_base + PMU_MPP_GENERAL_CTRL);
++		func = readl(mpp_base + off);
+ 		func &= ~(MPP_MASK << shift);
+ 		func |= (config & MPP_MASK) << shift;
+-		writel(func, DOVE_MPP_VIRT_BASE + off);
++		writel(func, mpp_base + off);
+ 	}
  	return 0;
  }
-@@ -216,14 +215,9 @@ static int dove_nand_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- static int dove_nand_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
- 			      unsigned long config)
- {
--	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
--
--	gmpp &= ~DOVE_NAND_GPIO_EN;
--	if (config)
--		gmpp |= DOVE_NAND_GPIO_EN;
--
--	writel(gmpp, DOVE_MPP_GENERAL_VIRT_BASE);
--
-+	regmap_update_bits(gconfmap, MPP_GENERAL_CONFIG,
-+			   NAND_GPIO_EN,
-+			   (config) ? NAND_GPIO_EN : 0);
- 	return 0;
- }
- 
-@@ -253,19 +247,23 @@ static int dove_audio0_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
- static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+@@ -228,9 +231,9 @@ static int dove_nand_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_audio0_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
  				unsigned long *config)
  {
--	unsigned long mpp4 = readl(mpp4_base + MPP_CTRL4);
--	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
--	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
--	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-+	unsigned int mpp4 = readl(mpp4_base + MPP_CTRL4);
-+	unsigned int sspc1;
-+	unsigned int gmpp;
-+	unsigned int gcfg2;
-+
-+	regmap_read(gconfmap, SSP_CTRL_STATUS_1, &sspc1);
-+	regmap_read(gconfmap, MPP_GENERAL_CONFIG, &gmpp);
-+	regmap_read(gconfmap, GLOBAL_CONFIG_2, &gcfg2);
+-	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
++	unsigned long pmu = readl(mpp_base + PMU_MPP_GENERAL_CTRL);
  
- 	*config = 0;
- 	if (mpp4 & AU1_GPIO_SEL)
- 		*config |= BIT(3);
--	if (sspc1 & DOVE_SSP_ON_AU1)
-+	if (sspc1 & SSP_ON_AU1)
- 		*config |= BIT(2);
--	if (gmpp & DOVE_AU1_SPDIFO_GPIO_EN)
-+	if (gmpp & AU1_SPDIFO_GPIO_EN)
- 		*config |= BIT(1);
--	if (gcfg2 & DOVE_TWSI_OPTION3_GPIO)
-+	if (gcfg2 & TWSI_OPTION3_GPIO)
- 		*config |= BIT(0);
- 
- 	/* SSP/TWSI only if I2S1 not set*/
-@@ -280,32 +278,22 @@ static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
- 				unsigned long config)
- {
--	unsigned long mpp4 = readl(mpp4_base + MPP_CTRL4);
--	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
--	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
--	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-+	unsigned int mpp4 = readl(mpp4_base + MPP_CTRL4);
- 
--	/*
--	 * clear all audio1 related bits before configure
--	 */
--	gcfg2 &= ~DOVE_TWSI_OPTION3_GPIO;
--	gmpp &= ~DOVE_AU1_SPDIFO_GPIO_EN;
--	sspc1 &= ~DOVE_SSP_ON_AU1;
- 	mpp4 &= ~AU1_GPIO_SEL;
--
--	if (config & BIT(0))
--		gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
--	if (config & BIT(1))
--		gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
--	if (config & BIT(2))
--		sspc1 |= DOVE_SSP_ON_AU1;
- 	if (config & BIT(3))
- 		mpp4 |= AU1_GPIO_SEL;
--
- 	writel(mpp4, mpp4_base + MPP_CTRL4);
--	writel(sspc1, DOVE_SSP_CTRL_STATUS_1);
--	writel(gmpp, DOVE_MPP_GENERAL_VIRT_BASE);
--	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
-+
-+	regmap_update_bits(gconfmap, SSP_CTRL_STATUS_1,
-+			   SSP_ON_AU1,
-+			   (config & BIT(2)) ? SSP_ON_AU1 : 0);
-+	regmap_update_bits(gconfmap, MPP_GENERAL_CONFIG,
-+			   AU1_SPDIFO_GPIO_EN,
-+			   (config & BIT(1)) ? AU1_SPDIFO_GPIO_EN : 0);
-+	regmap_update_bits(gconfmap, GLOBAL_CONFIG_2,
-+			   TWSI_OPTION3_GPIO,
-+			   (config & BIT(0)) ? TWSI_OPTION3_GPIO : 0);
+-	*config = ((pmu & DOVE_AU0_AC97_SEL) != 0);
++	*config = ((pmu & AU0_AC97_SEL) != 0);
  
  	return 0;
  }
-@@ -353,15 +341,18 @@ static int dove_audio1_ctrl_gpio_dir(struct mvebu_mpp_ctrl *ctrl, u8 pid,
- static int dove_twsi_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 			      unsigned long *config)
- {
--	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
--	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-+	unsigned int gcfg1;
-+	unsigned int gcfg2;
-+
-+	regmap_read(gconfmap, GLOBAL_CONFIG_1, &gcfg1);
-+	regmap_read(gconfmap, GLOBAL_CONFIG_2, &gcfg2);
- 
- 	*config = 0;
--	if (gcfg1 & DOVE_TWSI_ENABLE_OPTION1)
-+	if (gcfg1 & TWSI_ENABLE_OPTION1)
- 		*config = 1;
--	else if (gcfg2 & DOVE_TWSI_ENABLE_OPTION2)
-+	else if (gcfg2 & TWSI_ENABLE_OPTION2)
- 		*config = 2;
--	else if (gcfg2 & DOVE_TWSI_ENABLE_OPTION3)
-+	else if (gcfg2 & TWSI_ENABLE_OPTION3)
- 		*config = 3;
- 
- 	return 0;
-@@ -370,26 +361,27 @@ static int dove_twsi_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- static int dove_twsi_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+@@ -238,12 +241,12 @@ static int dove_audio0_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_audio0_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
  				unsigned long config)
  {
--	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
--	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
--
--	gcfg1 &= ~DOVE_TWSI_ENABLE_OPTION1;
--	gcfg2 &= ~(DOVE_TWSI_ENABLE_OPTION2 | DOVE_TWSI_ENABLE_OPTION3);
-+	unsigned int gcfg1 = 0;
-+	unsigned int gcfg2 = 0;
+-	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
++	unsigned long pmu = readl(mpp_base + PMU_MPP_GENERAL_CTRL);
  
- 	switch (config) {
- 	case 1:
--		gcfg1 |= DOVE_TWSI_ENABLE_OPTION1;
-+		gcfg1 = TWSI_ENABLE_OPTION1;
- 		break;
- 	case 2:
--		gcfg2 |= DOVE_TWSI_ENABLE_OPTION2;
-+		gcfg2 = TWSI_ENABLE_OPTION2;
- 		break;
- 	case 3:
--		gcfg2 |= DOVE_TWSI_ENABLE_OPTION3;
-+		gcfg2 = TWSI_ENABLE_OPTION3;
- 		break;
- 	}
- 
--	writel(gcfg1, DOVE_GLOBAL_CONFIG_1);
--	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
-+	regmap_update_bits(gconfmap, GLOBAL_CONFIG_1,
-+			   TWSI_ENABLE_OPTION1,
-+			   gcfg1);
-+	regmap_update_bits(gconfmap, GLOBAL_CONFIG_2,
-+			   TWSI_ENABLE_OPTION2 | TWSI_ENABLE_OPTION3,
-+			   gcfg2);
+-	pmu &= ~DOVE_AU0_AC97_SEL;
++	pmu &= ~AU0_AC97_SEL;
+ 	if (config)
+-		pmu |= DOVE_AU0_AC97_SEL;
+-	writel(pmu, DOVE_PMU_MPP_GENERAL_CTRL);
++		pmu |= AU0_AC97_SEL;
++	writel(pmu, mpp_base + PMU_MPP_GENERAL_CTRL);
  
  	return 0;
  }
