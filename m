@@ -1,38 +1,146 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Jan 2014 19:20:49 +0800
-Subject: [PATCH 2/9] ARM: dts: imx6sl: remove the use of pingrp macros
-In-Reply-To: <5923680.sl3G3EgCsY@phil>
-References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
- <1390668191-20289-3-git-send-email-shawn.guo@linaro.org>
- <5923680.sl3G3EgCsY@phil>
-Message-ID: <20140128112047.GC20583@S2101-09.ap.freescale.net>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Tue, 28 Jan 2014 16:50:16 +0530
+Subject: [PATCH v9 0/6] arm64: KGDB Support
+Message-ID: <1390908022-10287-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 11:17:22AM +0100, Heiko St?bner wrote:
-> [... and so on for the other groups ... ]
-> 
-> I'm confused now :-) . Current linux-next [0] shows the pin-settings as part 
-> of imx6sl.dtsi - a way a lot of other architectures organize their pingroups 
-> too, with the board file only referencing the relevant pingroups from the 
-> predefined ones of the soc.
-> 
-> So I guess your move to the pingrp-header moved them out of the imx6sl.dtsi to 
-> the .h and is not part of linux-next;
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-Yes, my for-next branch was excluded from linux-next temporarily for
-some reason.  I will ask Stephen to add it back once v3.14-rc1 is out.
-That said, you can see nothing we developed in this cycle on linux-next
-for now.
+Based on the step-handler and break-handler hooks patch from
+Sandeepa, KGDB debugging support is added for EL1
+debug in AArch64 mode.
 
-> but this patch (and the others in this 
-> series) now moves the definitions into the individual board files. Can't you 
-> just move them back to the soc-dtsi files to prevent each board duplicating 
-> them?
+In first patch, PSTATE.D is set correctly
 
-No.  That will bring back the problem we try to solve from the
-beginning [1].
+In second patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
 
-Shawn
+With second patch, step/next debugging support is added, where in
+pc is updated to point to the instruction to be stepped and
+stopped.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
+With third patch, the compile time breakpoint instruction
+reordering is fixed by making kgbd_breakpoint() as noinline
+
+Tested with ARM64 simulator
+
+v9: 
+ - minor code movement comments fix
+
+v8:
+ - fixed comments on local_dbg_{save,restore} macros
+ - instruction_pointer() macro to return unsigned long to fix
+   compilation warnings
+
+v7:
+ - Changes made to set PSTATE.D properly
+ - Performed KGDB boot tests
+ - Fixed compilation warnings in driver/misc/kgbdts.c
+
+Results:
+
+kgdb boot test:
+
+  [32927.237895] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+  [32927.266066] kgdb: Registered I/O driver kgdbts.
+  [32927.266419] kgdb: Waiting for connection from remote gdb...
+  [32927.268598] kgdbts:RUN plant and detach test
+  [32927.270683] kgdbts:RUN sw breakpoint test
+  [32927.287659] kgdbts:RUN bad memory access test
+  [32927.290322] kgdbts:RUN singlestep test 1000 iterations
+  [32927.330342] kgdbts:RUN singlestep [0/1000]
+  [32931.286356] kgdbts:RUN singlestep [100/1000]
+  [32935.242536] kgdbts:RUN singlestep [200/1000]
+  [32939.205392] kgdbts:RUN singlestep [300/1000]
+  [32943.169522] kgdbts:RUN singlestep [400/1000]
+  [32947.231868] kgdbts:RUN singlestep [500/1000]
+  [32951.188008] kgdbts:RUN singlestep [600/1000]
+  [32955.332243] kgdbts:RUN singlestep [700/1000]
+  [32959.467109] kgdbts:RUN singlestep [800/1000]
+  [32963.430888] kgdbts:RUN singlestep [900/1000]
+  [32967.346992] kgdbts:RUN do_fork for 100 breakpoints
+
+kgdb test from sysfs:
+
+  ~ # echo V1F1000 > /sys/module/kgdbts/parameters/kgdbts
+  [33231.554237] kgdb: Registered I/O driver kgdbts.
+  [33231.554677] kgdbts:RUN plant and detach test
+  [33231.557072] kgdbts:RUN sw breakpoint test
+  [33231.576980] kgdbts:RUN bad memory access test
+  [33231.580022] kgdbts:RUN singlestep test 1000 iterations
+  [33231.627056] kgdbts:RUN singlestep [0/1000]
+  [33235.954027] kgdbts:RUN singlestep [100/1000]
+  [33240.429086] kgdbts:RUN singlestep [200/1000]
+  [33244.687118] kgdbts:RUN singlestep [300/1000]
+  [33248.945191] kgdbts:RUN singlestep [400/1000]
+  [33253.203751] kgdbts:RUN singlestep [500/1000]
+  [33257.462019] kgdbts:RUN singlestep [600/1000]
+  [33261.817809] kgdbts:RUN singlestep [700/1000]
+  [33266.081268] kgdbts:RUN singlestep [800/1000]
+  [33270.339813] kgdbts:RUN singlestep [900/1000]
+  [33274.712404] kgdbts:RUN do_fork for 1000 breakpoints
+  ~ #
+
+v6:
+ - Change pstate register to 8 bytes to make endian nuetral.
+   Use GDB below GDB patch to display pstate in Big endian mode.
+   https://sourceware.org/ml/gdb-patches/2013-12/msg00720.html
+   Thanks to Andrew.
+
+v5:
+ - Updated BRK #imm16 value to 0x400 & 0x401 as per recommendation
+   as per Marcus recommendataion
+   http://patchwork.ozlabs.org/patch/290801/
+ - Rebased to 3.13 AArch64 kernel
+
+v4:
+ - Updated kgdb_single_step and kgdb_cpu_doing_single_step
+   variables properly based on gdb state
+
+v3:
+ - Rebased to v4 version of Sandeepa Prabhu's patch (patch 1)
+ - Made dynamic break point instruction encoding generic
+ - Made ESR value encoding generic for dynamic and compile break point
+ - Used memcpy and memset to copy register contents to gdb buffer
+ - Fixed reordering of break point instruction by compiler with
+   patch 3
+ - Rebased against AAach64 upstream kernel
+
+v2:
+ - Moved break instruction encoding to debug-monitors.h file
+ - Fixed endianess of compile break instruction encoding
+ - Updated I/O buffer sizes
+ - Updated register buffer size
+ - Remove changes to debug_exception handler in entry.S for
+ - ELR update and step debugging with update pc instead of ELR
+ - Rebased against AArch64 upstream kernel
+
+v1:
+ - Initial patch-set
+
+
+Vijaya Kumar K (6):
+  arm64: Add macros to manage processor debug state
+  arm64: KGDB: Add Basic KGDB support
+  arm64: KGDB: Add step debugging support
+  KGDB: make kgdb_breakpoint() as noinline
+  misc: debug: remove compilation warnings
+  arm64: KGDB: Add KGDB config
+
+ arch/arm64/Kconfig                      |    1 +
+ arch/arm64/include/asm/debug-monitors.h |   64 ++++--
+ arch/arm64/include/asm/irqflags.h       |   23 +++
+ arch/arm64/include/asm/kgdb.h           |   84 ++++++++
+ arch/arm64/include/asm/ptrace.h         |    2 +-
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/debug-monitors.c      |    1 +
+ arch/arm64/kernel/kgdb.c                |  336 +++++++++++++++++++++++++++++++
+ kernel/debug/debug_core.c               |    2 +-
+ 9 files changed, 495 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
+
+-- 
+1.7.9.5
