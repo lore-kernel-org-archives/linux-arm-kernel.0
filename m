@@ -1,147 +1,75 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Tue, 28 Jan 2014 18:54:23 +0000
-Subject: [PATCH v2] arm/xen: Initialize event channels earlier
-Message-ID: <1390935264-23155-1-git-send-email-julien.grall@linaro.org>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 28 Jan 2014 10:59:26 -0800
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20131022175414.14753.58063@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+ <20131022175414.14753.58063@capellas-linux>
+Message-ID: <20140128185926.5312.36635@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Event channels driver needs to be initialized very early. Until now, Xen
-initialization was done after all CPUs was bring up.
+Quoting Sebastian Capella (2013-10-22 10:54:14)
+> Quoting Sebastian Capella (2013-10-10 10:50:10)
+> > Quoting Sebastian Capella (2013-10-03 16:47:35)
+> > > Quoting Sebastian Capella (2013-10-03 14:42:46)
+> > > I looked into removing the const from the store function, but I'm not sure
+> > > this is the right idea, so I'm going to shelf that for now.
+> > > 
+> > Below are the three options considered thus far.  Do
+> > you have any additional suggestions or preferences?
+> > 
+> > 1) copy buffer, remove \n.
+> >   - v1 patch did this
+> >   - alternatively could use an array on the stack or a preallocated global
+> >     Pros:
+> >      . cleanest change
+> >      . could use strim() proposed by Andrew
+> >     Cons:
+> >      . adds memcpy
+> > 2) make name_to_dev_t work with readonly buffer to ignore \n
+> >   - v2 and v3 patches do this
+> >     Pros:
+> >      . no memcpy, no big modifications to unrelated code
+> >     Cons:
+> >      . seems more appropriate to harden store functions to user input
+> >        than name_to_dev_t.
+> >      . a little complicated
+> > 3) remove const from buffer and modify contents in place to remove \n
+> >   - remove const from sysfs_ops.store, modify dependent definitions
+> >   - remove const from kobj_attribute.store, modify dependent definitions
+> >     Pros:
+> >      . no memcpy
+> >     Cons:
+> >      . a lot of modifications
+> >      . const contract to not modify the input buffer seems the right way.
+> 
+> Hi Andrew,
+> 
+> Do you have any feedback for me on this?
+> 
+> I'm happy do make any changes you think are correct, but I'm unsure if
+> you're asking me for option #3 above.  It's quite an intrusive change,
+> and changes old, established code and I'd like confirmation that's what
+> you'd like before proceeding down that path.
+> 
+> I've submitted patches with both options #1 and #2 above.
+> 
+> Thanks,
+> 
+> Sebastian
 
-We can safely move the initialization to an early initcall.
+Ping.
 
-Also use a cpu notifier to:
-    - Register the VCPU when the CPU is prepared
-    - Enable event channel IRQ when the CPU is running
+Sorry for the lapse in attention to this.
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
+Could you please clarify what is needed for this to be acceptable?
+I'm a little confused about what is being asked of me.
 
----
-    Changes in v2:
-        - Check earlier if the event IRQ is valid
-        - We can safely register the VCPU when the cpu is booting
----
- arch/arm/xen/enlighten.c |   71 ++++++++++++++++++++++++++++------------------
- 1 file changed, 44 insertions(+), 27 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 293eeea..b96723e 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -23,6 +23,7 @@
- #include <linux/of_address.h>
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
-+#include <linux/cpu.h>
- 
- #include <linux/mm.h>
- 
-@@ -154,7 +155,7 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
- 
--static void __init xen_percpu_init(void *unused)
-+static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
- 	struct vcpu_info *vcpup;
-@@ -193,6 +194,31 @@ static void xen_power_off(void)
- 		BUG();
- }
- 
-+static int xen_cpu_notification(struct notifier_block *self,
-+				unsigned long action,
-+				void *hcpu)
-+{
-+	switch (action) {
-+	case CPU_STARTING:
-+		xen_percpu_init();
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block xen_cpu_notifier = {
-+	.notifier_call = xen_cpu_notification,
-+};
-+
-+static irqreturn_t xen_arm_callback(int irq, void *arg)
-+{
-+	xen_hvm_evtchn_do_upcall();
-+	return IRQ_HANDLED;
-+}
-+
- /*
-  * see Documentation/devicetree/bindings/arm/xen.txt for the
-  * documentation of the Xen Device Tree format.
-@@ -229,6 +255,10 @@ static int __init xen_guest_init(void)
- 	xen_events_irq = irq_of_parse_and_map(node, 0);
- 	pr_info("Xen %s support found, events_irq=%d gnttab_frame=%pa\n",
- 			version, xen_events_irq, &grant_frames);
-+
-+	if (xen_events_irq < 0)
-+		return -ENODEV;
-+
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
- 	xen_setup_features();
-@@ -281,9 +311,21 @@ static int __init xen_guest_init(void)
- 	disable_cpuidle();
- 	disable_cpufreq();
- 
-+	xen_init_IRQ();
-+
-+	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-+			       "events", &xen_vcpu)) {
-+		pr_err("Error request IRQ %d\n", xen_events_irq);
-+		return -EINVAL;
-+	}
-+
-+	xen_percpu_init();
-+
-+	register_cpu_notifier(&xen_cpu_notifier);
-+
- 	return 0;
- }
--core_initcall(xen_guest_init);
-+early_initcall(xen_guest_init);
- 
- static int __init xen_pm_init(void)
- {
-@@ -297,31 +339,6 @@ static int __init xen_pm_init(void)
- }
- late_initcall(xen_pm_init);
- 
--static irqreturn_t xen_arm_callback(int irq, void *arg)
--{
--	xen_hvm_evtchn_do_upcall();
--	return IRQ_HANDLED;
--}
--
--static int __init xen_init_events(void)
--{
--	if (!xen_domain() || xen_events_irq < 0)
--		return -ENODEV;
--
--	xen_init_IRQ();
--
--	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
--			"events", &xen_vcpu)) {
--		pr_err("Error requesting IRQ %d\n", xen_events_irq);
--		return -EINVAL;
--	}
--
--	on_each_cpu(xen_percpu_init, NULL, 0);
--
--	return 0;
--}
--postcore_initcall(xen_init_events);
--
- /* In the hypervisor.S file. */
- EXPORT_SYMBOL_GPL(HYPERVISOR_event_channel_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_grant_table_op);
--- 
-1.7.10.4
+Sebastian
