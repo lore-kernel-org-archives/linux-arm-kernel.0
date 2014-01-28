@@ -1,53 +1,58 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 28 Jan 2014 07:27:50 -0300
-Subject: [PATCH v5 14/20] watchdog: orion: Add support for Armada 370 and
- Armada XP SoC
-In-Reply-To: <20140127173624.GT15937@n2100.arm.linux.org.uk>
-References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1390836440-12744-15-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140127173624.GT15937@n2100.arm.linux.org.uk>
-Message-ID: <20140128102750.GA13052@localhost>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 28 Jan 2014 11:05:53 +0100
+Subject: [PATCH] usb: at91-udc: fix irq and iomem resource retrieval
+In-Reply-To: <52E130FE.1070506@atmel.com>
+References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+ <52E130FE.1070506@atmel.com>
+Message-ID: <52E78101.3060102@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 05:36:24PM +0000, Russell King - ARM Linux wrote:
-[..]
-> > +static int armadaxp_wdt_clock_init(struct platform_device *pdev,
-> > +				   struct orion_watchdog *dev)
-> > +{
-> > +	int ret;
-> > +
-> > +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
-> > +	if (IS_ERR(dev->clk))
-> > +		return PTR_ERR(dev->clk);
-> > +	ret = clk_prepare_enable(dev->clk);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	/* Enable the fixed watchdog clock input */
-> > +	atomic_io_modify(dev->reg + TIMER_CTRL,
-> > +			 WDT_AXP_FIXED_ENABLE_BIT,
-> > +			 WDT_AXP_FIXED_ENABLE_BIT);
-> > +
-> > +	dev->clk_rate = clk_get_rate(dev->clk);
-> > +	return 0;
-> > +}
-> 
-> Doesn't this result in dev->clk being leaked?  Or at least a difference
-> in the way dev->clk needs to be cleaned up between these two functions?
-> 
-
-Yes, indeed.
-
-> I think it would be better in this case to use the standard clk_get() in
-> the first function and always use clk_put()... until there is a devm_*
-> version of the of_clk_get* functions.
-> 
-
-Sound good.
-
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+On 23/01/2014 16:10, Nicolas Ferre wrote:
+> On 23/01/2014 15:41, Jean-Jacques Hiblot :
+>> When using dt resources retrieval (interrupts and reg properties) there is
+>> no predefined order for these resources in the platform dev resource
+>> table. Also don't expect the number of resource to be always 2.
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> Yes, indeed.
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Maybe we can also add a "stable" tag to it. Looking at the history of
+> this file, I think that we can add a pretty old stable limit... But as
+> it only makes sense with DT, I would advice something like this, for the
+> 3.4-ish timeframe:
+>
+> Cc: stable <stable@vger.kernel.org> # 3.4
+>
+> Bye,
+>
+>> ---
+>>   drivers/usb/gadget/at91_udc.c | 10 ----------
+>>   1 file changed, 10 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+>> index 4cc4fd6..dfd2943 100644
+>> --- a/drivers/usb/gadget/at91_udc.c
+>> +++ b/drivers/usb/gadget/at91_udc.c
+>> @@ -1710,16 +1710,6 @@ static int at91udc_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>   
+>> -	if (pdev->num_resources != 2) {
+>> -		DBG("invalid num_resources\n");
+>> -		return -ENODEV;
+>> -	}
+>> -	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+>> -			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+>> -		DBG("invalid resource type\n");
+>> -		return -ENODEV;
+>> -	}
+>> -
+>>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>   	if (!res)
+>>   		return -ENXIO;
+>>
+>
