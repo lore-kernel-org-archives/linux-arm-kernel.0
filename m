@@ -1,27 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Jan 2014 18:30:01 +0800
-Subject: [PATCH 1/9] ARM: dts: imx6qdl: remove the use of pingrp macros
-In-Reply-To: <20140127143745.GM15937@n2100.arm.linux.org.uk>
-References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
- <1390668191-20289-2-git-send-email-shawn.guo@linaro.org>
- <20140127143745.GM15937@n2100.arm.linux.org.uk>
-Message-ID: <20140128102959.GB20583@S2101-09.ap.freescale.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 28 Jan 2014 07:31:24 -0300
+Subject: [PATCH v5 01/20] ARM: Introduce atomic MMIO modify
+In-Reply-To: <1390836440-12744-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390836440-12744-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140128103122.GB13052@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 02:37:45PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Jan 26, 2014 at 12:43:03AM +0800, Shawn Guo wrote:
-> >  arch/arm/boot/dts/imx6dl-hummingboard.dts  |    5 +-
-> >  arch/arm/boot/dts/imx6qdl-microsom.dtsi    |    5 +-
+On Mon, Jan 27, 2014 at 12:27:01PM -0300, Ezequiel Garcia wrote:
+> Some SoC have MMIO regions that are shared across orthogonal
+> subsystems. This commit implements a possible solution for the
+> thread-safe access of such regions through a spinlock-protected API.
 > 
-> I've merged your changes here into my local copy of these just to reduce
-> the conflicts - unfortunately, it's taken soo long to deal with the above
-> that the cubox-i has now been released, which has prompted some
-> reorganisation between the above two files.
+> Concurrent access is protected with a single spinlock for the
+> entire MMIO address space. While this protects shared-registers,
+> it also serializes access to unrelated/unshared registers.
 > 
-> I would much rather you dropped these two entirely, and let me push them
-> upstream, rather than having some nasty conflicts which result from this.
+> We add relaxed and non-relaxed variants, by using writel_relaxed and writel,
+> respectively. The rationale for this is that some users may not require
+> register write completion but only thread-safe access to a register.
+> 
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> Russell,
+> 
+> Can you confirm this patch is on its way to v3.14?
+> 
 
-Dropped hummingboard from my tree.
+ping?
 
-Shawn
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
