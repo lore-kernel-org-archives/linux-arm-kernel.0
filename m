@@ -1,169 +1,195 @@
-From: rapatel@apm.com (Ravi Patel)
-Date: Mon, 27 Jan 2014 16:58:26 -0800
-Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
- Manager/Traffic Manager
-In-Reply-To: <201401141615.55820.arnd@arndb.de>
-References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
- <201401122219.11593.arnd@arndb.de>
- <CAN1v_Pt9rOGn8zmf+u7MR6-GJPDPswBbuhXu6i=MJVa2mwqNtw@mail.gmail.com>
- <201401141615.55820.arnd@arndb.de>
-Message-ID: <CAN1v_Ps9U=yjG-G40FK+L9SLaAQp7s8j9mg9DNoiGwqjMiGtiQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 28 Jan 2014 01:59:28 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through
+ DT
+In-Reply-To: <CAPDyKFqpOLZiUSDvxVtYrBM8DtrZDLE27LKzyoWaf29Ni2vcFQ@mail.gmail.com>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>	<1390190215-22700-2-git-send-email-olof@lixom.net>	<52DEBDA7.7030200@samsung.com>	<52E54540.8080304@gmail.com>
+ <CAPDyKFqpOLZiUSDvxVtYrBM8DtrZDLE27LKzyoWaf29Ni2vcFQ@mail.gmail.com>
+Message-ID: <52E700F0.7040708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 7:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Now that I have a better understanding of what the driver is good for and
-> how it's used, let's have a look at how we can make it fit into the Linux
-> driver APIs and the DT bindings. We don't have anything exactly like this
-> yet, but I think the "mailbox" framework is a close enough match that we
-> can fit it in there, with some extensions. This framework is still in the
-> process of being created (so far there is only a TI OMAP specific driver,
-> and one for pl320), and I've not seen any mailboxes that support IRQ
-> mitigation or multiple software interfaces per hardware mailbox, but those
-> should be easy enough to add.
-
-OK. We will put Queue Manager driver under drivers/mailbox directory along
-with TI OMAP and pl320 drivers.
-
-> For the DT binding, I would suggest using something along the lines of
-> what we have for clocks, pinctrl and dmaengine. OMAP doesn't use this
-> (yet), but now would be a good time to standardize it. The QMTM node
-> should define a "#mailbox-cells" property that indicates how many
-> 32-bit cells a qmtm needs to describe the connection between the
-> controller and the slave. My best guess is that this would be hardcoded
-> to <3>, using two cells for a 64-bit FIFO bus address, and a 32-bit cell
-> for the slave-id signal number. All other parameters that you have in
-> the big table in the qmtm driver at the moment can then get moved into
-> the slave drivers, as they are constant per type of slave. This will
-> simplify the QMTM driver.
->
-> In the slave, you should have a "mailboxes" property with a phandle
-> to the qmtm followed by the three cells to identify the actual
-> queue. If it's possible that a device uses more than one rx and
-> one tx queue, we also need a "mailbox-names" property to identify
-> the individual queues.
-
-We explored on DT bindings suggestion given by you. We have come
-up with a sample DT binding for how it will look like. Herewith we have
-provided the same. Would you please review and give us your
-comments before we change our driver and DTS file to accomodate it?
-
-Sample DTS node for QM:
-                qmlite: qmtm at 17030000 {
-                        compatible = "apm,xgene-qmtm-lite";
-                        reg = <0x0 0x17030000 0x0 0x10000>,
-                              <0x0 0x10000000 0x0 0x400000>;
-                        interrupts = <0x0 0x40 0x4>,
-                                     <0x0 0x3c 0x4>;
-                        status = "ok";
-                        #clock-cells = <1>;
-                        clocks = <&qmlclk 0>;
-                        #mailbox-cells = <3>;
-                };
-
-Sample DTS node for Ethernet:
-                menet: ethernet at 17020000 {
-                        compatible = "apm,xgene-enet";
-                        status = "disabled";
-                        reg = <0x0 0x17020000 0x0 0x30>,
-                              <0x0 0x17020000 0x0 0x10000>,
-                              <0x0 0x17020000 0x0 0x20>;
-                        mailboxes = <&qmlite 0x0 0x1000002c 0x0000>,
-                                            <&qmlite 0x0 0x10000052 0x0020>,
-                                            <&qmlite 0x0 0x10000060 0x0f00>
-                        mailbox-names = "mb-tx", "mb-fp", "mb-rx";
-                        interrupts = <0x0 0x38 0x4>,
-                                     <0x0 0x39 0x4>,
-                                     <0x0 0x3a 0x4>;
-                        #clock-cells = <1>;
-                        clocks = <&eth8clk 0>;
-                        local-mac-address = <0x0 0x11 0x3a 0x8a 0x5a 0x78>;
-                        max-frame-size = <0x233a>;
-                        phyid = <3>;
-                        phy-mode = "rgmii";
-                };
-
-The mailbox node in DTS has following format:
-mailbox = <&parent 'higher 32 bit bus address' 'lower 32 bit bus
-address' 'signal id'>
-Ethernet driver will call following function in platform_probe:
- mailbox_get(dev, "mb-tx");
-mailbox_get API will return the the context of allocated and configured mailbox.
-For now, mailbox_get API will be implemented in xgene QMTM driver.
-Eventually when mailbox framework in Linux will be standardized, we
-will use it instead.
-
-> For the in-kernel interfaces, we should probably start a conversation
-> with the owners of the mailbox drivers to get a common API, for now
-> I'd suggest you just leave it as it is, and only adapt for the new
-> binding.
-
-Sure. For now we will put our driver mostly as is in the
-drivers/mailbox. Can you please help us identify the owners of the
-mailbox drivers? As you suggested, we can start conversation with them
-to define common in kernel APIs.
-
-Ravi
-
-On Tue, Jan 14, 2014 at 7:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 13 January 2014, Ravi Patel wrote:
->> > Examples for local resource management (I had to think about this
->> > a long time, but probably some of these are wrong) would be
->> > * balancing between multiple non-busmaster devices connected to
->> >   a dma-engine
->> > * distributing incoming ethernet data to the available CPUs based on
->> >   a flow classifier in the MAC, e.g. by IOV MAC address, VLAN tag
->> >   or even individual TCP connection depending on the NIC's capabilities.
->> > * 802.1p flow control for incoming ethernet data based on the amount
->> >   of data queued up between the MAC and the driver
->> > * interrupt mitigation for both inbound data and outbound completion,
->> >   by delaying the IRQ to the OS until multiple messages have arrived
->> >   or a queue specific amount of time has passed.
->> > * controlling the amount of outbound buffer space per flow to minimize
->> >   buffer-bloat between an ethernet driver and the NIC hardware.
->> > * reordering data from outbound flows based on priority.
->> >
->> > This is basically my current interpretation, I hope I got at least
->> > some of it right this time ;-)
+On 27.01.2014 11:19, Ulf Hansson wrote:
+> On 26 January 2014 18:26, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 21.01.2014 19:34, Tomasz Figa wrote:
+>>>
+>>> Hi,
+>>>
+>>> On 20.01.2014 04:56, Olof Johansson wrote:
+>>>>
+>>>> This patch enables support for power-on sequencing of SDIO peripherals
+>>>> through DT.
+>>>>
+>>>> In general, it's quite common that wifi modules and other similar
+>>>> peripherals have several signals in addition to the SDIO interface that
+>>>> needs wiggling before the module will power on. It's common to have a
+>>>> reference clock, one or several power rails and one or several lines
+>>>> for reset/enable type functions.
+>>>>
+>>>> The binding as written today introduces a number of reset gpios,
+>>>> a regulator and a clock specifier. The code will handle up to 2 gpio
+>>>> reset lines, but it's trivial to increase to more than that if needed
+>>>> at some point.
+>>>>
+>>>> Implementation-wise, the MMC core has been changed to handle this during
+>>>> host power up, before the host interface is powered on. I have not yet
+>>>> implemented the power-down side, I wanted people to have a chance for
+>>>> reporting back w.r.t. issues (or comments on the bindings) first.
+>>>>
+>>>> I have not tested the regulator portion, since the system and module
+>>>> I'm working on doesn't need one (Samsung Chromebook with Marvell
+>>>> 8797-based wifi). Testing of those portions (and reporting back) would
+>>>> be appreciated.
+>>>
+>>>
+>>> While I fully agree that this is an important problem that needs to be
+>>> solved, I really don't think this is the right way, because:
+>>>
+>>> a) power-up sequence is really specific to the MMC device and often it's
+>>> not simply a matter of switching on one regulator or one clock, e.g.
+>>> specific time constraints need to be met.
+>>>
+>>> b) you can have WLAN chips in which SDIO is just one of the options to
+>>> use as host interface, which may be also HSIC, I2C or UART. Really. See
+>>> [1].
+>>>
+>>> c) this is leaking device specific details to generic host code, which
+>>> isn't really elegant.
+>>>
+>>> Now, to make this a bit more constructive, [2] is a solution that I came
+>>> up with (not perfect either), which simply adds a separate platform
+>>> device for the low level part of the chip. I believe this is a better
+>>> solution because:
+>>>
+>>> a) you can often see such WLAN/BT combo chip as a set of separate
+>>> devices, e.g. SDIO WLAN, UART BT and a simple PMIC or management IC,
+>>> which provides power/reset control, out of band signalling and etc. for
+>>> the first two, so it isn't that bad to have a separate device node for
+>>> the last one,
+>>>
+>>> b) you have full freedom of defining your DT binding with whatever data
+>>> you need, any number of clocks, regulators, GPIOs and even out of band
+>>> interrupts (IMHO the most important one).
+>>>
+>>> c) you can implement power-on, power-off sequences as needed for your
+>>> particular device,
+>>>
+>>> d) you have full separation of device-specific data from MMC core (or
+>>> any other subsystem simply used as a way to perform I/O to the chip).
+>>>
+>>> Now what's missing there is a way to signal the MMC core or any other
+>>> transport that a device showed up and the controller should be woken up
+>>> out of standby and scan of the bus initialized. This could be done by
+>>> explicitly specifying the device as a subnode of the
+>>> MMC/UART/USB(HSIC)/I2C or whatever with a link (phandle) to the power
+>>> controller of the chip or the other way around - a link to the
+>>> MMC/UART/... controller from the power controller node.
 >>
->> You have got them right. Although we have taken Ethernet examples here,
->> most of the local resource management apply to other slave devices also.
+>>
+>> I've looked a bit around MMC core code and got some basic idea how things
+>> look. I will definitely need some guidance, or at least some opinions, from
+>> MMC guys, as some MMC core changes are unavoidable.
+>>
+>> Now, the device-specific code is not really an issue, existing drivers
+>> usually already have their ways of powering the chips on and off, based on
+>> platform data. Everything needed here is to retrieve needed resources
+>> (GPIOs, clocks, regulators) using DT, which should be trivial.
+>>
+>> The worse part is the interaction between MMC and power controller driver
+>> (the platform driver part of WLAN driver, if you look at brcmfmac as an
+>> example). I believe that we need following things:
+>>
+>> a) A way to tell the MMC controller that there is no card detection
+>> mechanism available on given slot and it also should not be polling the slot
+>> to check card presence. Something like a "manual card detect" that would be
+>> triggered by another kernel entity that controls whether the MMC device is
+>> present (i.e. WLAN driver). We already have "broken-cd" property, but it
+>> only implies the former, wasting time on needless polling.
 >
-> I'm very suprised I got all those right, it seems it's a quite sophisticated
-> piece of hardware then. I guess most other slave devices only use a subset
-> of the capabilities that ethernet wants.
+> There is already a host capability that I think we could use to handle
+> this. MMC_CAP_NONREMOVABLE, the corresponding DT binding string is
+> "non-removable", and it may be set per host device.
 >
-> Now that I have a better understanding of what the driver is good for and
-> how it's used, let's have a look at how we can make it fit into the Linux
-> driver APIs and the DT bindings. We don't have anything exactly like this
-> yet, but I think the "mailbox" framework is a close enough match that we
-> can fit it in there, with some extensions. This framework is still in the
-> process of being created (so far there is only a TI OMAP specific driver,
-> and one for pl320), and I've not seen any mailboxes that support IRQ
-> mitigation or multiple software interfaces per hardware mailbox, but those
-> should be easy enough to add.
+> Using this cap means the mmc_rescan process that runs to detect new
+> cards, will only be executed once and during boot. So, we need to make
+> sure all resources and powers are provided to the card at this point.
+> Otherwise the card will not be detected.
+
+I don't quite like this requirement, especially if you consider 
+multi-platform kernels where a lot of drivers is going to be provided as 
+modules. WLAN drivers are especially good candidates. This means that 
+even if the card is powered off at boot-up, if user (or init system) 
+loads appropriate module, which powers the chip on, MMC core must be 
+able to notice this.
+
+> In the SDIO case, to save power, the SDIO func driver may use runtime
+> PM to tell the mmc core power about whether the card needs to be
+> powered. Typically from the WLAN driver's probe() and "interface
+> up/down" the runtime PM reference for the SDIO func device, should be
+> adjusted with pm_runtime_get|put.
+
+I need to think a bit more about the power management control flow here. 
+In case of such chips I'd tend to look at MMC merely as a host 
+interface, which as I said, might be only one of available options. I'm 
+not sure if it should be the host interface core that decides whether 
+the whole device should be powered off. However there might be a 
+solution that leverages SDIO func runtime PM, which wouldn't imply such 
+control flow. Let me reconsider this.
+
 >
-> For the DT binding, I would suggest using something along the lines of
-> what we have for clocks, pinctrl and dmaengine. OMAP doesn't use this
-> (yet), but now would be a good time to standardize it. The QMTM node
-> should define a "#mailbox-cells" property that indicates how many
-> 32-bit cells a qmtm needs to describe the connection between the
-> controller and the slave. My best guess is that this would be hardcoded
-> to <3>, using two cells for a 64-bit FIFO bus address, and a 32-bit cell
-> for the slave-id signal number. All other parameters that you have in
-> the big table in the qmtm driver at the moment can then get moved into
-> the slave drivers, as they are constant per type of slave. This will
-> simplify the QMTM driver.
+>>
+>> b) A mechanism to bind the power controller to used MMC slot. Something like
+>> "mmc-bus = <&mmc2>;" property in device node of the power controller and a
+>> function like of_find_mmc_controller_by_node(), which would be an MMC
+>> counterpart of I2C's of_find_i2c_adapter_by_node(). To avoid races, it
+>> should probably take a reference on MMC host that would have to be dropped
+>> explicitly whenever it is not needed anymore.
 >
-> In the slave, you should have a "mailboxes" property with a phandle
-> to the qmtm followed by the three cells to identify the actual
-> queue. If it's possible that a device uses more than one rx and
-> one tx queue, we also need a "mailbox-names" property to identify
-> the individual queues.
+> I suppose an "MMC slot" can be translated to "MMC host"?
+
+Right.
+
+> What I am trying to understand is how the mmc core (or if we push it
+> to be handled from the mmc host's .set_ios callback) shall be able to
+> tell the power controller driver to enable/disable it's resources.
+> Somehow we need the struct device available to handle that. Then I
+> guess operating on it using runtime PM would be a solution that would
+> be quite nice!?
+
+As I wrote above, I'm not quite sure about this yet.
+
+>>
+>> c) A method to notify the MMC subsystem that card presence has changed. We
+>> already have something like this in drivers/mmc/core/slot-gpio.c, but used
+>> for a simple GPIO-based card detection. If the main part of
+>> mmc_gpio_cd_irqt() could be turned into an exported helper, e.g.
+>> mmc_force_card_detect(host) then basically we would have everything needed.
 >
-> For the in-kernel interfaces, we should probably start a conversation
-> with the owners of the mailbox drivers to get a common API, for now
-> I'd suggest you just leave it as it is, and only adapt for the new
-> binding.
+> I am not sure I understand why this is needed. I think it would be
+> more convenient to use MMC_CAP_NONREMOVABLE instead as stated earlier.
+> But please elaborate, I might have missed something.
+
+See above. I'm not quite convinced that state of MMC interface should 
+determine power state of the chip. I can easily imagine a situation 
+where the MMC link is powered down (link power management) but the WLAN 
+chip keeps operation. Keep in mind that those are usually complete SoCs 
+that can keep processing network traffic autonomously and wake-up the 
+application processor whenever anything interesting happens using extra 
+out of bounds signalling, which might trigger re-enabling the MMC link.
+
+>>
+>> Unfortunately, I don't have more time left for today to create patches and
+>> test them, so for now, I'd like to hear opinion of MMC maintainers about
+>> this approach. Do you find this acceptable?
+>>
+>> By the way, it seems like slot-gpio.c could replace a lot of custom GPIO
+>> card detection code used in MMC host drivers, e.g. sdhci-s3c. Is there any
+>> reason why it couldn't?
 >
->         Arnd
+> I suppose most host driver's should convert to the slot-gpio API, it's
+> is just a matter of someone to send the patches. :-)
+
+OK, great. I'll add conversion of sdhci-s3c to my queue then.
+
+Best regards,
+Tomasz
