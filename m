@@ -1,38 +1,17 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Jan 2014 13:28:06 -0500
-Subject: [PATCH V2 1/2] ARM: multi_v7_defconfig: update for v3.13-rc1
-In-Reply-To: <CAOesGMh3qho=-3sN2-ju_-npggLSvD-s4Mnwt0EyVVh+YT7jYA@mail.gmail.com>
-References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
- <14397edee7978df1d80e048d7cd02c826a91af56.1390932990.git.jason@lakedaemon.net>
- <CAOesGMh3qho=-3sN2-ju_-npggLSvD-s4Mnwt0EyVVh+YT7jYA@mail.gmail.com>
-Message-ID: <20140128182806.GW29184@titan.lakedaemon.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 28 Jan 2014 10:30:18 -0800
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140128182245.18840.51279@capellas-linux>
+References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
+ <20140128141458.GD8713@xo-6d-61-c0.localdomain>
+ <20140128182245.18840.51279@capellas-linux>
+Message-ID: <20140128183018.24540.25278@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 10:22:31AM -0800, Olof Johansson wrote:
-> On Tue, Jan 28, 2014 at 10:20 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Just the output of:
-> >
-> >   make ARCH=arm multi_v7_defconfig
-> >   make savedefconfig
-> >   mv defconfig arch/arm/configs/multi_v7_defconfig
-> >
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> Do you mean 3.14-rc1? If so, this will likely have conflicts with the
-> multi_v7_defconfig that we still have in our for-next branch (should
-> be queued in a regular branch now that all the contents has been
-> merged in by Linus).
+Quoting Sebastian Capella (2014-01-28 10:22:45)
+> Otherwise, I am still looking at how to get this upstream by verifying
+> on omap 5.  In my case, I still have the chicken egg problem, where I'm 
+> trying to verify on omap 5 with out of tree patches.
 
-No, I meant v3.13-rc1.  mvebu/defconfig branch is still based on
-v3.13-rc1 since there is no stable tag for v3.14 yet.
-
-Let me know how you'd like me to handle it.  My main goal is to have
-something locally I can build and test against as well.  If you think
-you can get this in in time for v3.14-rc1, I'll rebase this series
-against arm-soc/for-next and then base all my branches off of v3.14-rc1
-when it drops.
-
-thx,
-
-Jason.
+Sorry, incorrect, I'm verifying on Beaglebone black not OMAP 5.
