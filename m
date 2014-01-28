@@ -1,21 +1,37 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Tue, 28 Jan 2014 18:20:34 +0400
-Subject: [PATCH 01/11] resolve PXA<->8250 serial device address conflict
-In-Reply-To: <20140128141437.GB8713@xo-6d-61-c0.localdomain>
-References: <1385879185-22455-1-git-send-email-ynvich@gmail.com>
- <1385879185-22455-2-git-send-email-ynvich@gmail.com>
- <20140128141437.GB8713@xo-6d-61-c0.localdomain>
-Message-ID: <1390918834.22403.16.camel@host5.omatika.ru>
+From: mikpelinux@gmail.com (Mikael Pettersson)
+Date: Tue, 28 Jan 2014 15:38:14 +0100
+Subject: Building with gcc 4.6.4
+In-Reply-To: <20140128120150.GG15937@n2100.arm.linux.org.uk>
+References: <20140128120150.GG15937@n2100.arm.linux.org.uk>
+Message-ID: <21223.49366.479579.145000@gargle.gargle.HOWL>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-01-28 at 15:14 +0100, Pavel Machek wrote:
-> Yes, please. I was hitting the same issue with Sharp Zaurus and bluetooth
-> CF card... Bluetooth card had 8250 inside...
+Russell King - ARM Linux writes:
+ > So, yesterday I built gcc 4.6.4 (mainline) for the autobuilder, and the
+ > result is that every build failed with the same error:
+ > 
+ > scripts/mod/empty.c:1:0: error: FPA is unsupported in the AAPCS
+ > 
+ > This seems to be because linux-elf targets default to fpe3 in mainline
+ > gcc, but specifying -mabi=aapcs-linux switches us into EABI mode where
+ > the compiler errors out with the default FPU.
+ > 
+ > Hence, I believe we need this to ensure that a compatible VFP is
+ > selected.  One can argue that building EABI ARMv4 with VFP is silly,
+ > but it seems that's what the gcc folk have decided (rightly or
+ > wrongly.)
+ > 
+ > Maybe this is a bug in mainline GCC - which begs the question why
+ > (presumably, since no one has picked this up) Linaro's toolchain
+ > has fixes but mainline GCC doesn't.
+ > 
+ > Comments?
 
-A better implementation is posted as v3 of the patch.
+Perhaps because most ARM EABI toolchains default to soft-float,
+and the hardfloat ones usually select v6 or v7 + vfp-d16 or neon
+as their defaults, so the archaic FPA is never the default.
 
-http://linux-kernel.2935.n7.nabble.com/PATCH-00-11-ARM-support-for-ICP-DAS-LP-8x4x-tp761919p773485.html
+Or are you using an OABI toolchain to compile an EABI kernel?
 
-It would be great if you could test that patch add post back the
-results.
+/Mikael
