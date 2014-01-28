@@ -1,57 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jan 2014 16:14:02 +0000
-Subject: [PATCH V2] arm64: add DSB after icache flush in
- __flush_icache_all()
-In-Reply-To: <1390892813-30407-1-git-send-email-vkale@apm.com>
-References: <1390892813-30407-1-git-send-email-vkale@apm.com>
-Message-ID: <20140128161402.GI2885@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Jan 2014 16:19:00 +0000
+Subject: [PATCH 01/18] regulator: max14577: Remove unused state container
+ definition
+In-Reply-To: <1390911522-28209-2-git-send-email-k.kozlowski@samsung.com>
+References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
+ <1390911522-28209-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140128161900.GP11841@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 07:06:53AM +0000, Vinayak Kale wrote:
-> Add DSB after icache flush. It's needed to complete the cache maintenance
-> operation. The function __flush_icache_all() is used only for user space
-> mappings and an ISB is not required because of an exception return before
-> executing user instructions. An exception return would behave like an ISB.
-> 
-> This patch also uses 'memory' clobber for flush operation instruction to 
-> prevent instruction re-ordering by compiler. 
-> 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> ---
-> 
-> V2: - Add more desciption in the commit message as suggested by Catalin & Will
->     - Use 'memory' clobber for flush instruction as suggested by Will
+On Tue, Jan 28, 2014 at 01:18:25PM +0100, Krzysztof Kozlowski wrote:
+> Remove the "struct max14577_regulator" because this is not used
+> anywhere. It should be removed earlier along with changing the driver
+> after review on the mailing lists.
 
-Please can you check and fix other occurrences of this bug too, as I asked
-in v1? For example, a 2 second grep shows problems with data-cache
-maintenance in kvm. I can also see the same problem for system register
-writes followed up with isb.
-
-I also don't buy you not being able to test AArch32 kernels. Does KVM not
-work for you?
-
-Will
-
-> 
->  arch/arm64/include/asm/cacheflush.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index fea9ee3..bd30f42 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -115,7 +115,8 @@ extern void flush_dcache_page(struct page *);
->  
->  static inline void __flush_icache_all(void)
->  {
-> -	asm("ic	ialluis");
-> +	asm volatile("ic ialluis" : : : "memory");
-> +	dsb();
->  }
->  
->  #define flush_dcache_mmap_lock(mapping) \
-> -- 
-> 1.8.2.1
-> 
-> 
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/f46a547b/attachment.sig>
