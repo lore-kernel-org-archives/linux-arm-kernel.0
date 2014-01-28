@@ -1,57 +1,95 @@
-From: detheridge@ti.com (Darren Etheridge)
-Date: Tue, 28 Jan 2014 13:24:00 -0600
-Subject: [PATCH v3 07/24] drm/i2c: tda998x: set the video mode from the
- adjusted value
-In-Reply-To: <20140128181218.39d1d15e@armhf>
-References: <cover.1390153344.git.moinejf@free.fr>
- <20140119195840.1ecab03b@armhf> <20140123232907.GA25988@ti.com>
- <20140128181218.39d1d15e@armhf>
-Message-ID: <20140128192400.GA13187@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Jan 2014 19:27:15 +0000
+Subject: [PATCH V3 2/2] ARM: multi_v7_defconfig: add mvebu drivers
+In-Reply-To: <9609875ac4d1bd7d628bd994e0646340d78e423d.1390936638.git.jason@lakedaemon.net>
+References: <1390871129-4838-1-git-send-email-jason@lakedaemon.net>
+ <9609875ac4d1bd7d628bd994e0646340d78e423d.1390936638.git.jason@lakedaemon.net>
+Message-ID: <8a95aff6b85c8974e3e5cfea0b0765b3a9bedc80.1390936638.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Francois Moine <moinejf@free.fr> wrote on Tue [2014-Jan-28 18:12:18 +0100]:
-> On Thu, 23 Jan 2014 17:29:07 -0600
-> Darren Etheridge <detheridge@ti.com> wrote:
-> 
-> > > @@ -896,9 +897,9 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
-> > >  	 * TDA19988 requires high-active sync at input stage,
-> > >  	 * so invert low-active sync provided by master encoder here
-> > >  	 */
-> > > -	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-> > > +	if (adj_mode->flags & DRM_MODE_FLAG_NHSYNC)
-> > >  		reg_set(priv, REG_VIP_CNTRL_3, VIP_CNTRL_3_H_TGL);
-> > > -	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-> > > +	if (adj_mode->flags & DRM_MODE_FLAG_NVSYNC)
-> > >  		reg_set(priv, REG_VIP_CNTRL_3, VIP_CNTRL_3_V_TGL);
-> > >    
-> > 
-> > Using the adj_mode->flags breaks a workaround I had done on BeagleBone Black
-> > (tilcdc + tda998x) to resolve an issue with out of spec syncs from the
-> > tlcdc.  I invert the HSYNC in adj_mode->flags but don't want the tda998x to
-> > really know that I am doing that so I use adj_mode in the tilcdc driver, and
-> > mode here in the tda998x driver.  The theory being adj_mode contains whatever
-> > workarounds I need to do for the driving device and mode has the pristine
-> > values that I want to send to the monitor.  I would need to look if there is a
-> > different way to solve this as I am guessing you are actually using adj_mode in
-> > the manner it was intended.
-> 
-> No. In fact, I just wanted the function to use only one mode.
-> 
-> Looking at the other drivers, it seems that they don't touch the
-> adjusted_mode, so, for the Cubox, mode and adjusted_mode have same
-> values.
-> 
-> I will do an other patch so that you will not have to touch the tilcdc
-> driver.
-> 
-Thanks, that would certainly be the easiest path to avoid the regression given
-the other drivers that use tda998x don't currently use adj_mode.  However I
-don't disagree with your reasoning, it would make sense to only use values
-from one of the strctures and not a mix and match.  Anybody looking at only
-the tda998x driver would be confused :) I'll work on finding a different
-solution for this.
+Recent boot farm testing has highlighted some issues with mvebu and
+multiplatform kernels.  Increase the test coverage so we can discover
+these issues earlier.
 
-> -- 
-> Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-> Jef		|		http://moinejf.free.fr/
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+v2 -> v3:
+ - rebase onto arm-soc/for-next so arm-soc can apply directly for v3.14-rcX
+
+v1 -> v2:
+ - split into two patches, update and +mvebu
+
+ arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 1f3649d94bbb..ef877c44cd21 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -57,6 +57,7 @@ CONFIG_ARCH_ZYNQ=y
+ CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
++CONFIG_PCI_MVEBU=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_HIGHPTE=y
+ CONFIG_CMA=y
+@@ -108,11 +109,13 @@ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_MVNETA=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_TI_CPSW=y
++CONFIG_MARVELL_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+@@ -155,10 +158,12 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+ CONFIG_SPI_OMAP24XX=y
++CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_SIRF=y
+ CONFIG_SPI_TEGRA114=y
+@@ -177,6 +182,8 @@ CONFIG_BATTERY_SBS=y
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_LM90=y
++CONFIG_THERMAL=y
++CONFIG_ARMADA_THERMAL=y
+ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+@@ -245,6 +252,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
++CONFIG_MMC_MVSDIO=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+@@ -259,9 +267,11 @@ CONFIG_RTC_DRV_TPS65910=y
+ CONFIG_RTC_DRV_EM3027=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_VT8500=y
++CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
++CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_STE_DMA40=y
+ CONFIG_SIRF_DMA=y
+-- 
+1.8.5.3
