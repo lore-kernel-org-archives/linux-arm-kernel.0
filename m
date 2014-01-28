@@ -1,106 +1,54 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:27 +0100
-Subject: [PATCH v2 15/21] pinctrl: mvebu: dove: request additional resources
-In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-16-git-send-email-sebastian.hesselbarth@gmail.com>
+From: avanbrunt@nvidia.com (Alex Van Brunt)
+Date: Mon, 27 Jan 2014 17:23:41 -0800
+Subject: [PATCH] arm64: setup: report non-optional CPU features
+Message-ID: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl also requires additional registers to control all pins.
-This patch requests resources for mpp4 and pmu-mpp register ranges.
-As this changes DT to driver requirements, fallback to hardcoded
-resources, if the corresponding DT regs have not been set.
-Also, WARN about old DT binding usage to encourage users to update
-their DTBs.
+There are a large number of popular applications compiled for ARMv7-A that read
+/proc/cpuinfo to find out what features the CPU has. But, when they are run
+on an arm64 kernel, they fail to run. This is because features that were
+optional on ARMv7 or earlier but are not optional on ARMv8-A like Thumb are not
+listed as a CPU feature using the arm64 kernel. To make those applications run,
+the kernel still needs to print the features in the list.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This patch changes "cat /proc/cpuinfo" from printing:
+
+Features        : fp asimd
+
+To printing:
+
+Features        : fp asimd wp half thumb fastmult vfp edsp neon vfpv3d16 tlsi vfpv4 idiva idivt
+
+Subject: [PATCH] arm64: setup: report non-optional CPU features
+
+Many ARM applications read the CPU features list provided by the
+kernel in /proc/cpuinfo to determine which features to use. If a
+feature is not listed, the application with either run slower or will
+not run at all.
+
+CPU features that are no longer optional in ARMv8-A, but were
+optional in previous architectures still need to be printed. To
+achieve this, always report these features.
+
+Change-Id: I0a8092ee07926ae5410d7863a270a76fa224297d
+Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
 ---
-Changelog:
-v1->v2:
-- add FW_BUG to WARN message
+ arch/arm64/kernel/setup.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/pinctrl/mvebu/pinctrl-dove.c | 39 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 98f8cae72ace..bb7ff396ddd1 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -22,6 +22,11 @@
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index bd9bbd0..7f8e9bd 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -302,6 +302,8 @@ static int c_show(struct seq_file *m, void *v)
+ 	for (i = 0; hwcap_str[i]; i++)
+ 		if (elf_hwcap & (1 << i))
+ 			seq_printf(m, "%s ", hwcap_str[i]);
++	/* Print non-optional features in ARMv8 */
++	seq_printf(m, "half thumb fastmult vfp neon vfpv3 vfpv4 idiva");
  
- #include "pinctrl-mvebu.h"
- 
-+/* Internal registers can be configured at any 1 MiB aligned address */
-+#define INT_REGS_MASK			~(SZ_1M - 1)
-+#define MPP4_REGS_OFFS			0xd0440
-+#define PMU_REGS_OFFS			0xd802c
-+
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
- #define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
-@@ -56,6 +61,8 @@
- #define CONFIG_PMU	BIT(4)
- 
- static void __iomem *mpp_base;
-+static void __iomem *mpp4_base;
-+static void __iomem *pmu_base;
- 
- static int dove_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 			     unsigned long *config)
-@@ -802,13 +809,43 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
--	struct resource *mpp_res;
-+	struct resource *mpp_res, *res;
-+	struct resource res_fallback;
- 
- 	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
- 	if (IS_ERR(mpp_base))
- 		return PTR_ERR(mpp_base);
- 
-+	/* prepare fallback resource */
-+	memcpy(&res_fallback, mpp_res, sizeof(struct resource));
-+	res_fallback.start = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded MPP4 resource\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + MPP4_REGS_OFFS, 0x4);
-+		res = &res_fallback;
-+	}
-+	mpp4_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp4_base))
-+		return PTR_ERR(mpp4_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded PMU resource\n");
-+		adjust_resource(&res_fallback,
-+			(mpp_res->start & INT_REGS_MASK) + PMU_REGS_OFFS, 0x8);
-+		res = &res_fallback;
-+	}
-+	pmu_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pmu_base))
-+		return PTR_ERR(pmu_base);
-+
-+	/* Warn on any missing DT resource */
-+	WARN(res_fallback.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
-+
- 	pdev->dev.platform_data = (void *)match->data;
- 
- 	/*
+ 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
+ 	seq_printf(m, "CPU architecture: AArch64\n");
 -- 
-1.8.5.2
+1.8.1.5
