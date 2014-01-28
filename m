@@ -1,49 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 28 Jan 2014 17:46:44 +0000
-Subject: [Xen-devel] [PATCH] arm/xen: Initialize event channels earlier
-In-Reply-To: <52E7EA78.5020305@linaro.org>
-References: <1390920842-21886-1-git-send-email-julien.grall@linaro.org>
- <alpine.DEB.2.02.1401281651400.4373@kaball.uk.xensource.com>
- <52E7EA78.5020305@linaro.org>
-Message-ID: <alpine.DEB.2.02.1401281742080.4373@kaball.uk.xensource.com>
+From: avanbrunt@nvidia.com (Alexander Van Brunt)
+Date: Tue, 28 Jan 2014 09:48:16 -0800
+Subject: [PATCH] arm64: setup: report non-optional CPU features
+In-Reply-To: <20140128172253.GD24617@arm.com>
+References: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
+ <20140128172253.GD24617@arm.com>
+Message-ID: <EE746E6E9AE0D14088A85BFB257DF432374EB56044@HQMAIL04.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jan 2014, Julien Grall wrote:
-> >> +static int xen_cpu_notification(struct notifier_block *self,
-> >> +				unsigned long action,
-> >> +				void *hcpu)
-> >> +{
-> >> +	int cpu = (long)hcpu;
-> >> +
-> >> +	switch (action) {
-> >> +	case CPU_UP_PREPARE:
-> >> +		xen_percpu_init(cpu);
-> >> +		break;
-> >> +	case CPU_STARTING:
-> >> +		xen_interrupt_init();
-> >> +		break;
-> > 
-> > Is CPU_STARTING guaranteed to be called on the new cpu only?
-> 
-> Yes.
-> 
-> > If so, why not call both xen_percpu_init and xen_interrupt_init on
-> > CPU_STARTING?
-> 
-> Just in case that xen_vcpu is used somewhere else by a cpu notifier
-> callback CPU_STARTING. We don't know which callback is called first.
+There are a large number of Android applications that read "/proc/cpuinfo" to determine what CPU features are available. These applications are delivered as binaries and cannot be easily recompiled. Another example of code is the Android NDK framework. It will separately read "/proc/cpuinfo" and parse the "Features" list to get the list of CPU features.
 
-Could you please elaborate a bit more on the problem you are trying to
-describe?
+Are there other architectures that report different information in "/proc/cpuinfo" depending on the personality? x86 doesn't. The problem I have with making this conditional on the personality is that CPU's "Features" list should be listing the features of the CPU not the features of the kernel mode. For example, the CPU does have the "thumb" feature even if the personality doesn't use it.
 
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Tuesday, January 28, 2014 9:23 AM
+To: Alexander Van Brunt
+Cc: Will Deacon; Linux ARM Kernel
+Subject: Re: [PATCH] arm64: setup: report non-optional CPU features
 
-> > As it stands I think you introduced a subtle change (that might be OK
-> > but I think is unintentional): xen_percpu_init might not be called from
-> > the same cpu as its target anymore.
+On Tue, Jan 28, 2014 at 01:23:41AM +0000, Alex Van Brunt wrote:
+> There are a large number of popular applications compiled for ARMv7-A 
+> that read /proc/cpuinfo to find out what features the CPU has.
+
+ELF_HWCAP should work fine. Which popular applications are these?
+
+> But, when they are run
+> on an arm64 kernel, they fail to run. This is because features that 
+> were optional on ARMv7 or earlier but are not optional on ARMv8-A like 
+> Thumb are not listed as a CPU feature using the arm64 kernel. To make 
+> those applications run, the kernel still needs to print the features in the list.
 > 
-> No, xen_percpu_init and xen_interrupt_init are called on the boot cpu at
-> the end of xen_guest_init.
- 
-Is CPU_UP_PREPARE guaranteed to be called on the target cpu? I think
-not, therefore you would be executing xen_percpu_init for cpu1 on cpu0.
+> This patch changes "cat /proc/cpuinfo" from printing:
+> 
+> Features        : fp asimd
+> 
+> To printing:
+> 
+> Features        : fp asimd wp half thumb fastmult vfp edsp neon vfpv3d16 tlsi vfpv4 idiva idivt
+
+That's not correct, the features reported are for the AArch64 mode, it doesn't make sense to overlap the AArch32 features here. There is COMPAT_ELF_HWCAP and the bits should be passed correctly to AArch32 binaries.
+
+A solution would be to add a check for personality(current->personality) == PER_LINUX32 and report cpuinfo in an AArch32 compatible way and based on COMPAT_ELF_HWCAP.
+
+--
+Catalin
