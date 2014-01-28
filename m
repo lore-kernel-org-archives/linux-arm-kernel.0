@@ -1,54 +1,76 @@
-From: avanbrunt@nvidia.com (Alex Van Brunt)
-Date: Mon, 27 Jan 2014 17:23:41 -0800
-Subject: [PATCH] arm64: setup: report non-optional CPU features
-Message-ID: <alpine.DEB.2.02.1401271712340.10177@avanbrunt-dt>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 28 Jan 2014 10:35:47 +0900
+Subject: [PATCH 1/2] arm64: use num_possible_cpus() instead of NR_CPUS
+Message-ID: <001d01cf1bc9$452569d0$cf703d70$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a large number of popular applications compiled for ARMv7-A that read
-/proc/cpuinfo to find out what features the CPU has. But, when they are run
-on an arm64 kernel, they fail to run. This is because features that were
-optional on ARMv7 or earlier but are not optional on ARMv8-A like Thumb are not
-listed as a CPU feature using the arm64 kernel. To make those applications run,
-the kernel still needs to print the features in the list.
+Use num_possible_cpus() instead of direct use of NR_CPUS. Also,
+it fixes the following checkpatch warning.
 
-This patch changes "cat /proc/cpuinfo" from printing:
+  WARNING: usage of NR_CPUS is often wrong - consider using cpu_possible(), num_possible_cpus(), for_each_possible_cpu(), etc
 
-Features        : fp asimd
-
-To printing:
-
-Features        : fp asimd wp half thumb fastmult vfp edsp neon vfpv3d16 tlsi vfpv4 idiva idivt
-
-Subject: [PATCH] arm64: setup: report non-optional CPU features
-
-Many ARM applications read the CPU features list provided by the
-kernel in /proc/cpuinfo to determine which features to use. If a
-feature is not listed, the application with either run slower or will
-not run at all.
-
-CPU features that are no longer optional in ARMv8-A, but were
-optional in previous architectures still need to be printed. To
-achieve this, always report these features.
-
-Change-Id: I0a8092ee07926ae5410d7863a270a76fa224297d
-Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm64/kernel/setup.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kernel/smp.c |   10 +++++-----
+ arch/arm64/mm/context.c |    2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index bd9bbd0..7f8e9bd 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -302,6 +302,8 @@ static int c_show(struct seq_file *m, void *v)
- 	for (i = 0; hwcap_str[i]; i++)
- 		if (elf_hwcap & (1 << i))
- 			seq_printf(m, "%s ", hwcap_str[i]);
-+	/* Print non-optional features in ARMv8 */
-+	seq_printf(m, "half thumb fastmult vfp neon vfpv3 vfpv4 idiva");
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 1b7617a..09ff7d4 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -320,7 +320,7 @@ void __init smp_init_cpus(void)
+ 		 * cpu_logical_map was initialized to INVALID_HWID to
+ 		 * avoid matching valid MPIDR values.
+ 		 */
+-		for (i = 1; (i < cpu) && (i < NR_CPUS); i++) {
++		for (i = 1; (i < cpu) && (i < num_possible_cpus()); i++) {
+ 			if (cpu_logical_map(i) == hwid) {
+ 				pr_err("%s: duplicate cpu reg properties in the DT\n",
+ 					dn->full_name);
+@@ -352,7 +352,7 @@ void __init smp_init_cpus(void)
+ 			continue;
+ 		}
  
- 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
- 	seq_printf(m, "CPU architecture: AArch64\n");
+-		if (cpu >= NR_CPUS)
++		if (cpu >= num_possible_cpus())
+ 			goto next;
+ 
+ 		if (cpu_read_ops(dn, cpu) != 0)
+@@ -368,9 +368,9 @@ next:
+ 	}
+ 
+ 	/* sanity check */
+-	if (cpu > NR_CPUS)
++	if (cpu > num_possible_cpus())
+ 		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+-			   cpu, NR_CPUS);
++			   cpu, num_possible_cpus());
+ 
+ 	if (!bootcpu_valid) {
+ 		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
+@@ -381,7 +381,7 @@ next:
+ 	 * All the cpus that made it to the cpu_logical_map have been
+ 	 * validated so set them as possible cpus.
+ 	 */
+-	for (i = 0; i < NR_CPUS; i++)
++	for (i = 0; i < num_possible_cpus(); i++)
+ 		if (cpu_logical_map(i) != INVALID_HWID)
+ 			set_cpu_possible(i, true);
+ }
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index baa758d..3ef960a 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -151,7 +151,7 @@ void __new_context(struct mm_struct *mm)
+ 		smp_wmb();
+ 		smp_call_function(reset_context, NULL, 1);
+ #endif
+-		cpu_last_asid += NR_CPUS - 1;
++		cpu_last_asid += num_possible_cpus() - 1;
+ 	}
+ 
+ 	set_mm_context(mm, asid);
 -- 
-1.8.1.5
+1.7.10.4
