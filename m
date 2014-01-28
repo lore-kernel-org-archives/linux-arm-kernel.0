@@ -1,45 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jan 2014 12:16:56 +0000
-Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
-In-Reply-To: <9156959.vu4XdoKglI@wuerfel>
-References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
- <20140128113242.GJ10628@intel.com> <4916428.f0GtxdkWKj@wuerfel>
- <9156959.vu4XdoKglI@wuerfel>
-Message-ID: <20140128121656.GH15937@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 28 Jan 2014 13:18:24 +0100
+Subject: [PATCH 00/18] mfd: max14577: Add support for MAX77836
+Message-ID: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:08:47PM +0100, Arnd Bergmann wrote:
-> On a related note, should we try to remove the slave_id field from
-> the slave config structure as well? I believe it is still used by
-> the shmobile dma engine in non-DT mode, but that is inconsistent with
-> how all the others work, and with what the same driver does for DT.
+Hi,
 
-I didn't see that appear, but now that it is there, I'm in two minds
-about it.
 
-The first is that the virtual channel approach is more flexible (one
-virtual channel per DMA request line) since it allows users to hold on
-to a DMA engine virtual channel and don't have the overhead of getting
-that.  It also means that they have access to the DMA engine struct
-device, which should be used with the DMA API for mapping/unmapping etc.
+This patchset adds support for MAX77836 device to the max14577 driver.
 
-Another advantage is that it is possible (though we don't really do this
-at present) to schedule a number of virtual channels onto the underlying
-physical channels according to whatever algorithm(s) we decide.
+The MAX77836 is almost the same as MAX14577. Basically it is an extended
+version of MAX14577. The chipsets have same MUIC component so the extcon,
+charger and regulators require only little adjustments. More changes were
+needed in the charger (because it uses lower charging current) and regulator
+drivers (because mentioned different charing current and additional
+regulators). The MAX77836 has also PMIC and Fuel Gauge (which is the same
+as MAX17040/17048 Fuel Gauge).
 
-The second point is that requesting a physical channel and then
-configuring it seems more elegant from the DMA engine point of view - but
-has the down-side that clients have to release the DMA engine channel
-(and thus forget the struct device) as soon as possible to avoid starving
-the system of physical DMA channels.
+The MAX77836 uses three I2C slave addresses and has additional interrupts
+(related to PMIC and Fuel Gauge). It has also Interrupt Source register,
+just like MAX77686 and MAX77693.
 
-On balance, I think the virtual channel approach makes client drivers
-more elegant and simpler, and makes the DMA engine API easier to use,
-and gives greater flexibility for future improvements.  So, I wouldn't
-miss the slave_id being removed.
+The patchset is organized in following way:
+1. Patches from 1 to 6 clean up the max14577 drivers and add minor tweaks.
+2. Patches from 7 to 12 prepare the driver for supporting MAX77836. They
+   mostly rename symbols and add additional logic related to different
+   deviec types.
+3. Patches from 13 to 17 add support for MAX77836.
+4. Patch 18 adds bindings documentation, which was not merged previously.
+   Here I tried to address also Tomasz Figa's comments from review.
+
+The patchset is based on current Linus' tree (v3.13-8789-g54c0a4b46150).
+Testing was done on 3.10.
+
+TODO: Merge max14577, max77686 and max77693 into one common driver. They are
+very similar.
+
+
+Best regards,
+Krzysztof Kozlowski
+
+
+Chanwoo Choi (1):
+  extcon: max14577: Change extcon name instead of static name according
+    to device type
+
+Krzysztof Kozlowski (17):
+  regulator: max14577: Remove unused state container definition
+  mfd: max14577: Remove unused enum max14577_irq_source
+  mfd: max14577: Remove not needed header inclusion
+  mfd: max14577: Add of_compatible to extcon mfd_cell
+  mfd: max14577: Use of_match_ptr() in i2c_driver
+  mfd: max14577: Rename and add MAX14577 symbols to prepare for
+    max77836
+  mfd: max14577: Rename state container to maxim_core
+  mfd: max14577: Add "muic" suffix to regmap and irq_chip
+  mfd: max14577: Add detection of device type
+  extcon: max14577: Add max14577 prefix to muic_irqs
+  extcon: max14577: Choose muic_irqs according to device type
+  mfd: max77836: Add max77836 support to max14577 driver
+  extcon: max14577: Add support for max77836
+  regulator: max14577: Add support for max77836 regulators
+  charger: max14577: Add support for MAX77836 charger
+  power: max17040: Add ID for max77836 Fuel Gauge block
+  mfd: max14577: Add device tree bindings document
+
+ Documentation/devicetree/bindings/mfd/max14577.txt |  104 ++++
+ drivers/extcon/extcon-max14577.c                   |  272 ++++++----
+ drivers/mfd/max14577.c                             |  377 ++++++++++---
+ drivers/power/max14577_charger.c                   |  170 +++---
+ drivers/power/max17040_battery.c                   |    1 +
+ drivers/regulator/max14577.c                       |  323 ++++++++---
+ include/linux/mfd/max14577-private.h               |  565 ++++++++++++--------
+ include/linux/mfd/max14577.h                       |   24 +-
+ 8 files changed, 1313 insertions(+), 523 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.7.9.5
