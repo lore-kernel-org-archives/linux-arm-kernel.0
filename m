@@ -1,114 +1,81 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 28 Jan 2014 12:02:23 +0100
-Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver
- for NMI controller
-In-Reply-To: <20140128104044.GC3867@lukather>
-References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
- <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
- <20140116123940.GE31779@lukather>
- <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
- <20140128104044.GC3867@lukather>
-Message-ID: <52E78E3F.6080902@redhat.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Jan 2014 12:03:47 +0100
+Subject: [PATCH 2/9] ARM: dts: imx6sl: remove the use of pingrp macros
+In-Reply-To: <5923680.sl3G3EgCsY@phil>
+References: <1390668191-20289-1-git-send-email-shawn.guo@linaro.org>
+ <1390668191-20289-3-git-send-email-shawn.guo@linaro.org>
+ <5923680.sl3G3EgCsY@phil>
+Message-ID: <20140128110347.GA16215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-Hi,
-
-On 01/28/2014 11:40 AM, Maxime Ripard wrote:
-
-Jumping in here to try and clarify things, or so I hope at least :)
-
-> On Fri, Jan 17, 2014 at 09:54:55AM +0100, Carlo Caione wrote:
->>>> +/* + * Ack level interrupts right before unmask + * + * In case of level-triggered interrupt, IRQ line must be acked before it + * is unmasked or else a double-interrupt is triggered + */ + +static void sunxi_sc_nmi_ack_and_unmask(struct irq_data *d) +{ +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d); +     struct irq_chip_type *ct = irq_data_get_chip_type(d); +     u32 mask = d->mask; + +     if (irqd_get_trigger_type(d) & IRQ_TYPE_LEVEL_MASK) +             ct->chip.irq_ack(d); + +     irq_gc_lock(gc); +     irq_reg_writel(mask, gc->reg_base + ct->regs.mask); +
->>>> irq_gc_unlock(gc); +}
->>> 
->>> Hmmm, handle_level_irq seems to be doing exactly that already. It first masks and acks the interrupts, and then unmask it, so we should be fine, don't we?
->> 
->> We don't, or at least handle_level_irq doesn't work for all the cases.
+On Tue, Jan 28, 2014 at 11:17:22AM +0100, Heiko St?bner wrote:
+> Hi Shawn,
 > 
-> This is what I find weird :)
+> On Sunday, 26. January 2014 00:43:04 Shawn Guo wrote:
+> > We created the pingrp macros in imx6sl-pingrp.h for purpose of less LOC
+> > when same pin group is used by multiple boards.  However, DT maintainers
+> > take it as an abuse of DTC macro support.  So let's get rid of it to
+> > make the pins used by given device more intuitive.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/imx6sl-evk.dts  |  120 ++++++++++++++++++++++++++----
+> >  arch/arm/boot/dts/imx6sl-pingrp.h |  148
+> > ------------------------------------- arch/arm/boot/dts/imx6sl.dtsi     |  
+> >  1 -
+> >  3 files changed, 107 insertions(+), 162 deletions(-)
+> >  delete mode 100644 arch/arm/boot/dts/imx6sl-pingrp.h
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6sl-evk.dts
+> > b/arch/arm/boot/dts/imx6sl-evk.dts index f5e4513..8594d13 100644
+> > --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> > +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> > @@ -86,55 +86,149 @@
+> >  		};
+> > 
+> >  		pinctrl_ecspi1: ecspi1grp {
+> > -			fsl,pins = <MX6SL_ECSPI1_PINGRP1>;
+> > +			fsl,pins = <
+> > +				MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO	0x100b1
+> > +				MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI	0x100b1
+> > +				MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK	0x100b1
+> > +			>;
+> >  		};
+> > 
+> >  		pinctrl_fec: fecgrp {
+> > -			fsl,pins = <MX6SL_FEC_PINGRP1>;
+> > +			fsl,pins = <
+> > +				MX6SL_PAD_FEC_MDC__FEC_MDC		0x1b0b0
+> > +				MX6SL_PAD_FEC_MDIO__FEC_MDIO		0x1b0b0
+> > +				MX6SL_PAD_FEC_CRS_DV__FEC_RX_DV		0x1b0b0
+> > +				MX6SL_PAD_FEC_RXD0__FEC_RX_DATA0	0x1b0b0
+> > +				MX6SL_PAD_FEC_RXD1__FEC_RX_DATA1	0x1b0b0
+> > +				MX6SL_PAD_FEC_TX_EN__FEC_TX_EN		0x1b0b0
+> > +				MX6SL_PAD_FEC_TXD0__FEC_TX_DATA0	0x1b0b0
+> > +				MX6SL_PAD_FEC_TXD1__FEC_TX_DATA1	0x1b0b0
+> > +				MX6SL_PAD_FEC_REF_CLK__FEC_REF_OUT	0x4001b0a8
+> > +			>;
+> >  		};
 > 
->> Let's say (i.e. this is the cubieboard2 case) that to the irqchip is connected to the IRQ line of a PMIC accessed by I2C. In this case we cannot mask/ack the interrupt on the originating device in the hard interrupt handler (in which handle_level_irq is) since we need to access the I2C bus in an non-interrupt context.
+> [... and so on for the other groups ... ]
 > 
-> We agree here.
-> 
->> ACKing the IRQ in handle_level_irq at this point is pretty much useless since we still have to ACK the IRQs on the originating device and this will be done in a IRQ thread started after the hard IRQ handler.
-> 
-> Ok, so what you're saying is that you want to adress this case:
-> 
-> handle_level_irq |          device    device | mask ack handler irq acked unmask |  |    |    |         |       | v  v    v    v         v       v
-> 
-> NMI -> GIC: +--------+     +----------------- ---------------+        +-----+
-> 
-> PMIC -> NMI: +-+           +-+ ------------+ +-----------+ +--------------------
-> 
-> Right?
+> I'm confused now :-) . Current linux-next [0] shows the pin-settings as part 
+> of imx6sl.dtsi - a way a lot of other architectures organize their pingroups 
+> too, with the board file only referencing the relevant pingroups from the 
+> predefined ones of the soc.
 
-No, the IRQ from the PMIC is a level sensitive IRQ, so it would look like this:
+Current mainline has all groups under the iomux node which has the
+effect that all possible groups are compiled into every dtb resulting in
+very bloated dtbs. So Shawn changed it to what's currently in next, but
+this hasn't been accepted by the dt maintainers. Now this series tries
+to address the concerns of the dt maintainers by not using macros that
+expand to other macros.
 
-> handle_level_irq |          device    device | mask ack handler irq acked unmask |  |    |    |         |       | v  v    v    v         v       v
-> 
-> NMI -> GIC: +------------------------------+ ---------------+                              +--
-> 
-> PMIC -> NMI: +-------------------------+ ------------+                         +----------
+Sascha
 
-The PMIC irq line won't go low until an i2c write to its irq status
-registers write-clears all status bits for which the corresponding
-bit in the irq-mask register is set.
-
-And the only reason the NMI -> GIC also goes low is because the unmask
-operation writes a second ack to the NMI controller in the unmask
-callback of the NMI controller driver.
-
-Note that we cannot use edge triggered interrupts here because the PMIC
-has the typical setup with multiple irq status bits driving a single
-irq line, so the irq handler does read irq-status, handle stuff,
-write-clear irq-status. And if any other irq-status bits get set
-between the read and write-clear the PMIC -> NMI line will stay
-high, as it should since there are more interrupts to handle.
-
-> But in this case, you would have two events coming from your device (the two rising edges), so you'd expect two interrupts. And in the case of a level triggered interrupt, the device would keep the interrupt line active until it's unmasked, so we wouldn't end up with this either.
-> 
->> sunxi_sc_nmi_ack_and_unmask is therefore called (by irq_finalize_oneshot) after the IRQ thread has been executed. After the IRQ thread has ACKed the IRQs on the originating device we can finally ACK and unmask again the NMI.
-> 
-> And what happens if you get a new interrupt right between the end of the handler and the unmask?
-
-The implicit ack done by the unmask will be ignored if the NMI line is still
-high, just like the initial ack is ignored (which is why we need the mask),
-and when the unmask completes the irq will immediately retrigger, as it should.
-
-
-<snip>
-
->>> I really wonder whether it makes sense to have a generic chip here. It seems to be much more complicated than it should. It's only about a single interrupt interrupt chip here.
->> 
->> I agree but is there any other way to manage the NMI without the driver of the device connected to NMI having to worry about acking/masking/unmasking/ etc..?
-> 
-> Yes, just declare a "raw" irqchip. Pretty much like we do on irq-sun4i for example.
-
-Hmm, I'm not going to say that using a raw irqchip here is a bad idea, it
-sounds like it would be better.
-
-But I don't think this will solve the need the mask / umask. The problem is
-we need to do an i2c write to clear the interrupt source, which needs to
-be done from a thread / workqueue. So when the interrupt handler finishes
-the source won't be cleared yet, and AFAIK then only way to deal with this
-is to mask the interrupt until we've cleared the interrupt source.
-
-I agree that ideally we would be able to hide all this inside the NMI
-controller driver, but I'm not sure if we can.
-
-Regards,
-
-Hans
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iEYEARECAAYFAlLnjj8ACgkQF3VEtJrzE/skqACgjGLU2QLQUq9o0pU1DuuWIUpx
-YngAoJmbmCGEhkRBy5xFmKuXapilqzmM
-=BoL/
------END PGP SIGNATURE-----
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
