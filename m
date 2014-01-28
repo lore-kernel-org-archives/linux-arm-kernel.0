@@ -1,48 +1,57 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 28 Jan 2014 10:22:45 -0800
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140128141458.GD8713@xo-6d-61-c0.localdomain>
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
-Message-ID: <20140128182245.18840.51279@capellas-linux>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 28 Jan 2014 13:26:23 -0500
+Subject: [PATCH v2] ARM: hw_breakpoint: Add ARMv8 support
+In-Reply-To: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
+References: <1390415365-17230-1-git-send-email-cov@codeaurora.org>
+Message-ID: <1390933583-1278-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pavel Machek (2014-01-28 06:14:58)
-> > > what's the status of suspend-to-disk on ARM? The most recent discussion I
-> > > found is:
-> > > http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
-> > > 
-> > > with no replies at all. Is anyone still working on that? Anyone got it running?
+Add the trivial support necessary to get hardware breakpoints
+working for GDB on ARMv8 simulators running in AArch32 mode.
 
-Hi Pavel, Russ,
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
 
-I have been looking and working with Russ' most recent branch based
-on the 3.12 kernel, which includes the big pile of patches for OMAP.
-(https://github.com/russdill/linux/commits/arm-hibernation-am33xx-v3.12)
+ v2: modify debug_exception_updates_fsr
 
-He has hibernation mostly working and I have been able to run 1400 or
-so entry/exits overnight there on beaglebone black without issue.
-Combining this with device activity has been tricky.  An active
-network will lose the link on restore.  Active SD traffic will
-eventually hang (Last night ran for about 11 hours before hanging
-after ~350 or so hibernations).  I have not found where this is or
-the cause.
+ arch/arm/include/asm/hw_breakpoint.h | 1 +
+ arch/arm/kernel/hw_breakpoint.c      | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-> > For ARM hibernation support to get merged, there needs to be at least
-> > one platform that supports it. the am335x code I have is not ready as it
-> > still relies on PM patchsets that have not yet themselves been merged.
-> 
-> Given that we have chicken-and-egg problem here, I believe it makes sense
-> to merge generic ARM hibernation support now.
-
-If you want to go ahead with upstreaming the base patch, Russ, would you
-like me to do that for you or will you have time to do this?
-
-Otherwise, I am still looking at how to get this upstream by verifying
-on omap 5.  In my case, I still have the chicken egg problem, where I'm 
-trying to verify on omap 5 with out of tree patches.
-
-Thanks,
-
-Sebastian
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index eef55ea..8e427c7 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -51,6 +51,7 @@ static inline void decode_ctrl_reg(u32 reg,
+ #define ARM_DEBUG_ARCH_V7_ECP14	3
+ #define ARM_DEBUG_ARCH_V7_MM	4
+ #define ARM_DEBUG_ARCH_V7_1	5
++#define ARM_DEBUG_ARCH_V8	6
+ 
+ /* Breakpoint */
+ #define ARM_BREAKPOINT_EXECUTE	0
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 3d44660..a711b27 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -167,7 +167,7 @@ static int debug_arch_supported(void)
+ /* Can we determine the watchpoint access type from the fsr? */
+ static int debug_exception_updates_fsr(void)
+ {
+-	return 0;
++	return get_debug_arch() == ARM_DEBUG_ARCH_V8;
+ }
+ 
+ /* Determine number of WRP registers available. */
+@@ -257,6 +257,7 @@ static int enable_monitor_mode(void)
+ 		break;
+ 	case ARM_DEBUG_ARCH_V7_ECP14:
+ 	case ARM_DEBUG_ARCH_V7_1:
++	case ARM_DEBUG_ARCH_V8:
+ 		ARM_DBG_WRITE(c0, c2, 2, (dscr | ARM_DSCR_MDBGEN));
+ 		isb();
+ 		break;
+-- 
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
