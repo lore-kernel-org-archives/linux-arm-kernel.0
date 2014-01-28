@@ -1,75 +1,169 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 27 Jan 2014 17:55:25 -0700
-Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <5086198.ZOWZ5xuyna@wuerfel>
-References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
- <CACoXjc=ZT9fEm_KdY4WFSoS8n5FmO+hn9LjsR4m8YZG2iBbt5A@mail.gmail.com>
- <CACoXjc=-JtpiM3m4DSA_DeOxYr3sihGGf4FSaJ2yC08rpm6ANQ@mail.gmail.com>
- <5086198.ZOWZ5xuyna@wuerfel>
-Message-ID: <CAErSpo5zMd_k407tvzPS85Nub9p2KMQnHJLTqd3eyvjdgfVtLg@mail.gmail.com>
+From: rapatel@apm.com (Ravi Patel)
+Date: Mon, 27 Jan 2014 16:58:26 -0800
+Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+In-Reply-To: <201401141615.55820.arnd@arndb.de>
+References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
+ <201401122219.11593.arnd@arndb.de>
+ <CAN1v_Pt9rOGn8zmf+u7MR6-GJPDPswBbuhXu6i=MJVa2mwqNtw@mail.gmail.com>
+ <201401141615.55820.arnd@arndb.de>
+Message-ID: <CAN1v_Ps9U=yjG-G40FK+L9SLaAQp7s8j9mg9DNoiGwqjMiGtiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're only seeing Arnd's side of the conversation on linux-pci.
-Tanmay, are your messages being rejected because they're too "fancy",
-per the definition here: http://vger.kernel.org/majordomo-info.html ?
+On Tue, Jan 14, 2014 at 7:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Now that I have a better understanding of what the driver is good for and
+> how it's used, let's have a look at how we can make it fit into the Linux
+> driver APIs and the DT bindings. We don't have anything exactly like this
+> yet, but I think the "mailbox" framework is a close enough match that we
+> can fit it in there, with some extensions. This framework is still in the
+> process of being created (so far there is only a TI OMAP specific driver,
+> and one for pl320), and I've not seen any mailboxes that support IRQ
+> mitigation or multiple software interfaces per hardware mailbox, but those
+> should be easy enough to add.
 
-On Sat, Jan 25, 2014 at 1:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
->> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
->> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
+OK. We will put Queue Manager driver under drivers/mailbox directory along
+with TI OMAP and pl320 drivers.
+
+> For the DT binding, I would suggest using something along the lines of
+> what we have for clocks, pinctrl and dmaengine. OMAP doesn't use this
+> (yet), but now would be a good time to standardize it. The QMTM node
+> should define a "#mailbox-cells" property that indicates how many
+> 32-bit cells a qmtm needs to describe the connection between the
+> controller and the slave. My best guess is that this would be hardcoded
+> to <3>, using two cells for a 64-bit FIFO bus address, and a 32-bit cell
+> for the slave-id signal number. All other parameters that you have in
+> the big table in the qmtm driver at the moment can then get moved into
+> the slave drivers, as they are constant per type of slave. This will
+> simplify the QMTM driver.
 >
->> >>
->> >>> +static void xgene_pcie_poll_linkup(struct xgene_pcie_port *port, u32 *lanes)
->> >>> +{
->> >>> +     void *csr_base = port->csr_base;
->> >>> +     u32 val32;
->> >>> +     u64 start_time, time;
->> >>> +
->> >>> +     /*
->> >>> +      * A component enters the LTSSM Detect state within
->> >>> +      * 20ms of the end of fundamental core reset.
->> >>> +      */
->> >>> +     msleep(XGENE_LTSSM_DETECT_WAIT);
->> >>> +     port->link_up = 0;
->> >>> +     start_time = jiffies;
->> >>> +     do {
->> >>> +             val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
->> >>> +             if (val32 & LINK_UP_MASK) {
->> >>> +                     port->link_up = 1;
->> >>> +                     port->link_speed = PIPE_PHY_RATE_RD(val32);
->> >>> +                     val32 = readl(csr_base + BRIDGE_STATUS_0);
->> >>> +                     *lanes = val32 >> 26;
->> >>> +             }
->> >>> +             time = jiffies_to_msecs(jiffies - start_time);
->> >>> +     } while ((!port->link_up) || (time <= XGENE_LTSSM_L0_WAIT));
->> >>> +}
->> >>
->> >> Maybe another msleep() in the loop? It seems weird to first do an
->> >> unconditional sleep but then busy-wait for the result.
+> In the slave, you should have a "mailboxes" property with a phandle
+> to the qmtm followed by the three cells to identify the actual
+> queue. If it's possible that a device uses more than one rx and
+> one tx queue, we also need a "mailbox-names" property to identify
+> the individual queues.
+
+We explored on DT bindings suggestion given by you. We have come
+up with a sample DT binding for how it will look like. Herewith we have
+provided the same. Would you please review and give us your
+comments before we change our driver and DTS file to accomodate it?
+
+Sample DTS node for QM:
+                qmlite: qmtm at 17030000 {
+                        compatible = "apm,xgene-qmtm-lite";
+                        reg = <0x0 0x17030000 0x0 0x10000>,
+                              <0x0 0x10000000 0x0 0x400000>;
+                        interrupts = <0x0 0x40 0x4>,
+                                     <0x0 0x3c 0x4>;
+                        status = "ok";
+                        #clock-cells = <1>;
+                        clocks = <&qmlclk 0>;
+                        #mailbox-cells = <3>;
+                };
+
+Sample DTS node for Ethernet:
+                menet: ethernet at 17020000 {
+                        compatible = "apm,xgene-enet";
+                        status = "disabled";
+                        reg = <0x0 0x17020000 0x0 0x30>,
+                              <0x0 0x17020000 0x0 0x10000>,
+                              <0x0 0x17020000 0x0 0x20>;
+                        mailboxes = <&qmlite 0x0 0x1000002c 0x0000>,
+                                            <&qmlite 0x0 0x10000052 0x0020>,
+                                            <&qmlite 0x0 0x10000060 0x0f00>
+                        mailbox-names = "mb-tx", "mb-fp", "mb-rx";
+                        interrupts = <0x0 0x38 0x4>,
+                                     <0x0 0x39 0x4>,
+                                     <0x0 0x3a 0x4>;
+                        #clock-cells = <1>;
+                        clocks = <&eth8clk 0>;
+                        local-mac-address = <0x0 0x11 0x3a 0x8a 0x5a 0x78>;
+                        max-frame-size = <0x233a>;
+                        phyid = <3>;
+                        phy-mode = "rgmii";
+                };
+
+The mailbox node in DTS has following format:
+mailbox = <&parent 'higher 32 bit bus address' 'lower 32 bit bus
+address' 'signal id'>
+Ethernet driver will call following function in platform_probe:
+ mailbox_get(dev, "mb-tx");
+mailbox_get API will return the the context of allocated and configured mailbox.
+For now, mailbox_get API will be implemented in xgene QMTM driver.
+Eventually when mailbox framework in Linux will be standardized, we
+will use it instead.
+
+> For the in-kernel interfaces, we should probably start a conversation
+> with the owners of the mailbox drivers to get a common API, for now
+> I'd suggest you just leave it as it is, and only adapt for the new
+> binding.
+
+Sure. For now we will put our driver mostly as is in the
+drivers/mailbox. Can you please help us identify the owners of the
+mailbox drivers? As you suggested, we can start conversation with them
+to define common in kernel APIs.
+
+Ravi
+
+On Tue, Jan 14, 2014 at 7:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 13 January 2014, Ravi Patel wrote:
+>> > Examples for local resource management (I had to think about this
+>> > a long time, but probably some of these are wrong) would be
+>> > * balancing between multiple non-busmaster devices connected to
+>> >   a dma-engine
+>> > * distributing incoming ethernet data to the available CPUs based on
+>> >   a flow classifier in the MAC, e.g. by IOV MAC address, VLAN tag
+>> >   or even individual TCP connection depending on the NIC's capabilities.
+>> > * 802.1p flow control for incoming ethernet data based on the amount
+>> >   of data queued up between the MAC and the driver
+>> > * interrupt mitigation for both inbound data and outbound completion,
+>> >   by delaying the IRQ to the OS until multiple messages have arrived
+>> >   or a queue specific amount of time has passed.
+>> > * controlling the amount of outbound buffer space per flow to minimize
+>> >   buffer-bloat between an ethernet driver and the NIC hardware.
+>> > * reordering data from outbound flows based on priority.
 >> >
->> > ok.
+>> > This is basically my current interpretation, I hope I got at least
+>> > some of it right this time ;-)
 >>
->> This loop can execute for maximum 4 msec. So putting msleep(1) won't
->> get us much.
+>> You have got them right. Although we have taken Ethernet examples here,
+>> most of the local resource management apply to other slave devices also.
 >
-> 4 msec is still quite a long time for a busy loop that can be spent doing
-> useful work in another thread.
+> I'm very suprised I got all those right, it seems it's a quite sophisticated
+> piece of hardware then. I guess most other slave devices only use a subset
+> of the capabilities that ethernet wants.
 >
->> >>
->> >> Another general note: Your "compatible" strings are rather unspecific.
->> >> Do you have a version number for this IP block? I suppose that it's related
->> >> to one that has been used in other chips before, or will be used in future
->> >> chips, if it's not actually licensed from some other company.
->> >
->> > I will have to check this.
->> >
->>
->> We have decided to stick with current compatible string for now.
+> Now that I have a better understanding of what the driver is good for and
+> how it's used, let's have a look at how we can make it fit into the Linux
+> driver APIs and the DT bindings. We don't have anything exactly like this
+> yet, but I think the "mailbox" framework is a close enough match that we
+> can fit it in there, with some extensions. This framework is still in the
+> process of being created (so far there is only a TI OMAP specific driver,
+> and one for pl320), and I've not seen any mailboxes that support IRQ
+> mitigation or multiple software interfaces per hardware mailbox, but those
+> should be easy enough to add.
 >
-> Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
-> product and you won't be doing any new chips based on the same hardware
-> components?
+> For the DT binding, I would suggest using something along the lines of
+> what we have for clocks, pinctrl and dmaengine. OMAP doesn't use this
+> (yet), but now would be a good time to standardize it. The QMTM node
+> should define a "#mailbox-cells" property that indicates how many
+> 32-bit cells a qmtm needs to describe the connection between the
+> controller and the slave. My best guess is that this would be hardcoded
+> to <3>, using two cells for a 64-bit FIFO bus address, and a 32-bit cell
+> for the slave-id signal number. All other parameters that you have in
+> the big table in the qmtm driver at the moment can then get moved into
+> the slave drivers, as they are constant per type of slave. This will
+> simplify the QMTM driver.
+>
+> In the slave, you should have a "mailboxes" property with a phandle
+> to the qmtm followed by the three cells to identify the actual
+> queue. If it's possible that a device uses more than one rx and
+> one tx queue, we also need a "mailbox-names" property to identify
+> the individual queues.
+>
+> For the in-kernel interfaces, we should probably start a conversation
+> with the owners of the mailbox drivers to get a common API, for now
+> I'd suggest you just leave it as it is, and only adapt for the new
+> binding.
 >
 >         Arnd
