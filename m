@@ -1,237 +1,99 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Jan 2014 16:37:51 +0800
-Subject: [PATCHv12] ARM: dts: Add support for the cpuimx35 board from
- Eukrea and its baseboard.
-In-Reply-To: <1389803532-8516-1-git-send-email-denis@eukrea.com>
-References: <1389803532-8516-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140128083746.GA20595@S2101-09.ap.freescale.net>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 28 Jan 2014 10:45:46 +0200
+Subject: [PATCH] clk: divider: fix rate calculation for fractional rates
+In-Reply-To: <20131106161911.GA16735@n2100.arm.linux.org.uk>
+References: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
+ <20131106111534.GW16735@n2100.arm.linux.org.uk> <527A2C9C.4080409@ti.com>
+ <20131106161911.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <52E76E3A.8030807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 15, 2014 at 05:32:12PM +0100, Denis Carikli wrote:
-> diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> new file mode 100644
-> index 0000000..303f789
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-> @@ -0,0 +1,59 @@
-> +/*
-> + * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "imx35.dtsi"
-> +
-> +/ {
-> +	model = "Eukrea CPUIMX35";
-> +	compatible = "eukrea,cpuimx35", "fsl,imx35";
-> +
-> +	memory {
-> +		reg = <0x80000000 0x8000000>; /* 128M */
-> +	};
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_fec>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	pcf8563 at 51 {
-> +		compatible = "nxp,pcf8563";
-> +		reg = <0x51>;
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	imx35-eukrea {
-> +		pinctrl_fec: fecgrp {
-> +			fsl,pins = <MX35_FEC_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <MX35_I2C1_PINGRP1>;
-> +		};
+Hi Mike, Russell,
 
-You have these two pingrp in imx35-eukrea-cpuimx35.dtsi ...
-
-> +	};
-> +};
-> +
-> +&nfc {
-> +	nand-bus-width = <8>;
-> +	nand-ecc-mode = "hw";
-> +	nand-on-flash-bbt;
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-> new file mode 100644
-> index 0000000..23f6fe1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-> @@ -0,0 +1,137 @@
-> +/*
-> + * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "imx35-eukrea-cpuimx35.dtsi"
-
-... imx35-eukrea-cpuimx35.dtsi is being included here ...
-
-> +
-> +/ {
-> +	model = "Eukrea CPUIMX35";
-> +	compatible = "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_bp1>;
-> +
-> +		bp1 {
-> +			label = "BP1";
-> +			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
-> +			linux,code = <BTN_MISC>;
-> +			gpio-key,wakeup;
-> +			linux,input-type = <1>;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_led1>;
-> +
-> +		led1 {
-> +			label = "led1";
-> +			gpios = <&gpio3 29 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux>;
-> +	status = "okay";
-> +};
-> +
-> +&esdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc1>;
-> +	cd-gpios = <&gpio3 24>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	tlv320aic23: codec at 1a {
-> +		compatible = "ti,tlv320aic23";
-> +		reg = <0x1a>;
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	imx35-eukrea {
-> +		pinctrl_audmux: audmuxgrp {
-> +			fsl,pins = <MX35_AUDMUX_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_bp1: bp1grp {
-> +			fsl,pins = <MX35_PAD_LD19__GPIO3_25  0x80000000>;
-> +		};
-> +
-> +		pinctrl_esdhc1: esdhc1grp {
-> +			fsl,pins = <
-> +				  MX35_ESDHC1_PINGRP1
-> +				  MX35_PAD_LD18__GPIO3_24  0x80000000 /* CD */
-> +			>;
-> +		};
-> +
-> +		pinctrl_fec: fecgrp {
-> +			fsl,pins = <MX35_FEC_PINGRP1>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <MX35_I2C1_PINGRP1>;
-> +		};
-
-... why do you need to have them again?
-
-I spotted this when rebasing this patch on pingrp removal series, and
-just dropped them from imx35-eukrea-mbimxsd35-baseboard.dts.  Let me
-know if I did get it right.
-
-Shawn
-
-> +
-> +		pinctrl_led1: led1grp {
-> +			fsl,pins = <MX35_PAD_LD23__GPIO3_29  0x80000000>;
-> +		};
-> +
-> +		pinctrl_reg_lcd_3v3: reg-lcd-3v3 {
-> +			fsl,pins = <MX35_PAD_D3_CLS__GPIO1_4 0x80000000>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX35_UART1_PINGRP1
-> +				MX35_UART1_RTSCTS_PINGRP1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX35_UART2_PINGRP1
-> +				MX35_UART2_RTSCTS_PINGRP1
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&ssi1 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	fsl,uart-has-rtscts;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	fsl,uart-has-rtscts;
-> +	status = "okay";
-> +};
-> -- 
-> 1.7.9.5
+On 2013-11-06 18:19, Russell King - ARM Linux wrote:
+> On Wed, Nov 06, 2013 at 01:48:44PM +0200, Tomi Valkeinen wrote:
+>> On 2013-11-06 13:15, Russell King - ARM Linux wrote:
+>>> On Wed, Nov 06, 2013 at 01:06:48PM +0200, Tomi Valkeinen wrote:
+>>>> This means that the following code works a bit oddly:
+>>>>
+>>>> rate = clk_round_rate(clk, 123428572);
+>>>> clk_set_rate(clk, rate);
+>>>
+>>> You're right, but the above sequence is quite a crass thing to do.  Why?
+>>
+>> Do you mean that you think the fix is right, but the above example
+>> sequence is silly, or that the fix is not needed either?
 > 
+> I think a fix _is) required, because:
+> 
+> 	rate = clk_get_rate(clk);
+> 	clk_set_rate(clk, rate);
+> 	assert(clk_get_rate(clk) == rate);
+> 
+> If not, there's something quite wrong.  However, I am saying that the
+> sequence you provided was nevertheless silly - I've seen it in real code
+> in the kernel, which is why I've commented about it.
+
+I just ran into this issue again with omap3, and so I'm resurrecting the
+thread.
+
+Mike, can you review the patch?
+
+Russell, I'd like to understand why you think the original example is bad:
+
+	rate = clk_round_rate(clk, rate);
+	clk_set_rate(clk, rate);
+
+If the definition of clk_round_rate is basically "clk_set_rate without
+actually setting the rate", I agree that the above code is not good as
+it might not work correctly.
+
+However, if  the following code you gave should work:
+
+	rate = clk_get_rate(clk);
+	clk_set_rate(clk, rate);
+	assert(clk_get_rate(clk) == rate);
+
+then the original example should also always work, as it's almost the
+same as:
+
+	/* this is the "round" part */
+	clk_set_rate(clk, rate);
+	rate = clk_get_rate(clk);
+
+	clk_set_rate(clk, rate);
+	assert(clk_get_rate(clk) == rate);
+
+Why I'm asking this is that for me (and probably for others also if
+you've seen it used in the kernel code) it feels natural to have code like:
+
+	rate = clk_round_rate(clk, rate);
+	
+	/* Verify the rounded rate here to see it's ok for the IP etc */
+
+	/* The rate is ok, so set it */
+	clk_set_rate(clk, rate);
+
+This could be rewritten as:
+
+	rounded_rate = clk_round_rate(clk, rate);
+	
+	/* Verify the rounded rate here to see it's ok for the IP etc */
+
+	/* The rounded rate is ok, so set the original rate */
+	clk_set_rate(clk, rate);
+
+But it just feels unnecessary complication to keep both the original
+rate and the rounded rate around.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/56c20d63/attachment-0001.sig>
