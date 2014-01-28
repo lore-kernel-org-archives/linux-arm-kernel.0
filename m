@@ -1,19 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:17 +0100
-Subject: [PATCH v2 05/21] pinctrl: mvebu: prepare to fix misdesigned resource
- allocation
+Date: Tue, 28 Jan 2014 01:39:32 +0100
+Subject: [PATCH v2 20/21] pinctrl: mvebu: dove: use global register regmap
 In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-21-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocating the pinctrl resource in common pinctrl-mvebu was a misdesign,
-as it does not allow SoC specific parts to access the allocated resource.
-This moves resource allocation from mvebu_pinctrl_probe to SoC specific
-_probe functions and temporarily passes the base address to common pinctrl
-driver instead.
+Now that we have a regmap for global registers, get rid of the last
+remaining hardcoded physical addresses. While at it, also remove
+DOVE_ prefix from those macros.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -25,203 +22,222 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-370.c | 10 +++++++++-
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c  | 10 +++++++++-
- drivers/pinctrl/mvebu/pinctrl-dove.c       | 11 ++++++++++-
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 11 ++++++++++-
- drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 14 ++++++--------
- drivers/pinctrl/mvebu/pinctrl-mvebu.h      |  2 +-
- 6 files changed, 45 insertions(+), 13 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 128 ++++++++++++++++-------------------
+ 1 file changed, 60 insertions(+), 68 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-index ae1f760cbdd2..7586072e66c6 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-@@ -23,6 +23,8 @@
- 
- #include "pinctrl-mvebu.h"
- 
-+static void __iomem *mpp_base;
-+
- static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
- 	MPP_MODE(0,
- 	   MPP_FUNCTION(0x0, "gpio", NULL),
-@@ -385,6 +387,12 @@ static struct pinctrl_gpio_range mv88f6710_mpp_gpio_ranges[] = {
- static int armada_370_pinctrl_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pinctrl_soc_info *soc = &armada_370_pinctrl_info;
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp_base))
-+		return PTR_ERR(mpp_base);
- 
- 	soc->variant = 0; /* no variants for Armada 370 */
- 	soc->controls = mv88f6710_mpp_controls;
-@@ -396,7 +404,7 @@ static int armada_370_pinctrl_probe(struct platform_device *pdev)
- 
- 	pdev->dev.platform_data = soc;
- 
--	return mvebu_pinctrl_probe(pdev);
-+	return mvebu_pinctrl_probe(pdev, mpp_base);
- }
- 
- static int armada_370_pinctrl_remove(struct platform_device *pdev)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-index 843a51f9d129..786c629af8a8 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-@@ -33,6 +33,8 @@
- 
- #include "pinctrl-mvebu.h"
- 
-+static void __iomem *mpp_base;
-+
- enum armada_xp_variant {
- 	V_MV78230	= BIT(0),
- 	V_MV78260	= BIT(1),
-@@ -399,10 +401,16 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
- 	struct mvebu_pinctrl_soc_info *soc = &armada_xp_pinctrl_info;
- 	const struct of_device_id *match =
- 		of_match_device(armada_xp_pinctrl_of_match, &pdev->dev);
-+	struct resource *res;
- 
- 	if (!match)
- 		return -ENODEV;
- 
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp_base))
-+		return PTR_ERR(mpp_base);
-+
- 	soc->variant = (unsigned) match->data & 0xff;
- 
- 	switch (soc->variant) {
-@@ -443,7 +451,7 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
- 
- 	pdev->dev.platform_data = soc;
- 
--	return mvebu_pinctrl_probe(pdev);
-+	return mvebu_pinctrl_probe(pdev, mpp_base);
- }
- 
- static int armada_xp_pinctrl_remove(struct platform_device *pdev)
 diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 47268393af34..4d051ba17fee 100644
+index 9126cedec1bc..1823a1a7ec45 100644
 --- a/drivers/pinctrl/mvebu/pinctrl-dove.c
 +++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -55,6 +55,8 @@
+@@ -30,21 +30,6 @@
+ #define PMU_REGS_OFFS			0xd802c
+ #define GC_REGS_OFFS			0xe802c
  
+-#define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
+-#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
+-#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE + 0xe802C)
+-#define  DOVE_TWSI_ENABLE_OPTION1	BIT(7)
+-#define DOVE_GLOBAL_CONFIG_2		(DOVE_SB_REGS_VIRT_BASE + 0xe8030)
+-#define  DOVE_TWSI_ENABLE_OPTION2	BIT(20)
+-#define  DOVE_TWSI_ENABLE_OPTION3	BIT(21)
+-#define  DOVE_TWSI_OPTION3_GPIO		BIT(22)
+-#define DOVE_SSP_CTRL_STATUS_1		(DOVE_SB_REGS_VIRT_BASE + 0xe8034)
+-#define  DOVE_SSP_ON_AU1		BIT(0)
+-#define DOVE_MPP_GENERAL_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xe803c)
+-#define  DOVE_AU1_SPDIFO_GPIO_EN	BIT(1)
+-#define  DOVE_NAND_GPIO_EN		BIT(0)
+-#define DOVE_GPIO_LO_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0400)
+-
+ /* MPP Base registers */
+ #define PMU_MPP_GENERAL_CTRL	0x10
+ #define  AU0_AC97_SEL		BIT(16)
+@@ -62,6 +47,19 @@
+ #define PMU_SIGNAL_SELECT_0	0x00
+ #define PMU_SIGNAL_SELECT_1	0x04
+ 
++/* Global Config regmap registers */
++#define GLOBAL_CONFIG_1		0
++#define  TWSI_ENABLE_OPTION1	BIT(7)
++#define GLOBAL_CONFIG_2		1
++#define  TWSI_ENABLE_OPTION2	BIT(20)
++#define  TWSI_ENABLE_OPTION3	BIT(21)
++#define  TWSI_OPTION3_GPIO	BIT(22)
++#define SSP_CTRL_STATUS_1	2
++#define  SSP_ON_AU1		BIT(0)
++#define MPP_GENERAL_CONFIG	4
++#define  AU1_SPDIFO_GPIO_EN	BIT(1)
++#define  NAND_GPIO_EN		BIT(0)
++
  #define CONFIG_PMU	BIT(4)
  
-+static void __iomem *mpp_base;
-+
- static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
- 				 unsigned long *config)
+ static void __iomem *mpp_base;
+@@ -206,9 +204,10 @@ static int dove_mpp4_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_nand_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 			      unsigned long *config)
  {
-@@ -776,6 +778,13 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match =
- 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
-+	struct resource *mpp_res;
-+
-+	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
-+	if (IS_ERR(mpp_base))
-+		return PTR_ERR(mpp_base);
-+
- 	pdev->dev.platform_data = (void *)match->data;
+-	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
++	unsigned int gmpp;
  
- 	/*
-@@ -789,7 +798,7 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare_enable(clk);
+-	*config = ((gmpp & DOVE_NAND_GPIO_EN) != 0);
++	regmap_read(gconfmap, MPP_GENERAL_CONFIG, &gmpp);
++	*config = ((gmpp & NAND_GPIO_EN) != 0);
  
--	return mvebu_pinctrl_probe(pdev);
-+	return mvebu_pinctrl_probe(pdev, mpp_base);
+ 	return 0;
  }
- 
- static int dove_pinctrl_remove(struct platform_device *pdev)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-index 6b504b5935a5..842ceb196726 100644
---- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-@@ -21,6 +21,8 @@
- 
- #include "pinctrl-mvebu.h"
- 
-+static void __iomem *mpp_base;
-+
- #define V(f6180, f6190, f6192, f6281, f6282, dx4122)	\
- 	((f6180 << 0) | (f6190 << 1) | (f6192 << 2) |	\
- 	 (f6281 << 3) | (f6282 << 4) | (dx4122 << 5))
-@@ -458,8 +460,15 @@ static int kirkwood_pinctrl_probe(struct platform_device *pdev)
+@@ -216,14 +215,9 @@ static int dove_nand_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_nand_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ 			      unsigned long config)
  {
- 	const struct of_device_id *match =
- 		of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp_base))
-+		return PTR_ERR(mpp_base);
-+
- 	pdev->dev.platform_data = (void *)match->data;
--	return mvebu_pinctrl_probe(pdev);
-+	return mvebu_pinctrl_probe(pdev, mpp_base);
- }
- 
- static int kirkwood_pinctrl_remove(struct platform_device *pdev)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index 0fd1ad31fbf9..90c35b20a7af 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -590,26 +590,24 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
+-	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+-
+-	gmpp &= ~DOVE_NAND_GPIO_EN;
+-	if (config)
+-		gmpp |= DOVE_NAND_GPIO_EN;
+-
+-	writel(gmpp, DOVE_MPP_GENERAL_VIRT_BASE);
+-
++	regmap_update_bits(gconfmap, MPP_GENERAL_CONFIG,
++			   NAND_GPIO_EN,
++			   (config) ? NAND_GPIO_EN : 0);
  	return 0;
  }
  
--int mvebu_pinctrl_probe(struct platform_device *pdev)
-+int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base)
+@@ -253,19 +247,23 @@ static int dove_audio0_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 				unsigned long *config)
  {
- 	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
--	struct resource *res;
- 	struct mvebu_pinctrl *pctl;
--	void __iomem *base;
- 	struct pinctrl_pin_desc *pdesc;
- 	unsigned gid, n, k;
- 	int ret;
- 
-+	if (!base) {
-+		dev_err(&pdev->dev, "missing base address\n");
-+		return -EINVAL;
-+	}
+-	unsigned long mpp4 = readl(mpp4_base + MPP_CTRL4);
+-	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
+-	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+-	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
++	unsigned int mpp4 = readl(mpp4_base + MPP_CTRL4);
++	unsigned int sspc1;
++	unsigned int gmpp;
++	unsigned int gcfg2;
 +
- 	if (!soc || !soc->controls || !soc->modes) {
- 		dev_err(&pdev->dev, "wrong pinctrl soc info\n");
- 		return -EINVAL;
- 	}
++	regmap_read(gconfmap, SSP_CTRL_STATUS_1, &sspc1);
++	regmap_read(gconfmap, MPP_GENERAL_CONFIG, &gmpp);
++	regmap_read(gconfmap, GLOBAL_CONFIG_2, &gcfg2);
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
+ 	*config = 0;
+ 	if (mpp4 & AU1_GPIO_SEL)
+ 		*config |= BIT(3);
+-	if (sspc1 & DOVE_SSP_ON_AU1)
++	if (sspc1 & SSP_ON_AU1)
+ 		*config |= BIT(2);
+-	if (gmpp & DOVE_AU1_SPDIFO_GPIO_EN)
++	if (gmpp & AU1_SPDIFO_GPIO_EN)
+ 		*config |= BIT(1);
+-	if (gcfg2 & DOVE_TWSI_OPTION3_GPIO)
++	if (gcfg2 & TWSI_OPTION3_GPIO)
+ 		*config |= BIT(0);
+ 
+ 	/* SSP/TWSI only if I2S1 not set*/
+@@ -280,32 +278,22 @@ static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ 				unsigned long config)
+ {
+-	unsigned long mpp4 = readl(mpp4_base + MPP_CTRL4);
+-	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
+-	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+-	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
++	unsigned int mpp4 = readl(mpp4_base + MPP_CTRL4);
+ 
+-	/*
+-	 * clear all audio1 related bits before configure
+-	 */
+-	gcfg2 &= ~DOVE_TWSI_OPTION3_GPIO;
+-	gmpp &= ~DOVE_AU1_SPDIFO_GPIO_EN;
+-	sspc1 &= ~DOVE_SSP_ON_AU1;
+ 	mpp4 &= ~AU1_GPIO_SEL;
 -
- 	pctl = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pinctrl),
- 			GFP_KERNEL);
- 	if (!pctl) {
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.h b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-index 90bd3beee860..b66949040e0a 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-@@ -186,7 +186,7 @@ struct mvebu_pinctrl_soc_info {
- 		.npins = _npins,				\
+-	if (config & BIT(0))
+-		gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
+-	if (config & BIT(1))
+-		gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
+-	if (config & BIT(2))
+-		sspc1 |= DOVE_SSP_ON_AU1;
+ 	if (config & BIT(3))
+ 		mpp4 |= AU1_GPIO_SEL;
+-
+ 	writel(mpp4, mpp4_base + MPP_CTRL4);
+-	writel(sspc1, DOVE_SSP_CTRL_STATUS_1);
+-	writel(gmpp, DOVE_MPP_GENERAL_VIRT_BASE);
+-	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
++
++	regmap_update_bits(gconfmap, SSP_CTRL_STATUS_1,
++			   SSP_ON_AU1,
++			   (config & BIT(2)) ? SSP_ON_AU1 : 0);
++	regmap_update_bits(gconfmap, MPP_GENERAL_CONFIG,
++			   AU1_SPDIFO_GPIO_EN,
++			   (config & BIT(1)) ? AU1_SPDIFO_GPIO_EN : 0);
++	regmap_update_bits(gconfmap, GLOBAL_CONFIG_2,
++			   TWSI_OPTION3_GPIO,
++			   (config & BIT(0)) ? TWSI_OPTION3_GPIO : 0);
+ 
+ 	return 0;
+ }
+@@ -353,15 +341,18 @@ static int dove_audio1_ctrl_gpio_dir(struct mvebu_mpp_ctrl *ctrl, u8 pid,
+ static int dove_twsi_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 			      unsigned long *config)
+ {
+-	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
+-	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
++	unsigned int gcfg1;
++	unsigned int gcfg2;
++
++	regmap_read(gconfmap, GLOBAL_CONFIG_1, &gcfg1);
++	regmap_read(gconfmap, GLOBAL_CONFIG_2, &gcfg2);
+ 
+ 	*config = 0;
+-	if (gcfg1 & DOVE_TWSI_ENABLE_OPTION1)
++	if (gcfg1 & TWSI_ENABLE_OPTION1)
+ 		*config = 1;
+-	else if (gcfg2 & DOVE_TWSI_ENABLE_OPTION2)
++	else if (gcfg2 & TWSI_ENABLE_OPTION2)
+ 		*config = 2;
+-	else if (gcfg2 & DOVE_TWSI_ENABLE_OPTION3)
++	else if (gcfg2 & TWSI_ENABLE_OPTION3)
+ 		*config = 3;
+ 
+ 	return 0;
+@@ -370,26 +361,27 @@ static int dove_twsi_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ static int dove_twsi_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ 				unsigned long config)
+ {
+-	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
+-	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+-
+-	gcfg1 &= ~DOVE_TWSI_ENABLE_OPTION1;
+-	gcfg2 &= ~(DOVE_TWSI_ENABLE_OPTION2 | DOVE_TWSI_ENABLE_OPTION3);
++	unsigned int gcfg1 = 0;
++	unsigned int gcfg2 = 0;
+ 
+ 	switch (config) {
+ 	case 1:
+-		gcfg1 |= DOVE_TWSI_ENABLE_OPTION1;
++		gcfg1 = TWSI_ENABLE_OPTION1;
+ 		break;
+ 	case 2:
+-		gcfg2 |= DOVE_TWSI_ENABLE_OPTION2;
++		gcfg2 = TWSI_ENABLE_OPTION2;
+ 		break;
+ 	case 3:
+-		gcfg2 |= DOVE_TWSI_ENABLE_OPTION3;
++		gcfg2 = TWSI_ENABLE_OPTION3;
+ 		break;
  	}
  
--int mvebu_pinctrl_probe(struct platform_device *pdev);
-+int mvebu_pinctrl_probe(struct platform_device *pdev, void __iomem *base);
- int mvebu_pinctrl_remove(struct platform_device *pdev);
+-	writel(gcfg1, DOVE_GLOBAL_CONFIG_1);
+-	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
++	regmap_update_bits(gconfmap, GLOBAL_CONFIG_1,
++			   TWSI_ENABLE_OPTION1,
++			   gcfg1);
++	regmap_update_bits(gconfmap, GLOBAL_CONFIG_2,
++			   TWSI_ENABLE_OPTION2 | TWSI_ENABLE_OPTION3,
++			   gcfg2);
  
- #endif
+ 	return 0;
+ }
 -- 
 1.8.5.2
