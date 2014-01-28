@@ -1,150 +1,133 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 28 Jan 2014 10:30:36 -0600
-Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
- returns -ENODEV/-ENXIO
-In-Reply-To: <20140128153230.GA20991@xps8300>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
- <20140121144725.GF30451@saruman.home>
- <20140127150855.GA17928@xps8300>
- <20140127160458.GF13268@saruman.home>
- <20140128153230.GA20991@xps8300>
-Message-ID: <20140128163036.GD28546@saruman.home>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jan 2014 17:41:42 +0100
+Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
+ NMI controller
+In-Reply-To: <52E78E3F.6080902@redhat.com>
+References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
+ <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
+ <20140116123940.GE31779@lukather>
+ <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
+ <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
+Message-ID: <20140128164142.GL3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 28, 2014 at 05:32:30PM +0200, Heikki Krogerus wrote:
-> On Mon, Jan 27, 2014 at 10:05:20AM -0600, Felipe Balbi wrote:
-> > > Why would you need to know if the PHY drivers are needed or not
-> > > explicitly in your controller driver?
+On Tue, Jan 28, 2014 at 12:02:23PM +0100, Hans de Goede wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> Hi,
+> 
+> On 01/28/2014 11:40 AM, Maxime Ripard wrote:
+> 
+> Jumping in here to try and clarify things, or so I hope at least :)
+
+Sure :)
+
+> No, the IRQ from the PMIC is a level sensitive IRQ, so it would look
+> like this:
+
+Hmm, your mailer seems to have mangled your drawing :(
+
+> The PMIC irq line won't go low until an i2c write to its irq status
+> registers write-clears all status bits for which the corresponding
+> bit in the irq-mask register is set.
+
+Which makes sense too
+
+> And the only reason the NMI -> GIC also goes low is because the unmask
+> operation writes a second ack to the NMI controller in the unmask
+> callback of the NMI controller driver.
+
+Yes, and this is exactly what I don't understand. You shouldn't need
+that ack in first place, since it's been done already right after the
+unmask.
+
+> Note that we cannot use edge triggered interrupts here because the PMIC
+> has the typical setup with multiple irq status bits driving a single
+> irq line, so the irq handler does read irq-status, handle stuff,
+> write-clear irq-status. And if any other irq-status bits get set
+> between the read and write-clear the PMIC -> NMI line will stay
+> high, as it should since there are more interrupts to handle.
+
+Yep, the edge-thing was just the only case I could think of where it
+could lead to troubles.
+
+In what you're saying, which makes total sense, if we don't do the
+ack, as soon as the irq will be unmasked, since the level is high, the
+handler will be called again, treat the new interrupts, and so on. I
+don't see how this is an issue actually.
+
+> > But in this case, you would have two events coming from your
+> > device (the two rising edges), so you'd expect two interrupts. And
+> > in the case of a level triggered interrupt, the device would keep
+> > the interrupt line active until it's unmasked, so we wouldn't end
+> > up with this either.
 > > 
-> > because, one way or another, they all do need it. Except for quirky ones
-> > like AM437x where a USB3 IP was hardwired into USB2-only mode, so it
-> > really lacks a USB3 PHY.
-> 
-> The Baytrail board I deal with has completely autonomous PHYs. But my
-> question is, why would you need to care about the PHYs in your
-> controller driver? Why can't you leave the responsibility of them to
-> the upper layers and trust what they tell you?
-> 
-> If there is no USB3 PHY for dwc3 then, the driver gets something like
-> -ENODEV and just continues. There is no need to know about the
-> details.
-
-it's a little more complicated than that. We could get -EPROBE_DEFER
-meaning we should try probing at a later time because the PHY isn't
-available yet.
-
-But sure, if we can very easily differentiate between those two
-conditions in a way that error report from PHY layer (whichever it is),
-then we can certainly do that.
-
-> For the controller drivers the PHYs are just a resource like any
-> other. The controller drivers can't have any responsibility of
-> them. They should not care if PHY drivers are available for them or
-> not, or even if the PHY framework is available or not.
-
-huh? If memory isn't available you don't continue probing, right ? If
-your IORESOURCE_MEM is missing, you also don't continue probing, if your
-IRQ line is missing, you bail too. Those are also nothing but resources
-to the driver, what you're asking here is to treat PHY as a _different_
-resource; which might be fine, but we need to make sure we don't
-continue probing when a PHY is missing in a platform that certainly
-needs a PHY.
-
-> > > > But I really want to see the argument against using no-op. As far as I
-> > > > could see, everybody needs a PHY driver one way or another, some
-> > > > platforms just haven't sent any PHY driver upstream and have their own
-> > > > hacked up solution to avoid using the PHY layer.
-> > > 
-> > > Not true in our case. Platforms using Intel's SoCs and chip sets may
-> > > or may not have controllable USB PHY. Quite often they don't. The
-> > > Baytrails have usually ULPI PHY for USB2, but that does not mean they
-> > > provide any vendor specific functions or any need for a driver in any
-> > > case.
+> >> sunxi_sc_nmi_ack_and_unmask is therefore called (by
+> >> irq_finalize_oneshot) after the IRQ thread has been
+> >> executed. After the IRQ thread has ACKed the IRQs on the
+> >> originating device we can finally ACK and unmask again the NMI.
 > > 
-> > that's different from what I heard.
+> > And what happens if you get a new interrupt right between the end
+> > of the handler and the unmask?
 > 
-> I don't know where you got that impression, but it's not true. The
-> Baytrail SoCs for example don't have internal USB PHYs, which means
-> the manufacturers using it can select what they want. So we have
-> boards where PHY driver(s) is needed and boards where it isn't.
+> The implicit ack done by the unmask will be ignored if the NMI line
+> is still high, just like the initial ack is ignored (which is why we
+> need the mask), and when the unmask completes the irq will
+> immediately retrigger, as it should.
 
-alright, that explains it ;-) So you have external USB2 and USB3 PHYs ?
-You have an external PIPE3 interface ? That's quite an achievement,
-kudos to your HW designers. Getting timing closure on PIPE3 is a
-difficult task.
+Yeah, but why do we need the ack in the first place? I can't think of
+a case where the ACK would be doing something useful. Either:
+  - there is no new interrupts between the mask/ack and the unmask, so
+    there's no interrupt to ack.
+  - There's a new interrupt between the mask/ack and the
+    unmask. There's two more cases here:
+    * The interrupt came before the device handler kicked in, and the
+      handler will treat it/ack it: No issue
+    * The interrupt comes right after the handler has been acking its
+      interrupt, the level stays high, your handler is called once
+      again, you can treat it: No issue
 
-> The problem is that we just don't always know all the details about
-> the platform. If the PHY is ULPI PHY, we can do runtime detection, but
-> we can't even rely on always having ULPI.
-
-right, we've had that before on n900 ;-)
-
-> > > Are we talking about the old USB PHY library or the new PHY framework
-> > > with the no-op PHY driver?
-> > > 
-> > > Well, in any case, I don't understand what is the purpose of the no-op
-> > > PHY driver. What are you drying to achieve with that?
+> >>> I really wonder whether it makes sense to have a generic chip
+> >>> here. It seems to be much more complicated than it should. It's
+> >>> only about a single interrupt interrupt chip here.
+> >> 
+> >> I agree but is there any other way to manage the NMI without the
+> >> driver of the device connected to NMI having to worry about
+> >> acking/masking/unmasking/ etc..?
 > > 
-> > I'm trying to avoid supporting 500 different combinations for a single
-> > driver. We already support old USB PHY layer and generic PHY layer, now
-> > they both need to be made optional.
+> > Yes, just declare a "raw" irqchip. Pretty much like we do on
+> > irq-sun4i for example.
 > 
-> This is really good to get. We have some projects where we are dealing
-> with more embedded environments, like IVI, where the kernel should be
-> stripped of everything useless. Since the PHYs are autonomous, we
-> should be able to disable the PHY libraries/frameworks.
+> Hmm, I'm not going to say that using a raw irqchip here is a bad
+> idea, it sounds like it would be better.
 
-hmmm, in that case it's a lot easier to treat. We can use
-ERR_PTR(-ENXIO) as an indication that the framework is disabled, or
-something like that.
+There's none. It was a separate comment :)
 
-The difficult is really reliably supporting e.g. OMAP5 (which won't work
-without a PHY) and your BayTrail with autonomous PHYs. What can we use
-as an indication ?
+> But I don't think this will solve the need the mask / umask. The
+> problem is we need to do an i2c write to clear the interrupt source,
+> which needs to be done from a thread / workqueue. So when the
+> interrupt handler finishes the source won't be cleared yet, and
+> AFAIK then only way to deal with this is to mask the interrupt until
+> we've cleared the interrupt source.
 
-I mean, I need to know that a particular platform depends on a PHY
-driver before I decide to return -EPROBE_DEFER or just assume the PHY
-isn't needed ;-)
+Yes, but the interrupt is still masked during the time between the
+"hard" handler and the thread, so there's no way you can get an
+interrupt flood during that time.
 
-> But I still don't understand what is the benefit in the no-op? You
-> really need to explain this. What you have now in dwc3 is expectations
-> regarding the PHY, which put a lot of pressure on upper layers to
-> satisfy the driver. The no-op is just an extra thing that you have to
-> provide when you fail to determine if the system requires a PHY driver
-> or not, or if you know that it doesn't, plus an additional check for
-> the case where the PHY lib/framework is not enabled. I don't see the
-> value in it.
-
-it "solves" the difficulty above. If everybody has to provide a PHY
-driver, the problem is a lot simpler don't you think ? ;-)
-
-> > The old USB PHY layer also provides
-> > a no-op, now called phy-generic, which is actually pretty useful.
-> > 
-> > On top of all that, I'm sure you'll subscribe to the idea of preventing
-> > dwc3 from becoming another MUSB which supports several different
-> > configurations and none work correctly. I much prefer to take baby steps
-> > which are well thought-out and very well exercised, so I'll be very
-> > pedantic about proof of testing.
-> 
-> I think our goals are the same. I just want to also minimize the need
-> for any platform specific extra work from the upper layers regarding
-> the PHYs.
-
-I'll agree to that, but let's not apply patches until we're 100% sure
-there will be no regressions. Looking at $subject, I don't think it
-satisfies that condition ;-)
+Maxime
 
 -- 
-balbi
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/40c2bd34/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140128/18a6c784/attachment.sig>
