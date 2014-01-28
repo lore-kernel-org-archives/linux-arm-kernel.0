@@ -1,61 +1,115 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 28 Jan 2014 11:00:45 +0100
-Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
-In-Reply-To: <20140128094427.GZ3867@lukather>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
- <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
- <20140128094427.GZ3867@lukather>
-Message-ID: <52E77FCD.5050701@redhat.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 28 Jan 2014 11:00:35 +0000
+Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
+ block
+In-Reply-To: <20140123195718.GC26399@alberich>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-3-git-send-email-andreas.herrmann@calxeda.com>
+ <20140120222814.GI3471@alberich>
+ <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140122122550.GA14108@mudshark.cambridge.arm.com>
+ <a73ef0128a0141eabf0a3b899f3afdae@DM2PR03MB479.namprd03.prod.outlook.com>
+ <20140122134028.GB14108@mudshark.cambridge.arm.com>
+ <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140122153352.GE14108@mudshark.cambridge.arm.com>
+ <3d0a888e122f490ba6bbc80b1aaa977c@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140123195718.GC26399@alberich>
+Message-ID: <991cc0024ea54cdb964f31de89c0b0ea@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
 
-Hi,
 
-On 01/28/2014 10:44 AM, Maxime Ripard wrote:
-> On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
->>>> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
->>> 
->>> Maybe we can just remove the gates from there? Even though they are gates, they are also (a bit) more than that.
->> 
->> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Andreas Herrmann
+> Sent: Friday, January 24, 2014 1:27 AM
+> To: Sethi Varun-B16395
+> Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; Will Deacon;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
+> notifier block
 > 
-> Yep, exactly
+> On Wed, Jan 22, 2014 at 07:07:40PM +0000, Varun Sethi wrote:
+> > > -----Original Message-----
+> > > From: Will Deacon [mailto:will.deacon at arm.com]
+> > > Sent: Wednesday, January 22, 2014 9:04 PM
+> > > To: Sethi Varun-B16395
+> > > Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; linux-arm-
+> > > kernel at lists.infradead.org; Andreas Herrmann
+> > > Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
+> > > notifier block
+> > >
+> > > On Wed, Jan 22, 2014 at 01:54:11PM +0000, Varun Sethi wrote:
+> > > > > > > Ok, so are you suggesting that we perform the isolation
+> > > > > > > mapping in arm_smmu_add_device and drop the notifier
+> altogether?
+> > > > > > I think that should be fine, until we want to delay mapping
+> > > > > > creation till driver bind time.
+> > > > >
+> > > > > Is there a hard dependency on that?
+> > > > >
+> > > > Not sure, may be Andreas can answer that.
+> > >
+> > > Ok. Andreas? I would have thought doing this *earlier* shouldn't be
+> > > a problem (the DMA ops must be swizzled before the driver is probed).
+> > >
+> > > > > > But the "isolate device" property should dictate iommu group
+> > > creation.
+> > > > >
+> > > > > The reason we added automatic group creation (per-device) is for
+> > > > > VFIO, which expects all devices to be in a group regardless of
+> > > > > the device isolation configuration.
+> > > > >
+> > > > IIUC, with the "isolate devices" property we ensure that there
+> > > > would be independent SMR and S2CR per device. Is that correct?
+> > >
+> > > Yes, as part of giving them independent sets of page tables.
+> > > Initially these tables don't have any valid mappings, but the
+> > > dma-mapping API will populate them in response to
+> dma_map_*/dma_alloc/etc.
+> > >
+> > > Not sure what this has to do with us putting devices into their own
+> > > groups...
 > 
->>> I guess that means that we will have the OHCI0 gate declared with <&...-gates-clk 6>, while it's actually the first gate for this clock?
->> 
->> Correct.
->> 
->>> Maybe introducing an offset field in the gates_data would be a good idea, so that we always start from indexing the gates from 0 in the DT?
->> 
->> Well for the other "gates" type clks we also have holes in the range, and we always refer to the clk with the bit number in the reg as the clock-cell value.
+> > [Sethi Varun-B16395] Devices in an iommu group would share the dma
+> > mapping, so shouldn't they be sharing the SMR and context registers?
 > 
-> Yes, we have holes, but I see two majors differences here: - the other gates are just gates, while the usb clocks are a bit more than that.
+> I aggree with the context but SMRs won't be shared. I think you just can
+> say that a certain subset of the available SMRs will be used to map all
+> devices in an iommu group to the same context. Depending on what
+> streamIDs each device has you might have to use separate SMRs for each
+> device to map it to the same context.
+[Sethi Varun-B16395] IIUC the SMRs would unique per device, but there is a possibility where the number of context registers are restricted?
+In that case IOMMU groups should correspond to unique stream IDs (and corresponding SMRs).
 
-The usb-clk registers contain more then that, but the bits we are talking
-about now are gates.
+> 
+> > In case of the "isolate devices" property, each device would have its
+> > own SMR and context registers, thus allowing the devices to have
+> > independent mappings and allowing them to fall in separate iommu
+> > groups.
+> 
+> I aggree with Varun's view here. (Now that I take iommu groups into
+> consideration.)
+> 
+> But my goal with the "isolate devices" thing was twofold:
+> 
+> 1. actual make use of SMMU for address translation for all master
+>   devices (instead of just bypassing the SMMU)
+[Sethi Varun-B16395]  even if masters have to share translation? But from the patch it seemed that we are creating mapping only if we find the isolate devices property.
+> 
+> plus
+> 
+> 2. put each master into it's own domain to isolate it
+> 
+> The latter matches usage of separate iommu groups for devices. If we now
+> use the isolate devices property to just control whether master devices
+> fall into the same or separate iommu groups it seems to me we would need
+> to have another mechanism that triggers the creation of a mapping for a
+> group.
+> 
+> What do you think?
+> 
+[Sethi Varun-B16395] As mentioned before, we should be having iommu group per device (having a unique stream id). Isolate devices property just ensures that each device has a unique context. Now, for the devices for which we don't have the isolate device property, can't we have the multiple devices point to a common mapping. 
 
-> - the other gates' gating bits thus all start at bit 0, while here, since it's kind of a "mixed" clock, the gating bits start at bit 6 (on the A20 at least)
-
-Right, still I believe that the consistent thing to do is keeping the
-bit-number for the bit in the register controlling the gate as the
-specifier.  When adding new dts entries / reviewing existing ones
-I'm used to matching the specifier to the bit-nr in the data-sheet,
-I think making things different just for this one register is counter
-productive.
-
-Regards,
-
-Hans
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iEYEARECAAYFAlLnf80ACgkQF3VEtJrzE/udugCdEDpN65hazG7H+FD45iOVnTY9
-548An3dXeF6f8wp5REck5H3gqQPQkIoX
-=6yba
------END PGP SIGNATURE-----
+-Varun
