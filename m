@@ -1,16 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:23 +0100
-Subject: [PATCH v2 11/21] pinctrl: mvebu: armada-370: provide generic mpp
- callbacks
+Date: Tue, 28 Jan 2014 01:39:13 +0100
+Subject: [PATCH v2 01/21] devicetree: bindings: add missing Marvell Dove SoC
+ documentation
 In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to get rid of passing register addresses to common pinctrl
-driver, so provide set/get callbacks for generic mpp pins.
+Marvell Dove SoC binding was not documented, yet. Add the documentation
+and also describe Global Configuration register node in it.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -18,56 +18,42 @@ Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-370.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/arm/marvell,dove.txt       | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,dove.txt
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-index 7586072e66c6..5e8e83f57b8e 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-@@ -25,6 +25,30 @@
- 
- static void __iomem *mpp_base;
- 
-+static int armada_370_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-+				   unsigned long *config)
-+{
-+	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+diff --git a/Documentation/devicetree/bindings/arm/marvell,dove.txt b/Documentation/devicetree/bindings/arm/marvell,dove.txt
+new file mode 100644
+index 000000000000..aaaf64c56e44
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell,dove.txt
+@@ -0,0 +1,22 @@
++Marvell Dove Platforms Device Tree Bindings
++-----------------------------------------------
 +
-+	*config = (readl(mpp_base + off) >> shift) & MVEBU_MPP_MASK;
++Boards with a Marvell Dove SoC shall have the following properties:
 +
-+	return 0;
-+}
++Required root node property:
++- compatible: must contain "marvell,dove";
 +
-+static int armada_370_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
-+				   unsigned long config)
-+{
-+	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned long reg;
++* Global Configuration registers
 +
-+	reg = readl(mpp_base + off) & ~(MVEBU_MPP_MASK << shift);
-+	writel(reg | (config << shift), mpp_base + off);
++Global Configuration registers of Dove SoC are shared by a syscon node.
 +
-+	return 0;
-+}
++Required properties:
++- compatible: must contain "marvell,dove-global-config" and "syscon".
++- reg: base address and size of the Global Configuration registers.
 +
- static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
- 	MPP_MODE(0,
- 	   MPP_FUNCTION(0x0, "gpio", NULL),
-@@ -375,7 +399,7 @@ static struct of_device_id armada_370_pinctrl_of_match[] = {
- };
- 
- static struct mvebu_mpp_ctrl mv88f6710_mpp_controls[] = {
--	MPP_REG_CTRL(0, 65),
-+	MPP_FUNC_CTRL(0, 65, NULL, armada_370_mpp_ctrl),
- };
- 
- static struct pinctrl_gpio_range mv88f6710_mpp_gpio_ranges[] = {
++Example:
++
++gconf: global-config at e802c {
++	compatible = "marvell,dove-global-config", "syscon";
++	reg = <0xe802c 0x14>;
++};
 -- 
 1.8.5.2
