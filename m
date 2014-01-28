@@ -1,32 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 28 Jan 2014 10:14:55 -0200
-Subject: [PATCH 2/2] ARM: dts: imx6sl-evk: Add audio support
-In-Reply-To: <20140128121211.GK20583@S2101-09.ap.freescale.net>
-References: <1390443213-14061-1-git-send-email-festevam@gmail.com>
- <1390443213-14061-2-git-send-email-festevam@gmail.com>
- <20140128121211.GK20583@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5BWfrjxJr=f=0hHwQNuJcQDeLSJi=u6Fci44EctKMSCHQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jan 2014 12:16:56 +0000
+Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <9156959.vu4XdoKglI@wuerfel>
+References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
+ <20140128113242.GJ10628@intel.com> <4916428.f0GtxdkWKj@wuerfel>
+ <9156959.vu4XdoKglI@wuerfel>
+Message-ID: <20140128121656.GH15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 10:12 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, Jan 28, 2014 at 01:08:47PM +0100, Arnd Bergmann wrote:
+> On a related note, should we try to remove the slave_id field from
+> the slave config structure as well? I believe it is still used by
+> the shmobile dma engine in non-DT mode, but that is inconsistent with
+> how all the others work, and with what the same driver does for DT.
 
->> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
->> index 95bb37b..04cf457 100644
->> --- a/arch/arm/boot/dts/imx6sl.dtsi
->> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> @@ -236,6 +236,7 @@
->>                                              <&sdma 38 1 0>;
->>                                       dma-names = "rx", "tx";
->>                                       fsl,fifo-depth = <15>;
->> +                                     fsl,ssi-dma-events = <38 37>;
->
-> Do you still need this custom property?
+I didn't see that appear, but now that it is there, I'm in two minds
+about it.
 
-I can get rid of it.
+The first is that the virtual channel approach is more flexible (one
+virtual channel per DMA request line) since it allows users to hold on
+to a DMA engine virtual channel and don't have the overhead of getting
+that.  It also means that they have access to the DMA engine struct
+device, which should be used with the DMA API for mapping/unmapping etc.
 
-Should I remove from the other SoCs as well?
+Another advantage is that it is possible (though we don't really do this
+at present) to schedule a number of virtual channels onto the underlying
+physical channels according to whatever algorithm(s) we decide.
 
-Regards,
+The second point is that requesting a physical channel and then
+configuring it seems more elegant from the DMA engine point of view - but
+has the down-side that clients have to release the DMA engine channel
+(and thus forget the struct device) as soon as possible to avoid starving
+the system of physical DMA channels.
 
-Fabio Estevam
+On balance, I think the virtual channel approach makes client drivers
+more elegant and simpler, and makes the DMA engine API easier to use,
+and gives greater flexibility for future improvements.  So, I wouldn't
+miss the slave_id being removed.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
