@@ -1,62 +1,46 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 28 Jan 2014 01:17:42 +0100
-Subject: Samsung-clk patches for 3.15
-In-Reply-To: <251c01cf1bbd$36802390$a3806ab0$@samsung.com>
-References: <52E27AE9.7040501@samsung.com> <52E6EDC1.9080003@gmail.com>
- <251c01cf1bbd$36802390$a3806ab0$@samsung.com>
-Message-ID: <52E6F726.1070900@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 28 Jan 2014 01:39:15 +0100
+Subject: [PATCH v2 03/21] ARM: dove: add additional pinctrl registers
+In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dove pinctrl used additional registers to control MPPs. This patch first
+increases existing pinctrl reg property by one register, and then adds
+two new ranges for MPP4 and PMU MPP registers.
 
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-On 28.01.2014 01:09, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> [Forgot to Cc Mike...]
->>
->> On 24.01.2014 15:38, Tomasz Figa wrote:
->>> Hi,
->>>
->
-> Hi,
->
->>> Linux 3.14 is going to include Andrzej Hajda's patches converting
->>> Samsung clock drivers to use clock ID defines in include/dt-bindings,
->>> instead of local enums, but to avoid unnecessary merge conflicts we
->>> have converted only the clock driver, leaving DTS files unchanged yet.
->>>
->>> We intend to complete the conversion in 3.15, by replacing magic
->>> numbers in DTS files with respective preprocessor macros, but to
->>> reduce potential conflicts we need help of you, Samsung clock patches
->> authors :).
->>>
->>> I'd like to ask anybody who already has patches for DTS files adding
->>> any clock-related contents still using numeric IDs, e.g. clock
->>> properties in nodes or full nodes containing clock properties, to make
->>> sure that the patches are merged before Andrzej sends the conversion
->>> patches. Then Andrzej's script will generate patches updating all
->>> clock properties, leaving no numeric IDs in DTS files.
->>>
->
-> There are several DTS patches in v3.14-drop/soc-exynos-2 branch of my tree
-> for 3.15 and it will be merged after done of multiplatform, I need to rebase
-> them based on v3.14-rc1 though...So I think, would be better if we could
-> update DTS with using Andrzej's script after merging it into arm-soc...
-
-Basically my intention is to:
-
-1) Have any existing patches using clock numbers merged in reasonable 
-period of time (to not miss the merge window with DTS conversion patches).
-
-2) Stop accepting such patches anymore.
-
-3) Rerun Andrzej's script and convert all device tree sources to use 
-clock macros.
-
-Andrzej's patches for DTSes should go through your tree anyway (as any 
-Samsung DTS patches by default), so it shouldn't be a problem, 
-regardless of merging anything into arm-soc.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 8de1031233ae..69405e00f2c8 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -392,7 +392,9 @@
+ 
+ 			pinctrl: pin-ctrl at d0200 {
+ 				compatible = "marvell,dove-pinctrl";
+-				reg = <0xd0200 0x10>;
++				reg = <0xd0200 0x14>,
++				      <0xd0440 0x04>,
++				      <0xd802c 0x08>;
+ 				clocks = <&gate_clk 22>;
+ 
+ 				pmx_gpio_0: pmx-gpio-0 {
+-- 
+1.8.5.2
