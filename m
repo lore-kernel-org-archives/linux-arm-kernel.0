@@ -1,14 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Jan 2014 01:39:16 +0100
-Subject: [PATCH v2 04/21] ARM: dove: add global-config register node
+Date: Tue, 28 Jan 2014 01:39:22 +0100
+Subject: [PATCH v2 10/21] pinctrl: mvebu: kirkwood: provide generic mpp
+ callbacks
 In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1390869573-27624-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1390869573-27624-11-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We share global config registers by syscon node, add it to dove.dtsi.
+We want to get rid of passing register addresses to common pinctrl
+driver, so provide set/get callbacks for generic mpp pins.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -16,31 +18,74 @@ Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/dove.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 69405e00f2c8..fb289d83b76d 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -618,6 +618,12 @@
- 				interrupts = <5>;
- 			};
+diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+index 842ceb196726..2872f28057fb 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
++++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+@@ -23,6 +23,30 @@
  
-+			gconf: global-config at e802c {
-+				compatible = "marvell,dove-global-config",
-+				             "syscon";
-+				reg = <0xe802c 0x14>;
-+			};
+ static void __iomem *mpp_base;
+ 
++static int kirkwood_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
++				 unsigned long *config)
++{
++	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
++	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
 +
- 			gpio2: gpio-ctrl at e8400 {
- 				compatible = "marvell,orion-gpio";
- 				#gpio-cells = <2>;
++	*config = (readl(mpp_base + off) >> shift) & MVEBU_MPP_MASK;
++
++	return 0;
++}
++
++static int kirkwood_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
++				 unsigned long config)
++{
++	unsigned off = (ctrl->pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
++	unsigned shift = (ctrl->pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
++	unsigned long reg;
++
++	reg = readl(mpp_base + off) & ~(MVEBU_MPP_MASK << shift);
++	writel(reg | (config << shift), mpp_base + off);
++
++	return 0;
++}
++
+ #define V(f6180, f6190, f6192, f6281, f6282, dx4122)	\
+ 	((f6180 << 0) | (f6190 << 1) | (f6192 << 2) |	\
+ 	 (f6281 << 3) | (f6282 << 4) | (dx4122 << 5))
+@@ -361,7 +385,7 @@ static struct mvebu_mpp_mode mv88f6xxx_mpp_modes[] = {
+ };
+ 
+ static struct mvebu_mpp_ctrl mv88f6180_mpp_controls[] = {
+-	MPP_REG_CTRL(0, 29),
++	MPP_FUNC_CTRL(0, 29, NULL, kirkwood_mpp_ctrl),
+ };
+ 
+ static struct pinctrl_gpio_range mv88f6180_gpio_ranges[] = {
+@@ -369,7 +393,7 @@ static struct pinctrl_gpio_range mv88f6180_gpio_ranges[] = {
+ };
+ 
+ static struct mvebu_mpp_ctrl mv88f619x_mpp_controls[] = {
+-	MPP_REG_CTRL(0, 35),
++	MPP_FUNC_CTRL(0, 35, NULL, kirkwood_mpp_ctrl),
+ };
+ 
+ static struct pinctrl_gpio_range mv88f619x_gpio_ranges[] = {
+@@ -378,7 +402,7 @@ static struct pinctrl_gpio_range mv88f619x_gpio_ranges[] = {
+ };
+ 
+ static struct mvebu_mpp_ctrl mv88f628x_mpp_controls[] = {
+-	MPP_REG_CTRL(0, 49),
++	MPP_FUNC_CTRL(0, 49, NULL, kirkwood_mpp_ctrl),
+ };
+ 
+ static struct pinctrl_gpio_range mv88f628x_gpio_ranges[] = {
 -- 
 1.8.5.2
