@@ -1,126 +1,53 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 28 Jan 2014 17:03:02 +0530
-Subject: [PATCH 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <20140124163920.GI31040@mudshark.cambridge.arm.com>
-References: <1390490948-25386-1-git-send-email-vijay.kilari@gmail.com>
- <20140124163920.GI31040@mudshark.cambridge.arm.com>
-Message-ID: <CALicx6vS2oQ6V0kqOBNxUE2xiPpXD6Xgb0g+vyhQUpQN1Ox9dg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 28 Jan 2014 17:02:42 +0530
+Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <20140128111756.GE15937@n2100.arm.linux.org.uk>
+References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
+ <1390890471-14882-3-git-send-email-agross@codeaurora.org>
+ <52E772DF.6000604@metafoo.de> <4697306.PPWWh8UGTE@wuerfel>
+ <20140128111756.GE15937@n2100.arm.linux.org.uk>
+Message-ID: <20140128113242.GJ10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wiil,
+On Tue, Jan 28, 2014 at 11:17:57AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 28, 2014 at 10:16:53AM +0100, Arnd Bergmann wrote:
+> > On Tuesday 28 January 2014 10:05:35 Lars-Peter Clausen wrote:
+> > > Why does the direction needs to be specified in specifier? I see two
+> > > options, either the direction per is fixed in hardware. In that case the DMA
+> > > controller node should describe which channel is which direction. Or the
+> > > direction is not fixed in hardware and can be changed at runtime in which
+> > > case it should be set on a per descriptor basis.
+> > 
+> > Normally the direction is implied by dmaengine_slave_config().
+> 
+> No.  The direction argument in there is deprecated - we've been talking
+> about removing it for some time.
+> 
+> DMA engine drivers should store all parameters of the configuration, and
+> then select the appropriate ones when preparing a transfer (which itself
+> involves a direction.)
 
-On Fri, Jan 24, 2014 at 10:09 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hello,
->
-> On Thu, Jan 23, 2014 at 03:29:07PM +0000, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->>
->> Add macros to enable and disable to manage PSTATE.D
->> for debugging. The macros local_dbg_save and local_dbg_restore
->> are moved to irqflags.h file
->>
->> KGDB boot tests fail because of PSTATE.D is masked.
->> unmask it for debugging support
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->> ---
->>  arch/arm64/include/asm/debug-monitors.h |   17 -----------
->>  arch/arm64/include/asm/irqflags.h       |   48 +++++++++++++++++++++++++++++++
->>  arch/arm64/kernel/debug-monitors.c      |    1 +
->>  3 files changed, 49 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
->> index 6231479..ee9f28e 100644
->> --- a/arch/arm64/include/asm/debug-monitors.h
->> +++ b/arch/arm64/include/asm/debug-monitors.h
->> @@ -43,23 +43,6 @@ enum debug_el {
->>  #ifndef __ASSEMBLY__
->>  struct task_struct;
->>
->> -#define local_dbg_save(flags)                                                        \
->> -     do {                                                                    \
->> -             typecheck(unsigned long, flags);                                \
->> -             asm volatile(                                                   \
->> -             "mrs    %0, daif                        // local_dbg_save\n"    \
->> -             "msr    daifset, #8"                                            \
->> -             : "=r" (flags) : : "memory");                                   \
->> -     } while (0)
->> -
->> -#define local_dbg_restore(flags)                                             \
->> -     do {                                                                    \
->> -             typecheck(unsigned long, flags);                                \
->> -             asm volatile(                                                   \
->> -             "msr    daif, %0                        // local_dbg_restore\n" \
->> -             : : "r" (flags) : "memory");                                    \
->> -     } while (0)
->> -
->>  #define DBG_ARCH_ID_RESERVED 0       /* In case of ptrace ABI updates. */
->>
->>  #define DBG_HOOK_HANDLED     0
->> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
->> index b2fcfbc..f9b013e 100644
->> --- a/arch/arm64/include/asm/irqflags.h
->> +++ b/arch/arm64/include/asm/irqflags.h
->> @@ -90,5 +90,53 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
->>       return flags & PSR_I_BIT;
->>  }
->>
->> +/*
->> + * save and restore debug state
->> + */
->> +static inline unsigned long arch_local_dbg_save(void)
->> +{
->> +     unsigned long flags;
->> +     asm volatile(
->> +             "mrs    %0, daif        // arch_local_dbg_save"
->> +             "msr    daifset, #8"
->> +             : "=r" (flags) : : "memory");
->> +     return flags;
->> +}
->> +
->> +static inline void arch_local_dbg_restore(unsigned long flags)
->> +{
->> +     asm volatile(
->> +             "msr    daif, %0        // arch_local_dbg_restore"
->> +             :
->> +             : "r" (flags)
->> +             : "memory");
->> +}
->> +
->> +#define raw_local_dbg_save(flags)                    \
->> +     do {                                            \
->> +             typecheck(unsigned long, flags);        \
->> +             flags = arch_local_dbg_save();          \
->> +     } while (0)
->> +
->> +#define raw_local_dbg_restore(flags)                 \
->> +     do {                                            \
->> +             typecheck(unsigned long, flags);        \
->> +             arch_local_dbg_restore(flags);          \
->> +     } while (0)
->> +
->> +#define local_dbg_save(flags)                                \
->> +     do {                                            \
->> +             raw_local_dbg_save(flags);              \
->> +     } while (0)
->> +
->> +#define local_dbg_restore(flags)                     \
->> +     do {                                            \
->> +             typecheck(unsigned long, flags);        \
->> +             raw_local_dbg_restore(flags);           \
->> +     } while (0)
->
-> Hehe, I think you took me a bit too literally when I said to follow what we
-> do for irqs. This code is arm64-specific, so you don't need to construct it
-> in the same way. All you need to do is *move* the existing code from
-> debug-monitors.h to irqflags.h. That's it!
->
-I have reposted the patch (v9) please review.
+Right all the prep_ calls for slave cases have explcit direction argument so
+sending it using slave config makes no sense. So will remove it after the merge
+window closes and fix :)
 
->> +#define local_dbg_enable()   asm("msr        daifclr, #8" : : : "memory")
->> +#define local_dbg_disable()  asm("msr        daifset, #8" : : : "memory")
->
-> I'm also fine with adding these two.
->
-> Will
+--
+~Vinod
+> 
+> Not doing this implies that if you have a half-duplex device, you have to
+> repeatedly issue a dmaengine_slave_config() call, a prepare call, and a
+> submit call to the DMA engine code for every segment you want to transfer.
+> We don't need that kind of DMA engine specific behaviour in DMA engine
+> users.
+> 
+> -- 
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
