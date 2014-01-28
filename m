@@ -1,273 +1,176 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 28 Jan 2014 09:17:21 +0100
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <CAJuA9ah1vsgpD04QhM5RApkCe9xcvpPkLvdwzgadKGWvngAt+g@mail.gmail.com>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <1390047057-2239-2-git-send-email-thomas.ab@samsung.com>
- <20140127202543.4167.83362@quantum>
- <CAJuA9ah1vsgpD04QhM5RApkCe9xcvpPkLvdwzgadKGWvngAt+g@mail.gmail.com>
-Message-ID: <20140128091721.1d8128cd@amdc2363>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 28 Jan 2014 09:24:54 +0100
+Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
+In-Reply-To: <20140124175806.GC23274@e102568-lin.cambridge.arm.com>
+References: <1390240079-6495-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1390240079-6495-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAKfTPtAbYXuis1bfyDLiHRaYwosre3RAG+iNQSz-y+cWfc3uQA@mail.gmail.com>
+ <20140122192041.GA3709@e102568-lin.cambridge.arm.com>
+ <CAKfTPtDHTs67qvoA6++zo4SZdZJj4T_BV2gVECOu-76-2kLbuw@mail.gmail.com>
+ <20140124175806.GC23274@e102568-lin.cambridge.arm.com>
+Message-ID: <CAKfTPtAEekg_KHhLikJK=njC-b5F=MOmAmSP8P96+j_23-iu3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Mike
+On 24 January 2014 18:58, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> Hi Vincent,
+>
+> On Fri, Jan 24, 2014 at 08:40:40AM +0000, Vincent Guittot wrote:
+>
+> [...]
+>
+>> Hi Lorenzo,
+>>
+>> Sorry for the late reply,
+>>
+>>
+>> > I had an idea. To simplify things, I think that one possibility is to
+>> > add a parameter to the power domain specifier (platform specific, see
+>> > Tomasz bindings):
+>>
+>> We can't use a simple boolean state (on/off) for defining the
+>> powerdomain state associated to a c-state so your proposal of being
+>> able to add a parameter that will define the power domain state is
+>> interesting.
+>>
+>> >
+>> > Documentation/devicetree/bindings/power/power_domain.txt
+>> >
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224928.html
+>> >
+>> > to represent, when that state is entered the behavior of the power
+>> > controller (ie cache RAM retention or cache shutdown or in general any
+>> > substate within a power domain). Since it is platform specific, and since
+>> > we are able to link caches to the power domain, the power controller will
+>> > actually define what happens to the cache when that state is entered
+>> > (basically we use the power domain specifier additional parameter to define
+>> > a "substate" in that power domain e.g.:
+>> >
+>> > Example:
+>> >
+>> > foo_power_controller {
+>> >         [...]
+>> >         /*
+>> >          * first cell is register index, second one is the state index
+>> >          * that in turn implies the state behavior - eg cache lost or
+>> >          * retained
+>> >          */
+>> >         #power-domain-cells = <2>;
+>> > };
+>> >
+>> > l1-cache {
+>> >         [...]
+>> >         /*
+>> >          * syntax: power-domains = list of power domain specifiers
+>> >                 <[&power_domain_phandle register-index state],[&power_domain_phandle register-index state]>;
+>> >                 The syntax is defined by the power controller du jour
+>> >                 as described by Tomasz bindings
+>> >         */
+>> >         power-domains =<&foo_power_controller 0 0 &foo_power_controller 0 1>;
+>>
+>> Normally, power-domains describes a list of power domain specifiers
+>> that are necessary for the l1-cache to at least retain its state so
+>> i'm not sure understand your example above
+>
+>>
+>> If we take the example of system that support running, retention and
+>> powerdown state described as state 0, 1 and 2 for the power domain, i
+>> would have set the l1-cache like:
+>>        power-domains =<&foo_power_controller 0 1>;
+>>
+>> for saying that the state is retained up to state 1
+>>
+>> Please look below, i have modified the rest of your example accordingly
+>>
+>> >
+>> > }:
+>> >
+>> > and then
+>> >
+>> > state0 {
+>> >         index = <2>;
+>> >         compatible = "arm,cpu-power-state";
+>> >         latency = <...>;
+>> >         /*
+>> >          * This means that when the state is entered, the power
+>> >          * controller should use register index 0 and state 0,
+>> >          * whose meaning is power controller specific. Since we
+>> >          * know all components affected (for every component
+>> >          * we declare its power domain(s) and states so we
+>> >          * know what components are affected by the state entry.
+>> >          * Given the cache node above and this phandle, the state
+>> >          * implies that the cache is retained, register index == 0 state == 0
+>> >          /*
+>> >         power-domain =<&foo_power_controller 0 0>;
+>>
+>> for retention state we need to set the power domain in state 1
+>>         power-domain =<&foo_power_controller 0 1>;
+>>
+>> > };
+>> >
+>> > state1 {
+>> >         index = <3>;
+>> >         compatible = "arm,cpu-power-state";
+>> >         latency = <...>;
+>> >         /*
+>> >          * This means that when the state is entered, the power
+>> >          * controller should use register index 0 and state 1,
+>> >          * whose meaning is power controller specific. Since we
+>> >          * know all components affected (for every component
+>> >          * we declare its power domain(s) and states so we
+>> >          * know what components are affected by the state entry.
+>> >          * Given the cache node above and this phandle, the state
+>> >          * implies that the cache is lost, register index == 0 state == 1
+>> >          /*
+>> >         power-domain =<&foo_power_controller 0 1>;
+>>
+>> for power down mode, we need to set thge power domain in state 2
+>>         power-domain =<&foo_power_controller 0 2>;
+>
+> Ok, what I meant was not what you got, but your approach looks sensible
+> too. What I do not like is that the power-domain specifier is power
 
-> Hi Mike,
-> 
-> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette
-> <mturquette@linaro.org> wrote:
-> > Quoting Thomas Abraham (2014-01-18 04:10:51)
-> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>
-> >> On some platforms such as the Samsung Exynos, changing the
-> >> frequency of the CPU clock requires changing the frequency of the
-> >> PLL that is supplying the CPU clock. To change the frequency of
-> >> the PLL, the CPU clock is temporarily reparented to another parent
-> >> clock.
-> >>
-> >> The clock frequency of this temporary parent clock could be much
-> >> higher than the clock frequency of the PLL at the time of
-> >> reparenting. Due to the temporary increase in the CPU clock speed,
-> >> the CPU (and any other components in the CPU clock domain such as
-> >> dividers, mux, etc.) have to to be operated at a higher voltage
-> >> level, called the safe voltage level. This patch adds optional
-> >> support to temporarily switch to a safe voltage level during CPU
-> >> frequency transitions.
-> >>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >
-> > I'm not a fan of this change. This corner case should be abstracted
-> > away somehow. I had talked to Chander Kayshap previously about
-> > handling voltage changes in clock notifier callbacks, which then
-> > renders any voltage change as a trivial part of the clock rate
-> > transition. That means that this "safe voltage" thing could be
-> > handled automagically without any additional code in the CPUfreq
-> > driver.
-> >
-> > There are two nice ways to do this with the clock framework. First
-> > is explicit re-parenting with voltage scaling done in the clock
-> > rate-change notifiers:
-> >
-> > clk_set_parent(cpu_clk, temp_parent);
-> > /* implicit voltage scaling to "safe voltage" happens above */
-> > clk_set_rate(pll, some_rate);
-> > clk_set_parent(cpu_clk, pll);
-> > /* implicit voltage scaling to nominal OPP voltage happens above */
-> >
+sorry for the misconception of your example
 
-I must agree with Mike here. In my opinion the above approach is more
-compliant with CCF (as I've pointed it out in my other comment - the
-cpu_clk has more than one parent and we could switch between them when
-needed). 
+> controller specific (that was true even for my example). In theory
+> we can achieve something identical by forcing every component in a power
+> domain to specify the max C-state index that allows it to retain its
 
-> > The above sequence would require a separate exnyos CPUfreq driver,
-> > due to the added clk_set_parent logic.
-> >
-> > The second way to do this is to abstract the clk re-muxing logic out
-> > into the clk driver, which would allow cpufreq-cpu0 to be used for
-> > the exynos chips.
-> 
-> This is the approach this patch series takes (patch 2/7). The clock
-> re-muxing logic is handled by a clock driver code. The difference from
-> what you suggested is that the safe voltage (that may be optionally)
-> required before doing the re-muxing is handled here in cpufreq-cpu0
-> driver.
-> 
-> The safe voltage setup can be done in the notifier as you suggested.
+I'm not sure that we should force a component to set an opaque (for
+the component) max c-state. The device should describe its power
+domain requirements and the correlation of the latter with the
+description of the c-state binding should be enough to deduct the max
+c-state.
 
-If the clk_set_parent() approach is not suitable, then cannot we
-consider using the one from highbank-cpufreq.c?
+> state (through a specific property). Same logic to your example applies.
+> Nice thing is that we do not change the power domain specifiers, bad thing
+> is that it adds two properties to each device (c-state index and
+> power-domain-specifier - but we can make it hierarchical so that device
+> nodes can inherit the maximum operating C-state by inheriting the value
+> from a parent node providing a common value).
+>
+> In my example the third parameter was just a number that the power
+> controller would decode (eg 0 = cache retained, 1 = cache lost)
+> according to its implementation, it was not a "state index". The
+> power controller would know what to do with eg a cache component (that
+> declares to be in that power domain) when a C-state with that power
+> domain specifier was entered.
+>
+> Not very different from what you are saying, let's get to the nub:
+>
+> - Either we define it in a platform specific way through the power
+>   domain specifier
+> - Or we force a max-c-state-supported property for every device,
+>   possibly hierarchical
 
-Here we have cpufreq-cpu0.c which sets voltage of the cpu_clk. 
-In the highbank-cpufreq.c there are clock notifiers to change the
-voltage.
+As explained above, adding a max-cstate property for a device that
+only know the power-domain is not a good thing IMHO.
 
-Cannot Exynos reuse such approach? Why shall we pollute cpufreq-cpu0.c
-with another solution?
+Vincent
 
-> But, doing that in cpufreq-cpu0 driver will help other platforms reuse
-> this feature if required. Also, if done here, the regulator handling
-> is localized in this driver which otherwise would need to be handled
-> in two places, cpufreq-cpu0 driver and the clock notifier.
-
-I think that there is a logical distinction between setting voltage for
-cpufreq-cpu0 related clock and increasing voltage of reparented clock.
-
-The former fits naturally to cpufreq-cpu0, when the latter seems like
-some corner case (as Mike pointed out) for Exynos. 
-
-> 
-> So I tend to prefer the approach in this patch but I am willing to
-> consider any suggestions. 
-
-Thomas, what do you think about highbank-cpufreq.c approach (with
-using clock notifiers)? 
-
-Do you think, that it is feasible to reuse it with Exynos?
-
-> Shawn, it would be helpful if you could let
-> us know your thoughts on this. I am almost done with testing the v3 of
-> this series and want to post it so if there are any objections to the
-> changes in this patch, please let me know.
-> 
-> Thanks,
-> Thomas.
-> 
-> >
-> > I'm more a fan of explicitly listing the Exact Steps for the cpu opp
-> > transition in a separate exynos-specific CPUfreq driver, but that's
-> > probably an unpopular view.
-> >
-> > Regards,
-> > Mike
-> >
-> >> ---
-> >>  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    7 ++++
-> >>  drivers/cpufreq/cpufreq-cpu0.c                     |   37
-> >> +++++++++++++++++-- 2 files changed, 40 insertions(+), 4
-> >> deletions(-)
-> >>
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> >> b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt index
-> >> f055515..37453ab 100644 ---
-> >> a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt +++
-> >> b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt @@
-> >> -19,6 +19,12 @@ Optional properties:
-> >>  - cooling-min-level:
-> >>  - cooling-max-level:
-> >>       Please refer to
-> >> Documentation/devicetree/bindings/thermal/thermal.txt. +-
-> >> safe-opp: Certain platforms require that during a opp transition,
-> >> +  a system should not go below a particular opp level. For such
-> >> systems,
-> >> +  this property specifies the minimum opp to be maintained during
-> >> the
-> >> +  opp transitions. The safe-opp value is a tuple with first
-> >> element
-> >> +  representing the safe frequency and the second element
-> >> representing the
-> >> +  safe voltage.
-> >>
-> >>  Examples:
-> >>
-> >> @@ -36,6 +42,7 @@ cpus {
-> >>                         396000  950000
-> >>                         198000  850000
-> >>                 >;
-> >> +               safe-opp = <396000 950000>
-> >>                 clock-latency = <61036>; /* two CLK32 periods */
-> >>                 #cooling-cells = <2>;
-> >>                 cooling-min-level = <0>;
-> >> diff --git a/drivers/cpufreq/cpufreq-cpu0.c
-> >> b/drivers/cpufreq/cpufreq-cpu0.c index 0c12ffc..075d3d1 100644
-> >> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> >> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> >> @@ -27,6 +27,8 @@
-> >>
-> >>  static unsigned int transition_latency;
-> >>  static unsigned int voltage_tolerance; /* in percentage */
-> >> +static unsigned long safe_frequency;
-> >> +static unsigned long safe_voltage;
-> >>
-> >>  static struct device *cpu_dev;
-> >>  static struct clk *cpu_clk;
-> >> @@ -64,17 +66,30 @@ static int cpu0_set_target(struct
-> >> cpufreq_policy *policy, unsigned int index) volt_old =
-> >> regulator_get_voltage(cpu_reg); }
-> >>
-> >> -       pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> >> +       pr_debug("\n\n%u MHz, %ld mV --> %u MHz, %ld mV\n",
-> >>                  old_freq / 1000, volt_old ? volt_old / 1000 : -1,
-> >>                  new_freq / 1000, volt ? volt / 1000 : -1);
-> >>
-> >>         /* scaling up?  scale voltage before frequency */
-> >> -       if (!IS_ERR(cpu_reg) && new_freq > old_freq) {
-> >> +       if (!IS_ERR(cpu_reg) && new_freq > old_freq &&
-> >> +                               new_freq >= safe_frequency) {
-> >>                 ret = regulator_set_voltage_tol(cpu_reg, volt,
-> >> tol); if (ret) {
-> >>                         pr_err("failed to scale voltage up: %d\n",
-> >> ret); return ret;
-> >>                 }
-> >> +       } else if (!IS_ERR(cpu_reg) && old_freq < safe_frequency) {
-> >> +               /*
-> >> +                * the scaled up voltage level for the new_freq is
-> >> lower
-> >> +                * than the safe voltage level. so set safe_voltage
-> >> +                * as the intermediate voltage level and revert it
-> >> +                * back after the frequency has been changed.
-> >> +                */
-> >> +               ret = regulator_set_voltage_tol(cpu_reg,
-> >> safe_voltage, tol);
-> >> +               if (ret) {
-> >> +                       pr_err("failed to set safe voltage: %d\n",
-> >> ret);
-> >> +                       return ret;
-> >> +               }
-> >>         }
-> >>
-> >>         ret = clk_set_rate(cpu_clk, freq_exact);
-> >> @@ -86,7 +101,8 @@ static int cpu0_set_target(struct
-> >> cpufreq_policy *policy, unsigned int index) }
-> >>
-> >>         /* scaling down?  scale voltage after frequency */
-> >> -       if (!IS_ERR(cpu_reg) && new_freq < old_freq) {
-> >> +       if (!IS_ERR(cpu_reg) &&
-> >> +                       (new_freq < old_freq || new_freq <
-> >> safe_frequency)) { ret = regulator_set_voltage_tol(cpu_reg, volt,
-> >> tol); if (ret) {
-> >>                         pr_err("failed to scale voltage down:
-> >> %d\n", ret); @@ -116,6 +132,8 @@ static struct cpufreq_driver
-> >> cpu0_cpufreq_driver = {
-> >>
-> >>  static int cpu0_cpufreq_probe(struct platform_device *pdev)
-> >>  {
-> >> +       const struct property *prop;
-> >> +       struct dev_pm_opp *opp;
-> >>         struct device_node *np;
-> >>         int ret;
-> >>
-> >> @@ -165,13 +183,24 @@ static int cpu0_cpufreq_probe(struct
-> >> platform_device *pdev) goto out_put_node;
-> >>         }
-> >>
-> >> +       prop = of_find_property(np, "safe-opp", NULL);
-> >> +       if (prop) {
-> >> +               if (prop->value && (prop->length / sizeof(u32)) ==
-> >> 2) {
-> >> +                       const __be32 *val;
-> >> +                       val = prop->value;
-> >> +                       safe_frequency = be32_to_cpup(val++);
-> >> +                       safe_voltage = be32_to_cpup(val);
-> >> +               } else {
-> >> +                       pr_err("invalid safe-opp level
-> >> specified\n");
-> >> +               }
-> >> +       }
-> >> +
-> >>         of_property_read_u32(np, "voltage-tolerance",
-> >> &voltage_tolerance);
-> >>
-> >>         if (of_property_read_u32(np, "clock-latency",
-> >> &transition_latency)) transition_latency = CPUFREQ_ETERNAL;
-> >>
-> >>         if (!IS_ERR(cpu_reg)) {
-> >> -               struct dev_pm_opp *opp;
-> >>                 unsigned long min_uV, max_uV;
-> >>                 int i;
-> >>
-> >> --
-> >> 1.6.6.rc2
-> >>
-
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+>
+> Thoughts ?
+>
+> Thank you !
+> Lorenzo
+>
