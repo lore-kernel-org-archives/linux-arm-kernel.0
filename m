@@ -1,54 +1,32 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 28 Jan 2014 14:33:09 +0100 (CET)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jan 2014 13:48:27 +0000
 Subject: [Q] block / zynq: DMA bouncing
 In-Reply-To: <Pine.LNX.4.64.1401281420580.2714@axis700.grange>
 References: <Pine.LNX.4.64.1401271549280.23931@axis700.grange>
  <20140127170230.GQ15937@n2100.arm.linux.org.uk> <52E69B4E.5010604@monstr.eu>
  <20140127175231.GU15937@n2100.arm.linux.org.uk> <52E69E1E.3020202@monstr.eu>
  <Pine.LNX.4.64.1401281420580.2714@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1401281430150.2714@axis700.grange>
+Message-ID: <20140128134827.GK15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jan 2014, Guennadi Liakhovetski wrote:
+On Tue, Jan 28, 2014 at 02:28:28PM +0100, Guennadi Liakhovetski wrote:
+> +static void __init zynq_memory_init(void)
+> +{
+> +	/*
+> +	 * Reserve the 0-0x4000 addresses (before page tables and kernel)
+> +	 * which can't be used for DMA
+> +	 */
+> +	if (!__pa(PAGE_OFFSET))
+> +		memblock_reserve(0, 0x4000);
 
-> Hi Michal,
-> 
-> (trimmed CC a bit)
-> 
-> On Mon, 27 Jan 2014, Michal Simek wrote:
-> 
-> > On 01/27/2014 06:52 PM, Russell King - ARM Linux wrote:
-> > > On Mon, Jan 27, 2014 at 06:45:50PM +0100, Michal Simek wrote:
-> > >> Why 0x4000? IRC Linux for ARM is using space for any purpose.
-> > >> Russell knows this much better than I.
-> > > 
-> > > Probably because as the kernel is loaded at 0x8000, it will place the
-> > > swapper page table at 0x4000, thus covering from 0x4000 upwards.
-> > 
-> > Ah yeah swapper.
-> > 
-> > > 
-> > > Thus, the majority of your un-DMA-able memory will be kernel text or
-> > > swapper page tables.
-> > 
-> > Yes, exactly.
-> > 0x0 - 0x4000 - reserving not to be used by DMA
-> > 0x4000 - 0x8000 swapper page table
-> > 0x8000 - 0x80000 kernel text + up
-> 
-> Maybe you could submit something like the attached patch upstream. I'm not 
-> sure shom you'd like to put as its original author. I put John Linn there 
-> as he originally authored commit 5b9f3f2ac8a3e4edae9de7b855f25f757884d84c 
+Or maybe this:
 
-Sorry, I actually meant commit 83e198c01c381a1d90ba07e241a517d1dabf7c84
+	memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
 
-Guennadi
+since that's actually what you mean here.
 
-> from Xilinx tree with the same description, as the attached patch. 
-> Unfortunately, that commit didn't have an Sob.
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
