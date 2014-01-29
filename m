@@ -1,38 +1,39 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 29 Jan 2014 09:00:13 -0500
-Subject: [PATCH v3] ARM: hw_breakpoint: Add ARMv8 support
-In-Reply-To: <20140129105722.GD26622@mudshark.cambridge.arm.com>
-References: <20140128183851.GK2885@mudshark.cambridge.arm.com>
- <1390935112-28465-1-git-send-email-cov@codeaurora.org>
- <20140129105722.GD26622@mudshark.cambridge.arm.com>
-Message-ID: <52E9096D.9070800@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jan 2014 15:13:31 +0100
+Subject: [PATCH] ARM: iop32x: fix reset handling for the EM7210 board
+In-Reply-To: <87txcneyi6.fsf@lebrac.rtp-net.org>
+References: <1390999545-31428-1-git-send-email-linus.walleij@linaro.org>
+ <87txcneyi6.fsf@lebrac.rtp-net.org>
+Message-ID: <CACRpkdaLVNg_ZEju8=+5kQ0CbRj=5X5tQ8OTPeZF2Fp_C3BSwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Jan 29, 2014 at 1:57 PM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
 
-On 01/29/2014 05:57 AM, Will Deacon wrote:
-> Hi Christopher,
-> 
-> On Tue, Jan 28, 2014 at 06:51:51PM +0000, Christopher Covington wrote:
->> Add the trivial support necessary to get hardware breakpoints
->> working for GDB on ARMv8 simulators running in AArch32 mode.
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+> don't know how to comment about the subjet but it's _not_ about
+> resetting the board but about powering it off.
+
+Aha sorry I'll respin with updated text.
+
+>>       register_iop32x_gpio();
+>>       platform_device_register(&em7210_serial_device);
+>>       platform_device_register(&iop3xx_i2c0_device);
+>> @@ -194,7 +202,9 @@ static void __init em7210_init_machine(void)
 >>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>
->>  v3: assume for now that ARMv9 and later will update FSR
-> 
-> Please can you stick this into the patch system? I don't have any other
-> hw_breakpoint changes queued, so I doubt I'll send a pull for 3.15.
+>>       i2c_register_board_info(0, em7210_i2c_devices,
+>>               ARRAY_SIZE(em7210_i2c_devices));
+>> -
+>> +     ret = gpio_request(EM7210_HARDWARE_RESET, "reset");
+>> +     if (ret)
+>> +             pr_err("could not request reset GPIO\n");
+>
+> no chance to work. too early. you'll get a -EPROBE_DEFER.
 
-Thanks for your review. Sounds good; will do.
+Yeah that's right, I remember now that I added a separate
+device_initcall() on the N2100 for this. Thanks, I'll respin that.
 
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Yours,
+Linus Walleij
