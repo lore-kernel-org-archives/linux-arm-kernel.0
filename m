@@ -1,84 +1,66 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 30 Jan 2014 08:10:29 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Lager USB0 cable detection workaround
-In-Reply-To: <20140129230959.22655.55645.sendpatchset@w520>
-References: <20140129230959.22655.55645.sendpatchset@w520>
-Message-ID: <20140129231029.22655.58864.sendpatchset@w520>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 30 Jan 2014 00:19:18 +0100
+Subject: [PATCH v2] ARM: iop32x: fix power off handling for the EM7210
+ board
+In-Reply-To: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
+ (Linus Walleij's message of "Wed, 29 Jan 2014 15:20:15 +0100")
+References: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <87lhxyfkax.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Add Lager board code to check the PWEN GPIO signal and refuse to
-allow probe of the USBHS driver in case of DIP misconfiguration.
+> This board was missed when converting all the others to proper
+> abstracted GPIO handling. Fix it up the right way by requesting
+> and driving GPIO line 0 high through gpiolib to power off the
+> machine.
+>
+> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Request the power off and set the power off hook with a
+>   device_initcall() so we know the GPIO driver is available
+>   when requesting the line.
+> - Refer to POWER OFF rather than RESET everywhere.
+>
+> ARM SoC folks, if you're happy with this fix, please apply it
+> directly to fixes in the ARM SoC tree.
+> ---
+>  arch/arm/mach-iop32x/em7210.c | 32 +++++++++++++++++++++++++++-----
+>  1 file changed, 27 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-iop32x/em7210.c b/arch/arm/mach-iop32x/em7210.c
+> index 177cd073a83b..77e1ff057303 100644
+> --- a/arch/arm/mach-iop32x/em7210.c
+> +++ b/arch/arm/mach-iop32x/em7210.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/mtd/physmap.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+> +#include <linux/gpio.h>
+>  #include <mach/hardware.h>
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+> @@ -176,11 +177,35 @@ static struct platform_device em7210_serial_device = {
+>  	.resource	= &em7210_uart_resource,
+>  };
+>  
+> +#define EM7210_HARDWARE_POWER 0
+> +
+>  void em7210_power_off(void)
+>  {
+> -	*IOP3XX_GPOE &= 0xfe;
+> -	*IOP3XX_GPOD |= 0x01;
+> +	int ret;
+> +
+> +	ret = gpio_direction_output(EM7210_HARDWARE_POWER, 1);
 
-For correct operation Lager DIP switches SW5 and SW6 shall be
-configured in 2-3 position to enable USB Function support.
+btw, any reason for not using gpio_direction_output() in
+em7210_request_gpios() and gpio_set_value() here ? (just wondering)
 
-If the DIP switch is configured incorrectly then the user can
-simply adjust the hardware and either reboot or use the bind interface
-to try to probe again:
+I can't test it on my ss4000e but at least this patch looks fine.
 
-# echo renesas_usbhs > /sys/bus/platform/drivers/renesas_usbhs/bind
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Depends on "[PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS"
-
- arch/arm/mach-shmobile/board-lager.c |   25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
-
---- 0004/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2014-01-24 10:17:20.000000000 +0900
-@@ -406,13 +406,30 @@ static int usbhs_hardware_init(struct pl
- {
- 	struct usbhs_private *priv = usbhs_get_priv(pdev);
- 	struct usb_phy *phy;
-+	int ret;
-+
-+	/* USB0 Function - use PWEN as GPIO input to detect DIP Switch SW5
-+	 * setting to avoid VBUS short circuit due to wrong cable.
-+	 * PWEN should be pulled up high if USB Function is selected by SW5
-+	 */
-+	gpio_request_one(RCAR_GP_PIN(5, 18), GPIOF_IN, NULL); /* USB0_PWEN */
-+	if (!gpio_get_value(RCAR_GP_PIN(5, 18))) {
-+		pr_warn("Error: USB Function not selected - check SW5 + SW6\n");
-+		ret = -ENOTSUPP;
-+		goto error;
-+	}
- 
- 	phy = usb_get_phy_dev(&pdev->dev, 0);
--	if (IS_ERR(phy))
--		return PTR_ERR(phy);
-+	if (IS_ERR(phy)) {
-+		ret = PTR_ERR(phy);
-+		goto error;
-+	}
- 
- 	priv->phy = phy;
- 	return 0;
-+ error:
-+	gpio_free(RCAR_GP_PIN(5, 18));
-+	return ret;
- }
- 
- static int usbhs_hardware_exit(struct platform_device *pdev)
-@@ -424,6 +441,8 @@ static int usbhs_hardware_exit(struct pl
- 
- 	usb_put_phy(priv->phy);
- 	priv->phy = NULL;
-+
-+	gpio_free(RCAR_GP_PIN(5, 18));
- 	return 0;
- }
- 
-@@ -534,7 +553,7 @@ static const struct pinctrl_map lager_pi
- 				  "vin1_clk", "vin1"),
- 	/* USB0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
--				  "usb0", "usb0"),
-+				  "usb0_ovc_vbus", "usb0"),
- };
- 
- static void __init lager_add_standard_devices(void)
+Arnaud
