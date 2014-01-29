@@ -1,60 +1,41 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 29 Jan 2014 08:32:49 -0800
-Subject: [PATCH v3 0/2] Qualcomm Universal Peripheral (QUP) I2C controller
-In-Reply-To: <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
-References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
-Message-ID: <CAJAp7Oj_D1QvG9nBWTVrW1QVEpqi2cTTc9c6Um25DDzidCjW1w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Jan 2014 16:32:50 +0000
+Subject: imx-drm: screen flickering
+In-Reply-To: <201401291553.15040.marex@denx.de>
+References: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
+ <20140129111557.GI16215@pengutronix.de> <201401291553.15040.marex@denx.de>
+Message-ID: <20140129163250.GU15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 12:14 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
->
-> Hi Bjorn,
->
-> On Fri, 2014-01-17 at 15:03 -0800, Bjorn Andersson wrote:
->> Continuing on Ivans i2c-qup series.
->>
->
-> Do you plan to send v4 of this driver? I would like to address
-> the remaining errors and suggestions and send a new version.
->
-Hi Ivan,
+On Wed, Jan 29, 2014 at 03:53:14PM +0100, Marek Vasut wrote:
+> Isn't it the clock polarity being inverted thing again [1]?
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-
+> December/215536.html
+> 
+> The easiest way to check this would be to try sig_cfg.clk_pol = 0
+> or = 1 and see if it changes anything.
 
-Yes I'm planning to send out a new revision of the patch set.
+It seems that the pixel clock polarity on iMX hardware is something of
+a mess.  Some hardware blocks require one polarity, others require a
+different polarity.
 
-I've incorporated fixes from the review comments here and my colleague
-concluded through some testing that block read did not work, so we've
-fixed that as well.
+I think what would make sense is if the various output connectors/
+encoders (in other words, imx-hdmi, imx-ldb, etc supplied their
+properties concerning the clock polarity to the IPU layer.
 
-What have been holding me from submitting a new patchset is the 3
-functions that does polling of state and status updates;
-* qup_i2c_poll_state() reads the state register up to 1000 times,
-hoping we reach the expected state, will delay 100uS and then continue
-with 1000 more retries.
-  According to the data sheet a state transition is supposed to take
-up to 2 bus cycles. Only time I can see that this would take longer
-time are all error states, but the data sheet is not very clear
-regarding this.
+We already have something like this in place already: we have the encoder
+prepare functions calling into the ipuv3-crtc layer (via imx-drm-core) to
+set the interface format, vsync/hsync pins, and clock flags - all of which
+get used in the CRTC's mode_set method.  Adding the clock polarity into
+that path doesn't sound too difficult.
 
-* qup_i2c_wait_idle() reads the status register up to 1000 times,
-hoping the fifo gets drained and the bus go idle, if that fails it
-sleeps for the time we expect it to take to drain a full fifo and then
-loops another 1000 times. This waits for the fifo to have drained and
-the bus to go idle. On a read we get to this state if we issue the
-write and then hit the error state, so we would reset the entire
-block. On write we will only wait for the buffer not to be full before
-returning.
+The only issue is that there's a lack of conflict management here - but
+that's not a new problem with this approach - it exists with the existing
+data.
 
-* qup_i2c_wait_clock_ready() waits up to 300 bus-clocks for the i2c
-bus to go idle or forced low, I don't know why it retries 300 times.
-This is called at the end of a write, possibly to wait for the fifo to
-drain.
-
-
-All three loops are in line with how it's been in codeaurora since the
-beginning of time, but I at least need to figure out some good names
-for those "magic numbers".
-
-Regards,
-Bjorn
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
