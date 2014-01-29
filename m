@@ -1,46 +1,59 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 29 Jan 2014 10:41:06 -0800
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20140129182956.14275.72264@capellas-linux>
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
- <20131010175010.17870.58060@capellas-linux>
- <20131022175414.14753.58063@capellas-linux>
- <20140128185926.5312.36635@capellas-linux>
- <20140128125442.4bac748945b404179deb58ba@linux-foundation.org>
- <20140128205830.14275.80319@capellas-linux>
- <20140129182956.14275.72264@capellas-linux>
-Message-ID: <20140129104106.793524a07e48324a32dc6f06@linux-foundation.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 29 Jan 2014 15:46:20 -0300
+Subject: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND flash controller
+ support
+In-Reply-To: <20140129175641.GF1427@obsidianresearch.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
+ <20140129175641.GF1427@obsidianresearch.com>
+Message-ID: <20140129184619.GC27143@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jan 2014 10:29:56 -0800 Sebastian Capella <sebastian.capella@linaro.org> wrote:
-
-> Hi Andrew,
+On Wed, Jan 29, 2014 at 10:56:42AM -0700, Jason Gunthorpe wrote:
+> On Wed, Jan 29, 2014 at 03:34:18PM +0100, Boris BREZILLON wrote:
 > 
-> By the way, I do see a call (sysfs_streq) in use for this purpose
-> other places.  Sorry, I didn't find it while looking at the original
-> problem.  I'm not sure if this is preferable, but it appears to have
-> been added specifically for the strings coming through sysfs.
+> [..]
+> 
+> > +static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+> [..]
+> > +       ret = sunxi_nand_chip_init_timings(chip, np);
+> > +       if (ret)
+> > +               return ret;
+> [..]
+> > +       ret = nand_scan_ident(mtd, nsels, NULL);
+> 
+> This ordering looks a bit problematic, will onfi_get_async_timing_mode
+> ever return anything other than ONFI_TIMING_MODE_UNKNOWN if it is
+> called before nand_scan_ident ? What sets clk_rate to non-zero if there
+> is no DT property?
+> 
+> For a flow that uses onfi_get_async_timing_mode rather than DT the
+> driver should set the interface to timing mode 0 (slowest) and then
+> call nand_scan_ident, and then reset the interface to the detected
+> timing mode.
+> 
 
-Yes, I wrote it ;)
+Yes. And I believe this is a requirement from the ONFI 2.1 spec:
 
-I didn't think sysfs_streq() is well suited to this problem.  And the
-issue of possibly-null-terminated-strings coming in from userspace is a
-common one, so it is desirable that we build up the suite of utilities
-to handle this.
+"""
+4.1.4.3. Source Synchronous to Asynchronous
+[..]
 
-There are probably quite a lot of open-coded \n trimming loops which
-can be cleaned up using such tools.
+The host shall transition to the asynchronous data interface. Then the
+host shall issue the Reset (FFh) command described in the previous paragraph
+using asynchronous timing mode 0, thus the host transitions to the asynchronous
+data interface prior to issuing the Reset (FFh). A device in any timing mode is
+required to recognize a Reset (FFh) command issued in asynchronous timing
+mode 0.
 
-	grep -r "if .* == '\\\n'" .
+[..]
 
-> My preference is copying the string and cleaning it up before passing
-> it to internal functions, even though we incur an allocation.
+After CE# has been pulled high and then transitioned low again, the host
+should issue a Set Features to select the appropriate asynchronous timing mode.
+"""
 
-Yes.  Here on the kernel/userspace boundary we are typically running in
-GFP_KERNEL context and the code is not performance critical - it is a
-good fit.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
