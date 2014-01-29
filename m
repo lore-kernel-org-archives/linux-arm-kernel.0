@@ -1,52 +1,48 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 29 Jan 2014 10:56:42 -0700
-Subject: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND flash controller
- support
-In-Reply-To: <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <20140129175641.GF1427@obsidianresearch.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 29 Jan 2014 11:57:16 -0600
+Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
+In-Reply-To: <20140129172932.GQ26622@mudshark.cambridge.arm.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
+ <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
+ <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
+ <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
+ <52E939CB.1020705@amd.com>
+ <20140129172932.GQ26622@mudshark.cambridge.arm.com>
+Message-ID: <52E940FC.9050602@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 03:34:18PM +0100, Boris BREZILLON wrote:
+On 1/29/2014 11:29 AM, Will Deacon wrote:
+> On Wed, Jan 29, 2014 at 05:26:35PM +0000, Suravee Suthikulanit wrote:
+>> On 1/29/2014 11:16 AM, Andreas Herrmann wrote:
+>>> On Wed, Jan 29, 2014 at 11:59:12AM -0500, Suravee Suthikulanit wrote:
+>>>> Actually, we are using 32 on the AMD system. So, do you think we can set
+>>>> this to 32 instead?
+>>>
+>>> I think that's ok.
+>>>
+>>> But are we really talking about number of SMRs or number of StreamIDs
+>>> per master device here? Ie. are you just having 32 SMRs for an SMMU on
+>>> your AMD system or do you have master devices which have 32 StreamIDs?
+>>>
+>>> If it's just number of SMRs we don't need to modify this macro.
+>>>
+>>
+>> I am referring to the case where each mmu-master can have upto 32 streamID.
+>
+> Crikey, how many SMRs do you have? Andreas and I have been struggling to
+> write a decent allocator for those, so if you have any algorithms that don't
+> require a quantum computer, we'd love to hear from you :)!
+>
+> Will
+>
 
-> +static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
-> +					struct device_node *np)
-> +{
-> +	const struct nand_sdr_timings *timings;
-> +	u32 min_clk_period = 0;
-> +	int ret;
-> +
-> +	ret = onfi_get_async_timing_mode(&chip->nand);
-> +	if (ret == ONFI_TIMING_MODE_UNKNOWN) {
-> +		ret = of_get_nand_onfi_timing_mode(np);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
+Are you talking about the __arm_smmu_alloc_bitmap()?
 
-[..]
+Currently, we have configured the each SMMU to have 32 SMRs and using 
+15-bit streamID. However, we mostly have upto 32 streamID for each 
+master, and most of the SMMU only have one master.  So it looks like the 
+current logic should be ok.
 
-> +static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
-[..]
-> +       ret = sunxi_nand_chip_init_timings(chip, np);
-> +       if (ret)
-> +               return ret;
-[..]
-> +       ret = nand_scan_ident(mtd, nsels, NULL);
-
-This ordering looks a bit problematic, will onfi_get_async_timing_mode
-ever return anything other than ONFI_TIMING_MODE_UNKNOWN if it is
-called before nand_scan_ident ? What sets clk_rate to non-zero if there
-is no DT property?
-
-For a flow that uses onfi_get_async_timing_mode rather than DT the
-driver should set the interface to timing mode 0 (slowest) and then
-call nand_scan_ident, and then reset the interface to the detected
-timing mode.
-
-Maybe this should be implemented in the core code through a new
-callback (nand->set_timing_mode ?)
-
-Regards,
-Jason
+Suravee
