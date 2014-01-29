@@ -1,60 +1,71 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 29 Jan 2014 15:34:22 +0100
-Subject: [RFC PATCH v2 12/14] ARM: sunxi/dt: enable NAND on cubietruck board
+Date: Wed, 29 Jan 2014 15:34:19 +0100
+Subject: [RFC PATCH v2 09/14] mtd: nand: add sunxi NFC dt bindings doc
 In-Reply-To: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1391006064-28890-13-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1391006064-28890-10-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the NFC and describe the NAND flash connected to this controller.
+Add the sunxi NAND Flash Controller dt bindings documentation.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts |   31 ++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ .../devicetree/bindings/mtd/sunxi-nand.txt         |   46 ++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 8a1009d..031de97 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -19,6 +19,37 @@
- 	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
-+		nfc: nand at 01c03000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
-+			status = "okay";
+diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+new file mode 100644
+index 0000000..b0e55a3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+@@ -0,0 +1,46 @@
++Allwinner NAND Flash Controller (NFC)
 +
-+			nand at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0>;
-+				allwinner,rb = <0>;
-+				nand-ecc-mode = "soft_bch";
++Required properties:
++- compatible : "allwinner,sun4i-nand".
++- reg : shall contain registers location and length for data and reg.
++- interrupts : shall define the nand controller interrupt.
++- #address-cells: shall be set to 1. Encode the nand CS.
++- #size-cells : shall be set to 0.
++- clocks : shall reference nand controller clocks.
++- clock-names : nand controller internal clock names. Shall contain :
++    * "ahb_clk" : AHB gating clock
++    * "sclk" : nand controller clock
 +
-+				/* nand timings */
-+				tCLS-min = <6>;
-+				tCLH-min = <3>;
-+				tCS-min = <20>;
-+				tCH-min = <5>;
-+				tWP-min = <8>;
-+				tWH-min = <6>;
-+				tALS-min = <6>;
-+				tDS-min = <6>;
-+				tDH-min = <2>;
-+				tRR-min = <20>;
-+				tALH-min = <3>;
-+				tRP-min = <8>;
-+				tREH-min = <6>;
-+				tRC-min = <16>;
-+				tWC-min = <16>;
-+			};
-+		};
++Optional children nodes:
++Children nodes represent the available nand chips.
 +
- 		pinctrl at 01c20800 {
- 			led_pins_cubietruck: led_pins at 0 {
- 				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
++Optional properties:
++- onfi,nand-timing-mode : mandatory if the chip does not support the ONFI
++  standard.
++- allwinner,rb : shall contain the native Ready/Busy ids.
++ or
++- rb-gpios : shall contain the gpios used as R/B pins.
++
++see Documentation/devicetree/mtd/nand.txt for generic bindings.
++
++
++Examples:
++nfc: nand at 01c03000 {
++	compatible = "allwinner,sun4i-nand";
++	reg = <0x01c03000 0x1000>;
++	interrupts = <0 37 1>;
++	clocks = <&ahb_gates 13>, <&nand_clk>;
++	clock-names = "ahb_clk", "sclk";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
++	status = "okay";
++
++	nand at 0 {
++		reg = <0>;
++		allwinner,rb = <0>;
++		nand-ecc-mode = "soft_bch";
++		onfi,nand-timing-mode = <4>;
++	};
++};
 -- 
 1.7.9.5
