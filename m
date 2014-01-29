@@ -1,36 +1,152 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Jan 2014 12:15:57 +0100
-Subject: imx-drm: screen flickering
-In-Reply-To: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
-References: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
-Message-ID: <20140129111557.GI16215@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Jan 2014 09:58:14 -0200
+Subject: [PATCH v2 1/2] ARM: dts: imx6sl-evk: Add PFUZE100 support
+Message-ID: <1390996695-25164-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Tue, Jan 28, 2014 at 09:11:32AM +0100, Christian Gmeiner wrote:
-> Hi all.
-> 
-> From time to time it happens that my LVDS display is flickering (look
-> at scroll bar in the video).
-> https://drive.google.com/file/d/0B_fznDimUHVubWtvVFlMTkdBbUU/edit?usp=sharing
-> 
-> I really want to find the root cause of it, but I do not know where to
-> start. I can trigger this
-> sometimes after xscreensever "blanks" the screen and the screensafer
-> gets disabled
-> via user input.
-> 
-> Any hints?
+imx6sl-evk board has Freescale PFUZE100 regulator, so add support for it.
 
-Sorry, no idea. Philipp and me watched the video, but we both haven't
-seen something like this before.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Remove pingrp
 
-Sascha
+ arch/arm/boot/dts/imx6sl-evk.dts | 113 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 113 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 0001804..4fc62e8 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -46,6 +46,112 @@
+ 	};
+ };
+ 
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
+ &ecspi1 {
+ 	fsl,spi-num-chipselects = <1>;
+ 	cs-gpios = <&gpio4 11 0>;
+@@ -86,6 +192,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX6SL_PAD_I2C1_SCL__I2C1_SCL	0x4001b8b1
++				MX6SL_PAD_I2C1_SDA__I2C1_SDA	0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_ecspi1: ecspi1grp {
+ 			fsl,pins = <
+ 				MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO	0x100b1
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.2
