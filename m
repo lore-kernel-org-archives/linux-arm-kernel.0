@@ -1,152 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Jan 2014 10:15:15 -0200
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
-Message-ID: <1390997715-25498-1-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jan 2014 13:23:14 +0100
+Subject: [PATCH] ARM: sa1100: fix compile problem on Collie
+Message-ID: <1390998194-9197-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Due to a problem in the MFD Kconfig it was not possible to
+compile the UCB battery driver for the Collie SA1100 system,
+in turn making it impossible to compile in the battery driver.
+(See patch "mfd: include all drivers in subsystem menu".)
 
-mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
+After fixing the MFD Kconfig (separate patch) a compile error
+appears in the Collie battery driver due to the <mach/collie.h>
+implicitly requiring <mach/hardware.h> through <linux/gpio.h>
+via <mach/gpio.h> prior to commit
+40ca061b "ARM: 7841/1: sa1100: remove complex GPIO interface".
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fix this up by including the required header into
+<mach/collie.h>.
+
+Cc: stable at vger.kernel.org
+Cc: Andrea Adami <andrea.adami@gmail.com>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Changes since v1:
-- Remove pingrp
+ arch/arm/mach-sa1100/include/mach/collie.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 113 +++++++++++++++++++++++++++++++
- 1 file changed, 113 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 10a00e4..772c5a1 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -63,6 +63,112 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index f33679d2d3ee..50e1d850ee2e 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -13,6 +13,8 @@
+ #ifndef __ASM_ARCH_COLLIE_H
+ #define __ASM_ARCH_COLLIE_H
  
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
++#include "hardware.h" /* Gives GPIO_MAX */
 +
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -111,6 +217,13 @@
- 			>;
- 		};
+ extern void locomolcd_power(int on);
  
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_EB2__I2C2_SCL	0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_gpmi_nand: gpminandgrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
+ #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
 -- 
-1.8.1.2
+1.8.5.3
