@@ -1,92 +1,29 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Wed, 29 Jan 2014 15:40:17 +0100
-Subject: [PATCH 11/11] arm: dma-mapping: Add support to extend DMA IOMMU
- mappings
-In-Reply-To: <20140129110537.GG26622@mudshark.cambridge.arm.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-12-git-send-email-andreas.herrmann@calxeda.com>
- <52E8DE7D.5020801@samsung.com>
- <20140129110537.GG26622@mudshark.cambridge.arm.com>
-Message-ID: <20140129144017.GA13543@alberich>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 29 Jan 2014 15:34:24 +0100
+Subject: [RFC PATCH v2 14/14] ARM: sunxi/dt: enable HW ECC on cubietruck board
+In-Reply-To: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1391006064-28890-15-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Marek,
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Wed, Jan 29, 2014 at 06:05:37AM -0500, Will Deacon wrote:
-> Hi Marek,
-> 
-> On Wed, Jan 29, 2014 at 10:57:01AM +0000, Marek Szyprowski wrote:
-> > On 2014-01-16 13:44, Andreas Herrmann wrote:
-> > > Instead of using just one bitmap to keep track of IO virtual addresses
-> > > (handed out for IOMMU use) introduce a list of iova_ranges (each
-> > > having its own bitmap). This allows us to extend existing mappings
-> > > when running out of iova space for a mapping.
-> > >
-> > > If there is not enough space in the mapping to service an IO virtual
-> > > address allocation request, __alloc_iova() tries to extend the mapping
-> > > -- by allocating another bitmap -- and makes another allocation
-> > > attempt using the freshly allocated bitmap.
-> > >
-> > > This allows arm iommu drivers to start with a decent initial size when
-> > > an dma_iommu_mapping is created and still to avoid running out of IO
-> > > virtual addresses for the mapping.
-> > >
-> > > Tests were done on Calxeda ECX-2000 with smmu for sata and xgmac.
-> > > I've used SZ_512K both for initial mapping size and grow_size.
-> > 
-> > Thanks for implementing this feature! I remember it was discussed from
-> > early beginning of arm dma iommu support, but I never had enough time
-> > to actually implement it. I briefly checked the code and it look fine,
-> > however I really wonder if we need separate grow_size parameter?
-> > Personally I would simplify it to simply grow the bitmap by initial
-> > size until it reaches the maximal size.
-> 
-> That sounds sensible, but I also think it would be worth taking into account
-> the page sizes supported by the IOMMU as well, since aligning to those makes
-> sense from a TLB utilisation perspective.
-
-Meanwhile I also think that the grow_size parameter is overkill. Only
-the initial mapping size and the maximum size really matter. Then we
-could try to extend the mapping by initial mapping size and if this
-fails (we might not have enough pages to serve such an allocation) we
-could/should even fall back to allocate a single page (which should
-give us at least a 16MB range).
-
-> > The whole concept of the simplified bitmap (where 1 bit != 1 page) for
-> > iova allocation is a specific feature of this code and it has nothing
-> > to the hardware. After thinking a bit more on the existing
-> > implementation I've already observed that it is sometimes hard to
-> > understand the parameters for arm_iommu_create_mapping() function,
-> > especially the 'order' argument is ofter misunderstood. With your
-> > patch we got two additional parameters. Maybe it will be much better
-> > to use only 2 arguments: max_mapping_size and allocation_accuracy.
-> > The initial bitmap size can be then calculated to fit it into single
-> > memory page (that's quite important to avoid allocations larger that
-> > a single memory page). 'allocation_accuracy' will serve the same way
-> > as 'order' parameter now (but expressed in bytes rather than being
-> > the multiplier for the number of pages). This way the
-> > arm_iommu_create_mapping() function should be much easier to
-> > understand, while keeping the implementation details hidden from the
-> > caller.
-> 
-> Hmm, I wouldn't guess the SI unit of accuracy to be bytes ;)
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 031de97..5828923 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -29,7 +29,7 @@
+ 				#size-cells = <1>;
+ 				reg = <0>;
+ 				allwinner,rb = <0>;
+-				nand-ecc-mode = "soft_bch";
++				nand-ecc-mode = "hw";
  
-Have to think about the alignment argument and the last paragraph for
-a while.
-
-All I can say now is that starting with a bitmap size that fits into a
-single memory page doesn't sound right to me. The initial allocation
-is "easy" (not GFP_ATOMIC) and thus I think we should start with a
-larger bitmap. Say you have a device for which at runtime 512MB
-mapping range are required and you use a 4k page for the bitmaps (each
-tracking 16MB IOVA range) you'll have 32 bitmaps to maintain. Whereas
-when you start with 128MB initial bitmap size and (successfully)
-enhance the mapping by 128MB you just have to maintain 4 bitmaps.
-
-But of course coming up with the right choice for the initial bitmap
-size that fits all master devices is a hard thing to do ...
- 
-
-
-Andreas
+ 				/* nand timings */
+ 				tCLS-min = <6>;
+-- 
+1.7.9.5
