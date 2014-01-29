@@ -1,31 +1,58 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 29 Jan 2014 10:29:56 -0800
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20140128205830.14275.80319@capellas-linux>
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
- <20131010175010.17870.58060@capellas-linux>
- <20131022175414.14753.58063@capellas-linux>
- <20140128185926.5312.36635@capellas-linux>
- <20140128125442.4bac748945b404179deb58ba@linux-foundation.org>
- <20140128205830.14275.80319@capellas-linux>
-Message-ID: <20140129182956.14275.72264@capellas-linux>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 29 Jan 2014 19:33:51 +0100
+Subject: [RFC PATCH v2 09/14] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EA6C01D@DBDE04.ent.ti.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-10-git-send-email-b.brezillon.dev@gmail.com>
+ <CAL_JsqLVr1gSLArqtfOiHce+u6ZK8FiKMX0o9bvMrMoGGhATvg@mail.gmail.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EA6C01D@DBDE04.ent.ti.com>
+Message-ID: <52E9498F.8090709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Le 29/01/2014 19:02, Gupta, Pekon a ?crit :
+> Dear Rob, and other DT maintainers,
+>
+>> From: Rob Herring
+> [...]
+>>> +- onfi,nand-timing-mode : mandatory if the chip does not support the ONFI
+>>> +  standard.
+>> Add to generic nand binding.
+>>
+>>> +- allwinner,rb : shall contain the native Ready/Busy ids.
+>>> + or
+>>> +- rb-gpios : shall contain the gpios used as R/B pins.
+>> Isn't allwinner,rb implied by a lack of rb-gpios property. Or no R/B
+>> pin is an option? If so, don't you need some fixed time delay
+>> properties like max erase time?
+>>
+>> rb-gpios could be added to the generic nand binding as well.
+>>
+> I do think this should go into generic nand binding, as this is controller specific.
+> Some controllers have dedicated R/B pin (Ready/Busy) while others may use
+> GPIO instead. It's the way a hardware controller is designed.
 
-By the way, I do see a call (sysfs_streq) in use for this purpose
-other places.  Sorry, I didn't find it while looking at the original
-problem.  I'm not sure if this is preferable, but it appears to have
-been added specifically for the strings coming through sysfs.
+You meant "You do not think", right ?
+If so, I think even if the retrieval and control of the GPIO is done is 
+each NAND
+controller, we could at least use a common property name for all drivers 
+using
+a GPIO to detect the R/B state.
 
-My preference is copying the string and cleaning it up before passing
-it to internal functions, even though we incur an allocation.
+> Request you to please consider Ack from MTD Maintainers 'at-least' for
+> generic NAND DT bindings. There is already a discussion going in
+> a separate thread for which is still not awaiting replies [1].
+>
+> [1]http://lists.infradead.org/pipermail/linux-mtd/2014-January/051625.html
 
-Thanks,
+I missed this thread, but I can definitely use the nand-ecc-strength and
+nand-ecc-step-size instead of the one I defined (nand-ecc-level), as long
+as there is a proper way to define these informations in the DT.
 
-Sebastian
+I'll let DT and MTD maintainers decide ;-).
+
+Best Regards,
+
+Boris
+>
+> with regards, pekon
