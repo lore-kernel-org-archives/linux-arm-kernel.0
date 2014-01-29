@@ -1,73 +1,52 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 29 Jan 2014 17:10:04 +0100
-Subject: [PATCH] ARM: imx6: Initialize low-power mode early again
-Message-ID: <1391011804-22516-1-git-send-email-p.zabel@pengutronix.de>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 29 Jan 2014 10:11:46 -0600
+Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
+In-Reply-To: <20140117110830.GW3471@alberich>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>	<1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
+ <20140117110830.GW3471@alberich>
+Message-ID: <52E92842.3000001@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 9e8147bb5ec5d1dda2141da70f96b98985a306cb
-"ARM: imx6q: move low-power code out of clock driver"
-the kernel fails to boot on i.MX6Q/D if preemption is
-enabled (CONFIG_PREEMPT=y). The kernel just hangs
-before the console comes up.
+On 1/17/2014 5:08 AM, Andreas Herrmann wrote:
+>
+> arm-smmu driver uses of_parse_phandle_with_args when parsing DT
+> information to determine stream IDs for a master device.
+> Thus the number of stream IDs per master device is bound by
+> MAX_PHANDLE_ARGS.
+>
+> To support Calxeda ECX-2000 hardware arm-smmu driver requires a
+> slightly higher value for MAX_PHANDLE_ARGS as this hardware has 10
+> stream IDs for one master device.
+>
+> Increasing it to 16 seems a reasonable choice.
+>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> ---
+>   include/linux/of.h |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 276c546..24e1b28 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -67,7 +67,7 @@ struct device_node {
+>   #endif
+>   };
+>
+> -#define MAX_PHANDLE_ARGS 8
+> +#define MAX_PHANDLE_ARGS 16
 
-The above commit moved the initalization of the low-power
-mode setting (enabling clocked WAIT states), which was
-introduced in commit 83ae20981ae924c37d02a42c829155fc3851260c
-"ARM: imx: correct low-power mode setting", from
-imx6q_clks_init to imx6q_pm_init. Now it is called
-much later, after all cores are enabled.
+Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't 
+this be changed to be able to support 128 StreamIDs as well?  Although I 
+am not sure if this would be too big to have on the stack per Rob's 
+comment in the previous patch set.
 
-This patch moves the low-power mode initialization back
-to imx6q_clks_init again (and to imx6sl_clks_init).
+Thank you,
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx6q.c  | 3 +++
- arch/arm/mach-imx/clk-imx6sl.c | 3 +++
- arch/arm/mach-imx/pm-imx6q.c   | 2 --
- 3 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index af2e582..4d677f4 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -482,6 +482,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	if (IS_ENABLED(CONFIG_PCI_IMX6))
- 		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
- 
-+	/* Set initial power mode */
-+	imx6q_set_lpm(WAIT_CLOCKED);
-+
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 78f3bd6..6617ac8 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -299,6 +299,9 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	/* Audio-related clocks configuration */
- 	clk_set_parent(clks[IMX6SL_CLK_SPDIF0_SEL], clks[IMX6SL_CLK_PLL3_PFD3]);
- 
-+	/* Set initial power mode */
-+	imx6q_set_lpm(WAIT_CLOCKED);
-+
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index c8fea8f..a9a187d 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -532,8 +532,6 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
- 		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_GINT,
- 				   IMX6Q_GPR1_GINT);
- 
--	/* Set initial power mode */
--	imx6q_set_lpm(WAIT_CLOCKED);
- 
- 	suspend_set_ops(&imx6q_pm_ops);
- }
--- 
-1.8.5.3
+Suravee
