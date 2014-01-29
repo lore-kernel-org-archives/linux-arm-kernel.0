@@ -1,279 +1,93 @@
-From: andy@aeruder.net (Andrew Ruder)
-Date: Tue, 28 Jan 2014 23:32:38 -0600
-Subject: [BUG] reproducable ubifs reboot assert and corruption
-In-Reply-To: <20140127163939.GA27809@gmail.com>
-References: <20140122051510.GB17284@gmail.com>
- <CAFLxGvwmzftdQKSjjjwpFLS8g3EJqMrQ2gU2scBsh2MvG7Wyyw@mail.gmail.com>
- <20140127163939.GA27809@gmail.com>
-Message-ID: <20140129053238.GA6035@gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 29 Jan 2014 14:58:59 +0900
+Subject: [PATCH v3] audit: Add generic compat syscall support
+In-Reply-To: <20140127121505.GD32608@arm.com>
+References: <1384854235-6567-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389945795-4255-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140123145119.GE27520@arm.com> <52E5F56F.2030502@linaro.org>
+ <20140127121505.GD32608@arm.com>
+Message-ID: <52E898A3.2050401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, I've got some more useful information.  I have been adding
-a multitude of WARN_ON's and prink's all over the remount code and have
-come up with the attached log.
+Catalin,
 
-A little bit of explanation:
+Let me correct myself,
 
-Line 1: sync_filesystem (from do_remount_sb)
-Line 188: sync_filesystem ends
-Line 43, 64, 81, 98, 114, 135, 156, 173: write operations that occur
-during sync_filesystem.  Before each warning I print the inode pointer.
-Line 197: read-only remount has completely finished (this message is
-from userspace post remount)
-Line 199: a sync is called, there are apparently dirty inodes in our
-now-readonly ubifs filesystem
-Line 215: failed assert that occurs because the writeback triggers for
-inode 0xd75b9450 (see line 41, it got in with a sys_write while we were
-running our sync_filesystem in do_remount_sb)
+On 01/27/2014 09:15 PM, Catalin Marinas wrote:
+> On Mon, Jan 27, 2014 at 05:58:07AM +0000, AKASHI Takahiro wrote:
+>> Catalin and audit maintainers,
+>>
+>> On 01/23/2014 11:51 PM, Catalin Marinas wrote:
+>>> On Fri, Jan 17, 2014 at 08:03:15AM +0000, AKASHI Takahiro wrote:
+>>>> diff --git a/lib/compat_audit.c b/lib/compat_audit.c
+>>>> new file mode 100644
+>>>> index 0000000..94f6480
+>>>> --- /dev/null
+>>>> +++ b/lib/compat_audit.c
+>>>> @@ -0,0 +1,51 @@
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/types.h>
+>>>> +/* FIXME: this might be architecture dependent */
+>>>> +#include <asm/unistd_32.h>
+>>>
+>>> It most likely is architecture dependent.
+>>
+>> I'm wondering what name is the most appropriate in this case.
+>> Most archictures have __NR_xyz definitions in "unistd_32.h",
+>> but arm64 doesn't have it, instead "unistd32." which contains
+>> only __SYSCALL(xyz, NO). Confusing?
+>
+> I don't think we should introduce a new file (or at least it should be
+> named something containing "audit" to make it clearer).
+>
+>>>> +int audit_classify_compat_syscall(int abi, unsigned syscall)
+>>>> +{
+>>>> +	switch (syscall) {
+>>>> +#ifdef __NR_open
+>>>> +	case __NR_open:
+>>>> +		return 2;
+>>>> +#endif
+>>>> +#ifdef __NR_openat
+>>>> +	case __NR_openat:
+>>>> +		return 3;
+>>>> +#endif
+>>>> +#ifdef __NR_socketcall
+>>>> +	case __NR_socketcall:
+>>>> +		return 4;
+>>>> +#endif
+>>>> +	case __NR_execve:
+>>>> +		return 5;
+>>>> +	default:
+>>>> +		return 1;
+>>>> +	}
+>>>> +}
+>>>
+>>> BTW, since they aren't many, you could get the arch code to define
+>>> __NR_compat_open etc. explicitly and use these. On arm64 we have a few
+>>> of these defined to avoid name collision in signal handling code.
+>>
+>> Again, most architecture have their own unistd32.h for compat system calls,
+>> and use __NR_open-like naming.
+>> It's unlikely for these archs to migrate to "generic compat" auditing,
+>> but I believe that '__NR_open'-like naming is better because we may be able to avoid
+>> arch-specific changes even for future(?) syscall-related enhancements in audit.
 
-Does this help?  It looks like there is a race condition between the
-writeback code and the remount read-only.  Nothing is done to lock out
-writes during the first half of the do_remount_sb and some stuff makes
-it into the writeback worker queue while we are busy syncing the
-filesystem only to trigger later when ubifs has decided it is
-read-only...
+In my compat_audit.c, all the entries in audit classes are derived from asm-generic/audit_*.h,
+where __NR_xyz are used to list the system calls. So it is not possible to use __NR_compat_xyz
+as far as we re-use those generic files.
+(Obviously we don't want to duplicate those header files, that is, audit_compat_*.h.)
 
-Note: I only barely know what I am talking about - filesystems still not
-my forte :)
+I agree that we should not have similar but different files, like unist32.h and unistd_32.h,
+but it seems to be inevitable for our case. (That is the reason why I dynamically generate unistd_32.h)
 
-Thanks,
-Andy
+As for arch-specific header file name, "audit_unistd32.h" can be fine, but people on other architectures
+might be unhappy with such a name since they can commonly use unistd32.h instead.
 
 
-  1: pre sync_filesystem
-  2: ------------[ cut here ]------------
-  3: WARNING: CPU: 0 PID: 645 at fs/fs-writeback.c:98 bdi_queue_work+0xc8/0x130()
-  4: Modules linked in:
-  5: CPU: 0 PID: 645 Comm: mount Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-  6: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-  7: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-  8: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-  9: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
- 10: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f4f00>] (bdi_queue_work+0xc8/0x130)
- 11: [<c00f4f00>] (bdi_queue_work+0xc8/0x130) from [<c00f58cc>] (writeback_inodes_sb_nr+0xb4/0xd4)
- 12: [<c00f58cc>] (writeback_inodes_sb_nr+0xb4/0xd4) from [<c00f591c>] (writeback_inodes_sb+0x30/0x34)
- 13: [<c00f591c>] (writeback_inodes_sb+0x30/0x34) from [<c00fa3fc>] (sync_filesystem+0x50/0xbc)
- 14: [<c00fa3fc>] (sync_filesystem+0x50/0xbc) from [<c00d3bf4>] (do_remount_sb+0xb8/0x1fc)
- 15: [<c00d3bf4>] (do_remount_sb+0xb8/0x1fc) from [<c00ee3d0>] (do_mount+0x2e8/0x81c)
- 16: [<c00ee3d0>] (do_mount+0x2e8/0x81c) from [<c00ee998>] (SyS_mount+0x94/0xc8)
- 17: [<c00ee998>] (SyS_mount+0x94/0xc8) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
- 18: ---[ end trace c6e04f3813781dc3 ]---
- 19: Adding tail
- 20: writeback_workfn d781c110 d700fe8c
- 21: inode: d75a2c30
- 22: inode: d75b8c30
- 23: ------------[ cut here ]------------
- 24: WARNING: CPU: 0 PID: 645 at fs/fs-writeback.c:98 bdi_queue_work+0xc8/0x130()
- 25: Modules linked in:
- 26: CPU: 0 PID: 645 Comm: mount Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
- 27: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
- 28: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
- 29: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
- 30: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
- 31: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f4f00>] (bdi_queue_work+0xc8/0x130)
- 32: [<c00f4f00>] (bdi_queue_work+0xc8/0x130) from [<c00f59dc>] (sync_inodes_sb+0xbc/0x1bc)
- 33: [<c00f59dc>] (sync_inodes_sb+0xbc/0x1bc) from [<c00fa434>] (sync_filesystem+0x88/0xbc)
- 34: [<c00fa434>] (sync_filesystem+0x88/0xbc) from [<c00d3bf4>] (do_remount_sb+0xb8/0x1fc)
- 35: [<c00d3bf4>] (do_remount_sb+0xb8/0x1fc) from [<c00ee3d0>] (do_mount+0x2e8/0x81c)
- 36: [<c00ee3d0>] (do_mount+0x2e8/0x81c) from [<c00ee998>] (SyS_mount+0x94/0xc8)
- 37: [<c00ee998>] (SyS_mount+0x94/0xc8) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
- 38: ---[ end trace c6e04f3813781dc4 ]---
- 39: Adding tail
- 40: writeback_workfn d781c110 d700fe9c
- 41: inode: d75b9450
- 42: ------------[ cut here ]------------
- 43: WARNING: CPU: 0 PID: 651 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
- 44: Modules linked in:
- 45: CPU: 0 PID: 651 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
- 46: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
- 47: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
- 48: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
- 49: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
- 50: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
- 51: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110)
- 52: [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110) from [<c0138a48>] (ubifs_write_end+0x1c8/0x294)
- 53: [<c0138a48>] (ubifs_write_end+0x1c8/0x294) from [<c009504c>] (generic_file_buffered_write+0x17c/0x260)
- 54: [<c009504c>] (generic_file_buffered_write+0x17c/0x260) from [<c0096ce8>] (__generic_file_aio_write+0x420/0x448)
- 55: [<c0096ce8>] (__generic_file_aio_write+0x420/0x448) from [<c0096d78>] (generic_file_aio_write+0x68/0xac)
- 56: [<c0096d78>] (generic_file_aio_write+0x68/0xac) from [<c0139880>] (ubifs_aio_write+0x17c/0x18c)
- 57: [<c0139880>] (ubifs_aio_write+0x17c/0x18c) from [<c00d0290>] (do_sync_write+0x7c/0xa0)
- 58: [<c00d0290>] (do_sync_write+0x7c/0xa0) from [<c00d09e4>] (vfs_write+0xe4/0x194)
- 59: [<c00d09e4>] (vfs_write+0xe4/0x194) from [<c00d0f94>] (SyS_write+0x4c/0x7c)
- 60: [<c00d0f94>] (SyS_write+0x4c/0x7c) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
- 61: ---[ end trace c6e04f3813781dc5 ]---
- 62: inode: d75a3248
- 63: ------------[ cut here ]------------
- 64: WARNING: CPU: 0 PID: 656 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
- 65: Modules linked in:
- 66: CPU: 0 PID: 656 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
- 67: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
- 68: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
- 69: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
- 70: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
- 71: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
- 72: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c0138184>] (ubifs_setattr+0x40c/0x49c)
- 73: [<c0138184>] (ubifs_setattr+0x40c/0x49c) from [<c00e9634>] (notify_change+0x204/0x2e8)
- 74: [<c00e9634>] (notify_change+0x204/0x2e8) from [<c00ce888>] (chown_common.isra.14+0x80/0x98)
- 75: [<c00ce888>] (chown_common.isra.14+0x80/0x98) from [<c00cf820>] (SyS_fchownat+0x8c/0xd4)
- 76: [<c00cf820>] (SyS_fchownat+0x8c/0xd4) from [<c00cf8e8>] (SyS_lchown+0x3c/0x44)
- 77: [<c00cf8e8>] (SyS_lchown+0x3c/0x44) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
- 78: ---[ end trace c6e04f3813781dc6 ]---
- 79: inode: d75a7040
- 80: ------------[ cut here ]------------
- 81: WARNING: CPU: 0 PID: 652 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
- 82: Modules linked in:
- 83: CPU: 0 PID: 652 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
- 84: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
- 85: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
- 86: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
- 87: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
- 88: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
- 89: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c0138184>] (ubifs_setattr+0x40c/0x49c)
- 90: [<c0138184>] (ubifs_setattr+0x40c/0x49c) from [<c00e9634>] (notify_change+0x204/0x2e8)
- 91: [<c00e9634>] (notify_change+0x204/0x2e8) from [<c00ce888>] (chown_common.isra.14+0x80/0x98)
- 92: [<c00ce888>] (chown_common.isra.14+0x80/0x98) from [<c00cf820>] (SyS_fchownat+0x8c/0xd4)
- 93: [<c00cf820>] (SyS_fchownat+0x8c/0xd4) from [<c00cf8e8>] (SyS_lchown+0x3c/0x44)
- 94: [<c00cf8e8>] (SyS_lchown+0x3c/0x44) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
- 95: ---[ end trace c6e04f3813781dc7 ]---
- 96: inode: d75b9c70
- 97: ------------[ cut here ]------------
- 98: WARNING: CPU: 0 PID: 647 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
- 99: Modules linked in:
-100: CPU: 0 PID: 647 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-101: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-102: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-103: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-104: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-105: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
-106: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c013b8ac>] (ubifs_rename+0x4a4/0x600)
-107: [<c013b8ac>] (ubifs_rename+0x4a4/0x600) from [<c00de80c>] (vfs_rename+0x280/0x3f4)
-108: [<c00de80c>] (vfs_rename+0x280/0x3f4) from [<c00df4ac>] (SyS_renameat+0x18c/0x218)
-109: [<c00df4ac>] (SyS_renameat+0x18c/0x218) from [<c00df564>] (SyS_rename+0x2c/0x30)
-110: [<c00df564>] (SyS_rename+0x2c/0x30) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-111: ---[ end trace c6e04f3813781dc8 ]---
-112: inode: d75a6e38
-113: ------------[ cut here ]------------
-114: WARNING: CPU: 0 PID: 650 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
-115: Modules linked in:
-116: CPU: 0 PID: 650 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-117: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-118: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-119: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-120: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-121: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
-122: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110)
-123: [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110) from [<c0138a48>] (ubifs_write_end+0x1c8/0x294)
-124: [<c0138a48>] (ubifs_write_end+0x1c8/0x294) from [<c009504c>] (generic_file_buffered_write+0x17c/0x260)
-125: [<c009504c>] (generic_file_buffered_write+0x17c/0x260) from [<c0096ce8>] (__generic_file_aio_write+0x420/0x448)
-126: [<c0096ce8>] (__generic_file_aio_write+0x420/0x448) from [<c0096d78>] (generic_file_aio_write+0x68/0xac)
-127: [<c0096d78>] (generic_file_aio_write+0x68/0xac) from [<c0139880>] (ubifs_aio_write+0x17c/0x18c)
-128: [<c0139880>] (ubifs_aio_write+0x17c/0x18c) from [<c00d0290>] (do_sync_write+0x7c/0xa0)
-129: [<c00d0290>] (do_sync_write+0x7c/0xa0) from [<c00d09e4>] (vfs_write+0xe4/0x194)
-130: [<c00d09e4>] (vfs_write+0xe4/0x194) from [<c00d0f94>] (SyS_write+0x4c/0x7c)
-131: [<c00d0f94>] (SyS_write+0x4c/0x7c) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-132: ---[ end trace c6e04f3813781dc9 ]---
-133: inode: d75a2e38
-134: ------------[ cut here ]------------
-135: WARNING: CPU: 0 PID: 651 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
-136: Modules linked in:
-137: CPU: 0 PID: 651 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-138: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-139: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-140: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-141: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-142: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
-143: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110)
-144: [<c009dc70>] (__set_page_dirty_nobuffers+0xf4/0x110) from [<c0138a48>] (ubifs_write_end+0x1c8/0x294)
-145: [<c0138a48>] (ubifs_write_end+0x1c8/0x294) from [<c009504c>] (generic_file_buffered_write+0x17c/0x260)
-146: [<c009504c>] (generic_file_buffered_write+0x17c/0x260) from [<c0096ce8>] (__generic_file_aio_write+0x420/0x448)
-147: [<c0096ce8>] (__generic_file_aio_write+0x420/0x448) from [<c0096d78>] (generic_file_aio_write+0x68/0xac)
-148: [<c0096d78>] (generic_file_aio_write+0x68/0xac) from [<c0139880>] (ubifs_aio_write+0x17c/0x18c)
-149: [<c0139880>] (ubifs_aio_write+0x17c/0x18c) from [<c00d0290>] (do_sync_write+0x7c/0xa0)
-150: [<c00d0290>] (do_sync_write+0x7c/0xa0) from [<c00d09e4>] (vfs_write+0xe4/0x194)
-151: [<c00d09e4>] (vfs_write+0xe4/0x194) from [<c00d0f94>] (SyS_write+0x4c/0x7c)
-152: [<c00d0f94>] (SyS_write+0x4c/0x7c) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-153: ---[ end trace c6e04f3813781dca ]---
-154: inode: d75a2410
-155: ------------[ cut here ]------------
-156: WARNING: CPU: 0 PID: 653 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
-157: Modules linked in:
-158: CPU: 0 PID: 653 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-159: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-160: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-161: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-162: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-163: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
-164: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c0138184>] (ubifs_setattr+0x40c/0x49c)
-165: [<c0138184>] (ubifs_setattr+0x40c/0x49c) from [<c00e9634>] (notify_change+0x204/0x2e8)
-166: [<c00e9634>] (notify_change+0x204/0x2e8) from [<c00ce888>] (chown_common.isra.14+0x80/0x98)
-167: [<c00ce888>] (chown_common.isra.14+0x80/0x98) from [<c00cf820>] (SyS_fchownat+0x8c/0xd4)
-168: [<c00cf820>] (SyS_fchownat+0x8c/0xd4) from [<c00cf8e8>] (SyS_lchown+0x3c/0x44)
-169: [<c00cf8e8>] (SyS_lchown+0x3c/0x44) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-170: ---[ end trace c6e04f3813781dcb ]---
-171: inode: d75a6410
-172: ------------[ cut here ]------------
-173: WARNING: CPU: 0 PID: 653 at fs/fs-writeback.c:1215 __mark_inode_dirty+0x2dc/0x32c()
-174: Modules linked in:
-175: CPU: 0 PID: 653 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-176: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-177: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-178: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-179: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-180: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c)
-181: [<c00f57c8>] (__mark_inode_dirty+0x2dc/0x32c) from [<c0138184>] (ubifs_setattr+0x40c/0x49c)
-182: [<c0138184>] (ubifs_setattr+0x40c/0x49c) from [<c00e9634>] (notify_change+0x204/0x2e8)
-183: [<c00e9634>] (notify_change+0x204/0x2e8) from [<c00ce888>] (chown_common.isra.14+0x80/0x98)
-184: [<c00ce888>] (chown_common.isra.14+0x80/0x98) from [<c00cf820>] (SyS_fchownat+0x8c/0xd4)
-185: [<c00cf820>] (SyS_fchownat+0x8c/0xd4) from [<c00cf8e8>] (SyS_lchown+0x3c/0x44)
-186: [<c00cf8e8>] (SyS_lchown+0x3c/0x44) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-187: ---[ end trace c6e04f3813781dcc ]---
-188: post sync_filesystem
-189: preparing
-190: done preparing
-191: success
-192: In remount_ro
-193: UBIFS: background thread "ubifs_bgt0_0" stops
-194: thread stopped
-195: ending 1 d781c110 d781c110
-196: remount done 1
-197:  remount
-198: ------------[ cut here ]------------
-199: WARNING: CPU: 0 PID: 661 at fs/fs-writeback.c:98 bdi_queue_work+0xc8/0x130()
-200: Modules linked in:
-201: CPU: 0 PID: 661 Comm: fsstress Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-202: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-203: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-204: [<c0348590>] (dump_stack+0x20/0x28) from [<c0020874>] (warn_slowpath_common+0x78/0x98)
-205: [<c0020874>] (warn_slowpath_common+0x78/0x98) from [<c0020950>] (warn_slowpath_null+0x2c/0x34)
-206: [<c0020950>] (warn_slowpath_null+0x2c/0x34) from [<c00f4f00>] (bdi_queue_work+0xc8/0x130)
-207: [<c00f4f00>] (bdi_queue_work+0xc8/0x130) from [<c00f5e48>] (__bdi_start_writeback+0x114/0x128)
-208: [<c00f5e48>] (__bdi_start_writeback+0x114/0x128) from [<c00f70fc>] (wakeup_flusher_threads+0x70/0x90)
-209: [<c00f70fc>] (wakeup_flusher_threads+0x70/0x90) from [<c00fa49c>] (sys_sync+0x34/0xa4)
-210: [<c00fa49c>] (sys_sync+0x34/0xa4) from [<c000e820>] (ret_fast_syscall+0x0/0x2c)
-211: ---[ end trace c6e04f3813781dcd ]---
-212: Adding tail
-213: writeback_workfn d781c110 d7b970d8
-214: inode: d75b9450
-215: UBIFS assert failed in reserve_space at 125 (pid 6)
-216: CPU: 0 PID: 6 Comm: kworker/u2:0 Tainted: G        W    3.12.0-00041-g7f12d39-dirty #236
-217: Workqueue: writeback bdi_writeback_workfn (flush-ubifs_0_0)
-218: [<c0014fb4>] (unwind_backtrace+0x0/0x128) from [<c0012394>] (show_stack+0x20/0x24)
-219: [<c0012394>] (show_stack+0x20/0x24) from [<c0348590>] (dump_stack+0x20/0x28)
-220: [<c0348590>] (dump_stack+0x20/0x28) from [<c0134b84>] (make_reservation+0x8c/0x560)
-221: [<c0134b84>] (make_reservation+0x8c/0x560) from [<c0135ed8>] (ubifs_jnl_write_inode+0xbc/0x214)
-222: [<c0135ed8>] (ubifs_jnl_write_inode+0xbc/0x214) from [<c013d168>] (ubifs_write_inode+0xec/0x17c)
-223: [<c013d168>] (ubifs_write_inode+0xec/0x17c) from [<c01391d8>] (ubifs_writepage+0x180/0x288)
-224: [<c01391d8>] (ubifs_writepage+0x180/0x288) from [<c009d2dc>] (__writepage+0x24/0x6c)
-225: [<c009d2dc>] (__writepage+0x24/0x6c) from [<c009d89c>] (write_cache_pages+0x2e8/0x3e8)
-226: [<c009d89c>] (write_cache_pages+0x2e8/0x3e8) from [<c009d9e8>] (generic_writepages+0x4c/0x68)
-227: [<c009d9e8>] (generic_writepages+0x4c/0x68) from [<c009f040>] (do_writepages+0x3c/0x48)
-228: [<c009f040>] (do_writepages+0x3c/0x48) from [<c00f518c>] (__writeback_single_inode+0xf8/0x37c)
-229: [<c00f518c>] (__writeback_single_inode+0xf8/0x37c) from [<c00f60f0>] (writeback_sb_inodes+0x1f8/0x3dc)
-230: [<c00f60f0>] (writeback_sb_inodes+0x1f8/0x3dc) from [<c00f6354>] (__writeback_inodes_wb+0x80/0xc0)
-231: [<c00f6354>] (__writeback_inodes_wb+0x80/0xc0) from [<c00f6548>] (wb_writeback+0x1b4/0x364)
-232: [<c00f6548>] (wb_writeback+0x1b4/0x364) from [<c00f6c74>] (bdi_writeback_workfn+0xbc/0x4d4)
-233: [<c00f6c74>] (bdi_writeback_workfn+0xbc/0x4d4) from [<c0038454>] (process_one_work+0x298/0x44c)
-234: [<c0038454>] (process_one_work+0x298/0x44c) from [<c0038b04>] (worker_thread+0x240/0x380)
-235: [<c0038b04>] (worker_thread+0x240/0x380) from [<c003e1a8>] (kthread+0xbc/0xc8)
-236: [<c003e1a8>] (kthread+0xbc/0xc8) from [<c000e8b0>] (ret_from_fork+0x14/0x20)
+- Takahiro AKASHI
+
+> My preference is as above, a few __NR_compat_* (just those required by
+> audit) defined in unistd.h but I'm not an audit maintainer.
+>
