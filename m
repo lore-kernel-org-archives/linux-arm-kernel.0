@@ -1,92 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Jan 2014 12:33:03 +0000
-Subject: [PATCH RFC v2 2/2] Documentation: arm: define DT C-states bindings
-In-Reply-To: <20140127155924.GA2178@e103592.cambridge.arm.com>
-References: <20140127155924.GA2178@e103592.cambridge.arm.com>
-Message-ID: <20140129123303.GA10396@e102568-lin.cambridge.arm.com>
+From: mikpelinux@gmail.com (Mikael Pettersson)
+Date: Wed, 29 Jan 2014 13:34:49 +0100
+Subject: Building with gcc 4.6.4
+In-Reply-To: <20140128150611.GL15937@n2100.arm.linux.org.uk>
+References: <20140128120150.GG15937@n2100.arm.linux.org.uk>
+ <21223.49366.479579.145000@gargle.gargle.HOWL>
+ <20140128150611.GL15937@n2100.arm.linux.org.uk>
+Message-ID: <21224.62825.625591.200853@gargle.gargle.HOWL>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 27, 2014 at 03:59:37PM +0000, Dave Martin wrote:
-> On Fri, Jan 24, 2014 at 05:58:07PM +0000, Lorenzo Pieralisi wrote:
+Russell King - ARM Linux writes:
+ > On Tue, Jan 28, 2014 at 03:38:14PM +0100, Mikael Pettersson wrote:
+ > > Russell King - ARM Linux writes:
+ > >  > So, yesterday I built gcc 4.6.4 (mainline) for the autobuilder, and the
+ > >  > result is that every build failed with the same error:
+ > >  > 
+ > >  > scripts/mod/empty.c:1:0: error: FPA is unsupported in the AAPCS
+ > >  > 
+ > >  > This seems to be because linux-elf targets default to fpe3 in mainline
+ > >  > gcc, but specifying -mabi=aapcs-linux switches us into EABI mode where
+ > >  > the compiler errors out with the default FPU.
+ > >  > 
+ > >  > Hence, I believe we need this to ensure that a compatible VFP is
+ > >  > selected.  One can argue that building EABI ARMv4 with VFP is silly,
+ > >  > but it seems that's what the gcc folk have decided (rightly or
+ > >  > wrongly.)
+ > >  > 
+ > >  > Maybe this is a bug in mainline GCC - which begs the question why
+ > >  > (presumably, since no one has picked this up) Linaro's toolchain
+ > >  > has fixes but mainline GCC doesn't.
+ > >  > 
+ > >  > Comments?
+ > > 
+ > > Perhaps because most ARM EABI toolchains default to soft-float,
+ > > and the hardfloat ones usually select v6 or v7 + vfp-d16 or neon
+ > > as their defaults, so the archaic FPA is never the default.
+ > 
+ > soft-float has nothing to do with it, because the kernel always passes
+ > -msoft-float.
+ > 
+ > > Or are you using an OABI toolchain to compile an EABI kernel?
+ > 
+ > ... which should make no difference what so ever since the kernel should
+ > be passing the appropriate options.  That's why we pass -mabi=aapcs-linux
+ > to the kernel.
 
-[...]
+I can reproduce your error with an OABI toolchain (gcc-4.6.4 or 4.7.3,
+default configuration options wrt ISA and floating-point model), but
+there's no such error with an EABI toolchain.  So it looks like you've
+found a GCC bug.
 
-> > > > state0 {
-> > > >         index = <2>;
-> > > >         compatible = "arm,cpu-power-state";
-> > > >         latency = <...>;
-> > > >         /*
-> > > >          * This means that when the state is entered, the power
-> > > >          * controller should use register index 0 and state 0,
-> > > >          * whose meaning is power controller specific. Since we
-> > > >          * know all components affected (for every component
-> > > >          * we declare its power domain(s) and states so we
-> > > >          * know what components are affected by the state entry.
-> > > >          * Given the cache node above and this phandle, the state
-> > > >          * implies that the cache is retained, register index == 0 state == 0
-> > > >          /*
-> > > >         power-domain =<&foo_power_controller 0 0>;
-> > > 
-> > > for retention state we need to set the power domain in state 1
-> > >         power-domain =<&foo_power_controller 0 1>;
-> 
-> The name "power-domain" probably needs changing if the specifier contains
-> state information too.
-> 
-> Instead, we could call it "power-state" or similar.
-> 
-> 
-> Key issues I see:
-> 
-> 1) How to describe platforms where there is no "power controller" as such,
->    just a bunch of clocks and regulators that Linux has to poke directly.
-> 
-> 2) Two devices might have the same power controller (in terms of IP and
->    revision), but integrated in different ways.  So, maybe thinking of
->    the referenced thing as a power controller is not correct.  We can
->    thing in terms of referring to individual power domains, or maybe
->    to a "power model" for the SoC.
+However, the toolchain people considers OABI to be obsolete, it's
+unsupported since gcc-4.7.0, gcc-4.6 is EOL, and even gcc-4.7 is
+nearing EOL (will probably happen this spring or early summer after
+the release of gcc-4.9.0), so I doubt anyone is going to work on
+this issue.
 
-The example was misleading. There is no link to a power controller as
-such, the phandle is to a power domain, which fits with what you are
-saying, basically the C-state does not care about how the power domain
-is implemented, it just defines that that specific power domain is
-affected. I am not sure we should change the naming either, a C-state
-defines a power-domain specifier, which implies a certain behaviour
-for a power domain. It is platform specific, so for certain platforms
-the cells represent a state for others they do not.
-
->    The power domain or model becomes a container for power (domains and)
->    states, and refers to the IP blocks (power controllers, regulators,
->    clocks, clamps, whatever) required to implement it.
-> 
->    This change of abstraction might map more naturally onto "bunch
->    of clocks and regulators" situations: the power model or domain
->    binding can make symbolic references to clocks and regulators etc.,
->    so that the binding becomes less dependent on the exact content of
->    the rest of the DT.
-
-Exactly, I agree, the complexity is in the power-domain (how states are
-handled, what components should be programmed, etc) the C-state just
-defines what power-domain it affects, with power domain specifier cells
-providing additional, power domain specific, semantics (ie retention vs.
-shutdown).
-
-> 3) We need to be very clear that the power state specifier needs to be
->    defined in terms of the actual hardware effects in the relevant SoC-
->    specific binding -- at the "what" level, rather than "how".
-> 
->    There's a fair chance of people getting lazy: they'll just stuff
->    indices in the DT which map to random LUTs in the Linux driver.  In
->    that case, the DT would be describing the Linux driver, not the
->    hardware -- that's not what we want.
-> 
->    Delegating the job of defining power states to the SoC documentation
->    seems acceptable, though.
-
-I agree, and I think we are pretty close to a general agreement on this
-specific subject.
-
-Thank you,
-Lorenzo
+/Mikael
