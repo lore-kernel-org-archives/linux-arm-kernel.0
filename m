@@ -1,63 +1,73 @@
-From: rgb@redhat.com (Richard Guy Briggs)
-Date: Wed, 29 Jan 2014 15:21:27 -0500
-Subject: [PATCH v2 1/6] audit: Enable arm64 support
-In-Reply-To: <52E5EAC1.2070306@linaro.org>
-References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
- <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
- <20140123141808.GD27520@arm.com> <52E5EAC1.2070306@linaro.org>
-Message-ID: <20140129202127.GA24068@madcap2.tricolour.ca>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 Jan 2014 15:31:36 -0500 (EST)
+Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
+ idle loop
+In-Reply-To: <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/27, AKASHI Takahiro wrote:
-> [To audit maintainers]
-> 
-> On 01/23/2014 11:18 PM, Catalin Marinas wrote:
-> >On Fri, Jan 17, 2014 at 08:13:14AM +0000, AKASHI Takahiro wrote:
-> >>--- a/include/uapi/linux/audit.h
-> >>+++ b/include/uapi/linux/audit.h
-> >>@@ -327,6 +327,8 @@ enum {
-> >>  /* distinguish syscall tables */
-> >>  #define __AUDIT_ARCH_64BIT 0x80000000
-> >>  #define __AUDIT_ARCH_LE	   0x40000000
-> >>+#define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
-> >>+#define AUDIT_ARCH_AARCH64EB	(EM_AARCH64|__AUDIT_ARCH_64BIT)
-> >>  #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
-> >>  #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
-> >>  #define AUDIT_ARCH_ARMEB	(EM_ARM)
-> >>diff --git a/init/Kconfig b/init/Kconfig
-> >>index 79383d3..3aae602 100644
-> >>--- a/init/Kconfig
-> >>+++ b/init/Kconfig
-> >>@@ -284,7 +284,7 @@ config AUDIT
-> >>
-> >>  config AUDITSYSCALL
-> >>  	bool "Enable system-call auditing support"
-> >>-	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
-> >>+	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ARM64)
-> >
-> >The usual comment for such changes: could you please clean this up and
-> >just use something like "depends on HAVE_ARCH_AUDITSYSCALL"?
-> 
-> Do you agree to this change?
-> 
-> If so, I can create a patch, but have some concerns:
-> 1) I can't verify it on other architectures than (arm &) arm64.
-> 2) Some architectures (microblaze, mips, openrisc) are not listed here, but
->    their ptrace.c have a call to audit_syscall_entry/exit().
->    (audit_syscall_entry/exit are null if !AUDITSYSCALL, though)
+On Wed, 29 Jan 2014, Nicolas Pitre wrote:
 
-I can try: ppc s390 x86_64 ppc64 i686 s390x
-
-> So I'm afraid that the change might break someone's assumption.
+> In order to integrate cpuidle with the scheduler, we must have a better
+> proximity in the core code with what cpuidle is doing and not delegate
+> such interaction to arch code.
 > 
-> Thanks,
-> -Takahiro AKASHI
+> Architectures implementing arch_cpu_idle() should simply enter
+> a cheap idle mode in the absence of a proper cpuidle driver.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-- RGB
+As mentioned in my reply to Olof's comment on patch #5/6, here's a new 
+version of this patch adding the safety local_irq_enable() to the core 
+code.
 
---
-Richard Guy Briggs <rbriggs@redhat.com>
-Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
-Remote, Ottawa, Canada
-Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+----- >8
+
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Subject: idle: move the cpuidle entry point to the generic idle loop
+
+In order to integrate cpuidle with the scheduler, we must have a better
+proximity in the core code with what cpuidle is doing and not delegate
+such interaction to arch code.
+
+Architectures implementing arch_cpu_idle() should simply enter
+a cheap idle mode in the absence of a proper cpuidle driver.
+
+In both cases i.e. whether it is a cpuidle driver or the default
+arch_cpu_idle(), the calling convention expects IRQs to be disabled
+on entry and enabled on exit. There is a warning in place already but
+let's add a forced IRQ enable here as well.  This will allow for
+removing the forced IRQ enable some implementations do locally and 
+allowing for the warning to trig.
+
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+
+diff --git a/kernel/cpu/idle.c b/kernel/cpu/idle.c
+index 988573a9a3..14ca43430a 100644
+--- a/kernel/cpu/idle.c
++++ b/kernel/cpu/idle.c
+@@ -3,6 +3,7 @@
+  */
+ #include <linux/sched.h>
+ #include <linux/cpu.h>
++#include <linux/cpuidle.h>
+ #include <linux/tick.h>
+ #include <linux/mm.h>
+ #include <linux/stackprotector.h>
+@@ -95,8 +96,10 @@ static void cpu_idle_loop(void)
+ 				if (!current_clr_polling_and_test()) {
+ 					stop_critical_timings();
+ 					rcu_idle_enter();
+-					arch_cpu_idle();
+-					WARN_ON_ONCE(irqs_disabled());
++					if (cpuidle_idle_call())
++						arch_cpu_idle();
++					if (WARN_ON_ONCE(irqs_disabled()))
++						local_irq_enable();
+ 					rcu_idle_exit();
+ 					start_critical_timings();
+ 				} else {
