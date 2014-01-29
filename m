@@ -1,78 +1,67 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 12:07:48 -0800
-Subject: [PATCH v2 06/10] ARM: KVM: fix handling of trapped 64bit
- coprocessor accesses
-In-Reply-To: <1390402602-22777-7-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 29 Jan 2014 12:07:57 -0800
+Subject: [PATCH v2 07/10] ARM: KVM: fix ordering of 64bit coprocessor
+ accesses
+In-Reply-To: <1390402602-22777-8-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
- <1390402602-22777-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140129200748.GI3570@cbox>
+ <1390402602-22777-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140129200757.GJ3570@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:56:38PM +0000, Marc Zyngier wrote:
+On Wed, Jan 22, 2014 at 02:56:39PM +0000, Marc Zyngier wrote:
 > Commit 240e99cbd00a (ARM: KVM: Fix 64-bit coprocessor handling)
-> changed the way we match the 64bit coprocessor access from
-> user space, but didn't update the trap handler for the same
-> set of registers.
+> added an ordering dependency for the 64bit registers.
 > 
-> The effect is that a trapped 64bit access is never matched, leading
-> to a fault being injected into the guest. This went unnoticed as we
-> didn;t really trap any 64bit register so far.
-
-didn't
-
+> The order described is: CRn, CRm, Op1, Op2, 64bit-first.
 > 
-> Placing the CRm field of the access into the CRn field of the matching
-> structure fixes the problem. Also update the debug feature to emit the
-> expected string in case of failing match.
+> Unfortunately, the implementation is: CRn, 64bit-first, CRm...
+> 
+> Move the 64bit test to be last in order to match the documentation.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/kvm/coproc.c | 4 ++--
->  arch/arm/kvm/coproc.h | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/kvm/coproc.h | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 78c0885..126c90d 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -443,7 +443,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	struct coproc_params params;
->  
-> -	params.CRm = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
-> +	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
->  	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
->  	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
->  	params.is_64bit = true;
-> @@ -451,7 +451,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 16) & 0xf;
->  	params.Op2 = 0;
->  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
-> -	params.CRn = 0;
-> +	params.CRm = 0;
->  
->  	return emulate_cp15(vcpu, &params);
->  }
 > diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-> index 0461d5c..c5ad7ff 100644
+> index c5ad7ff..1a44bbe 100644
 > --- a/arch/arm/kvm/coproc.h
 > +++ b/arch/arm/kvm/coproc.h
-> @@ -58,8 +58,8 @@ static inline void print_cp_instr(const struct coproc_params *p)
->  {
->  	/* Look, we even formatted it for you to paste into the table! */
->  	if (p->is_64bit) {
-> -		kvm_pr_unimpl(" { CRm(%2lu), Op1(%2lu), is64, func_%s },\n",
-> -			      p->CRm, p->Op1, p->is_write ? "write" : "read");
-> +		kvm_pr_unimpl(" { CRm64(%2lu), Op1(%2lu), is64, func_%s },\n",
-> +			      p->CRn, p->Op1, p->is_write ? "write" : "read");
->  	} else {
->  		kvm_pr_unimpl(" { CRn(%2lu), CRm(%2lu), Op1(%2lu), Op2(%2lu), is32,"
->  			      " func_%s },\n",
+> @@ -135,13 +135,13 @@ static inline int cmp_reg(const struct coproc_reg *i1,
+>  		return -1;
+>  	if (i1->CRn != i2->CRn)
+>  		return i1->CRn - i2->CRn;
+> -	if (i1->is_64 != i2->is_64)
+> -		return i2->is_64 - i1->is_64;
+>  	if (i1->CRm != i2->CRm)
+>  		return i1->CRm - i2->CRm;
+>  	if (i1->Op1 != i2->Op1)
+>  		return i1->Op1 - i2->Op1;
+> -	return i1->Op2 - i2->Op2;
+> +	if (i1->Op2 != i2->Op2)
+> +		return i1->Op2 - i2->Op2;
+> +	return i2->is_64 - i1->is_64;
+>  }
+>  
+>  
+> @@ -153,4 +153,8 @@ static inline int cmp_reg(const struct coproc_reg *i1,
+>  #define is64		.is_64 = true
+>  #define is32		.is_64 = false
+>  
+> +bool access_sctlr(struct kvm_vcpu *vcpu,
+> +		  const struct coproc_params *p,
+> +		  const struct coproc_reg *r);
+> +
+>  #endif /* __ARM_KVM_COPROC_LOCAL_H__ */
+
+stray hunk from other patch?
+
 > -- 
 > 1.8.3.4
 > 
 
-Thanks for fixing my broken fix!
+otherwise,
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks for fixing my broken fix, again,
+FWIW: Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
