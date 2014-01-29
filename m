@@ -1,66 +1,56 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 30 Jan 2014 00:19:18 +0100
-Subject: [PATCH v2] ARM: iop32x: fix power off handling for the EM7210
- board
-In-Reply-To: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
- (Linus Walleij's message of "Wed, 29 Jan 2014 15:20:15 +0100")
-References: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <87lhxyfkax.fsf@lebrac.rtp-net.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 29 Jan 2014 17:32:41 -0600
+Subject: [PATCH 2/2] ARM: dts: OMAP3+: add clock nodes for CPU
+In-Reply-To: <CAOCHtYjaCBn2oOk66ef9wiz_GJnVwHDyx446_mrkipPoENaeUQ@mail.gmail.com>
+References: <1391019557-22313-1-git-send-email-nm@ti.com>	<1391019557-22313-3-git-send-email-nm@ti.com>
+ <CAOCHtYjaCBn2oOk66ef9wiz_GJnVwHDyx446_mrkipPoENaeUQ@mail.gmail.com>
+Message-ID: <52E98F99.2050600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On 01/29/2014 01:29 PM, Robert Nelson wrote:
+> On Wed, Jan 29, 2014 at 12:19 PM, Nishanth Menon <nm@ti.com> wrote:
+>> OMAP34xx, AM3517 and OMAP36xx platforms use dpll1 clock.
+>>
+>> OMAP443x, OMAP446x, OMAP447x, OMAP5, DRA7, AM43xx platforms use
+>> dpll_mpu clock.
+>>
+>> Latency used is the generic latency defined in omap-cpufreq
+>> driver.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+> 
+> Hi Nishanth,
+> 
+> After this patch, do you see any limitation to finally enabling 1Ghz
+> operation on the beagle-xm by default? Or are we still missing a
+> dependicy somewhere?
 
-> This board was missed when converting all the others to proper
-> abstracted GPIO handling. Fix it up the right way by requesting
-> and driving GPIO line 0 high through gpiolib to power off the
-> machine.
->
-> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Request the power off and set the power off hook with a
->   device_initcall() so we know the GPIO driver is available
->   when requesting the line.
-> - Refer to POWER OFF rather than RESET everywhere.
->
-> ARM SoC folks, if you're happy with this fix, please apply it
-> directly to fixes in the ARM SoC tree.
-> ---
->  arch/arm/mach-iop32x/em7210.c | 32 +++++++++++++++++++++++++++-----
->  1 file changed, 27 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-iop32x/em7210.c b/arch/arm/mach-iop32x/em7210.c
-> index 177cd073a83b..77e1ff057303 100644
-> --- a/arch/arm/mach-iop32x/em7210.c
-> +++ b/arch/arm/mach-iop32x/em7210.c
-> @@ -23,6 +23,7 @@
->  #include <linux/mtd/physmap.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
-> +#include <linux/gpio.h>
->  #include <mach/hardware.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
-> @@ -176,11 +177,35 @@ static struct platform_device em7210_serial_device = {
->  	.resource	= &em7210_uart_resource,
->  };
->  
-> +#define EM7210_HARDWARE_POWER 0
-> +
->  void em7210_power_off(void)
->  {
-> -	*IOP3XX_GPOE &= 0xfe;
-> -	*IOP3XX_GPOD |= 0x01;
-> +	int ret;
-> +
-> +	ret = gpio_direction_output(EM7210_HARDWARE_POWER, 1);
+yes, there is:
+a) ABB dt series - i will repost this in a few mins
+b) AVS conversion from non-dt mode to dt supported mode. (which by
+itself depends on VC/VP conversion).
+c) clk notifier based dvfs for cpufreq-cpu0 -> this allows us to
+introduce the necessary plumbing for mpu voltage domain such that the
+TWL4030 regulator, AVS and ABB are rightly sequenced.
 
-btw, any reason for not using gpio_direction_output() in
-em7210_request_gpios() and gpio_set_value() here ? (just wondering)
+What you have done in the patch below is to introduce ABB regulator -
+but no one is actually using it -> this might actually work on certain
+samples at 1GHz, but prolonged operation will either damage the device
+or fail on other samples - I have tried numerous times Internally to
+get approval for non ABB/AVS configuration for 1GHz - but I have a
+clear feedback that it cannot be done with the constraints of
+DM3730/OMAP3630.
 
-I can't test it on my ss4000e but at least this patch looks fine.
+Lets do this a series at a time and build up the necessary support -
+we get clock nodes for dvfs (using i2c1) here with cpufreq-cpu0 with
+this series. If folks can ack and queue this up, we can get in ABB dts
+nodes in place - allowing us to work on the next set -> sequencing
+using clock notifier. in parallel we could work on converting AVS back
+to dt based solution.
 
-Arnaud
+yes, the road is long.
+
+-- 
+Regards,
+Nishanth Menon
