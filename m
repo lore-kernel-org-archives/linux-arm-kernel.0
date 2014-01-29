@@ -1,230 +1,108 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 12:08:17 -0800
-Subject: [PATCH v2 09/10] ARM: KVM: trap VM system registers until MMU
- and caches are ON
-In-Reply-To: <1390402602-22777-10-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 29 Jan 2014 12:08:28 -0800
+Subject: [PATCH v2 10/10] ARM: KVM: add world-switch for AMAIR{0,1}
+In-Reply-To: <1390402602-22777-11-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
- <1390402602-22777-10-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140129200817.GL3570@cbox>
+ <1390402602-22777-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140129200828.GM3570@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:56:41PM +0000, Marc Zyngier wrote:
-> In order to be able to detect the point where the guest enables
-> its MMU and caches, trap all the VM related system registers.
-> 
-> Once we see the guest enabling both the MMU and the caches, we
-> can go back to a saner mode of operation, which is to leave these
-> registers in complete control of the guest.
+On Wed, Jan 22, 2014 at 02:56:42PM +0000, Marc Zyngier wrote:
+> HCR.TVM traps (among other things) accesses to AMAIR0 and AMAIR1.
+> In order to minimise the amount of surprise a guest could generate by
+> trying to access these registers with caches off, add them to the
+> list of registers we switch/handle.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_arm.h |  3 +-
->  arch/arm/kvm/coproc.c          | 85 ++++++++++++++++++++++++++++++++++--------
->  arch/arm/kvm/coproc_a15.c      |  2 +-
->  arch/arm/kvm/coproc_a7.c       |  2 +-
->  4 files changed, 73 insertions(+), 19 deletions(-)
+>  arch/arm/include/asm/kvm_asm.h |  4 +++-
+>  arch/arm/kvm/coproc.c          |  6 ++++++
+>  arch/arm/kvm/interrupts_head.S | 12 ++++++++++--
+>  3 files changed, 19 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index a843e74..816db0b 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -55,6 +55,7 @@
->   * The bits we set in HCR:
->   * TAC:		Trap ACTLR
->   * TSC:		Trap SMC
-> + * TVM:		Trap VM ops (until MMU and caches are on)
->   * TSW:		Trap cache operations by set/way
->   * TWI:		Trap WFI
->   * TWE:		Trap WFE
-> @@ -68,7 +69,7 @@
->   */
->  #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
->  			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-> -			HCR_TWE | HCR_SWIO | HCR_TIDCP)
-> +			HCR_TVM | HCR_TWE | HCR_SWIO | HCR_TIDCP)
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 661da11..53b3c4a 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -48,7 +48,9 @@
+>  #define c13_TID_URO	26	/* Thread ID, User R/O */
+>  #define c13_TID_PRIV	27	/* Thread ID, Privileged */
+>  #define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
+> -#define NR_CP15_REGS	29	/* Number of regs (incl. invalid) */
+> +#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
+> +#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
+> +#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
 >  
->  /* System Control Register (SCTLR) bits */
->  #define SCTLR_TE	(1 << 30)
+>  #define ARM_EXCEPTION_RESET	  0
+>  #define ARM_EXCEPTION_UNDEFINED   1
 > diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 126c90d..1839770 100644
+> index 1839770..539f6d4 100644
 > --- a/arch/arm/kvm/coproc.c
 > +++ b/arch/arm/kvm/coproc.c
-> @@ -23,6 +23,7 @@
->  #include <asm/kvm_host.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_coproc.h>
-> +#include <asm/kvm_mmu.h>
->  #include <asm/cacheflush.h>
->  #include <asm/cputype.h>
->  #include <trace/events/kvm.h>
-> @@ -205,6 +206,55 @@ done:
->  }
->  
->  /*
-> + * Generic accessor for VM registers. Only called as long as HCR_TVM
-> + * is set.
-> + */
-> +static bool access_vm_reg(struct kvm_vcpu *vcpu,
-> +			  const struct coproc_params *p,
-> +			  const struct coproc_reg *r)
-> +{
-> +	if (p->is_write) {
-> +		vcpu->arch.cp15[r->reg] = *vcpu_reg(vcpu, p->Rt1);
-> +		if (p->is_64bit)
-> +			vcpu->arch.cp15[r->reg + 1] = *vcpu_reg(vcpu, p->Rt2);
-> +	} else {
-
-hmm, the TVM in the ARM ARM v7 says it only traps for write accesses...?
-
-> +		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
-> +		if (p->is_64bit)
-> +			*vcpu_reg(vcpu, p->Rt2) = vcpu->arch.cp15[r->reg + 1];
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +/*
-> + * SCTLR accessor. Only called as long as HCR_TVM is set.  If the
-> + * guest enables the MMU, we stop trapping the VM sys_regs and leave
-> + * it in complete control of the caches.
-> + *
-> + * Used by the cpu-specific code.
-> + */
-> +bool access_sctlr(struct kvm_vcpu *vcpu,
-> +		  const struct coproc_params *p,
-> +		  const struct coproc_reg *r)
-> +{
-> +	if (p->is_write) {
-> +		unsigned long val;
-> +
-> +		val = *vcpu_reg(vcpu, p->Rt1);
-> +		vcpu->arch.cp15[r->reg] = val;
-
-again, would it make sense to just call access_vm_reg and do the check
-for caches enabled afterwards?
-
-> +
-> +		if ((val & (0b101)) == 0b101) {	/* MMU+Caches enabled? */
-> +			vcpu->arch.hcr &= ~HCR_TVM;
-> +			stage2_flush_vm(vcpu->kvm);
-> +		}
-
-my favorite static inline, again, again, ...
-
-> +	} else {
-> +		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[r->reg];
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +/*
->   * We could trap ID_DFR0 and tell the guest we don't support performance
->   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
->   * NAKed, so it will read the PMCR anyway.
-> @@ -261,33 +311,36 @@ static const struct coproc_reg cp15_regs[] = {
->  	{ CRn( 1), CRm( 0), Op1( 0), Op2( 2), is32,
->  			NULL, reset_val, c1_CPACR, 0x00000000 },
->  
-> -	/* TTBR0/TTBR1: swapped by interrupt.S. */
-> -	{ CRm64( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
-> -	{ CRm64( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
-> -
-> -	/* TTBCR: swapped by interrupt.S. */
-> +	/* TTBR0/TTBR1/TTBCR: swapped by interrupt.S. */
-> +	{ CRm64( 2), Op1( 0), is64, access_vm_reg, reset_unknown64, c2_TTBR0 },
-> +	{ CRn(2), CRm( 0), Op1( 0), Op2( 0), is32,
-> +			access_vm_reg, reset_unknown, c2_TTBR0 },
-> +	{ CRn(2), CRm( 0), Op1( 0), Op2( 1), is32,
-> +			access_vm_reg, reset_unknown, c2_TTBR1 },
->  	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
-> -			NULL, reset_val, c2_TTBCR, 0x00000000 },
-> +			access_vm_reg, reset_val, c2_TTBCR, 0x00000000 },
-> +	{ CRm64( 2), Op1( 1), is64, access_vm_reg, reset_unknown64, c2_TTBR1 },
-> +
->  
->  	/* DACR: swapped by interrupt.S. */
->  	{ CRn( 3), CRm( 0), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_unknown, c3_DACR },
-> +			access_vm_reg, reset_unknown, c3_DACR },
->  
->  	/* DFSR/IFSR/ADFSR/AIFSR: swapped by interrupt.S. */
->  	{ CRn( 5), CRm( 0), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_unknown, c5_DFSR },
-> +			access_vm_reg, reset_unknown, c5_DFSR },
->  	{ CRn( 5), CRm( 0), Op1( 0), Op2( 1), is32,
-> -			NULL, reset_unknown, c5_IFSR },
-> +			access_vm_reg, reset_unknown, c5_IFSR },
->  	{ CRn( 5), CRm( 1), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_unknown, c5_ADFSR },
-> +			access_vm_reg, reset_unknown, c5_ADFSR },
->  	{ CRn( 5), CRm( 1), Op1( 0), Op2( 1), is32,
-> -			NULL, reset_unknown, c5_AIFSR },
-> +			access_vm_reg, reset_unknown, c5_AIFSR },
->  
->  	/* DFAR/IFAR: swapped by interrupt.S. */
->  	{ CRn( 6), CRm( 0), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_unknown, c6_DFAR },
-> +			access_vm_reg, reset_unknown, c6_DFAR },
->  	{ CRn( 6), CRm( 0), Op1( 0), Op2( 2), is32,
-> -			NULL, reset_unknown, c6_IFAR },
-> +			access_vm_reg, reset_unknown, c6_IFAR },
->  
->  	/* PAR swapped by interrupt.S */
->  	{ CRm64( 7), Op1( 0), is64, NULL, reset_unknown64, c7_PAR },
-> @@ -324,9 +377,9 @@ static const struct coproc_reg cp15_regs[] = {
->  
->  	/* PRRR/NMRR (aka MAIR0/MAIR1): swapped by interrupt.S. */
->  	{ CRn(10), CRm( 2), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_unknown, c10_PRRR},
-> +			access_vm_reg, reset_unknown, c10_PRRR},
+> @@ -381,6 +381,12 @@ static const struct coproc_reg cp15_regs[] = {
 >  	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
-> -			NULL, reset_unknown, c10_NMRR},
-> +			access_vm_reg, reset_unknown, c10_NMRR},
+>  			access_vm_reg, reset_unknown, c10_NMRR},
 >  
+> +	/* AMAIR0/AMAIR1: swapped by interrupt.S. */
+> +	{ CRn(10), CRm( 3), Op1( 0), Op2( 0), is32,
+> +			access_vm_reg, reset_unknown, c10_AMAIR0},
+> +	{ CRn(10), CRm( 3), Op1( 0), Op2( 1), is32,
+> +			access_vm_reg, reset_unknown, c10_AMAIR1},
+> +
 >  	/* VBAR: swapped by interrupt.S. */
 >  	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
-> @@ -334,7 +387,7 @@ static const struct coproc_reg cp15_regs[] = {
+>  			NULL, reset_val, c12_VBAR, 0x00000000 },
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index 7cb41e1..e4eaf30 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -303,13 +303,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
 >  
->  	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
->  	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
-> -			NULL, reset_val, c13_CID, 0x00000000 },
-> +			access_vm_reg, reset_val, c13_CID, 0x00000000 },
->  	{ CRn(13), CRm( 0), Op1( 0), Op2( 2), is32,
->  			NULL, reset_unknown, c13_TID_URW },
->  	{ CRn(13), CRm( 0), Op1( 0), Op2( 3), is32,
-> diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
-> index bb0cac1..e6f4ae4 100644
-> --- a/arch/arm/kvm/coproc_a15.c
-> +++ b/arch/arm/kvm/coproc_a15.c
-> @@ -34,7 +34,7 @@
->  static const struct coproc_reg a15_regs[] = {
->  	/* SCTLR: swapped by interrupt.S. */
->  	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_val, c1_SCTLR, 0x00C50078 },
-> +			access_sctlr, reset_val, c1_SCTLR, 0x00C50078 },
->  };
+>  	mrc	p15, 0, r2, c14, c1, 0	@ CNTKCTL
+>  	mrrc	p15, 0, r4, r5, c7	@ PAR
+> +	mrc	p15, 0, r6, c10, c3, 0	@ AMAIR0
+> +	mrc	p15, 0, r7, c10, c3, 1	@ AMAIR1
 >  
->  static struct kvm_coproc_target_table a15_target_table = {
-> diff --git a/arch/arm/kvm/coproc_a7.c b/arch/arm/kvm/coproc_a7.c
-> index 1df76733..17fc7cd 100644
-> --- a/arch/arm/kvm/coproc_a7.c
-> +++ b/arch/arm/kvm/coproc_a7.c
-> @@ -37,7 +37,7 @@
->  static const struct coproc_reg a7_regs[] = {
->  	/* SCTLR: swapped by interrupt.S. */
->  	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
-> -			NULL, reset_val, c1_SCTLR, 0x00C50878 },
-> +			access_sctlr, reset_val, c1_SCTLR, 0x00C50878 },
->  };
+>  	.if \store_to_vcpu == 0
+> -	push	{r2,r4-r5}
+> +	push	{r2,r4-r7}
+>  	.else
+>  	str	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
+>  	add	r12, vcpu, #CP15_OFFSET(c7_PAR)
+>  	strd	r4, r5, [r12]
+> +	str	r6, [vcpu, #CP15_OFFSET(c10_AMAIR0)]
+> +	str	r7, [vcpu, #CP15_OFFSET(c10_AMAIR1)]
+>  	.endif
+>  .endm
 >  
->  static struct kvm_coproc_target_table a7_target_table = {
+> @@ -322,15 +326,19 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>   */
+>  .macro write_cp15_state read_from_vcpu
+>  	.if \read_from_vcpu == 0
+> -	pop	{r2,r4-r5}
+> +	pop	{r2,r4-r7}
+>  	.else
+>  	ldr	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
+>  	add	r12, vcpu, #CP15_OFFSET(c7_PAR)
+>  	ldrd	r4, r5, [r12]
+> +	ldr	r6, [vcpu, #CP15_OFFSET(c10_AMAIR0)]
+> +	ldr	r7, [vcpu, #CP15_OFFSET(c10_AMAIR1)]
+>  	.endif
+>  
+>  	mcr	p15, 0, r2, c14, c1, 0	@ CNTKCTL
+>  	mcrr	p15, 0, r4, r5, c7	@ PAR
+> +	mcr	p15, 0, r6, c10, c3, 0	@ AMAIR0
+> +	mcr	p15, 0, r7, c10, c3, 1	@ AMAIR1
+>  
+>  	.if \read_from_vcpu == 0
+>  	pop	{r2-r12}
 > -- 
 > 1.8.3.4
 > 
 
-Otherwise looks good,
--- 
-Christoffer
+Looks good, but shouldn't this be added before patch 9 to maintain
+functional bisectability?
+
+Otherwise:
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
