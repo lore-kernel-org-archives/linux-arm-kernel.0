@@ -1,36 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Jan 2014 17:29:33 +0000
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <52E939CB.1020705@amd.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
- <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
- <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
- <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
- <52E939CB.1020705@amd.com>
-Message-ID: <20140129172932.GQ26622@mudshark.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 Jan 2014 12:45:07 -0500
+Subject: [PATCH v2 0/6] setting the table for integration of cpuidle with the
+ scheduler
+Message-ID: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 05:26:35PM +0000, Suravee Suthikulanit wrote:
-> On 1/29/2014 11:16 AM, Andreas Herrmann wrote:
-> > On Wed, Jan 29, 2014 at 11:59:12AM -0500, Suravee Suthikulanit wrote:
-> >> Actually, we are using 32 on the AMD system. So, do you think we can set
-> >> this to 32 instead?
-> >
-> > I think that's ok.
-> >
-> > But are we really talking about number of SMRs or number of StreamIDs
-> > per master device here? Ie. are you just having 32 SMRs for an SMMU on
-> > your AMD system or do you have master devices which have 32 StreamIDs?
-> >
-> > If it's just number of SMRs we don't need to modify this macro.
-> >
-> 
-> I am referring to the case where each mmu-master can have upto 32 streamID.
+As everyone should know by now, we want to integrate the cpuidle
+governor with the scheduler for a more efficient idling of CPUs.
+In order to help the transition, this small patch series moves the
+existing interaction with cpuidle from architecture code to generic
+core code.  The ARM, PPC, SH and X86 architectures are concerned.
+No functional change should have occurred yet.
 
-Crikey, how many SMRs do you have? Andreas and I have been struggling to
-write a decent allocator for those, so if you have any algorithms that don't
-require a quantum computer, we'd love to hear from you :)!
+@peterz: Are you willing to pick up those patches?
 
-Will
+Change from v1:
+
+- dropped removal of arch_cpu_idle_prepare()
+
+
+ arch/arm/kernel/process.c                       | 16 +++------
+ arch/powerpc/platforms/pseries/processor_idle.c |  5 +++
+ arch/powerpc/platforms/pseries/setup.c          | 34 ++++++++-----------
+ arch/sh/kernel/idle.c                           |  4 +--
+ arch/x86/kernel/process.c                       |  5 +--
+ kernel/Makefile                                 |  1 -
+ kernel/cpu/Makefile                             |  1 -
+ kernel/sched/Makefile                           |  2 +-
+ kernel/{cpu => sched}/idle.c                    |  4 ++-
+ 9 files changed, 30 insertions(+), 42 deletions(-)
+
+
+Nicolas
