@@ -1,82 +1,60 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 29 Jan 2014 17:24:06 +0100
-Subject: [PATCH 1/3] clk: divider: Fix best div calculation for power-of-two
- and table dividers
-In-Reply-To: <1391012648-12481-1-git-send-email-maxime.coquelin@st.com>
-References: <1391012648-12481-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1391012648-12481-2-git-send-email-maxime.coquelin@st.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 29 Jan 2014 08:32:49 -0800
+Subject: [PATCH v3 0/2] Qualcomm Universal Peripheral (QUP) I2C controller
+In-Reply-To: <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <CAJAp7Oj_D1QvG9nBWTVrW1QVEpqi2cTTc9c6Um25DDzidCjW1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The divider returned by clk_divider_bestdiv() is likely to be invalid in case
-of power-of-two and table dividers when CLK_SET_RATE_PARENT flag isn't set.
+On Wed, Jan 29, 2014 at 12:14 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+>
+> Hi Bjorn,
+>
+> On Fri, 2014-01-17 at 15:03 -0800, Bjorn Andersson wrote:
+>> Continuing on Ivans i2c-qup series.
+>>
+>
+> Do you plan to send v4 of this driver? I would like to address
+> the remaining errors and suggestions and send a new version.
+>
+Hi Ivan,
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- drivers/clk/clk-divider.c |   37 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+Yes I'm planning to send out a new revision of the patch set.
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 5543b7d..2137d58 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -144,6 +144,37 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
- 	return true;
- }
- 
-+static int _round_up_table(const struct clk_div_table *table, int div)
-+{
-+	const struct clk_div_table *clkt;
-+	int up = _get_table_maxdiv(table);
-+
-+	for (clkt = table; clkt->div; clkt++) {
-+		if (clkt->div == div)
-+			return clkt->div;
-+		else if (clkt->div < div)
-+			continue;
-+
-+		if ((clkt->div - div) < (up - div))
-+			up = clkt->div;
-+	}
-+
-+	return up;
-+}
-+
-+static int _div_round_up(struct clk_divider *divider,
-+		unsigned long parent_rate, unsigned long rate)
-+{
-+	int div = DIV_ROUND_UP(parent_rate, rate);
-+
-+	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+		div = __roundup_pow_of_two(div);
-+	if (divider->table)
-+		div = _round_up_table(divider->table, div);
-+
-+	return div;
-+}
-+
- static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 		unsigned long *best_parent_rate)
- {
-@@ -159,7 +190,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
- 		parent_rate = *best_parent_rate;
--		bestdiv = DIV_ROUND_UP(parent_rate, rate);
-+		bestdiv = _div_round_up(divider, parent_rate, rate);
- 		bestdiv = bestdiv == 0 ? 1 : bestdiv;
- 		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
- 		return bestdiv;
-@@ -219,6 +250,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	u32 val;
- 
- 	div = parent_rate / rate;
-+
-+	if (!_is_valid_div(divider, div))
-+		return -EINVAL;
-+
- 	value = _get_val(divider, div);
- 
- 	if (value > div_mask(divider))
--- 
-1.7.9.5
+I've incorporated fixes from the review comments here and my colleague
+concluded through some testing that block read did not work, so we've
+fixed that as well.
+
+What have been holding me from submitting a new patchset is the 3
+functions that does polling of state and status updates;
+* qup_i2c_poll_state() reads the state register up to 1000 times,
+hoping we reach the expected state, will delay 100uS and then continue
+with 1000 more retries.
+  According to the data sheet a state transition is supposed to take
+up to 2 bus cycles. Only time I can see that this would take longer
+time are all error states, but the data sheet is not very clear
+regarding this.
+
+* qup_i2c_wait_idle() reads the status register up to 1000 times,
+hoping the fifo gets drained and the bus go idle, if that fails it
+sleeps for the time we expect it to take to drain a full fifo and then
+loops another 1000 times. This waits for the fifo to have drained and
+the bus to go idle. On a read we get to this state if we issue the
+write and then hit the error state, so we would reset the entire
+block. On write we will only wait for the buffer not to be full before
+returning.
+
+* qup_i2c_wait_clock_ready() waits up to 300 bus-clocks for the i2c
+bus to go idle or forced low, I don't know why it retries 300 times.
+This is called at the end of a write, possibly to wait for the fifo to
+drain.
+
+
+All three loops are in line with how it's been in codeaurora since the
+beginning of time, but I at least need to figure out some good names
+for those "magic numbers".
+
+Regards,
+Bjorn
