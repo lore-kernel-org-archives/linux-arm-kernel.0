@@ -1,91 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Jan 2014 14:32:27 +0100
-Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140129122520.GY11841@sirena.org.uk>
-References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
- <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140129122520.GY11841@sirena.org.uk>
-Message-ID: <20140129133227.GQ3867@lukather>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 29 Jan 2014 09:00:13 -0500
+Subject: [PATCH v3] ARM: hw_breakpoint: Add ARMv8 support
+In-Reply-To: <20140129105722.GD26622@mudshark.cambridge.arm.com>
+References: <20140128183851.GK2885@mudshark.cambridge.arm.com>
+ <1390935112-28465-1-git-send-email-cov@codeaurora.org>
+ <20140129105722.GD26622@mudshark.cambridge.arm.com>
+Message-ID: <52E9096D.9070800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
-> On Wed, Jan 29, 2014 at 12:10:48PM +0100, Maxime Ripard wrote:
+Hi Will,
+
+On 01/29/2014 05:57 AM, Will Deacon wrote:
+> Hi Christopher,
 > 
-> > +config SPI_SUN6I
-> > +	tristate "Allwinner A31 SPI controller"
-> > +	depends on ARCH_SUNXI || COMPILE_TEST
-> > +	select PM_RUNTIME
-> > +	help
-> > +	  This enables using the SPI controller on the Allwinner A31 SoCs.
-> > +
+> On Tue, Jan 28, 2014 at 06:51:51PM +0000, Christopher Covington wrote:
+>> Add the trivial support necessary to get hardware breakpoints
+>> working for GDB on ARMv8 simulators running in AArch32 mode.
+>>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+>> ---
+>>
+>>  v3: assume for now that ARMv9 and later will update FSR
 > 
-> A select of PM_RUNTIME is both surprising and odd - why is that there?
-> The usual idiom is that the device starts out powered up (flagged using
-> pm_runtime_set_active()) and then runtime PM then suspends it when it's
-> compiled in.  That way if for some reason people want to avoid runtime
-> PM they can still use the device.
+> Please can you stick this into the patch system? I don't have any other
+> hw_breakpoint changes queued, so I doubt I'll send a pull for 3.15.
 
-Since pm_runtime_set_active and all the pm_runtime* callbacks in
-general are defined to pretty much empty functions, how the
-suspend/resume callbacks are called then? Obviously, we need them to
-be run, hence why I added the select here, but now I'm seeing a
-construct like what's following acceptable then?
+Thanks for your review. Sounds good; will do.
 
-pm_runtime_enable(&pdev->dev);
-if (!pm_runtime_enabled(&pdev->dev))
-   sun6i_spi_runtime_resume(&pdev->dev);
-
-> > +static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
-> > +{
-> > +	struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
-> > +	u32 reg;
-> > +
-> > +	if (!enable)
-> > +		return;
-> > +
-> > +	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
-> > +	reg &= ~SUN6I_TFR_CTL_CS_MASK;
-> > +	reg |= SUN6I_TFR_CTL_CS(spi->chip_select);
-> > +	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
-> > +}
-> 
-> The !enable means that it'll only ever be able to go one way.  Also note
-> that the documentation was clarified here to make the enable flag be the
-> absolute logic level, not if chip select was asserted.
-
-Actually the IP asserts the CS automatically, the only thing you need
-to do is to set which CS to use for your next transfer in some
-register (which is what I'm doing after the !enable), and the CS will
-be managed directly by the controller. Hence, there's no way to say
-wether you want to enable it or not.
-
-The controller allows to control the CS manually also, if that's the
-preferred way of doing things.
-
-> > +	timeout = wait_for_completion_timeout(&sspi->done,
-> > +					      msecs_to_jiffies(1000));
-> > +	if (!timeout) {
-> > +		ret = -ETIMEDOUT;
-> > +		goto out;
-> > +	}
-> > +
-> > +	sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
-> 
-> This means we can only transfer a single FIFO of data?  I didn't see a
-> check on the transfer length.
-
-At the moment, indeed. And that's the first thing I check in the
-transfer_one function.
+Regards,
+Christopher
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140129/f8b2b915/attachment-0001.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
