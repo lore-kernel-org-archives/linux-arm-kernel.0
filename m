@@ -1,74 +1,46 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 29 Jan 2014 19:39:34 +0100
-Subject: [RFC PATCH v2 03/14] of: mtd: add documentation for nand-ecc-level
- property
-In-Reply-To: <20140129175331.GA27143@localhost>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com>
- <20140129175331.GA27143@localhost>
-Message-ID: <52E94AE6.3020107@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 29 Jan 2014 10:41:06 -0800
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20140129182956.14275.72264@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+ <20131022175414.14753.58063@capellas-linux>
+ <20140128185926.5312.36635@capellas-linux>
+ <20140128125442.4bac748945b404179deb58ba@linux-foundation.org>
+ <20140128205830.14275.80319@capellas-linux>
+ <20140129182956.14275.72264@capellas-linux>
+Message-ID: <20140129104106.793524a07e48324a32dc6f06@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ezequiel
+On Wed, 29 Jan 2014 10:29:56 -0800 Sebastian Capella <sebastian.capella@linaro.org> wrote:
 
-Le 29/01/2014 18:53, Ezequiel Garcia a ?crit :
-> On Wed, Jan 29, 2014 at 03:34:13PM +0100, Boris BREZILLON wrote:
->> nand-ecc-level property statically defines NAND chip's ECC requirements.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
->>   Documentation/devicetree/bindings/mtd/nand.txt |    3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
->> index 03855c8..0c962296 100644
->> --- a/Documentation/devicetree/bindings/mtd/nand.txt
->> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
->> @@ -3,5 +3,8 @@
->>   - nand-ecc-mode : String, operation mode of the NAND ecc mode.
->>     Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
->>     "soft_bch".
->> +- nand-ecc-level : Two cells property defining the ECC level requirements.
->> +  The first cell represent the strength and the second cell the ECC block size.
->> +  E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
->>   - nand-bus-width : 8 or 16 bus width if not present 8
->>   - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-> Hm.. when was this proposal agreed?
-Never, this is a proposal based on my needs, and this was not present in the
-1st version of this series :-).
-> It seems I've missed the
-> discussion...
->
-> FWIW, we've already proposed an equivalent one, but it received no
-> feedback from the devicetree maintainers:
->
-> http://comments.gmane.org/gmane.linux.drivers.devicetree/58764
->
-> Maybe we can discuss about it now?
->
->    nand-ecc-strength : integer ECC required strength.
->    nand-ecc-size : integer step size associated to the ECC strength.
->
->    vs.
->
->    nand-ecc-level : Two cells property defining the ECC level requirements.
->    The first cell represent the strength and the second cell the ECC block size.
->    E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
->
-> It's really the same proposal but with a different format, right?
+> Hi Andrew,
+> 
+> By the way, I do see a call (sysfs_streq) in use for this purpose
+> other places.  Sorry, I didn't find it while looking at the original
+> problem.  I'm not sure if this is preferable, but it appears to have
+> been added specifically for the strings coming through sysfs.
 
-Yes it is.
+Yes, I wrote it ;)
 
-> IMHO, the former is more human-readable, but other than that I see no
-> difference.
+I didn't think sysfs_streq() is well suited to this problem.  And the
+issue of possibly-null-terminated-strings coming in from userspace is a
+common one, so it is desirable that we build up the suite of utilities
+to handle this.
 
-As I already said to Pekon, I won't complain if my proposal is not chosen,
-as long as there is a proper way to define these ECC requirements ;-).
+There are probably quite a lot of open-coded \n trimming loops which
+can be cleaned up using such tools.
 
-Best Regards,
+	grep -r "if .* == '\\\n'" .
 
-Boris
+> My preference is copying the string and cleaning it up before passing
+> it to internal functions, even though we incur an allocation.
 
->
-> Brian? DT-guys?
+Yes.  Here on the kernel/userspace boundary we are typically running in
+GFP_KERNEL context and the code is not performance critical - it is a
+good fit.
