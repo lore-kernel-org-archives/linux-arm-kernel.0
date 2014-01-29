@@ -1,28 +1,54 @@
-From: jilin@nvidia.com (Jim Lin)
-Date: Wed, 29 Jan 2014 10:26:18 +0800
-Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
- <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1390962378.2398.11.camel@jilin-desktop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 29 Jan 2014 12:01:42 +0800
+Subject: [linux-sunxi] Re: [PATCH RFC 4/6] net: rfkill: gpio: add device
+ tree support
+In-Reply-To: <20140127142400.GI3867@lukather>
+References: <1389941251-32692-1-git-send-email-wens@csie.org>
+ <1389941251-32692-5-git-send-email-wens@csie.org>
+ <20140127142400.GI3867@lukather>
+Message-ID: <CAGb2v65cipUXbL52adDTYLqVJB5gMoDjfWVFa6AYYp0EKvkS6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-01-29 at 07:36 +0800, Peter De Schrijver wrote:
-> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
->  Documentation/ABI/testing/sysfs-driver-tegra-fuse |    8 +
->  drivers/misc/fuse/Makefile                        |    1 +
->  drivers/misc/fuse/tegra/Makefile                  |    7 +
->  drivers/misc/fuse/tegra/fuse-tegra.c              |  228 ++++++++++++++++
->  drivers/misc/fuse/tegra/fuse-tegra20.c            |  136 ++++++++++
->  drivers/misc/fuse/tegra/fuse-tegra30.c            |  178 +++++++++++++
->  drivers/misc/fuse/tegra/fuse.h                    |   82 ++++++
-Could we move this fuse.h to other folder under /include/linux
-(like /include/linux/platform_data)
-for other driver to include?
-So other driver can invoke function to read fuse data if needed.
+Hi,
 
---nvpublic
+On Mon, Jan 27, 2014 at 10:24 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, Jan 17, 2014 at 02:47:29PM +0800, Chen-Yu Tsai wrote:
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  .../devicetree/bindings/rfkill/rfkill-gpio.txt     | 26 ++++++++++++++++++++++
+>>  net/rfkill/rfkill-gpio.c                           | 23 +++++++++++++++++++
+>>  2 files changed, 49 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+>> new file mode 100644
+>> index 0000000..8a07ea4
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+>> @@ -0,0 +1,26 @@
+>> +GPIO controlled RFKILL devices
+>> +
+>> +Required properties:
+>> +- compatible : Must be "rfkill-gpio".
+>> +- rfkill-name        : Name of RFKILL device
+>> +- rfkill-type        : Type of RFKILL device: 1 for WiFi, 2 for BlueTooth
+>> +- NAME_shutdown-gpios        : GPIO phandle to shutdown control
+>> +                       (phandle must be the second)
+>
+> Can't it be handled by a regulator?
+>
+>> +- NAME_reset-gpios   : GPIO phandle to reset control
+>
+> And this one using the reset framework?
+
+The driver is already used in platform device and ACPI fashions.
+AFAIK, ACPI only passes the GPIO lines. Preferably the behavior
+and requirements between the different usages remain the same.
+
+
+Cheers
+ChenYu
