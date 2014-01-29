@@ -1,85 +1,76 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 29 Jan 2014 13:29:50 -0600
-Subject: [PATCH 2/2] ARM: dts: OMAP3+: add clock nodes for CPU
-In-Reply-To: <1391019557-22313-3-git-send-email-nm@ti.com>
-References: <1391019557-22313-1-git-send-email-nm@ti.com>
- <1391019557-22313-3-git-send-email-nm@ti.com>
-Message-ID: <CAOCHtYjaCBn2oOk66ef9wiz_GJnVwHDyx446_mrkipPoENaeUQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jan 2014 20:36:34 +0100
+Subject: [RFC PATCH V2 1/4] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <CACoXjcnTnhWS-5yOgiHA5yVaBjdH1DVzmSsknEBJLB+CFR0EyA@mail.gmail.com>
+References: <1389742458-7693-1-git-send-email-tinamdar@apm.com>
+ <5086198.ZOWZ5xuyna@wuerfel>
+ <CACoXjcnTnhWS-5yOgiHA5yVaBjdH1DVzmSsknEBJLB+CFR0EyA@mail.gmail.com>
+Message-ID: <201401292036.34501.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 12:19 PM, Nishanth Menon <nm@ti.com> wrote:
-> OMAP34xx, AM3517 and OMAP36xx platforms use dpll1 clock.
->
-> OMAP443x, OMAP446x, OMAP447x, OMAP5, DRA7, AM43xx platforms use
-> dpll_mpu clock.
->
-> Latency used is the generic latency defined in omap-cpufreq
-> driver.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+On Monday 27 January 2014, Tanmay Inamdar wrote:
+> On Sat, Jan 25, 2014 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 24 January 2014 13:28:22 Tanmay Inamdar wrote:
+> >> On Thu, Jan 16, 2014 at 5:10 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> >> > On Wed, Jan 15, 2014 at 4:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> On Wednesday 15 January 2014, Tanmay Inamdar wrote:
+> >> >>
+> >> >> Maybe another msleep() in the loop? It seems weird to first do an
+> >> >> unconditional sleep but then busy-wait for the result.
+> >> >
+> >> > ok.
+> >>
+> >> This loop can execute for maximum 4 msec. So putting msleep(1) won't
+> >> get us much.
+> >
+> > 4 msec is still quite a long time for a busy loop that can be spent doing
+> > useful work in another thread.
+> >
+> 
+> Right. If 'msleep(1)' is used, then 'checkpatch' throws a warning
+> saying that it can actually sleep for 20ms in some cases. I will check
+> if 'usleep_range' is useful here.
 
-Hi Nishanth,
+Sound good. This is really a false positive from checkpatch though,
+with the timeout handling in place, everything's fine even with
+msleep(1).
 
-After this patch, do you see any limitation to finally enabling 1Ghz
-operation on the beagle-xm by default? Or are we still missing a
-dependicy somewhere?
+> >> >>
+> >> >> Another general note: Your "compatible" strings are rather unspecific.
+> >> >> Do you have a version number for this IP block? I suppose that it's related
+> >> >> to one that has been used in other chips before, or will be used in future
+> >> >> chips, if it's not actually licensed from some other company.
+> >> >
+> >> > I will have to check this.
+> >> >
+> >>
+> >> We have decided to stick with current compatible string for now.
+> >
+> > Can you elaborate on your reasoning? Does this mean X-Gene is a one-off
+> > product and you won't be doing any new chips based on the same hardware
+> > components?
+> 
+> The current convention is to key upon the family name - X-Gene. Future
+> chips will also be a part of X-Gene family. Right now it is unclear if
+> there are any obvious feature additions to be done in Linux PCIe
+> driver. Until then same driver is expected to work as is in future
+> chips.
 
-cpufreq stats: 300 MHz:98.64%, 600 MHz:0.04%, 800 MHz:0.09%, 1000
-MHz:1.23%  (11)
-full cpufreq output: http://paste.debian.net/79073/
+This is not enough for me. Of course you hope that things keep working,
+but experience shows that sometimes hardware has slight differences that
+you need to work around later. It's better to always be specific and
+at least as a secondary identifier list the exact model of the component,
+or if that is not know, the model of the SoC. The driver can bind to
+the most generic string, but in DT you should have a specific one as
+well.
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts
-b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index bb5dad0..b0e5863 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -16,9 +16,36 @@
-        cpus {
-                cpu at 0 {
-                        cpu0-supply = <&vcc>;
-+                       operating-points = <
-+                               /* kHz    uV */
-+                               300000   1012500
-+                               600000   1200000
-+                               800000   1325000
-+                               1000000  1380000
-+                       >;
-                };
-        };
+You could for instance have something like
 
-+       abb: regulator-abb {
-+               compatible = "ti,abb-v1";
-+               regulator-name = "abb";
-+               #address-cell = <0>;
-+               #size-cells = <0>;
-+               reg = <0x483072f0 0x8>, <0x48306818 0x4>;
-+               reg-names = "base-address", "int-address";
-+               ti,tranxdone-status-mask = <0x4000000>;
-+               clocks = <&dpll1_ck>;
-+               ti,settling-time = <30>;
-+               ti,clock-cycles = <8>;
-+               ti,abb_info = <
-+                       /* uV           ABB     efuse   rbb_m   fbb_m
- vset_m */
-+                       1012500         0       0       0       0
- 0 /* Bypass */
-+                       1200000         3       0       0       0
- 0 /* RBB mandatory */
-+                       1320000         1       0       0       0
- 0 /* FBB mandatory */
-+                       1380000         1       0       0       0       0
-+                       >;
-+       };
-+
-        memory {
-                device_type = "memory";
-                reg = <0x80000000 0x20000000>; /* 512 MB */
--- 
-1.8.5.3
+	compatible = "apm,xgene-1234w78-pcie", "thirdparty,pcie-1.23", "apm,xgene-pcie", "thirdparty,pcie";
 
-Regards,
+as an example where you licensed the pcie block version 1.23 from a company
+named thirdparty and integrated it into the xgene variant with product
+code 1234w78.
 
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+	Arnd
