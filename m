@@ -1,50 +1,31 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 29 Jan 2014 18:28:05 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <20140122112055.GF1621@mudshark.cambridge.arm.com>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
- <20140122112055.GF1621@mudshark.cambridge.arm.com>
-Message-ID: <20140129182805.GF11329@bivouac.eciton.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 29 Jan 2014 10:29:56 -0800
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20140128205830.14275.80319@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+ <20131022175414.14753.58063@capellas-linux>
+ <20140128185926.5312.36635@capellas-linux>
+ <20140128125442.4bac748945b404179deb58ba@linux-foundation.org>
+ <20140128205830.14275.80319@capellas-linux>
+Message-ID: <20140129182956.14275.72264@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 11:20:55AM +0000, Will Deacon wrote:
-> > +#ifdef CONFIG_CPU_CP15
-> > +/* Macro for setting/clearing bits in sctlr */
-> > +	.macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
-> > +	mrc	p15, 0, \tmp, c1, c0, 0
-> > +	ldr	\tmp2, =\set
-> > +	orr	\tmp, \tmp, \tmp2
-> > +	ldr	\tmp2, =\clear
-> > +	mvn	\tmp2, \tmp2
-> > +	and	\tmp, \tmp, \tmp2
-> > +	mcr	p15, 0, \tmp, c1, c0, 0
-> 
-> I think this would be cleaner if you force the caller to put set and clear
-> into registers beforehand, rather than have to do the literal load every
-> time. Also, I don't think set and clear should be required (and then you can
-> lose tmp2 as well).
+Hi Andrew,
 
-I can't figure out how to make register-parameters non-required
-(i.e. conditionalise on whether an optional parameter was provided),
-so my attempt of refactoring actually ends up using an additional
-register:
+By the way, I do see a call (sysfs_streq) in use for this purpose
+other places.  Sorry, I didn't find it while looking at the original
+problem.  I'm not sure if this is preferable, but it appears to have
+been added specifically for the strings coming through sysfs.
 
-#ifdef CONFIG_CPU_CP15
-/* Macro for setting/clearing bits in sctlr */
-	.macro	update_sctlr, set:req, clear:req, tmp:req
-	mrc	p15, 0, \tmp, c1, c0, 0
-	orr	\tmp, \set
-	mvn	\clear, \clear
-	and	\tmp, \tmp, \clear
-	mcr	p15, 0, \tmp, c1, c0, 0
-	.endm
-#endif
+My preference is copying the string and cleaning it up before passing
+it to internal functions, even though we incur an allocation.
 
-If you think that's an improvement I can do that, and I have (just)
-enough registers to spare.
-If I'm being daft with my macro issues, do point it out.
+Thanks,
 
-/
-    Leif
+Sebastian
