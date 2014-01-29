@@ -1,37 +1,74 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 29 Jan 2014 10:59:12 -0600
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>	<1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>	<20140117110830.GW3471@alberich>	<52E92842.3000001@amd.com>
- <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
-Message-ID: <52E93360.1000904@amd.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jan 2014 17:50:45 +0100
+Subject: [PATCH 4/5] arm64: enable generic CPU feature modalias matching for
+ this arch
+In-Reply-To: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1391014246-9715-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2014 10:57 AM, Rob Herring wrote:
->>> diff --git a/include/linux/of.h b/include/linux/of.h
->>> >>index 276c546..24e1b28 100644
->>> >>--- a/include/linux/of.h
->>> >>+++ b/include/linux/of.h
->>> >>@@ -67,7 +67,7 @@ struct device_node {
->>> >>   #endif
->>> >>   };
->>> >>
->>> >>-#define MAX_PHANDLE_ARGS 8
->>> >>+#define MAX_PHANDLE_ARGS 16
->> >
->> >
->> >Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't
->> >this be changed to be able to support 128 StreamIDs as well?  Although I am
->> >not sure if this would be too big to have on the stack per Rob's comment in
->> >the previous patch set.
-> Do you actually need 128 now? If not, then we can deal with that when
-> we get there. There are lots of things in spec's that are not actually
-> implemented or supported.
+This enables support for the generic CPU feature modalias implementation that
+wires up optional CPU features to udev based module autoprobing.
 
-Actually, we are using 32 on the AMD system. So, do you think we can set 
-this to 32 instead?
+A file <asm/cpufeatures.h> is provided that maps CPU feature numbers to
+elf_hwcap bits, which is the standard way on arm64 to advertise optional CPU
+features both internally and to user space.
 
-Thanks,
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/include/asm/cpufeature.h | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
+ create mode 100644 arch/arm64/include/asm/cpufeature.h
 
-Suravee
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index dd4327f09ba4..e339099b6fbd 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -16,6 +16,7 @@ config ARM64
+ 	select DCACHE_WORD_ACCESS
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
++	select GENERIC_CPU_AUTOPROBE
+ 	select GENERIC_IOMAP
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+new file mode 100644
+index 000000000000..1d902efa201d
+--- /dev/null
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_CPUFEATURE_H
++#define __ASM_CPUFEATURE_H
++
++#include <asm/elf.h>
++#include <asm/hwcap.h>
++
++/*
++ * In the arm64 world (as in the ARM world), elf_hwcap is used both internally
++ * in the kernel and for user space to keep track of which optional features
++ * are supported by the current system. So let's map feature 'x' to HWCAP_x.
++ * Note that HWCAP_x constants are bit fields so we need to take the log.
++ */
++
++#define MAX_CPU_FEATURES	sizeof(elf_hwcap)
++#define cpu_feature(x)		((unsigned int)ilog2(HWCAP_ ## x))
++
++static inline bool cpu_have_feature(unsigned int num)
++{
++	return !!(elf_hwcap & (1 << num));
++}
++
++#endif
+-- 
+1.8.3.2
