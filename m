@@ -1,72 +1,78 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 12:07:33 -0800
-Subject: [PATCH v2 05/10] ARM: KVM: force cache clean on page fault when
- caches are off
-In-Reply-To: <1390402602-22777-6-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 29 Jan 2014 12:07:48 -0800
+Subject: [PATCH v2 06/10] ARM: KVM: fix handling of trapped 64bit
+ coprocessor accesses
+In-Reply-To: <1390402602-22777-7-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
- <1390402602-22777-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140129200733.GH3570@cbox>
+ <1390402602-22777-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140129200748.GI3570@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:56:37PM +0000, Marc Zyngier wrote:
-> In order for the guest with caches off to observe data written
-
-nit: s/the guest/a guest/
-nit: s/caches off/caches disabled/
-
-> contained in a given page, we need to make sure that page is
-> committed to memory, and not just hanging in the cache (as
-> guest accesses are completely bypassing the cache until it
-
-nit: s/it/the guest/
-
-> decides to enable it).
+On Wed, Jan 22, 2014 at 02:56:38PM +0000, Marc Zyngier wrote:
+> Commit 240e99cbd00a (ARM: KVM: Fix 64-bit coprocessor handling)
+> changed the way we match the 64bit coprocessor access from
+> user space, but didn't update the trap handler for the same
+> set of registers.
 > 
-> For this purpose, hook into the coherent_cache_guest_page
-> function and flush the region if the guest SCTLR
-> register doesn't show the MMU and caches as being enabled.
+> The effect is that a trapped 64bit access is never matched, leading
+> to a fault being injected into the guest. This went unnoticed as we
+> didn;t really trap any 64bit register so far.
+
+didn't
+
+> 
+> Placing the CRm field of the access into the CRn field of the matching
+> structure fixes the problem. Also update the debug feature to emit the
+> expected string in case of failing match.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_mmu.h | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+>  arch/arm/kvm/coproc.c | 4 ++--
+>  arch/arm/kvm/coproc.h | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index cbab9ba..fa023e2 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -116,9 +116,14 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
->  
->  struct kvm;
->  
-> +#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> +
->  static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
->  					     unsigned long size)
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 78c0885..126c90d 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -443,7 +443,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
 >  {
-> +	if ((vcpu->arch.cp15[c1_SCTLR] & 0b101) != 0b101)
-> +		kvm_flush_dcache_to_poc((void *)hva, size);
-> +	
-
-Ah, my favorite inline function again...
-
->  	/*
->  	 * If we are going to insert an instruction page and the icache is
->  	 * either VIPT or PIPT, there is a potential problem where the host
-> @@ -139,8 +144,6 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
->  	}
+>  	struct coproc_params params;
+>  
+> -	params.CRm = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+> +	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+>  	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
+>  	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
+>  	params.is_64bit = true;
+> @@ -451,7 +451,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 16) & 0xf;
+>  	params.Op2 = 0;
+>  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+> -	params.CRn = 0;
+> +	params.CRm = 0;
+>  
+>  	return emulate_cp15(vcpu, &params);
 >  }
->  
-> -#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-> -
->  void stage2_flush_vm(struct kvm *kvm);
->  
->  #endif	/* !__ASSEMBLY__ */
+> diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
+> index 0461d5c..c5ad7ff 100644
+> --- a/arch/arm/kvm/coproc.h
+> +++ b/arch/arm/kvm/coproc.h
+> @@ -58,8 +58,8 @@ static inline void print_cp_instr(const struct coproc_params *p)
+>  {
+>  	/* Look, we even formatted it for you to paste into the table! */
+>  	if (p->is_64bit) {
+> -		kvm_pr_unimpl(" { CRm(%2lu), Op1(%2lu), is64, func_%s },\n",
+> -			      p->CRm, p->Op1, p->is_write ? "write" : "read");
+> +		kvm_pr_unimpl(" { CRm64(%2lu), Op1(%2lu), is64, func_%s },\n",
+> +			      p->CRn, p->Op1, p->is_write ? "write" : "read");
+>  	} else {
+>  		kvm_pr_unimpl(" { CRn(%2lu), CRm(%2lu), Op1(%2lu), Op2(%2lu), is32,"
+>  			      " func_%s },\n",
 > -- 
 > 1.8.3.4
 > 
 
-Besides the nits:
+Thanks for fixing my broken fix!
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
