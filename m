@@ -1,29 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Jan 2014 16:05:22 +0100
-Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
-In-Reply-To: <20140128121656.GH15937@n2100.arm.linux.org.uk>
-References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
- <9156959.vu4XdoKglI@wuerfel> <20140128121656.GH15937@n2100.arm.linux.org.uk>
-Message-ID: <21038487.ygragjUUsd@wuerfel>
+Date: Wed, 29 Jan 2014 16:08:47 +0100
+Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation for
+ generic SYSCON reboot driver
+In-Reply-To: <52E2F450.2070100@gmail.com>
+References: <1390504801-24483-1-git-send-email-fkan@apm.com>
+ <20140124182355.GF4758@e106331-lin.cambridge.arm.com>
+ <52E2F450.2070100@gmail.com>
+Message-ID: <3683633.QqePEXQehq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 January 2014 12:16:56 Russell King - ARM Linux wrote:
-> On Tue, Jan 28, 2014 at 01:08:47PM +0100, Arnd Bergmann wrote:
+On Friday 24 January 2014 15:16:32 Marc C wrote:
 > 
-> On balance, I think the virtual channel approach makes client drivers
-> more elegant and simpler, and makes the DMA engine API easier to use,
-> and gives greater flexibility for future improvements.  So, I wouldn't
-> miss the slave_id being removed.
+> > What's wrong with having a system clock unit binding, that the kernel
+> > can decompose as appropriate?
+> 
+> From what I understand, the arm-soc maintainers want to reduce (and perhaps even
+> eliminate) these board-specific constructs, and try to utilize common driver-code that
+> resides in the "driver" folder. I can vouch for the syscon/regmap framework as something
+> which would enable the effort.
 
-Ok, good. There are some dmaengine drivers that actually behave
-in hardware like the virtual-channel extension, i.e. they have
-one physical channel per request line (qcom_bam_dma seems to be
-one of them in fact), so they don't really have a choice.
-
-The way that both the DT and ACPI bindings are structured,
-the request ID is always known by the time the channel is
-allocated to allow this model, and that means supporting both
-approaches in the same master or slave driver is a mess.
+While your statement is true in general, it doesn't seem to counter
+what Mark R said above.
 
 	Arnd
