@@ -1,159 +1,79 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 29 Jan 2014 19:19:03 +0000
-Subject: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group notifier
- block
-In-Reply-To: <20140129141429.GD19326@alberich>
-References: <20140120222814.GI3471@alberich>
- <e92c5fd617fb4068b4ec5de696527ee3@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122122550.GA14108@mudshark.cambridge.arm.com>
- <a73ef0128a0141eabf0a3b899f3afdae@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140122134028.GB14108@mudshark.cambridge.arm.com>
- <aeebc7cf4084486790a5166cf83cb332@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140122153352.GE14108@mudshark.cambridge.arm.com>
- <3d0a888e122f490ba6bbc80b1aaa977c@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140123195718.GC26399@alberich>
- <991cc0024ea54cdb964f31de89c0b0ea@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140129141429.GD19326@alberich>
-Message-ID: <fd76e563312749508e5f952f5d9b1391@BL2PR03MB468.namprd03.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Jan 2014 19:27:18 +0000
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140129182805.GF11329@bivouac.eciton.net>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+Message-ID: <20140129192718.GT26622@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Leif,
 
+On Wed, Jan 29, 2014 at 06:28:05PM +0000, Leif Lindholm wrote:
+> On Wed, Jan 22, 2014 at 11:20:55AM +0000, Will Deacon wrote:
+> > > +#ifdef CONFIG_CPU_CP15
+> > > +/* Macro for setting/clearing bits in sctlr */
+> > > +	.macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
+> > > +	mrc	p15, 0, \tmp, c1, c0, 0
+> > > +	ldr	\tmp2, =\set
+> > > +	orr	\tmp, \tmp, \tmp2
+> > > +	ldr	\tmp2, =\clear
+> > > +	mvn	\tmp2, \tmp2
+> > > +	and	\tmp, \tmp, \tmp2
+> > > +	mcr	p15, 0, \tmp, c1, c0, 0
+> > 
+> > I think this would be cleaner if you force the caller to put set and clear
+> > into registers beforehand, rather than have to do the literal load every
+> > time. Also, I don't think set and clear should be required (and then you can
+> > lose tmp2 as well).
+> 
+> I can't figure out how to make register-parameters non-required
+> (i.e. conditionalise on whether an optional parameter was provided),
+> so my attempt of refactoring actually ends up using an additional
+> register:
+> 
+> #ifdef CONFIG_CPU_CP15
+> /* Macro for setting/clearing bits in sctlr */
+> 	.macro	update_sctlr, set:req, clear:req, tmp:req
+> 	mrc	p15, 0, \tmp, c1, c0, 0
+> 	orr	\tmp, \set
+> 	mvn	\clear, \clear
+> 	and	\tmp, \tmp, \clear
+> 	mcr	p15, 0, \tmp, c1, c0, 0
+> 	.endm
+> #endif
+> 
+> If you think that's an improvement I can do that, and I have (just)
+> enough registers to spare.
+> If I'm being daft with my macro issues, do point it out.
 
-> -----Original Message-----
-> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> bounces at lists.linux-foundation.org] On Behalf Of Andreas Herrmann
-> Sent: Wednesday, January 29, 2014 7:44 PM
-> To: Sethi Varun-B16395
-> Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; Will Deacon;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
-> notifier block
-> 
-> On Tue, Jan 28, 2014 at 11:00:35AM +0000, Varun Sethi wrote:
-> >
-> >
-> > > -----Original Message-----
-> > > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> > > bounces at lists.linux-foundation.org] On Behalf Of Andreas Herrmann
-> > > Sent: Friday, January 24, 2014 1:27 AM
-> > > To: Sethi Varun-B16395
-> > > Cc: Andreas Herrmann; iommu at lists.linux-foundation.org; Will Deacon;
-> > > linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce iommu_group
-> > > notifier block
-> > >
-> > > On Wed, Jan 22, 2014 at 07:07:40PM +0000, Varun Sethi wrote:
-> > > > > -----Original Message-----
-> > > > > From: Will Deacon [mailto:will.deacon at arm.com]
-> > > > > Sent: Wednesday, January 22, 2014 9:04 PM
-> > > > > To: Sethi Varun-B16395
-> > > > > Cc: Andreas Herrmann; iommu at lists.linux-foundation.org;
-> > > > > linux-arm- kernel at lists.infradead.org; Andreas Herrmann
-> > > > > Subject: Re: [PATCH v3 02/11] iommu/arm-smmu: Introduce
-> > > > > iommu_group notifier block
-> > > > >
-> > > > > On Wed, Jan 22, 2014 at 01:54:11PM +0000, Varun Sethi wrote:
-> > > > > > > > > Ok, so are you suggesting that we perform the isolation
-> > > > > > > > > mapping in arm_smmu_add_device and drop the notifier
-> > > altogether?
-> > > > > > > > I think that should be fine, until we want to delay
-> > > > > > > > mapping creation till driver bind time.
-> > > > > > >
-> > > > > > > Is there a hard dependency on that?
-> > > > > > >
-> > > > > > Not sure, may be Andreas can answer that.
-> > > > >
-> > > > > Ok. Andreas? I would have thought doing this *earlier* shouldn't
-> > > > > be a problem (the DMA ops must be swizzled before the driver is
-> probed).
-> > > > >
-> > > > > > > > But the "isolate device" property should dictate iommu
-> > > > > > > > group
-> > > > > creation.
-> > > > > > >
-> > > > > > > The reason we added automatic group creation (per-device) is
-> > > > > > > for VFIO, which expects all devices to be in a group
-> > > > > > > regardless of the device isolation configuration.
-> > > > > > >
-> > > > > > IIUC, with the "isolate devices" property we ensure that there
-> > > > > > would be independent SMR and S2CR per device. Is that correct?
-> > > > >
-> > > > > Yes, as part of giving them independent sets of page tables.
-> > > > > Initially these tables don't have any valid mappings, but the
-> > > > > dma-mapping API will populate them in response to
-> > > dma_map_*/dma_alloc/etc.
-> > > > >
-> > > > > Not sure what this has to do with us putting devices into their
-> > > > > own groups...
-> > >
-> > > > [Sethi Varun-B16395] Devices in an iommu group would share the dma
-> > > > mapping, so shouldn't they be sharing the SMR and context
-> registers?
-> > >
-> > > I aggree with the context but SMRs won't be shared. I think you just
-> > > can say that a certain subset of the available SMRs will be used to
-> > > map all devices in an iommu group to the same context. Depending on
-> > > what streamIDs each device has you might have to use separate SMRs
-> > > for each device to map it to the same context.
-> 
-> > [Sethi Varun-B16395] IIUC the SMRs would unique per device, but there
-> > is a possibility where the number of context registers are restricted?
-> > In that case IOMMU groups should correspond to unique stream IDs (and
-> > corresponding SMRs).
-> 
-> > > > In case of the "isolate devices" property, each device would have
-> > > > its own SMR and context registers, thus allowing the devices to
-> > > > have independent mappings and allowing them to fall in separate
-> > > > iommu groups.
-> > >
-> > > I aggree with Varun's view here. (Now that I take iommu groups into
-> > > consideration.)
-> > >
-> > > But my goal with the "isolate devices" thing was twofold:
-> > >
-> > > 1. actual make use of SMMU for address translation for all master
-> > >   devices (instead of just bypassing the SMMU)
-> 
-> > [Sethi Varun-B16395] even if masters have to share translation? But
-> > from the patch it seemed that we are creating mapping only if we find
-> > the isolate devices property.
-> 
-> Yes, the patch creates mappings only if isolate-devices property is
-> given. Currently there is no trigger to create a common mapping for all
-> devices attached to the same SMMU.
-> 
-> > > plus
-> > >
-> > > 2. put each master into it's own domain to isolate it
-> > >
-> > > The latter matches usage of separate iommu groups for devices. If we
-> > > now use the isolate devices property to just control whether master
-> > > devices fall into the same or separate iommu groups it seems to me
-> > > we would need to have another mechanism that triggers the creation
-> > > of a mapping for a group.
-> > >
-> > > What do you think?
-> > >
-> 
-> > [Sethi Varun-B16395] As mentioned before, we should be having iommu
-> > group per device (having a unique stream id). Isolate devices property
-> > just ensures that each device has a unique context. Now, for the
-> > devices for which we don't have the isolate device property, can't we
-> > have the multiple devices point to a common mapping.
-> 
-> Hmm, the isolate-devices option is per SMMU. So if this is set for an
-> SMMU the driver tries to create a mapping per device. (And this is done
-> for all master devices of this SMMU.)
-> 
-> Are you requesting to change the default behaviour of the driver to
-> create a shared mapping in case the isolate-devices property is not
-> specified in DT for an SMMU node?
-> 
-> Or maybe your concern is that you have x master devices for an SMMU which
-> support y number of contexts and x > y? Which would imply that not all
-> devices can be isolated and some need to share a context?
-> 
-[Sethi Varun-B16395] I am trying to understand the requirement for the "isolate devices" property. Currently no default in mapping is created in the SMMU driver. The new property allows default mapping to be created for all masters. Why can't we create default mappings for all masters without this property?
+I was thinking along the lines of:
 
--Varun
+	.macro  update_sctlr, tmp:req, set=0, clear=0
+	.if	\set
+	orr ...
+	.endif
+	.if	\clear
+	bic ...
+	.endif
+	.endm
+
+however, that puts us back to the problem of having to pass immediates
+instead of registers. Gas *does* seem to accept the following:
+
+	.macro  update_sctlr, tmp:req, set=0, clear=0
+	.if	\set != 0
+	orr ...
+	.endif
+	.if	\clear != 0
+	bic ...
+	.endif
+	.endm
+
+which is filthy, so we'd need to see how beautiful the caller ends up being
+to justify that!
+
+Will
