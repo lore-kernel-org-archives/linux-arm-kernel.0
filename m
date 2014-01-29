@@ -1,26 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Jan 2014 16:08:47 +0100
-Subject: [PATCH V4 5/5] Documentation: power: reset: Add documentation for
- generic SYSCON reboot driver
-In-Reply-To: <52E2F450.2070100@gmail.com>
-References: <1390504801-24483-1-git-send-email-fkan@apm.com>
- <20140124182355.GF4758@e106331-lin.cambridge.arm.com>
- <52E2F450.2070100@gmail.com>
-Message-ID: <3683633.QqePEXQehq@wuerfel>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 29 Jan 2014 07:16:24 -0800
+Subject: [PATCH v5 17/23] drm/i2c: tda998x: set the PLL division factor
+ in range 0..3
+In-Reply-To: <d4ba259762605793aee726b5e33dcad6a8bd4777.1390986083.git.moinejf@free.fr>
+References: <cover.1390986082.git.moinejf@free.fr>
+ <d4ba259762605793aee726b5e33dcad6a8bd4777.1390986083.git.moinejf@free.fr>
+Message-ID: <1391008584.11756.59.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 January 2014 15:16:32 Marc C wrote:
-> 
-> > What's wrong with having a system clock unit binding, that the kernel
-> > can decompose as appropriate?
-> 
-> From what I understand, the arm-soc maintainers want to reduce (and perhaps even
-> eliminate) these board-specific constructs, and try to utilize common driver-code that
-> resides in the "driver" folder. I can vouch for the syscon/regmap framework as something
-> which would enable the effort.
+On Sat, 2014-01-25 at 18:14 +0100, Jean-Francois Moine wrote:
+> The predivider division factor of the register PLL_SERIAL_2 is in the
+> range 0..3, the value 0 being used for a division by 1.
 
-While your statement is true in general, it doesn't seem to counter
-what Mark R said above.
+trivia:
 
-	Arnd
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+[]
+> @@ -886,6 +886,11 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+>  	}
+>  
+>  	div = 148500 / mode->clock;
+> +	if (div != 0) {
+> +		div--;
+> +		if (div > 3)
+> +			div = 3;
+> +	}
+
+perhaps
+	clamp(div, 1, 4)
+	div--;
