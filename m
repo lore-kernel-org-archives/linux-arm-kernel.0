@@ -1,81 +1,69 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 29 Jan 2014 13:57:53 +0100
-Subject: [PATCH] ARM: iop32x: fix reset handling for the EM7210 board
-In-Reply-To: <1390999545-31428-1-git-send-email-linus.walleij@linaro.org>
- (Linus Walleij's message of "Wed, 29 Jan 2014 13:45:45 +0100")
-References: <1390999545-31428-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <87txcneyi6.fsf@lebrac.rtp-net.org>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Wed, 29 Jan 2014 14:21:37 +0100
+Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
+ NMI controller
+In-Reply-To: <20140129125818.GO3867@lukather>
+References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
+ <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
+ <20140116123940.GE31779@lukather>
+ <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
+ <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
+ <20140128164142.GL3867@lukather>
+ <CAOQ7t2YLv8dNF6i-X6Y1BgvvcBCNt6JhmpGuo23E057xez6+Tg@mail.gmail.com>
+ <20140129125818.GO3867@lukather>
+Message-ID: <CAOQ7t2Y-tnFf8AXQpmqsM+z3htFO4E91jybpSVrgqmC4LnOEAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Wed, Jan 29, 2014 at 1:58 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Hi,
-
-don't know how to comment about the subjet but it's _not_ about
-resetting the board but about powering it off.
-
-> This board was missed when converting all the others to proper
-> abstracted GPIO handling. Fix it up the right way by requesting
-> and driving GPIO line 0 high through gpiolib to reset the machine.
 >
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks, if you're happy with this fix, please apply it
-> directly to fixes in the ARM SoC tree.
-> ---
->  arch/arm/mach-iop32x/em7210.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+> So, to sum things up, what you see is something like:
 >
-> diff --git a/arch/arm/mach-iop32x/em7210.c b/arch/arm/mach-iop32x/em7210.c
-> index 177cd073a83b..e0c4187f3799 100644
-> --- a/arch/arm/mach-iop32x/em7210.c
-> +++ b/arch/arm/mach-iop32x/em7210.c
-> @@ -23,6 +23,7 @@
->  #include <linux/mtd/physmap.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
-> +#include <linux/gpio.h>
->  #include <mach/hardware.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
-> @@ -176,14 +177,21 @@ static struct platform_device em7210_serial_device = {
->  	.resource	= &em7210_uart_resource,
->  };
->  
-> +#define EM7210_HARDWARE_RESET 0
-> +
+>         handle_level_irq
+>                |              device    device
+>                | mask ack     handler irq acked unmask
+>                |  |    |         |         |       |
+>                v  v    v         v         v       v
+>
+> NMI -> GIC:
+>                +--------+     +---------------------
+> ---------------+        +-----+
+>
+> PMIC -> NMI:
+>             +-------------------------+
+> ------------+                         +-------------
+>
+> And you get a "rogue" retrigger because the NMI -> GIC level went up
+> again.
 
-please fix accoring to my previous comment.
+I'd say something like:
 
->  void em7210_power_off(void)
->  {
-> -	*IOP3XX_GPOE &= 0xfe;
-> -	*IOP3XX_GPOD |= 0x01;
-> +	int ret;
-> +
-> +	ret = gpio_direction_output(EM7210_HARDWARE_RESET, 1);
-> +	if (ret)
-> +		pr_crit("could not drive reset GPIO high\n");
->  }
->  
->  static void __init em7210_init_machine(void)
->  {
-> +	int ret;
-> +
->  	register_iop32x_gpio();
->  	platform_device_register(&em7210_serial_device);
->  	platform_device_register(&iop3xx_i2c0_device);
-> @@ -194,7 +202,9 @@ static void __init em7210_init_machine(void)
->  
->  	i2c_register_board_info(0, em7210_i2c_devices,
->  		ARRAY_SIZE(em7210_i2c_devices));
-> -
-> +	ret = gpio_request(EM7210_HARDWARE_RESET, "reset");
-> +	if (ret)
-> +		pr_err("could not request reset GPIO\n");
+         handle_level_irq
+                |              device    device
+                | mask ack     handler irq acked unmask
+                |  |    |         |         |       |
+                v  v    v         v         v       v
 
-no chance to work. too early. you'll get a -EPROBE_DEFER.
+ NMI -> GIC:
+                +-----------------------------+
+ ---------------+                             +------
 
-Arnaud
+ PMIC -> NMI:
+             +-------------------------+
+ ------------+                         +-------------
+
+
+> I'm not exactly sure on how to fix this. Maybe by adding a call to the
+> irqchip's ack just before the unmask in irq_finalize_oneshot?
+
+That is exactly what the unmask callback in the NMI controller driver does.
+The unmask_irq() in irq_finalize_oneshot() calls the unmask callback
+in the driver (sunxi_sc_nmi_ack_and_unmask()) that ACKs the line
+before unmasking it again.
+
+Best,
+
+-- 
+Carlo Caione
