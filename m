@@ -1,39 +1,48 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Jan 2014 11:29:04 +0100
-Subject: [PATCH RESEND 1/4] clk: clk-s2mps11: Refactor for including
- support for  other MFD clocks
-In-Reply-To: <mvd17-4vW-3@gated-at.bofh.it>
-References: <m8Uox-5kN-11@gated-at.bofh.it> <mtgmt-44E-3@gated-at.bofh.it>
- <mtgmu-44E-27@gated-at.bofh.it> <muwSe-WJ-17@gated-at.bofh.it>
- <muCkW-RP-15@gated-at.bofh.it> <mva3f-bR-7@gated-at.bofh.it>
- <mvd17-4vW-3@gated-at.bofh.it>
-Message-ID: <1390991344.2207.8.camel@AMDC1943>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 29 Jan 2014 11:29:59 +0100
+Subject: [RFC PATCH 1/9] mtd: nand: retrieve ECC requirements from Hynix
+ READ ID byte 4
+In-Reply-To: <20140123014906.GY8919@ld-irv-0074>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>
+ <1389190924-26226-2-git-send-email-b.brezillon@overkiz.com>
+ <20140123014906.GY8919@ld-irv-0074>
+Message-ID: <52E8D827.8010609@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Brian,
 
-> 
-> Quoting Mark Brown (2013-12-31 08:09:16)
-> > On Mon, Dec 30, 2013 at 09:33:50AM +0530, Tushar Behera wrote:
-> > 
-> > > Commit 1b1ccee1e821 "mfd: s2mps11: Fix build after regmap field rename
-> > > in sec-core.c" is also touching this file, which is in Mark's tree
-> > > right now. If I rebase
-> > 
-> > It's been in Linus' tree for a while now.
-> 
-> OK, so I merged the two patches into clk-next, then merged clk-next into
-> next-20131224 and the merge is super trivial to resolve. So I propose
-> that we just let it get resolved in linux-next the usual way.
-> 
-> Any objections? If not I'll take these two patches into clk-next.
+On 23/01/2014 02:49, Brian Norris wrote:
+> + Huang
+>
+> Hi Boris,
+>
+> On Wed, Jan 08, 2014 at 03:21:56PM +0100, Boris BREZILLON wrote:
+>> The Hynix nand flashes store their ECC requirements in byte 4 of its id
+>> (returned on READ ID command).
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> I haven't verified yet (perhaps Huang can confirm?), but this may be
+> similar to a patch Huang submitted recently. In his case, we found that
+> this table is actually quite unreliable and is likely hard to maintain.
 
-Did you merged these patches into clk-next? Unfortunately I couldn't
-find them (clk-next, next).
+You mean these bytes are not reliable within the whole Hynix LP (Large Page)
+NAND product line ?
 
-I am asking because I want to send patches with support for S2MPS14
-clock (based on these patches).
+>
+> Why do you need this ECC information, for my reference?
 
-Best regards,
-Krzysztof
+Because the NAND flash available on the cubietruck board does not 
+support the
+ONFI standard, and I thought this could be a option to retrieve the ECC 
+strength
+requirements.
+
+Anyway, I added a new helper function to retrieve ecc informations from 
+device
+tree (I'll post it in the 2nd version of this series). We'll see if this 
+approach is
+accepted...
+
+>
+> Brian
