@@ -1,40 +1,63 @@
-From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
-Date: Wed, 29 Jan 2014 17:33:17 +0100
-Subject: imx6 power consumption
-In-Reply-To: <CAOMZO5DGxN9C_fOxZTmh0ev7wnpL9YP1g4tQjw4wpL2AmQPcog@mail.gmail.com>
-References: <E1VszO5-00060R-Gp@merlin.infradead.org>
- <20131218024546.GA6691@S2101-09.ap.freescale.net>
- <E1VtF3I-0002MQ-Ra@merlin.infradead.org>
- <20131218113240.GK6691@S2101-09.ap.freescale.net>
- <b43eb01926cf4b1f9413a66cc5791d9b@DM2PR03MB317.namprd03.prod.outlook.com>
- <1387440914.4131.4.camel@bnilsen-HP>
- <E1W8XqE-0000Ml-GE@merlin.infradead.org>
- <CAOMZO5DGxN9C_fOxZTmh0ev7wnpL9YP1g4tQjw4wpL2AmQPcog@mail.gmail.com>
-Message-ID: <mailman.25.1391013238.1056.linux-arm-kernel@lists.infradead.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 Jan 2014 16:40:35 +0000
+Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
+In-Reply-To: <20140129133227.GQ3867@lukather>
+References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140129122520.GY11841@sirena.org.uk>
+ <20140129133227.GQ3867@lukather>
+Message-ID: <20140129164035.GC22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-01-29 at 17:21 +0100, Fabio Estevam wrote:
-> On Wed, Jan 29, 2014 at 2:17 PM, Bj?rn Erik Nilsen <ben@datarespons.no> wrote:
-> 
-> >> I successfully managed to cherry-pick a handful of commits from
-> >> freescale 3.10 and got down to approximately half the consumption.
-> >> That's already very good news.
-> >>
-> >> Looking forward to see these patches upstream. Will you be able upstream
-> >> them before 3.14 you think?
-> >
-> >
-> > Any updates on this?
-> 
-> Take a look at http://git.linaro.org/people/shawn.guo/linux-2.6.git/shortlog/refs/heads/for-next
-> .
-> There are some patches for low power support from Anson.
+On Wed, Jan 29, 2014 at 02:32:27PM +0100, Maxime Ripard wrote:
+> On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
 
+> > A select of PM_RUNTIME is both surprising and odd - why is that there?
+> > The usual idiom is that the device starts out powered up (flagged using
+> > pm_runtime_set_active()) and then runtime PM then suspends it when it's
+> > compiled in.  That way if for some reason people want to avoid runtime
+> > PM they can still use the device.
 
-Excellent news!
+> Since pm_runtime_set_active and all the pm_runtime* callbacks in
+> general are defined to pretty much empty functions, how the
+> suspend/resume callbacks are called then? Obviously, we need them to
+> be run, hence why I added the select here, but now I'm seeing a
+> construct like what's following acceptable then?
 
-It looks like these patches are exactly what is needed. I'm going to try
-them out tomorrow.
+> pm_runtime_enable(&pdev->dev);
+> if (!pm_runtime_enabled(&pdev->dev))
+>    sun6i_spi_runtime_resume(&pdev->dev);
 
-Great piece of work, thank you!
+I think you're looking for pm_request_idle() - just leave the device
+started by default and kick the system to suspend it.
+
+> Actually the IP asserts the CS automatically, the only thing you need
+> to do is to set which CS to use for your next transfer in some
+> register (which is what I'm doing after the !enable), and the CS will
+> be managed directly by the controller. Hence, there's no way to say
+> wether you want to enable it or not.
+
+> The controller allows to control the CS manually also, if that's the
+> preferred way of doing things.
+
+Yes, that's required to provide set_cs() - it's there so that things
+like the cs_change option in transfers can be factored out into the
+core.  We may in future want to integrate the ability to switch between
+manual and automatic management but it's likely to be more trouble than
+it's worth.
+
+> > This means we can only transfer a single FIFO of data?  I didn't see a
+> > check on the transfer length.
+
+> At the moment, indeed. And that's the first thing I check in the
+> transfer_one function.
+
+Oh, so it is - sorry.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140129/886075ea/attachment.sig>
