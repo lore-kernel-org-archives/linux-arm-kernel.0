@@ -1,70 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 Jan 2014 15:14:40 -0500 (EST)
-Subject: [PATCH v2 5/6] X86: remove redundant cpuidle_idle_call()
-In-Reply-To: <CAOesGMjvOkuxCopog91SAV1-gB9GaEYXpuXwhV1EJQor_pKjBA@mail.gmail.com>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-6-git-send-email-nicolas.pitre@linaro.org>
- <CAOesGMjvOkuxCopog91SAV1-gB9GaEYXpuXwhV1EJQor_pKjBA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1401291434120.1652@knanqh.ubzr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Jan 2014 21:15:54 +0100
+Subject: [PATCH v5 16/20] ARM: kirkwood: Add RSTOUT 'reg' entry to
+ devicetree
+In-Reply-To: <1390836440-12744-17-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390836440-12744-17-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140129201554.GJ10864@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jan 2014, Olof Johansson wrote:
-
-> Hi,
+On Mon, Jan 27, 2014 at 12:27:16PM -0300, Ezequiel Garcia wrote:
+> In order to support multiplatform builds the watchdog devicetree binding
+> was modified and now the 'reg' property is specified to need two
+> entries. This commit adds the second entry as-per the new specification.
 > 
-> On Wed, Jan 29, 2014 at 9:45 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > The core idle loop now takes care of it.
-> >
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > ---
-> >  arch/x86/kernel/process.c | 5 +----
-> >  1 file changed, 1 insertion(+), 4 deletions(-)
-> >
-> > diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
-> > index 3fb8d95ab8..4505e2a950 100644
-> > --- a/arch/x86/kernel/process.c
-> > +++ b/arch/x86/kernel/process.c
-> > @@ -298,10 +298,7 @@ void arch_cpu_idle_dead(void)
-> >   */
-> >  void arch_cpu_idle(void)
-> >  {
-> > -       if (cpuidle_idle_call())
-> > -               x86_idle();
-> > -       else
-> > -               local_irq_enable();
-> > +       x86_idle();
-> 
-> You're taking out the local_irq_enable() here but I don't see the
-> equivalent of adding it back in the 1/6 patch that moves the
-> cpuidle_idle_call() up to common code. It seems that one of the call
-> paths through cpuidle_idle_call() don't re-enable it on its own.
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-When cpuidle_idle_call() returns non-zero, IRQs are left disabled.  When 
-it returns zero then IRQs should be disabled.  Same goes for cpuidle 
-drivers.  That's the theory at least.
+Hi Ezequiel
 
-Looking into some cpuidle drivers for x86 I found at least one that 
-doesn't respect this convention.  Damn.
+I tested on Kirkwood, using the standard watchdog test cases. Works
+great.
 
-> Even if this is the right thing to do, why it's OK to do so should
-> probably be documented in the patch description.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-Better yet, I'm going to amend patch 1/6 with the below to make things 
-more reliable while still identifying misbehaving drivers.
-
-diff --git a/kernel/cpu/idle.c b/kernel/cpu/idle.c
-index ffcd3ee9af..14ca43430a 100644
---- a/kernel/cpu/idle.c
-+++ b/kernel/cpu/idle.c
-@@ -98,7 +98,8 @@ static void cpu_idle_loop(void)
- 					rcu_idle_enter();
- 					if (cpuidle_idle_call())
- 						arch_cpu_idle();
--					WARN_ON_ONCE(irqs_disabled());
-+					if (WARN_ON_ONCE(irqs_disabled()))
-+						local_irq_enable();
- 					rcu_idle_exit();
- 					start_critical_timings();
- 				} else {
+Thanks
+	Andrew
