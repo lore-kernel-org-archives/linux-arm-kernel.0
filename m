@@ -1,32 +1,45 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 30 Jan 2014 08:09:59 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Lager USBHS update
-Message-ID: <20140129230959.22655.55645.sendpatchset@w520>
+Date: Thu, 30 Jan 2014 08:10:09 +0900
+Subject: [PATCH 01/03] ARM: shmobile: Remove Lager USBHS UDC ifdefs
+In-Reply-To: <20140129230959.22655.55645.sendpatchset@w520>
+References: <20140129230959.22655.55645.sendpatchset@w520>
+Message-ID: <20140129231009.22655.45084.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Lager USBHS update
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/03] ARM: shmobile: Remove Lager USBHS UDC ifdefs
-[PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS
-[PATCH 03/03] ARM: shmobile: Lager USB0 cable detection workaround
+Remove ifdefs to make the Lager USBHS device always present.
+This makes it more like other devices, no need to be special.
 
-Update the Lager USB0 code to let the USBHS device always be present
-and check for DIP switch configuration. To be able to check the DIP
-switch configuration the r8a7790 PINCTRL bits need to be updated too.
-
-With this series USB0 on Lager will be fixed to USB Function via the
-USBHS driver. In theory the SoC can also use USB Host on this port
-either via USBHS or PCI USB, but since cable detection is missing
-it is possible for the user to misconfigure USB Host and drive VBUS
-with the wrong cable. Because of that USB0 will be forced to stick
-to Function-only in the Lager board code.
+Also, these ifdefs by themselves do not hurt much, but combined
+with USB Host device ifdefs that were proposed earlier we could
+basically end up with a kernel that drives VBUS incorrectly
+depending on the kernel configuration - lets not do that.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Written against renesas.git tag renesas-devel-v3.13-20140127
+ arch/arm/mach-shmobile/board-lager.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
- arch/arm/mach-shmobile/board-lager.c |   29 ++++++++++++++++++++++-------
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c |    9 +++++++++
- 2 files changed, 31 insertions(+), 7 deletions(-)
+--- 0003/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2014-01-24 10:16:15.000000000 +0900
+@@ -368,7 +368,6 @@ static const struct platform_device_info
+ };
+ 
+ /* USBHS */
+-#if IS_ENABLED(CONFIG_USB_RENESAS_USBHS_UDC)
+ static const struct resource usbhs_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe6590000, 0x100),
+ 	DEFINE_RES_IRQ(gic_spi(107)),
+@@ -478,9 +477,6 @@ static void __init lager_register_usbhs(
+ 					  &usbhs_priv.info,
+ 					  sizeof(usbhs_priv.info));
+ }
+-#else	/* CONFIG_USB_RENESAS_USBHS_UDC */
+-static inline void lager_register_usbhs(void) { }
+-#endif	/* CONFIG_USB_RENESAS_USBHS_UDC */
+ 
+ /* USBHS PHY */
+ static const struct rcar_gen2_phy_platform_data usbhs_phy_pdata __initconst = {
