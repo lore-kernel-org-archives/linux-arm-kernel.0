@@ -1,210 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 07:50:05 -0800
-Subject: [RFC PATCH 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2
- emulation
-In-Reply-To: <CAAhSdy2ny3qhWGMFZcOE1vP1j-iqB9r1Q82fOhUo=NMP1h=JrA@mail.gmail.com>
-References: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
- <1390309301-28424-3-git-send-email-anup.patel@linaro.org>
- <20140128210410.GA26671@cbox>
- <CAAhSdy2ny3qhWGMFZcOE1vP1j-iqB9r1Q82fOhUo=NMP1h=JrA@mail.gmail.com>
-Message-ID: <20140129155005.GC3570@cbox>
+From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
+Date: Wed, 29 Jan 2014 17:17:40 +0100
+Subject: imx6 power consumption
+In-Reply-To: <1387440914.4131.4.camel@bnilsen-HP>
+References: <E1VszO5-00060R-Gp@merlin.infradead.org>
+ <20131218024546.GA6691@S2101-09.ap.freescale.net>
+ <E1VtF3I-0002MQ-Ra@merlin.infradead.org>
+ <20131218113240.GK6691@S2101-09.ap.freescale.net>
+ <b43eb01926cf4b1f9413a66cc5791d9b@DM2PR03MB317.namprd03.prod.outlook.com>
+ <1387440914.4131.4.camel@bnilsen-HP>
+Message-ID: <mailman.24.1391012292.1056.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 10:22:47AM +0530, Anup Patel wrote:
-> On Wed, Jan 29, 2014 at 2:34 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Tue, Jan 21, 2014 at 06:31:40PM +0530, Anup Patel wrote:
+Hi guys,
 
-[...]
-
-> >
-> > Which tree does this patch apply to?  It looks like you'll get a
-> > conflict with:
-> > 478a823 arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
+On Thu, 2013-12-19 at 09:15 +0100, Bj?rn Erik Nilsen wrote:
+> Hi Anson,
 > 
-> This patchset applies on v3.13 tag of Torvalds tree.
-
-That would not contain anything in kvm/next or kvm-arm-next.
-
+> On Thu, 2013-12-19 at 03:28 +0100, Anson.Huang at freescale.com wrote:
+> > 
+> > Best Regards.
+> > Anson huang ???
+> >  
+> > Freescale Semiconductor Shanghai
+> > ?????????192?A?2?
+> > 201203
+> > Tel:021-28937058
+> > 
+> > 
+> > >-----Original Message-----
+> > >From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> > >On Behalf Of Shawn Guo
+> > >Sent: Wednesday, December 18, 2013 7:33 PM
+> > >To: Bj?rn Erik Nilsen
+> > >Cc: linux-arm-kernel at lists.infradead.org
+> > >Subject: Re: imx6 power consumption
+> > >
+> > >On Wed, Dec 18, 2013 at 12:12:05PM +0100, Bj?rn Erik Nilsen wrote:
+> > >> As far as I can tell, commit e95dddb34c8 "ARM: imx: enable anatop
+> > >> suspend/resume" is the common ancestor for mainline and freescale, and
+> > >> from there pm-imx6q.c starts to diverge.
+> > >>
+> > >> I haven not looked at it in great detail yet, but it seems there are
+> > >> not too many patches missing in mainline. Any idea why remaining
+> > >> patches haven't been upstreamed?
+> > >
+> > >Probably because no one cares and would spend time to upstream these patches.
+> > 
+> > This root cause is we did NOT put the DSM code in IRAM and free DDR IO in DSM.
+> > We have done this in our internal v3.10 kernel, so I will do the upstream soon,
+> > Below is the DSM number of i.MX6Q SabreSD we got on v3.10 release:
+> > 
+> > VDDARM_IN(R27)             0mA at 0.97V
+> > VDDSOC_IN(R21)             4.2 at 0.97V
+> > DDR(R25)                   14.8mA at 1.5V
+> > VDDHIGH_IN + SNVS(SH17)    0.35mA at 2.98V, 0.9mA
 > 
-> I generally base my patches on latest stable/rc tag of Torvalds tree
-> so that I can provide KVM patches to folks interested in trying KVM
-> on X-Gene with latest Linux stable/rc.
-
-If you want to make it slightly easier for me or Marc to apply your
-patches in general I would recommend basing them off kvm/next or
-kvm-arm-next, but it's no big deal.
-
-In this case all you need to consider is already in linus/master.
-
 > 
-> I will make sure that revised patchset applies on top of
-> 478a823 arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
+> I successfully managed to cherry-pick a handful of commits from
+> freescale 3.10 and got down to approximately half the consumption.
+> That's already very good news.
 > 
-> >
-> >>       }
-> >>
-> >> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> >> index 0881bf1..ee044a3 100644
-> >> --- a/arch/arm/kvm/psci.c
-> >> +++ b/arch/arm/kvm/psci.c
-> >> @@ -55,13 +55,13 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
-> >>       }
-> >>
-> >>       if (!vcpu)
-> >> -             return KVM_PSCI_RET_INVAL;
-> >> +             return KVM_PSCI_RET_INVALID_PARAMS;
-> >>
-> >>       target_pc = *vcpu_reg(source_vcpu, 2);
-> >>
-> >>       wq = kvm_arch_vcpu_wq(vcpu);
-> >>       if (!waitqueue_active(wq))
-> >> -             return KVM_PSCI_RET_INVAL;
-> >> +             return KVM_PSCI_RET_INVALID_PARAMS;
-> >>
-> >>       kvm_reset_vcpu(vcpu);
-> >>
-> >> @@ -84,17 +84,49 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
-> >>       return KVM_PSCI_RET_SUCCESS;
-> >>  }
-> >>
-> >> -/**
-> >> - * kvm_psci_call - handle PSCI call if r0 value is in range
-> >> - * @vcpu: Pointer to the VCPU struct
-> >> - *
-> >> - * Handle PSCI calls from guests through traps from HVC instructions.
-> >> - * The calling convention is similar to SMC calls to the secure world where
-> >> - * the function number is placed in r0 and this function returns true if the
-> >> - * function number specified in r0 is withing the PSCI range, and false
-> >> - * otherwise.
-> >> - */
-> >> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
-> >> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +     unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
-> >> +     unsigned long val;
-> >> +
-> >> +     switch (psci_fn) {
-> >> +     case KVM_PSCI_0_2_FN_PSCI_VERSION:
-> >> +             /*
-> >> +              * Bits[31:16] = Major Version = 0
-> >> +              * Bits[15:0] = Minor Version = 2
-> >> +              */
-> >> +             val = 2;
-> >> +             break;
-> >> +     case KVM_PSCI_0_2_FN_CPU_OFF:
-> >> +             kvm_psci_vcpu_off(vcpu);
-> >> +             val = KVM_PSCI_RET_SUCCESS;
-> >> +             break;
-> >> +     case KVM_PSCI_0_2_FN_CPU_ON:
-> >> +     case KVM_PSCI_0_2_FN64_CPU_ON:
-> >> +             val = kvm_psci_vcpu_on(vcpu);
-> >> +             break;
-> >> +     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
-> >> +     case KVM_PSCI_0_2_FN_AFFINITY_INFO:
-> >> +     case KVM_PSCI_0_2_FN_MIGRATE:
-> >> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
-> >> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
-> >> +     case KVM_PSCI_0_2_FN_SYSTEM_OFF:
-> >> +     case KVM_PSCI_0_2_FN_SYSTEM_RESET:
-> >> +     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
-> >> +     case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
-> >> +     case KVM_PSCI_0_2_FN64_MIGRATE:
-> >> +     case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
-> >> +             val = KVM_PSCI_RET_NOT_SUPPORTED;
-> >> +             break;
-> >> +     default:
-> >> +             return false;
-> >> +     }
-> >> +
-> >> +     *vcpu_reg(vcpu, 0) = val;
-> >> +     return true;
-> >> +}
-> >> +
-> >> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-> >>  {
-> >>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
-> >>       unsigned long val;
-> >> @@ -109,9 +141,8 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
-> >>               break;
-> >>       case KVM_PSCI_FN_CPU_SUSPEND:
-> >>       case KVM_PSCI_FN_MIGRATE:
-> >> -             val = KVM_PSCI_RET_NI;
-> >> +             val = KVM_PSCI_RET_NOT_SUPPORTED;
-> >>               break;
-> >> -
-> >>       default:
-> >>               return false;
-> >>       }
-> >> @@ -119,3 +150,21 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
-> >>       *vcpu_reg(vcpu, 0) = val;
-> >>       return true;
-> >>  }
-> >> +
-> >> +/**
-> >> + * kvm_psci_call - handle PSCI call if r0 value is in range
-> >> + * @vcpu: Pointer to the VCPU struct
-> >> + *
-> >> + * Handle PSCI calls from guests through traps from HVC instructions.
-> >> + * The calling convention is similar to SMC calls to the secure world where
-> >> + * the function number is placed in r0 and this function returns true if the
-> >> + * function number specified in r0 is withing the PSCI range, and false
-> >> + * otherwise.
-> >> + */
-> >> +bool kvm_psci_call(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +     if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-> >> +             return kvm_psci_0_2_call(vcpu);
-> >> +
-> >> +     return kvm_psci_0_1_call(vcpu);
-> >> +}
-> >
-> > Why don't we just try one after the other?  Do they conflict in some
-> > way?
-> 
-> Atleast the functions IDs are totally different in v0.2 and v0.1
-> 
-> Also, in v0.2 we have separate function IDs for 32bit and 64bit
-> VCPU calling same PSCI function.
-> 
+> Looking forward to see these patches upstream. Will you be able upstream
+> them before 3.14 you think?
 
-So we could just do:
 
-{
-	ret = kvm_psci_0_2_call(vcpu);
-	if (ret)
-		return ret;
-
-	ret = kvm_psci_0_1_call(vcpu);
-	if (ret)
-		return ret;
-
-	return false;
-}
-
-and be rid of the vcpu feature, or?  I thought this was Marc's point in
-the last KVM/ARM call?
-
-> >
-> > I assume PSCI calls are never going to be in the critical path and calls
-> > into PSCI are pretty much expected to be slow as a dog anyhow, so if we
-> > could avoid the extra churn in user space code and potential user
-> > confusion (providing PSCI 0.2 kernel but too old user space tool for
-> > example), I think that would be preferred.
-> 
-> Yes, PSCI calls will not be in critical path except few functions such as
-> PSCI CPU_SUSPEND and CPU_ON.
-> 
-> For example,
-> On real HW, people are very much interested in time taken to resume a
-> HW CPU from suspended state because this affects responsiveness of
-> a system.
-> 
-
-In which case time taken to wake up from suspended state in a VM will
-for sure not be dominated by an extra call to a psci function id
-checking function.
-
-Thanks,
--Christoffer
+Any updates on this?
