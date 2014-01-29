@@ -1,90 +1,72 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 Jan 2014 13:00:45 -0500 (EST)
-Subject: [PATCH 2/9] ARM64: get rid of arch_cpu_idle_prepare()
-In-Reply-To: <20140127155755.GH32608@arm.com>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-3-git-send-email-nicolas.pitre@linaro.org>
- <20140127154315.GG32608@arm.com>
- <alpine.LFD.2.11.1401271047240.1652@knanqh.ubzr>
- <20140127155755.GH32608@arm.com>
-Message-ID: <alpine.LFD.2.11.1401291249240.1652@knanqh.ubzr>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Wed, 29 Jan 2014 19:01:40 +0100
+Subject: [RFC PATCH v2 09/14] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <CAL_JsqLVr1gSLArqtfOiHce+u6ZK8FiKMX0o9bvMrMoGGhATvg@mail.gmail.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>	<1391006064-28890-10-git-send-email-b.brezillon.dev@gmail.com>
+ <CAL_JsqLVr1gSLArqtfOiHce+u6ZK8FiKMX0o9bvMrMoGGhATvg@mail.gmail.com>
+Message-ID: <52E94204.1050207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jan 2014, Catalin Marinas wrote:
+Hello Rob,
 
-> On Mon, Jan 27, 2014 at 03:51:02PM +0000, Nicolas Pitre wrote:
-> > On Mon, 27 Jan 2014, Catalin Marinas wrote:
-> > 
-> > > For arm64, we could simply remove any reference to FIQs. I'm not aware
-> > > of anyone using them.
-> > 
-> > OK. What if I sumply remove arch_cpu_idle_prepare() and let you
-> > remove the rest?
-> > 
-> > IMHO I'd simply remove local_fiq_{enable/disable}() from 
-> > arm64/kernel/smp.c and leave the infrastructure in place in case someone 
-> > needs it eventually.  In which case I could include that into my patch 
-> > as well.
-> 
-> Sounds good. We can keep the local_fiq_*() functions but remove about 4
-> calling sites (process.c and smp.c) until needed.
+Le 29/01/2014 18:11, Rob Herring a ?crit :
+> On Wed, Jan 29, 2014 at 8:34 AM, Boris BREZILLON
+> <b.brezillon.dev@gmail.com> wrote:
+>> Add the sunxi NAND Flash Controller dt bindings documentation.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>> ---
+>>   .../devicetree/bindings/mtd/sunxi-nand.txt         |   46 ++++++++++++++++++++
+>>   1 file changed, 46 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+>> new file mode 100644
+>> index 0000000..b0e55a3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+>> @@ -0,0 +1,46 @@
+>> +Allwinner NAND Flash Controller (NFC)
+>> +
+>> +Required properties:
+>> +- compatible : "allwinner,sun4i-nand".
+>> +- reg : shall contain registers location and length for data and reg.
+>> +- interrupts : shall define the nand controller interrupt.
+>> +- #address-cells: shall be set to 1. Encode the nand CS.
+>> +- #size-cells : shall be set to 0.
+>> +- clocks : shall reference nand controller clocks.
+>> +- clock-names : nand controller internal clock names. Shall contain :
+>> +    * "ahb_clk" : AHB gating clock
+>> +    * "sclk" : nand controller clock
+>> +
+>> +Optional children nodes:
+>> +Children nodes represent the available nand chips.
+>> +
+>> +Optional properties:
+> For the controller or per nand chip?
+>
+>> +- onfi,nand-timing-mode : mandatory if the chip does not support the ONFI
+>> +  standard.
+> Add to generic nand binding.
+>
+>> +- allwinner,rb : shall contain the native Ready/Busy ids.
+>> + or
+>> +- rb-gpios : shall contain the gpios used as R/B pins.
+> Isn't allwinner,rb implied by a lack of rb-gpios property. Or no R/B
+> pin is an option?
+Both are optional. In case none of the properties are defined the dev_ready
+callback is set to NULL and the nand_base waiting loop is used.
 
-OK here it is.  Please feel free to merge this into your tree directly 
-as it no longer has any dependency issues with other patches.
+> If so, don't you need some fixed time delay
+> properties like max erase time?
 
------ >8
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Subject: [PATCH] ARM64: FIQs are unused
+This is handled in nand_base (using the chip_delay field), but I guess 
+we could
+use the information retrieved from nand timings and the operation in 
+progress...
 
-So any FIQ handling is superfluous at the moment.  The functions to 
-disable/enable FIQs is kept around if ever someone needs them in the 
-future, but existing calling sites including arch_cpu_idle_prepare() 
-may go for now.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index de17c89985..adeabe8c6b 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -84,11 +84,6 @@ EXPORT_SYMBOL_GPL(pm_power_off);
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- EXPORT_SYMBOL_GPL(arm_pm_restart);
- 
--void arch_cpu_idle_prepare(void)
--{
--	local_fiq_enable();
--}
--
- /*
-  * This is our default idle handler.
-  */
-@@ -135,7 +130,6 @@ void machine_restart(char *cmd)
- 
- 	/* Disable interrupts first */
- 	local_irq_disable();
--	local_fiq_disable();
- 
- 	/* Now call the architecture specific reboot code. */
- 	if (arm_pm_restart)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index a0c2ca602c..94576c02f5 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -159,7 +159,6 @@ asmlinkage void secondary_start_kernel(void)
- 	complete(&cpu_running);
- 
- 	local_irq_enable();
--	local_fiq_enable();
- 	local_async_enable();
- 
- 	/*
-@@ -491,7 +490,6 @@ static void ipi_cpu_stop(unsigned int cpu)
- 
- 	set_cpu_online(cpu, false);
- 
--	local_fiq_disable();
- 	local_irq_disable();
- 
- 	while (1)
+> rb-gpios could be added to the generic nand binding as well.
+Sure.
+>
+> Rob
