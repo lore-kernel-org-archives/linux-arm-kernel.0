@@ -1,69 +1,72 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Wed, 29 Jan 2014 14:21:37 +0100
-Subject: [PATCH v3 1/3] ARM: sun7i/sun6i: irqchip: Add irqchip driver for
- NMI controller
-In-Reply-To: <20140129125818.GO3867@lukather>
-References: <1389453548-10665-1-git-send-email-carlo.caione@gmail.com>
- <1389453548-10665-2-git-send-email-carlo.caione@gmail.com>
- <20140116123940.GE31779@lukather>
- <CAOQ7t2ay6UM-YAUSypRzC=_oSY=0L5RhD6FziG96j4aoK6RHsQ@mail.gmail.com>
- <20140128104044.GC3867@lukather> <52E78E3F.6080902@redhat.com>
- <20140128164142.GL3867@lukather>
- <CAOQ7t2YLv8dNF6i-X6Y1BgvvcBCNt6JhmpGuo23E057xez6+Tg@mail.gmail.com>
- <20140129125818.GO3867@lukather>
-Message-ID: <CAOQ7t2Y-tnFf8AXQpmqsM+z3htFO4E91jybpSVrgqmC4LnOEAQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 29 Jan 2014 07:27:15 -0600
+Subject: [PATCH] ARM: OMAP2+: add missing ARCH_HAS_OPP
+In-Reply-To: <1389816038-17363-1-git-send-email-nm@ti.com>
+References: <1389816038-17363-1-git-send-email-nm@ti.com>
+Message-ID: <52E901B3.5070307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 1:58 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Hi Tony,
+On 01/15/2014 02:00 PM, Nishanth Menon wrote:
+> OMAP5, DRA7, AM43xx all have OPPs. So select the same to allow SoC
+> only configuration boot to work with OPP.
+> 
+> Reported-by: Nikhil Devshatwar <nikhil.nd@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> 
+> For DRA7, depends on: https://patchwork.kernel.org/patch/3465411/
 
->
-> So, to sum things up, what you see is something like:
->
->         handle_level_irq
->                |              device    device
->                | mask ack     handler irq acked unmask
->                |  |    |         |         |       |
->                v  v    v         v         v       v
->
-> NMI -> GIC:
->                +--------+     +---------------------
-> ---------------+        +-----+
->
-> PMIC -> NMI:
->             +-------------------------+
-> ------------+                         +-------------
->
-> And you get a "rogue" retrigger because the NMI -> GIC level went up
-> again.
+Considering that dependent patch is now on linus master,
+a gentle ping -> The patch does apply on latest linus master commit
+0e47c969c65e213421450c31043353ebe3c67e0c
 
-I'd say something like:
+patchworks reference: https://patchwork.kernel.org/patch/3493581/
 
-         handle_level_irq
-                |              device    device
-                | mask ack     handler irq acked unmask
-                |  |    |         |         |       |
-                v  v    v         v         v       v
+> 
+>  arch/arm/mach-omap2/Kconfig |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 35c23e5..66a9c4a 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -50,6 +50,7 @@ config SOC_OMAP5
+>  	bool "TI OMAP5"
+>  	depends on ARCH_MULTI_V7
+>  	select ARCH_OMAP2PLUS
+> +	select ARCH_HAS_OPP
+>  	select ARM_CPU_SUSPEND if PM
+>  	select ARM_GIC
+>  	select CPU_V7
+> @@ -63,6 +64,7 @@ config SOC_AM33XX
+>  	bool "TI AM33XX"
+>  	depends on ARCH_MULTI_V7
+>  	select ARCH_OMAP2PLUS
+> +	select ARCH_HAS_OPP
+>  	select ARM_CPU_SUSPEND if PM
+>  	select CPU_V7
+>  	select MULTI_IRQ_HANDLER
+> @@ -72,6 +74,7 @@ config SOC_AM43XX
+>  	depends on ARCH_MULTI_V7
+>  	select CPU_V7
+>  	select ARCH_OMAP2PLUS
+> +	select ARCH_HAS_OPP
+>  	select MULTI_IRQ_HANDLER
+>  	select ARM_GIC
+>  	select MACH_OMAP_GENERIC
+> @@ -80,6 +83,7 @@ config SOC_DRA7XX
+>  	bool "TI DRA7XX"
+>  	depends on ARCH_MULTI_V7
+>  	select ARCH_OMAP2PLUS
+> +	select ARCH_HAS_OPP
+>  	select ARM_CPU_SUSPEND if PM
+>  	select ARM_GIC
+>  	select CPU_V7
+> 
 
- NMI -> GIC:
-                +-----------------------------+
- ---------------+                             +------
-
- PMIC -> NMI:
-             +-------------------------+
- ------------+                         +-------------
-
-
-> I'm not exactly sure on how to fix this. Maybe by adding a call to the
-> irqchip's ack just before the unmask in irq_finalize_oneshot?
-
-That is exactly what the unmask callback in the NMI controller driver does.
-The unmask_irq() in irq_finalize_oneshot() calls the unmask callback
-in the driver (sunxi_sc_nmi_ack_and_unmask()) that ACKs the line
-before unmasking it again.
-
-Best,
 
 -- 
-Carlo Caione
+Regards,
+Nishanth Menon
