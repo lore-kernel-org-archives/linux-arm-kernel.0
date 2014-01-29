@@ -1,59 +1,38 @@
-From: mikpelinux@gmail.com (Mikael Pettersson)
-Date: Wed, 29 Jan 2014 13:34:49 +0100
-Subject: Building with gcc 4.6.4
-In-Reply-To: <20140128150611.GL15937@n2100.arm.linux.org.uk>
-References: <20140128120150.GG15937@n2100.arm.linux.org.uk>
- <21223.49366.479579.145000@gargle.gargle.HOWL>
- <20140128150611.GL15937@n2100.arm.linux.org.uk>
-Message-ID: <21224.62825.625591.200853@gargle.gargle.HOWL>
+From: sander@humilis.net (Sander)
+Date: Wed, 29 Jan 2014 13:26:51 +0100
+Subject: [PATCH] arm: Add Arm Erratum 773769 for Large data RAM latency.
+In-Reply-To: <CAD=FV=XqoSGpQ_Yrjj4hvV_0FSMfQGcGEsKkL1Stnm9m5s2Xvw@mail.gmail.com>
+References: <1389187991-26446-1-git-send-email-gautam.vivek@samsung.com>
+ <20140108143529.GB14122@mudshark.cambridge.arm.com>
+ <CAD=FV=WYe7Qk_XPs=FCeB7pbDz8AnG0txFcDyAQWWAU60vd-Sw@mail.gmail.com>
+ <20140108192028.GM27432@n2100.arm.linux.org.uk>
+ <CAD=FV=Ui8kec5vYA1jRT3EGNaUeWX-Ua5sUs+u3wdRz1oFnTzw@mail.gmail.com>
+ <alpine.LFD.2.10.1401081600370.1851@knanqh.ubzr>
+ <CAD=FV=XqoSGpQ_Yrjj4hvV_0FSMfQGcGEsKkL1Stnm9m5s2Xvw@mail.gmail.com>
+Message-ID: <20140129122651.GB31980@panda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
- > On Tue, Jan 28, 2014 at 03:38:14PM +0100, Mikael Pettersson wrote:
- > > Russell King - ARM Linux writes:
- > >  > So, yesterday I built gcc 4.6.4 (mainline) for the autobuilder, and the
- > >  > result is that every build failed with the same error:
- > >  > 
- > >  > scripts/mod/empty.c:1:0: error: FPA is unsupported in the AAPCS
- > >  > 
- > >  > This seems to be because linux-elf targets default to fpe3 in mainline
- > >  > gcc, but specifying -mabi=aapcs-linux switches us into EABI mode where
- > >  > the compiler errors out with the default FPU.
- > >  > 
- > >  > Hence, I believe we need this to ensure that a compatible VFP is
- > >  > selected.  One can argue that building EABI ARMv4 with VFP is silly,
- > >  > but it seems that's what the gcc folk have decided (rightly or
- > >  > wrongly.)
- > >  > 
- > >  > Maybe this is a bug in mainline GCC - which begs the question why
- > >  > (presumably, since no one has picked this up) Linaro's toolchain
- > >  > has fixes but mainline GCC doesn't.
- > >  > 
- > >  > Comments?
- > > 
- > > Perhaps because most ARM EABI toolchains default to soft-float,
- > > and the hardfloat ones usually select v6 or v7 + vfp-d16 or neon
- > > as their defaults, so the archaic FPA is never the default.
- > 
- > soft-float has nothing to do with it, because the kernel always passes
- > -msoft-float.
- > 
- > > Or are you using an OABI toolchain to compile an EABI kernel?
- > 
- > ... which should make no difference what so ever since the kernel should
- > be passing the appropriate options.  That's why we pass -mabi=aapcs-linux
- > to the kernel.
+Doug Anderson wrote (ao):
+> On Wed, Jan 8, 2014 at 1:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Wed, 8 Jan 2014, Doug Anderson wrote:
+> >> * If Joe Upstream wants to run an upstream kernel on some type of
+> >> exynos5250 product (Samsung ARM Chromebook, HP Chromebook 11, Nexus 10
+> >> are the ones I know of) then he will deal with the small number of
+> >> crashes or figure out a solution.
+> >
+> > If Joe Upstream wants to run an upstream kernel, doesn't he have to
+> > unscrew his write protect switch first, at which point the RO firmware
+> > can be updated as well?
+> 
+> Actually, no.  You can move your device into dev mode and run any
+> kernel you want.  You'll get an annoying "you're in dev mode" screen
+> at every bootup, but otherwise it works just fine.
+> 
+> Going into dev mode requires some special keystrokes at bootup and a
+> wipe of your hard disk but no screwdrivers.
 
-I can reproduce your error with an OABI toolchain (gcc-4.6.4 or 4.7.3,
-default configuration options wrt ISA and floating-point model), but
-there's no such error with an EABI toolchain.  So it looks like you've
-found a GCC bug.
+And there is http://www.arndaleboard.org/ where you just put an upstream
+kernel on sd and boot.
 
-However, the toolchain people considers OABI to be obsolete, it's
-unsupported since gcc-4.7.0, gcc-4.6 is EOL, and even gcc-4.7 is
-nearing EOL (will probably happen this spring or early summer after
-the release of gcc-4.9.0), so I doubt anyone is going to work on
-this issue.
-
-/Mikael
+	Sander
