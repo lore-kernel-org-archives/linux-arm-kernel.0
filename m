@@ -1,52 +1,84 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 30 Jan 2014 08:10:19 +0900
-Subject: [PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS
+Date: Thu, 30 Jan 2014 08:10:29 +0900
+Subject: [PATCH 03/03] ARM: shmobile: Lager USB0 cable detection workaround
 In-Reply-To: <20140129230959.22655.55645.sendpatchset@w520>
 References: <20140129230959.22655.55645.sendpatchset@w520>
-Message-ID: <20140129231019.22655.41456.sendpatchset@w520>
+Message-ID: <20140129231029.22655.58864.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Create a new group for the USB0 OVC/VBUS pin by itself. This
-allows us to monitor PWEN as GPIO on the Lager board.
+Add Lager board code to check the PWEN GPIO signal and refuse to
+allow probe of the USBHS driver in case of DIP misconfiguration.
+
+For correct operation Lager DIP switches SW5 and SW6 shall be
+configured in 2-3 position to enable USB Function support.
+
+If the DIP switch is configured incorrectly then the user can
+simply adjust the hardware and either reboot or use the bind interface
+to try to probe again:
+
+# echo renesas_usbhs > /sys/bus/platform/drivers/renesas_usbhs/bind
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ Depends on "[PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS"
 
---- 0001/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ work/drivers/pinctrl/sh-pfc/pfc-r8a7790.c	2014-01-24 10:23:32.000000000 +0900
-@@ -3231,6 +3231,13 @@ static const unsigned int usb0_pins[] =
- static const unsigned int usb0_mux[] = {
- 	USB0_PWEN_MARK, USB0_OVC_VBUS_MARK,
- };
-+static const unsigned int usb0_ovc_vbus_pins[] = {
-+	/* OVC/VBUS */
-+	RCAR_GP_PIN(5, 19),
-+};
-+static const unsigned int usb0_ovc_vbus_mux[] = {
-+	USB0_OVC_VBUS_MARK,
-+};
- /* - USB1 ------------------------------------------------------------------- */
- static const unsigned int usb1_pins[] = {
- 	/* PWEN, OVC */
-@@ -3789,6 +3796,7 @@ static const struct sh_pfc_pin_group pin
- 	SH_PFC_PIN_GROUP(tpu0_to2),
- 	SH_PFC_PIN_GROUP(tpu0_to3),
- 	SH_PFC_PIN_GROUP(usb0),
-+	SH_PFC_PIN_GROUP(usb0_ovc_vbus),
- 	SH_PFC_PIN_GROUP(usb1),
- 	SH_PFC_PIN_GROUP(usb2),
- 	VIN_DATA_PIN_GROUP(vin0_data, 24),
-@@ -4134,6 +4142,7 @@ static const char * const tpu0_groups[]
+ arch/arm/mach-shmobile/board-lager.c |   25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
+
+--- 0004/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2014-01-24 10:17:20.000000000 +0900
+@@ -406,13 +406,30 @@ static int usbhs_hardware_init(struct pl
+ {
+ 	struct usbhs_private *priv = usbhs_get_priv(pdev);
+ 	struct usb_phy *phy;
++	int ret;
++
++	/* USB0 Function - use PWEN as GPIO input to detect DIP Switch SW5
++	 * setting to avoid VBUS short circuit due to wrong cable.
++	 * PWEN should be pulled up high if USB Function is selected by SW5
++	 */
++	gpio_request_one(RCAR_GP_PIN(5, 18), GPIOF_IN, NULL); /* USB0_PWEN */
++	if (!gpio_get_value(RCAR_GP_PIN(5, 18))) {
++		pr_warn("Error: USB Function not selected - check SW5 + SW6\n");
++		ret = -ENOTSUPP;
++		goto error;
++	}
  
- static const char * const usb0_groups[] = {
- 	"usb0",
-+	"usb0_ovc_vbus",
+ 	phy = usb_get_phy_dev(&pdev->dev, 0);
+-	if (IS_ERR(phy))
+-		return PTR_ERR(phy);
++	if (IS_ERR(phy)) {
++		ret = PTR_ERR(phy);
++		goto error;
++	}
+ 
+ 	priv->phy = phy;
+ 	return 0;
++ error:
++	gpio_free(RCAR_GP_PIN(5, 18));
++	return ret;
+ }
+ 
+ static int usbhs_hardware_exit(struct platform_device *pdev)
+@@ -424,6 +441,8 @@ static int usbhs_hardware_exit(struct pl
+ 
+ 	usb_put_phy(priv->phy);
+ 	priv->phy = NULL;
++
++	gpio_free(RCAR_GP_PIN(5, 18));
+ 	return 0;
+ }
+ 
+@@ -534,7 +553,7 @@ static const struct pinctrl_map lager_pi
+ 				  "vin1_clk", "vin1"),
+ 	/* USB0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
+-				  "usb0", "usb0"),
++				  "usb0_ovc_vbus", "usb0"),
  };
  
- static const char * const usb1_groups[] = {
+ static void __init lager_add_standard_devices(void)
