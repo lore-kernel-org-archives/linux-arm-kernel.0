@@ -1,54 +1,91 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 29 Jan 2014 07:30:59 -0600
-Subject: [PATCH] ARM: dts: Add basic devices for AM3517-craneboard
-In-Reply-To: <52DD522E.1070607@ti.com>
-References: <1386626150-23504-1-git-send-email-nm@ti.com>
- <52B0A9C8.7070201@ti.com> <52B1D3DC.1010304@baylibre.com>
- <52B1D50A.50406@ti.com> <52B1D866.7040300@baylibre.com>
- <52DD522E.1070607@ti.com>
-Message-ID: <52E90293.5080906@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 Jan 2014 14:32:27 +0100
+Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
+In-Reply-To: <20140129122520.GY11841@sirena.org.uk>
+References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140129122520.GY11841@sirena.org.uk>
+Message-ID: <20140129133227.GQ3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2014 10:43 AM, Nishanth Menon wrote:
-> Benoit,
+On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
+> On Wed, Jan 29, 2014 at 12:10:48PM +0100, Maxime Ripard wrote:
 > 
-> On 12/18/2013 11:16 AM, Benoit Cousson wrote:
->> On 18/12/2013 18:02, Nishanth Menon wrote:
->>> On 12/18/2013 10:57 AM, Benoit Cousson wrote:
->>>> On 17/12/2013 20:45, Nishanth Menon wrote:
->>>>> On 12/09/2013 03:55 PM, Nishanth Menon wrote:
->>>>>> Craneboard is a hardware development platform based on the Sitara
->>>>>> AM3517 ARM Cortex - A8 microprocessor device - see [1] for more
->>>>>> details. Add basic devices for craneboard as replacement for the board
->>>>>> file scheduled for removal as part of device tree conversion
->>>>>>
->>>>>> [1] http://craneboard.org
->>>>>>
->>>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>>> ---
->>>>>
->>>>> gentle ping.. had'nt seen a response on this patch. Could we queue
->>>>> this up for v3.14-rc1?
->>>>
->>>> Yep, it looks good to me.
->>> Thanks benoit.
->>>
->>>> But if you don't mind I'll start pushing my branch after Xmas :-).
->>>
->>> As long as Tony is ok with it, I have no issues either - will be great
->>> to have dt only boot in .14-rc1 though.
->>
->> Good point, it is already -rc4.
->>
->> OK, I'll just queued it and pushed it to for_3.14/dts.
+> > +config SPI_SUN6I
+> > +	tristate "Allwinner A31 SPI controller"
+> > +	depends on ARCH_SUNXI || COMPILE_TEST
+> > +	select PM_RUNTIME
+> > +	help
+> > +	  This enables using the SPI controller on the Allwinner A31 SoCs.
+> > +
 > 
-> I dont see this in next-20140120 yet - wondering if Tony or you have
-> plans for one of .14 rcs OR if this is queued for .15.
+> A select of PM_RUNTIME is both surprising and odd - why is that there?
+> The usual idiom is that the device starts out powered up (flagged using
+> pm_runtime_set_active()) and then runtime PM then suspends it when it's
+> compiled in.  That way if for some reason people want to avoid runtime
+> PM they can still use the device.
 
-gentle ping yet again :(
+Since pm_runtime_set_active and all the pm_runtime* callbacks in
+general are defined to pretty much empty functions, how the
+suspend/resume callbacks are called then? Obviously, we need them to
+be run, hence why I added the select here, but now I'm seeing a
+construct like what's following acceptable then?
 
+pm_runtime_enable(&pdev->dev);
+if (!pm_runtime_enabled(&pdev->dev))
+   sun6i_spi_runtime_resume(&pdev->dev);
+
+> > +static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
+> > +{
+> > +	struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
+> > +	u32 reg;
+> > +
+> > +	if (!enable)
+> > +		return;
+> > +
+> > +	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+> > +	reg &= ~SUN6I_TFR_CTL_CS_MASK;
+> > +	reg |= SUN6I_TFR_CTL_CS(spi->chip_select);
+> > +	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
+> > +}
+> 
+> The !enable means that it'll only ever be able to go one way.  Also note
+> that the documentation was clarified here to make the enable flag be the
+> absolute logic level, not if chip select was asserted.
+
+Actually the IP asserts the CS automatically, the only thing you need
+to do is to set which CS to use for your next transfer in some
+register (which is what I'm doing after the !enable), and the CS will
+be managed directly by the controller. Hence, there's no way to say
+wether you want to enable it or not.
+
+The controller allows to control the CS manually also, if that's the
+preferred way of doing things.
+
+> > +	timeout = wait_for_completion_timeout(&sspi->done,
+> > +					      msecs_to_jiffies(1000));
+> > +	if (!timeout) {
+> > +		ret = -ETIMEDOUT;
+> > +		goto out;
+> > +	}
+> > +
+> > +	sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
+> 
+> This means we can only transfer a single FIFO of data?  I didn't see a
+> check on the transfer length.
+
+At the moment, indeed. And that's the first thing I check in the
+transfer_one function.
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140129/f8b2b915/attachment-0001.sig>
