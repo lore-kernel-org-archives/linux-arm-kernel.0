@@ -1,41 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jan 2014 16:32:50 +0000
-Subject: imx-drm: screen flickering
-In-Reply-To: <201401291553.15040.marex@denx.de>
-References: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
- <20140129111557.GI16215@pengutronix.de> <201401291553.15040.marex@denx.de>
-Message-ID: <20140129163250.GU15937@n2100.arm.linux.org.uk>
+From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
+Date: Wed, 29 Jan 2014 17:33:17 +0100
+Subject: imx6 power consumption
+In-Reply-To: <CAOMZO5DGxN9C_fOxZTmh0ev7wnpL9YP1g4tQjw4wpL2AmQPcog@mail.gmail.com>
+References: <E1VszO5-00060R-Gp@merlin.infradead.org>
+ <20131218024546.GA6691@S2101-09.ap.freescale.net>
+ <E1VtF3I-0002MQ-Ra@merlin.infradead.org>
+ <20131218113240.GK6691@S2101-09.ap.freescale.net>
+ <b43eb01926cf4b1f9413a66cc5791d9b@DM2PR03MB317.namprd03.prod.outlook.com>
+ <1387440914.4131.4.camel@bnilsen-HP>
+ <E1W8XqE-0000Ml-GE@merlin.infradead.org>
+ <CAOMZO5DGxN9C_fOxZTmh0ev7wnpL9YP1g4tQjw4wpL2AmQPcog@mail.gmail.com>
+Message-ID: <mailman.25.1391013238.1056.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 03:53:14PM +0100, Marek Vasut wrote:
-> Isn't it the clock polarity being inverted thing again [1]?
+On Wed, 2014-01-29 at 17:21 +0100, Fabio Estevam wrote:
+> On Wed, Jan 29, 2014 at 2:17 PM, Bj?rn Erik Nilsen <ben@datarespons.no> wrote:
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-
-> December/215536.html
+> >> I successfully managed to cherry-pick a handful of commits from
+> >> freescale 3.10 and got down to approximately half the consumption.
+> >> That's already very good news.
+> >>
+> >> Looking forward to see these patches upstream. Will you be able upstream
+> >> them before 3.14 you think?
+> >
+> >
+> > Any updates on this?
 > 
-> The easiest way to check this would be to try sig_cfg.clk_pol = 0
-> or = 1 and see if it changes anything.
+> Take a look at http://git.linaro.org/people/shawn.guo/linux-2.6.git/shortlog/refs/heads/for-next
+> .
+> There are some patches for low power support from Anson.
 
-It seems that the pixel clock polarity on iMX hardware is something of
-a mess.  Some hardware blocks require one polarity, others require a
-different polarity.
 
-I think what would make sense is if the various output connectors/
-encoders (in other words, imx-hdmi, imx-ldb, etc supplied their
-properties concerning the clock polarity to the IPU layer.
+Excellent news!
 
-We already have something like this in place already: we have the encoder
-prepare functions calling into the ipuv3-crtc layer (via imx-drm-core) to
-set the interface format, vsync/hsync pins, and clock flags - all of which
-get used in the CRTC's mode_set method.  Adding the clock polarity into
-that path doesn't sound too difficult.
+It looks like these patches are exactly what is needed. I'm going to try
+them out tomorrow.
 
-The only issue is that there's a lack of conflict management here - but
-that's not a new problem with this approach - it exists with the existing
-data.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Great piece of work, thank you!
