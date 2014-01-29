@@ -1,63 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jan 2014 16:40:35 +0000
-Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140129133227.GQ3867@lukather>
-References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
- <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140129122520.GY11841@sirena.org.uk>
- <20140129133227.GQ3867@lukather>
-Message-ID: <20140129164035.GC22609@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jan 2014 17:50:41 +0100
+Subject: [PATCH 0/5] generic CPU feature based udev module autoprobing
+Message-ID: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 02:32:27PM +0100, Maxime Ripard wrote:
-> On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
+This series is a slightly expanded version of the series that I have proposed
+before. It implements a generic way to wire up udev module autoprobing to
+optional CPU features.
 
-> > A select of PM_RUNTIME is both surprising and odd - why is that there?
-> > The usual idiom is that the device starts out powered up (flagged using
-> > pm_runtime_set_active()) and then runtime PM then suspends it when it's
-> > compiled in.  That way if for some reason people want to avoid runtime
-> > PM they can still use the device.
+Patch #1 moves some code around to prevent duplication later.
 
-> Since pm_runtime_set_active and all the pm_runtime* callbacks in
-> general are defined to pretty much empty functions, how the
-> suspend/resume callbacks are called then? Obviously, we need them to
-> be run, hence why I added the select here, but now I'm seeing a
-> construct like what's following acceptable then?
+Patch #2 implements the actual generic part. It relies on the include file
+<asm/cpufeature.h> to be supplied by the architecture to map CPU features to
+the number based scheme used by modalias.
 
-> pm_runtime_enable(&pdev->dev);
-> if (!pm_runtime_enabled(&pdev->dev))
->    sun6i_spi_runtime_resume(&pdev->dev);
+Patch #3 aligns x86 with the generic code. As x86 allows matching on CPU vendor,
+family and model IDs, it still retains most of the original code for creating
+and matching the module metadata.
 
-I think you're looking for pm_request_idle() - just leave the device
-started by default and kick the system to suspend it.
+Patch #4 enables the generic implementation of patch #2 for arm64 by supplying
+an 'asm/cpufeatures.h' that maps CPU feature numbers to bit offsets in
+elf_hwcap, and by setting CONFIG_GENERIC_CPU_AUTOPROBE for the architecture.
 
-> Actually the IP asserts the CS automatically, the only thing you need
-> to do is to set which CS to use for your next transfer in some
-> register (which is what I'm doing after the !enable), and the CS will
-> be managed directly by the controller. Hence, there's no way to say
-> wether you want to enable it or not.
+Patch #5 is an example that maps an AES crypto module to the optional AES
+feature found on arm64.
 
-> The controller allows to control the CS manually also, if that's the
-> preferred way of doing things.
+Ard Biesheuvel (5):
+  cpu: move arch_cpu_uevent() to generic code
+  cpu: add generic support for CPU feature based module autoloading
+  x86: align x86 arch with generic CPU modalias handling
+  arm64: enable generic CPU feature modalias matching for this
+    architecture
+  arm64: add Crypto Extensions based synchronous core AES cipher
 
-Yes, that's required to provide set_cs() - it's there so that things
-like the cs_change option in transfers can be factored out into the
-core.  We may in future want to integrate the ability to switch between
-manual and automatic management but it's likely to be more trouble than
-it's worth.
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/Makefile                 |   1 +
+ arch/arm64/crypto/Makefile          |  13 +++++
+ arch/arm64/crypto/aes-ce-cipher.c   | 103 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/cpufeature.h |  30 +++++++++++
+ arch/x86/Kconfig                    |   4 +-
+ arch/x86/include/asm/cpufeature.h   |   7 +++
+ arch/x86/kernel/cpu/match.c         |  42 ---------------
+ crypto/Kconfig                      |   6 +++
+ drivers/base/Kconfig                |   3 ++
+ drivers/base/cpu.c                  |  46 ++++++++++++++--
+ include/linux/cpu.h                 |   7 ---
+ include/linux/cpufeature.h          |  60 +++++++++++++++++++++
+ include/linux/mod_devicetable.h     |   9 ++++
+ scripts/mod/devicetable-offsets.c   |   3 ++
+ scripts/mod/file2alias.c            |  20 +++++--
+ 16 files changed, 293 insertions(+), 62 deletions(-)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
+ create mode 100644 arch/arm64/include/asm/cpufeature.h
+ create mode 100644 include/linux/cpufeature.h
 
-> > This means we can only transfer a single FIFO of data?  I didn't see a
-> > check on the transfer length.
-
-> At the moment, indeed. And that's the first thing I check in the
-> transfer_one function.
-
-Oh, so it is - sorry.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140129/886075ea/attachment.sig>
+-- 
+1.8.3.2
