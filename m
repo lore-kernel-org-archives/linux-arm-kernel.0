@@ -1,73 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 Jan 2014 15:31:36 -0500 (EST)
-Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
- idle loop
-In-Reply-To: <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 29 Jan 2014 15:58:44 -0500
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140129182805.GF11329@bivouac.eciton.net>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+Message-ID: <1391029124.2488.50.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jan 2014, Nicolas Pitre wrote:
-
-> In order to integrate cpuidle with the scheduler, we must have a better
-> proximity in the core code with what cpuidle is doing and not delegate
-> such interaction to arch code.
+On Wed, 2014-01-29 at 18:28 +0000, Leif Lindholm wrote:
+> On Wed, Jan 22, 2014 at 11:20:55AM +0000, Will Deacon wrote:
+> > > +#ifdef CONFIG_CPU_CP15
+> > > +/* Macro for setting/clearing bits in sctlr */
+> > > +   .macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
+> > > +   mrc     p15, 0, \tmp, c1, c0, 0
+> > > +   ldr     \tmp2, =\set
+> > > +   orr     \tmp, \tmp, \tmp2
+> > > +   ldr     \tmp2, =\clear
+> > > +   mvn     \tmp2, \tmp2
+> > > +   and     \tmp, \tmp, \tmp2
+> > > +   mcr     p15, 0, \tmp, c1, c0, 0
+> > 
+> > I think this would be cleaner if you force the caller to put set and clear
+> > into registers beforehand, rather than have to do the literal load every
+> > time. Also, I don't think set and clear should be required (and then you can
+> > lose tmp2 as well).
 > 
-> Architectures implementing arch_cpu_idle() should simply enter
-> a cheap idle mode in the absence of a proper cpuidle driver.
+> I can't figure out how to make register-parameters non-required
+> (i.e. conditionalise on whether an optional parameter was provided),
+> so my attempt of refactoring actually ends up using an additional
+> register:
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-As mentioned in my reply to Olof's comment on patch #5/6, here's a new 
-version of this patch adding the safety local_irq_enable() to the core 
-code.
+Register parameters are just strings, so how about this:
 
------ >8
+	.macro foo bar=, baz=
+	.ifnc \bar,
+	mov \bar,#0
+	.endif
+	.ifnc \baz,
+	mov \baz,#1
+	.endif
+	.endm
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Subject: idle: move the cpuidle entry point to the generic idle loop
+	foo x0
+	foo
+	foo x1, x2
+	foo ,x3
 
-In order to integrate cpuidle with the scheduler, we must have a better
-proximity in the core code with what cpuidle is doing and not delegate
-such interaction to arch code.
+Results in:
 
-Architectures implementing arch_cpu_idle() should simply enter
-a cheap idle mode in the absence of a proper cpuidle driver.
-
-In both cases i.e. whether it is a cpuidle driver or the default
-arch_cpu_idle(), the calling convention expects IRQs to be disabled
-on entry and enabled on exit. There is a warning in place already but
-let's add a forced IRQ enable here as well.  This will allow for
-removing the forced IRQ enable some implementations do locally and 
-allowing for the warning to trig.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/kernel/cpu/idle.c b/kernel/cpu/idle.c
-index 988573a9a3..14ca43430a 100644
---- a/kernel/cpu/idle.c
-+++ b/kernel/cpu/idle.c
-@@ -3,6 +3,7 @@
-  */
- #include <linux/sched.h>
- #include <linux/cpu.h>
-+#include <linux/cpuidle.h>
- #include <linux/tick.h>
- #include <linux/mm.h>
- #include <linux/stackprotector.h>
-@@ -95,8 +96,10 @@ static void cpu_idle_loop(void)
- 				if (!current_clr_polling_and_test()) {
- 					stop_critical_timings();
- 					rcu_idle_enter();
--					arch_cpu_idle();
--					WARN_ON_ONCE(irqs_disabled());
-+					if (cpuidle_idle_call())
-+						arch_cpu_idle();
-+					if (WARN_ON_ONCE(irqs_disabled()))
-+						local_irq_enable();
- 					rcu_idle_exit();
- 					start_critical_timings();
- 				} else {
+0000000000000000 <.text>:
+   0:	d2800000 	mov	x0, #0x0                   	// #0
+   4:	d2800001 	mov	x1, #0x0                   	// #0
+   8:	d2800022 	mov	x2, #0x1                   	// #1
+   c:	d2800023 	mov	x3, #0x1                   	// #1
