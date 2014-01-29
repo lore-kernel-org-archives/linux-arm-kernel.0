@@ -1,43 +1,33 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Wed, 29 Jan 2014 15:59:57 -0500
-Subject: [PATCH 3/5] iio: enable selection and build of pulse drivers
+Date: Wed, 29 Jan 2014 15:59:58 -0500
+Subject: [PATCH 4/5] pwm: enable TI PWMSS if the IIO tiecap driver is selected
 In-Reply-To: <1391029199-3670-1-git-send-email-mporter@linaro.org>
 References: <1391029199-3670-1-git-send-email-mporter@linaro.org>
-Message-ID: <1391029199-3670-4-git-send-email-mporter@linaro.org>
+Message-ID: <1391029199-3670-5-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pulse driver subdirectory when configuring and building
-IIO.
+The IIO TI ECAP driver depends on the TI PWMSS management
+driver in this subsystem. Enable PWMSS when the IIO TI ECAP
+driver is selected.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
 ---
- drivers/iio/Kconfig  | 1 +
- drivers/iio/Makefile | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/pwm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-index 5dd0e12..286acc3 100644
---- a/drivers/iio/Kconfig
-+++ b/drivers/iio/Kconfig
-@@ -74,6 +74,7 @@ if IIO_TRIGGER
-    source "drivers/iio/trigger/Kconfig"
- endif #IIO_TRIGGER
- source "drivers/iio/pressure/Kconfig"
-+source "drivers/iio/pulse/Kconfig"
- source "drivers/iio/temperature/Kconfig"
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 22f2f28..bd3cc65 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -219,7 +219,7 @@ config  PWM_TIEHRPWM
  
- endif # IIO
-diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
-index 887d390..9a953c9 100644
---- a/drivers/iio/Makefile
-+++ b/drivers/iio/Makefile
-@@ -24,5 +24,6 @@ obj-y += light/
- obj-y += magnetometer/
- obj-y += orientation/
- obj-y += pressure/
-+obj-y += pulse/
- obj-y += temperature/
- obj-y += trigger/
+ config  PWM_TIPWMSS
+ 	bool
+-	default y if SOC_AM33XX && (PWM_TIECAP || PWM_TIEHRPWM)
++	default y if SOC_AM33XX && (IIO_TIECAP || PWM_TIECAP || PWM_TIEHRPWM)
+ 	help
+ 	  PWM Subsystem driver support for AM33xx SOC.
+ 
 -- 
 1.8.4
