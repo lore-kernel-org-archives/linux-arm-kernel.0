@@ -1,79 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Jan 2014 19:27:18 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <20140129182805.GF11329@bivouac.eciton.net>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
- <20140122112055.GF1621@mudshark.cambridge.arm.com>
- <20140129182805.GF11329@bivouac.eciton.net>
-Message-ID: <20140129192718.GT26622@mudshark.cambridge.arm.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 29 Jan 2014 13:29:50 -0600
+Subject: [PATCH 2/2] ARM: dts: OMAP3+: add clock nodes for CPU
+In-Reply-To: <1391019557-22313-3-git-send-email-nm@ti.com>
+References: <1391019557-22313-1-git-send-email-nm@ti.com>
+ <1391019557-22313-3-git-send-email-nm@ti.com>
+Message-ID: <CAOCHtYjaCBn2oOk66ef9wiz_GJnVwHDyx446_mrkipPoENaeUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leif,
+On Wed, Jan 29, 2014 at 12:19 PM, Nishanth Menon <nm@ti.com> wrote:
+> OMAP34xx, AM3517 and OMAP36xx platforms use dpll1 clock.
+>
+> OMAP443x, OMAP446x, OMAP447x, OMAP5, DRA7, AM43xx platforms use
+> dpll_mpu clock.
+>
+> Latency used is the generic latency defined in omap-cpufreq
+> driver.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-On Wed, Jan 29, 2014 at 06:28:05PM +0000, Leif Lindholm wrote:
-> On Wed, Jan 22, 2014 at 11:20:55AM +0000, Will Deacon wrote:
-> > > +#ifdef CONFIG_CPU_CP15
-> > > +/* Macro for setting/clearing bits in sctlr */
-> > > +	.macro update_sctlr, set:req, clear:req, tmp:req, tmp2:req
-> > > +	mrc	p15, 0, \tmp, c1, c0, 0
-> > > +	ldr	\tmp2, =\set
-> > > +	orr	\tmp, \tmp, \tmp2
-> > > +	ldr	\tmp2, =\clear
-> > > +	mvn	\tmp2, \tmp2
-> > > +	and	\tmp, \tmp, \tmp2
-> > > +	mcr	p15, 0, \tmp, c1, c0, 0
-> > 
-> > I think this would be cleaner if you force the caller to put set and clear
-> > into registers beforehand, rather than have to do the literal load every
-> > time. Also, I don't think set and clear should be required (and then you can
-> > lose tmp2 as well).
-> 
-> I can't figure out how to make register-parameters non-required
-> (i.e. conditionalise on whether an optional parameter was provided),
-> so my attempt of refactoring actually ends up using an additional
-> register:
-> 
-> #ifdef CONFIG_CPU_CP15
-> /* Macro for setting/clearing bits in sctlr */
-> 	.macro	update_sctlr, set:req, clear:req, tmp:req
-> 	mrc	p15, 0, \tmp, c1, c0, 0
-> 	orr	\tmp, \set
-> 	mvn	\clear, \clear
-> 	and	\tmp, \tmp, \clear
-> 	mcr	p15, 0, \tmp, c1, c0, 0
-> 	.endm
-> #endif
-> 
-> If you think that's an improvement I can do that, and I have (just)
-> enough registers to spare.
-> If I'm being daft with my macro issues, do point it out.
+Hi Nishanth,
 
-I was thinking along the lines of:
+After this patch, do you see any limitation to finally enabling 1Ghz
+operation on the beagle-xm by default? Or are we still missing a
+dependicy somewhere?
 
-	.macro  update_sctlr, tmp:req, set=0, clear=0
-	.if	\set
-	orr ...
-	.endif
-	.if	\clear
-	bic ...
-	.endif
-	.endm
+cpufreq stats: 300 MHz:98.64%, 600 MHz:0.04%, 800 MHz:0.09%, 1000
+MHz:1.23%  (11)
+full cpufreq output: http://paste.debian.net/79073/
 
-however, that puts us back to the problem of having to pass immediates
-instead of registers. Gas *does* seem to accept the following:
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts
+b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index bb5dad0..b0e5863 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -16,9 +16,36 @@
+        cpus {
+                cpu at 0 {
+                        cpu0-supply = <&vcc>;
++                       operating-points = <
++                               /* kHz    uV */
++                               300000   1012500
++                               600000   1200000
++                               800000   1325000
++                               1000000  1380000
++                       >;
+                };
+        };
 
-	.macro  update_sctlr, tmp:req, set=0, clear=0
-	.if	\set != 0
-	orr ...
-	.endif
-	.if	\clear != 0
-	bic ...
-	.endif
-	.endm
++       abb: regulator-abb {
++               compatible = "ti,abb-v1";
++               regulator-name = "abb";
++               #address-cell = <0>;
++               #size-cells = <0>;
++               reg = <0x483072f0 0x8>, <0x48306818 0x4>;
++               reg-names = "base-address", "int-address";
++               ti,tranxdone-status-mask = <0x4000000>;
++               clocks = <&dpll1_ck>;
++               ti,settling-time = <30>;
++               ti,clock-cycles = <8>;
++               ti,abb_info = <
++                       /* uV           ABB     efuse   rbb_m   fbb_m
+ vset_m */
++                       1012500         0       0       0       0
+ 0 /* Bypass */
++                       1200000         3       0       0       0
+ 0 /* RBB mandatory */
++                       1320000         1       0       0       0
+ 0 /* FBB mandatory */
++                       1380000         1       0       0       0       0
++                       >;
++       };
++
+        memory {
+                device_type = "memory";
+                reg = <0x80000000 0x20000000>; /* 512 MB */
+-- 
+1.8.5.3
 
-which is filthy, so we'd need to see how beautiful the caller ends up being
-to justify that!
+Regards,
 
-Will
+-- 
+Robert Nelson
+http://www.rcn-ee.com/
