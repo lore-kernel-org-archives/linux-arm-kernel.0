@@ -1,62 +1,30 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 29 Jan 2014 20:02:52 +0100
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 29 Jan 2014 12:10:05 -0700
 Subject: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND flash controller
  support
-In-Reply-To: <20140129175641.GF1427@obsidianresearch.com>
+In-Reply-To: <20140129184619.GC27143@localhost>
 References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
  <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
  <20140129175641.GF1427@obsidianresearch.com>
-Message-ID: <52E9505C.8080001@gmail.com>
+ <20140129184619.GC27143@localhost>
+Message-ID: <20140129191005.GG1427@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/01/2014 18:56, Jason Gunthorpe a ?crit :
-> On Wed, Jan 29, 2014 at 03:34:18PM +0100, Boris BREZILLON wrote:
->
->> +static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
->> +					struct device_node *np)
->> +{
->> +	const struct nand_sdr_timings *timings;
->> +	u32 min_clk_period = 0;
->> +	int ret;
->> +
->> +	ret = onfi_get_async_timing_mode(&chip->nand);
->> +	if (ret == ONFI_TIMING_MODE_UNKNOWN) {
->> +		ret = of_get_nand_onfi_timing_mode(np);
->> +		if (ret < 0)
->> +			return ret;
->> +	}
-> [..]
->
->> +static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
-> [..]
->> +       ret = sunxi_nand_chip_init_timings(chip, np);
->> +       if (ret)
->> +               return ret;
-> [..]
->> +       ret = nand_scan_ident(mtd, nsels, NULL);
-> This ordering looks a bit problematic, will onfi_get_async_timing_mode
-> ever return anything other than ONFI_TIMING_MODE_UNKNOWN if it is
-> called before nand_scan_ident ?
-Indeed. I haven't tested this part as I don't own any board with an ONFI 
-compatible chip.
-> What sets clk_rate to non-zero if there
-> is no DT property?
-It is set to 20 MHz by default, but it should definitely be set to the 
-rate fulfilling mode 0.
-I'll fix this.
+On Wed, Jan 29, 2014 at 03:46:20PM -0300, Ezequiel Garcia wrote:
 
->
-> For a flow that uses onfi_get_async_timing_mode rather than DT the
-> driver should set the interface to timing mode 0 (slowest) and then
-> call nand_scan_ident, and then reset the interface to the detected
-> timing mode.
+> After CE# has been pulled high and then transitioned low again, the host
+> should issue a Set Features to select the appropriate asynchronous timing mode.
+> """
 
-Absolutely.
+Oh, I had forgot you should do a set feature too
 
->
-> Maybe this should be implemented in the core code through a new
-> callback (nand->set_timing_mode ?)
->
-> Regards,
-> Jason
+Boris, I think the core core should handle this dance and the driver
+should just implement a call back to change the timing mode on the
+interface..
+
+If I ever get a moment I can work on support for timing setting in the
+mvebu driver, I have boards here with ONFI NAND..
+
+Regards,
+Jason
