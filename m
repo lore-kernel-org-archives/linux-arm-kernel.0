@@ -1,43 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Jan 2014 11:08:17 +0100
-Subject: [PATCH 05/18] mfd: max14577: Use of_match_ptr() in i2c_driver
-In-Reply-To: <1390911522-28209-6-git-send-email-k.kozlowski@samsung.com>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1390990097.2207.2.camel@AMDC1943>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 29 Jan 2014 11:20:42 +0100
+Subject: [RFC PATCH 0/9] mtd: nand: add sunxi NAND Flash Controller support
+In-Reply-To: <CAL_JsqJNd_gtn-cCLbZxT=s5NkkXp0DZkJkZrBhWiaL6Js=woQ@mail.gmail.com>
+References: <1389190924-26226-1-git-send-email-b.brezillon@overkiz.com>	<52D1494E.9090303@overkiz.com>
+ <CAL_JsqJNd_gtn-cCLbZxT=s5NkkXp0DZkJkZrBhWiaL6Js=woQ@mail.gmail.com>
+Message-ID: <52E8D5FA.9070400@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I would like to drop this patch.
+Hello Rob,
 
-It does not make sense as "max14577_dt_match" is always compiled and
-of_match_ptr was removed on purpose by Sachin Kamat (ae679c12e8; mfd:
-max14577: Remove redundant of_match_ptr helper).
+On 23/01/2014 16:22, Rob Herring wrote:
+> On Sat, Jan 11, 2014 at 7:38 AM, boris brezillon
+> <b.brezillon@overkiz.com> wrote:
+>> On 08/01/2014 15:21, Boris BREZILLON wrote:
+>>> Hello,
+>>>
+>>> This series add the sunxi NFC support with up to 8 NAND chip connected.
+>>> I'm still in the early stages drivers development and some key features
+>>> are
+>>> missing, but it's usable (I tested it on the cubietruck board).
+>>>
+>>> Here's what's missing:
+>>>    - HW ECC support
+>>>    - DMA support
+>>>    - HW randomization support
+>>>    - many more improvements
+>>>
+>>> This series depends on Emilio's patch series implementing mod0 clks
+>>>
+>>> (http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185478.html)
+>>> + an other patch not yet posted
+>>>
+>>> (http://git.elopez.com.ar/linux/commits/5b4eb3ac406b9c98965714d40e8dd6da943d1ab0)
+>>
+>> During my reasearch regarding the HW ECC and HW randomizer of the Allwinner
+>> NAND flash controller I found this document describing the Altera NAND flash
+>> controller
+>> (which is in turn based on a cadence IP):
+> Which may be similar to drivers/mtd/nand/denali.c as Cadence bought Denali?
+Actually I was wrong, the sunxi and the cadence IP have nothing in common.
+This was pointed out by Henrik (see this thread :
+https://groups.google.com/forum/#!searchin/linux-sunxi/nand/linux-sunxi/x69tFBi95Zk/bNyJlWWOV8oJ 
+<https://groups.google.com/forum/#%21searchin/linux-sunxi/nand/linux-sunxi/x69tFBi95Zk/bNyJlWWOV8oJ>).
 
-Best regards,
-Krzysztof Kozlowski
 
+Sorry for the false hopes.
 
-On Tue, 2014-01-28 at 13:18 +0100, Krzysztof Kozlowski wrote:
-> Use of_match_ptr() in assignment of i2c_driver.of_match_table.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/mfd/max14577.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
-> index 2ac2f2d7cea6..75b37082a3fe 100644
-> --- a/drivers/mfd/max14577.c
-> +++ b/drivers/mfd/max14577.c
-> @@ -224,7 +224,7 @@ static struct i2c_driver max14577_i2c_driver = {
->  		.name = "max14577",
->  		.owner = THIS_MODULE,
->  		.pm = &max14577_pm,
-> -		.of_match_table = max14577_dt_match,
-> +		.of_match_table = of_match_ptr(max14577_dt_match),
->  	},
->  	.probe = max14577_i2c_probe,
->  	.remove = max14577_i2c_remove,
+Best Regards,
+
+Boris
+
+>
+> Rob
