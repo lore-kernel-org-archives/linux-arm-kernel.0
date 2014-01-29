@@ -1,40 +1,53 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Wed, 29 Jan 2014 15:34:20 +0100
-Subject: [RFC PATCH v2 10/14] ARM: dt/sunxi: add NFC node to Allwinner A20 SoC
+Date: Wed, 29 Jan 2014 15:34:21 +0100
+Subject: [RFC PATCH v2 11/14] ARM: dt/sunxi: add NFC pinctrl pin definitions
 In-Reply-To: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1391006064-28890-11-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1391006064-28890-12-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND Flash controller node definition to the A20 SoC.
+Define the NAND pinctrl configs.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 8e4cdcc..3b47253 100644
+index 3b47253..0f6e002 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -299,6 +299,17 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		nfc: nand at 01c03000 {
-+			compatible = "allwinner,sun4i-nand";
-+			reg = <0x01c03000 0x1000>;
-+			interrupts = <0 37 1>;
-+			clocks = <&ahb_gates 13>, <&nand_clk>;
-+			clock-names = "ahb_clk", "sclk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
+@@ -389,6 +389,30 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
 +
- 		emac: ethernet at 01c0b000 {
- 			compatible = "allwinner,sun4i-emac";
- 			reg = <0x01c0b000 0x1000>;
++			nand_pins_a: nand_base0 at 0 {
++				allwinner,pins = "PC0", "PC1", "PC2",
++						"PC5", "PC8", "PC9", "PC10",
++						"PC11", "PC12", "PC13", "PC14",
++						"PC15", "PC16";
++				allwinner,function = "nand0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			nand_cs0_pins_a: nand_cs at 0 {
++				allwinner,pins = "PC4";
++				allwinner,function = "nand0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			nand_rb0_pins_a: nand_rb at 0 {
++				allwinner,pins = "PC6";
++				allwinner,function = "nand0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 1.7.9.5
