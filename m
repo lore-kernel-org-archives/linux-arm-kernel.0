@@ -1,31 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 29 Jan 2014 12:19:16 -0600
-Subject: [PATCH 1/2] clk: ti: am335x: remove unecessary cpu0 clk node
-In-Reply-To: <1391019557-22313-1-git-send-email-nm@ti.com>
-References: <1391019557-22313-1-git-send-email-nm@ti.com>
-Message-ID: <1391019557-22313-2-git-send-email-nm@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 29 Jan 2014 15:19:50 -0300
+Subject: [PATCH v5 00/20] Armada 370/XP watchdog support
+In-Reply-To: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140129181949.GB27143@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu0 clock node has no functionality, since cpufreq-cpu0 is already
-capable of picking up the clock from dts.
+On Mon, Jan 27, 2014 at 12:27:00PM -0300, Ezequiel Garcia wrote:
+> A new round, mostly fixing some minor nitpicks.
+> 
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/clk/ti/clk-33xx.c |    1 -
- 1 file changed, 1 deletion(-)
+If anyone wants to give this a test, here's a public branch:
 
-diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-index 776ee45..028b337 100644
---- a/drivers/clk/ti/clk-33xx.c
-+++ b/drivers/clk/ti/clk-33xx.c
-@@ -34,7 +34,6 @@ static struct ti_dt_clk am33xx_clks[] = {
- 	DT_CLK(NULL, "dpll_core_m5_ck", "dpll_core_m5_ck"),
- 	DT_CLK(NULL, "dpll_core_m6_ck", "dpll_core_m6_ck"),
- 	DT_CLK(NULL, "dpll_mpu_ck", "dpll_mpu_ck"),
--	DT_CLK("cpu0", NULL, "dpll_mpu_ck"),
- 	DT_CLK(NULL, "dpll_mpu_m2_ck", "dpll_mpu_m2_ck"),
- 	DT_CLK(NULL, "dpll_ddr_ck", "dpll_ddr_ck"),
- 	DT_CLK(NULL, "dpll_ddr_m2_ck", "dpll_ddr_m2_ck"),
+https://github.com/MISL-EBU-System-SW/mainline-public/tree/wdt_for_v3.14_v5
+
+I'll be resending a new v6 adressing Russell's last comment about the
+clock initialization, as soon as v3.14-rc1 is out.
+
+Go, testers, go!
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
