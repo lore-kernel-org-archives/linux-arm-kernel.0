@@ -1,82 +1,249 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 12:06:47 -0800
-Subject: [PATCH v2 02/10] arm64: KVM: allows discrimination of AArch32
- sysreg access
-In-Reply-To: <1390402602-22777-3-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 29 Jan 2014 12:07:00 -0800
+Subject: [PATCH v2 03/10] arm64: KVM: trap VM system registers until MMU
+ and caches are ON
+In-Reply-To: <1390402602-22777-4-git-send-email-marc.zyngier@arm.com>
 References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
- <1390402602-22777-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140129200647.GE3570@cbox>
+ <1390402602-22777-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140129200700.GF3570@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:56:34PM +0000, Marc Zyngier wrote:
-> The current handling of AArch32 trapping is slightly less than
-> perfect, as it is not possible (from a handler point of view)
-> to distinguish it from an AArch64 access, nor to tell a 32bit
-> from a 64bit access either.
+On Wed, Jan 22, 2014 at 02:56:35PM +0000, Marc Zyngier wrote:
+> In order to be able to detect the point where the guest enables
+> its MMU and caches, trap all the VM related system registers.
 > 
-> Fix this by introducing two additional flags:
-> - is_aarch32: true if the access was made in AArch32 mode
-> - is_32bit: true if is_aarch32 == true and a MCR/MRC instruction
->   was used to perform the access (as opposed to MCRR/MRRC).
-> 
-> This allows a handler to cover all the possible conditions in which
-> a system register gets trapped.
+> Once we see the guest enabling both the MMU and the caches, we
+> can go back to a saner mode of operation, which is to leave these
+> registers in complete control of the guest.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->  arch/arm64/kvm/sys_regs.c | 5 +++++
->  arch/arm64/kvm/sys_regs.h | 2 ++
->  2 files changed, 7 insertions(+)
+>  arch/arm64/include/asm/kvm_arm.h |  3 +-
+>  arch/arm64/include/asm/kvm_asm.h |  3 +-
+>  arch/arm64/kvm/sys_regs.c        | 99 +++++++++++++++++++++++++++++++++++-----
+>  3 files changed, 91 insertions(+), 14 deletions(-)
 > 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index c98ef47..fd0a651 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -62,6 +62,7 @@
+>   * RW:		64bit by default, can be overriden for 32bit VMs
+>   * TAC:		Trap ACTLR
+>   * TSC:		Trap SMC
+> + * TVM:		Trap VM ops (until M+C set in SCTLR_EL1)
+>   * TSW:		Trap cache operations by set/way
+>   * TWE:		Trap WFE
+>   * TWI:		Trap WFI
+> @@ -74,7 +75,7 @@
+>   * SWIO:	Turn set/way invalidates into set/way clean+invalidate
+>   */
+>  #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+> -			 HCR_BSU_IS | HCR_FB | HCR_TAC | \
+> +			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+>  			 HCR_AMO | HCR_IMO | HCR_FMO | \
+>  			 HCR_SWIO | HCR_TIDCP | HCR_RW)
+>  #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 3d796b4..89d7796 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -81,7 +81,8 @@
+>  #define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
+>  #define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
+>  #define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
+> -#define c10_AMAIR	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+> +#define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+> +#define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+>  #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+>  #define NR_CP15_REGS	(NR_SYS_REGS * 2)
+>  
 > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 02e9d09..f063750 100644
+> index f063750..1a4731b 100644
 > --- a/arch/arm64/kvm/sys_regs.c
 > +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -437,6 +437,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
->  	int Rt2 = (hsr >> 10) & 0xf;
+> @@ -121,6 +121,55 @@ done:
+>  }
 >  
-> +	params.is_aarch32 = true;
-> +	params.is_32bit = false;
->  	params.CRm = (hsr >> 1) & 0xf;
->  	params.Rt = (hsr >> 5) & 0xf;
->  	params.is_write = ((hsr & 1) == 0);
-> @@ -480,6 +482,8 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	struct sys_reg_params params;
->  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
->  
-> +	params.is_aarch32 = true;
-> +	params.is_32bit = true;
->  	params.CRm = (hsr >> 1) & 0xf;
->  	params.Rt  = (hsr >> 5) & 0xf;
->  	params.is_write = ((hsr & 1) == 0);
-> @@ -549,6 +553,7 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	struct sys_reg_params params;
->  	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
->  
-> +	params.is_aarch32 = false;
+>  /*
+> + * Generic accessor for VM registers. Only called as long as HCR_TVM
+> + * is set.
+> + */
+> +static bool access_vm_reg(struct kvm_vcpu *vcpu,
+> +			  const struct sys_reg_params *p,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	unsigned long val;
+> +
+> +	BUG_ON(!p->is_write);
+> +
+> +	val = *vcpu_reg(vcpu, p->Rt);
+> +	if (!p->is_aarch32) {
+> +		vcpu_sys_reg(vcpu, r->reg) = val;
+> +	} else {
+> +		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+> +		if (!p->is_32bit)
+> +			vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
+> +	}
+> +	return true;
+> +}
+> +
+> +/*
+> + * SCTLR_EL1 accessor. Only called as long as HCR_TVM is set.  If the
+> + * guest enables the MMU, we stop trapping the VM sys_regs and leave
+> + * it in complete control of the caches.
+> + */
+> +static bool access_sctlr(struct kvm_vcpu *vcpu,
+> +			 const struct sys_reg_params *p,
+> +			 const struct sys_reg_desc *r)
+> +{
+> +	unsigned long val;
+> +
+> +	BUG_ON(!p->is_write);
+> +
+> +	val = *vcpu_reg(vcpu, p->Rt);
+> +
+> +	if (!p->is_aarch32)
+> +		vcpu_sys_reg(vcpu, r->reg) = val;
+> +	else
+> +		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
 
-I'm wondering if we should set is_32bit = false, just for clarity...
+call access_vm_reg()?
 
->  	params.Op0 = (esr >> 20) & 3;
->  	params.Op1 = (esr >> 14) & 0x7;
->  	params.CRn = (esr >> 10) & 0xf;
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index d50d372..d411e25 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -30,6 +30,8 @@ struct sys_reg_params {
->  	u8	Op2;
->  	u8	Rt;
->  	bool	is_write;
-> +	bool	is_aarch32;
-> +	bool	is_32bit;	/* Only valid if is_aarch32 is true */
+> +
+> +	if ((val & (0b101)) == 0b101)	/* MMU+Caches enabled? */
+> +		vcpu->arch.hcr_el2 &= ~HCR_TVM;
+
+static inline and reuse in patch 1?
+
+static inline bool sctlr_caches_enabled(unsigned long val)
+{
+	return (val & 0b101) == 0b101;
+}
+
+> +
+> +	return true;
+> +}
+> +
+> +/*
+>   * We could trap ID_DFR0 and tell the guest we don't support performance
+>   * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+>   * NAKed, so it will read the PMCR anyway.
+> @@ -185,32 +234,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  NULL, reset_mpidr, MPIDR_EL1 },
+>  	/* SCTLR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
+> -	  NULL, reset_val, SCTLR_EL1, 0x00C50078 },
+> +	  access_sctlr, reset_val, SCTLR_EL1, 0x00C50078 },
+>  	/* CPACR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
+>  	  NULL, reset_val, CPACR_EL1, 0 },
+>  	/* TTBR0_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
+> -	  NULL, reset_unknown, TTBR0_EL1 },
+> +	  access_vm_reg, reset_unknown, TTBR0_EL1 },
+>  	/* TTBR1_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
+> -	  NULL, reset_unknown, TTBR1_EL1 },
+> +	  access_vm_reg, reset_unknown, TTBR1_EL1 },
+>  	/* TCR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
+> -	  NULL, reset_val, TCR_EL1, 0 },
+> +	  access_vm_reg, reset_val, TCR_EL1, 0 },
+>  
+>  	/* AFSR0_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
+> -	  NULL, reset_unknown, AFSR0_EL1 },
+> +	  access_vm_reg, reset_unknown, AFSR0_EL1 },
+>  	/* AFSR1_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
+> -	  NULL, reset_unknown, AFSR1_EL1 },
+> +	  access_vm_reg, reset_unknown, AFSR1_EL1 },
+>  	/* ESR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
+> -	  NULL, reset_unknown, ESR_EL1 },
+> +	  access_vm_reg, reset_unknown, ESR_EL1 },
+>  	/* FAR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
+> -	  NULL, reset_unknown, FAR_EL1 },
+> +	  access_vm_reg, reset_unknown, FAR_EL1 },
+>  	/* PAR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
+>  	  NULL, reset_unknown, PAR_EL1 },
+> @@ -224,17 +273,17 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* MAIR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+> -	  NULL, reset_unknown, MAIR_EL1 },
+> +	  access_vm_reg, reset_unknown, MAIR_EL1 },
+>  	/* AMAIR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
+> -	  NULL, reset_amair_el1, AMAIR_EL1 },
+> +	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+>  
+>  	/* VBAR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+>  	  NULL, reset_val, VBAR_EL1, 0 },
+>  	/* CONTEXTIDR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+> -	  NULL, reset_val, CONTEXTIDR_EL1, 0 },
+> +	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+>  	/* TPIDR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
+>  	  NULL, reset_unknown, TPIDR_EL1 },
+> @@ -305,14 +354,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  NULL, reset_val, FPEXC32_EL2, 0x70 },
 >  };
 >  
->  struct sys_reg_desc {
+> -/* Trapped cp15 registers */
+> +/*
+> + * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+> + * depending on the way they are accessed (as a 32bit or a 64bit
+> + * register).
+> + */
+>  static const struct sys_reg_desc cp15_regs[] = {
+> +	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+> +	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
+> +	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+> +	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
+> +	{ Op1( 0), CRn( 2), CRm( 0), Op2( 2), access_vm_reg, NULL, c2_TTBCR },
+> +	{ Op1( 0), CRn( 3), CRm( 0), Op2( 0), access_vm_reg, NULL, c3_DACR },
+> +	{ Op1( 0), CRn( 5), CRm( 0), Op2( 0), access_vm_reg, NULL, c5_DFSR },
+> +	{ Op1( 0), CRn( 5), CRm( 0), Op2( 1), access_vm_reg, NULL, c5_IFSR },
+> +	{ Op1( 0), CRn( 5), CRm( 1), Op2( 0), access_vm_reg, NULL, c5_ADFSR },
+> +	{ Op1( 0), CRn( 5), CRm( 1), Op2( 1), access_vm_reg, NULL, c5_AIFSR },
+> +	{ Op1( 0), CRn( 6), CRm( 0), Op2( 0), access_vm_reg, NULL, c6_DFAR },
+> +	{ Op1( 0), CRn( 6), CRm( 0), Op2( 2), access_vm_reg, NULL, c6_IFAR },
+> +
+>  	/*
+>  	 * DC{C,I,CI}SW operations:
+>  	 */
+>  	{ Op1( 0), CRn( 7), CRm( 6), Op2( 2), access_dcsw },
+>  	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
+>  	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+> +
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
+> @@ -326,6 +393,14 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
+> +
+> +	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+> +	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+> +	{ Op1( 0), CRn(10), CRm( 3), Op2( 0), access_vm_reg, NULL, c10_AMAIR0 },
+> +	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
+> +	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
+> +
+> +	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
+>  };
+>  
+>  /* Target specific emulation tables */
 > -- 
 > 1.8.3.4
 > 
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
