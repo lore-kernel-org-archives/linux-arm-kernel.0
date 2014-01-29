@@ -1,62 +1,61 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 Jan 2014 12:45:13 -0500
-Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
-In-Reply-To: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 29 Jan 2014 14:53:32 -0300
+Subject: [RFC PATCH v2 03/14] of: mtd: add documentation for
+ nand-ecc-level property
+In-Reply-To: <1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <20140129175331.GA27143@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Integration of cpuidle with the scheduler requires that the idle loop be
-closely integrated with the scheduler proper. Moving cpu/idle.c into the
-sched directory will allow for a smoother integration, and eliminate a
-subdirectory which contained only one source file.
+On Wed, Jan 29, 2014 at 03:34:13PM +0100, Boris BREZILLON wrote:
+> nand-ecc-level property statically defines NAND chip's ECC requirements.
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/nand.txt |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+> index 03855c8..0c962296 100644
+> --- a/Documentation/devicetree/bindings/mtd/nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/nand.txt
+> @@ -3,5 +3,8 @@
+>  - nand-ecc-mode : String, operation mode of the NAND ecc mode.
+>    Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+>    "soft_bch".
+> +- nand-ecc-level : Two cells property defining the ECC level requirements.
+> +  The first cell represent the strength and the second cell the ECC block size.
+> +  E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
+>  - nand-bus-width : 8 or 16 bus width if not present 8
+>  - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- kernel/Makefile              | 1 -
- kernel/cpu/Makefile          | 1 -
- kernel/sched/Makefile        | 2 +-
- kernel/{cpu => sched}/idle.c | 0
- 4 files changed, 1 insertion(+), 3 deletions(-)
- delete mode 100644 kernel/cpu/Makefile
- rename kernel/{cpu => sched}/idle.c (100%)
+Hm.. when was this proposal agreed? It seems I've missed the
+discussion...
 
-diff --git a/kernel/Makefile b/kernel/Makefile
-index bc010ee272..6f1c7e5cfc 100644
---- a/kernel/Makefile
-+++ b/kernel/Makefile
-@@ -22,7 +22,6 @@ obj-y += sched/
- obj-y += locking/
- obj-y += power/
- obj-y += printk/
--obj-y += cpu/
- obj-y += irq/
- obj-y += rcu/
- 
-diff --git a/kernel/cpu/Makefile b/kernel/cpu/Makefile
-deleted file mode 100644
-index 59ab052ef7..0000000000
---- a/kernel/cpu/Makefile
-+++ /dev/null
-@@ -1 +0,0 @@
--obj-y	= idle.o
-diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index 7b621409cf..ac3e0ea68f 100644
---- a/kernel/sched/Makefile
-+++ b/kernel/sched/Makefile
-@@ -11,7 +11,7 @@ ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
- CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
- endif
- 
--obj-y += core.o proc.o clock.o cputime.o idle_task.o fair.o rt.o stop_task.o
-+obj-y += core.o proc.o clock.o cputime.o idle_task.o idle.o fair.o rt.o stop_task.o
- obj-y += wait.o completion.o
- obj-$(CONFIG_SMP) += cpupri.o
- obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
-diff --git a/kernel/cpu/idle.c b/kernel/sched/idle.c
-similarity index 100%
-rename from kernel/cpu/idle.c
-rename to kernel/sched/idle.c
+FWIW, we've already proposed an equivalent one, but it received no
+feedback from the devicetree maintainers:
+
+http://comments.gmane.org/gmane.linux.drivers.devicetree/58764
+
+Maybe we can discuss about it now?
+
+  nand-ecc-strength : integer ECC required strength.
+  nand-ecc-size : integer step size associated to the ECC strength.
+
+  vs.
+
+  nand-ecc-level : Two cells property defining the ECC level requirements.
+  The first cell represent the strength and the second cell the ECC block size.
+  E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
+
+It's really the same proposal but with a different format, right?
+IMHO, the former is more human-readable, but other than that I see no
+difference.
+
+Brian? DT-guys?
 -- 
-1.8.4.108.g55ea5f6
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
