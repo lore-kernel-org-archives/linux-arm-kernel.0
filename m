@@ -1,52 +1,19 @@
 From: phdm@macq.eu (Philippe De Muyter)
-Date: Wed, 29 Jan 2014 10:54:29 +0100
-Subject: imx6dl/imx6q fec rmii mode with external ref_clk
-In-Reply-To: <20140115073536.GD1914@S2101-09.ap.freescale.net>
-References: <20140114153012.GA22550@frolo.macqel>
- <20140115073536.GD1914@S2101-09.ap.freescale.net>
-Message-ID: <20140129095429.GA30854@frolo.macqel>
+Date: Wed, 29 Jan 2014 11:03:21 +0100
+Subject: emmc on imx6 sabresd
+Message-ID: <20140129100321.GA32101@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Shawn,
 
-On Wed, Jan 15, 2014 at 03:35:40PM +0800, Shawn Guo wrote:
-> On Tue, Jan 14, 2014 at 04:30:12PM +0100, Philippe De Muyter wrote:
-> > Hi,
-> > 
-> > On the custom board we are developping (imx6q and imx6dl), we have connected
-> > the fec to a switch chip using rmii mode, and we let the switch provide the
-> > reference clock to gpio_16.
-> > 
-> > I work currently with 3.13-rc8 and
-> > 
-> > - I do not have ethernet access working (tx timeout)
-> > - I do not find in the dtb files a description of the pad settings for the
-> > RMII mode
-> > - when searching about the setting for bit 21 ing GPR1, which seems to
-> > be important for my setting to work, I found the following mail:
-> > 	http://www.spinics.net/lists/devicetree/msg06450.html
-> 
-> Just for testing your hardware, does the following change make the
-> Ethernet work for you?
-> 
-> Shawn
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c
-> b/arch/arm/mach-imx/mach-imx6q.c
-> index e51e3da..be8d074 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -188,7 +188,7 @@ static void __init imx6q_1588_init(void)
->         if (!IS_ERR(gpr))
->                 regmap_update_bits(gpr, IOMUXC_GPR1,
->                                 IMX6Q_GPR1_ENET_CLK_SEL_MASK,
-> -                               IMX6Q_GPR1_ENET_CLK_SEL_ANATOP);
-> +                               0);
->         else
->                 pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
-> 
+I try to use the emmc on my sabresd board and on a similar custom board
+using 3.13, and I have just discovered by reading Internet that it was
+not supported up to some weeks ago.  Is there a git tree somewhere that
+has a branch containing 3.13 or linux-next and all the fixes for emmc on
+sabresd ?
 
-Yes, it works now.  Thanks.  Is that configurable from the device tree ?
+TIA
 
-Philippe
+-- 
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
