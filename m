@@ -1,41 +1,21 @@
-From: sj38.park@gmail.com (SeongJae Park)
-Date: Wed, 29 Jan 2014 17:13:45 +0900
-Subject: [PATCH] clk: export __clk_get_hw for re-use in others
-In-Reply-To: <alpine.DEB.2.02.1401282328360.10321@chino.kir.corp.google.com>
-References: <1390110907-29918-1-git-send-email-sj38.park@gmail.com>
- <20140119173712.GA26481@kroah.com>
- <CAPtuhTikj38yKy-=uF7O+VFG_N4AWee23f9woemM318fM3V4VQ@mail.gmail.com>
- <CAEjAshoh5ucPJA6pG1sx+7HGCYjHzCKtbzmH+GYJwpefDYLwJg@mail.gmail.com>
- <CAEjAshozB4S0ZGqEn41ROfZwGTV+_GZRRTZ8cssi0VdH8Uhr_w@mail.gmail.com>
- <20140122045937.GB23869@kroah.com>
- <CAEjAshrxXLJ-zFsTO9TnewYBBEPzFR1cixbLnD6U-U1EKdByxg@mail.gmail.com>
- <alpine.DEB.2.02.1401282328360.10321@chino.kir.corp.google.com>
-Message-ID: <CAEjAshoLRjZJ4M=C8H5rL8rgm8BBE2Ab2emC_xqU1YDtKfdwVQ@mail.gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 29 Jan 2014 10:14:06 +0200
+Subject: [PATCH v3 0/2] Qualcomm Universal Peripheral (QUP) I2C controller
+In-Reply-To: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Jan 29, 2014 at 4:29 PM, David Rientjes <rientjes@google.com> wrote:
-> On Wed, 22 Jan 2014, SeongJae Park wrote:
->
->> Oops, I've forgot about the merge window. Thank you very much for your
->> kind answer.
->> Sorry if I bothered you while you're in busy time.
->> Because the build problem is not a big deal because it exists only in
->> -next tree,
->
-> This problem exists in Linus's tree, not only in -next.
+Hi Bjorn,
 
-Yes, it looks like the problem caused commit is in Linus's tree
-now(Maybe between this merge window).
+On Fri, 2014-01-17 at 15:03 -0800, Bjorn Andersson wrote: 
+> Continuing on Ivans i2c-qup series.
+> 
 
-But, because similar and better patch was
-submitted(https://patchwork.kernel.org/patch/3507921/)
-before mine by Stephen and Mike said he will merge the patch during rc1 or rc2,
-looks like there is nothing we can rather than just waiting rc1 or rc2.
+Do you plan to send v4 of this driver? I would like to address
+the remaining errors and suggestions and send a new version.
 
-If there is anything I am thinking or doing wrong, please let me know.
-
-Thanks and Regards,
-SeongJae Park
+Regards,
+Ivan
