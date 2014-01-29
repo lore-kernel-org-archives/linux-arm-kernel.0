@@ -1,111 +1,29 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 29 Jan 2014 10:00:27 -0500
-Subject: [PATCH v3 0/6] efuse driver for Tegra
-In-Reply-To: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAP=VYLpJT1T2RGuK73TXhSYn-K+ZrLx9FuhQe+hVXYGnfoOBcQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jan 2014 16:05:22 +0100
+Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <20140128121656.GH15937@n2100.arm.linux.org.uk>
+References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
+ <9156959.vu4XdoKglI@wuerfel> <20140128121656.GH15937@n2100.arm.linux.org.uk>
+Message-ID: <21038487.ygragjUUsd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 6:36 PM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> This driver allows userspace to read the raw efuse data. Its userspace
-> interface is modelled after the sunxi_sid driver which provides similar
-> functionality for some Allwinner SoCs. It has been tested on
-> Tegra20 (ventana), Tegra30 (beaverboard) and Tegra114 (dalmore).
->
-> Changes since v1:
->
-> * Add documentation for sysfs interface
-> * Cleanup messages
->
-> Changes since v2:
->
-> * Incorporate early fuse code
-> * Remove module support
-> * Make driver always build when Tegra platform is selected
+On Tuesday 28 January 2014 12:16:56 Russell King - ARM Linux wrote:
+> On Tue, Jan 28, 2014 at 01:08:47PM +0100, Arnd Bergmann wrote:
+> 
+> On balance, I think the virtual channel approach makes client drivers
+> more elegant and simpler, and makes the DMA engine API easier to use,
+> and gives greater flexibility for future improvements.  So, I wouldn't
+> miss the slave_id being removed.
 
-Given the above, you should be able to remove #include <linux/module.h>
-and MODULE_DEVICE_TABLE, etc.
+Ok, good. There are some dmaengine drivers that actually behave
+in hardware like the virtual-channel extension, i.e. they have
+one physical channel per request line (qcom_bam_dma seems to be
+one of them in fact), so they don't really have a choice.
 
-Paul.
---
+The way that both the DT and ACPI bindings are structured,
+the request ID is always known by the time the channel is
+allocated to allow this model, and that means supporting both
+approaches in the same master or slave driver is a mess.
 
-> * Add DT binding document
-> * Address comments on v2
->
-> TODO:
-> * test on Tegra124 (venice2)
->
-> Peter De Schrijver (6):
->   ARM: tegra: export apb dma readl/writel
->   ARM: tegra: Add chipid, revision and fuse init
->   misc: fuse: Add efuse driver for Tegra
->   ARM: tegra: Add efuse bindings
->   misc: enable fuse drivers
->   ARM: tegra: remove fuse files from mach-tegra
->
->  Documentation/ABI/testing/sysfs-driver-tegra-fuse  |    8 +
->  .../devicetree/bindings/fuse/fuse-tegra.txt        |   32 +++
->  arch/arm/boot/dts/tegra114.dtsi                    |    7 +
->  arch/arm/boot/dts/tegra124.dtsi                    |    7 +
->  arch/arm/boot/dts/tegra20.dtsi                     |    7 +
->  arch/arm/boot/dts/tegra30.dtsi                     |    7 +
->  arch/arm/mach-tegra/Makefile                       |    4 -
->  arch/arm/mach-tegra/apbio.c                        |   51 ++--
->  arch/arm/mach-tegra/cpuidle.c                      |    2 +-
->  arch/arm/mach-tegra/flowctrl.c                     |    2 +-
->  arch/arm/mach-tegra/fuse.c                         |  252 -----------------
->  arch/arm/mach-tegra/fuse.h                         |   79 ------
->  arch/arm/mach-tegra/hotplug.c                      |    2 +-
->  arch/arm/mach-tegra/platsmp.c                      |    2 +-
->  arch/arm/mach-tegra/pm.c                           |    2 +-
->  arch/arm/mach-tegra/pmc.c                          |    2 +-
->  arch/arm/mach-tegra/powergate.c                    |    2 +-
->  arch/arm/mach-tegra/reset-handler.S                |    2 +-
->  arch/arm/mach-tegra/reset.c                        |    2 +-
->  arch/arm/mach-tegra/sleep-tegra30.S                |    2 +-
->  arch/arm/mach-tegra/tegra.c                        |    2 +-
->  arch/arm/mach-tegra/tegra114_speedo.c              |  104 -------
->  arch/arm/mach-tegra/tegra20_speedo.c               |  109 --------
->  arch/arm/mach-tegra/tegra2_emc.c                   |    2 +-
->  arch/arm/mach-tegra/tegra30_speedo.c               |  292 -------------------
->  drivers/misc/Makefile                              |    1 +
->  drivers/misc/fuse/Makefile                         |    1 +
->  drivers/misc/fuse/tegra/Makefile                   |    7 +
->  drivers/misc/fuse/tegra/fuse-tegra.c               |  228 +++++++++++++++
->  drivers/misc/fuse/tegra/fuse-tegra20.c             |  136 +++++++++
->  drivers/misc/fuse/tegra/fuse-tegra30.c             |  178 ++++++++++++
->  drivers/misc/fuse/tegra/fuse.h                     |   82 ++++++
->  drivers/misc/fuse/tegra/tegra114_speedo.c          |  110 ++++++++
->  drivers/misc/fuse/tegra/tegra124_speedo.c          |  164 +++++++++++
->  drivers/misc/fuse/tegra/tegra20_speedo.c           |  110 ++++++++
->  drivers/misc/fuse/tegra/tegra30_speedo.c           |  294 ++++++++++++++++++++
->  include/linux/tegra-soc.h                          |   39 +++
->  37 files changed, 1461 insertions(+), 872 deletions(-)
->  create mode 100644 Documentation/ABI/testing/sysfs-driver-tegra-fuse
->  create mode 100644 Documentation/devicetree/bindings/fuse/fuse-tegra.txt
->  delete mode 100644 arch/arm/mach-tegra/fuse.c
->  delete mode 100644 arch/arm/mach-tegra/fuse.h
->  delete mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
->  delete mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
->  delete mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
->  create mode 100644 drivers/misc/fuse/Makefile
->  create mode 100644 drivers/misc/fuse/tegra/Makefile
->  create mode 100644 drivers/misc/fuse/tegra/fuse-tegra.c
->  create mode 100644 drivers/misc/fuse/tegra/fuse-tegra20.c
->  create mode 100644 drivers/misc/fuse/tegra/fuse-tegra30.c
->  create mode 100644 drivers/misc/fuse/tegra/fuse.h
->  create mode 100644 drivers/misc/fuse/tegra/tegra114_speedo.c
->  create mode 100644 drivers/misc/fuse/tegra/tegra124_speedo.c
->  create mode 100644 drivers/misc/fuse/tegra/tegra20_speedo.c
->  create mode 100644 drivers/misc/fuse/tegra/tegra30_speedo.c
->
-> --
-> 1.7.7.rc0.72.g4b5ea.dirty
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+	Arnd
