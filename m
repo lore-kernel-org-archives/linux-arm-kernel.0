@@ -1,108 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Jan 2014 12:08:28 -0800
-Subject: [PATCH v2 10/10] ARM: KVM: add world-switch for AMAIR{0,1}
-In-Reply-To: <1390402602-22777-11-git-send-email-marc.zyngier@arm.com>
-References: <1390402602-22777-1-git-send-email-marc.zyngier@arm.com>
- <1390402602-22777-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140129200828.GM3570@cbox>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 Jan 2014 15:14:40 -0500 (EST)
+Subject: [PATCH v2 5/6] X86: remove redundant cpuidle_idle_call()
+In-Reply-To: <CAOesGMjvOkuxCopog91SAV1-gB9GaEYXpuXwhV1EJQor_pKjBA@mail.gmail.com>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-6-git-send-email-nicolas.pitre@linaro.org>
+ <CAOesGMjvOkuxCopog91SAV1-gB9GaEYXpuXwhV1EJQor_pKjBA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1401291434120.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 22, 2014 at 02:56:42PM +0000, Marc Zyngier wrote:
-> HCR.TVM traps (among other things) accesses to AMAIR0 and AMAIR1.
-> In order to minimise the amount of surprise a guest could generate by
-> trying to access these registers with caches off, add them to the
-> list of registers we switch/handle.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_asm.h |  4 +++-
->  arch/arm/kvm/coproc.c          |  6 ++++++
->  arch/arm/kvm/interrupts_head.S | 12 ++++++++++--
->  3 files changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 661da11..53b3c4a 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -48,7 +48,9 @@
->  #define c13_TID_URO	26	/* Thread ID, User R/O */
->  #define c13_TID_PRIV	27	/* Thread ID, Privileged */
->  #define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
-> -#define NR_CP15_REGS	29	/* Number of regs (incl. invalid) */
-> +#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
-> +#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
-> +#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
->  
->  #define ARM_EXCEPTION_RESET	  0
->  #define ARM_EXCEPTION_UNDEFINED   1
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 1839770..539f6d4 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -381,6 +381,12 @@ static const struct coproc_reg cp15_regs[] = {
->  	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
->  			access_vm_reg, reset_unknown, c10_NMRR},
->  
-> +	/* AMAIR0/AMAIR1: swapped by interrupt.S. */
-> +	{ CRn(10), CRm( 3), Op1( 0), Op2( 0), is32,
-> +			access_vm_reg, reset_unknown, c10_AMAIR0},
-> +	{ CRn(10), CRm( 3), Op1( 0), Op2( 1), is32,
-> +			access_vm_reg, reset_unknown, c10_AMAIR1},
-> +
->  	/* VBAR: swapped by interrupt.S. */
->  	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
->  			NULL, reset_val, c12_VBAR, 0x00000000 },
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 7cb41e1..e4eaf30 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -303,13 +303,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  
->  	mrc	p15, 0, r2, c14, c1, 0	@ CNTKCTL
->  	mrrc	p15, 0, r4, r5, c7	@ PAR
-> +	mrc	p15, 0, r6, c10, c3, 0	@ AMAIR0
-> +	mrc	p15, 0, r7, c10, c3, 1	@ AMAIR1
->  
->  	.if \store_to_vcpu == 0
-> -	push	{r2,r4-r5}
-> +	push	{r2,r4-r7}
->  	.else
->  	str	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
->  	add	r12, vcpu, #CP15_OFFSET(c7_PAR)
->  	strd	r4, r5, [r12]
-> +	str	r6, [vcpu, #CP15_OFFSET(c10_AMAIR0)]
-> +	str	r7, [vcpu, #CP15_OFFSET(c10_AMAIR1)]
->  	.endif
->  .endm
->  
-> @@ -322,15 +326,19 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   */
->  .macro write_cp15_state read_from_vcpu
->  	.if \read_from_vcpu == 0
-> -	pop	{r2,r4-r5}
-> +	pop	{r2,r4-r7}
->  	.else
->  	ldr	r2, [vcpu, #CP15_OFFSET(c14_CNTKCTL)]
->  	add	r12, vcpu, #CP15_OFFSET(c7_PAR)
->  	ldrd	r4, r5, [r12]
-> +	ldr	r6, [vcpu, #CP15_OFFSET(c10_AMAIR0)]
-> +	ldr	r7, [vcpu, #CP15_OFFSET(c10_AMAIR1)]
->  	.endif
->  
->  	mcr	p15, 0, r2, c14, c1, 0	@ CNTKCTL
->  	mcrr	p15, 0, r4, r5, c7	@ PAR
-> +	mcr	p15, 0, r6, c10, c3, 0	@ AMAIR0
-> +	mcr	p15, 0, r7, c10, c3, 1	@ AMAIR1
->  
->  	.if \read_from_vcpu == 0
->  	pop	{r2-r12}
-> -- 
-> 1.8.3.4
-> 
+On Wed, 29 Jan 2014, Olof Johansson wrote:
 
-Looks good, but shouldn't this be added before patch 9 to maintain
-functional bisectability?
+> Hi,
+> 
+> On Wed, Jan 29, 2014 at 9:45 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > The core idle loop now takes care of it.
+> >
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > ---
+> >  arch/x86/kernel/process.c | 5 +----
+> >  1 file changed, 1 insertion(+), 4 deletions(-)
+> >
+> > diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
+> > index 3fb8d95ab8..4505e2a950 100644
+> > --- a/arch/x86/kernel/process.c
+> > +++ b/arch/x86/kernel/process.c
+> > @@ -298,10 +298,7 @@ void arch_cpu_idle_dead(void)
+> >   */
+> >  void arch_cpu_idle(void)
+> >  {
+> > -       if (cpuidle_idle_call())
+> > -               x86_idle();
+> > -       else
+> > -               local_irq_enable();
+> > +       x86_idle();
+> 
+> You're taking out the local_irq_enable() here but I don't see the
+> equivalent of adding it back in the 1/6 patch that moves the
+> cpuidle_idle_call() up to common code. It seems that one of the call
+> paths through cpuidle_idle_call() don't re-enable it on its own.
 
-Otherwise:
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+When cpuidle_idle_call() returns non-zero, IRQs are left disabled.  When 
+it returns zero then IRQs should be disabled.  Same goes for cpuidle 
+drivers.  That's the theory at least.
+
+Looking into some cpuidle drivers for x86 I found at least one that 
+doesn't respect this convention.  Damn.
+
+> Even if this is the right thing to do, why it's OK to do so should
+> probably be documented in the patch description.
+
+Better yet, I'm going to amend patch 1/6 with the below to make things 
+more reliable while still identifying misbehaving drivers.
+
+diff --git a/kernel/cpu/idle.c b/kernel/cpu/idle.c
+index ffcd3ee9af..14ca43430a 100644
+--- a/kernel/cpu/idle.c
++++ b/kernel/cpu/idle.c
+@@ -98,7 +98,8 @@ static void cpu_idle_loop(void)
+ 					rcu_idle_enter();
+ 					if (cpuidle_idle_call())
+ 						arch_cpu_idle();
+-					WARN_ON_ONCE(irqs_disabled());
++					if (WARN_ON_ONCE(irqs_disabled()))
++						local_irq_enable();
+ 					rcu_idle_exit();
+ 					start_critical_timings();
+ 				} else {
