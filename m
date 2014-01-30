@@ -1,38 +1,54 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Thu, 30 Jan 2014 14:46:02 +0100
-Subject: =?UTF-8?q?=5BRFC=20PATCH=20pre-v3=2007/14=5D=20of=3A=20mtd=3A=20add=20documentation=20for=20the=20ONFI=20NAND=20timing=20mode=20property?=
-In-Reply-To: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1391089562-8385-1-git-send-email-b.brezillon.dev@gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 30 Jan 2014 15:49:26 +0200
+Subject: [PATCH] clk: keystone: gate: fix clk_init_data initialization
+In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
+References: <1391081821-13306-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
+Message-ID: <52EA5866.3090706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for the ONFI NAND timing mode property.
+Yes. As result the clk->flag field contains garbage. In my case it leads
+that flag CLK_IGNORE_UNUSED is set for most of clocks.  As result a bunch
+of unused clocks cannot be disabled.
 
-Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
----
-Changes since v2:
- - fix description of the nand-timing-mode property: the mode property is
-   a mask containing all supported modes, each mode is encoded as a bit
-   position
-
- Documentation/devicetree/bindings/mtd/nand.txt |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-index 0c962296..60c7112 100644
---- a/Documentation/devicetree/bindings/mtd/nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/nand.txt
-@@ -8,3 +8,10 @@
-   E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
- - nand-bus-width : 8 or 16 bus width if not present 8
- - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-+- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
-+  the NAND chip. Each supported mode is represented as a bit position (i.e. :
-+  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
-+  This is only used when the chip does not support the ONFI standard.
-+  The last bit set represent the closest mode fulfilling the NAND chip timings.
-+  For a full description of the different timing modes see this document:
-+  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf?
--- 
-1.7.9.5
+On 01/30/2014 03:26 PM, Shilimkar, Santosh wrote:
+> Can u capture the issue withiout this fix?
+>
+> Sent from my Android phone using TouchDown (www.nitrodesk.com)
+>
+> -----Original Message-----
+> *From:* Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
+> *Received:* Thursday, 30 Jan 2014, 6:37am
+> *To:* Shilimkar, Santosh [santosh.shilimkar at ti.com]
+> *CC:* mturquette at linaro.org [mturquette at linaro.org];
+> linux-arm-kernel at lists.infradead.org [linux-arm-kernel at lists.infradead.org];
+> linux-kernel at vger.kernel.org [linux-kernel at vger.kernel.org]; Khoronzhuk, Ivan
+> [ivan.khoronzhuk at ti.com]
+> *Subject:* [PATCH] clk: keystone: gate: fix clk_init_data initialization
+>
+> In clk_register_psc() function clk_init_data struct is allocated
+> in the stack. All members of this struct should be initialized
+> before using otherwise it will contain garbage. So initialize flags
+> in this structure too.
+>
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>    drivers/clk/keystone/gate.c | 1 +
+>    1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
+> index 17a5983..86f1e36 100644
+> --- a/drivers/clk/keystone/gate.c
+> +++ b/drivers/clk/keystone/gate.c
+> @@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
+>
+>            init.name = name;
+>            init.ops = &clk_psc_ops;
+> +       init.flags = 0;
+>            init.parent_names = (parent_name ? &parent_name : NULL);
+>            init.num_parents = (parent_name ? 1 : 0);
+>
+> -- 
+> 1.8.3.2
+>
