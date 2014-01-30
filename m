@@ -1,30 +1,33 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 30 Jan 2014 11:31:32 +0100
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <52EA2875.5020807@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <52EA2875.5020807@free-electrons.com>
-Message-ID: <52EA2A04.2070109@gmail.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Thu, 30 Jan 2014 16:11:17 +0530
+Subject: [PATCH v2 1/3] KVM: Add capability to advertise PSCI v0.2 support
+In-Reply-To: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
+References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/14 11:24, Gregory CLEMENT wrote:
-> On 25/01/2014 19:19, Sebastian Hesselbarth wrote:
->> This patch set fixes clk init order that went upside-down with
->> v3.14. I haven't really investigated what caused this, but I assume
->> it is related with DT node reordering by addresses.
->
-> Can you explain what kind of issue do you observe?
+User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
 
-Sure. When probing CLK_OF_DECLAREed clock drivers, clock-gating driver
-gets registered before core-clocks. It therefore cannot resolve it's
-parent clock name for tclk and all clock gates will have no parent
-clock.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ include/uapi/linux/kvm.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-Usually, you'll see in some drivers (e.g. v643xx_eth) div_by_zero errors
-poping up, when they calculate a frequency division factors based on
-clock gate frequency, which should have been tclk but is 0 now.
-
-> I have just tested the master branch of Linus and (excepted for SATA
-> but Andrew will send a patch set soon), I didn't experiment any
-> issues on Armada 370 and Armada XP based boards.
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 902f124..d64349e 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_ARM_EL1_32BIT 93
+ #define KVM_CAP_SPAPR_MULTITCE 94
+ #define KVM_CAP_EXT_EMUL_CPUID 95
++#define KVM_CAP_ARM_PSCI_0_2 96
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+-- 
+1.7.9.5
