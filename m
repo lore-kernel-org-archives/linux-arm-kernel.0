@@ -1,49 +1,78 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 30 Jan 2014 16:11:16 +0530
-Subject: [PATCH v2 0/3] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-Message-ID: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Thu, 30 Jan 2014 16:18:45 +0530
+Subject: [PATCH V3 3/8] SPEAr13xx: defconfig: Update
+In-Reply-To: <cover.1391077731.git.mohit.kumar@st.com>
+References: <cover.1391077731.git.mohit.kumar@st.com>
+Message-ID: <77553346b18c3978b12329161a85dba7d50242ca.1391077731.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-and Coordination Interface (PSCI) v0.1.
+Enable EABI, OEABI, VFP and NFS configs in default configuration file for
+SPEAr13xx.
 
-This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
-provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
-CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
-later.
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Pratyush Anand <pratyush.anand@st.com>
+Cc: spear-devel at list.st.com
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/configs/spear13xx_defconfig |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-PSCI v0.2 to VCPUs.
-
-Changlog:
-
-V2:
- - Don't rename PSCI return values KVM_PSCI_RET_NI and KVM_PSCI_RET_INVAL
- - Added kvm_psci_version() to get PSCI version available to VCPU
- - Fixed grammer in Documentation/virtual/kvm/api.txt
-
-V1:
- - Initial RFC PATCH
-
-Anup Patel (3):
-  KVM: Add capability to advertise PSCI v0.2 support
-  ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
-  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
-
- Documentation/virtual/kvm/api.txt |    2 +
- arch/arm/include/asm/kvm_host.h   |    2 +-
- arch/arm/include/asm/kvm_psci.h   |    4 ++
- arch/arm/include/uapi/asm/kvm.h   |   35 ++++++++++++++-
- arch/arm/kvm/arm.c                |    1 +
- arch/arm/kvm/psci.c               |   85 +++++++++++++++++++++++++++++++------
- arch/arm64/include/asm/kvm_host.h |    2 +-
- arch/arm64/include/asm/kvm_psci.h |    4 ++
- arch/arm64/include/uapi/asm/kvm.h |   35 ++++++++++++++-
- include/uapi/linux/kvm.h          |    1 +
- 10 files changed, 155 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 82eaa55..0cf87d0 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -14,10 +14,19 @@ CONFIG_MACH_SPEAR1340=y
+ CONFIG_SMP=y
+ # CONFIG_SMP_ON_UP is not set
+ # CONFIG_ARM_CPU_TOPOLOGY is not set
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+ CONFIG_MTD_OF_PARTS=y
+@@ -27,6 +36,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -66,6 +76,7 @@ CONFIG_USB=y
+ # CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+@@ -79,11 +90,14 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
++CONFIG_FUSE_FS=y
+ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=m
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=m
 -- 
-1.7.9.5
+1.7.0.1
