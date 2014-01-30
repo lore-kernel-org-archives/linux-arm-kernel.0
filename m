@@ -1,109 +1,50 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 30 Jan 2014 19:18:09 +0100
-Subject: [PATCH 6/6] iommu/arm-smmu: Introduce iommu_group notifier block
-In-Reply-To: <1391105889-32718-1-git-send-email-andreas.herrmann@calxeda.com>
-References: <1391105889-32718-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1391105889-32718-7-git-send-email-andreas.herrmann@calxeda.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 30 Jan 2014 19:29:25 +0100
+Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove
+ hardcoded addresses from Dove pinctrl
+In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140130182925.GM10864@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment just handle IOMMU_GROUP_NOTIFY_BIND_DRIVER to
-conditionally isolate all master devices for an SMMU.
+On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
+> This patch set is one required step for Dove to hop into mach-mvebu.
+> Until now, pinctrl-dove was hardcoding some registers that do not
+> directly belong to MPP core registers. This is not compatible with
+> what we want for mach-mvebu.
 
-Depending on DT information each device is put into its own protection
-domain (if possible). For configuration with one or just a few
-masters per SMMU that is easy to achieve.
+Hi Sebastian
 
-In case of many devices per SMMU (e.g. MMU-500 with it's distributed
-translation support) isolation of each device might not be possible --
-depending on number of available SMR groups and/or context banks.
+I think there might be something wrong here....
 
-Default is that device isolation is contolled per SMMU with SMMU node
-property "arm,smmu-isolate-devices" in a DT. If this property is set
-for an SMMU node, device isolation is performed.
+/debug/pinctrl/f1010000.pinctrl/pinconf-groups used to contain:
 
-W/o device isolation the driver detects SMMUs but no translation is
-configured (transactions just bypass translation process).
+Pin config settings per pin group
+Format: group (name): configs
+0 (mpp0):current: spi(cs), available = [ gpio(io) nand(io2) ]
+1 (mpp1):current: spi(mosi), available = [ gpo(o) nand(io3) ]
+2 (mpp2):current: spi(sck), available = [ gpo(o) nand(io4) ]
+3 (mpp3):current: spi(miso), available = [ gpo(o) nand(io5) ]
+4 (mpp4):current: sata1(act), available = [ gpio(io) nand(io6) uart0(rxd) lcd(hsync) ]
+5 (mpp5):current: sata0(act), available = [ gpo(o) nand(io7) uart0(txd) lcd(vsync) ]
+6 (mpp6):current: sysrst(out), available = [ spi(mosi) ]
+...
 
-Note that for device isolation dma_base and size are fixed as 0 and
-SZ_128M at the moment. Additional patches will address this
-restriction and allow automatic growth of mapping size.
+It now has:
 
-Cc: Varun Sethi <Varun.Sethi@freescale.com>
-Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- drivers/iommu/arm-smmu.c |   44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+Pin config settings per pin group
+Format: group (name): configs
+0 (mpp0):current: gpio(io), available = [ nand(io2) spi(cs) ]
+1 (mpp1):current: gpo(o), available = [ nand(io3) spi(mosi) ]
+2 (mpp2):current: gpo(o), available = [ nand(io4) spi(sck) ]
+3 (mpp3):current: gpo(o), available = [ nand(io5) spi(miso) ]
+4 (mpp4):current: gpio(io), available = [ nand(io6) uart0(rxd) sata1(act) lcd(hsync) ]
+5 (mpp5):current: gpo(o), available = [ nand(io7) uart0(txd) sata0(act) lcd(vsync) ]
+6 (mpp6):current: UNKNOWN, available = [ sysrst(out) spi(mosi) ]
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index d1f166f..bee88c8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -47,6 +47,7 @@
- #include <linux/amba/bus.h>
- 
- #include <asm/pgalloc.h>
-+#include <asm/dma-iommu.h>
- 
- /* Maximum number of stream IDs assigned to a single device */
- #define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
-@@ -1677,6 +1678,47 @@ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
- 	return !!(cap & caps);
- }
- 
-+static int arm_smmu_group_notifier(struct notifier_block *nb,
-+				unsigned long action, void *data)
-+{
-+	struct device *dev = data;
-+	struct dma_iommu_mapping *mapping;
-+	struct arm_smmu_device *smmu;
-+	int ret;
-+
-+	switch (action) {
-+	case IOMMU_GROUP_NOTIFY_BIND_DRIVER:
-+
-+		smmu = dev->archdata.iommu;
-+		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
-+			break;
-+
-+		mapping = arm_iommu_create_mapping(&platform_bus_type,
-+						0, SZ_128M, 0);
-+		if (IS_ERR(mapping)) {
-+			ret = PTR_ERR(mapping);
-+			dev_info(dev, "arm_iommu_create_mapping failed\n");
-+			break;
-+		}
-+
-+		ret = arm_iommu_attach_device(dev, mapping);
-+		if (ret < 0) {
-+			dev_info(dev, "arm_iommu_attach_device failed\n");
-+			arm_iommu_release_mapping(mapping);
-+		}
-+
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct notifier_block group_nb = {
-+	.notifier_call = arm_smmu_group_notifier,
-+};
-+
- static int arm_smmu_add_device(struct device *dev)
- {
- 	struct arm_smmu_device *child, *parent, *smmu;
-@@ -1726,6 +1768,8 @@ static int arm_smmu_add_device(struct device *dev)
- 		return PTR_ERR(group);
- 	}
- 
-+	iommu_group_register_notifier(group, &group_nb);
-+
- 	ret = iommu_group_add_device(group, dev);
- 	iommu_group_put(group);
- 	dev->archdata.iommu = smmu;
--- 
-1.7.9.5
+The device i'm testing on does use spi and sata, so i would say the
+old contents was correct and the new is wrong.
+
+    Andrew
