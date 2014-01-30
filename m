@@ -1,37 +1,72 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Thu, 30 Jan 2014 09:57:41 +0100
-Subject: [linux-sunxi] Re: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND
- flash controller support
-In-Reply-To: <20140129191005.GG1427@obsidianresearch.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
- <20140129175641.GF1427@obsidianresearch.com>
- <20140129184619.GC27143@localhost>
- <20140129191005.GG1427@obsidianresearch.com>
-Message-ID: <52EA1405.8060801@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Jan 2014 11:24:53 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <52EA2875.5020807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/2014 20:10, Jason Gunthorpe wrote:
-> On Wed, Jan 29, 2014 at 03:46:20PM -0300, Ezequiel Garcia wrote:
->
->> After CE# has been pulled high and then transitioned low again, the host
->> should issue a Set Features to select the appropriate asynchronous timing mode.
->> """
-> Oh, I had forgot you should do a set feature too
->
-> Boris, I think the core core should handle this dance and the driver
-> should just implement a call back to change the timing mode on the
-> interface..
->
-> If I ever get a moment I can work on support for timing setting in the
-> mvebu driver, I have boards here with ONFI NAND..
+Hi Sebastian,
 
-Okay, I'll wait :).
+On 25/01/2014 19:19, Sebastian Hesselbarth wrote:
+> This patch set fixes clk init order that went upside-down with
+> v3.14. I haven't really investigated what caused this, but I assume
+> it is related with DT node reordering by addresses.
 
-Thanks.
+Can you explain what kind of issue do you observe?
 
->
-> Regards,
-> Jason
->
+I have just tested the master branch of Linus and (excepted for SATA
+but Andrew will send a patch set soon), I didn't experiment any
+issues on Armada 370 and Armada XP based boards.
+
+Thanks,
+
+Gregory
+
+
+> 
+> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> registered before core clocks driver. Unfortunately, we cannot
+> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> init order for our drivers is always core clocks before clock gating,
+> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> init function that will register core clocks before clock gating
+> driver.
+> 
+> This patch is based on pre-v3.14-rc1 mainline and should go in as
+> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> I suggest Jason picks it up as a topic branch.
+> 
+> The patches have been boot tested on Dove and compile-tested only
+> for Kirkwood, Armada 370 and XP.
+> 
+> Sebastian Hesselbarth (4):
+>   clk: mvebu: armada-370: maintain clock init order
+>   clk: mvebu: armada-xp: maintain clock init order
+>   clk: mvebu: dove: maintain clock init order
+>   clk: mvebu: kirkwood: maintain clock init order
+> 
+>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+>  4 files changed, 44 insertions(+), 50 deletions(-)
+> 
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
