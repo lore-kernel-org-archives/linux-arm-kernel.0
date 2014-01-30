@@ -1,134 +1,53 @@
-From: trond.myklebust@primarydata.com (Trond Myklebust)
-Date: Thu, 30 Jan 2014 09:45:44 -0500
-Subject: NFS client broken in Linus' tip
-In-Reply-To: <20140130143054.GY15937@n2100.arm.linux.org.uk>
-References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
- <960A8F94-BDD4-4ED0-95EC-0D71D4AC27E7@primarydata.com>
- <20140130143054.GY15937@n2100.arm.linux.org.uk>
-Message-ID: <88DBB0A6-218A-40C5-94EA-295406E5E20E@primarydata.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 30 Jan 2014 15:55:41 +0100
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Alexandre TORGUE <alexandre.torgue@st.com>
 
-On Jan 30, 2014, at 9:30, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+This patch adds support to STiD127 SoC.
+The main adaptation is the L2 cache way size compare to STiH41x SoCs.
 
-> On Thu, Jan 30, 2014 at 09:17:00AM -0500, Trond Myklebust wrote:
->> 
->> On Jan 30, 2014, at 9:08, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> 
->>> I just booted Linus' tip (plus a few other patches to imx-drm and imx
->>> code), and stumbled into this interesting scenario:
->>> 
->>> # touch test
->>> touch: cannot touch `test': Operation not supported
->>> 
->>> I also tried mkdir and mknod, all result in the same error.  Hard and
->>> symlinks links are creatable.
->>> 
->>> However, I can chmod existing files and rename them.  Files can also be
->>> deleted, and the combination of this has left me without a /etc/mtab !
->>> 
->>> The machine is a iMX6 based ARM, running root-nfs, which was mounted via
->>> ubuntu's initramfs (so not using the kernel's built-in root-nfs.)
->>> 
->>> /proc/mounts for the root mount gives:
->>> 192.168.1.123:/var/boot/ci / nfs rw,relatime,vers=3,rsize=65536,wsize=65536,namlen=255,hard,nolock,proto=tcp,port=2049,timeo=7,retrans=10,sec=sys,local_lock=all,addr=192.168.1.123 0 0
->>> 
->>> CONFIG_NFS_FS=y
->>> CONFIG_NFS_V2=y
->>> CONFIG_NFS_V3=y
->>> CONFIG_NFS_V3_ACL=y
->>> CONFIG_NFS_V4=y
->>> # CONFIG_NFS_SWAP is not set
->>> # CONFIG_NFS_V4_1 is not set
->>> CONFIG_ROOT_NFS=y
->>> # CONFIG_NFS_USE_LEGACY_DNS is not set
->>> CONFIG_NFS_USE_KERNEL_DNS=y
->>> # CONFIG_NFSD is not set
->>> CONFIG_LOCKD=y
->>> CONFIG_LOCKD_V4=y
->>> CONFIG_NFS_ACL_SUPPORT=y
->>> CONFIG_NFS_COMMON=y
->>> CONFIG_SUNRPC=y
->>> CONFIG_SUNRPC_GSS=y
->>> 
->>> tcpdumping, I see:
->>> 
->>> 13:59:51.713523 IP 192.168.1.252.1341245608 > 192.168.1.123.2049: 132 lookup fh Unknown/010007011040840000000000CC238FC8FBA0475D9D9F8356B4C44166CDC38700 "test"
->>> 13:59:51.714345 IP 192.168.1.123.2049 > 192.168.1.252.1341245608: reply ok 120 lookup ERROR: No such file or directory
->>> 13:59:51.751303 IP 192.168.1.252.797 > 192.168.1.123.nfs: . ack 3381 win 2625 <nop,nop,timestamp 474136 3431312924>
->>> 
->>> which is the only NFS packet(s) I see which mention "test".
->>> 
->>> and stracing touch:
->>> 
->>> open("test", O_WRONLY|O_CREAT|O_NOCTTY|O_NONBLOCK|O_LARGEFILE, 0666) = -1 EOPNOTSUPP (Operation not supported)
->>> utimensat(AT_FDCWD, "test", NULL, 0)    = -1 ENOENT (No such file or directory)
->>> write(2, "touch: ", 7touch: )                  = 7
->>> write(2, "cannot touch `test'", 19cannot touch `test')     = 19
->>> write(2, ": Operation not supported", 25: Operation not supported) = 25
->>> write(2, "\n", 1
->>> )                       = 1
->>> 
->>> I think it's down to this:
->>> 
->>> commit 013cdf1088d7235da9477a2375654921d9b9ba9f
->>> Author: Christoph Hellwig <hch@infradead.org>
->>> Date:   Fri Dec 20 05:16:53 2013 -0800
->>> 
->>>   nfs: use generic posix ACL infrastructure for v3 Posix ACLs
->>> 
->>>   This causes a small behaviour change in that we don't bother to set
->>>   ACLs on file creation if the mode bit can express the access permissions
->>>   fully, and thus behaving identical to local filesystems.
->>> 
->>>   Signed-off-by: Christoph Hellwig <hch@lst.de>
->>>   Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
->>> 
->>> which adds:
->>> 
->>> +       status = posix_acl_create(dir, &sattr->ia_mode, &default_acl, &acl);
->>> +       if (status)
->>> +               goto out;
->> 
->> Right, this should clearly not cause nfs4_proc_create to fail if it
->> returns EOPNOTSUPP.
-> 
-> NFS3 :)
+Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/mach-sti/board-dt.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Sorry. I fat fingered that one. I intended to write nfs3_...
-
->>> into nfs3_proc_create(), but this ends up calling down into nfs3_get_acl(),
->>> which does this:
->>> 
->>>       if (!nfs_server_capable(inode, NFS_CAP_ACLS))
->>>               return ERR_PTR(-EOPNOTSUPP);
->> 
->> Just for completeness sake: is the server you were running against supposed to support POSIX acls?
-> 
-> The server is an old 3.1.8 kernel with this NFS config:
-> 
-> CONFIG_NFS_FS=m
-> CONFIG_NFS_V3=y
-> # CONFIG_NFS_V3_ACL is not set
-> # CONFIG_NFS_V4 is not set
-> # CONFIG_NFS_FSCACHE is not set
-> CONFIG_NFSD=m
-> CONFIG_NFSD_V3=y
-> # CONFIG_NFSD_V3_ACL is not set
-> # CONFIG_NFSD_V4 is not set
-> CONFIG_LOCKD=m
-> CONFIG_LOCKD_V4=y
-> CONFIG_NFS_COMMON=y
-> 
-> which has worked fine with NFS clients for the last 1800 odd days... until
-> now.
-> 
-
-OK. I?m guessing that you?re hitting the auto-probing code further down in nfs3_get_acl(), which also returns EOPNOTSUPP in those cases. Those probably need to return NULL too, then?
-
-However, there seems to be an inconsistency in the whole API here: posix_acl_create() and posix_acl_chmod() seem to want to return ?0? both when acls are not supported and when they are not set, however posix_acl_xattr_get() wants to return EOPNOTSUPP in the first case, and ENODATA in the second. How is the filesystem supposed to know what to return?
-
---
-Trond Myklebust
-Linux NFS client maintainer
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index 1217fb5..be018a9 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -9,6 +9,7 @@
+ 
+ #include <linux/irq.h>
+ #include <linux/of_platform.h>
++#include <linux/of.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ 
+@@ -18,6 +19,10 @@ void __init stih41x_l2x0_init(void)
+ {
+ 	u32 way_size = 0x4;
+ 	u32 aux_ctrl;
++
++	if (of_machine_is_compatible("st,stid127"))
++		way_size = 0x3;
++
+ 	/* may be this can be encoded in macros like BIT*() */
+ 	aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+ 		(0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+@@ -36,6 +41,7 @@ static void __init stih41x_machine_init(void)
+ static const char *stih41x_dt_match[] __initdata = {
+ 	"st,stih415",
+ 	"st,stih416",
++	"st,stid127",
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
