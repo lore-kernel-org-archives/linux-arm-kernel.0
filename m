@@ -1,54 +1,67 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 30 Jan 2014 15:49:26 +0200
-Subject: [PATCH] clk: keystone: gate: fix clk_init_data initialization
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
-References: <1391081821-13306-1-git-send-email-ivan.khoronzhuk@ti.com>
- <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
-Message-ID: <52EA5866.3090706@ti.com>
+Date: Thu, 30 Jan 2014 15:58:39 +0200
+Subject: [PATCH] ARM: keystone: dts: disable "msmcsram" clock
+In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52A0B4B6@DBDE04.ent.ti.com>
+References: <1391082343-13371-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <448912EABC71F84BBCADFD3C67C4BE52A0B4B6@DBDE04.ent.ti.com>
+Message-ID: <52EA5A8F.7070107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes. As result the clk->flag field contains garbage. In my case it leads
-that flag CLK_IGNORE_UNUSED is set for most of clocks.  As result a bunch
-of unused clocks cannot be disabled.
+Ok. I will delete node for this clock from DT and send v1
 
-On 01/30/2014 03:26 PM, Shilimkar, Santosh wrote:
-> Can u capture the issue withiout this fix?
+On 01/30/2014 03:25 PM, Shilimkar, Santosh wrote:
+> Disable is not good idea since it conveys wrong info....
+>
+> Hyperlink case was different.
 >
 > Sent from my Android phone using TouchDown (www.nitrodesk.com)
 >
 > -----Original Message-----
 > *From:* Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
-> *Received:* Thursday, 30 Jan 2014, 6:37am
-> *To:* Shilimkar, Santosh [santosh.shilimkar at ti.com]
-> *CC:* mturquette at linaro.org [mturquette at linaro.org];
-> linux-arm-kernel at lists.infradead.org [linux-arm-kernel at lists.infradead.org];
-> linux-kernel at vger.kernel.org [linux-kernel at vger.kernel.org]; Khoronzhuk, Ivan
-> [ivan.khoronzhuk at ti.com]
-> *Subject:* [PATCH] clk: keystone: gate: fix clk_init_data initialization
+> *Received:* Thursday, 30 Jan 2014, 6:45am
+> *To:* robh+dt at kernel.org [robh+dt at kernel.org]; galak at codeaurora.org
+> [galak at codeaurora.org]
+> *CC:* pawel.moll at arm.com [pawel.moll at arm.com]; mark.rutland at arm.com
+> [mark.rutland at arm.com]; ijc+devicetree at hellion.org.uk
+> [ijc+devicetree at hellion.org.uk]; linux at arm.linux.org.uk
+> [linux at arm.linux.org.uk]; devicetree at vger.kernel.org
+> [devicetree at vger.kernel.org]; linux-arm-kernel at lists.infradead.org
+> [linux-arm-kernel at lists.infradead.org]; linux-kernel at vger.kernel.org
+> [linux-kernel at vger.kernel.org]; Shilimkar, Santosh [santosh.shilimkar at ti.com];
+> Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
+> *Subject:* [PATCH] ARM: keystone: dts: disable "msmcsram" clock
 >
-> In clk_register_psc() function clk_init_data struct is allocated
-> in the stack. All members of this struct should be initialized
-> before using otherwise it will contain garbage. So initialize flags
-> in this structure too.
+> At late init all unused clocks are disabled. So clocks that were not
+> get before will be gated. In Keysone 2 SoC we have at least one
+> necessary clock that is not used by any driver - "msmcsram". This
+> clock is necessary, because it supplies the Multicore Shared Memory
+> Controller (MSMC). The MSMC provides memory protection for accesses to
+> the MSMC SRAM and DDR3 memory from system masters. It also manages
+> traffic among mastering peripherals and the EMIF.
+>
+> This means that MSMC clock is always needed by SoC and cannot be gated.
+> It is only one from necessary clocks that was not used by any driver.
+> So to avoid its gating at late init we have to disable it in DT.
 >
 > Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 > ---
->    drivers/clk/keystone/gate.c | 1 +
+>    arch/arm/boot/dts/keystone-clocks.dtsi | 1 +
 >    1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-> index 17a5983..86f1e36 100644
-> --- a/drivers/clk/keystone/gate.c
-> +++ b/drivers/clk/keystone/gate.c
-> @@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
->
->            init.name = name;
->            init.ops = &clk_psc_ops;
-> +       init.flags = 0;
->            init.parent_names = (parent_name ? &parent_name : NULL);
->            init.num_parents = (parent_name ? 1 : 0);
->
+> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi
+> b/arch/arm/boot/dts/keystone-clocks.dtsi
+> index 2363593..e7aea2e 100644
+> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
+> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+> @@ -332,6 +332,7 @@ clocks {
+>                    compatible = "ti,keystone,psc-clock";
+>                    clocks = <&chipclk1>;
+>                    clock-output-names = "msmcsram";
+> +               status = "disabled";
+>                    reg = <0x02350038 0xb00>, <0x0235001c 0x400>;
+>                    reg-names = "control", "domain";
+>                    domain-id = <7>;
 > -- 
 > 1.8.3.2
 >
