@@ -1,37 +1,78 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 30 Jan 2014 17:33:55 +0000
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 30 Jan 2014 12:43:29 -0500
 Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <201401301828.59294.arnd@arndb.de>
+In-Reply-To: <1391102149.9495.39.camel@kazak.uk.xensource.com>
 References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
- <201401301828.59294.arnd@arndb.de>
-Message-ID: <1391103235.9495.49.camel@kazak.uk.xensource.com>
+ <52EA83D6.9050506@codeaurora.org>
+ <1391102149.9495.39.camel@kazak.uk.xensource.com>
+Message-ID: <52EA8F41.5060403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-30 at 18:28 +0100, Arnd Bergmann wrote:
-> On Thursday 30 January 2014, Ian Campbell wrote:
-> > mach-virt has existed for a while but it is not written down what it actually
-> > consists of. Although it seems a bit unusual to document a binding for an
-> > entire platform since mach-virt is entirely virtual it is helpful to have
-> > something to refer to in the absence of a single concrete implementation.
-> > 
-> > I've done my best to capture the requirements based on the git log and my
-> > memory/understanding.
-> > 
-> > While here remove the xenvm dts example, the Xen tools will now build a
-> > suitable mach-virt compatible dts when launching the guest.
+Hi Ian,
+
+On 01/30/2014 12:15 PM, Ian Campbell wrote:
+> On Thu, 2014-01-30 at 11:54 -0500, Christopher Covington wrote:
+>>> +++ b/Documentation/devicetree/bindings/arm/mach-virt.txt
+>>> @@ -0,0 +1,32 @@
+>>> +* Mach-virt "Dummy Virtual Machine" platform
+>>> +
+>>> +"mach-virt" is the smallest, dumbest platform possible, to be used as
+>>> +a guest for Xen, KVM and other hypervisors.
+>>
+>> The platform is also useful to, and used by, simulators like QEMU in TCG mode.
 > 
-> It might be worth noting in the changeset comment that the 'compatible'
-> string is actually no longer needed on newer kernels: All the members
-> of the machine descriptor are now the defaults (we should remove the
-> virt_init() function as well), and the fallback machine descriptor should
-> work just fine if any other string gets passed.
+> I can mention this, although I don't think the list needs to be
+> exhaustive.
 
-So Marc's plan has actually happened. Neat. In that case is there even
-any point in listing explicit compatiblity strings (except perhaps as a
-historical note) -- I can just say that this is the fallback/default
-machine?
+Cool, thanks. Agreed, but I thought it'd be nice to list the simulator class.
 
-I'll leave the virt_init change to a separate patch if that's ok.
+>                                       It has no
+>>> +properties/functionality of its own and is driven entirely by device
+>>> +tree.
+>>
+>> I find this wording confusing. I read it as saying the platform has no
+>> properties or functionality. Perhaps you could phrase it slightly differently,
+>> such as having no properties or functionality beyond what's described in the
+>> device tree.
+> 
+> Yes, this is what I was trying to say, I'll update with something along
+> those lines.
+> 
+>>> +The platform may also provide hypervisor specific functionality
+>>> +(e.g. PV I/O), if it does so then this functionality must be
+>>> +discoverable (directly or indirectly) via device tree.
+>>
+>> I think it would be informative to provide pointers here to commonly used
+>> paravirtualized devices, especially VirtIO PCI/MMIO.
+> 
+> Under what criteria would something be eligible/appropriate to be
+> listed? I was trying to avoid "advocating" any particular type of PV
+> devices. We already have something of a problem with people incorrectly
+> assuming that mach-virt == virtio, which is not the case.
 
-Ian.
+This isn't particularly scientific, but maybe a practical criteria could be
+that it's mentioned in this thread? I think if we word the introduction to the
+list clearly, readers will know that that these are just a few examples known
+to be in use when the binding was written and by no means required. I think
+that providing more information is more likely to fix the incorrect assumption
+than providing less information.
+
+> If we did want to include an explicit list here at a minimum I would
+> also want to include the Xen PV devices as well and surely there would
+> be others which ought to be included too.
+
+Yes, I assumed you would include Xen. I'm not aware of any others*, but
+perhaps those who do could speak up about them?
+
+(*I do use Angel semihosting and DCC from time to time, but I've never seen
+devicetree bindings for these facilities. I'm not sure whether they count in
+this context.)
+
+Thanks,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
