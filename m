@@ -1,7 +1,9 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 30 Jan 2014 13:04:11 -0200
-Subject: [PATCH 1/2] ARM: imx_v4_v5_defconfig: Select CONFIG_MMC_UNSAFE_RESUME
-Message-ID: <1391094252-10599-1-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 30 Jan 2014 13:04:12 -0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select CONFIG_MMC_UNSAFE_RESUME
+In-Reply-To: <1391094252-10599-1-git-send-email-fabio.estevam@freescale.com>
+References: <1391094252-10599-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1391094252-10599-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,16 +15,16 @@ such purpose.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 6309ee5..f1aeb7d 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -154,6 +154,7 @@ CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 82ab3cc..7b76794 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -215,6 +215,7 @@ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
+ CONFIG_USB_MASS_STORAGE=m
  CONFIG_MMC=y
 +CONFIG_MMC_UNSAFE_RESUME=y
  CONFIG_MMC_SDHCI=y
