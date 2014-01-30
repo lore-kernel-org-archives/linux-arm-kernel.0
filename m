@@ -1,99 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jan 2014 17:13:55 +0000
-Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
-References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <52EA8853.8080709@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 30 Jan 2014 18:14:05 +0100
+Subject: [PATCH 1/7] sound: codec: add Device Tree binding to cs42l51
+In-Reply-To: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1391102051-5319-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+This commit adds a trivial Device Tree binding to the I2C-based
+cs42l51 sound codec, so that it can be used from Device Tree based
+platforms.
 
-On 30/01/14 16:11, Ian Campbell wrote:
-> mach-virt has existed for a while but it is not written down what it actually
-> consists of. Although it seems a bit unusual to document a binding for an
-> entire platform since mach-virt is entirely virtual it is helpful to have
-> something to refer to in the absence of a single concrete implementation.
-> 
-> I've done my best to capture the requirements based on the git log and my
-> memory/understanding.
-> 
-> While here remove the xenvm dts example, the Xen tools will now build a
-> suitable mach-virt compatible dts when launching the guest.
-> 
-> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
-> I'm not sure which tree this sort of thing should go though, sorry for the
-> huge Cc.
-> ---
->  .../devicetree/bindings/arm/mach-virt.txt          |   32 ++++++++
->  arch/arm/boot/dts/xenvm-4.2.dts                    |   81 --------------------
->  2 files changed, 32 insertions(+), 81 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mach-virt.txt
->  delete mode 100644 arch/arm/boot/dts/xenvm-4.2.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mach-virt.txt b/Documentation/devicetree/bindings/arm/mach-virt.txt
-> new file mode 100644
-> index 0000000..562bcda
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mach-virt.txt
-> @@ -0,0 +1,32 @@
-> +* Mach-virt "Dummy Virtual Machine" platform
-> +
-> +"mach-virt" is the smallest, dumbest platform possible, to be used as
-> +a guest for Xen, KVM and other hypervisors. It has no
-> +properties/functionality of its own and is driven entirely by device
-> +tree.
-> +
-> +This document defines the requirements for such a platform.
-> +
-> +* Required properties:
-> +
-> +- compatible: should be one of:
-> +	"linux,dummy-virt"
-> +	"xen,xenvm"
-> +
-> +In addition to the standard nodes (chosen, cpus, memory etc) the
-> +platform is required to provide certain other basic functionality
-> +which must be described in the device tree:
-> +
-> +    The platform must provide an ARM Generic Interrupt Controller
-> +    (GIC), defined in Documentation/devicetree/bindings/arm/gic.txt.
-> +
-> +    The platform must provide ARM architected timer, defined in
-> +    Documentation/devicetree/bindings/arm/arch_timer.txt.
-> +
-> +    If the platform is SMP then it must provide the Power State
-> +    Coordination Interface (PSCI) described in
-> +    Documentation/devicetree/bindings/arm/psci.txt.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ Documentation/devicetree/bindings/i2c/trivial-devices.txt | 1 +
+ sound/soc/codecs/cs42l51.c                                | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-I'm afraid I disagree with most of the above. The whole point of
-mach-virt is to provide a shell for DT platforms. None of this hardware
-is mandated. Instead, all the necessary information should be described
-in DT.
-
-Actually, mach-virt doesn't really stand for Virtual Machine. It stands
-for virtual mach-* directory! Eventually, mach-virt should become the
-default platform, the one we use when we don't match anything else in
-the kernel
-
-What you've described here are requirements for a hypervisor like Xen or
-KVM. mach-virt itself shouldn't have any of that.
-
-Cheers,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index b1cb341..041e560 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -17,6 +17,7 @@ at,24c08		i2c serial eeprom  (24cxx)
+ atmel,24c02		i2c serial eeprom  (24cxx)
+ atmel,at97sc3204t	i2c trusted platform module (TPM)
+ catalyst,24c32		i2c serial eeprom
++cirrus,cs42l51		Cirrus Logic CS42L51 audio codec
+ dallas,ds1307		64 x 8, Serial, I2C Real-Time Clock
+ dallas,ds1338		I2C RTC with 56-Byte NV RAM
+ dallas,ds1339		I2C Serial Real-Time Clock
+diff --git a/sound/soc/codecs/cs42l51.c b/sound/soc/codecs/cs42l51.c
+index 1e0fa3b..4a7a733 100644
+--- a/sound/soc/codecs/cs42l51.c
++++ b/sound/soc/codecs/cs42l51.c
+@@ -604,10 +604,17 @@ static const struct i2c_device_id cs42l51_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, cs42l51_id);
+ 
++static const struct of_device_id cs42l51_of_match[] = {
++	{ .compatible = "cirrus,cs42l51", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, cs42l51_of_match);
++
+ static struct i2c_driver cs42l51_i2c_driver = {
+ 	.driver = {
+ 		.name = "cs42l51-codec",
+ 		.owner = THIS_MODULE,
++		.of_match_table = cs42l51_of_match,
+ 	},
+ 	.id_table = cs42l51_id,
+ 	.probe = cs42l51_i2c_probe,
 -- 
-Jazz is not dead. It just smells funny...
+1.8.3.2
