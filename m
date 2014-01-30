@@ -1,40 +1,177 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Thu, 30 Jan 2014 14:20:56 +0200
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <20140128102353.48e8fb51@armhf>
-References: <y>	<cover.1390836773.git.jsarha@ti.com>	<52E6806A.2090109@metafoo.de>	<52E686B2.9060806@ti.com>	<20140127190641.273890c6@armhf>	<52E6B42F.4050901@ti.com>
- <20140128102353.48e8fb51@armhf>
-Message-ID: <52EA43A8.9050909@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 30 Jan 2014 13:25:56 +0100
+Subject: [RFC] dtc: add ability to make nodes conditional on them being
+ referenced
+Message-ID: <1578575.rVWgTPdq1W@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2014 11:23 AM, Jean-Francois Moine wrote:
-> On Mon, 27 Jan 2014 21:31:59 +0200
-> Jyri Sarha <jsarha@ti.com> wrote:
->
->> I would suggest to leave the CTS_N_K to the current setting (3), unless
->> we can change the CTS_N_K on the fly according to the used sample format.
->
-> Yes, this is possible:
->
-> - the tda998x codec may call the tda998x hdmi in the hw_params()
->    function, i.e. when the sample format is known, and then,
->
-> - the tda998x_audio_update() function may have the audio parameters
->    (struct snd_pcm_hw_params) as an argument, and CTS_N_K may be set
->    to either 1, 2 or 3 for SNDRV_PCM_FORMAT_S16_LE / S24_LE and S32_LE.
->
-> This is working in my machine. Would it also work for you?
->
+From: Heiko Stuebner <heiko.stuebner@bqreaders.com>
 
-I am having trouble getting the tda998x-codec working on BBB. The 
-problem is I do not have a DT node for the tda998x driver. Instead I 
-have tilcdc-slave node that provides pdata for the tda-driver.
+On i.MX, which carries a lot of pin-groups of which most are unused on
+individual boards, they noticed that this plehora of nodes also results
+in the runtime-lookup-performance also degrading [0].
 
-I am thinking of solving the problem by adding a reference to the 
-i2c-adapter hosting tda998x as an optional DT property to the codec 
-node. I could then dig the driver instance from the i2c adapter's 
-children. Any better ideas?
+A i.MX-specific solution defining the pingroups in the board files but
+using macros to reference the pingroup-data was not well received
 
-Best regards,
-Jyri
+This patch is trying to solve this issue in a more general way, by
+adding the ability to mark nodes as needing to be referenced somewhere
+in the tree.
+
+To mark a node a needing to be referenced it must be prefixed with
+/delete-unreferenced/. This makes dtc check the nodes reference-status
+when creating the flattened tree, dropping it if unreferenced.
+
+For example, the i.MX6SL pingroup
+
+	/delete-uneferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
+		fsl,pins = <
+			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
+			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
+			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
+		>;
+	};
+
+would only be included in the dtb if it got referenced somewhere
+as pingroup via
+
+	node {
+		pinctrl-0 <&pinctrl_ecscpi1_1>;
+	};
+
+[0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
+
+Signed-off-by: Heiko Stuebner <heiko.stuebner@bqreaders.com>
+---
+This is just the idea I had in [1] explored a bit more. I'm definitely
+not sure if this is a valid approach to the problem.
+Also this is my first venture into dtc as well as flex and bison :-) .
+
+[1] http://www.spinics.net/lists/arm-kernel/msg303731.html
+
+ scripts/dtc/checks.c     |    2 ++
+ scripts/dtc/dtc-lexer.l  |    7 +++++++
+ scripts/dtc/dtc-parser.y |    5 +++++
+ scripts/dtc/dtc.h        |    4 ++++
+ scripts/dtc/flattree.c   |    3 +++
+ scripts/dtc/livetree.c   |   14 ++++++++++++++
+ 6 files changed, 35 insertions(+)
+
+diff --git a/scripts/dtc/checks.c b/scripts/dtc/checks.c
+index ee96a25..747ada8 100644
+--- a/scripts/dtc/checks.c
++++ b/scripts/dtc/checks.c
+@@ -472,6 +472,8 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
+ 
+ 		phandle = get_node_phandle(dt, refnode);
+ 		*((cell_t *)(prop->val.val + m->offset)) = cpu_to_fdt32(phandle);
++
++		reference_node(refnode);
+ 	}
+ }
+ ERROR(phandle_references, NULL, NULL, fixup_phandle_references, NULL,
+diff --git a/scripts/dtc/dtc-lexer.l b/scripts/dtc/dtc-lexer.l
+index 3b41bfc..3b18e97 100644
+--- a/scripts/dtc/dtc-lexer.l
++++ b/scripts/dtc/dtc-lexer.l
+@@ -138,6 +138,13 @@ static int pop_input_file(void);
+ 			return DT_DEL_NODE;
+ 		}
+ 
++<*>"/delete-unreferenced/"	{
++			DPRINT("Keyword: /delete-unreferenced/\n");
++			DPRINT("<PROPNODENAME>\n");
++			BEGIN(PROPNODENAME);
++			return DT_DEL_UNREFERENCED;
++		}
++
+ <*>{LABEL}:	{
+ 			DPRINT("Label: %s\n", yytext);
+ 			yylval.labelref = xstrdup(yytext);
+diff --git a/scripts/dtc/dtc-parser.y b/scripts/dtc/dtc-parser.y
+index f412460..ae9108b 100644
+--- a/scripts/dtc/dtc-parser.y
++++ b/scripts/dtc/dtc-parser.y
+@@ -64,6 +64,7 @@ static unsigned char eval_char_literal(const char *s);
+ %token DT_BITS
+ %token DT_DEL_PROP
+ %token DT_DEL_NODE
++%token DT_DEL_UNREFERENCED
+ %token <propnodename> DT_PROPNODENAME
+ %token <literal> DT_LITERAL
+ %token <literal> DT_CHAR_LITERAL
+@@ -461,6 +462,10 @@ subnode:
+ 		{
+ 			$$ = name_node(build_node_delete(), $2);
+ 		}
++	| DT_DEL_UNREFERENCED subnode
++		{
++			$$ = check_node_referenced($2);
++		}
+ 	| DT_LABEL subnode
+ 		{
+ 			add_label(&$2->labels, $1);
+diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
+index 3e42a07..c10c440 100644
+--- a/scripts/dtc/dtc.h
++++ b/scripts/dtc/dtc.h
+@@ -159,6 +159,8 @@ struct node {
+ 	int addr_cells, size_cells;
+ 
+ 	struct label *labels;
++
++	int needs_reference, is_referenced;
+ };
+ 
+ #define for_each_label_withdel(l0, l) \
+@@ -193,6 +195,8 @@ struct property *reverse_properties(struct property *first);
+ struct node *build_node(struct property *proplist, struct node *children);
+ struct node *build_node_delete(void);
+ struct node *name_node(struct node *node, char *name);
++struct node *check_node_referenced(struct node *node);
++struct node *reference_node(struct node *node);
+ struct node *chain_node(struct node *first, struct node *list);
+ struct node *merge_nodes(struct node *old_node, struct node *new_node);
+ 
+diff --git a/scripts/dtc/flattree.c b/scripts/dtc/flattree.c
+index 665dad7..a327592 100644
+--- a/scripts/dtc/flattree.c
++++ b/scripts/dtc/flattree.c
+@@ -266,6 +266,9 @@ static void flatten_tree(struct node *tree, struct emitter *emit,
+ 	if (tree->deleted)
+ 		return;
+ 
++	if (tree->needs_reference && !tree->is_referenced)
++		return;
++
+ 	emit->beginnode(etarget, tree->labels);
+ 
+ 	if (vi->flags & FTF_FULLPATH)
+diff --git a/scripts/dtc/livetree.c b/scripts/dtc/livetree.c
+index b61465f..98bb33d 100644
+--- a/scripts/dtc/livetree.c
++++ b/scripts/dtc/livetree.c
+@@ -134,6 +134,20 @@ struct node *name_node(struct node *node, char *name)
+ 	return node;
+ }
+ 
++struct node *check_node_referenced(struct node *node)
++{
++	node->needs_reference = 1;
++
++	return node;
++}
++
++struct node *reference_node(struct node *node)
++{
++	node->is_referenced = 1;
++
++	return node;
++}
++
+ struct node *merge_nodes(struct node *old_node, struct node *new_node)
+ {
+ 	struct property *new_prop, *old_prop;
+-- 
+1.7.10.4
