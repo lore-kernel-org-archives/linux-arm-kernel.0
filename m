@@ -1,377 +1,363 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 30 Jan 2014 10:58:22 +0530
-Subject: [RFC PATCH 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2
- emulation
-In-Reply-To: <20140128210410.GA26671@cbox>
-References: <1390309301-28424-1-git-send-email-anup.patel@linaro.org>
- <1390309301-28424-3-git-send-email-anup.patel@linaro.org>
- <20140128210410.GA26671@cbox>
-Message-ID: <CAAhSdy2qfYCv1Eiq3pT99B5knn5ur7rm_KK_gENEX=Ed=gShqA@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 30 Jan 2014 13:52:25 +0800
+Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
+Message-ID: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+From: Rongjun Ying <Rongjun.ying@csr.com>
 
-On Wed, Jan 29, 2014 at 2:34 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Tue, Jan 21, 2014 at 06:31:40PM +0530, Anup Patel wrote:
->> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
->> VCPUs. This patch extends current in-kernel PSCI emulation to provide
->> PSCI v0.2 interface to VCPUs.
->>
->> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
->> keeping the ABI backward-compatible.
->>
->> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
->> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
->> init using KVM_ARM_VCPU_INIT ioctl.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h   |    2 +-
->>  arch/arm/include/uapi/asm/kvm.h   |   39 ++++++++++++++++--
->>  arch/arm/kvm/arm.c                |    6 ++-
->>  arch/arm/kvm/psci.c               |   79 ++++++++++++++++++++++++++++++-------
->>  arch/arm64/include/asm/kvm_host.h |    2 +-
->>  arch/arm64/include/uapi/asm/kvm.h |   39 ++++++++++++++++--
->>  6 files changed, 143 insertions(+), 24 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 8a6f6db..0239ac5 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -36,7 +36,7 @@
->>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->>  #define KVM_HAVE_ONE_REG
->>
->> -#define KVM_VCPU_MAX_FEATURES 1
->> +#define KVM_VCPU_MAX_FEATURES 2
->>
->>  #include <kvm/arm_vgic.h>
->>
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index c498b60..d9eb74c 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -83,6 +83,7 @@ struct kvm_regs {
->>  #define KVM_VGIC_V2_CPU_SIZE         0x2000
->>
->>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
->> +#define KVM_ARM_VCPU_PSCI_0_2                1 /* CPU uses PSCI v0.2 */
->>
->>  struct kvm_vcpu_init {
->>       __u32 target;
->> @@ -164,7 +165,7 @@ struct kvm_arch_memory_slot {
->>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>  #define KVM_ARM_IRQ_GIC_MAX          127
->>
->> -/* PSCI interface */
->> +/* PSCI v0.1 interface */
->>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
->>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
->>
->> @@ -173,9 +174,41 @@ struct kvm_arch_memory_slot {
->>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
->>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
->>
->> +/* PSCI v0.2 interface */
->> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
->> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
->> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
->> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0)
->> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
->> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
->> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
->> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
->> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->> +                                     KVM_PSCI_0_2_FN(6)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN(7)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
->> +
->> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
->> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
->> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN64(7)
->> +
->> +/* PSCI return values */
->>  #define KVM_PSCI_RET_SUCCESS         0
->> -#define KVM_PSCI_RET_NI                      ((unsigned long)-1)
->> -#define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
->> +#define KVM_PSCI_RET_NOT_SUPPORTED   ((unsigned long)-1)
->> +#define KVM_PSCI_RET_INVALID_PARAMS  ((unsigned long)-2)
->>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
->> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
->> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
->> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
->> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
->> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
->>
->>  #endif /* __ARM_KVM_H__ */
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 2a700e0..0b7817a 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -193,6 +193,7 @@ int kvm_dev_ioctl_check_extension(long ext)
->>       case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
->>       case KVM_CAP_ONE_REG:
->>       case KVM_CAP_ARM_PSCI:
->> +     case KVM_CAP_ARM_PSCI_0_2:
->>               r = 1;
->>               break;
->>       case KVM_CAP_COALESCED_MMIO:
->> @@ -483,7 +484,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->>        * PSCI code.
->>        */
->>       if (test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features)) {
->> -             *vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
->> +             if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
->> +                     *vcpu_reg(vcpu, 0) = KVM_PSCI_0_2_FN_CPU_OFF;
->> +             else
->> +                     *vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
->>               kvm_psci_call(vcpu);
->
-> Which tree does this patch apply to?  It looks like you'll get a
-> conflict with:
-> 478a823 arm: KVM: Don't return PSCI_INVAL if waitqueue is inactive
->
->>       }
->>
->> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
->> index 0881bf1..ee044a3 100644
->> --- a/arch/arm/kvm/psci.c
->> +++ b/arch/arm/kvm/psci.c
->> @@ -55,13 +55,13 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>       }
->>
->>       if (!vcpu)
->> -             return KVM_PSCI_RET_INVAL;
->> +             return KVM_PSCI_RET_INVALID_PARAMS;
->>
->>       target_pc = *vcpu_reg(source_vcpu, 2);
->>
->>       wq = kvm_arch_vcpu_wq(vcpu);
->>       if (!waitqueue_active(wq))
->> -             return KVM_PSCI_RET_INVAL;
->> +             return KVM_PSCI_RET_INVALID_PARAMS;
->>
->>       kvm_reset_vcpu(vcpu);
->>
->> @@ -84,17 +84,49 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>       return KVM_PSCI_RET_SUCCESS;
->>  }
->>
->> -/**
->> - * kvm_psci_call - handle PSCI call if r0 value is in range
->> - * @vcpu: Pointer to the VCPU struct
->> - *
->> - * Handle PSCI calls from guests through traps from HVC instructions.
->> - * The calling convention is similar to SMC calls to the secure world where
->> - * the function number is placed in r0 and this function returns true if the
->> - * function number specified in r0 is withing the PSCI range, and false
->> - * otherwise.
->> - */
->> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
->> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->> +{
->> +     unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->> +     unsigned long val;
->> +
->> +     switch (psci_fn) {
->> +     case KVM_PSCI_0_2_FN_PSCI_VERSION:
->> +             /*
->> +              * Bits[31:16] = Major Version = 0
->> +              * Bits[15:0] = Minor Version = 2
->> +              */
->> +             val = 2;
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_OFF:
->> +             kvm_psci_vcpu_off(vcpu);
->> +             val = KVM_PSCI_RET_SUCCESS;
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_ON:
->> +     case KVM_PSCI_0_2_FN64_CPU_ON:
->> +             val = kvm_psci_vcpu_on(vcpu);
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->> +     case KVM_PSCI_0_2_FN_AFFINITY_INFO:
->> +     case KVM_PSCI_0_2_FN_MIGRATE:
->> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
->> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
->> +     case KVM_PSCI_0_2_FN_SYSTEM_OFF:
->> +     case KVM_PSCI_0_2_FN_SYSTEM_RESET:
->> +     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
->> +     case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
->> +     case KVM_PSCI_0_2_FN64_MIGRATE:
->> +     case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
->> +             val = KVM_PSCI_RET_NOT_SUPPORTED;
->> +             break;
->> +     default:
->> +             return false;
->> +     }
->> +
->> +     *vcpu_reg(vcpu, 0) = val;
->> +     return true;
->> +}
->> +
->> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->>  {
->>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>       unsigned long val;
->> @@ -109,9 +141,8 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>               break;
->>       case KVM_PSCI_FN_CPU_SUSPEND:
->>       case KVM_PSCI_FN_MIGRATE:
->> -             val = KVM_PSCI_RET_NI;
->> +             val = KVM_PSCI_RET_NOT_SUPPORTED;
->>               break;
->> -
->>       default:
->>               return false;
->>       }
->> @@ -119,3 +150,21 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>       *vcpu_reg(vcpu, 0) = val;
->>       return true;
->>  }
->> +
->> +/**
->> + * kvm_psci_call - handle PSCI call if r0 value is in range
->> + * @vcpu: Pointer to the VCPU struct
->> + *
->> + * Handle PSCI calls from guests through traps from HVC instructions.
->> + * The calling convention is similar to SMC calls to the secure world where
->> + * the function number is placed in r0 and this function returns true if the
->> + * function number specified in r0 is withing the PSCI range, and false
->> + * otherwise.
->> + */
->> +bool kvm_psci_call(struct kvm_vcpu *vcpu)
->> +{
->> +     if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
->> +             return kvm_psci_0_2_call(vcpu);
->> +
->> +     return kvm_psci_0_1_call(vcpu);
->> +}
->
-> Why don't we just try one after the other?  Do they conflict in some
-> way?
->
-> I assume PSCI calls are never going to be in the critical path and calls
-> into PSCI are pretty much expected to be slow as a dog anyhow, so if we
-> could avoid the extra churn in user space code and potential user
-> confusion (providing PSCI 0.2 kernel but too old user space tool for
-> example), I think that would be preferred.
+PWM controller of CSR SiRFSoC can generate 7 independent outputs. Each output
+duty cycle can be adjusted by setting the corresponding wait & hold registers.
 
-I gave more thought to this.
+Supports 7 independent channel output: 6 for external(channel0-5) and 1 for
+internal(channel6).
 
-Currently, there is no conflict of function IDs between PSCI v0.1 and v0.2
-but what if in future some new PSCI vX.Y comes-up with function IDs which
-conflict with existing PSCI vA.B.
+Supports wide frequency range: divide by 2 to 65536*2 of source clock.
 
-I think it is very likely that we will have more versions of PSCI and each
-subsequent of version of PSCI will generally extend functions IDs defined
-by PSCI v0.2
+Signed-off-by: Rongjun Ying <Rongjun.ying@csr.com>
+Signed-off-by: Huayi Li <Huayi.Li@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2: clean the source clock of PWM wave, use OSC(26MHz)
 
-I will keep the KVM_ARM_VCPU_PSCI_0_2 feature for v2 patchset and
-wait for more comments on this.
+ drivers/pwm/Kconfig    |    9 ++
+ drivers/pwm/Makefile   |    1 +
+ drivers/pwm/pwm-sirf.c |  294 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 304 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pwm/pwm-sirf.c
 
-Regards,
-Anup
-
->
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 0a1d697..92242ce 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -39,7 +39,7 @@
->>  #include <kvm/arm_vgic.h>
->>  #include <kvm/arm_arch_timer.h>
->>
->> -#define KVM_VCPU_MAX_FEATURES 2
->> +#define KVM_VCPU_MAX_FEATURES 3
->>
->>  struct kvm_vcpu;
->>  int kvm_target_cpu(void);
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index d9f026b..0eb254d 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -77,6 +77,7 @@ struct kvm_regs {
->>
->>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
->>  #define KVM_ARM_VCPU_EL1_32BIT               1 /* CPU running a 32bit VM */
->> +#define KVM_ARM_VCPU_PSCI_0_2                2 /* CPU uses PSCI v0.2 */
->>
->>  struct kvm_vcpu_init {
->>       __u32 target;
->> @@ -150,7 +151,7 @@ struct kvm_arch_memory_slot {
->>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>  #define KVM_ARM_IRQ_GIC_MAX          127
->>
->> -/* PSCI interface */
->> +/* PSCI v0.1 interface */
->>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
->>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
->>
->> @@ -159,10 +160,42 @@ struct kvm_arch_memory_slot {
->>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
->>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
->>
->> +/* PSCI v0.2 interface */
->> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
->> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
->> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
->> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0)
->> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
->> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
->> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
->> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
->> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->> +                                     KVM_PSCI_0_2_FN(6)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN(7)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
->> +
->> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
->> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
->> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN64(7)
->> +
->> +/* PSCI return values */
->>  #define KVM_PSCI_RET_SUCCESS         0
->> -#define KVM_PSCI_RET_NI                      ((unsigned long)-1)
->> -#define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
->> +#define KVM_PSCI_RET_NOT_SUPPORTED   ((unsigned long)-1)
->> +#define KVM_PSCI_RET_INVALID_PARAMS  ((unsigned long)-2)
->>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
->> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
->> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
->> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
->> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
->> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
->>
->>  #endif
->>
->> --
->> 1.7.9.5
->>
->
-> Thanks,
-> --
-> Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 7acab93..0a252f8 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -166,6 +166,15 @@ config PWM_SAMSUNG
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-samsung.
+ 
++config PWM_SIRF
++	tristate "SiRF PWM support"
++	depends on ARCH_SIRF
++	help
++	  Generic PWM framework driver for SiRF SoC.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-sirf.
++
+ config PWM_SPEAR
+ 	tristate "STMicroelectronics SPEAr PWM support"
+ 	depends on PLAT_SPEAR
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 4abf337..49ab0d7 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_PWM_PUV3)		+= pwm-puv3.o
+ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+ obj-$(CONFIG_PWM_RENESAS_TPU)	+= pwm-renesas-tpu.o
+ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
++obj-$(CONFIG_PWM_SIRF)		+= pwm-sirf.o
+ obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+ obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
+diff --git a/drivers/pwm/pwm-sirf.c b/drivers/pwm/pwm-sirf.c
+new file mode 100644
+index 0000000..1a5c5b7
+--- /dev/null
++++ b/drivers/pwm/pwm-sirf.c
+@@ -0,0 +1,294 @@
++/*
++ * SIRF serial SoC PWM device core driver
++ *
++ * Copyright (c) 2014 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/pwm.h>
++#include <linux/of.h>
++#include <linux/io.h>
++
++#define SIRF_PWM_SELECT_PRECLK			0x0
++#define SIRF_PWM_OE				0x4
++#define SIRF_PWM_ENABLE_PRECLOCK		0x8
++#define SIRF_PWM_ENABLE_POSTCLOCK		0xC
++#define SIRF_PWM_GET_WAIT_OFFSET(n)		(0x10 + 0x8*n)
++#define SIRF_PWM_GET_HOLD_OFFSET(n)		(0x14 + 0x8*n)
++
++#define SIRF_PWM_TR_STEP(n)			(0x48 + 0x8*n)
++#define SIRF_PWM_STEP_HOLD(n)			(0x4c + 0x8*n)
++
++#define SRC_FIELD_SIZE				3
++#define BYPASS_MODE_BIT				21
++#define TRANS_MODE_SELECT_BIT			7
++
++#define SIRF_PWM_CHL_NUM			7
++#define SIRF_PWM_BLS_GRP_NUM			16
++
++struct sirf_pwm {
++	void __iomem		*base;
++	struct clk		*clk;
++	struct pwm_chip		chip;
++};
++
++#define to_sirf_chip(chip)	container_of(chip, struct sirf_pwm, chip)
++
++static unsigned int sirf_pwm_ns_to_cycles(struct pwm_chip *chip, unsigned int time_ns)
++{
++	u64 dividend;
++	unsigned int cycle;
++	/*
++	 * on SiRFSoC, OSC input is const, we use it as the source to generate
++	 * PWM wave
++	 */
++#define SRC_OSC_RATE 26000000ULL
++	dividend = SRC_OSC_RATE * time_ns + NSEC_PER_SEC / 2;
++	do_div(dividend, NSEC_PER_SEC);
++
++	cycle = dividend & 0xFFFFFFFFUL;
++
++	return cycle > 1 ? cycle : 1;
++}
++
++static int sirf_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++		int duty_ns, int period_ns)
++{
++	unsigned int period_cycles, high_cycles, low_cycles;
++	unsigned int val;
++	struct sirf_pwm *spwm = to_sirf_chip(chip);
++
++	period_cycles = sirf_pwm_ns_to_cycles(chip, period_ns);
++
++	high_cycles = sirf_pwm_ns_to_cycles(chip, duty_ns);
++	low_cycles = period_cycles - high_cycles;
++
++	if (period_cycles == 1) {
++		/* bypass mode */
++		val = readl(spwm->base + SIRF_PWM_SELECT_PRECLK);
++		val |= 0x1 << (BYPASS_MODE_BIT + pwm->hwpwm);
++		writel(val, spwm->base + SIRF_PWM_SELECT_PRECLK);
++		dev_warn(chip->dev, "period is too short!\n");
++	} else {
++		/* divider mode */
++		val = readl(spwm->base + SIRF_PWM_SELECT_PRECLK);
++		val &= ~(0x1 << (BYPASS_MODE_BIT + pwm->hwpwm));
++		writel(val, spwm->base + SIRF_PWM_SELECT_PRECLK);
++
++		if (high_cycles == period_cycles) {
++			high_cycles--;
++			low_cycles = 1;
++		}
++
++		writel(high_cycles, spwm->base + SIRF_PWM_GET_WAIT_OFFSET(pwm->hwpwm));
++		writel(low_cycles, spwm->base + SIRF_PWM_GET_HOLD_OFFSET(pwm->hwpwm));
++	}
++
++	return 0;
++}
++
++static int sirf_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct sirf_pwm *spwm = to_sirf_chip(chip);
++	unsigned int val;
++
++	/* disable preclock */
++	val = readl(spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++	val &= ~(1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++
++	/* select preclock source must after disable preclk*/
++	val = readl(spwm->base + SIRF_PWM_SELECT_PRECLK);
++	val &= ~(0x7 << (SRC_FIELD_SIZE * pwm->hwpwm));
++	writel(val, spwm->base + SIRF_PWM_SELECT_PRECLK);
++	/* wait for some time */
++	udelay(100);
++
++	/* enable preclock */
++	val = readl(spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++	val |= (1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++
++	/* enable post clock*/
++	val = readl(spwm->base + SIRF_PWM_ENABLE_POSTCLOCK);
++	val |= (1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_ENABLE_POSTCLOCK);
++
++	/* enable output */
++	val = readl(spwm->base + SIRF_PWM_OE);
++	val |= 1 << pwm->hwpwm;
++	val &= ~(1 << (pwm->hwpwm + TRANS_MODE_SELECT_BIT));
++
++	writel(val, spwm->base + SIRF_PWM_OE);
++
++	return 0;
++}
++
++static void sirf_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	unsigned int val;
++	struct sirf_pwm *spwm = to_sirf_chip(chip);
++	/* disable output */
++	val = readl(spwm->base + SIRF_PWM_OE);
++	val &= ~(1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_OE);
++
++	/* disable postclock */
++	val = readl(spwm->base + SIRF_PWM_ENABLE_POSTCLOCK);
++	val &= ~(1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_ENABLE_POSTCLOCK);
++
++	/* disable preclock */
++	val = readl(spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++	val &= ~(1 << pwm->hwpwm);
++	writel(val, spwm->base + SIRF_PWM_ENABLE_PRECLOCK);
++}
++
++static struct pwm_ops sirf_pwm_ops = {
++	.enable = sirf_pwm_enable,
++	.disable = sirf_pwm_disable,
++	.config = sirf_pwm_config,
++	.owner = THIS_MODULE,
++};
++
++static int sirf_pwm_probe(struct platform_device *pdev)
++{
++	struct sirf_pwm *spwm;
++	struct resource *mem_res;
++	int ret;
++
++	spwm = devm_kzalloc(&pdev->dev, sizeof(struct sirf_pwm),
++			GFP_KERNEL);
++	if (!spwm)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, spwm);
++
++	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	spwm->base = devm_ioremap_resource(&pdev->dev, mem_res);
++	if (!spwm->base)
++		return -ENOMEM;
++
++	spwm->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(spwm->clk)) {
++		dev_err(&pdev->dev, "Get clock failed.\n");
++		return PTR_ERR(spwm->clk);
++	}
++
++	clk_prepare_enable(spwm->clk);
++
++	spwm->chip.dev = &pdev->dev;
++	spwm->chip.ops = &sirf_pwm_ops;
++	spwm->chip.base = 0;
++	spwm->chip.npwm = SIRF_PWM_CHL_NUM;
++
++	ret = pwmchip_add(&spwm->chip);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to register pwm\n");
++		clk_disable_unprepare(spwm->clk);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int sirf_pwm_remove(struct platform_device *pdev)
++{
++	struct sirf_pwm *spwm = platform_get_drvdata(pdev);
++	clk_disable_unprepare(spwm->clk);
++
++	pwmchip_remove(&spwm->chip);
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int sirf_pwm_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct sirf_pwm *spwm = platform_get_drvdata(pdev);
++
++	clk_disable_unprepare(spwm->clk);
++
++	return 0;
++}
++
++static void sirf_pwm_config_restore(struct sirf_pwm *spwm)
++{
++	struct pwm_device *pwm;
++	int i;
++
++	for (i = 0; i < spwm->chip.npwm; i++) {
++		pwm = &spwm->chip.pwms[i];
++		/*
++		 * while restoring from hibernation, state of pwm is enabled,
++		 * but PWM hardware is not re-enabled
++		 */
++		if (test_bit(PWMF_REQUESTED, &pwm->flags) &&
++		     test_bit(PWMF_ENABLED, &pwm->flags))
++			sirf_pwm_enable(&spwm->chip, pwm);
++	}
++}
++
++static int sirf_pwm_resume(struct device *dev)
++{
++	struct sirf_pwm *spwm = dev_get_drvdata(dev);
++
++	clk_prepare_enable(spwm->clk);
++
++	sirf_pwm_config_restore(spwm);
++
++	return 0;
++}
++
++static int sirf_pwm_restore(struct device *dev)
++{
++	struct sirf_pwm *spwm = dev_get_drvdata(dev);
++
++	/* back from hibernation, clock is already enabled */
++	sirf_pwm_config_restore(spwm);
++
++	return 0;
++}
++
++#else
++#define sirf_pwm_resume NULL
++#define sirf_pwm_suspend NULL
++#define sirf_pwm_restore NULL
++#endif
++
++static const struct dev_pm_ops sirf_pwm_pm_ops = {
++	.suspend = sirf_pwm_suspend,
++	.resume = sirf_pwm_resume,
++	.restore = sirf_pwm_restore,
++};
++
++static const struct of_device_id sirf_pwm_of_match[] = {
++	{ .compatible = "sirf,prima2-pwm", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, sirf_pwm_of_match);
++
++static struct platform_driver sirf_pwm_driver = {
++	.driver = {
++		.name = "prima2-pwm",
++		.owner = THIS_MODULE,
++		.pm = &sirf_pwm_pm_ops,
++		.of_match_table = sirf_pwm_of_match,
++	},
++	.probe = sirf_pwm_probe,
++	.remove = sirf_pwm_remove,
++};
++
++module_platform_driver(sirf_pwm_driver);
++
++MODULE_DESCRIPTION("SIRF serial SoC PWM device core driver");
++MODULE_AUTHOR("RongJun Ying <Rongjun.Ying@csr.com>, "
++	"Huayi Li <huayi.li@csr.com>");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.5.4
