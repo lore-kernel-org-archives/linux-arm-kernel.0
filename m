@@ -1,58 +1,107 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Jan 2014 18:51:10 +0000
-Subject: [RFC] arm: vdso: Convert sigpage to vdso implementation
-In-Reply-To: <20140129142235.GA12965@linaro.org>
-References: <1390926308-15581-1-git-send-email-steve.capper@linaro.org>
- <20140128171015.GM15937@n2100.arm.linux.org.uk>
- <20140129142235.GA12965@linaro.org>
-Message-ID: <20140130185110.GB4437@mudshark.cambridge.arm.com>
+Date: Thu, 30 Jan 2014 18:56:45 +0000
+Subject: [PATCH 5/5] arm64: add Crypto Extensions based synchronous core
+ AES cipher
+In-Reply-To: <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140130185645.GC4437@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 02:22:36PM +0000, Steve Capper wrote:
-> On Tue, Jan 26, 2014 at 05:10:15PM +0000, Russell King - ARM Linux wrote:
-> > I'm not happy with this removing much of the work I pushed into the
-> > kernel to work around the security issues which were identified with
-> > the fixed-address placement of stuff in the vectors page.  Particularly
-> > the random placement of the signal return stubs within the new signal
-> > page is gone with the VDSO approach, which means if someone can discover
-> > the VDSO page, they can issue any system call they please by knowing
-> > the appropriate offset into the page to call.
+Hi Ard,
 
-[...]
+On Wed, Jan 29, 2014 at 04:50:46PM +0000, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
+> new file mode 100644
+> index 000000000000..b5a5d5d6e4b8
+> --- /dev/null
+> +++ b/arch/arm64/crypto/aes-ce-cipher.c
+> @@ -0,0 +1,103 @@
+> +/*
+> + * linux/arch/arm64/crypto/aes-ce-cipher.c
+> + *
+> + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <asm/neon.h>
+> +#include <crypto/aes.h>
+> +#include <linux/crypto.h>
+> +#include <linux/module.h>
+> +#include <linux/cpufeature.h>
+> +
+> +MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
+> +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+> +MODULE_LICENSE("GPL");
+> +
+> +static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+> +{
+> +	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+> +	u32 rounds = 6 + ctx->key_length / 4;
 
-> > While the VDSO page will be placed randomly, I'd also like to have the
-> > signal handlers placed randomly within that page as well - there's no
-> > need for them to be at a fixed offset.  The only thing which needs to
-> > know where they are after all is the kernel.
-> 
-> I was considering a larger segment containing the trampoline at random
-> offset, but came to the conclusion that the VA randomisation of the
-> vdso page location was in itself sufficient?
+Can you document these constants please?
 
-Whilst randomising within a page could potentially be beneficial, I question
-just how much use it is doing it only for the signal page. For example, for
-a system running a given version of libc, if you know where libc is mapped,
-then you can easily find syscall sequences in there. Similarly for
-gettimeofday() in the vDSO, there is a syscall fallback path too.
+> +
+> +	kernel_neon_begin();
+> +
+> +	__asm__("	ld1		{v0.16b}, [%[in]]		;"
+> +		"	ld1		{v1.16b}, [%[key]], #16		;"
+> +		"0:	aese		v0.16b, v1.16b			;"
+> +		"	subs		%[rounds], %[rounds], #1	;"
+> +		"	ld1		{v1.16b}, [%[key]], #16		;"
+> +		"	beq		1f				;"
+> +		"	aesmc		v0.16b, v0.16b			;"
+> +		"	b		0b				;"
+> +		"1:	eor		v0.16b, v0.16b, v1.16b		;"
+> +		"	st1		{v0.16b}, [%[out]]		;"
+> +	: :
+> +		[out]		"r"(dst),
+> +		[in]		"r"(src),
+> +		[rounds]	"r"(rounds),
+> +		[key]		"r"(ctx->key_enc)
+> +	:			"cc");
 
-Dynamically randomising the layout of shared libraries is likely to confuse
-the dynamic linker and completely break debugging with GDB. It's also not
-something that I'm aware of being done by any other architectures in the
-kernel.
+You probably need a memory output to stop this being re-ordered by the
+compiler. Can GCC not generate the addressing modes you need directly,
+allowing you to avoid moving everything into registers?
 
-I think there's a trade-off between the measurable performance advantage of
-exporting functions such as gtod in the vDSO and the unclear security gains
-of randomising the sigreturn code within a page when the page address is
-already randomised.
 
-> > I believe x86 eventually ended up going down the path of trapping and
-> > emulating calls to the VDSO page because VDSO became too much of a
-> > problem (though I think it does provide the option for having it back
-> > but not by default.)
+> +	kernel_neon_end();
+> +}
+> +
+> +static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+> +{
+> +	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+> +	u32 rounds = 6 + ctx->key_length / 4;
+> +
+> +	kernel_neon_begin();
+> +
+> +	__asm__("	ld1		{v0.16b}, [%[in]]		;"
+> +		"	ld1		{v1.16b}, [%[key]], #16		;"
+> +		"0:	aesd		v0.16b, v1.16b			;"
+> +		"	ld1		{v1.16b}, [%[key]], #16		;"
+> +		"	subs		%[rounds], %[rounds], #1	;"
+> +		"	beq		1f				;"
+> +		"	aesimc		v0.16b, v0.16b			;"
+> +		"	b		0b				;"
+> +		"1:	eor		v0.16b, v0.16b, v1.16b		;"
+> +		"	st1		{v0.16b}, [%[out]]		;"
+> +	: :
+> +		[out]		"r"(dst),
+> +		[in]		"r"(src),
+> +		[rounds]	"r"(rounds),
+> +		[key]		"r"(ctx->key_dec)
+> +	:			"cc");
 
-Hmm, do you have any pointers to more information about that? I know that
-the vsyscall page went the way of the dodo because it was placed at a fixed
-address, but I thought that the vDSO was still alive and kicking.
+Same comments here.
 
-Will
+FWIW: I spoke to the guy at ARM who designed the crypto instructions and he
+reckons your code works :)
+
+Cheers,
+
+Will "got a B in maths" Deacon
