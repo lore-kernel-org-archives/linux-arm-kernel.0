@@ -1,29 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 30 Jan 2014 21:25:00 +0100
-Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove
- hardcoded addresses from Dove pinctrl
-In-Reply-To: <52EA9EFA.1030609@gmail.com>
-References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140130182925.GM10864@lunn.ch> <52EA9EFA.1030609@gmail.com>
-Message-ID: <20140130202500.GN10864@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 30 Jan 2014 15:45:58 -0500
+Subject: recommended action for bootloaders regarding modifying
+ device-tree nodes
+In-Reply-To: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
+References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
+Message-ID: <20140130204558.GC29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 07:50:34PM +0100, Sebastian Hesselbarth wrote:
-> On 01/30/2014 07:29 PM, Andrew Lunn wrote:
-> >On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
-> >>This patch set is one required step for Dove to hop into mach-mvebu.
-> >>Until now, pinctrl-dove was hardcoding some registers that do not
-> >>directly belong to MPP core registers. This is not compatible with
-> >>what we want for mach-mvebu.
-> >
-> >I think there might be something wrong here....
-> 
-> There _is_ something wrong. I'll have a look at it. For the record,
-> what SoC are you testing with? From the base address, I guess it is
-> Kirkwood?
+Hi Tim,
 
-Yes, Kirkwood. Sorry for not saying.
+On Thu, Jan 30, 2014 at 01:11:18AM -0800, Tim Harvey wrote:
+> My approach has been to define a per-baseboard device-tree in Linux
+> for a 'fully loaded' board, then remove nodes which the EEPROM claims
+> are not present in the bootloader before it passes the DTB to the
+> kernel.  I do this by defining aliases in the device-tree for the
+> peripherals that are 'optional' so that the bootloader itself does not
+> need to know the details about how the device is connected.
 
-     Andrew
+This is more of a process question:  Is there any information captured
+in your EEPROM that can't be represented in the dtb?  iow, at the point
+when you write the EEPROM, why not write the dtb to it as configured?
+
+You could have pre-configured dtsi fragments for each config option, and
+then dynamically create the board dts from the order.
+
+I only ask because it would solve the problem below.  However, there's a
+lot more to changing a manufacturing process than meets the eye. :)
+
+> Is it more appropriate for the bootloader to 'remove' nodes for
+> devices that are not physically present or should I be setting their
+> status property to 'disabled' instead?  I'm not clear if either option
+> really has any pros or cons.
+
+That depends on how you have it structured.  Is it a valid dtb?
+Meaning, do you have four nodes all at the same register address?
+Perhaps you could provide an example dts?
+
+thx,
+
+Jason.
+
+> Tim Harvey - Principal Software Engineer
+> Gateworks Corporation
+
+btw - one of my first embedded projects was on one of your boards. An
+ixp425 with 4 mini-pci slots.
