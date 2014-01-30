@@ -1,26 +1,35 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 29 Jan 2014 21:33:15 -0800
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-In-Reply-To: <20140130111919.afc7f4e5b58e409aaabf7550@canb.auug.org.au>
-References: <20140130111919.afc7f4e5b58e409aaabf7550@canb.auug.org.au>
-Message-ID: <CAGa+x85md++qtw5n7c_4L-MvaK8nB3c8GpFf+OLb4p--8N=+og@mail.gmail.com>
+From: amit.grover@samsung.com (Amit Grover)
+Date: Thu, 30 Jan 2014 11:12:41 +0530
+Subject: [PATCH v2 0/2] drivers/media: Add controls for Horizontal and Vertical
+ MV Search Range
+In-Reply-To: <52E0ED10.2020901@samsung.com>
+References: <52E0ED10.2020901@samsung.com>
+Message-ID: <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 4:19 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/clk/Makefile between commit fd3fdaf09f26 ("clk: sort Makefile")
-> from Linus' tree and commit 7ee2c5117483 ("clk: bcm281xx: add initial
-> clock framework support") from the arm-soc tree.
+Based on 'master' branch of Linux-next.
+This is v2 version for the patch:
+s5p-mfc: Add Horizontal and Vertical search range for Video Macro Blocks
+(https://lkml.org/lkml/2013/12/30/83)
 
-Ugh.  Looks like some last minute cleanup stuff went into clk-next
-that didn't spend time in linux-next, and now causes conflicts with
-some clk stuff we still have queued in arm-soc (ack'd by Mike.)
+Changes from v1:
+1) Splitted the patch into v4l2 and mfc driver patches.
+2) Incorporated review comments of v1
 
-Now, based on the Hulk's response to Mike's pull request, if we submit
-this, introducing yet more conflicts in the Makefile, it will surely
-be Hulk angry, Hulk smash.
+Amit Grover (2):
+  drivers/media: v4l2: Add settings for Horizontal and Vertical MV
+    Search Range
+  drivers/media: s5p-mfc: Add Horizontal and Vertical MV Search Range
 
-Kevin
+ Documentation/DocBook/media/v4l/controls.xml    |   20 +++++++++++++++++++
+ drivers/media/platform/s5p-mfc/regs-mfc-v6.h    |    1 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |   24 +++++++++++++++++++++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    8 ++------
+ drivers/media/v4l2-core/v4l2-ctrls.c            |   14 +++++++++++++
+ include/uapi/linux/v4l2-controls.h              |    2 ++
+ 7 files changed, 65 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
