@@ -1,81 +1,38 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 30 Jan 2014 12:36:41 -0600
-Subject: [PATCH 3/4] clocksource: qcom: split building of legacy vs
- multiplatform support
-In-Reply-To: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
-References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1391107002-21470-4-git-send-email-galak@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jan 2014 19:39:08 +0100
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <201401301935.16463.arnd@arndb.de>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+ <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
+ <201401301935.16463.arnd@arndb.de>
+Message-ID: <201401301939.08302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The majority of the clocksource code for the Qualcomm platform is shared
-between newer (multiplatform) and older platforms.  However there is a bit
-of code that isn't, so only build it for the appropriate config.
+On Thursday 30 January 2014, Arnd Bergmann wrote:
+> On Thursday 30 January 2014, Patrice CHOTARD wrote:
+> > From: Alexandre TORGUE <alexandre.torgue@st.com>
+> > 
+> > This patch adds support to STiD127 SoC.
+> > The main adaptation is the L2 cache way size compare to STiH41x SoCs.
+> > 
+> > Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> > Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> > ---
+> >  arch/arm/mach-sti/board-dt.c |    6 ++++++
+> >  1 file changed, 6 insertions(+)
+> 
+> Wouldn't it be better to read this value from the l2 cache
+> controller node? I'd assume there might be more SoCs that
+> will need a similar change, so it's better to come up with
+> a solution that doesn't involve changing the kernel every
+> time.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- drivers/clocksource/qcom-timer.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+Actually reading the code in this file shows that the L2 cache
+initialization is the only nonstandard thing in there. We should
+really find a way to get rid of the entire function.
 
-diff --git a/drivers/clocksource/qcom-timer.c b/drivers/clocksource/qcom-timer.c
-index dca829e..e807acf 100644
---- a/drivers/clocksource/qcom-timer.c
-+++ b/drivers/clocksource/qcom-timer.c
-@@ -106,15 +106,6 @@ static notrace cycle_t msm_read_timer_count(struct clocksource *cs)
- 	return readl_relaxed(source_base + TIMER_COUNT_VAL);
- }
- 
--static notrace cycle_t msm_read_timer_count_shift(struct clocksource *cs)
--{
--	/*
--	 * Shift timer count down by a constant due to unreliable lower bits
--	 * on some targets.
--	 */
--	return msm_read_timer_count(cs) >> MSM_DGT_SHIFT;
--}
--
- static struct clocksource msm_clocksource = {
- 	.name	= "dg_timer",
- 	.rating	= 300,
-@@ -228,7 +219,7 @@ err:
- 	sched_clock_register(msm_sched_clock_read, sched_bits, dgt_hz);
- }
- 
--#ifdef CONFIG_OF
-+#ifdef CONFIG_ARCH_QCOM
- static void __init msm_dt_timer_init(struct device_node *np)
- {
- 	u32 freq;
-@@ -281,7 +272,7 @@ static void __init msm_dt_timer_init(struct device_node *np)
- }
- CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
- CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
--#endif
-+#else
- 
- static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
- 				u32 sts)
-@@ -301,6 +292,15 @@ static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
- 	return 0;
- }
- 
-+static notrace cycle_t msm_read_timer_count_shift(struct clocksource *cs)
-+{
-+	/*
-+	 * Shift timer count down by a constant due to unreliable lower bits
-+	 * on some targets.
-+	 */
-+	return msm_read_timer_count(cs) >> MSM_DGT_SHIFT;
-+}
-+
- void __init msm7x01_timer_init(void)
- {
- 	struct clocksource *cs = &msm_clocksource;
-@@ -327,3 +327,4 @@ void __init qsd8x50_timer_init(void)
- 		return;
- 	msm_timer_init(19200000 / 4, 32, 7, false);
- }
-+#endif
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Sorry if I missed the initial review, but can you explain
+why this is needed to start with?
+
+	Arnd
