@@ -1,43 +1,77 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 30 Jan 2014 16:25:00 +0100
-Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
-In-Reply-To: <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20140130152500.GB5002@laptop.programming.kicks-ass.net>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 30 Jan 2014 17:30:11 +0200
+Subject: [PATCH v3 0/2] Qualcomm Universal Peripheral (QUP) I2C controller
+In-Reply-To: <CAJAp7Oj_D1QvG9nBWTVrW1QVEpqi2cTTc9c6Um25DDzidCjW1w@mail.gmail.com>
+References: <1389999819-10648-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1390983246.28998.24.camel@iivanov-dev.int.mm-sol.com>
+ <CAJAp7Oj_D1QvG9nBWTVrW1QVEpqi2cTTc9c6Um25DDzidCjW1w@mail.gmail.com>
+Message-ID: <1391095811.3275.17.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 12:45:13PM -0500, Nicolas Pitre wrote:
-> Integration of cpuidle with the scheduler requires that the idle loop be
-> closely integrated with the scheduler proper. Moving cpu/idle.c into the
-> sched directory will allow for a smoother integration, and eliminate a
-> subdirectory which contained only one source file.
+
+Hi Bjorn,
+
+On Wed, 2014-01-29 at 08:32 -0800, Bjorn Andersson wrote: 
+> On Wed, Jan 29, 2014 at 12:14 AM, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+> >
+> > Hi Bjorn,
+> >
+> > On Fri, 2014-01-17 at 15:03 -0800, Bjorn Andersson wrote:
+> >> Continuing on Ivans i2c-qup series.
+> >>
+> >
+> > Do you plan to send v4 of this driver? I would like to address
+> > the remaining errors and suggestions and send a new version.
+> >
+> Hi Ivan,
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  kernel/Makefile              | 1 -
->  kernel/cpu/Makefile          | 1 -
->  kernel/sched/Makefile        | 2 +-
->  kernel/{cpu => sched}/idle.c | 0
->  4 files changed, 1 insertion(+), 3 deletions(-)
->  delete mode 100644 kernel/cpu/Makefile
->  rename kernel/{cpu => sched}/idle.c (100%)
+> Yes I'm planning to send out a new revision of the patch set.
+> 
+> I've incorporated fixes from the review comments here and my colleague
+> concluded through some testing that block read did not work, so we've
+> fixed that as well.
 
-> --- a/kernel/sched/Makefile
-> +++ b/kernel/sched/Makefile
-> @@ -11,7 +11,7 @@ ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
->  CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
->  endif
->  
-> -obj-y += core.o proc.o clock.o cputime.o idle_task.o fair.o rt.o stop_task.o
-> +obj-y += core.o proc.o clock.o cputime.o idle_task.o idle.o fair.o rt.o stop_task.o
->  obj-y += wait.o completion.o
->  obj-$(CONFIG_SMP) += cpupri.o
->  obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
-> diff --git a/kernel/cpu/idle.c b/kernel/sched/idle.c
-> similarity index 100%
-> rename from kernel/cpu/idle.c
-> rename to kernel/sched/idle.c
+Busted. I have not test it.
 
-This is not a valid patch for PATCH(1). Please try again.
+> 
+> What have been holding me from submitting a new patchset is the 3
+> functions that does polling of state and status updates;
+> * qup_i2c_poll_state() reads the state register up to 1000 times,
+> hoping we reach the expected state, will delay 100uS and then continue
+> with 1000 more retries.
+>   According to the data sheet a state transition is supposed to take
+> up to 2 bus cycles. Only time I can see that this would take longer
+> time are all error states, but the data sheet is not very clear
+> regarding this.
+> 
+> * qup_i2c_wait_idle() reads the status register up to 1000 times,
+> hoping the fifo gets drained and the bus go idle, if that fails it
+> sleeps for the time we expect it to take to drain a full fifo and then
+> loops another 1000 times. This waits for the fifo to have drained and
+> the bus to go idle. On a read we get to this state if we issue the
+> write and then hit the error state, so we would reset the entire
+> block. On write we will only wait for the buffer not to be full before
+> returning.
+> 
+> * qup_i2c_wait_clock_ready() waits up to 300 bus-clocks for the i2c
+> bus to go idle or forced low, I don't know why it retries 300 times.
+> This is called at the end of a write, possibly to wait for the fifo to
+> drain.
+> 
+> 
+> All three loops are in line with how it's been in codeaurora since the
+> beginning of time, but I at least need to figure out some good names
+> for those "magic numbers".
+
+
+Sure. I have keep them this way, just because I don't have information
+for internal trickery of the block.
+
+Thanks, 
+Ivan
+
+
+> 
+> Regards,
+> Bjorn
