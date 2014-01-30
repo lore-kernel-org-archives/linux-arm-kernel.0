@@ -1,55 +1,60 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 30 Jan 2014 18:14:05 +0100
-Subject: [PATCH 1/7] sound: codec: add Device Tree binding to cs42l51
+Date: Thu, 30 Jan 2014 18:14:06 +0100
+Subject: [PATCH 2/7] sound: soc: enable Kirkwood driver for mvebu platforms
 In-Reply-To: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1391102051-5319-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1391102051-5319-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a trivial Device Tree binding to the I2C-based
-cs42l51 sound codec, so that it can be used from Device Tree based
-platforms.
+The audio unit found in the Armada 370 SoC is similar to the one used
+in the Marvell Kirkwood and Marvell Dove SoCs. Therefore, this commit
+allows the Kirkwood audio driver to be built on mvebu platforms, and
+adds an additional compatible string to identify the Armada 370
+variant of the audio unit.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 1 +
- sound/soc/codecs/cs42l51.c                                | 7 +++++++
- 2 files changed, 8 insertions(+)
+ Documentation/devicetree/bindings/sound/mvebu-audio.txt | 1 +
+ sound/soc/kirkwood/Kconfig                              | 2 +-
+ sound/soc/kirkwood/kirkwood-i2s.c                       | 1 +
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index b1cb341..041e560 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -17,6 +17,7 @@ at,24c08		i2c serial eeprom  (24cxx)
- atmel,24c02		i2c serial eeprom  (24cxx)
- atmel,at97sc3204t	i2c trusted platform module (TPM)
- catalyst,24c32		i2c serial eeprom
-+cirrus,cs42l51		Cirrus Logic CS42L51 audio codec
- dallas,ds1307		64 x 8, Serial, I2C Real-Time Clock
- dallas,ds1338		I2C RTC with 56-Byte NV RAM
- dallas,ds1339		I2C Serial Real-Time Clock
-diff --git a/sound/soc/codecs/cs42l51.c b/sound/soc/codecs/cs42l51.c
-index 1e0fa3b..4a7a733 100644
---- a/sound/soc/codecs/cs42l51.c
-+++ b/sound/soc/codecs/cs42l51.c
-@@ -604,10 +604,17 @@ static const struct i2c_device_id cs42l51_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, cs42l51_id);
+diff --git a/Documentation/devicetree/bindings/sound/mvebu-audio.txt b/Documentation/devicetree/bindings/sound/mvebu-audio.txt
+index f0062c5..cb8c07c 100644
+--- a/Documentation/devicetree/bindings/sound/mvebu-audio.txt
++++ b/Documentation/devicetree/bindings/sound/mvebu-audio.txt
+@@ -5,6 +5,7 @@ Required properties:
+ - compatible:
+   "marvell,kirkwood-audio" for Kirkwood platforms
+   "marvell,dove-audio" for Dove platforms
++  "marvell,armada370-audio" for Armada 370 platforms
  
-+static const struct of_device_id cs42l51_of_match[] = {
-+	{ .compatible = "cirrus,cs42l51", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, cs42l51_of_match);
-+
- static struct i2c_driver cs42l51_i2c_driver = {
- 	.driver = {
- 		.name = "cs42l51-codec",
- 		.owner = THIS_MODULE,
-+		.of_match_table = cs42l51_of_match,
- 	},
- 	.id_table = cs42l51_id,
- 	.probe = cs42l51_i2c_probe,
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
+index 78ed4a4..764a0ef 100644
+--- a/sound/soc/kirkwood/Kconfig
++++ b/sound/soc/kirkwood/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_KIRKWOOD_SOC
+ 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
+-	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
++	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || COMPILE_TEST
+ 	help
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the Kirkwood I2S interface. You will also need to select the
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index 3920a5e..9f84222 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -633,6 +633,7 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
+ static struct of_device_id mvebu_audio_of_match[] = {
+ 	{ .compatible = "marvell,kirkwood-audio" },
+ 	{ .compatible = "marvell,dove-audio" },
++	{ .compatible = "marvell,armada370-audio" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, mvebu_audio_of_match);
 -- 
 1.8.3.2
