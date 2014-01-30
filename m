@@ -1,37 +1,44 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 30 Jan 2014 19:06:59 +0100
-Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
- idle loop
-In-Reply-To: <52EA8BD4.6020803@linaro.org>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
- <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
- <52E9C946.50704@linux.vnet.ibm.com>
- <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
- <52EA5720.8010000@linaro.org>
- <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
- <52EA8BD4.6020803@linaro.org>
-Message-ID: <20140130180659.GI5002@laptop.programming.kicks-ass.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Jan 2014 18:07:06 +0000
+Subject: [PATCH V2] arm64: add DSB after icache flush in
+ __flush_icache_all()
+In-Reply-To: <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
+References: <1390892813-30407-1-git-send-email-vkale@apm.com>
+ <20140128161402.GI2885@mudshark.cambridge.arm.com>
+ <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
+Message-ID: <20140130180706.GO7575@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 06:28:52PM +0100, Daniel Lezcano wrote:
-> Ok, I think the mess is coming from 'default_idle' which does not re-enable
-> the local_irq but used from different places like amd_e400_idle and
-> apm_cpu_idle.
-> 
-> void default_idle(void)
-> {
->         trace_cpu_idle_rcuidle(1, smp_processor_id());
->         safe_halt();
->         trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-> }
-> 
-> Considering the system configured without cpuidle because this one *always*
-> enable the local irq, we have the different cases:
-> 
-> x86_idle = default_idle();
-> ==> local_irq_enable is missing
-> 
+On Thu, Jan 30, 2014 at 06:04:43AM +0000, Vinayak Kale wrote:
+> On Tue, Jan 28, 2014 at 9:44 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jan 28, 2014 at 07:06:53AM +0000, Vinayak Kale wrote:
+> >> V2: - Add more desciption in the commit message as suggested by Catalin & Will
+> >>     - Use 'memory' clobber for flush instruction as suggested by Will
+> >
+> > Please can you check and fix other occurrences of this bug too, as I asked
+> > in v1? For example, a 2 second grep shows problems with data-cache
+> > maintenance in kvm. I can also see the same problem for system register
+> > writes followed up with isb.
+> Can you please elaborate whether you are referring to lack of memory
+> clobber or missing barriers?
 
-safe_halt() is "sti; hlt" and so very much does the irq_enable.
+The clobbers. For example:
+
+arch/arm64/kvm/sys_regs.c:
+
+        /* Make sure noone else changes CSSELR during this! */
+        local_irq_disable();
+        /* Put value into CSSELR */
+        asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
+        isb();
+        /* Read result out of CCSIDR */
+        asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
+        local_irq_enable();
+
+Just about everything can be re-ordered in that block, because the asm
+volatile statements don't have "memory" clobbers.
+
+I think it's worth checking the rest of the kernel, too.
+
+Will
