@@ -1,29 +1,24 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 30 Jan 2014 11:36:43 +0000
-Subject: [PATCH 2/9] ARM64: get rid of arch_cpu_idle_prepare()
-In-Reply-To: <alpine.LFD.2.11.1401291249240.1652@knanqh.ubzr>
-References: <1390802904-28399-1-git-send-email-nicolas.pitre@linaro.org>
- <1390802904-28399-3-git-send-email-nicolas.pitre@linaro.org>
- <20140127154315.GG32608@arm.com>
- <alpine.LFD.2.11.1401271047240.1652@knanqh.ubzr>
- <20140127155755.GH32608@arm.com>
- <alpine.LFD.2.11.1401291249240.1652@knanqh.ubzr>
-Message-ID: <20140130113643.GK30161@arm.com>
+Date: Thu, 30 Jan 2014 11:41:33 +0000
+Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
+In-Reply-To: <1390944264-3435-1-git-send-email-christoffer.dall@linaro.org>
+References: <1390944264-3435-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20140130114133.GL30161@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 06:00:45PM +0000, Nicolas Pitre wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Subject: [PATCH] ARM64: FIQs are unused
+On Tue, Jan 28, 2014 at 09:24:24PM +0000, Christoffer Dall wrote:
+> The stage-2 memory attributes are distinct from the Hyp memory
+> attributes and the Stage-1 memory attributes.  We were using the stage-1
+> memory attributes for stage-2 mappings causing device mappings to be
+> mapped as normal memory.  Add the S2 equivalent defines for memory
+> attributes and fix the comments explaining the defines while at it.
 > 
-> So any FIQ handling is superfluous at the moment.  The functions to 
-> disable/enable FIQs is kept around if ever someone needs them in the 
-> future, but existing calling sites including arch_cpu_idle_prepare() 
-> may go for now.
+> Add a prot_pte_s2 field to the mem_type struct and fill out the field
+> for device mappings accordingly.
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Thanks. Applied.
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
