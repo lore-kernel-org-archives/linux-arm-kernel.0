@@ -1,45 +1,38 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 30 Jan 2014 14:15:12 -0700
-Subject: recommended action for bootloaders regarding modifying
- device-tree nodes
-In-Reply-To: <20140130204558.GC29184@titan.lakedaemon.net>
-References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
- <20140130204558.GC29184@titan.lakedaemon.net>
-Message-ID: <20140130211512.GD13372@obsidianresearch.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 30 Jan 2014 13:23:51 -0800
+Subject: [PATCH] ARM: msm_defconfig: Change CONFIG_CC_STACKPROTECTOR
+Message-ID: <1391117031-8131-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 03:45:58PM -0500, Jason Cooper wrote:
+CONFIG_CC_STACKPROTECTOR is no longer the option to select.
+Switch to CONFIG_CC_STACKPROTECTOR_REGULAR.
 
-> This is more of a process question:  Is there any information captured
-> in your EEPROM that can't be represented in the dtb?  iow, at the point
-> when you write the EEPROM, why not write the dtb to it as configured?
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/configs/msm_defconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I can share what we do here.. In our systems the serial EEPROM is only
-256 bytes, so storing things in DT format would be challenging.
-
-What we do is have a master DTB that has the union of all our
-configurations. The boot process has a very simple bit of code that
-runs down the DTB in binary format and replaces entire
-OF_DT_BEGIN_NODE->OF_DT_END_NODE regions with OF_DT_NOP.
-
-The NOP approach is very simple, no other changes (eg offset
-recalculation) needs to be done to the DT, so we can do this process
-with a very small code footprint and without libfdt.
-
-Choosing which sections to drop is done with some combination of
-hardwired code and searching for specific property patterns. There are
-also a few places where placeholder sections are directly fixed up, eg
-a mac address is written into a placeholder of 0s, etc.
-
-So an example might be
-
-   optional_peripheral at 10000 {
-      orc,board-style = <1>;
-      [..]
-   }
-
-Eg The board-style number comes from the EEPROM and if board-style !=
-1 then the entire stanza is replaced with NOP.
-
-Jason
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+index 0219c65..d61d5bb 100644
+--- a/arch/arm/configs/msm_defconfig
++++ b/arch/arm/configs/msm_defconfig
+@@ -12,6 +12,7 @@ CONFIG_EMBEDDED=y
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_KPROBES=y
++CONFIG_CC_STACKPROTECTOR_REGULAR=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+@@ -27,7 +28,6 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_HIGHPTE=y
+ CONFIG_CLEANCACHE=y
+-CONFIG_CC_STACKPROTECTOR=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_VFP=y
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
