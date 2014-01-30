@@ -1,29 +1,91 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Wed, 29 Jan 2014 22:36:38 -0300
-Subject: [PATCH] of: add vendor prefix for Allwinner Technology
-Message-ID: <1391045798-7053-1-git-send-email-emilio@elopez.com.ar>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Thu, 30 Jan 2014 09:08:46 +0530
+Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
+ idle loop
+In-Reply-To: <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+Message-ID: <52E9C946.50704@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have been using the "allwinner" prefix for everything so far; let's
-document it here.
+Hi Nicolas,
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+On 01/30/2014 02:01 AM, Nicolas Pitre wrote:
+> On Wed, 29 Jan 2014, Nicolas Pitre wrote:
+> 
+>> In order to integrate cpuidle with the scheduler, we must have a better
+>> proximity in the core code with what cpuidle is doing and not delegate
+>> such interaction to arch code.
+>>
+>> Architectures implementing arch_cpu_idle() should simply enter
+>> a cheap idle mode in the absence of a proper cpuidle driver.
+>>
+>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> As mentioned in my reply to Olof's comment on patch #5/6, here's a new 
+> version of this patch adding the safety local_irq_enable() to the core 
+> code.
+> 
+> ----- >8
+> 
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Subject: idle: move the cpuidle entry point to the generic idle loop
+> 
+> In order to integrate cpuidle with the scheduler, we must have a better
+> proximity in the core code with what cpuidle is doing and not delegate
+> such interaction to arch code.
+> 
+> Architectures implementing arch_cpu_idle() should simply enter
+> a cheap idle mode in the absence of a proper cpuidle driver.
+> 
+> In both cases i.e. whether it is a cpuidle driver or the default
+> arch_cpu_idle(), the calling convention expects IRQs to be disabled
+> on entry and enabled on exit. There is a warning in place already but
+> let's add a forced IRQ enable here as well.  This will allow for
+> removing the forced IRQ enable some implementations do locally and 
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index edbb8d8..5a2904b 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -7,6 +7,7 @@ ad	Avionic Design GmbH
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
- ak	Asahi Kasei Corp.
-+allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
- apm	Applied Micro Circuits Corporation (APM)
--- 
-1.8.5.3
+Why would this patch allow for removing the forced IRQ enable that are
+being done on some archs in arch_cpu_idle()? Isn't this patch expecting
+the default arch_cpu_idle() to have re-enabled the interrupts after
+exiting from the default idle state? Its supposed to only catch faulty
+cpuidle drivers that haven't enabled IRQs on exit from idle state but
+are expected to have done so, isn't it?
+
+Thanks
+
+Regards
+Preeti U Murthy
+
+> allowing for the warning to trig.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> diff --git a/kernel/cpu/idle.c b/kernel/cpu/idle.c
+> index 988573a9a3..14ca43430a 100644
+> --- a/kernel/cpu/idle.c
+> +++ b/kernel/cpu/idle.c
+> @@ -3,6 +3,7 @@
+>   */
+>  #include <linux/sched.h>
+>  #include <linux/cpu.h>
+> +#include <linux/cpuidle.h>
+>  #include <linux/tick.h>
+>  #include <linux/mm.h>
+>  #include <linux/stackprotector.h>
+> @@ -95,8 +96,10 @@ static void cpu_idle_loop(void)
+>  				if (!current_clr_polling_and_test()) {
+>  					stop_critical_timings();
+>  					rcu_idle_enter();
+> -					arch_cpu_idle();
+> -					WARN_ON_ONCE(irqs_disabled());
+> +					if (cpuidle_idle_call())
+> +						arch_cpu_idle();
+> +					if (WARN_ON_ONCE(irqs_disabled()))
+> +						local_irq_enable();
+>  					rcu_idle_exit();
+>  					start_critical_timings();
+>  				} else {
+> 
