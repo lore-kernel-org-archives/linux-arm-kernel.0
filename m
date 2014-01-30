@@ -1,107 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Jan 2014 18:56:45 +0000
-Subject: [PATCH 5/5] arm64: add Crypto Extensions based synchronous core
- AES cipher
-In-Reply-To: <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140130185645.GC4437@mudshark.cambridge.arm.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu, 30 Jan 2014 10:27:14 -0800
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140130180639.GC16503@amd.pavel.ucw.cz>
+References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
+ <20140128141458.GD8713@xo-6d-61-c0.localdomain>
+ <20140128182245.18840.51279@capellas-linux>
+ <20140130180639.GC16503@amd.pavel.ucw.cz>
+Message-ID: <20140130182714.6051.8759@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Quoting Pavel Machek (2014-01-30 10:06:39)
+> Yeah, but those are driver problems, right? 1400 suspends is very
+> nice, and it shows that the core is working. That should be enough for
+> merge; driver problems can be solved later.
 
-On Wed, Jan 29, 2014 at 04:50:46PM +0000, Ard Biesheuvel wrote:
-> diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
-> new file mode 100644
-> index 000000000000..b5a5d5d6e4b8
-> --- /dev/null
-> +++ b/arch/arm64/crypto/aes-ce-cipher.c
-> @@ -0,0 +1,103 @@
-> +/*
-> + * linux/arch/arm64/crypto/aes-ce-cipher.c
-> + *
-> + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <asm/neon.h>
-> +#include <crypto/aes.h>
-> +#include <linux/crypto.h>
-> +#include <linux/module.h>
-> +#include <linux/cpufeature.h>
-> +
-> +MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
-> +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-> +MODULE_LICENSE("GPL");
-> +
-> +static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-> +{
-> +	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-> +	u32 rounds = 6 + ctx->key_length / 4;
+Hi Pavel,
 
-Can you document these constants please?
+I spoke to Russ, and he's ok with me sending this on his behalf.
 
-> +
-> +	kernel_neon_begin();
-> +
-> +	__asm__("	ld1		{v0.16b}, [%[in]]		;"
-> +		"	ld1		{v1.16b}, [%[key]], #16		;"
-> +		"0:	aese		v0.16b, v1.16b			;"
-> +		"	subs		%[rounds], %[rounds], #1	;"
-> +		"	ld1		{v1.16b}, [%[key]], #16		;"
-> +		"	beq		1f				;"
-> +		"	aesmc		v0.16b, v0.16b			;"
-> +		"	b		0b				;"
-> +		"1:	eor		v0.16b, v0.16b, v1.16b		;"
-> +		"	st1		{v0.16b}, [%[out]]		;"
-> +	: :
-> +		[out]		"r"(dst),
-> +		[in]		"r"(src),
-> +		[rounds]	"r"(rounds),
-> +		[key]		"r"(ctx->key_enc)
-> +	:			"cc");
+Let me prepare it for review and I'll send it out.
 
-You probably need a memory output to stop this being re-ordered by the
-compiler. Can GCC not generate the addressing modes you need directly,
-allowing you to avoid moving everything into registers?
+Thanks,
 
-
-> +	kernel_neon_end();
-> +}
-> +
-> +static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-> +{
-> +	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-> +	u32 rounds = 6 + ctx->key_length / 4;
-> +
-> +	kernel_neon_begin();
-> +
-> +	__asm__("	ld1		{v0.16b}, [%[in]]		;"
-> +		"	ld1		{v1.16b}, [%[key]], #16		;"
-> +		"0:	aesd		v0.16b, v1.16b			;"
-> +		"	ld1		{v1.16b}, [%[key]], #16		;"
-> +		"	subs		%[rounds], %[rounds], #1	;"
-> +		"	beq		1f				;"
-> +		"	aesimc		v0.16b, v0.16b			;"
-> +		"	b		0b				;"
-> +		"1:	eor		v0.16b, v0.16b, v1.16b		;"
-> +		"	st1		{v0.16b}, [%[out]]		;"
-> +	: :
-> +		[out]		"r"(dst),
-> +		[in]		"r"(src),
-> +		[rounds]	"r"(rounds),
-> +		[key]		"r"(ctx->key_dec)
-> +	:			"cc");
-
-Same comments here.
-
-FWIW: I spoke to the guy at ARM who designed the crypto instructions and he
-reckons your code works :)
-
-Cheers,
-
-Will "got a B in maths" Deacon
+Sebastian
