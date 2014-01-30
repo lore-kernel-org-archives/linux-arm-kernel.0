@@ -1,125 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Jan 2014 20:20:38 +0100
-Subject: [PATCH 5/5] arm64: add Crypto Extensions based synchronous core
- AES cipher
-In-Reply-To: <20140130185645.GC4437@mudshark.cambridge.arm.com>
-References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
- <20140130185645.GC4437@mudshark.cambridge.arm.com>
-Message-ID: <CAKv+Gu_NdVHawdVz3KUeZPHUL4ZPNSpeq7EWAgsVy+DfS6Kaqw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 30 Jan 2014 14:24:18 -0500 (EST)
+Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
+ idle loop
+In-Reply-To: <52EA8BD4.6020803@linaro.org>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+ <52E9C946.50704@linux.vnet.ibm.com>
+ <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
+ <52EA5720.8010000@linaro.org> <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
+ <52EA8BD4.6020803@linaro.org>
+Message-ID: <alpine.LFD.2.11.1401301358040.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2014 19:56, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Wed, Jan 29, 2014 at 04:50:46PM +0000, Ard Biesheuvel wrote:
->> diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
->> new file mode 100644
->> index 000000000000..b5a5d5d6e4b8
->> --- /dev/null
->> +++ b/arch/arm64/crypto/aes-ce-cipher.c
->> @@ -0,0 +1,103 @@
->> +/*
->> + * linux/arch/arm64/crypto/aes-ce-cipher.c
->> + *
->> + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <asm/neon.h>
->> +#include <crypto/aes.h>
->> +#include <linux/crypto.h>
->> +#include <linux/module.h>
->> +#include <linux/cpufeature.h>
->> +
->> +MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
->> +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
->> +MODULE_LICENSE("GPL");
->> +
->> +static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
->> +{
->> +     struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
->> +     u32 rounds = 6 + ctx->key_length / 4;
->
-> Can you document these constants please?
->
+On Thu, 30 Jan 2014, Daniel Lezcano wrote:
 
-Sure.
+> On 01/30/2014 05:07 PM, Nicolas Pitre wrote:
+> > On Thu, 30 Jan 2014, Daniel Lezcano wrote:
+> > > But what I don't get with your comment is the local_irq_enable is done
+> > > from
+> > > the cpuidle common framework in 'cpuidle_enter_state' it is not done from
+> > > the
+> > > arch specific backend cpuidle driver.
+> >
+> > Oh well... This certainly means we'll have to clean this mess as some
+> > drivers do it on their own while some others don't.  Some drivers also
+> > loop on !need_resched() while some others simply return on the first
+> > interrupt.
+> 
+> Ok, I think the mess is coming from 'default_idle' which does not re-enable
+> the local_irq but used from different places like amd_e400_idle and
+> apm_cpu_idle.
 
->> +
->> +     kernel_neon_begin();
->> +
->> +     __asm__("       ld1             {v0.16b}, [%[in]]               ;"
->> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
->> +             "0:     aese            v0.16b, v1.16b                  ;"
->> +             "       subs            %[rounds], %[rounds], #1        ;"
->> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
->> +             "       beq             1f                              ;"
->> +             "       aesmc           v0.16b, v0.16b                  ;"
->> +             "       b               0b                              ;"
->> +             "1:     eor             v0.16b, v0.16b, v1.16b          ;"
->> +             "       st1             {v0.16b}, [%[out]]              ;"
->> +     : :
->> +             [out]           "r"(dst),
->> +             [in]            "r"(src),
->> +             [rounds]        "r"(rounds),
->> +             [key]           "r"(ctx->key_enc)
->> +     :                       "cc");
->
-> You probably need a memory output to stop this being re-ordered by the
-> compiler. Can GCC not generate the addressing modes you need directly,
-> allowing you to avoid moving everything into registers?
->
+Yet if you look at the code path before my patches you'll see that IRQs 
+were enabled only after cpuidle_idle_call() had returned success.
 
-Would a memory clobber work as well?
+> void default_idle(void)
+> {
+>         trace_cpu_idle_rcuidle(1, smp_processor_id());
+>         safe_halt();
+>         trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> }
+> 
+> Considering the system configured without cpuidle because this one *always*
+> enable the local irq,
 
-Re addressing modes: I would prefer to explicitly use v0 and v1, I
-have another patch pending that allows partial saves/restores of the
-NEON register file when called from interrupt context. I suppose I
-could use 'register asm("v0")' or something like that, but that won't
-make it any prettier.
+Yet this is discutable. Given that some hardware do have IRQs turned on 
+upon exiting idle mode, I think we should generalize it so that 
+the explicit enabling 
+of IRQs, when needed, should be done as close as possible to the 
+operation that caused idle mode to be entered.
 
->
->> +     kernel_neon_end();
->> +}
->> +
->> +static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
->> +{
->> +     struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
->> +     u32 rounds = 6 + ctx->key_length / 4;
->> +
->> +     kernel_neon_begin();
->> +
->> +     __asm__("       ld1             {v0.16b}, [%[in]]               ;"
->> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
->> +             "0:     aesd            v0.16b, v1.16b                  ;"
->> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
->> +             "       subs            %[rounds], %[rounds], #1        ;"
->> +             "       beq             1f                              ;"
->> +             "       aesimc          v0.16b, v0.16b                  ;"
->> +             "       b               0b                              ;"
->> +             "1:     eor             v0.16b, v0.16b, v1.16b          ;"
->> +             "       st1             {v0.16b}, [%[out]]              ;"
->> +     : :
->> +             [out]           "r"(dst),
->> +             [in]            "r"(src),
->> +             [rounds]        "r"(rounds),
->> +             [key]           "r"(ctx->key_dec)
->> +     :                       "cc");
->
-> Same comments here.
->
-> FWIW: I spoke to the guy at ARM who designed the crypto instructions and he
-> reckons your code works :)
->
+> we have the different cases:
+> 
+> x86_idle = default_idle();
+> ==> local_irq_enable is missing
 
-Good!
+According to Peter it is not.
 
-Care to comment on the rest of the series?
+> x86_idle = amd_e400_idle();
+> ==> it calls local_irq_disable(); but in the idle loop context where the 
+> local irqs are already disabled.
 
-Cheers.
-Ard.
+Since it returned from default_idle() then IRQs are enabled.
+
+> ==> if amd_e400_c1e_detected is true, the local_irq are enabled
+> ==> otherwise no
+> ==> default_idle is called from there and does not enable local_irqs
+
+Again, it does.
+
+> > > So the code above could be:
+> > >
+> > >  if (cpuidle_idle_call())
+> > >   x86_idle();
+> > >
+> > > without the else section, this local_irq_enable is pointless. Or may be I
+> > > missed something ?
+> >
+> > A later patch removes it anyway.  But if it is really necessary to
+> > enable interrupts then the core will do it but with a warning now.
+> 
+> This WARN should disappear. It was there because it was up to the backend
+> cpuidle driver to enable the irq. But in the meantime, that was consolidated
+> into a single place in the cpuidle framework so no need to try to catch
+> errors.
+
+And that consolidation was a mistake IMHO.  We should assume that the 
+exiting of idle mode has IRQs enabled already, and do so manually in the 
+backend driver if it is not the case on particular hardware.  That's the 
+only way to ensure uniformity at a higher level.
+
+Yet, if a code path is buggy in that regard, whether this is through 
+cpuidle when enabled, or the default idle function otherwise, then the 
+warning is there in cpu_idle_loop() to catch them all.
+
+> What about (based on this patchset).
+> 
+> diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
+> index 4505e2a..2d60cbb 100644
+> --- a/arch/x86/kernel/process.c
+> +++ b/arch/x86/kernel/process.c
+> @@ -299,6 +299,7 @@ void arch_cpu_idle_dead(void)
+>  void arch_cpu_idle(void)
+>  {
+>         x86_idle();
+> +       local_irq_enable();
+>  }
+
+Again this is redundant.
+
+
+Nicolas
