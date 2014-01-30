@@ -1,62 +1,113 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 30 Jan 2014 00:23:27 -0600
-Subject: [Patch v3 2/2] dmaengine: qcom_bam_dma: Add device tree binding
-In-Reply-To: <4697306.PPWWh8UGTE@wuerfel>
-References: <1390890471-14882-1-git-send-email-agross@codeaurora.org>
- <1390890471-14882-3-git-send-email-agross@codeaurora.org>
- <52E772DF.6000604@metafoo.de> <4697306.PPWWh8UGTE@wuerfel>
-Message-ID: <20140130062327.GA18356@qualcomm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 30 Jan 2014 08:36:05 +0100
+Subject: [PATCH v2 1/2] drivers/media: v4l2: Add settings for Horizontal
+ and Vertical MV Search Range
+In-Reply-To: <1391060563-27015-2-git-send-email-amit.grover@samsung.com>
+References: <52E0ED10.2020901@samsung.com>
+ <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
+ <1391060563-27015-2-git-send-email-amit.grover@samsung.com>
+Message-ID: <52EA00E5.10303@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 10:16:53AM +0100, Arnd Bergmann wrote:
-> On Tuesday 28 January 2014 10:05:35 Lars-Peter Clausen wrote:
-> > > +
-> > > +Clients must use the format described in the dma.txt file, using a three cell
-> > > +specifier for each channel.
-> > > +
-> > > +The three cells in order are:
-> > > +  1. A phandle pointing to the DMA controller
-> > > +  2. The channel number
-> > > +  3. Direction of the fixed unidirectional channel
-> > > +     0 - Memory to Device
-> > > +     1 - Device to Memory
-> > > +     2 - Device to Device
-> > > +
-> > 
-> > Why does the direction needs to be specified in specifier? I see two
-> > options, either the direction per is fixed in hardware. In that case the DMA
-> > controller node should describe which channel is which direction. Or the
-> > direction is not fixed in hardware and can be changed at runtime in which
-> > case it should be set on a per descriptor basis.
+On 01/30/2014 06:42 AM, Amit Grover wrote:
+> Adding V4L2 controls for horizontal and vertical search range in pixels
+> for motion estimation module in video encoder.
 > 
-> Normally the direction is implied by dmaengine_slave_config().
-> Note that neither the dma slave API nor the generic DT binding
-> can actually support device-to-device transfers, since this
-> normally implies using two dma-request lines rather than one.
+> Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
+> Signed-off-by: Amit Grover <amit.grover@samsung.com>
+> ---
+>  Documentation/DocBook/media/v4l/controls.xml |   20 ++++++++++++++++++++
+>  drivers/media/v4l2-core/v4l2-ctrls.c         |   14 ++++++++++++++
+>  include/uapi/linux/v4l2-controls.h           |    2 ++
+>  3 files changed, 36 insertions(+)
 > 
-> There might be a case where the direction is required in order
-> to allocate a channel, because the engine has specialized channels
-> per direction, and might connect any of them to any dma request
-> line. This does not seem to be the case for "bam", because
-> the DMA specifier already contains a specific channel number, not
-> a request line or slave ID number.
+> diff --git a/Documentation/DocBook/media/v4l/controls.xml b/Documentation/DocBook/media/v4l/controls.xml
+> index 7a3b49b..be04d18 100644
+> --- a/Documentation/DocBook/media/v4l/controls.xml
+> +++ b/Documentation/DocBook/media/v4l/controls.xml
+> @@ -2258,6 +2258,26 @@ Applicable to the MPEG1, MPEG2, MPEG4 encoders.</entry>
+>  VBV buffer control.</entry>
+>  	      </row>
+>  
+> +		  <row><entry></entry></row>
+> +	      <row id=""v4l2-mpeg-video-hor-search-range">
+> +		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE</constant>&nbsp;</entry>
+> +		<entry>integer</entry>
+> +	      </row>
+> +		<row><entry spanname="descr">Horizontal search range defines maximum horizontal search area in pixels
+> +to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
+> +horizontal search range for motion estimation module in video encoder.</entry>
+> +	      </row>
+> +
+> +		 <row><entry></entry></row>
+> +	      <row id="v4l2-mpeg-video-vert-search-range">
+> +		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE</constant>&nbsp;</entry>
+> +		<entry>integer</entry>
 
-After some deliberation, I think the best solution is removing the direction
-from the DT for now.  It doesn't add anything except some verification
-of direction.
+These two controls sound very mfc specific as opposed to being part of the standard.
+If so, then they should be named V4L2_CID_MPEG_MFC51_*. Also, for which codecs are
+these controls applicable?
 
-As for the device to device:
-As I mentioned before, each bam dma node is attached to a specific peripheral
-(with one exception, but lets skip over that).  The peripherals allow for more
-than one execution environment to access the peripheral and attached bam.  2 bam
-channels can be connected to form a unidirectional pipe from one execution
-environment to another.  Once the pipe is configured, the actually transfer
-resembles a cyclical dma transfer and continues until you explicitly stop it.
+> +	      </row>
+> +		<row><entry spanname="descr">Vertical search range defines maximum vertical search area in pixels
+> +to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
+> +vertical search range for motion estimation module in video encoder.</entry>
+> +	      </row>
+> +
+>  	      <row><entry></entry></row>
+>  	      <row>
+>  		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&nbsp;</entry>
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index fb46790..e775388 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_DEC_PTS:			return "Video Decoder PTS";
+>  	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:			return "Video Decoder Frame Count";
+>  	case V4L2_CID_MPEG_VIDEO_VBV_DELAY:			return "Initial Delay for VBV Control";
+> +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return "Horizontal MV Search Range";
+> +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
+>  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+>  
+>  	/* VPX controls */
+> @@ -905,6 +907,18 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  		*min = 0;
+>  		*max = *step = 1;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
+> +		*type = V4L2_CTRL_TYPE_INTEGER;
+> +		*min = 16;
+> +		*max = 128;
+> +		*step = 16;
 
-That functionality will come later.
+Weird range, why not use range 1-8?
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:
+> +		*type = V4L2_CTRL_TYPE_INTEGER;
+> +		*min = 16;
+> +		*max = 128;
+> +		*step = 16;
+> +		break;
+>  	case V4L2_CID_PAN_RESET:
+>  	case V4L2_CID_TILT_RESET:
+>  	case V4L2_CID_FLASH_STROBE:
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 1666aab..80e1def 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -372,6 +372,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
+>  #define V4L2_CID_MPEG_VIDEO_DEC_FRAME			(V4L2_CID_MPEG_BASE+224)
+>  #define V4L2_CID_MPEG_VIDEO_VBV_DELAY			(V4L2_CID_MPEG_BASE+225)
+>  #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER		(V4L2_CID_MPEG_BASE+226)
+> +#define V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+227)
+> +#define V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+228)
+>  
+>  #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP		(V4L2_CID_MPEG_BASE+300)
+>  #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP		(V4L2_CID_MPEG_BASE+301)
+> 
+
+Regards,
+
+	Hans
