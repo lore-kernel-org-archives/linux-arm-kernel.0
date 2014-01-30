@@ -1,42 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 30 Jan 2014 19:06:39 +0100
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140128182245.18840.51279@capellas-linux>
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
- <20140128182245.18840.51279@capellas-linux>
-Message-ID: <20140130180639.GC16503@amd.pavel.ucw.cz>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 30 Jan 2014 19:06:59 +0100
+Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
+ idle loop
+In-Reply-To: <52EA8BD4.6020803@linaro.org>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+ <52E9C946.50704@linux.vnet.ibm.com>
+ <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
+ <52EA5720.8010000@linaro.org>
+ <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
+ <52EA8BD4.6020803@linaro.org>
+Message-ID: <20140130180659.GI5002@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > what's the status of suspend-to-disk on ARM? The most recent discussion I
-> > > > found is:
-> > > > http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
-> > > > 
-> > > > with no replies at all. Is anyone still working on that? Anyone got it running?
+On Thu, Jan 30, 2014 at 06:28:52PM +0100, Daniel Lezcano wrote:
+> Ok, I think the mess is coming from 'default_idle' which does not re-enable
+> the local_irq but used from different places like amd_e400_idle and
+> apm_cpu_idle.
 > 
-> Hi Pavel, Russ,
+> void default_idle(void)
+> {
+>         trace_cpu_idle_rcuidle(1, smp_processor_id());
+>         safe_halt();
+>         trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> }
 > 
-> I have been looking and working with Russ' most recent branch based
-> on the 3.12 kernel, which includes the big pile of patches for OMAP.
-> (https://github.com/russdill/linux/commits/arm-hibernation-am33xx-v3.12)
+> Considering the system configured without cpuidle because this one *always*
+> enable the local irq, we have the different cases:
 > 
-> He has hibernation mostly working and I have been able to run 1400 or
-> so entry/exits overnight there on beaglebone black without issue.
-> Combining this with device activity has been tricky.  An active
-> network will lose the link on restore.  Active SD traffic will
-> eventually hang (Last night ran for about 11 hours before hanging
-> after ~350 or so hibernations).  I have not found where this is or
-> the cause.
+> x86_idle = default_idle();
+> ==> local_irq_enable is missing
+> 
 
-Yeah, but those are driver problems, right? 1400 suspends is very
-nice, and it shows that the core is working. That should be enough for
-merge; driver problems can be solved later.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+safe_halt() is "sti; hlt" and so very much does the irq_enable.
