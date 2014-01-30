@@ -1,30 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jan 2014 15:21:11 +0100
-Subject: [RFC PATCH V3 0/4] APM X-Gene PCIe controller
-In-Reply-To: <CACoXjc=LSrLK=kd9GJoHWJovVDC+TfH2bZO-2Ht9jMoBrL9eag@mail.gmail.com>
-References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
- <CAErSpo7Dfd4NJBEDuVe1VCvZObFq1YvV2x77S60Z4-CZq89QJw@mail.gmail.com>
- <CACoXjc=LSrLK=kd9GJoHWJovVDC+TfH2bZO-2Ht9jMoBrL9eag@mail.gmail.com>
-Message-ID: <201401301521.11665.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jan 2014 14:27:52 +0000
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <20140130141405.GA23985@infradead.org>
+References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
+ <20140130141405.GA23985@infradead.org>
+Message-ID: <20140130142752.GX15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 January 2014, Tanmay Inamdar wrote:
-> >
-> > When you repost, please make sure you fix whatever problem is
-> > preventing your email from appearing on the vger mailing lists.  I
-> > won't apply things that haven't appeared on the linux-pci list,
-> > because that list is the opportunity for other people to review them.
-> >
-> You are absolutely right. If the patches are not reaching mailing
-> list, they should not appear on archive list as well. However I am
-> seeing my patches recorded on archives. So I am not sure if they are
-> actually getting dropped on linux-pci or any other mailing list.
+On Thu, Jan 30, 2014 at 06:14:05AM -0800, Christoph Hellwig wrote:
+> On Thu, Jan 30, 2014 at 02:08:34PM +0000, Russell King - ARM Linux wrote:
+> > into nfs3_proc_create(), but this ends up calling down into nfs3_get_acl(),
+> > which does this:
+> > 
+> >         if (!nfs_server_capable(inode, NFS_CAP_ACLS))
+> >                 return ERR_PTR(-EOPNOTSUPP);
 > 
-> http://www.spinics.net/lists/linux-pci/msg28198.html
-> http://article.gmane.org/gmane.linux.kernel.pci/28442/match=tanmay+inamdar
+> Does replacing that return with a
+> 
+> 		return NULL;
+> 
+> fix the issue for you?
 
-Very strange. I can also confirm that I received the patches through
-the linux-arm-kernel and devicetree mailing lists without problems.
+Yes and no.  I still end up with an empty /etc/mtab, but the file now
+exists.  However, I can create and echo data into /etc/mtab, but it seems
+that can't happen at boot time.
 
-	Arnd
+I also find that kerberos doesn't work - again, it's weird - I can create
+the file which kerberos is trying to create in /var/tmp (which is also on
+the root nfs) manually, but when the kerberos daemons try to create it,
+it fails with -EOPNOTSUPP.  The kerberos daemon is running as uid 0 at
+that point (I don't know about the other uids/gids though since I wasn't
+able to catch them in the strace.)
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
