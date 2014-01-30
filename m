@@ -1,39 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Jan 2014 09:56:17 +0100
-Subject: [PATCH v2] ARM: iop32x: fix power off handling for the EM7210
- board
-In-Reply-To: <87lhxyfkax.fsf@lebrac.rtp-net.org>
-References: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
- <87lhxyfkax.fsf@lebrac.rtp-net.org>
-Message-ID: <CACRpkdbYNvS3+XfLeUHbUBxfd=L+bk9E3pidFMTENcLVj-nBkw@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 30 Jan 2014 01:11:18 -0800
+Subject: recommended action for bootloaders regarding modifying device-tree
+ nodes
+Message-ID: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 12:19 AM, Arnaud Patard
-<arnaud.patard@rtp-net.org> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
+Greetings,
 
->>  void em7210_power_off(void)
->>  {
->> -     *IOP3XX_GPOE &= 0xfe;
->> -     *IOP3XX_GPOD |= 0x01;
->> +     int ret;
->> +
->> +     ret = gpio_direction_output(EM7210_HARDWARE_POWER, 1);
->
-> btw, any reason for not using gpio_direction_output() in
-> em7210_request_gpios() and gpio_set_value() here ? (just wondering)
+I develop the boot-loader and kernel for a family of boards that have
+an on-board EEPROM which contains information as to what options are
+physically loaded on the board such as memory size/config, and
+peripheral IC's.  We allow customers to create special builds of our
+standard products with sub-loaded components and while each
+combination of options ends up with a unique model number, it seems
+silly to create a different static device-trees for each possible
+option (not to mention we don't create the unique model number until
+an order is placed).
 
-Mainly because the old code did not drive a default value on
-the pin (which would be zero then) but relies on the power-on
-default.
+My approach has been to define a per-baseboard device-tree in Linux
+for a 'fully loaded' board, then remove nodes which the EEPROM claims
+are not present in the bootloader before it passes the DTB to the
+kernel.  I do this by defining aliases in the device-tree for the
+peripherals that are 'optional' so that the bootloader itself does not
+need to know the details about how the device is connected.
 
-So by not doing this I'm not poking any hardware that wasn't poked
-earlier.
+Is it more appropriate for the bootloader to 'remove' nodes for
+devices that are not physically present or should I be setting their
+status property to 'disabled' instead?  I'm not clear if either option
+really has any pros or cons.
 
-> I can't test it on my ss4000e but at least this patch looks fine.
+Thanks for any suggestions or comments,
 
-Would be nice!
+Tim
 
-Yours,
-Linus Walleij
+Tim Harvey - Principal Software Engineer
+Gateworks Corporation
+3026 S. Higuera St. San Luis Obispo CA 93401
+805-781-2000
