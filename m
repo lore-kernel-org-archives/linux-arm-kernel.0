@@ -1,55 +1,63 @@
 From: adrienverge@gmail.com (=?UTF-8?q?Adrien=20Verg=C3=A9?=)
-Date: Thu, 30 Jan 2014 11:11:05 -0500
-Subject: [PATCH V3 0/5] ARM CoreSight: ETM: Fix a vmalloc/vfree failure and
- enhance tracing control
-Message-ID: <1391098270-8867-1-git-send-email-adrienverge@gmail.com>
+Date: Thu, 30 Jan 2014 11:11:06 -0500
+Subject: [PATCH V3 1/5] ARM CoreSight: ETM: Fix a memory allocation failure
+In-Reply-To: <1391098270-8867-1-git-send-email-adrienverge@gmail.com>
+References: <1391098270-8867-1-git-send-email-adrienverge@gmail.com>
+Message-ID: <1391098270-8867-2-git-send-email-adrienverge@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+When an application reads the ETB buffer too often, it can be empty.
+In this case, it results in a "vmalloc: allocation failure: 0 bytes",
+a backtrace in dmesg and a vfree on an incorrect address.
 
-Different ARM users have shown their interest in this patch, so I made
-a third version that is compatible with PID namespaces.
+This patch allocates and frees the trace buffer only when necessary.
 
-Mainly:
-- It fixes a "vmalloc: allocation failure: 0 bytes" when reading an
-  ETB buffer that is empty.
-- It extends current support of CoreSight ETM, that is currently
-  very limited.
+Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
+---
+ arch/arm/kernel/etm.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-ETM is a dedicated hardware that provides program tracing, a
-cycle-precise and low-overhead solution that software tools such as
-'perf record' cannot provide.
-
-Usage of ETM tracing facility is presently limited to start and stop
-tracing.  This set of patches enables management of address combinations
-and PIDs that trigger tracing, thus allowing to trace specific
-functions and processes.  ETM management was done via sysfs entries
-(trace_info, trace_running...), this code adds trace_addrrange and
-trace_pid to let the user read/write custom values.
-
-Changes in V2:
-- Fix a vmalloc/vfree failure when ETB is empty
-- Use device attributes rather than raw kobjects
-- Make PID_IN_CONTEXTIDR incompatible with PID_NS in Kconfig
-- Use pid_t instead of long
-
-Changes in V3:
-- Support tracing processes by their PID in PID namespaces
-- Reset PID_IN_CONTEXTIDR and PID_NS independent
-
-This series of patches applies to v3.13.
-
-Adrien Verg? (5):
-  ARM CoreSight: ETM: Fix a memory allocation failure
-  ARM CoreSight: ETM: Use device attributes
-  ARM CoreSight: ETM: Rename 'comparator' to 'address comparator'
-  ARM CoreSight: ETM: Add address control support
-  ARM CoreSight: ETM: Add PID control support
-
- arch/arm/include/asm/hardware/coresight.h |   9 +-
- arch/arm/kernel/etm.c                     | 257 ++++++++++++++++++++++++------
- 2 files changed, 216 insertions(+), 50 deletions(-)
-
+diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
+index 8ff0ecd..5192693 100644
+--- a/arch/arm/kernel/etm.c
++++ b/arch/arm/kernel/etm.c
+@@ -275,7 +275,7 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	long length;
+ 	struct tracectx *t = file->private_data;
+ 	u32 first = 0;
+-	u32 *buf;
++	u32 *buf = NULL;
+ 
+ 	mutex_lock(&t->mutex);
+ 
+@@ -293,12 +293,14 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	etb_writel(t, first, ETBR_READADDR);
+ 
+ 	length = min(total * 4, (int)len);
+-	buf = vmalloc(length);
++	if (length != 0)
++		buf = vmalloc(length);
+ 
+ 	dev_dbg(t->dev, "ETB buffer length: %d\n", total);
+ 	dev_dbg(t->dev, "ETB status reg: %x\n", etb_readl(t, ETBR_STATUS));
+-	for (i = 0; i < length / 4; i++)
+-		buf[i] = etb_readl(t, ETBR_READMEM);
++	if (buf)
++		for (i = 0; i < length / 4; i++)
++			buf[i] = etb_readl(t, ETBR_READMEM);
+ 
+ 	/* the only way to deassert overflow bit in ETB status is this */
+ 	etb_writel(t, 1, ETBR_CTRL);
+@@ -311,7 +313,8 @@ static ssize_t etb_read(struct file *file, char __user *data,
+ 	etb_lock(t);
+ 
+ 	length -= copy_to_user(data, buf, length);
+-	vfree(buf);
++	if (buf)
++		vfree(buf);
+ 
+ out:
+ 	mutex_unlock(&t->mutex);
 -- 
 1.8.5.3
