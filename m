@@ -1,67 +1,92 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 30 Jan 2014 15:58:39 +0200
-Subject: [PATCH] ARM: keystone: dts: disable "msmcsram" clock
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52A0B4B6@DBDE04.ent.ti.com>
-References: <1391082343-13371-1-git-send-email-ivan.khoronzhuk@ti.com>
- <448912EABC71F84BBCADFD3C67C4BE52A0B4B6@DBDE04.ent.ti.com>
-Message-ID: <52EA5A8F.7070107@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jan 2014 14:08:34 +0000
+Subject: NFS client broken in Linus' tip
+Message-ID: <20140130140834.GW15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok. I will delete node for this clock from DT and send v1
+I just booted Linus' tip (plus a few other patches to imx-drm and imx
+code), and stumbled into this interesting scenario:
 
-On 01/30/2014 03:25 PM, Shilimkar, Santosh wrote:
-> Disable is not good idea since it conveys wrong info....
->
-> Hyperlink case was different.
->
-> Sent from my Android phone using TouchDown (www.nitrodesk.com)
->
-> -----Original Message-----
-> *From:* Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
-> *Received:* Thursday, 30 Jan 2014, 6:45am
-> *To:* robh+dt at kernel.org [robh+dt at kernel.org]; galak at codeaurora.org
-> [galak at codeaurora.org]
-> *CC:* pawel.moll at arm.com [pawel.moll at arm.com]; mark.rutland at arm.com
-> [mark.rutland at arm.com]; ijc+devicetree at hellion.org.uk
-> [ijc+devicetree at hellion.org.uk]; linux at arm.linux.org.uk
-> [linux at arm.linux.org.uk]; devicetree at vger.kernel.org
-> [devicetree at vger.kernel.org]; linux-arm-kernel at lists.infradead.org
-> [linux-arm-kernel at lists.infradead.org]; linux-kernel at vger.kernel.org
-> [linux-kernel at vger.kernel.org]; Shilimkar, Santosh [santosh.shilimkar at ti.com];
-> Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
-> *Subject:* [PATCH] ARM: keystone: dts: disable "msmcsram" clock
->
-> At late init all unused clocks are disabled. So clocks that were not
-> get before will be gated. In Keysone 2 SoC we have at least one
-> necessary clock that is not used by any driver - "msmcsram". This
-> clock is necessary, because it supplies the Multicore Shared Memory
-> Controller (MSMC). The MSMC provides memory protection for accesses to
-> the MSMC SRAM and DDR3 memory from system masters. It also manages
-> traffic among mastering peripherals and the EMIF.
->
-> This means that MSMC clock is always needed by SoC and cannot be gated.
-> It is only one from necessary clocks that was not used by any driver.
-> So to avoid its gating at late init we have to disable it in DT.
->
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->    arch/arm/boot/dts/keystone-clocks.dtsi | 1 +
->    1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi
-> b/arch/arm/boot/dts/keystone-clocks.dtsi
-> index 2363593..e7aea2e 100644
-> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
-> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-> @@ -332,6 +332,7 @@ clocks {
->                    compatible = "ti,keystone,psc-clock";
->                    clocks = <&chipclk1>;
->                    clock-output-names = "msmcsram";
-> +               status = "disabled";
->                    reg = <0x02350038 0xb00>, <0x0235001c 0x400>;
->                    reg-names = "control", "domain";
->                    domain-id = <7>;
-> -- 
-> 1.8.3.2
->
+# touch test
+touch: cannot touch `test': Operation not supported
+
+I also tried mkdir and mknod, all result in the same error.  Hard and
+symlinks links are creatable.
+
+However, I can chmod existing files and rename them.  Files can also be
+deleted, and the combination of this has left me without a /etc/mtab !
+
+The machine is a iMX6 based ARM, running root-nfs, which was mounted via
+ubuntu's initramfs (so not using the kernel's built-in root-nfs.)
+
+/proc/mounts for the root mount gives:
+192.168.1.123:/var/boot/ci / nfs rw,relatime,vers=3,rsize=65536,wsize=65536,namlen=255,hard,nolock,proto=tcp,port=2049,timeo=7,retrans=10,sec=sys,local_lock=all,addr=192.168.1.123 0 0
+
+CONFIG_NFS_FS=y
+CONFIG_NFS_V2=y
+CONFIG_NFS_V3=y
+CONFIG_NFS_V3_ACL=y
+CONFIG_NFS_V4=y
+# CONFIG_NFS_SWAP is not set
+# CONFIG_NFS_V4_1 is not set
+CONFIG_ROOT_NFS=y
+# CONFIG_NFS_USE_LEGACY_DNS is not set
+CONFIG_NFS_USE_KERNEL_DNS=y
+# CONFIG_NFSD is not set
+CONFIG_LOCKD=y
+CONFIG_LOCKD_V4=y
+CONFIG_NFS_ACL_SUPPORT=y
+CONFIG_NFS_COMMON=y
+CONFIG_SUNRPC=y
+CONFIG_SUNRPC_GSS=y
+
+tcpdumping, I see:
+
+13:59:51.713523 IP 192.168.1.252.1341245608 > 192.168.1.123.2049: 132 lookup fh Unknown/010007011040840000000000CC238FC8FBA0475D9D9F8356B4C44166CDC38700 "test"
+13:59:51.714345 IP 192.168.1.123.2049 > 192.168.1.252.1341245608: reply ok 120 lookup ERROR: No such file or directory
+13:59:51.751303 IP 192.168.1.252.797 > 192.168.1.123.nfs: . ack 3381 win 2625 <nop,nop,timestamp 474136 3431312924>
+
+which is the only NFS packet(s) I see which mention "test".
+
+and stracing touch:
+
+open("test", O_WRONLY|O_CREAT|O_NOCTTY|O_NONBLOCK|O_LARGEFILE, 0666) = -1 EOPNOTSUPP (Operation not supported)
+utimensat(AT_FDCWD, "test", NULL, 0)    = -1 ENOENT (No such file or directory)
+write(2, "touch: ", 7touch: )                  = 7
+write(2, "cannot touch `test'", 19cannot touch `test')     = 19
+write(2, ": Operation not supported", 25: Operation not supported) = 25
+write(2, "\n", 1
+)                       = 1
+
+I think it's down to this:
+
+commit 013cdf1088d7235da9477a2375654921d9b9ba9f
+Author: Christoph Hellwig <hch@infradead.org>
+Date:   Fri Dec 20 05:16:53 2013 -0800
+
+    nfs: use generic posix ACL infrastructure for v3 Posix ACLs
+
+    This causes a small behaviour change in that we don't bother to set
+    ACLs on file creation if the mode bit can express the access permissions
+    fully, and thus behaving identical to local filesystems.
+
+    Signed-off-by: Christoph Hellwig <hch@lst.de>
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+
+which adds:
+
++       status = posix_acl_create(dir, &sattr->ia_mode, &default_acl, &acl);
++       if (status)
++               goto out;
+
+into nfs3_proc_create(), but this ends up calling down into nfs3_get_acl(),
+which does this:
+
+        if (!nfs_server_capable(inode, NFS_CAP_ACLS))
+                return ERR_PTR(-EOPNOTSUPP);
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
