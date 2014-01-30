@@ -1,67 +1,168 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 30 Jan 2014 17:10:30 +0100
-Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.14
-Message-ID: <52EA7976.7030709@monstr.eu>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Thu, 30 Jan 2014 16:11:02 +0000
+Subject: [PATCH] arm: document "mach-virt" platform.
+Message-ID: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+mach-virt has existed for a while but it is not written down what it actually
+consists of. Although it seems a bit unusual to document a binding for an
+entire platform since mach-virt is entirely virtual it is helpful to have
+something to refer to in the absence of a single concrete implementation.
 
-please consider to queue this patch to 3.14 because it enables Arasan
-SDHCI driver which has been merged to the tree. It took for a while
-to get it to the mainline that's why I didn't push this patch
-in regular arm-soc merge window. I was talking about it
-with Kevin some weeks ago.
+I've done my best to capture the requirements based on the git log and my
+memory/understanding.
 
-There will be one more patch which I have discussed with Russell but
-I will send it out for reviewed first.
-https://lkml.org/lkml/2014/1/27/212
+While here remove the xenvm dts example, the Xen tools will now build a
+suitable mach-virt compatible dts when launching the guest.
 
-Thanks,
-Michal
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+I'm not sure which tree this sort of thing should go though, sorry for the
+huge Cc.
+---
+ .../devicetree/bindings/arm/mach-virt.txt          |   32 ++++++++
+ arch/arm/boot/dts/xenvm-4.2.dts                    |   81 --------------------
+ 2 files changed, 32 insertions(+), 81 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mach-virt.txt
+ delete mode 100644 arch/arm/boot/dts/xenvm-4.2.dts
 
-
-The following changes since commit 9b0cd304f26b9fca140de15deeac2bf357d1f388:
-
-  Merge branch 'drm-next' of git://people.freedesktop.org/~airlied/linux (2014-01-29 20:49:12 -0800)
-
-are available in the git repository at:
-
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-dt-fixes-for-3.14
-
-for you to fetch changes up to b1d30fb5b8618e69195fb074b89c204cb1bb2262:
-
-  arm: dt: zynq: Add SDHCI nodes (2014-01-30 12:28:03 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq DT fixes for v3.14
-
-- Enable Arasan SDHCI driver
-
-----------------------------------------------------------------
-Soren Brinkmann (1):
-      arm: dt: zynq: Add SDHCI nodes
-
- arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc702.dts |  4 ++++
- arch/arm/boot/dts/zynq-zc706.dts |  4 ++++
- arch/arm/boot/dts/zynq-zed.dts   |  4 ++++
- 4 files changed, 32 insertions(+)
-
-
+diff --git a/Documentation/devicetree/bindings/arm/mach-virt.txt b/Documentation/devicetree/bindings/arm/mach-virt.txt
+new file mode 100644
+index 0000000..562bcda
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mach-virt.txt
+@@ -0,0 +1,32 @@
++* Mach-virt "Dummy Virtual Machine" platform
++
++"mach-virt" is the smallest, dumbest platform possible, to be used as
++a guest for Xen, KVM and other hypervisors. It has no
++properties/functionality of its own and is driven entirely by device
++tree.
++
++This document defines the requirements for such a platform.
++
++* Required properties:
++
++- compatible: should be one of:
++	"linux,dummy-virt"
++	"xen,xenvm"
++
++In addition to the standard nodes (chosen, cpus, memory etc) the
++platform is required to provide certain other basic functionality
++which must be described in the device tree:
++
++    The platform must provide an ARM Generic Interrupt Controller
++    (GIC), defined in Documentation/devicetree/bindings/arm/gic.txt.
++
++    The platform must provide ARM architected timer, defined in
++    Documentation/devicetree/bindings/arm/arch_timer.txt.
++
++    If the platform is SMP then it must provide the Power State
++    Coordination Interface (PSCI) described in
++    Documentation/devicetree/bindings/arm/psci.txt.
++
++The platform may also provide hypervisor specific functionality
++(e.g. PV I/O), if it does so then this functionality must be
++discoverable (directly or indirectly) via device tree.
+diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
+deleted file mode 100644
+index 3369151..0000000
+--- a/arch/arm/boot/dts/xenvm-4.2.dts
++++ /dev/null
+@@ -1,81 +0,0 @@
+-/*
+- * Xen Virtual Machine for unprivileged guests
+- *
+- * Based on ARM Ltd. Versatile Express CoreTile Express (single CPU)
+- * Cortex-A15 MPCore (V2P-CA15)
+- *
+- */
+-
+-/dts-v1/;
+-
+-/ {
+-	model = "XENVM-4.2";
+-	compatible = "xen,xenvm-4.2", "xen,xenvm";
+-	interrupt-parent = <&gic>;
+-	#address-cells = <2>;
+-	#size-cells = <2>;
+-
+-	chosen {
+-		/* this field is going to be adjusted by the hypervisor */
+-		bootargs = "console=hvc0 root=/dev/xvda";
+-	};
+-
+-	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <0>;
+-		};
+-
+-		cpu at 1 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <1>;
+-		};
+-	};
+-
+-	psci {
+-		compatible      = "arm,psci";
+-		method          = "hvc";
+-		cpu_off         = <1>;
+-		cpu_on          = <2>;
+-	};
+-
+-	memory at 80000000 {
+-		device_type = "memory";
+-		/* this field is going to be adjusted by the hypervisor */
+-		reg = <0 0x80000000 0 0x08000000>;
+-	};
+-
+-	gic: interrupt-controller at 2c001000 {
+-		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+-		#interrupt-cells = <3>;
+-		#address-cells = <0>;
+-		interrupt-controller;
+-		reg = <0 0x2c001000 0 0x1000>,
+-		      <0 0x2c002000 0 0x100>;
+-	};
+-
+-	timer {
+-		compatible = "arm,armv7-timer";
+-		interrupts = <1 13 0xf08>,
+-			     <1 14 0xf08>,
+-			     <1 11 0xf08>,
+-			     <1 10 0xf08>;
+-	};
+-
+-	hypervisor {
+-		compatible = "xen,xen-4.2", "xen,xen";
+-		/* this field is going to be adjusted by the hypervisor */
+-		reg = <0 0xb0000000 0 0x20000>;
+-		/* this field is going to be adjusted by the hypervisor */
+-		interrupts = <1 15 0xf08>;
+-	};
+-
+-	motherboard {
+-		arm,v2m-memory-map = "rs1";
+-	};
+-};
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140130/e3b3b418/attachment.sig>
+1.7.10.4
