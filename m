@@ -1,77 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 30 Jan 2014 00:28:04 -0500 (EST)
-Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
- idle loop
-In-Reply-To: <52E9C946.50704@linux.vnet.ibm.com>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
- <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
- <52E9C946.50704@linux.vnet.ibm.com>
-Message-ID: <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 29 Jan 2014 21:33:15 -0800
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <20140130111919.afc7f4e5b58e409aaabf7550@canb.auug.org.au>
+References: <20140130111919.afc7f4e5b58e409aaabf7550@canb.auug.org.au>
+Message-ID: <CAGa+x85md++qtw5n7c_4L-MvaK8nB3c8GpFf+OLb4p--8N=+og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jan 2014, Preeti U Murthy wrote:
+On Wed, Jan 29, 2014 at 4:19 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/clk/Makefile between commit fd3fdaf09f26 ("clk: sort Makefile")
+> from Linus' tree and commit 7ee2c5117483 ("clk: bcm281xx: add initial
+> clock framework support") from the arm-soc tree.
 
-> Hi Nicolas,
-> 
-> On 01/30/2014 02:01 AM, Nicolas Pitre wrote:
-> > On Wed, 29 Jan 2014, Nicolas Pitre wrote:
-> > 
-> >> In order to integrate cpuidle with the scheduler, we must have a better
-> >> proximity in the core code with what cpuidle is doing and not delegate
-> >> such interaction to arch code.
-> >>
-> >> Architectures implementing arch_cpu_idle() should simply enter
-> >> a cheap idle mode in the absence of a proper cpuidle driver.
-> >>
-> >> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> >> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > 
-> > As mentioned in my reply to Olof's comment on patch #5/6, here's a new 
-> > version of this patch adding the safety local_irq_enable() to the core 
-> > code.
-> > 
-> > ----- >8
-> > 
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Subject: idle: move the cpuidle entry point to the generic idle loop
-> > 
-> > In order to integrate cpuidle with the scheduler, we must have a better
-> > proximity in the core code with what cpuidle is doing and not delegate
-> > such interaction to arch code.
-> > 
-> > Architectures implementing arch_cpu_idle() should simply enter
-> > a cheap idle mode in the absence of a proper cpuidle driver.
-> > 
-> > In both cases i.e. whether it is a cpuidle driver or the default
-> > arch_cpu_idle(), the calling convention expects IRQs to be disabled
-> > on entry and enabled on exit. There is a warning in place already but
-> > let's add a forced IRQ enable here as well.  This will allow for
-> > removing the forced IRQ enable some implementations do locally and 
-> 
-> Why would this patch allow for removing the forced IRQ enable that are
-> being done on some archs in arch_cpu_idle()? Isn't this patch expecting
-> the default arch_cpu_idle() to have re-enabled the interrupts after
-> exiting from the default idle state? Its supposed to only catch faulty
-> cpuidle drivers that haven't enabled IRQs on exit from idle state but
-> are expected to have done so, isn't it?
+Ugh.  Looks like some last minute cleanup stuff went into clk-next
+that didn't spend time in linux-next, and now causes conflicts with
+some clk stuff we still have queued in arm-soc (ack'd by Mike.)
 
-Exact.  However x86 currently does this:
+Now, based on the Hulk's response to Mike's pull request, if we submit
+this, introducing yet more conflicts in the Makefile, it will surely
+be Hulk angry, Hulk smash.
 
-	if (cpuidle_idle_call())
-	        x86_idle();
-	else
-	        local_irq_enable();
-
-So whenever cpuidle_idle_call() is successful then IRQs are 
-unconditionally enabled whether or not the underlying cpuidle driver has 
-properly done it or not.  And the reason is that some of the x86 cpuidle 
-do fail to enable IRQs before returning.
-
-So the idea is to get rid of this unconditional IRQ enabling and let the 
-core issue a warning instead (as well as enabling IRQs to allow the 
-system to run).
-
-
-Nicolas
+Kevin
