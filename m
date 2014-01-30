@@ -1,24 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 30 Jan 2014 11:41:33 +0000
-Subject: [PATCH v2] ARM: mm: Fix stage-2 device memory attributes
-In-Reply-To: <1390944264-3435-1-git-send-email-christoffer.dall@linaro.org>
-References: <1390944264-3435-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20140130114133.GL30161@arm.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 30 Jan 2014 13:45:43 +0200
+Subject: [PATCH] ARM: keystone: dts: disable "msmcsram" clock
+Message-ID: <1391082343-13371-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 09:24:24PM +0000, Christoffer Dall wrote:
-> The stage-2 memory attributes are distinct from the Hyp memory
-> attributes and the Stage-1 memory attributes.  We were using the stage-1
-> memory attributes for stage-2 mappings causing device mappings to be
-> mapped as normal memory.  Add the S2 equivalent defines for memory
-> attributes and fix the comments explaining the defines while at it.
-> 
-> Add a prot_pte_s2 field to the mem_type struct and fill out the field
-> for device mappings accordingly.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+At late init all unused clocks are disabled. So clocks that were not
+get before will be gated. In Keysone 2 SoC we have at least one
+necessary clock that is not used by any driver - "msmcsram". This
+clock is necessary, because it supplies the Multicore Shared Memory
+Controller (MSMC). The MSMC provides memory protection for accesses to
+the MSMC SRAM and DDR3 memory from system masters. It also manages
+traffic among mastering peripherals and the EMIF.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+This means that MSMC clock is always needed by SoC and cannot be gated.
+It is only one from necessary clocks that was not used by any driver.
+So to avoid its gating at late init we have to disable it in DT.
+
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/boot/dts/keystone-clocks.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+index 2363593..e7aea2e 100644
+--- a/arch/arm/boot/dts/keystone-clocks.dtsi
++++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+@@ -332,6 +332,7 @@ clocks {
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk1>;
+ 		clock-output-names = "msmcsram";
++		status = "disabled";
+ 		reg = <0x02350038 0xb00>, <0x0235001c 0x400>;
+ 		reg-names = "control", "domain";
+ 		domain-id = <7>;
+-- 
+1.8.3.2
