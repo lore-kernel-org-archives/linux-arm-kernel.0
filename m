@@ -1,17 +1,22 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 30 Jan 2014 10:24:38 +0100
-Subject: [PATCH v2 5/6] X86: remove redundant cpuidle_idle_call()
-In-Reply-To: <alpine.LFD.2.11.1401291434120.1652@knanqh.ubzr>
+Date: Thu, 30 Jan 2014 10:28:35 +0100
+Subject: [PATCH v2 0/6] setting the table for integration of cpuidle with
+ the scheduler
+In-Reply-To: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-6-git-send-email-nicolas.pitre@linaro.org>
- <CAOesGMjvOkuxCopog91SAV1-gB9GaEYXpuXwhV1EJQor_pKjBA@mail.gmail.com>
- <alpine.LFD.2.11.1401291434120.1652@knanqh.ubzr>
-Message-ID: <20140130092438.GK11314@laptop.programming.kicks-ass.net>
+Message-ID: <20140130092835.GL11314@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 03:14:40PM -0500, Nicolas Pitre wrote:
-> Looking into some cpuidle drivers for x86 I found at least one that 
-> doesn't respect this convention.  Damn.
+On Wed, Jan 29, 2014 at 12:45:07PM -0500, Nicolas Pitre wrote:
+> As everyone should know by now, we want to integrate the cpuidle
+> governor with the scheduler for a more efficient idling of CPUs.
+> In order to help the transition, this small patch series moves the
+> existing interaction with cpuidle from architecture code to generic
+> core code.  The ARM, PPC, SH and X86 architectures are concerned.
+> No functional change should have occurred yet.
+> 
+> @peterz: Are you willing to pick up those patches?
 
-Which one? We should probably fix it :-)
+Yeah.. no objections. Should I pick these up or will you be sending
+another round?
