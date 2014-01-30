@@ -1,47 +1,34 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 30 Jan 2014 17:29:41 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jan 2014 17:33:50 +0000
 Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <52EA8AD3.8080904@arm.com>
+In-Reply-To: <201401301828.59294.arnd@arndb.de>
 References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
- <52EA8853.8080709@arm.com>
- <1391102475.9495.44.camel@kazak.uk.xensource.com>
- <52EA8AD3.8080904@arm.com>
-Message-ID: <1391102981.9495.46.camel@kazak.uk.xensource.com>
+ <201401301828.59294.arnd@arndb.de>
+Message-ID: <52EA8CFE.7020404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-30 at 17:24 +0000, Marc Zyngier wrote:
-> >> I'm afraid I disagree with most of the above. The whole point of
-> >> mach-virt is to provide a shell for DT platforms. None of this hardware
-> >> is mandated. Instead, all the necessary information should be described
-> >> in DT.
-> > 
-> > "Add support for the smallest, dumbest possible platform, to be
-> >  used as a guest for KVM or other hypervisors.
-> > 
-> >  It only mandates a GIC and architected timers"
-> > 
-> > (your original commit message :-P)
+On 30/01/14 17:28, Arnd Bergmann wrote:
+> On Thursday 30 January 2014, Ian Campbell wrote:
+>> mach-virt has existed for a while but it is not written down what it actually
+>> consists of. Although it seems a bit unusual to document a binding for an
+>> entire platform since mach-virt is entirely virtual it is helpful to have
+>> something to refer to in the absence of a single concrete implementation.
+>>
+>> I've done my best to capture the requirements based on the git log and my
+>> memory/understanding.
+>>
+>> While here remove the xenvm dts example, the Xen tools will now build a
+>> suitable mach-virt compatible dts when launching the guest.
 > 
-> Right. 1984, here we come. I'll disappear for a while, rewriting the
-> history. More seriously, that was just me scheming to get it merged,
-> hiding my cunning plan for mach-virt world domination!
+> It might be worth noting in the changeset comment that the 'compatible'
+> string is actually no longer needed on newer kernels: All the members
+> of the machine descriptor are now the defaults (we should remove the
+> virt_init() function as well), and the fallback machine descriptor should
+> work just fine if any other string gets passed.
 
-:-)
+I will ack the patch that removes the mach-virt directory altogether!
 
-> >> Actually, mach-virt doesn't really stand for Virtual Machine. It stands
-> >> for virtual mach-* directory! Eventually, mach-virt should become the
-> >> default platform, the one we use when we don't match anything else in
-> >> the kernel
-> > 
-> > I can word it more like that for sure, along with the alternative
-> > wording suggested by Christopher/Stefano to clarify the intent that
-> > everything comes from DTB and removal of the specific requirements for
-> > GIC/timer/PSCI I think that suit the (new) intention better?
-> 
-> Yes, please! :-)
-
-OK, I'll come up with an updated version.
-
-Cheers,
-Ian.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
