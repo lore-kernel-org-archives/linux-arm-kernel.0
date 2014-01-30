@@ -1,125 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 30 Jan 2014 19:00:11 +0100
-Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
-In-Reply-To: <52EA43A8.9050909@ti.com>
-References: <y> <cover.1390836773.git.jsarha@ti.com>
- <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
- <20140127190641.273890c6@armhf> <52E6B42F.4050901@ti.com>
- <20140128102353.48e8fb51@armhf> <52EA43A8.9050909@ti.com>
-Message-ID: <20140130190011.3849cf37@armhf>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 30 Jan 2014 20:03:11 +0200
+Subject: [PATCH v2] clk: keystone: gate: fix clk_init_data initialization
+Message-ID: <1391104991-15000-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jan 2014 14:20:56 +0200
-Jyri Sarha <jsarha@ti.com> wrote:
+The clk_init_data struct is allocated in the stack. All members of
+this struct should be initialized before using otherwise it will
+lead to unpredictable situation as it can contain garbage.
 
-> I am having trouble getting the tda998x-codec working on BBB. The 
-> problem is I do not have a DT node for the tda998x driver. Instead I 
-> have tilcdc-slave node that provides pdata for the tda-driver.
-> 
-> I am thinking of solving the problem by adding a reference to the 
-> i2c-adapter hosting tda998x as an optional DT property to the codec 
-> node. I could then dig the driver instance from the i2c adapter's 
-> children. Any better ideas?
+Ultimately the clk->flag field contains garbage. In my case it leads
+that flag CLK_IGNORE_UNUSED is set for most of clocks. As result a
+bunch of unused clocks cannot be disabled.
 
-I better think about a 'normal' DT definition:
+So initialize flags in this structure too.
 
-- in the DT, define the tda998x in a i2c subnode:
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
 
-  &i2c0 {
-	tda998x: hdmi-encoder {
-		compatible = "nxp,tda998x";
-		reg = <0x70>;
-		/* the video ports are OK by default */
-		/* define the interrupt if you want to use it */
-	};
-  };
+v1..v2:
+- updated commit description only
 
-- in tilcdc_slave.c, in the function slave_encoder_create(), instead of
-  using drm_i2c_encoder_init(), do quite the same, but without calling
-  request_module() nor i2c_new_device().
+ drivers/clk/keystone/gate.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-  This can be done as follows (the code is not compiled):
-
---------------------8<---------------------
-static struct drm_encoder *slave_encoder_create(struct drm_device *dev,
-		struct slave_module *mod)
-{
-	struct slave_encoder *slave_encoder;
-	struct drm_encoder *encoder;
-	int ret;
-/* ------ added ------ */
-	struct device_node *np;
-	static const struct of_device_id tda_dt[] = {
-		{ .compatible = "nxp,tda998x" },
-		{ },
-	};
-/* ------ end added ------ */
-
-	... no change ...
-
-	 drm_encoder_helper_add(encoder, &slave_encoder_helper_funcs);
-
-/* ------ added ------ */
-
-	/* search the tda998x device */
-	np = of_find_matching_node_and_match(NULL, tda_dt, NULL);
-	if (np && of_device_is_available(np)) {
-		struct i2c_client *i2c_client;
-		struct drm_i2c_encoder_driver *encoder_drv;
-		struct module *module;
-
-					/* the tda998x is in the DT */
-
-		i2c_client = of_find_i2c_device_by_node(np);
-		of_node_put(np);
-		if (!i2c_client) {
-			dev_err(dev->dev, "no tda998x i2c client\n");
-			goto fail;
-		}
-
-		to_encoder_slave(encoder)->bus_priv = i2c_client;
-
-		encoder_drv = to_drm_i2c_encoder_driver(
-				to_i2c_driver(i2c_client->dev.driver));
-
-		/* lock the tda998x module in memory */
-		module = to_i2c_driver(i2c_client->dev.driver)->driver.owner;
-		if (!module || !try_module_get(module)) {
-			dev_err(dev->dev, "cannot get module %s\n", module->name);
-			goto fail;
-		}
-
-		ret = encoder_drv->encoder_init(i2c_client, dev, encoder_slave);
-		if (ret < 0) {
-			dev_err(dev->dev, "slave encoder init failed\n");
-			module_put(module);
-			goto fail;
-		}
-					/* set_config is useless */
-		return encoder;
-	}
-
-/* ------ end added ------ */
-
-	ret = drm_i2c_encoder_init(dev, to_encoder_slave(encoder), mod->i2c, &info);
-	if (ret)
-		goto fail;
-
-	return encoder;
-
-fail:
-	slave_encoder_destroy(encoder);
-	return NULL;
-}
---------------------8<---------------------
-
-When the tda998x is in the DT, the i2c_client is already created.
-It must not be freed, and so, the function drm_i2c_encoder_destroy()
-must not be called. But, the module must be explicitly unlocked in
-slave_encoder_destroy(), and then, there must be some flag in the
-structures for this job to be done...
-
+diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
+index 17a5983..86f1e36 100644
+--- a/drivers/clk/keystone/gate.c
++++ b/drivers/clk/keystone/gate.c
+@@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_psc_ops;
++	init.flags = 0;
+ 	init.parent_names = (parent_name ? &parent_name : NULL);
+ 	init.num_parents = (parent_name ? 1 : 0);
+ 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.3.2
