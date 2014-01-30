@@ -1,96 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 30 Jan 2014 14:44:00 +0100
-Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
- idle loop
-In-Reply-To: <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
- <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
- <52E9C946.50704@linux.vnet.ibm.com>
- <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
-Message-ID: <52EA5720.8010000@linaro.org>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 30 Jan 2014 14:46:02 +0100
+Subject: =?UTF-8?q?=5BRFC=20PATCH=20pre-v3=2007/14=5D=20of=3A=20mtd=3A=20add=20documentation=20for=20the=20ONFI=20NAND=20timing=20mode=20property?=
+In-Reply-To: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1391089562-8385-1-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2014 06:28 AM, Nicolas Pitre wrote:
-> On Thu, 30 Jan 2014, Preeti U Murthy wrote:
->
->> Hi Nicolas,
->>
->> On 01/30/2014 02:01 AM, Nicolas Pitre wrote:
->>> On Wed, 29 Jan 2014, Nicolas Pitre wrote:
->>>
->>>> In order to integrate cpuidle with the scheduler, we must have a better
->>>> proximity in the core code with what cpuidle is doing and not delegate
->>>> such interaction to arch code.
->>>>
->>>> Architectures implementing arch_cpu_idle() should simply enter
->>>> a cheap idle mode in the absence of a proper cpuidle driver.
->>>>
->>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>
->>> As mentioned in my reply to Olof's comment on patch #5/6, here's a new
->>> version of this patch adding the safety local_irq_enable() to the core
->>> code.
->>>
->>> ----- >8
->>>
->>> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->>> Subject: idle: move the cpuidle entry point to the generic idle loop
->>>
->>> In order to integrate cpuidle with the scheduler, we must have a better
->>> proximity in the core code with what cpuidle is doing and not delegate
->>> such interaction to arch code.
->>>
->>> Architectures implementing arch_cpu_idle() should simply enter
->>> a cheap idle mode in the absence of a proper cpuidle driver.
->>>
->>> In both cases i.e. whether it is a cpuidle driver or the default
->>> arch_cpu_idle(), the calling convention expects IRQs to be disabled
->>> on entry and enabled on exit. There is a warning in place already but
->>> let's add a forced IRQ enable here as well.  This will allow for
->>> removing the forced IRQ enable some implementations do locally and
->>
->> Why would this patch allow for removing the forced IRQ enable that are
->> being done on some archs in arch_cpu_idle()? Isn't this patch expecting
->> the default arch_cpu_idle() to have re-enabled the interrupts after
->> exiting from the default idle state? Its supposed to only catch faulty
->> cpuidle drivers that haven't enabled IRQs on exit from idle state but
->> are expected to have done so, isn't it?
->
-> Exact.  However x86 currently does this:
->
-> 	if (cpuidle_idle_call())
-> 	        x86_idle();
-> 	else
-> 	        local_irq_enable();
->
-> So whenever cpuidle_idle_call() is successful then IRQs are
-> unconditionally enabled whether or not the underlying cpuidle driver has
-> properly done it or not.  And the reason is that some of the x86 cpuidle
-> do fail to enable IRQs before returning.
->
-> So the idea is to get rid of this unconditional IRQ enabling and let the
-> core issue a warning instead (as well as enabling IRQs to allow the
-> system to run).
+Add documentation for the ONFI NAND timing mode property.
 
-But what I don't get with your comment is the local_irq_enable is done 
-from the cpuidle common framework in 'cpuidle_enter_state' it is not 
-done from the arch specific backend cpuidle driver.
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+Changes since v2:
+ - fix description of the nand-timing-mode property: the mode property is
+   a mask containing all supported modes, each mode is encoded as a bit
+   position
 
-So the code above could be:
+ Documentation/devicetree/bindings/mtd/nand.txt |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-	if (cpuidle_idle_call())
-		x86_idle();
-
-without the else section, this local_irq_enable is pointless. Or may be 
-I missed something ?
-
-
+diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+index 0c962296..60c7112 100644
+--- a/Documentation/devicetree/bindings/mtd/nand.txt
++++ b/Documentation/devicetree/bindings/mtd/nand.txt
+@@ -8,3 +8,10 @@
+   E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
+ - nand-bus-width : 8 or 16 bus width if not present 8
+ - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
++- onfi,nand-timing-mode: an integer encoding the supported ONFI timing modes of
++  the NAND chip. Each supported mode is represented as a bit position (i.e. :
++  mode 0 and 1 => (1 << 0) | (1 << 1) = 0x3).
++  This is only used when the chip does not support the ONFI standard.
++  The last bit set represent the closest mode fulfilling the NAND chip timings.
++  For a full description of the different timing modes see this document:
++  www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf?
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
