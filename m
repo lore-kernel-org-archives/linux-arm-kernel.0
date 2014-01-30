@@ -1,330 +1,182 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 30 Jan 2014 13:03:40 +0200
-Subject: [PATCH v5] ARM: davinci: aemif: get rid of davinci-nand driver
- dependency on aemif
-Message-ID: <1391079820-13018-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 30 Jan 2014 13:17:20 +0200
+Subject: [PATCH] ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+Message-ID: <1391080640-23370-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The problem that the set timings code contains the call of Davinci
-platform function davinci_aemif_setup_timing() which is not
-accessible if kernel is built for another platform like Keystone.
+If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
+clk_set_rate() on the clock "skips" the x2 multiplier as there are no
+set_rate and round_rate functions defined for the clkoutx2.
 
-The Keysone platform is going to use TI AEMIF driver.
-If TI AEMIF is used we don't need to set timings and bus width.
-It is done by AEMIF driver.
+This results in getting double the requested clock rates, breaking the
+display on omap3430 based devices. This got broken when
+d0f58bd3bba3877fb1af4664c4e33273d36f00e4 and related patches were merged
+for v3.14, as omapdss driver now relies more on the clk-framework and
+CLK_SET_RATE_PARENT.
 
-To get rid of davinci-nand driver dependency on aemif platform code
-we moved aemif code to davinci platform.
+This patch implements set_rate and round_rate for clkoutx2.
 
-The platform AEMIF code (aemif.c) has to be removed once Davinci
-will be converted to DT and use ti-aemif.c driver.
+Tested on OMAP3430, OMAP3630, OMAP4460.
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-[nsekhar at ti.com: fixed checkpatch error and a build breakage due to
-		 missing include, rebased onto l2-mtd/master]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
-Applies to latest of l2-mtd/master
+ arch/arm/mach-omap2/cclock3xxx_data.c |  2 +
+ arch/arm/mach-omap2/dpll3xxx.c        | 92 +++++++++++++++++++++++++++++------
+ include/linux/clk/ti.h                |  4 ++
+ 3 files changed, 83 insertions(+), 15 deletions(-)
 
-v5:
-- fixed coccinelle warning
-
- arch/arm/mach-davinci/aemif.c                   | 107 +++++++++++++++++++++---
- arch/arm/mach-davinci/board-da830-evm.c         |   3 +
- arch/arm/mach-davinci/board-da850-evm.c         |   3 +
- arch/arm/mach-davinci/board-dm644x-evm.c        |   5 ++
- arch/arm/mach-davinci/board-dm646x-evm.c        |   3 +
- arch/arm/mach-davinci/board-mityomapl138.c      |   4 +
- drivers/mtd/nand/davinci_nand.c                 |  22 -----
- include/linux/platform_data/mtd-davinci-aemif.h |   5 +-
- 8 files changed, 117 insertions(+), 35 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-index f091a90..ff8b7e7 100644
---- a/arch/arm/mach-davinci/aemif.c
-+++ b/arch/arm/mach-davinci/aemif.c
-@@ -16,6 +16,7 @@
- #include <linux/time.h>
- 
- #include <linux/platform_data/mtd-davinci-aemif.h>
-+#include <linux/platform_data/mtd-davinci.h>
- 
- /* Timing value configuration */
- 
-@@ -43,6 +44,17 @@
- 				WSTROBE(WSTROBE_MAX) | \
- 				WSETUP(WSETUP_MAX))
- 
-+static inline unsigned int davinci_aemif_readl(void __iomem *base, int offset)
-+{
-+	return readl_relaxed(base + offset);
-+}
-+
-+static inline void davinci_aemif_writel(void __iomem *base,
-+					int offset, unsigned long value)
-+{
-+	writel_relaxed(value, base + offset);
-+}
-+
- /*
-  * aemif_calc_rate - calculate timing data.
-  * @wanted: The cycle time needed in nanoseconds.
-@@ -76,6 +88,7 @@ static int aemif_calc_rate(int wanted, unsigned long clk, int max)
-  * @t: timing values to be progammed
-  * @base: The virtual base address of the AEMIF interface
-  * @cs: chip-select to program the timing values for
-+ * @clkrate: the AEMIF clkrate
-  *
-  * This function programs the given timing values (in real clock) into the
-  * AEMIF registers taking the AEMIF clock into account.
-@@ -86,24 +99,17 @@ static int aemif_calc_rate(int wanted, unsigned long clk, int max)
-  *
-  * Returns 0 on success, else negative errno.
-  */
--int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
--					void __iomem *base, unsigned cs)
-+static int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
-+					void __iomem *base, unsigned cs,
-+					unsigned long clkrate)
- {
- 	unsigned set, val;
- 	int ta, rhold, rstrobe, rsetup, whold, wstrobe, wsetup;
- 	unsigned offset = A1CR_OFFSET + cs * 4;
--	struct clk *aemif_clk;
--	unsigned long clkrate;
- 
- 	if (!t)
- 		return 0;	/* Nothing to do */
- 
--	aemif_clk = clk_get(NULL, "aemif");
--	if (IS_ERR(aemif_clk))
--		return PTR_ERR(aemif_clk);
--
--	clkrate = clk_get_rate(aemif_clk);
--
- 	clkrate /= 1000;	/* turn clock into kHz for ease of use */
- 
- 	ta	= aemif_calc_rate(t->ta, clkrate, TA_MAX);
-@@ -130,4 +136,83 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(davinci_aemif_setup_timing);
-+
-+/**
-+ * davinci_aemif_setup - setup AEMIF interface by davinci_nand_pdata
-+ * @pdev - link to platform device to setup settings for
-+ *
-+ * This function does not use any locking while programming the AEMIF
-+ * because it is expected that there is only one user of a given
-+ * chip-select.
-+ *
-+ * Returns 0 on success, else negative errno.
-+ */
-+int davinci_aemif_setup(struct platform_device *pdev)
-+{
-+	struct davinci_nand_pdata *pdata = dev_get_platdata(&pdev->dev);
-+	uint32_t val;
-+	unsigned long clkrate;
-+	struct resource	*res;
-+	void __iomem *base;
-+	struct clk *clk;
-+	int ret = 0;
-+
-+	clk = clk_get(&pdev->dev, "aemif");
-+	if (IS_ERR(clk)) {
-+		ret = PTR_ERR(clk);
-+		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret < 0) {
-+		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
-+			ret);
-+		goto err_put;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_err(&pdev->dev, "cannot get IORESOURCE_MEM\n");
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	base = ioremap(res->start, resource_size(res));
-+	if (!base) {
-+		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res);
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	/*
-+	 * Setup Async configuration register in case we did not boot
-+	 * from NAND and so bootloader did not bother to set it up.
-+	 */
-+	val = davinci_aemif_readl(base, A1CR_OFFSET + pdev->id * 4);
-+	/*
-+	 * Extended Wait is not valid and Select Strobe mode is not
-+	 * used
-+	 */
-+	val &= ~(ACR_ASIZE_MASK | ACR_EW_MASK | ACR_SS_MASK);
-+	if (pdata->options & NAND_BUSWIDTH_16)
-+		val |= 0x1;
-+
-+	davinci_aemif_writel(base, A1CR_OFFSET + pdev->id * 4, val);
-+
-+	clkrate = clk_get_rate(clk);
-+
-+	if (pdata->timing)
-+		ret = davinci_aemif_setup_timing(pdata->timing, base, pdev->id,
-+						 clkrate);
-+
-+	if (ret < 0)
-+		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
-+
-+	iounmap(base);
-+err:
-+	clk_disable_unprepare(clk);
-+err_put:
-+	clk_put(clk);
-+	return ret;
-+}
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index d1f45af..5623131 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -419,6 +419,9 @@ static inline void da830_evm_init_nand(int mux_mode)
- 	if (ret)
- 		pr_warning("da830_evm_init: NAND device not registered.\n");
- 
-+	if (davinci_aemif_setup(&da830_evm_nand_device))
-+		pr_warn("%s: Cannot configure AEMIF.\n", __func__);
-+
- 	gpio_direction_output(mux_mode, 1);
- }
- #else
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e0af0ec..234c5bb 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -358,6 +358,9 @@ static inline void da850_evm_setup_nor_nand(void)
- 
- 		platform_add_devices(da850_evm_devices,
- 					ARRAY_SIZE(da850_evm_devices));
-+
-+		if (davinci_aemif_setup(&da850_evm_nandflash_device))
-+			pr_warn("%s: Cannot configure AEMIF.\n", __func__);
- 	}
- }
- 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 987605b7..5602957 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -778,6 +778,11 @@ static __init void davinci_evm_init(void)
- 		/* only one device will be jumpered and detected */
- 		if (HAS_NAND) {
- 			platform_device_register(&davinci_evm_nandflash_device);
-+
-+			if (davinci_aemif_setup(&davinci_evm_nandflash_device))
-+				pr_warn("%s: Cannot configure AEMIF.\n",
-+					__func__);
-+
- 			evm_leds[7].default_trigger = "nand-disk";
- 			if (HAS_NOR)
- 				pr_warning("WARNING: both NAND and NOR flash "
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 13d0801..ae129bc 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -805,6 +805,9 @@ static __init void evm_init(void)
- 
- 	platform_device_register(&davinci_nand_device);
- 
-+	if (davinci_aemif_setup(&davinci_nand_device))
-+		pr_warn("%s: Cannot configure AEMIF.\n", __func__);
-+
- 	dm646x_init_edma(dm646x_edma_rsv);
- 
- 	if (HAS_ATA)
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 7aa105b..96fc00a 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -27,6 +27,7 @@
- #include <mach/cp_intc.h>
- #include <mach/da8xx.h>
- #include <linux/platform_data/mtd-davinci.h>
-+#include <linux/platform_data/mtd-davinci-aemif.h>
- #include <mach/mux.h>
- #include <linux/platform_data/spi-davinci.h>
- 
-@@ -432,6 +433,9 @@ static void __init mityomapl138_setup_nand(void)
- {
- 	platform_add_devices(mityomapl138_devices,
- 				 ARRAY_SIZE(mityomapl138_devices));
-+
-+	if (davinci_aemif_setup(&mityomapl138_nandflash_device))
-+		pr_warn("%s: Cannot configure AEMIF.\n", __func__);
- }
- 
- static const short mityomap_mii_pins[] = {
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index a4989ec..8eb6a36 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -746,28 +746,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 		goto err_clk_enable;
- 	}
- 
--	/*
--	 * Setup Async configuration register in case we did not boot from
--	 * NAND and so bootloader did not bother to set it up.
--	 */
--	val = davinci_nand_readl(info, A1CR_OFFSET + info->core_chipsel * 4);
--
--	/* Extended Wait is not valid and Select Strobe mode is not used */
--	val &= ~(ACR_ASIZE_MASK | ACR_EW_MASK | ACR_SS_MASK);
--	if (info->chip.options & NAND_BUSWIDTH_16)
--		val |= 0x1;
--
--	davinci_nand_writel(info, A1CR_OFFSET + info->core_chipsel * 4, val);
--
--	ret = 0;
--	if (info->timing)
--		ret = davinci_aemif_setup_timing(info->timing, info->base,
--							info->core_chipsel);
--	if (ret < 0) {
--		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--		goto err;
--	}
--
- 	spin_lock_irq(&davinci_nand_lock);
- 
- 	/* put CSxNAND into NAND mode */
-diff --git a/include/linux/platform_data/mtd-davinci-aemif.h b/include/linux/platform_data/mtd-davinci-aemif.h
-index 05b2934..97948ac 100644
---- a/include/linux/platform_data/mtd-davinci-aemif.h
-+++ b/include/linux/platform_data/mtd-davinci-aemif.h
-@@ -10,6 +10,8 @@
- #ifndef _MACH_DAVINCI_AEMIF_H
- #define _MACH_DAVINCI_AEMIF_H
- 
-+#include <linux/platform_device.h>
-+
- #define NRCSR_OFFSET		0x00
- #define AWCCR_OFFSET		0x04
- #define A1CR_OFFSET		0x10
-@@ -31,6 +33,5 @@ struct davinci_aemif_timing {
- 	u8	ta;
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 3b05aea56d1f..11ed9152e665 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -433,7 +433,9 @@ static const struct clk_ops dpll4_m5x2_ck_ops = {
+ 	.enable		= &omap2_dflt_clk_enable,
+ 	.disable	= &omap2_dflt_clk_disable,
+ 	.is_enabled	= &omap2_dflt_clk_is_enabled,
++	.set_rate	= &omap3_clkoutx2_set_rate,
+ 	.recalc_rate	= &omap3_clkoutx2_recalc,
++	.round_rate	= &omap3_clkoutx2_round_rate,
  };
  
--int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
--					void __iomem *base, unsigned cs);
-+int davinci_aemif_setup(struct platform_device *pdev);
- #endif
+ static const struct clk_ops dpll4_m5x2_ck_3630_ops = {
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 3185ced807c9..3c418ea54bbe 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -623,6 +623,32 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk)
+ 
+ /* Clock control for DPLL outputs */
+ 
++/* Find the parent DPLL for the given clkoutx2 clock */
++static struct clk_hw_omap *omap3_find_clkoutx2_dpll(struct clk_hw *hw)
++{
++	struct clk_hw_omap *pclk = NULL;
++	struct clk *parent;
++
++	/* Walk up the parents of clk, looking for a DPLL */
++	do {
++		do {
++			parent = __clk_get_parent(hw->clk);
++			hw = __clk_get_hw(parent);
++		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
++		if (!hw)
++			break;
++		pclk = to_clk_hw_omap(hw);
++	} while (pclk && !pclk->dpll_data);
++
++	/* clk does not have a DPLL as a parent?  error in the clock data */
++	if (!pclk) {
++		WARN_ON(1);
++		return NULL;
++	}
++
++	return pclk;
++}
++
+ /**
+  * omap3_clkoutx2_recalc - recalculate DPLL X2 output virtual clock rate
+  * @clk: DPLL output struct clk
+@@ -637,27 +663,14 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 	unsigned long rate;
+ 	u32 v;
+ 	struct clk_hw_omap *pclk = NULL;
+-	struct clk *parent;
+ 
+ 	if (!parent_rate)
+ 		return 0;
+ 
+-	/* Walk up the parents of clk, looking for a DPLL */
+-	do {
+-		do {
+-			parent = __clk_get_parent(hw->clk);
+-			hw = __clk_get_hw(parent);
+-		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
+-		if (!hw)
+-			break;
+-		pclk = to_clk_hw_omap(hw);
+-	} while (pclk && !pclk->dpll_data);
++	pclk = omap3_find_clkoutx2_dpll(hw);
+ 
+-	/* clk does not have a DPLL as a parent?  error in the clock data */
+-	if (!pclk) {
+-		WARN_ON(1);
++	if (!pclk)
+ 		return 0;
+-	}
+ 
+ 	dd = pclk->dpll_data;
+ 
+@@ -672,6 +685,55 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 	return rate;
+ }
+ 
++int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long parent_rate)
++{
++	return 0;
++}
++
++long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate)
++{
++	const struct dpll_data *dd;
++	u32 v;
++	struct clk_hw_omap *pclk = NULL;
++
++	if (!*prate)
++		return 0;
++
++	pclk = omap3_find_clkoutx2_dpll(hw);
++
++	if (!pclk)
++		return 0;
++
++	dd = pclk->dpll_data;
++
++	/* TYPE J does not have a clkoutx2 */
++	if (dd->flags & DPLL_J_TYPE) {
++		*prate = __clk_round_rate(__clk_get_parent(pclk->hw.clk), rate);
++		return *prate;
++	}
++
++	WARN_ON(!dd->enable_mask);
++
++	v = omap2_clk_readl(pclk, dd->control_reg) & dd->enable_mask;
++	v >>= __ffs(dd->enable_mask);
++
++	/* If in bypass, the rate is fixed to the bypass rate*/
++	if (v != OMAP3XXX_EN_DPLL_LOCKED)
++		return *prate;
++
++	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
++		unsigned long best_parent;
++
++		best_parent = (rate / 2);
++		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
++				best_parent);
++	}
++
++	return *prate * 2;
++}
++
+ /* OMAP3/4 non-CORE DPLL clkops */
+ const struct clk_hw_omap_ops clkhwops_omap3_dpll = {
+ 	.allow_idle	= omap3_dpll_allow_idle,
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 092b64168d7f..4a21a872dbbd 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -245,6 +245,10 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ void omap2_init_clk_clkdm(struct clk_hw *clk);
+ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 				    unsigned long parent_rate);
++int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long parent_rate);
++long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate);
+ int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ int omap2_clk_disable_autoidle_all(void);
 -- 
 1.8.3.2
