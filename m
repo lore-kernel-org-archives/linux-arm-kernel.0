@@ -1,46 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 30 Jan 2014 16:07:06 -0500
-Subject: [PATCH 7/7] ARM: mvebu: enable audio options in mvebu_defconfig
-In-Reply-To: <1391102051-5319-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1391102051-5319-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140130210706.GG29184@titan.lakedaemon.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 30 Jan 2014 14:15:12 -0700
+Subject: recommended action for bootloaders regarding modifying
+ device-tree nodes
+In-Reply-To: <20140130204558.GC29184@titan.lakedaemon.net>
+References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
+ <20140130204558.GC29184@titan.lakedaemon.net>
+Message-ID: <20140130211512.GD13372@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 06:14:11PM +0100, Thomas Petazzoni wrote:
-> Since at least the Armada 370 SoC has audio support, it makes sense to
-> enable the corresponding kernel configuration options in
-> mvebu_defconfig.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
+On Thu, Jan 30, 2014 at 03:45:58PM -0500, Jason Cooper wrote:
 
-Please, let's also get in the habit of updating multi_v7_defconfig as
-well.
+> This is more of a process question:  Is there any information captured
+> in your EEPROM that can't be represented in the dtb?  iow, at the point
+> when you write the EEPROM, why not write the dtb to it as configured?
 
-thx,
+I can share what we do here.. In our systems the serial EEPROM is only
+256 bytes, so storing things in DT format would be challenging.
 
-Jason.
+What we do is have a master DTB that has the union of all our
+configurations. The boot process has a very simple bit of code that
+runs down the DTB in binary format and replaces entire
+OF_DT_BEGIN_NODE->OF_DT_END_NODE regions with OF_DT_NOP.
 
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-> index 594d706..e481f01 100644
-> --- a/arch/arm/configs/mvebu_defconfig
-> +++ b/arch/arm/configs/mvebu_defconfig
-> @@ -60,6 +60,11 @@ CONFIG_GPIOLIB=y
->  CONFIG_GPIO_SYSFS=y
->  CONFIG_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
-> +CONFIG_SOUND=y
-> +CONFIG_SND=y
-> +CONFIG_SND_SOC=y
-> +CONFIG_SND_KIRKWOOD_SOC=y
-> +CONFIG_SND_KIRKWOOD_SOC_ARMADA370_DB=y
->  CONFIG_USB_SUPPORT=y
->  CONFIG_USB=y
->  CONFIG_USB_EHCI_HCD=y
-> -- 
-> 1.8.3.2
-> 
+The NOP approach is very simple, no other changes (eg offset
+recalculation) needs to be done to the DT, so we can do this process
+with a very small code footprint and without libfdt.
+
+Choosing which sections to drop is done with some combination of
+hardwired code and searching for specific property patterns. There are
+also a few places where placeholder sections are directly fixed up, eg
+a mac address is written into a placeholder of 0s, etc.
+
+So an example might be
+
+   optional_peripheral at 10000 {
+      orc,board-style = <1>;
+      [..]
+   }
+
+Eg The board-style number comes from the EEPROM and if board-style !=
+1 then the entire stanza is replaced with NOP.
+
+Jason
