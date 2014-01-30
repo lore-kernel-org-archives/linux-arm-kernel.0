@@ -1,49 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 30 Jan 2014 16:42:29 -0500 (EST)
-Subject: [PATCH V2] arm64: add DSB after icache flush in
- __flush_icache_all()
-In-Reply-To: <20140130180706.GO7575@mudshark.cambridge.arm.com>
-References: <1390892813-30407-1-git-send-email-vkale@apm.com>
- <20140128161402.GI2885@mudshark.cambridge.arm.com>
- <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
- <20140130180706.GO7575@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1401301640500.1652@knanqh.ubzr>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 30 Jan 2014 13:47:15 -0800
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <CAGa+x85md++qtw5n7c_4L-MvaK8nB3c8GpFf+OLb4p--8N=+og@mail.gmail.com>
+References: <20140130111919.afc7f4e5b58e409aaabf7550@canb.auug.org.au>
+ <CAGa+x85md++qtw5n7c_4L-MvaK8nB3c8GpFf+OLb4p--8N=+og@mail.gmail.com>
+Message-ID: <CAPtuhTgAF7u-yZi3OpmAPikhp25nu+ooqEQXbJELVKTkAaJh4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jan 2014, Will Deacon wrote:
+On Wed, Jan 29, 2014 at 9:33 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Wed, Jan 29, 2014 at 4:19 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>> Hi all,
+>>
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> drivers/clk/Makefile between commit fd3fdaf09f26 ("clk: sort Makefile")
+>> from Linus' tree and commit 7ee2c5117483 ("clk: bcm281xx: add initial
+>> clock framework support") from the arm-soc tree.
+>
+> Ugh.  Looks like some last minute cleanup stuff went into clk-next
+> that didn't spend time in linux-next, and now causes conflicts with
+> some clk stuff we still have queued in arm-soc (ack'd by Mike.)
+>
+> Now, based on the Hulk's response to Mike's pull request, if we submit
+> this, introducing yet more conflicts in the Makefile, it will surely
+> be Hulk angry, Hulk smash.
 
-> On Thu, Jan 30, 2014 at 06:04:43AM +0000, Vinayak Kale wrote:
-> > On Tue, Jan 28, 2014 at 9:44 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Tue, Jan 28, 2014 at 07:06:53AM +0000, Vinayak Kale wrote:
-> > >> V2: - Add more desciption in the commit message as suggested by Catalin & Will
-> > >>     - Use 'memory' clobber for flush instruction as suggested by Will
-> > >
-> > > Please can you check and fix other occurrences of this bug too, as I asked
-> > > in v1? For example, a 2 second grep shows problems with data-cache
-> > > maintenance in kvm. I can also see the same problem for system register
-> > > writes followed up with isb.
-> > Can you please elaborate whether you are referring to lack of memory
-> > clobber or missing barriers?
-> 
-> The clobbers. For example:
-> 
-> arch/arm64/kvm/sys_regs.c:
-> 
->         /* Make sure noone else changes CSSELR during this! */
->         local_irq_disable();
->         /* Put value into CSSELR */
->         asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
->         isb();
->         /* Read result out of CCSIDR */
->         asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
->         local_irq_enable();
-> 
-> Just about everything can be re-ordered in that block, because the asm
-> volatile statements don't have "memory" clobbers.
+Well this is clearly my fault. Please place appropriate blame on me
+for sneaking in that Makefile cleanup.
 
-I don't think they would be reordered at all with the 
-volatile qualifiers.
+/me prepares to be smashed.
 
+Regards,
+Mike
 
-Nicolas
+>
+> Kevin
