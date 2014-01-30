@@ -1,41 +1,29 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 29 Jan 2014 22:20:48 -0300
-Subject: [linux-sunxi] [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI
- controller driver
-In-Reply-To: <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
- <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52E9A8F0.8030901@elopez.com.ar>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Wed, 29 Jan 2014 22:36:38 -0300
+Subject: [PATCH] of: add vendor prefix for Allwinner Technology
+Message-ID: <1391045798-7053-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+We have been using the "allwinner" prefix for everything so far; let's
+document it here.
 
-El 29/01/14 08:10, Maxime Ripard escribi?:
-> The Allwinner A31 has a new SPI controller IP compared to the older Allwinner
-> SoCs.
->
-> It supports DMA, but the driver only does PIO for now, and DMA will be
-> supported eventually.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-(snip)
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(sspi->hclk);
-> +	if (ret) {
-> +		dev_err(dev, "Couldn't enable clock 'ahb spi'\n");
-> +		goto out;
-> +	}
-> +
-> +	ret = clk_prepare_enable(sspi->mclk);
-> +	if (ret) {
-> +		dev_err(dev, "Couldn't enable clock 'ahb spi'\n");
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-A different message would be nice :)
-
-Cheers,
-
-Emilio
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index edbb8d8..5a2904b 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -7,6 +7,7 @@ ad	Avionic Design GmbH
+ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+ ak	Asahi Kasei Corp.
++allwinner	Allwinner Technology Co., Ltd.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+ apm	Applied Micro Circuits Corporation (APM)
+-- 
+1.8.5.3
