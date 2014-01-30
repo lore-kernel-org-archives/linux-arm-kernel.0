@@ -1,37 +1,37 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 30 Jan 2014 11:45:49 +0200
-Subject: [PATCH v3 0/6] efuse driver for Tegra
-In-Reply-To: <CAP=VYLpJT1T2RGuK73TXhSYn-K+ZrLx9FuhQe+hVXYGnfoOBcQ@mail.gmail.com>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
- <CAP=VYLpJT1T2RGuK73TXhSYn-K+ZrLx9FuhQe+hVXYGnfoOBcQ@mail.gmail.com>
-Message-ID: <20140130094549.GD26588@tbergstrom-lnx.Nvidia.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 30 Jan 2014 09:57:41 +0100
+Subject: [linux-sunxi] Re: [RFC PATCH v2 08/14] mtd: nand: add sunxi NAND
+ flash controller support
+In-Reply-To: <20140129191005.GG1427@obsidianresearch.com>
+References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1391006064-28890-9-git-send-email-b.brezillon.dev@gmail.com>
+ <20140129175641.GF1427@obsidianresearch.com>
+ <20140129184619.GC27143@localhost>
+ <20140129191005.GG1427@obsidianresearch.com>
+Message-ID: <52EA1405.8060801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 04:00:27PM +0100, Paul Gortmaker wrote:
-> On Tue, Jan 28, 2014 at 6:36 PM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > This driver allows userspace to read the raw efuse data. Its userspace
-> > interface is modelled after the sunxi_sid driver which provides similar
-> > functionality for some Allwinner SoCs. It has been tested on
-> > Tegra20 (ventana), Tegra30 (beaverboard) and Tegra114 (dalmore).
-> >
-> > Changes since v1:
-> >
-> > * Add documentation for sysfs interface
-> > * Cleanup messages
-> >
-> > Changes since v2:
-> >
-> > * Incorporate early fuse code
-> > * Remove module support
-> > * Make driver always build when Tegra platform is selected
-> 
-> Given the above, you should be able to remove #include <linux/module.h>
-> and MODULE_DEVICE_TABLE, etc.
+On 29/01/2014 20:10, Jason Gunthorpe wrote:
+> On Wed, Jan 29, 2014 at 03:46:20PM -0300, Ezequiel Garcia wrote:
+>
+>> After CE# has been pulled high and then transitioned low again, the host
+>> should issue a Set Features to select the appropriate asynchronous timing mode.
+>> """
+> Oh, I had forgot you should do a set feature too
+>
+> Boris, I think the core core should handle this dance and the driver
+> should just implement a call back to change the timing mode on the
+> interface..
+>
+> If I ever get a moment I can work on support for timing setting in the
+> mvebu driver, I have boards here with ONFI NAND..
 
-Indeed. Thanks for noticing!
+Okay, I'll wait :).
 
-Cheers,
+Thanks.
 
-Peter.
+>
+> Regards,
+> Jason
+>
