@@ -1,29 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jan 2014 15:38:12 +0000
-Subject: NFS client broken in Linus' tip
-In-Reply-To: <20140130143208.GB9573@infradead.org>
-References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
- <20140130141405.GA23985@infradead.org>
- <20140130142752.GX15937@n2100.arm.linux.org.uk>
- <20140130143208.GB9573@infradead.org>
-Message-ID: <20140130153812.GA15937@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 30 Jan 2014 16:43:22 +0100
+Subject: [PATCH v3 2/8] clk: sunxi: update clock-output-names dt binding
+ documentation
+In-Reply-To: <CAGb2v66+N9tgOO4X093WdiR4J+7Sk2TDVsMffDGo46iTezPQwA@mail.gmail.com>
+References: <1389257565-19797-1-git-send-email-wens@csie.org>
+ <1389257565-19797-3-git-send-email-wens@csie.org>
+ <52D89BB1.3030206@elopez.com.ar>
+ <CAGb2v66+N9tgOO4X093WdiR4J+7Sk2TDVsMffDGo46iTezPQwA@mail.gmail.com>
+Message-ID: <20140130154322.GS3867@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 06:32:08AM -0800, Christoph Hellwig wrote:
-> On Thu, Jan 30, 2014 at 02:27:52PM +0000, Russell King - ARM Linux wrote:
-> > Yes and no.  I still end up with an empty /etc/mtab, but the file now
-> > exists.  However, I can create and echo data into /etc/mtab, but it seems
-> > that can't happen at boot time.
-> 
-> Odd.  Can you disable CONFIG_NFSD_V3_ACL for now to isolate the issue?
+Hi Chen-Yu,
 
-Unfortunately, that results in some problem at boot time, which
-ultimately ends up with the other three CPUs being stopped, and
-hence the original reason scrolls off the screen before it can be
-read... even at 1920p.
+On Wed, Jan 29, 2014 at 09:52:57AM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> On Fri, Jan 17, 2014 at 10:55 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> > Hi,
+> >
+> > El 09/01/14 05:52, Chen-Yu Tsai escribi?:
+> >
+> >> clock-output-names is now required for most of sunxi clock nodes, to
+> >> provide the name of the corresponding clock. Add the new requirements,
+> >> exceptions, as well as examples.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>   Documentation/devicetree/bindings/clock/sunxi.txt | 36
+> >> +++++++++++++++++++----
+> >>   1 file changed, 31 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> index 0c127cd..8a9147d 100644
+> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> @@ -44,10 +44,18 @@ Required properties for all clocks:
+> >>         multiplexed clocks, the list order must match the hardware
+> >>         programming order.
+> >>   - #clock-cells : from common clock binding; shall be set to 0 except for
+> >> -       "allwinner,*-gates-clk" where it shall be set to 1
+> >> +       "allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk" and
+> >> +       "allwinner,sun4i-pll6-clk" where it shall be set to 1
+> >>
+> >> -Additionally, "allwinner,*-gates-clk" clocks require:
+> >> -- clock-output-names : the corresponding gate names that the clock
+> >> controls
+> >> +Additionally, most clocks require "clock-output-names":
+> >> +- "allwinner,*-gates-clk" : the corresponding gate names that the clock
+> >> controls
+> >> +- "allwinner,sun4i-pll5-clk" : "pll5_ddr", "pll5_mbus"
+> >> +- "allwinner,sun4i-pll6-clk" : "pll6_sata", "pll6_other"
+> >> +- "allwinner,sun4i-cpu-clk", "allwinner,sun4i-axi-clk",
+> >> +  "allwinner,sun4i-ahb-clk", "allwinner,sun4i-ahb-clk",
+> >> +  "allwinner,sun4i-apb1-mux-clk", "allwinner,sun4i-apb1-clk"
+> >> +  do not need "clock-output-names"
+> >> +- all others clocks : the corresponding module name of that clock
+> >
+> >
+> > As we discussed on IRC, I wonder if such verbosity is actually needed. Maybe
+> > we should dictate that all clocks must list their corresponding outputs on
+> > clock-output-names (with it being the module name if it only has one
+> > output).
+> 
+> Maxime, could we get your input on this?
+
+I didn't get it was a question for me. But I'm fine with both. If
+making clock-output-names mandatory makes our life easier, let's do
+it.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140130/f0d18584/attachment.sig>
