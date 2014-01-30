@@ -1,115 +1,156 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Jan 2014 17:24:35 +0000
-Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <1391102475.9495.44.camel@kazak.uk.xensource.com>
-References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
- <52EA8853.8080709@arm.com> <1391102475.9495.44.camel@kazak.uk.xensource.com>
-Message-ID: <52EA8AD3.8080904@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 30 Jan 2014 18:28:52 +0100
+Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
+ idle loop
+In-Reply-To: <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
+ <52E9C946.50704@linux.vnet.ibm.com>
+ <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
+ <52EA5720.8010000@linaro.org>
+ <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
+Message-ID: <52EA8BD4.6020803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/14 17:21, Ian Campbell wrote:
-> On Thu, 2014-01-30 at 17:13 +0000, Marc Zyngier wrote:
->> Hi Ian,
+On 01/30/2014 05:07 PM, Nicolas Pitre wrote:
+> On Thu, 30 Jan 2014, Daniel Lezcano wrote:
+>
+>> On 01/30/2014 06:28 AM, Nicolas Pitre wrote:
+>>> On Thu, 30 Jan 2014, Preeti U Murthy wrote:
+>>>
+>>>> Hi Nicolas,
+>>>>
+>>>> On 01/30/2014 02:01 AM, Nicolas Pitre wrote:
+>>>>> On Wed, 29 Jan 2014, Nicolas Pitre wrote:
+>>>>>
+>>>>>> In order to integrate cpuidle with the scheduler, we must have a
+>>>>>> better
+>>>>>> proximity in the core code with what cpuidle is doing and not delegate
+>>>>>> such interaction to arch code.
+>>>>>>
+>>>>>> Architectures implementing arch_cpu_idle() should simply enter
+>>>>>> a cheap idle mode in the absence of a proper cpuidle driver.
+>>>>>>
+>>>>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>>>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>
+>>>>> As mentioned in my reply to Olof's comment on patch #5/6, here's a new
+>>>>> version of this patch adding the safety local_irq_enable() to the core
+>>>>> code.
+>>>>>
+>>>>> ----- >8
+>>>>>
+>>>>> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+>>>>> Subject: idle: move the cpuidle entry point to the generic idle loop
+>>>>>
+>>>>> In order to integrate cpuidle with the scheduler, we must have a better
+>>>>> proximity in the core code with what cpuidle is doing and not delegate
+>>>>> such interaction to arch code.
+>>>>>
+>>>>> Architectures implementing arch_cpu_idle() should simply enter
+>>>>> a cheap idle mode in the absence of a proper cpuidle driver.
+>>>>>
+>>>>> In both cases i.e. whether it is a cpuidle driver or the default
+>>>>> arch_cpu_idle(), the calling convention expects IRQs to be disabled
+>>>>> on entry and enabled on exit. There is a warning in place already but
+>>>>> let's add a forced IRQ enable here as well.  This will allow for
+>>>>> removing the forced IRQ enable some implementations do locally and
+>>>>
+>>>> Why would this patch allow for removing the forced IRQ enable that are
+>>>> being done on some archs in arch_cpu_idle()? Isn't this patch expecting
+>>>> the default arch_cpu_idle() to have re-enabled the interrupts after
+>>>> exiting from the default idle state? Its supposed to only catch faulty
+>>>> cpuidle drivers that haven't enabled IRQs on exit from idle state but
+>>>> are expected to have done so, isn't it?
+>>>
+>>> Exact.  However x86 currently does this:
+>>>
+>>>   if (cpuidle_idle_call())
+>>>           x86_idle();
+>>>   else
+>>>           local_irq_enable();
+>>>
+>>> So whenever cpuidle_idle_call() is successful then IRQs are
+>>> unconditionally enabled whether or not the underlying cpuidle driver has
+>>> properly done it or not.  And the reason is that some of the x86 cpuidle
+>>> do fail to enable IRQs before returning.
+>>>
+>>> So the idea is to get rid of this unconditional IRQ enabling and let the
+>>> core issue a warning instead (as well as enabling IRQs to allow the
+>>> system to run).
 >>
->> On 30/01/14 16:11, Ian Campbell wrote:
->>> mach-virt has existed for a while but it is not written down what it actually
->>> consists of. Although it seems a bit unusual to document a binding for an
->>> entire platform since mach-virt is entirely virtual it is helpful to have
->>> something to refer to in the absence of a single concrete implementation.
->>>
->>> I've done my best to capture the requirements based on the git log and my
->>> memory/understanding.
->>>
->>> While here remove the xenvm dts example, the Xen tools will now build a
->>> suitable mach-virt compatible dts when launching the guest.
->>>
->>> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: Pawel Moll <pawel.moll@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Kumar Gala <galak@codeaurora.org>
->>> Cc: Olof Johansson <olof@lixom.net>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Cc: devicetree at vger.kernel.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> ---
->>> I'm not sure which tree this sort of thing should go though, sorry for the
->>> huge Cc.
->>> ---
->>>  .../devicetree/bindings/arm/mach-virt.txt          |   32 ++++++++
->>>  arch/arm/boot/dts/xenvm-4.2.dts                    |   81 --------------------
->>>  2 files changed, 32 insertions(+), 81 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/mach-virt.txt
->>>  delete mode 100644 arch/arm/boot/dts/xenvm-4.2.dts
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/mach-virt.txt b/Documentation/devicetree/bindings/arm/mach-virt.txt
->>> new file mode 100644
->>> index 0000000..562bcda
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/mach-virt.txt
->>> @@ -0,0 +1,32 @@
->>> +* Mach-virt "Dummy Virtual Machine" platform
->>> +
->>> +"mach-virt" is the smallest, dumbest platform possible, to be used as
->>> +a guest for Xen, KVM and other hypervisors. It has no
->>> +properties/functionality of its own and is driven entirely by device
->>> +tree.
->>> +
->>> +This document defines the requirements for such a platform.
->>> +
->>> +* Required properties:
->>> +
->>> +- compatible: should be one of:
->>> +	"linux,dummy-virt"
->>> +	"xen,xenvm"
->>> +
->>> +In addition to the standard nodes (chosen, cpus, memory etc) the
->>> +platform is required to provide certain other basic functionality
->>> +which must be described in the device tree:
->>> +
->>> +    The platform must provide an ARM Generic Interrupt Controller
->>> +    (GIC), defined in Documentation/devicetree/bindings/arm/gic.txt.
->>> +
->>> +    The platform must provide ARM architected timer, defined in
->>> +    Documentation/devicetree/bindings/arm/arch_timer.txt.
->>> +
->>> +    If the platform is SMP then it must provide the Power State
->>> +    Coordination Interface (PSCI) described in
->>> +    Documentation/devicetree/bindings/arm/psci.txt.
+>> But what I don't get with your comment is the local_irq_enable is done from
+>> the cpuidle common framework in 'cpuidle_enter_state' it is not done from the
+>> arch specific backend cpuidle driver.
+>
+> Oh well... This certainly means we'll have to clean this mess as some
+> drivers do it on their own while some others don't.  Some drivers also
+> loop on !need_resched() while some others simply return on the first
+> interrupt.
+
+Ok, I think the mess is coming from 'default_idle' which does not 
+re-enable the local_irq but used from different places like 
+amd_e400_idle and apm_cpu_idle.
+
+void default_idle(void)
+{
+         trace_cpu_idle_rcuidle(1, smp_processor_id());
+         safe_halt();
+         trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+}
+
+Considering the system configured without cpuidle because this one 
+*always* enable the local irq, we have the different cases:
+
+x86_idle = default_idle();
+==> local_irq_enable is missing
+
+x86_idle = amd_e400_idle();
+==> it calls local_irq_disable(); but in the idle loop context where the 
+local irqs are already disabled.
+==> if amd_e400_c1e_detected is true, the local_irq are enabled
+==> otherwise no
+==> default_idle is called from there and does not enable local_irqs
+
+
+>> So the code above could be:
 >>
->> I'm afraid I disagree with most of the above. The whole point of
->> mach-virt is to provide a shell for DT platforms. None of this hardware
->> is mandated. Instead, all the necessary information should be described
->> in DT.
-> 
-> "Add support for the smallest, dumbest possible platform, to be
->  used as a guest for KVM or other hypervisors.
-> 
->  It only mandates a GIC and architected timers"
-> 
-> (your original commit message :-P)
+>> 	if (cpuidle_idle_call())
+>> 		x86_idle();
+>>
+>> without the else section, this local_irq_enable is pointless. Or may be I
+>> missed something ?
+>
+> A later patch removes it anyway.  But if it is really necessary to
+> enable interrupts then the core will do it but with a warning now.
 
-Right. 1984, here we come. I'll disappear for a while, rewriting the
-history. More seriously, that was just me scheming to get it merged,
-hiding my cunning plan for mach-virt world domination!
+This WARN should disappear. It was there because it was up to the 
+backend cpuidle driver to enable the irq. But in the meantime, that was 
+consolidated into a single place in the cpuidle framework so no need to 
+try to catch errors.
 
->> Actually, mach-virt doesn't really stand for Virtual Machine. It stands
->> for virtual mach-* directory! Eventually, mach-virt should become the
->> default platform, the one we use when we don't match anything else in
->> the kernel
-> 
-> I can word it more like that for sure, along with the alternative
-> wording suggested by Christopher/Stefano to clarify the intent that
-> everything comes from DTB and removal of the specific requirements for
-> GIC/timer/PSCI I think that suit the (new) intention better?
+What about (based on this patchset).
 
-Yes, please! :-)
+diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
+index 4505e2a..2d60cbb 100644
+--- a/arch/x86/kernel/process.c
++++ b/arch/x86/kernel/process.c
+@@ -299,6 +299,7 @@ void arch_cpu_idle_dead(void)
+  void arch_cpu_idle(void)
+  {
+         x86_idle();
++       local_irq_enable();
+  }
 
-	M.
+  /*
+
+
+
 -- 
-Jazz is not dead. It just smells funny...
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
