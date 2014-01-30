@@ -1,164 +1,50 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 29 Jan 2014 17:46:16 -0600
-Subject: [PATCH 4/4] ARM: dts: DRA7: Add device nodes for ABB
-In-Reply-To: <1391039177-25284-1-git-send-email-nm@ti.com>
-References: <1391039177-25284-1-git-send-email-nm@ti.com>
-Message-ID: <1391039177-25284-5-git-send-email-nm@ti.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 29 Jan 2014 16:03:13 -0800
+Subject: [PATCH V5 0/5] Add X-Gene platform reboot mechanism
+Message-ID: <1391040198-14185-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ABB device nodes for DRA7 family of devices. Data is based on
-DRA7 Technical Reference Manual revision I (Sept 2013)
+Enable reboot driver for the X-Gene platform. Add generic syscon reboot
+driver.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Depends on https://patchwork.kernel.org/patch/3530111/
+V5 Change:
+	- Documentation update, endian and access size.
 
- arch/arm/boot/dts/dra7.dtsi |  132 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 132 insertions(+)
+V4 Change:
+	- Remove old X-Gene reboot driver
+	- Add generic syscon reboot driver
+	- Add DTS and Kconfig for X-Gene reboot using syscon method
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1fd75aa..23a2a11 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -559,6 +559,138 @@
- 			status = "disabled";
- 		};
- 
-+		abb_mpu: regulator-abb-mpu {
-+			compatible = "ti,abb-v3";
-+			regulator-name = "abb_mpu";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			clocks = <&sys_clkin1>;
-+			ti,settling-time = <50>;
-+			ti,clock-cycles = <16>;
-+
-+			reg = <0x4ae07ddc 0x4>, <0x4ae07de0 0x4>,
-+			      <0x4ae06014 0x4>, <0x4a003b20 0x8>,
-+			      <0x4ae0c158 0x4>;
-+			reg-names = "setup-address", "control-address",
-+				    "int-address", "efuse-address",
-+				    "ldo-address";
-+			ti,tranxdone-status-mask = <0x80>;
-+			/* LDOVBBMPU_FBB_MUX_CTRL */
-+			ti,ldovbb-override-mask = <0x400>;
-+			/* LDOVBBMPU_FBB_VSET_OUT */
-+			ti,ldovbb-vset-mask = <0x1F>;
-+
-+			/*
-+			 * NOTE: only FBB mode used but actual vset will
-+			 * determine final biasing
-+			 */
-+			ti,abb_info = <
-+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-+			1060000		0	0x0	0 0x02000000 0x01F00000
-+			1160000		0	0x4	0 0x02000000 0x01F00000
-+			1210000		0	0x8	0 0x02000000 0x01F00000
-+			>;
-+		};
-+
-+		abb_ivahd: regulator-abb-ivahd {
-+			compatible = "ti,abb-v3";
-+			regulator-name = "abb_ivahd";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			clocks = <&sys_clkin1>;
-+			ti,settling-time = <50>;
-+			ti,clock-cycles = <16>;
-+
-+			reg = <0x4ae07e34 0x4>, <0x4ae07e24 0x4>,
-+			      <0x4ae06010 0x4>, <0x4a0025cc 0x8>,
-+			      <0x4a002470 0x4>;
-+			reg-names = "setup-address", "control-address",
-+				    "int-address", "efuse-address",
-+				    "ldo-address";
-+			ti,tranxdone-status-mask = <0x40000000>;
-+			/* LDOVBBIVA_FBB_MUX_CTRL */
-+			ti,ldovbb-override-mask = <0x400>;
-+			/* LDOVBBIVA_FBB_VSET_OUT */
-+			ti,ldovbb-vset-mask = <0x1F>;
-+
-+			/*
-+			 * NOTE: only FBB mode used but actual vset will
-+			 * determine final biasing
-+			 */
-+			ti,abb_info = <
-+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-+			1055000		0	0x0	0 0x02000000 0x01F00000
-+			1150000		0	0x4	0 0x02000000 0x01F00000
-+			1250000		0	0x8	0 0x02000000 0x01F00000
-+			>;
-+		};
-+
-+		abb_dspeve: regulator-abb-dspeve {
-+			compatible = "ti,abb-v3";
-+			regulator-name = "abb_dspeve";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			clocks = <&sys_clkin1>;
-+			ti,settling-time = <50>;
-+			ti,clock-cycles = <16>;
-+
-+			reg = <0x4ae07e30 0x4>, <0x4ae07e20 0x4>,
-+			      <0x4ae06010 0x4>, <0x4a0025e0 0x8>,
-+			      <0x4a00246c 0x4>;
-+			reg-names = "setup-address", "control-address",
-+				    "int-address", "efuse-address",
-+				    "ldo-address";
-+			ti,tranxdone-status-mask = <0x20000000>;
-+			/* LDOVBBDSPEVE_FBB_MUX_CTRL */
-+			ti,ldovbb-override-mask = <0x400>;
-+			/* LDOVBBDSPEVE_FBB_VSET_OUT */
-+			ti,ldovbb-vset-mask = <0x1F>;
-+
-+			/*
-+			 * NOTE: only FBB mode used but actual vset will
-+			 * determine final biasing
-+			 */
-+			ti,abb_info = <
-+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-+			1055000		0	0x0	0 0x02000000 0x01F00000
-+			1150000		0	0x4	0 0x02000000 0x01F00000
-+			1250000		0	0x8	0 0x02000000 0x01F00000
-+			>;
-+		};
-+
-+		abb_gpu: regulator-abb-gpu {
-+			compatible = "ti,abb-v3";
-+			regulator-name = "abb_gpu";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			clocks = <&sys_clkin1>;
-+			ti,settling-time = <50>;
-+			ti,clock-cycles = <16>;
-+
-+			reg = <0x4ae07de4 0x4>, <0x4ae07de8 0x4>,
-+			      <0x4ae06010 0x4>, <0x4a003b08 0x8>,
-+			      <0x4ae0c154 0x4>;
-+			reg-names = "setup-address", "control-address",
-+				    "int-address", "efuse-address",
-+				    "ldo-address";
-+			ti,tranxdone-status-mask = <0x10000000>;
-+			/* LDOVBBGPU_FBB_MUX_CTRL */
-+			ti,ldovbb-override-mask = <0x400>;
-+			/* LDOVBBGPU_FBB_VSET_OUT */
-+			ti,ldovbb-vset-mask = <0x1F>;
-+
-+			/*
-+			 * NOTE: only FBB mode used but actual vset will
-+			 * determine final biasing
-+			 */
-+			ti,abb_info = <
-+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-+			1090000		0	0x0	0 0x02000000 0x01F00000
-+			1210000		0	0x4	0 0x02000000 0x01F00000
-+			1280000		0	0x8	0 0x02000000 0x01F00000
-+			>;
-+		};
-+
- 		mcspi1: spi at 48098000 {
- 			compatible = "ti,omap4-mcspi";
- 			reg = <0x48098000 0x200>;
+V3 Change:
+	- Remove the reboot driver's use of acpi resource patch.
+	- Change the reboot driver to use syscon to parse out 
+	  system clock register. Remove the old method of getting
+	  register from the reboot driver directly.
+	- Remove documentation since its now simple.
+
+V2 Change:
+	- Add support for using ACPI resource.
+
+Feng Kan (5):
+  power: reset: Add generic SYSCON register mapped reset
+  power: reset: Remove X-Gene reboot driver
+  arm64: dts: Add X-Gene reboot driver dts node
+  arm64: Select reboot driver for X-Gene platform
+  Documentation: power: reset: Add documentation for generic SYSCON
+    reboot driver
+
+ .../bindings/power/reset/syscon-reboot.txt         |   23 +++++
+ arch/arm64/Kconfig                                 |    2 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   13 +++
+ drivers/power/reset/Kconfig                        |    8 +-
+ drivers/power/reset/Makefile                       |    2 +-
+ drivers/power/reset/syscon-reboot.c                |  100 +++++++++++++++++++
+ drivers/power/reset/xgene-reboot.c                 |  103 --------------------
+ 7 files changed, 143 insertions(+), 108 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+ create mode 100644 drivers/power/reset/syscon-reboot.c
+ delete mode 100644 drivers/power/reset/xgene-reboot.c
+
 -- 
-1.7.9.5
+1.7.6.1
