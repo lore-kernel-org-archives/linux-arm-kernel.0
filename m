@@ -1,61 +1,125 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 30 Jan 2014 18:45:46 +0100
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <52E939CB.1020705@amd.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
- <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
- <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
- <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
- <52E939CB.1020705@amd.com>
-Message-ID: <20140130174546.GF13543@alberich>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 30 Jan 2014 19:00:11 +0100
+Subject: [alsa-devel] [PATCH RFC v3 0/8] Beaglebone-Black HDMI audio
+In-Reply-To: <52EA43A8.9050909@ti.com>
+References: <y> <cover.1390836773.git.jsarha@ti.com>
+ <52E6806A.2090109@metafoo.de> <52E686B2.9060806@ti.com>
+ <20140127190641.273890c6@armhf> <52E6B42F.4050901@ti.com>
+ <20140128102353.48e8fb51@armhf> <52EA43A8.9050909@ti.com>
+Message-ID: <20140130190011.3849cf37@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 12:26:35PM -0500, Suravee Suthikulanit wrote:
-> On 1/29/2014 11:16 AM, Andreas Herrmann wrote:
-> > On Wed, Jan 29, 2014 at 11:59:12AM -0500, Suravee Suthikulanit wrote:
-> >> On 1/29/2014 10:57 AM, Rob Herring wrote:
-> >>>>> diff --git a/include/linux/of.h b/include/linux/of.h
-> >>>>>>> index 276c546..24e1b28 100644
-> >>>>>>> --- a/include/linux/of.h
-> >>>>>>> +++ b/include/linux/of.h
-> >>>>>>> @@ -67,7 +67,7 @@ struct device_node {
-> >>>>>>>    #endif
-> >>>>>>>    };
-> >>>>>>>
-> >>>>>>> -#define MAX_PHANDLE_ARGS 8
-> >>>>>>> +#define MAX_PHANDLE_ARGS 16
-> >>>>>
-> >>>>>
-> >>>>> Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't
-> >>>>> this be changed to be able to support 128 StreamIDs as well?  Although I am
-> >>>>> not sure if this would be too big to have on the stack per Rob's comment in
-> >>>>> the previous patch set.
-> >>> Do you actually need 128 now? If not, then we can deal with that when
-> >>> we get there. There are lots of things in spec's that are not actually
-> >>> implemented or supported.
-> >>
-> >> Actually, we are using 32 on the AMD system. So, do you think we can set
-> >> this to 32 instead?
-> >
-> > I think that's ok.
-> >
-> > But are we really talking about number of SMRs or number of StreamIDs
-> > per master device here? Ie. are you just having 32 SMRs for an SMMU on
-> > your AMD system or do you have master devices which have 32 StreamIDs?
-> >
-> > If it's just number of SMRs we don't need to modify this macro.
+On Thu, 30 Jan 2014 14:20:56 +0200
+Jyri Sarha <jsarha@ti.com> wrote:
 
-> I am referring to the case where each mmu-master can have upto 32 streamID.
+> I am having trouble getting the tda998x-codec working on BBB. The 
+> problem is I do not have a DT node for the tda998x driver. Instead I 
+> have tilcdc-slave node that provides pdata for the tda-driver.
+> 
+> I am thinking of solving the problem by adding a reference to the 
+> i2c-adapter hosting tda998x as an optional DT property to the codec 
+> node. I could then dig the driver instance from the i2c adapter's 
+> children. Any better ideas?
 
-Rob,
+I better think about a 'normal' DT definition:
 
-Do you agree on increasing MAX_PHANDLE_ARGS to 32?
+- in the DT, define the tda998x in a i2c subnode:
 
-Or should this be done when someone (e.g. Suravee) submits a DTS
-update with an SMMU node description containing more than 16 stream
-IDs for a master device?
+  &i2c0 {
+	tda998x: hdmi-encoder {
+		compatible = "nxp,tda998x";
+		reg = <0x70>;
+		/* the video ports are OK by default */
+		/* define the interrupt if you want to use it */
+	};
+  };
 
+- in tilcdc_slave.c, in the function slave_encoder_create(), instead of
+  using drm_i2c_encoder_init(), do quite the same, but without calling
+  request_module() nor i2c_new_device().
 
-Andreas
+  This can be done as follows (the code is not compiled):
+
+--------------------8<---------------------
+static struct drm_encoder *slave_encoder_create(struct drm_device *dev,
+		struct slave_module *mod)
+{
+	struct slave_encoder *slave_encoder;
+	struct drm_encoder *encoder;
+	int ret;
+/* ------ added ------ */
+	struct device_node *np;
+	static const struct of_device_id tda_dt[] = {
+		{ .compatible = "nxp,tda998x" },
+		{ },
+	};
+/* ------ end added ------ */
+
+	... no change ...
+
+	 drm_encoder_helper_add(encoder, &slave_encoder_helper_funcs);
+
+/* ------ added ------ */
+
+	/* search the tda998x device */
+	np = of_find_matching_node_and_match(NULL, tda_dt, NULL);
+	if (np && of_device_is_available(np)) {
+		struct i2c_client *i2c_client;
+		struct drm_i2c_encoder_driver *encoder_drv;
+		struct module *module;
+
+					/* the tda998x is in the DT */
+
+		i2c_client = of_find_i2c_device_by_node(np);
+		of_node_put(np);
+		if (!i2c_client) {
+			dev_err(dev->dev, "no tda998x i2c client\n");
+			goto fail;
+		}
+
+		to_encoder_slave(encoder)->bus_priv = i2c_client;
+
+		encoder_drv = to_drm_i2c_encoder_driver(
+				to_i2c_driver(i2c_client->dev.driver));
+
+		/* lock the tda998x module in memory */
+		module = to_i2c_driver(i2c_client->dev.driver)->driver.owner;
+		if (!module || !try_module_get(module)) {
+			dev_err(dev->dev, "cannot get module %s\n", module->name);
+			goto fail;
+		}
+
+		ret = encoder_drv->encoder_init(i2c_client, dev, encoder_slave);
+		if (ret < 0) {
+			dev_err(dev->dev, "slave encoder init failed\n");
+			module_put(module);
+			goto fail;
+		}
+					/* set_config is useless */
+		return encoder;
+	}
+
+/* ------ end added ------ */
+
+	ret = drm_i2c_encoder_init(dev, to_encoder_slave(encoder), mod->i2c, &info);
+	if (ret)
+		goto fail;
+
+	return encoder;
+
+fail:
+	slave_encoder_destroy(encoder);
+	return NULL;
+}
+--------------------8<---------------------
+
+When the tda998x is in the DT, the i2c_client is already created.
+It must not be freed, and so, the function drm_i2c_encoder_destroy()
+must not be called. But, the module must be explicitly unlocked in
+slave_encoder_destroy(), and then, there must be some flag in the
+structures for this job to be done...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
