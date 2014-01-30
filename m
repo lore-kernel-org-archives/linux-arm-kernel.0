@@ -1,43 +1,64 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 30 Jan 2014 11:32:32 +0530
-Subject: [PATCH v2 0/2] drivers/media: Add controls for Horizontal and
- Vertical MV Search Range
-In-Reply-To: <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
-References: <52E0ED10.2020901@samsung.com>
- <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
-Message-ID: <CAK9yfHzMk=NyC942z6mGFm6M--AZ7Tkq8q__MfvBGOnNrJ5vyA@mail.gmail.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Thu, 30 Jan 2014 11:34:43 +0530
+Subject: [PATCH V2] arm64: add DSB after icache flush in
+ __flush_icache_all()
+In-Reply-To: <20140128161402.GI2885@mudshark.cambridge.arm.com>
+References: <1390892813-30407-1-git-send-email-vkale@apm.com>
+ <20140128161402.GI2885@mudshark.cambridge.arm.com>
+Message-ID: <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+Hi Will,
 
-On 30 January 2014 11:12, Amit Grover <amit.grover@samsung.com> wrote:
-> Based on 'master' branch of Linux-next.
-
-Kamil's tree [1] would be more current most of the times for this driver.
-
-[1] git://linuxtv.org/kdebski/media.git
-
-
-> This is v2 version for the patch:
-> s5p-mfc: Add Horizontal and Vertical search range for Video Macro Blocks
-> (https://lkml.org/lkml/2013/12/30/83)
+On Tue, Jan 28, 2014 at 9:44 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jan 28, 2014 at 07:06:53AM +0000, Vinayak Kale wrote:
+>> Add DSB after icache flush. It's needed to complete the cache maintenance
+>> operation. The function __flush_icache_all() is used only for user space
+>> mappings and an ISB is not required because of an exception return before
+>> executing user instructions. An exception return would behave like an ISB.
+>>
+>> This patch also uses 'memory' clobber for flush operation instruction to
+>> prevent instruction re-ordering by compiler.
+>>
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> ---
+>>
+>> V2: - Add more desciption in the commit message as suggested by Catalin & Will
+>>     - Use 'memory' clobber for flush instruction as suggested by Will
 >
-> Changes from v1:
-> 1) Splitted the patch into v4l2 and mfc driver patches.
-> 2) Incorporated review comments of v1
+> Please can you check and fix other occurrences of this bug too, as I asked
+> in v1? For example, a 2 second grep shows problems with data-cache
+> maintenance in kvm. I can also see the same problem for system register
+> writes followed up with isb.
+Can you please elaborate whether you are referring to lack of memory
+clobber or missing barriers?
 >
-> Amit Grover (2):
->   drivers/media: v4l2: Add settings for Horizontal and Vertical MV
->     Search Range
->   drivers/media: s5p-mfc: Add Horizontal and Vertical MV Search Range
-
-nit: media changes use the following title format:
-[media] v4l2: Add settings for Horizontal and Vertical MV Search Range
-[media] s5p-mfc: Add Horizontal and Vertical MV Search Range
-
-
-
--- 
-With warm regards,
-Sachin
+> I also don't buy you not being able to test AArch32 kernels. Does KVM not
+> work for you?
+Let me see what I can do to address this.
+>
+> Will
+>
+>>
+>>  arch/arm64/include/asm/cacheflush.h | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+>> index fea9ee3..bd30f42 100644
+>> --- a/arch/arm64/include/asm/cacheflush.h
+>> +++ b/arch/arm64/include/asm/cacheflush.h
+>> @@ -115,7 +115,8 @@ extern void flush_dcache_page(struct page *);
+>>
+>>  static inline void __flush_icache_all(void)
+>>  {
+>> -     asm("ic ialluis");
+>> +     asm volatile("ic ialluis" : : : "memory");
+>> +     dsb();
+>>  }
+>>
+>>  #define flush_dcache_mmap_lock(mapping) \
+>> --
+>> 1.8.2.1
+>>
+>>
