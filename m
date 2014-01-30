@@ -1,43 +1,36 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 30 Jan 2014 20:03:11 +0200
-Subject: [PATCH v2] clk: keystone: gate: fix clk_init_data initialization
-Message-ID: <1391104991-15000-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 30 Jan 2014 11:06:00 -0700
+Subject: [RFC PATCH V3 0/4] APM X-Gene PCIe controller
+In-Reply-To: <201401301521.11665.arnd@arndb.de>
+References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
+ <CAErSpo7Dfd4NJBEDuVe1VCvZObFq1YvV2x77S60Z4-CZq89QJw@mail.gmail.com>
+ <CACoXjc=LSrLK=kd9GJoHWJovVDC+TfH2bZO-2Ht9jMoBrL9eag@mail.gmail.com>
+ <201401301521.11665.arnd@arndb.de>
+Message-ID: <CAErSpo79zaf_92KCVkUSCrZLHML0B365K6Q6-0p1LEVVQJ=cVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_init_data struct is allocated in the stack. All members of
-this struct should be initialized before using otherwise it will
-lead to unpredictable situation as it can contain garbage.
+On Thu, Jan 30, 2014 at 7:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 30 January 2014, Tanmay Inamdar wrote:
+>> >
+>> > When you repost, please make sure you fix whatever problem is
+>> > preventing your email from appearing on the vger mailing lists.  I
+>> > won't apply things that haven't appeared on the linux-pci list,
+>> > because that list is the opportunity for other people to review them.
+>> >
+>> You are absolutely right. If the patches are not reaching mailing
+>> list, they should not appear on archive list as well. However I am
+>> seeing my patches recorded on archives. So I am not sure if they are
+>> actually getting dropped on linux-pci or any other mailing list.
+>>
+>> http://www.spinics.net/lists/linux-pci/msg28198.html
+>> http://article.gmane.org/gmane.linux.kernel.pci/28442/match=tanmay+inamdar
+>
+> Very strange. I can also confirm that I received the patches through
+> the linux-arm-kernel and devicetree mailing lists without problems.
 
-Ultimately the clk->flag field contains garbage. In my case it leads
-that flag CLK_IGNORE_UNUSED is set for most of clocks. As result a
-bunch of unused clocks cannot be disabled.
+Sorry, the problem was on my end.  I must have mistakenly marked one
+of those messages as spam, and gmail thought all the rest were spam,
+too.  Sorry about that.
 
-So initialize flags in this structure too.
-
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
-Based on
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-keystone/master
-
-v1..v2:
-- updated commit description only
-
- drivers/clk/keystone/gate.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
-index 17a5983..86f1e36 100644
---- a/drivers/clk/keystone/gate.c
-+++ b/drivers/clk/keystone/gate.c
-@@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
- 
- 	init.name = name;
- 	init.ops = &clk_psc_ops;
-+	init.flags = 0;
- 	init.parent_names = (parent_name ? &parent_name : NULL);
- 	init.num_parents = (parent_name ? 1 : 0);
- 
--- 
-1.8.3.2
+Bjorn
