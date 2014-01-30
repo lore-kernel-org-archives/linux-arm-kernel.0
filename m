@@ -1,29 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jan 2014 19:35:16 +0100
-Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
-In-Reply-To: <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
-References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
- <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
-Message-ID: <201401301935.16463.arnd@arndb.de>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 30 Jan 2014 12:36:38 -0600
+Subject: [PATCH 0/4] Split mach-msm into legacy and mach-qcom (multiplatform)
+Message-ID: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 January 2014, Patrice CHOTARD wrote:
-> From: Alexandre TORGUE <alexandre.torgue@st.com>
-> 
-> This patch adds support to STiD127 SoC.
-> The main adaptation is the L2 cache way size compare to STiH41x SoCs.
-> 
-> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->  arch/arm/mach-sti/board-dt.c |    6 ++++++
->  1 file changed, 6 insertions(+)
+This is the starts of splitting the Qualcomm MSM platform into legacy support
+that we will not try and convert to multiplatform and multiplatform support.
+These patches are based on the 'CPU enable method based SMP' patches.
 
-Wouldn't it be better to read this value from the l2 cache
-controller node? I'd assume there might be more SoCs that
-will need a similar change, so it's better to come up with
-a solution that doesn't involve changing the kernel every
-time.
+I wanted to get these out for review, will add a few more patches for defconfig
+updates/additions, as well as some additional driver being enabled for ARCH_QCOM.
 
-	Arnd
+- k
+
+ arch/arm/mach-msm/board-dt.c       |   27 --
+ arch/arm/mach-msm/hotplug.c        |   51 ----
+ arch/arm/mach-msm/platsmp.c        |  371 ------------------------------------
+ arch/arm/mach-msm/scm-boot.c       |   39 ---
+ arch/arm/mach-msm/scm-boot.h       |   24 --
+ arch/arm/mach-msm/scm.c            |  299 -----------------------------
+ arch/arm/mach-msm/scm.h            |   25 --
+ arch/arm/mach-msm/timer.c          |  333 --------------------------------
+ b/MAINTAINERS                      |    7 
+ b/arch/arm/Kconfig                 |    7 
+ b/arch/arm/Makefile                |    1 
+ b/arch/arm/boot/dts/Makefile       |    6 
+ b/arch/arm/mach-msm/Kconfig        |   54 -----
+ b/arch/arm/mach-msm/Makefile       |    8 
+ b/arch/arm/mach-qcom/Kconfig       |   34 +++
+ b/arch/arm/mach-qcom/Makefile      |    5 
+ b/arch/arm/mach-qcom/board.c       |   26 ++
+ b/arch/arm/mach-qcom/scm-boot.c    |   39 +++
+ b/arch/arm/mach-qcom/scm-boot.h    |   24 ++
+ b/arch/arm/mach-qcom/scm.c         |  299 +++++++++++++++++++++++++++++
+ b/arch/arm/mach-qcom/scm.h         |   25 ++
+ b/arch/arm/mach-qcom/smp.c         |  380 +++++++++++++++++++++++++++++++++++++
+ b/drivers/clocksource/Kconfig      |    4 
+ b/drivers/clocksource/Makefile     |    1 
+ b/drivers/clocksource/qcom-timer.c |  330 ++++++++++++++++++++++++++++++++
+ b/drivers/tty/serial/Kconfig       |    2 
+ 26 files changed, 1188 insertions(+), 1233 deletions(-)
