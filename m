@@ -1,79 +1,61 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 30 Jan 2014 11:54:46 -0500
-Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
-References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <52EA83D6.9050506@codeaurora.org>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 30 Jan 2014 18:56:45 +0200
+Subject: [PATCH] clk: keystone: gate: fix clk_init_data initialization
+In-Reply-To: <52EA627E.8060801@ti.com>
+References: <1391081821-13306-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
+ <52EA5866.3090706@ti.com> <52EA627E.8060801@ti.com>
+Message-ID: <52EA844D.2090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+Ok
 
-On 01/30/2014 11:11 AM, Ian Campbell wrote:
-> mach-virt has existed for a while but it is not written down what it actually
-> consists of. Although it seems a bit unusual to document a binding for an
-> entire platform since mach-virt is entirely virtual it is helpful to have
-> something to refer to in the absence of a single concrete implementation.
-> 
-> I've done my best to capture the requirements based on the git log and my
-> memory/understanding.
-> 
-> While here remove the xenvm dts example, the Xen tools will now build a
-> suitable mach-virt compatible dts when launching the guest.
-
-[...]
-
-> +++ b/Documentation/devicetree/bindings/arm/mach-virt.txt
-> @@ -0,0 +1,32 @@
-> +* Mach-virt "Dummy Virtual Machine" platform
-> +
-> +"mach-virt" is the smallest, dumbest platform possible, to be used as
-> +a guest for Xen, KVM and other hypervisors.
-
-The platform is also useful to, and used by, simulators like QEMU in TCG mode.
-
->                                              It has no
-> +properties/functionality of its own and is driven entirely by device
-> +tree.
-
-I find this wording confusing. I read it as saying the platform has no
-properties or functionality. Perhaps you could phrase it slightly differently,
-such as having no properties or functionality beyond what's described in the
-device tree.
-
-> +This document defines the requirements for such a platform.
-> +
-> +* Required properties:
-> +
-> +- compatible: should be one of:
-> +	"linux,dummy-virt"
-> +	"xen,xenvm"
-> +
-> +In addition to the standard nodes (chosen, cpus, memory etc) the
-> +platform is required to provide certain other basic functionality
-> +which must be described in the device tree:
-> +
-> +    The platform must provide an ARM Generic Interrupt Controller
-> +    (GIC), defined in Documentation/devicetree/bindings/arm/gic.txt.
-> +
-> +    The platform must provide ARM architected timer, defined in
-> +    Documentation/devicetree/bindings/arm/arch_timer.txt.
-> +
-> +    If the platform is SMP then it must provide the Power State
-> +    Coordination Interface (PSCI) described in
-> +    Documentation/devicetree/bindings/arm/psci.txt.
-> +
-> +The platform may also provide hypervisor specific functionality
-> +(e.g. PV I/O), if it does so then this functionality must be
-> +discoverable (directly or indirectly) via device tree.
-
-I think it would be informative to provide pointers here to commonly used
-paravirtualized devices, especially VirtIO PCI/MMIO.
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+On 01/30/2014 04:32 PM, Santosh Shilimkar wrote:
+> On Thursday 30 January 2014 08:49 AM, Ivan Khoronzhuk wrote:
+>> Yes. As result the clk->flag field contains garbage. In my case it leads
+>> that flag CLK_IGNORE_UNUSED is set for most of clocks.  As result a bunch
+>> of unused clocks cannot be disabled.
+>>
+> Can you please update the change log with above information.
+>
+>> On 01/30/2014 03:26 PM, Shilimkar, Santosh wrote:
+>>> Can u capture the issue withiout this fix?
+>>>
+>>> Sent from my Android phone using TouchDown (www.nitrodesk.com)
+>>>
+>>> -----Original Message-----
+>>> *From:* Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
+>>> *Received:* Thursday, 30 Jan 2014, 6:37am
+>>> *To:* Shilimkar, Santosh [santosh.shilimkar at ti.com]
+>>> *CC:* mturquette at linaro.org [mturquette at linaro.org];
+>>> linux-arm-kernel at lists.infradead.org [linux-arm-kernel at lists.infradead.org];
+>>> linux-kernel at vger.kernel.org [linux-kernel at vger.kernel.org]; Khoronzhuk, Ivan
+>>> [ivan.khoronzhuk at ti.com]
+>>> *Subject:* [PATCH] clk: keystone: gate: fix clk_init_data initialization
+>>>
+>>> In clk_register_psc() function clk_init_data struct is allocated
+>>> in the stack. All members of this struct should be initialized
+>>> before using otherwise it will contain garbage. So initialize flags
+>>> in this structure too.
+>>>
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>>>     drivers/clk/keystone/gate.c | 1 +
+>>>     1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
+>>> index 17a5983..86f1e36 100644
+>>> --- a/drivers/clk/keystone/gate.c
+>>> +++ b/drivers/clk/keystone/gate.c
+>>> @@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
+>>>
+>>>             init.name = name;
+>>>             init.ops = &clk_psc_ops;
+>>> +       init.flags = 0;
+>>>             init.parent_names = (parent_name ? &parent_name : NULL);
+>>>             init.num_parents = (parent_name ? 1 : 0);
+>>>
+>>> -- 
+>>> 1.8.3.2
+>>>
