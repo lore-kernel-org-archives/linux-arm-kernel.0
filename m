@@ -1,35 +1,100 @@
 From: amit.grover@samsung.com (Amit Grover)
-Date: Thu, 30 Jan 2014 11:12:41 +0530
-Subject: [PATCH v2 0/2] drivers/media: Add controls for Horizontal and Vertical
- MV Search Range
-In-Reply-To: <52E0ED10.2020901@samsung.com>
+Date: Thu, 30 Jan 2014 11:12:42 +0530
+Subject: [PATCH v2 1/2] drivers/media: v4l2: Add settings for Horizontal and
+ Vertical MV Search Range
+In-Reply-To: <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
 References: <52E0ED10.2020901@samsung.com>
-Message-ID: <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
+ <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
+Message-ID: <1391060563-27015-2-git-send-email-amit.grover@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on 'master' branch of Linux-next.
-This is v2 version for the patch:
-s5p-mfc: Add Horizontal and Vertical search range for Video Macro Blocks
-(https://lkml.org/lkml/2013/12/30/83)
+Adding V4L2 controls for horizontal and vertical search range in pixels
+for motion estimation module in video encoder.
 
-Changes from v1:
-1) Splitted the patch into v4l2 and mfc driver patches.
-2) Incorporated review comments of v1
+Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
+Signed-off-by: Amit Grover <amit.grover@samsung.com>
+---
+ Documentation/DocBook/media/v4l/controls.xml |   20 ++++++++++++++++++++
+ drivers/media/v4l2-core/v4l2-ctrls.c         |   14 ++++++++++++++
+ include/uapi/linux/v4l2-controls.h           |    2 ++
+ 3 files changed, 36 insertions(+)
 
-Amit Grover (2):
-  drivers/media: v4l2: Add settings for Horizontal and Vertical MV
-    Search Range
-  drivers/media: s5p-mfc: Add Horizontal and Vertical MV Search Range
-
- Documentation/DocBook/media/v4l/controls.xml    |   20 +++++++++++++++++++
- drivers/media/platform/s5p-mfc/regs-mfc-v6.h    |    1 +
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |   24 +++++++++++++++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    8 ++------
- drivers/media/v4l2-core/v4l2-ctrls.c            |   14 +++++++++++++
- include/uapi/linux/v4l2-controls.h              |    2 ++
- 7 files changed, 65 insertions(+), 6 deletions(-)
-
+diff --git a/Documentation/DocBook/media/v4l/controls.xml b/Documentation/DocBook/media/v4l/controls.xml
+index 7a3b49b..be04d18 100644
+--- a/Documentation/DocBook/media/v4l/controls.xml
++++ b/Documentation/DocBook/media/v4l/controls.xml
+@@ -2258,6 +2258,26 @@ Applicable to the MPEG1, MPEG2, MPEG4 encoders.</entry>
+ VBV buffer control.</entry>
+ 	      </row>
+ 
++		  <row><entry></entry></row>
++	      <row id=""v4l2-mpeg-video-hor-search-range">
++		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE</constant>&nbsp;</entry>
++		<entry>integer</entry>
++	      </row>
++		<row><entry spanname="descr">Horizontal search range defines maximum horizontal search area in pixels
++to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
++horizontal search range for motion estimation module in video encoder.</entry>
++	      </row>
++
++		 <row><entry></entry></row>
++	      <row id="v4l2-mpeg-video-vert-search-range">
++		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE</constant>&nbsp;</entry>
++		<entry>integer</entry>
++	      </row>
++		<row><entry spanname="descr">Vertical search range defines maximum vertical search area in pixels
++to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
++vertical search range for motion estimation module in video encoder.</entry>
++	      </row>
++
+ 	      <row><entry></entry></row>
+ 	      <row>
+ 		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&nbsp;</entry>
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index fb46790..e775388 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_MPEG_VIDEO_DEC_PTS:			return "Video Decoder PTS";
+ 	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:			return "Video Decoder Frame Count";
+ 	case V4L2_CID_MPEG_VIDEO_VBV_DELAY:			return "Initial Delay for VBV Control";
++	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return "Horizontal MV Search Range";
++	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
+ 	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+ 
+ 	/* VPX controls */
+@@ -905,6 +907,18 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 		*min = 0;
+ 		*max = *step = 1;
+ 		break;
++	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
++		*type = V4L2_CTRL_TYPE_INTEGER;
++		*min = 16;
++		*max = 128;
++		*step = 16;
++		break;
++	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:
++		*type = V4L2_CTRL_TYPE_INTEGER;
++		*min = 16;
++		*max = 128;
++		*step = 16;
++		break;
+ 	case V4L2_CID_PAN_RESET:
+ 	case V4L2_CID_TILT_RESET:
+ 	case V4L2_CID_FLASH_STROBE:
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index 1666aab..80e1def 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -372,6 +372,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
+ #define V4L2_CID_MPEG_VIDEO_DEC_FRAME			(V4L2_CID_MPEG_BASE+224)
+ #define V4L2_CID_MPEG_VIDEO_VBV_DELAY			(V4L2_CID_MPEG_BASE+225)
+ #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER		(V4L2_CID_MPEG_BASE+226)
++#define V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+227)
++#define V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+228)
+ 
+ #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP		(V4L2_CID_MPEG_BASE+300)
+ #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP		(V4L2_CID_MPEG_BASE+301)
 -- 
 1.7.9.5
