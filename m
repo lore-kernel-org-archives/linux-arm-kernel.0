@@ -1,21 +1,74 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Thu, 30 Jan 2014 06:14:05 -0800
-Subject: NFS client broken in Linus' tip
-In-Reply-To: <20140130140834.GW15937@n2100.arm.linux.org.uk>
-References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
-Message-ID: <20140130141405.GA23985@infradead.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jan 2014 15:16:26 +0100
+Subject: [RFC PATCH V3 1/4] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <1390599168-13150-2-git-send-email-tinamdar@apm.com>
+References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
+ <1390599168-13150-2-git-send-email-tinamdar@apm.com>
+Message-ID: <201401301516.27091.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 02:08:34PM +0000, Russell King - ARM Linux wrote:
-> into nfs3_proc_create(), but this ends up calling down into nfs3_get_acl(),
-> which does this:
-> 
->         if (!nfs_server_capable(inode, NFS_CAP_ACLS))
->                 return ERR_PTR(-EOPNOTSUPP);
+On Friday 24 January 2014, Tanmay Inamdar wrote:
 
-Does replacing that return with a
+> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+> +{
+> +	int i;
+> +
+> +	/* Hide the PCI host BARs from the kernel as their content doesn't
+> +	 * fit well in the resource management
+> +	 */
+> +	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+> +		dev->resource[i].start = dev->resource[i].end = 0;
+> +		dev->resource[i].flags = 0;
+> +	}
+> +	dev_info(&dev->dev, "Hiding X-Gene pci host bridge resources %s\n",
+> +		 pci_name(dev));
+> +}
+> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_DEVICEID,
+> +			 xgene_pcie_fixup_bridge);
 
-		return NULL;
+Shouldn't this be gone now that the host bridge is correctly shown
+at the domain root?
 
-fix the issue for you?
+> +static int xgene_pcie_setup(int nr, struct pci_sys_data *sys)
+> +{
+> +	struct xgene_pcie_port *pp = sys->private_data;
+> +	struct resource *io = &pp->realio;
+> +
+> +	io->start = sys->domain * SZ_64K;
+> +	io->end = io->start + SZ_64K;
+> +	io->flags = pp->io.res.flags;
+> +	io->name = "PCI IO";
+> +	pci_ioremap_io(io->start, pp->io.res.start);
+> +
+> +	pci_add_resource_offset(&sys->resources, io, sys->io_offset);
+> +	sys->mem_offset = pp->mem.res.start - pp->mem.pci_addr;
+> +	pci_add_resource_offset(&sys->resources, &pp->mem.res,
+> +				sys->mem_offset);
+> +	return 1;
+> +}
+
+Thanks for bringing back the I/O space handling.
+
+You don't seem to set sys->io_offset anywhere, but each of the
+ports listed in your DT starts a local bus I/O register range
+at port 0.
+
+AFAICT, you need to add (somewhere)
+
+	sys->io_offset = pp->realio.start - pp->io.pci_addr;
+
+but there could be something else missing. You clearly haven't
+tested if the I/O space actually works.
+
+If you want to try out the I/O space, I'd suggest using an Intel
+e1000 network card, which has both memory and i/o space. There
+is a patch at http://www.spinics.net/lists/linux-pci/msg27684.html
+that lets you check the I/O registers on it, or you can go
+through /dev/port from user space.
+
+I also haven't seen your patch that adds pci_ioremap_io() for
+arm64. It would be helpful to keep it in the same patch
+series, since it won't build without this patch.
+
+	Arnd
