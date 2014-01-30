@@ -1,60 +1,29 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 30 Jan 2014 21:17:52 +0100
-Subject: [PATCH] documentation/iommu: Update description of ARM System MMU
- binding
-In-Reply-To: <1391105889-32718-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20140130201752.GJ13543@alberich>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 30 Jan 2014 21:25:00 +0100
+Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove
+ hardcoded addresses from Dove pinctrl
+In-Reply-To: <52EA9EFA.1030609@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140130182925.GM10864@lunn.ch> <52EA9EFA.1030609@gmail.com>
+Message-ID: <20140130202500.GN10864@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 30, 2014 at 07:50:34PM +0100, Sebastian Hesselbarth wrote:
+> On 01/30/2014 07:29 PM, Andrew Lunn wrote:
+> >On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
+> >>This patch set is one required step for Dove to hop into mach-mvebu.
+> >>Until now, pinctrl-dove was hardcoding some registers that do not
+> >>directly belong to MPP core registers. This is not compatible with
+> >>what we want for mach-mvebu.
+> >
+> >I think there might be something wrong here....
+> 
+> There _is_ something wrong. I'll have a look at it. For the record,
+> what SoC are you testing with? From the base address, I guess it is
+> Kirkwood?
 
-This patch adds descriptions fore new properties of device tree
-binding for the ARM SMMU architecture. These properties control
-arm-smmu driver options.
+Yes, Kirkwood. Sorry for not saying.
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         |   11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-Hi Will,
-
-I should have included this patch in the series as it describes the
-options introduced there.
-
-
-Andreas
-
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index e34c6cd..7ad8ff0 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -48,6 +48,16 @@ conditions.
-                   from the mmu-masters towards memory) node for this
-                   SMMU.
- 
-+- arm,smmu-isolate-devices : Enable device isolation for all masters
-+                   of this SMMU. Ie. each master will be attached to
-+                   its own iommu domain.
-+
-+- calxeda,smmu-secure-config-access : Enable proper handling of buggy
-+                   implementations that always use secure access to
-+                   SMMU configuration registers. In this case
-+                   non-secure aliases of secure registers have to be
-+                   used during SMMU configuration.
-+
- Example:
- 
-         smmu {
-@@ -67,4 +77,5 @@ Example:
-                  */
-                 mmu-masters = <&dma0 0xd01d 0xd01e>,
-                               <&dma1 0xd11c>;
-+                arm,smmu-isolate-devices;
-         };
--- 
-1.7.9.5
+     Andrew
