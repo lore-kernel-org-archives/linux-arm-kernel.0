@@ -1,156 +1,28 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 30 Jan 2014 18:28:52 +0100
-Subject: [PATCH v2 1/6] idle: move the cpuidle entry point to the generic
- idle loop
-In-Reply-To: <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-2-git-send-email-nicolas.pitre@linaro.org>
- <alpine.LFD.2.11.1401291526320.1652@knanqh.ubzr>
- <52E9C946.50704@linux.vnet.ibm.com>
- <alpine.LFD.2.11.1401300021530.1652@knanqh.ubzr>
- <52EA5720.8010000@linaro.org>
- <alpine.LFD.2.11.1401301056180.1652@knanqh.ubzr>
-Message-ID: <52EA8BD4.6020803@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jan 2014 18:28:59 +0100
+Subject: [PATCH] arm: document "mach-virt" platform.
+In-Reply-To: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
+References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <201401301828.59294.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2014 05:07 PM, Nicolas Pitre wrote:
-> On Thu, 30 Jan 2014, Daniel Lezcano wrote:
->
->> On 01/30/2014 06:28 AM, Nicolas Pitre wrote:
->>> On Thu, 30 Jan 2014, Preeti U Murthy wrote:
->>>
->>>> Hi Nicolas,
->>>>
->>>> On 01/30/2014 02:01 AM, Nicolas Pitre wrote:
->>>>> On Wed, 29 Jan 2014, Nicolas Pitre wrote:
->>>>>
->>>>>> In order to integrate cpuidle with the scheduler, we must have a
->>>>>> better
->>>>>> proximity in the core code with what cpuidle is doing and not delegate
->>>>>> such interaction to arch code.
->>>>>>
->>>>>> Architectures implementing arch_cpu_idle() should simply enter
->>>>>> a cheap idle mode in the absence of a proper cpuidle driver.
->>>>>>
->>>>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>
->>>>> As mentioned in my reply to Olof's comment on patch #5/6, here's a new
->>>>> version of this patch adding the safety local_irq_enable() to the core
->>>>> code.
->>>>>
->>>>> ----- >8
->>>>>
->>>>> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->>>>> Subject: idle: move the cpuidle entry point to the generic idle loop
->>>>>
->>>>> In order to integrate cpuidle with the scheduler, we must have a better
->>>>> proximity in the core code with what cpuidle is doing and not delegate
->>>>> such interaction to arch code.
->>>>>
->>>>> Architectures implementing arch_cpu_idle() should simply enter
->>>>> a cheap idle mode in the absence of a proper cpuidle driver.
->>>>>
->>>>> In both cases i.e. whether it is a cpuidle driver or the default
->>>>> arch_cpu_idle(), the calling convention expects IRQs to be disabled
->>>>> on entry and enabled on exit. There is a warning in place already but
->>>>> let's add a forced IRQ enable here as well.  This will allow for
->>>>> removing the forced IRQ enable some implementations do locally and
->>>>
->>>> Why would this patch allow for removing the forced IRQ enable that are
->>>> being done on some archs in arch_cpu_idle()? Isn't this patch expecting
->>>> the default arch_cpu_idle() to have re-enabled the interrupts after
->>>> exiting from the default idle state? Its supposed to only catch faulty
->>>> cpuidle drivers that haven't enabled IRQs on exit from idle state but
->>>> are expected to have done so, isn't it?
->>>
->>> Exact.  However x86 currently does this:
->>>
->>>   if (cpuidle_idle_call())
->>>           x86_idle();
->>>   else
->>>           local_irq_enable();
->>>
->>> So whenever cpuidle_idle_call() is successful then IRQs are
->>> unconditionally enabled whether or not the underlying cpuidle driver has
->>> properly done it or not.  And the reason is that some of the x86 cpuidle
->>> do fail to enable IRQs before returning.
->>>
->>> So the idea is to get rid of this unconditional IRQ enabling and let the
->>> core issue a warning instead (as well as enabling IRQs to allow the
->>> system to run).
->>
->> But what I don't get with your comment is the local_irq_enable is done from
->> the cpuidle common framework in 'cpuidle_enter_state' it is not done from the
->> arch specific backend cpuidle driver.
->
-> Oh well... This certainly means we'll have to clean this mess as some
-> drivers do it on their own while some others don't.  Some drivers also
-> loop on !need_resched() while some others simply return on the first
-> interrupt.
+On Thursday 30 January 2014, Ian Campbell wrote:
+> mach-virt has existed for a while but it is not written down what it actually
+> consists of. Although it seems a bit unusual to document a binding for an
+> entire platform since mach-virt is entirely virtual it is helpful to have
+> something to refer to in the absence of a single concrete implementation.
+> 
+> I've done my best to capture the requirements based on the git log and my
+> memory/understanding.
+> 
+> While here remove the xenvm dts example, the Xen tools will now build a
+> suitable mach-virt compatible dts when launching the guest.
 
-Ok, I think the mess is coming from 'default_idle' which does not 
-re-enable the local_irq but used from different places like 
-amd_e400_idle and apm_cpu_idle.
+It might be worth noting in the changeset comment that the 'compatible'
+string is actually no longer needed on newer kernels: All the members
+of the machine descriptor are now the defaults (we should remove the
+virt_init() function as well), and the fallback machine descriptor should
+work just fine if any other string gets passed.
 
-void default_idle(void)
-{
-         trace_cpu_idle_rcuidle(1, smp_processor_id());
-         safe_halt();
-         trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-}
-
-Considering the system configured without cpuidle because this one 
-*always* enable the local irq, we have the different cases:
-
-x86_idle = default_idle();
-==> local_irq_enable is missing
-
-x86_idle = amd_e400_idle();
-==> it calls local_irq_disable(); but in the idle loop context where the 
-local irqs are already disabled.
-==> if amd_e400_c1e_detected is true, the local_irq are enabled
-==> otherwise no
-==> default_idle is called from there and does not enable local_irqs
-
-
->> So the code above could be:
->>
->> 	if (cpuidle_idle_call())
->> 		x86_idle();
->>
->> without the else section, this local_irq_enable is pointless. Or may be I
->> missed something ?
->
-> A later patch removes it anyway.  But if it is really necessary to
-> enable interrupts then the core will do it but with a warning now.
-
-This WARN should disappear. It was there because it was up to the 
-backend cpuidle driver to enable the irq. But in the meantime, that was 
-consolidated into a single place in the cpuidle framework so no need to 
-try to catch errors.
-
-What about (based on this patchset).
-
-diff --git a/arch/x86/kernel/process.c b/arch/x86/kernel/process.c
-index 4505e2a..2d60cbb 100644
---- a/arch/x86/kernel/process.c
-+++ b/arch/x86/kernel/process.c
-@@ -299,6 +299,7 @@ void arch_cpu_idle_dead(void)
-  void arch_cpu_idle(void)
-  {
-         x86_idle();
-+       local_irq_enable();
-  }
-
-  /*
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
