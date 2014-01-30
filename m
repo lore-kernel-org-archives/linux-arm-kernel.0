@@ -1,36 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 30 Jan 2014 18:14:11 +0100
-Subject: [PATCH 7/7] ARM: mvebu: enable audio options in mvebu_defconfig
+Date: Thu, 30 Jan 2014 18:14:09 +0100
+Subject: [PATCH 5/7] ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
 In-Reply-To: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1391102051-5319-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1391102051-5319-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since at least the Armada 370 SoC has audio support, it makes sense to
-enable the corresponding kernel configuration options in
-mvebu_defconfig.
+This commit adds a pin-muxing configuration for the I2C0 bus of the
+Armada 370, which is used on the Armada 370 DB platform to interface
+with the CS42L51 audio codec.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_defconfig | 5 +++++
+ arch/arm/boot/dts/armada-370.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 594d706..e481f01 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -60,6 +60,11 @@ CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_KIRKWOOD_SOC=y
-+CONFIG_SND_KIRKWOOD_SOC_ARMADA370_DB=y
- CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index d3bb66a..ef3cc22 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -129,6 +129,11 @@
+ 					marvell,function = "sd0";
+ 				};
+ 
++				i2c0_pins: i2c0-pins {
++					marvell,pins = "mpp2", "mpp3";
++					marvell,function = "i2c0";
++				};
++
+ 				i2s_pins1: i2s-pins1 {
+ 					marvell,pins = "mpp5", "mpp6", "mpp7",
+ 						       "mpp8", "mpp9", "mpp10",
 -- 
 1.8.3.2
