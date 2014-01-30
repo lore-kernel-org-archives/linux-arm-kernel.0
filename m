@@ -1,139 +1,180 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 30 Jan 2014 12:17:04 -0300
-Subject: Root NFS panicing on Linus' tip (Re: NFS client broken in Linus' tip)
-In-Reply-To: <20140130140834.GW15937@n2100.arm.linux.org.uk>
-References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
-Message-ID: <20140130151703.GA20594@localhost>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Thu, 30 Jan 2014 16:22:18 +0100
+Subject: [PATCH v2 1/2] drivers/media: v4l2: Add settings for Horizontal
+ and Vertical MV Search Range
+In-Reply-To: <52EA00E5.10303@xs4all.nl>
+References: <52E0ED10.2020901@samsung.com>
+ <1391060563-27015-1-git-send-email-amit.grover@samsung.com>
+ <1391060563-27015-2-git-send-email-amit.grover@samsung.com>
+ <52EA00E5.10303@xs4all.nl>
+Message-ID: <051c01cf1dcf$1132ee60$3398cb20$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Trond:
+Hi Hans, Amit,
 
-On Thu, Jan 30, 2014 at 02:08:34PM +0000, Russell King - ARM Linux wrote:
-> I just booted Linus' tip (plus a few other patches to imx-drm and imx
-> code), and stumbled into this interesting scenario:
+> From: Hans Verkuil [mailto:hverkuil at xs4all.nl]
+> Sent: Thursday, January 30, 2014 8:36 AM
 > 
-[..]
-
-> CONFIG_NFS_FS=y
-> CONFIG_NFS_V2=y
-> CONFIG_NFS_V3=y
-> CONFIG_NFS_V3_ACL=y
-
-Just came across another issue, but a bit more problematic, as my
-kernel (Linus' tip as well) panics, after mounting the rootfs:
-
-IP-Config: Complete:
-     device=eth0, hwaddr=00:50:43:50:1c:15, ipaddr=192.168.0.159, mask=255.255.255.0, gw=192.168.0.1
-     host=develboard, domain=, nis-domain=(none)
-     bootserver=192.168.0.45, rootserver=192.168.0.45, rootpath=
-VFS: Mounted root (nfs filesystem) on device 0:11.
-devtmpfs: mounted
-Freeing unused kernel memory: 136K (c0465000 - c0487000)
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0004000
-[00000000] *pgd=00000000
-Internal error: Oops: 5 [#1] ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Tainted: G        W    3.13.0-10094-g9b0cd30 #276
-task: ed839a40 ti: ed83a000 task.ti: ed83a000
-PC is at xattr_resolve_name+0x14/0x94
-LR is at generic_getxattr+0x2c/0x64
-pc : [<c00a7ab0>]    lr : [<c00a7b5c>]    psr: a0000113
-sp : ed83be5c  ip : ed83be74  fp : ed10ebc0
-r10: ed83a000  r9 : ed43d980  r8 : ed81b800
-r7 : c034dad8  r6 : 00000000  r5 : c03f3dcc  r4 : ed43d980
-r3 : 00000014  r2 : ed83be8c  r1 : ed83be74  r0 : 00000000
-Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 00004059  DAC: 00000015
-Process swapper (pid: 1, stack limit = 0xed83a238)
-Stack: (0xed83be5c to 0xed83c000)
-be40:                                                                ed43d980
-be60: 00000014 ed83be8c 00000000 00000000 c04bc22c c03f3dcc ed83bf14 ed43f340
-be80: ed43d980 c01115cc 00000000 00000041 c04bba6c 00000000 00000000 002040d0
-bea0: ed81bc00 ed10ebc0 ed81bc30 c01116f8 00000000 000004d0 ed8172d0 ed43d980
-bec0: 45878fd4 00000007 bfe01007 ef7f8fc0 c04bba6c ed43d6d8 c04bba6c 00000101
-bee0: 00000000 ed809fd0 ed809fc0 ed809f50 ed809f40 00000000 edb045d8 c0078bcc
-bf00: ed0e5dc0 edb045d8 00000000 bf000000 ed0e5dc0 00000000 00000000 00000000
-bf20: 00000000 00000000 bf000000 ed10ebc0 ed0e5dc0 00000001 edb045d8 c04926d0
-bf40: ed83a000 c0492758 ed10ebc0 c008fc54 00000001 ed0e5dc0 00000002 c0090cec
-bf60: c03ec85c ed0e5df4 00000000 ed839c00 c0487000 c04bcec0 c03e4f08 00000000
-bf80: 00000000 00000000 00000000 00000000 00000000 c00086a8 00000000 c04bcec0
-bfa0: c0344f5c c0345004 00000000 c000e398 00000000 00000000 00000000 00000000
-bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
-[<c00a7ab0>] (xattr_resolve_name) from [<00000000>] (  (null))
-Code: e1a06000 e5915000 e3550000 0a00001d (e5900000) 
----[ end trace 15c15b4afa9eff90 ]---
-swapper (1) used greatest stack depth: 5104 bytes left
-Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-
-Adding a little hack, and could produce a better strack trace.
-See the diff and the stack trace below:
-
-diff --git a/fs/xattr.c b/fs/xattr.c
-index 3377dff..bd2b173 100644
---- a/fs/xattr.c
-+++ b/fs/xattr.c
-@@ -740,6 +740,10 @@ xattr_resolve_name(const struct xattr_handler **handlers, const char **name)
- 
- 	if (!*name)
- 		return NULL;
-+	if(!handlers) {
-+		dump_stack();
-+		panic("ouch");
-+	}
- 
- 	for_each_xattr_handler(handlers, handler) {
- 		const char *n = strcmp_prefix(*name, handler->prefix);
-
-CPU: 0 PID: 1 Comm: swapper Tainted: G        W    3.13.0-10094-g9b0cd30-dirty #279
-[<c0012f40>] (unwind_backtrace) from [<c00107b8>] (show_stack+0x10/0x14)
-[<c00107b8>] (show_stack) from [<c00a8160>] (xattr_resolve_name+0x9c/0xa8)
-[<c00a8160>] (xattr_resolve_name) from [<c00a8274>] (generic_getxattr+0x2c/0x64)
-[<c00a8274>] (generic_getxattr) from [<c01115e0>] (get_vfs_caps_from_disk+0x4c/0xf4)
-[<c01115e0>] (get_vfs_caps_from_disk) from [<c011170c>] (cap_bprm_set_creds+0x84/0x408)
-[<c011170c>] (cap_bprm_set_creds) from [<c008fc54>] (prepare_binprm+0x80/0x11c)
-[<c008fc54>] (prepare_binprm) from [<c0090cec>] (do_execve+0x33c/0x46c)
-[<c0090cec>] (do_execve) from [<c00086a8>] (try_to_run_init_process+0x1c/0x50)
-[<c00086a8>] (try_to_run_init_process) from [<c0345024>] (kernel_init+0xa8/0x110)
-[<c0345024>] (kernel_init) from [<c000e398>] (ret_from_fork+0x14/0x3c)
-Kernel panic - not syncing: ouch
-
-FWIW, here's my piece of NFS config:
-
-CONFIG_NFS_FS=y
-CONFIG_NFS_V2=y
-CONFIG_NFS_V3=y
-# CONFIG_NFS_V3_ACL is not set
-# CONFIG_NFS_V4 is not set
-# CONFIG_NFS_SWAP is not set
-CONFIG_ROOT_NFS=y
-# CONFIG_NFSD is not set
-CONFIG_LOCKD=y
-CONFIG_LOCKD_V4=y
-CONFIG_NFS_COMMON=y
-CONFIG_SUNRPC=y
-
-> I think it's down to this:
+> On 01/30/2014 06:42 AM, Amit Grover wrote:
+> > Adding V4L2 controls for horizontal and vertical search range in
+> > pixels for motion estimation module in video encoder.
+> >
+> > Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
+> > Signed-off-by: Amit Grover <amit.grover@samsung.com>
+> > ---
+> >  Documentation/DocBook/media/v4l/controls.xml |   20
+> ++++++++++++++++++++
+> >  drivers/media/v4l2-core/v4l2-ctrls.c         |   14 ++++++++++++++
+> >  include/uapi/linux/v4l2-controls.h           |    2 ++
+> >  3 files changed, 36 insertions(+)
+> >
+> > diff --git a/Documentation/DocBook/media/v4l/controls.xml
+> > b/Documentation/DocBook/media/v4l/controls.xml
+> > index 7a3b49b..be04d18 100644
+> > --- a/Documentation/DocBook/media/v4l/controls.xml
+> > +++ b/Documentation/DocBook/media/v4l/controls.xml
+> > @@ -2258,6 +2258,26 @@ Applicable to the MPEG1, MPEG2, MPEG4
+> > encoders.</entry>  VBV buffer control.</entry>
+> >  	      </row>
+> >
+> > +		  <row><entry></entry></row>
+> > +	      <row id=""v4l2-mpeg-video-hor-search-range">
+> > +		<entry
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE</constant
+> >&nbsp;</entry>
+> > +		<entry>integer</entry>
+> > +	      </row>
+> > +		<row><entry spanname="descr">Horizontal search range
+> defines
+> > +maximum horizontal search area in pixels to search and match for the
+> > +present Macroblock (MB) in the reference picture. This V4L2 control
+> macro is used to set horizontal search range for motion estimation
+> module in video encoder.</entry>
+> > +	      </row>
+> > +
+> > +		 <row><entry></entry></row>
+> > +	      <row id="v4l2-mpeg-video-vert-search-range">
+> > +		<entry
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE</constant
+> >&nbsp;</entry>
+> > +		<entry>integer</entry>
 > 
-> commit 013cdf1088d7235da9477a2375654921d9b9ba9f
-> Author: Christoph Hellwig <hch@infradead.org>
-> Date:   Fri Dec 20 05:16:53 2013 -0800
-> 
->     nfs: use generic posix ACL infrastructure for v3 Posix ACLs
-> 
->     This causes a small behaviour change in that we don't bother to set
->     ACLs on file creation if the mode bit can express the access permissions
->     fully, and thus behaving identical to local filesystems.
-> 
->     Signed-off-by: Christoph Hellwig <hch@lst.de>
->     Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+> These two controls sound very mfc specific as opposed to being part of
+> the standard.
+> If so, then they should be named V4L2_CID_MPEG_MFC51_*. 
 
-And also here, reverting the above seem to fix the panic.
+mencoder has an option to set motion vector search radius.
 
-Ideas?
+>From man mencoder:
+       me_range=<4-64>
+              radius  of  exhaustive  or multi-hexagon motion search
+(default:
+              16)
+
+So I think it could be applicable to other hardware codecs as well.
+
+> Also, for which codecs are these controls applicable?
+
+Isn't the choice of motion estimation algorithm (and its parameters)
+codec agnostic, as long as the restrictions of the standard are honoured?
+
+> 
+> > +	      </row>
+> > +		<row><entry spanname="descr">Vertical search range defines
+> maximum
+> > +vertical search area in pixels to search and match for the present
+> > +Macroblock (MB) in the reference picture. This V4L2 control macro is
+> used to set vertical search range for motion estimation module in video
+> encoder.</entry>
+> > +	      </row>
+> > +
+> >  	      <row><entry></entry></row>
+> >  	      <row>
+> >  		<entry
+> >
+> spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&n
+> > bsp;</entry> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > index fb46790..e775388 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > @@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+> >  	case V4L2_CID_MPEG_VIDEO_DEC_PTS:			return
+"Video
+> Decoder PTS";
+> >  	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:			return
+"Video
+> Decoder Frame Count";
+> >  	case V4L2_CID_MPEG_VIDEO_VBV_DELAY:			return
+"Initial
+> Delay for VBV Control";
+> > +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return
+> "Horizontal MV Search Range";
+> > +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return
+> "Vertical MV Search Range";
+> >  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return
+> "Repeat Sequence Header";
+> >
+> >  	/* VPX controls */
+> > @@ -905,6 +907,18 @@ void v4l2_ctrl_fill(u32 id, const char **name,
+> enum v4l2_ctrl_type *type,
+> >  		*min = 0;
+> >  		*max = *step = 1;
+> >  		break;
+> > +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
+> > +		*type = V4L2_CTRL_TYPE_INTEGER;
+> > +		*min = 16;
+> > +		*max = 128;
+> > +		*step = 16;
+> 
+> Weird range, why not use range 1-8?
+
+If the search range is represented in pixels, then pixels should be used.
+It the control is also used in other hardware, then I think it the values
+should not be limited in this way here. For example mencoder accepts the
+value between 4 and 64. The range and step could be limited in the
+s5p_mfc_enc.c.
+
+> 
+> > +		break;
+> > +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:
+> > +		*type = V4L2_CTRL_TYPE_INTEGER;
+> > +		*min = 16;
+> > +		*max = 128;
+> > +		*step = 16;
+> > +		break;
+> >  	case V4L2_CID_PAN_RESET:
+> >  	case V4L2_CID_TILT_RESET:
+> >  	case V4L2_CID_FLASH_STROBE:
+> > diff --git a/include/uapi/linux/v4l2-controls.h
+> > b/include/uapi/linux/v4l2-controls.h
+> > index 1666aab..80e1def 100644
+> > --- a/include/uapi/linux/v4l2-controls.h
+> > +++ b/include/uapi/linux/v4l2-controls.h
+> > @@ -372,6 +372,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
+> >  #define V4L2_CID_MPEG_VIDEO_DEC_FRAME
+> 	(V4L2_CID_MPEG_BASE+224)
+> >  #define V4L2_CID_MPEG_VIDEO_VBV_DELAY
+> 	(V4L2_CID_MPEG_BASE+225)
+> >  #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER
+> 	(V4L2_CID_MPEG_BASE+226)
+> > +#define V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE
+> 	(V4L2_CID_MPEG_BASE+227)
+> > +#define V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE
+> 	(V4L2_CID_MPEG_BASE+228)
+> >
+> >  #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP
+> 	(V4L2_CID_MPEG_BASE+300)
+> >  #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP
+> 	(V4L2_CID_MPEG_BASE+301)
+> >
+> 
+> Regards,
+> 
+> 	Hans
+
+Best wishes,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Kamil Debski
+Samsung R&D Institute Poland
