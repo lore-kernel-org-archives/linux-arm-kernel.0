@@ -1,55 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jan 2014 20:49:27 +0100
-Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
-References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <201401302049.27521.arnd@arndb.de>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 30 Jan 2014 21:17:52 +0100
+Subject: [PATCH] documentation/iommu: Update description of ARM System MMU
+ binding
+In-Reply-To: <1391105889-32718-1-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20140130201752.GJ13543@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 January 2014, Barry Song wrote:
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 7acab93..0a252f8 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -166,6 +166,15 @@ config PWM_SAMSUNG
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-samsung.
->  
-> +config PWM_SIRF
-> +	tristate "SiRF PWM support"
-> +	depends on ARCH_SIRF
-> +	help
 
-please make this "depends on ARCH_SIRF || COMPILE_TEST" if you can, so we
-can build it on other platforms for test purposes. If you do this, you
-have to list the full set of dependencies, so probably another
-"depends on HAVE_CLK".
+This patch adds descriptions fore new properties of device tree
+binding for the ARM SMMU architecture. These properties control
+arm-smmu driver options.
 
-> +
-> +#define to_sirf_chip(chip)	container_of(chip, struct sirf_pwm, chip)
-> +
-> +static unsigned int sirf_pwm_ns_to_cycles(struct pwm_chip *chip, unsigned int time_ns)
-> +{
-> +	u64 dividend;
-> +	unsigned int cycle;
-> +	/*
-> +	 * on SiRFSoC, OSC input is const, we use it as the source to generate
-> +	 * PWM wave
-> +	 */
-> +#define SRC_OSC_RATE 26000000ULL
-> +	dividend = SRC_OSC_RATE * time_ns + NSEC_PER_SEC / 2;
-> +	do_div(dividend, NSEC_PER_SEC);
-> +
-> +	cycle = dividend & 0xFFFFFFFFUL;
-> +
-> +	return cycle > 1 ? cycle : 1;
-> +}
-> +
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andreas Herrmann <herrmann.der.user@googlemail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+---
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Is SRC_OSC_RATE the rate of spwm->clk? If so, it would be nice to just call
-clk_get_rate() here, in case you ever have a chip with a different rate.
+Hi Will,
 
-This is a very nice driver otherwise!
+I should have included this patch in the series as it describes the
+options introduced there.
 
-	Arnd
+
+Andreas
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index e34c6cd..7ad8ff0 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -48,6 +48,16 @@ conditions.
+                   from the mmu-masters towards memory) node for this
+                   SMMU.
+ 
++- arm,smmu-isolate-devices : Enable device isolation for all masters
++                   of this SMMU. Ie. each master will be attached to
++                   its own iommu domain.
++
++- calxeda,smmu-secure-config-access : Enable proper handling of buggy
++                   implementations that always use secure access to
++                   SMMU configuration registers. In this case
++                   non-secure aliases of secure registers have to be
++                   used during SMMU configuration.
++
+ Example:
+ 
+         smmu {
+@@ -67,4 +77,5 @@ Example:
+                  */
+                 mmu-masters = <&dma0 0xd01d 0xd01e>,
+                               <&dma1 0xd11c>;
++                arm,smmu-isolate-devices;
+         };
+-- 
+1.7.9.5
