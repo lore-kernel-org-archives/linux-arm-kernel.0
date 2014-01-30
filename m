@@ -1,35 +1,63 @@
 From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 30 Jan 2014 15:55:40 +0100
-Subject: [PATCH 0/4] ARM:sti: Add STiD127 platform and board support
-Message-ID: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+Date: Thu, 30 Jan 2014 15:55:42 +0100
+Subject: [PATCH 2/4] pinctrl: st: add stid127 support
+In-Reply-To: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1391093744-19905-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+From: Alexandre TORGUE <alexandre.torgue@st.com>
 
-This patch-set adds basic support for STMicroelectronics STiD127 
-with B2112 board support. STiD127 is dual-core ARM Cortex-A9 CPU 
-to function as a cable modem or in combination with a back end
-as a gateway set top box.
+Add STid127 PIOs (psouth, pwest, peast) in pinctrl.
 
-Alexandre TORGUE (4):
-  ARM: STi: add stid127 soc support
-  pinctrl: st: add stid127 support
-  ARM: dts: Add support of STid127 Soc.
-  ARM: dts: add B2112 board support
+Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
- arch/arm/boot/dts/Makefile             |    3 +-
- arch/arm/boot/dts/stid127-b2112.dts    |   35 +++++
- arch/arm/boot/dts/stid127-clock.dtsi   |   31 ++++
- arch/arm/boot/dts/stid127-pinctrl.dtsi |  245 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stid127.dtsi         |  130 +++++++++++++++++
- arch/arm/mach-sti/board-dt.c           |    6 +
- drivers/pinctrl/pinctrl-st.c           |   25 ++++
- 7 files changed, 474 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/stid127-b2112.dts
- create mode 100644 arch/arm/boot/dts/stid127-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stid127-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stid127.dtsi
-
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 9cadc68..01227de 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -336,6 +336,27 @@ static const struct st_pctl_data  stih416_data = {
+ 	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
+ };
+ 
++/* STid127 data */
++static const struct st_pctl_data  stid127_data = {
++	.rt_style	= st_retime_style_dedicated,
++	/* reuse stih416 delays as they are identical */
++	.input_delays	= stih416_delays,
++	.ninput_delays	= 14,
++	/* reuse stih416 delays as they are identical */
++	.output_delays	= stih416_delays,
++	.noutput_delays = 14,
++	.alt = 0, .oe = 8, .pu = 10, .od = 12, .rt = 14,
++};
++
++static const struct st_pctl_data  stid127_psouth_data = {
++	.rt_style	= st_retime_style_dedicated,
++	.input_delays	= stid127_delays,
++	.ninput_delays	= 14,
++	.output_delays	= stid127_delays,
++	.noutput_delays = 14,
++	.alt = 0, .oe = 7, .pu = 9, .od = 11, .rt = 13,
++};
++
+ /* Low level functions.. */
+ static inline int st_gpio_bank(int gpio)
+ {
+@@ -1264,6 +1285,10 @@ static struct of_device_id st_pctl_of_match[] = {
+ 	{ .compatible = "st,stih416-rear-pinctrl", .data = &stih416_data},
+ 	{ .compatible = "st,stih416-fvdp-fe-pinctrl", .data = &stih416_data},
+ 	{ .compatible = "st,stih416-fvdp-lite-pinctrl", .data = &stih416_data},
++	{ .compatible = "st,stid127-pwest-pinctrl", .data = &stid127_data },
++	{ .compatible = "st,stid127-psouth-pinctrl",
++		.data = &stid127_psouth_data },
++	{ .compatible = "st,stid127-peast-pinctrl", .data = &stid127_data },
+ 	{ /* sentinel */ }
+ };
+ 
 -- 
 1.7.9.5
