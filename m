@@ -1,59 +1,124 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 30 Jan 2014 09:32:30 -0500
-Subject: [PATCH] clk: keystone: gate: fix clk_init_data initialization
-In-Reply-To: <52EA5866.3090706@ti.com>
-References: <1391081821-13306-1-git-send-email-ivan.khoronzhuk@ti.com>
- <448912EABC71F84BBCADFD3C67C4BE52A0B4EB@DBDE04.ent.ti.com>
- <52EA5866.3090706@ti.com>
-Message-ID: <52EA627E.8060801@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jan 2014 15:35:10 +0100
+Subject: [PATCH V2 0/4] misc: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+In-Reply-To: <CAN1v_Ps9U=yjG-G40FK+L9SLaAQp7s8j9mg9DNoiGwqjMiGtiQ@mail.gmail.com>
+References: <1387594651-25771-1-git-send-email-rapatel@apm.com>
+ <201401141615.55820.arnd@arndb.de>
+ <CAN1v_Ps9U=yjG-G40FK+L9SLaAQp7s8j9mg9DNoiGwqjMiGtiQ@mail.gmail.com>
+Message-ID: <201401301535.10940.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 January 2014 08:49 AM, Ivan Khoronzhuk wrote:
-> Yes. As result the clk->flag field contains garbage. In my case it leads
-> that flag CLK_IGNORE_UNUSED is set for most of clocks.  As result a bunch
-> of unused clocks cannot be disabled.
+On Tuesday 28 January 2014, Ravi Patel wrote:
+> On Tue, Jan 14, 2014 at 7:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+-
+> > For the DT binding, I would suggest using something along the lines of
+> > what we have for clocks, pinctrl and dmaengine. OMAP doesn't use this
+> > (yet), but now would be a good time to standardize it. The QMTM node
+> > should define a "#mailbox-cells" property that indicates how many
+> > 32-bit cells a qmtm needs to describe the connection between the
+> > controller and the slave. My best guess is that this would be hardcoded
+> > to <3>, using two cells for a 64-bit FIFO bus address, and a 32-bit cell
+> > for the slave-id signal number. All other parameters that you have in
+> > the big table in the qmtm driver at the moment can then get moved into
+> > the slave drivers, as they are constant per type of slave. This will
+> > simplify the QMTM driver.
+> >
+> > In the slave, you should have a "mailboxes" property with a phandle
+> > to the qmtm followed by the three cells to identify the actual
+> > queue. If it's possible that a device uses more than one rx and
+> > one tx queue, we also need a "mailbox-names" property to identify
+> > the individual queues.
 > 
-Can you please update the change log with above information.
+> We explored on DT bindings suggestion given by you. We have come
+> up with a sample DT binding for how it will look like. Herewith we have
+> provided the same. Would you please review and give us your
+> comments before we change our driver and DTS file to accomodate it?
+> 
+> Sample DTS node for QM:
+>                 qmlite: qmtm at 17030000 {
+>                         compatible = "apm,xgene-qmtm-lite";
 
-> On 01/30/2014 03:26 PM, Shilimkar, Santosh wrote:
->> Can u capture the issue withiout this fix?
->>
->> Sent from my Android phone using TouchDown (www.nitrodesk.com)
->>
->> -----Original Message-----
->> *From:* Khoronzhuk, Ivan [ivan.khoronzhuk at ti.com]
->> *Received:* Thursday, 30 Jan 2014, 6:37am
->> *To:* Shilimkar, Santosh [santosh.shilimkar at ti.com]
->> *CC:* mturquette at linaro.org [mturquette at linaro.org];
->> linux-arm-kernel at lists.infradead.org [linux-arm-kernel at lists.infradead.org];
->> linux-kernel at vger.kernel.org [linux-kernel at vger.kernel.org]; Khoronzhuk, Ivan
->> [ivan.khoronzhuk at ti.com]
->> *Subject:* [PATCH] clk: keystone: gate: fix clk_init_data initialization
->>
->> In clk_register_psc() function clk_init_data struct is allocated
->> in the stack. All members of this struct should be initialized
->> before using otherwise it will contain garbage. So initialize flags
->> in this structure too.
->>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->>    drivers/clk/keystone/gate.c | 1 +
->>    1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
->> index 17a5983..86f1e36 100644
->> --- a/drivers/clk/keystone/gate.c
->> +++ b/drivers/clk/keystone/gate.c
->> @@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
->>
->>            init.name = name;
->>            init.ops = &clk_psc_ops;
->> +       init.flags = 0;
->>            init.parent_names = (parent_name ? &parent_name : NULL);
->>            init.num_parents = (parent_name ? 1 : 0);
->>
->> -- 
->> 1.8.3.2
->>
+I would use 'mailbox at 17030000' as the node name, as the name part
+is supposed to be descriptive of the function rather than the implemention.
+
+>                         reg = <0x0 0x17030000 0x0 0x10000>,
+>                               <0x0 0x10000000 0x0 0x400000>;
+>                         interrupts = <0x0 0x40 0x4>,
+>                                      <0x0 0x3c 0x4>;
+>                         status = "ok";
+>                         #clock-cells = <1>;
+>                         clocks = <&qmlclk 0>;
+>                         #mailbox-cells = <3>;
+>                 };
+
+The #clock-cells seems misplaced here, unless this is also a clock
+provider, which I don't think it is.
+
 > 
+> Sample DTS node for Ethernet:
+>                 menet: ethernet at 17020000 {
+>                         compatible = "apm,xgene-enet";
+>                         status = "disabled";
+>                         reg = <0x0 0x17020000 0x0 0x30>,
+>                               <0x0 0x17020000 0x0 0x10000>,
+>                               <0x0 0x17020000 0x0 0x20>;
+
+Unrelated, but it seems strange to have three register sets of different
+sizes at the same offset.
+
+>                         mailboxes = <&qmlite 0x0 0x1000002c 0x0000>,
+>                                             <&qmlite 0x0 0x10000052 0x0020>,
+>                                             <&qmlite 0x0 0x10000060 0x0f00>
+>                         mailbox-names = "mb-tx", "mb-fp", "mb-rx";
+
+I would leave out the "mb-" part of the strings and just document them
+as "tx", "rx" and "fp".
+
+>                         interrupts = <0x0 0x38 0x4>,
+>                                      <0x0 0x39 0x4>,
+>                                      <0x0 0x3a 0x4>;
+>                         #clock-cells = <1>;
+
+Same comment about #clock-cells here.
+
+>                         clocks = <&eth8clk 0>;
+>                         local-mac-address = <0x0 0x11 0x3a 0x8a 0x5a 0x78>;
+>                         max-frame-size = <0x233a>;
+>                         phyid = <3>;
+>                         phy-mode = "rgmii";
+>                 };
+> 
+> The mailbox node in DTS has following format:
+> mailbox = <&parent 'higher 32 bit bus address' 'lower 32 bit bus
+> address' 'signal id'>
+
+sounds good.
+
+> Ethernet driver will call following function in platform_probe:
+>  mailbox_get(dev, "mb-tx");
+> mailbox_get API will return the the context of allocated and configured mailbox.
+> For now, mailbox_get API will be implemented in xgene QMTM driver.
+> Eventually when mailbox framework in Linux will be standardized, we
+> will use it instead.
+
+Ok.
+
+> > For the in-kernel interfaces, we should probably start a conversation
+> > with the owners of the mailbox drivers to get a common API, for now
+> > I'd suggest you just leave it as it is, and only adapt for the new
+> > binding.
+> 
+> Sure. For now we will put our driver mostly as is in the
+> drivers/mailbox. Can you please help us identify the owners of the
+> mailbox drivers? As you suggested, we can start conversation with them
+> to define common in kernel APIs.
+ 
+Please talk to "Suman Anna" <s-anna@ti.com> for the TI part and Rob
+Herring <robh@kernel.org> for pl320. The pl320 driver was written
+by Mark Langsdorf for Calxeda, but I don't have an updated email
+address for him and assume that the calxeda address is no longer
+functional.
+
+	Arnd
