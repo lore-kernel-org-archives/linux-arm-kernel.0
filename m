@@ -1,53 +1,78 @@
 From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 30 Jan 2014 15:55:41 +0100
-Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+Date: Thu, 30 Jan 2014 15:55:44 +0100
+Subject: [PATCH 4/4] ARM: dts: add B2112 board support
 In-Reply-To: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
 References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <1391093744-19905-5-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alexandre TORGUE <alexandre.torgue@st.com>
 
-This patch adds support to STiD127 SoC.
-The main adaptation is the L2 cache way size compare to STiH41x SoCs.
+Add support for B2112  board based on STiD127 SoC.
 
-Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/mach-sti/board-dt.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/Makefile          |    3 ++-
+ arch/arm/boot/dts/stid127-b2112.dts |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stid127-b2112.dts
 
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index 1217fb5..be018a9 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -9,6 +9,7 @@
- 
- #include <linux/irq.h>
- #include <linux/of_platform.h>
-+#include <linux/of.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- 
-@@ -18,6 +19,10 @@ void __init stih41x_l2x0_init(void)
- {
- 	u32 way_size = 0x4;
- 	u32 aux_ctrl;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d57c1a6..7173dca 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -247,7 +247,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+ dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
+ 	stih416-b2000.dtb \
+ 	stih415-b2020.dtb \
+-	stih416-b2020.dtb
++	stih416-b2020.dtb \
++	stid127-b2112.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+diff --git a/arch/arm/boot/dts/stid127-b2112.dts b/arch/arm/boot/dts/stid127-b2112.dts
+new file mode 100644
+index 0000000..b4507e3
+--- /dev/null
++++ b/arch/arm/boot/dts/stid127-b2112.dts
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics Limited.
++ * Author: Alexandre Torgue <alexandre.torgue@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stid127.dtsi"
 +
-+	if (of_machine_is_compatible("st,stid127"))
-+		way_size = 0x3;
++/ {
++	model = "STiD127 B2112 Board";
++	compatible = "st,stid127", "st,stid127-b2112";
 +
- 	/* may be this can be encoded in macros like BIT*() */
- 	aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
- 		(0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
-@@ -36,6 +41,7 @@ static void __init stih41x_machine_init(void)
- static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
- 	"st,stih416",
-+	"st,stid127",
- 	NULL
- };
- 
++	memory{
++		device_type = "memory";
++		reg = <0x40000000 0x10000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyAS0,115200";
++		linux,stdout-path = &uart2;
++	};
++
++	aliases {
++		ttyAS0 = &uart2;
++	};
++
++	soc {
++		uart2: serial at fe532000{
++			status = "okay";
++		};
++	};
++};
 -- 
 1.7.9.5
