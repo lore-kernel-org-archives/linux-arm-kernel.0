@@ -1,26 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Jan 2014 16:23:56 +0100
-Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <CAGsJ_4xFKytv=Mj9eVwGY7RjyUy2W=iSXvnULKyBETYVzMVbOg@mail.gmail.com>
-References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
- <201401302049.27521.arnd@arndb.de>
- <CAGsJ_4xFKytv=Mj9eVwGY7RjyUy2W=iSXvnULKyBETYVzMVbOg@mail.gmail.com>
-Message-ID: <201401311623.56902.arnd@arndb.de>
+Date: Fri, 31 Jan 2014 16:27:50 +0100
+Subject: [PATCH V3 6/8] SPEAr13xx: Fixup: Move SPEAr1340 SATA platform
+ code to phy driver
+In-Reply-To: <20140131041204.GC2618@pratyush-vbox>
+References: <cover.1391077731.git.mohit.kumar@st.com>
+ <201401301421.00990.arnd@arndb.de> <20140131041204.GC2618@pratyush-vbox>
+Message-ID: <201401311627.50482.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 January 2014, Barry Song wrote:
-> >
-> > Is SRC_OSC_RATE the rate of spwm->clk? If so, it would be nice to just call
-> > clk_get_rate() here, in case you ever have a chip with a different rate.
-> >
+On Friday 31 January 2014, Pratyush Anand wrote:
+> On Thu, Jan 30, 2014 at 09:21:00PM +0800, Arnd Bergmann wrote:
+> > On Thursday 30 January 2014, Mohit Kumar wrote:
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
+> > > new file mode 100644
+> > > index 0000000..208b37d
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
+> > > @@ -0,0 +1,8 @@
+> > > +Required properties:
+> > > +- compatible : should be "st,spear1340-sata-pcie-phy".
+> > 
+> > Just for confirmation: This phy is by design only capable of driving
+> > sata or pcie, but nothing else if reused in a different SoC, right?
+> > 
+> > If the phy is actually more generic than that, I'd suggest changing
+> > the name, otherwise it's ok.
 > 
-> SRC_OSC_RATE is the fixed frequency of crystal oscillator, but
-> spwm->clk comes from the IO bus. the design is a little strange, pwm
-> channels don't use the clock of PWM controller to generate
-> period/duty, but use other sources.
+> OK, we will give a generic name as it can be used for sata/pcie/usb3.0.
+> Although, phy register definition may vary from version to version,
+> but that can be managed,as and when support of new soc is added. 
 
-How about modeling  that other source as a fixed-rate clock in DT
-then?
+It probably doesn't hurt to already define a list of possible
+modes in the binding that you already know about. That way, you
+don't have to update the binding in sync with the driver if you
+add another mode, such as USB.
 
 	Arnd
