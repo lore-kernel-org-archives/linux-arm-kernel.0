@@ -1,35 +1,60 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 31 Jan 2014 09:36:38 -0500
-Subject: [PATCH] ARM: dts: k2hk-evm: rename clock node to clocks
-In-Reply-To: <1391175066-13862-1-git-send-email-grygorii.strashko@ti.com>
-References: <1391175066-13862-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <52EBB4F6.3050202@ti.com>
+Date: Fri, 31 Jan 2014 09:45:09 -0500
+Subject: [PATCH v2] ARM: keystone: dts: drop "msmcsram" clock node
+In-Reply-To: <1391105400-31602-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1391105400-31602-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52EBB6F5.8080701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 January 2014 08:31 AM, Grygorii Strashko wrote:
-> Fix type in clock(s) node name: "clock"-->"clocks".
+On Thursday 30 January 2014 01:10 PM, Ivan Khoronzhuk wrote:
+> At late init all unused clocks are disabled. So clocks that were not
+> get before will be gated. In Keysone 2 SoC we have at least one
+> necessary clock that is not used by any driver - "msmcsram". This
+> clock is necessary, because it supplies the Multicore Shared Memory
+> Controller (MSMC). MSMC is the coherency interconnect and all the
+> coherent masters are connected to it including devices which are not
+> under Linux OS control. MSMC clock should not be touched even in low
+> power states.
 > 
-s/type/typo ;-)
-
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> So drop the clock node, otherwise 'clk_ignore_unused' parameter will
+> disable the clock leading to system stall.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 > ---
-No need to resend, I will fix it up while applying it
-
->  arch/arm/boot/dts/k2hk-evm.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+> keystone/master
 > 
-> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-> index eaefdfe..c02c3a8 100644
-> --- a/arch/arm/boot/dts/k2hk-evm.dts
-> +++ b/arch/arm/boot/dts/k2hk-evm.dts
-> @@ -15,7 +15,7 @@
->  	compatible =  "ti,keystone-evm";
+> v1..v2:
+> - dropped "msmcsram" clock node, instead disabling
+> - updated comment message
+> 
+Thanks for the update. Would be good to get blessing from DT folks.
+I want to send this one during the rc's since its a bug fix.
+
+>  arch/arm/boot/dts/keystone-clocks.dtsi | 10 ----------
+>  1 file changed, 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
+> index 2363593..98ad488 100644
+> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
+> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
+> @@ -327,16 +327,6 @@ clocks {
+>  		domain-id = <6>;
+>  	};
 >  
->  	soc {
-> -		clock {
-> +		clocks {
->  			refclksys: refclksys {
->  				#clock-cells = <0>;
->  				compatible = "fixed-clock";
+> -	clkmsmcsram: clkmsmcsram {
+> -		#clock-cells = <0>;
+> -		compatible = "ti,keystone,psc-clock";
+> -		clocks = <&chipclk1>;
+> -		clock-output-names = "msmcsram";
+> -		reg = <0x02350038 0xb00>, <0x0235001c 0x400>;
+> -		reg-names = "control", "domain";
+> -		domain-id = <7>;
+> -	};
+> -
+>  	clkgem0: clkgem0 {
+>  		#clock-cells = <0>;
+>  		compatible = "ti,keystone,psc-clock";
 > 
