@@ -1,39 +1,41 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 31 Jan 2014 16:04:36 +0100
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
-Message-ID: <52EBBB84.9050705@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 31 Jan 2014 18:03:09 +0200
+Subject: [PATCH] ARM: dts: k2hk-evm: rename clock node to clocks
+In-Reply-To: <52EBB4F6.3050202@ti.com>
+References: <1391175066-13862-1-git-send-email-grygorii.strashko@ti.com>
+ <52EBB4F6.3050202@ti.com>
+Message-ID: <52EBC93D.9000402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/2014 14:39, Linus Walleij wrote:
-> On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 
->> This passes the errata fix using a GPIO to control the RTS pin
->> on one of the AT91 chips to use gpiolib instead of the
->> AT91-specific interfaces. Also remove the reliance on
->> compile-time #defines and the cpu_* check and rely on the
->> platform passing down the proper GPIO pin through platform
->> data.
+On 01/31/2014 04:36 PM, Santosh Shilimkar wrote:
+> On Friday 31 January 2014 08:31 AM, Grygorii Strashko wrote:
+>> Fix type in clock(s) node name: "clock"-->"clocks".
 >>
->> This is a prerequisite for getting rid of the local GPIO
->> implementation in the AT91 platform and move toward
->> multiplatform.
->>
->> The patch also adds device tree support for getting the
->> RTS GPIO pin from the device tree on DT boot paths.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> s/type/typo ;-)
+>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >> ---
->> ChangeLog v3->v4:
-> 
-> ARM SoC folks, if you're not taking this in through the <timex.h> removal
-> series then please ACK this patch so I can take it through the GPIO
-> tree instead (unless you want to apply this single patch, which would
-> be even better, you have Greg's ACK in this thread).
-> 
-I can't find this patch in linux-next, did I missed something ?
+> No need to resend, I will fix it up while applying it
+
+Thanks
+
+>
+>>   arch/arm/boot/dts/k2hk-evm.dts |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+>> index eaefdfe..c02c3a8 100644
+>> --- a/arch/arm/boot/dts/k2hk-evm.dts
+>> +++ b/arch/arm/boot/dts/k2hk-evm.dts
+>> @@ -15,7 +15,7 @@
+>>   	compatible =  "ti,keystone-evm";
+>>
+>>   	soc {
+>> -		clock {
+>> +		clocks {
+>>   			refclksys: refclksys {
+>>   				#clock-cells = <0>;
+>>   				compatible = "fixed-clock";
+>>
+>
