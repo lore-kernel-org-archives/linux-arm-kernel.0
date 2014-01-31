@@ -1,86 +1,80 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 31 Jan 2014 15:18:15 +0100
-Subject: [PATCH 06/10] watchdog: xilinx: Fix all printk messages
+Date: Fri, 31 Jan 2014 15:18:16 +0100
+Subject: [PATCH 07/10] watchdog: xilinx: Fix OF binding
 In-Reply-To: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
 References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
-Message-ID: <fcb21f8907a2025371c612b818a0f2a04a2aa3af.1391177880.git.michal.simek@xilinx.com>
+Message-ID: <26d172891694e4041e73b7dae85a1848adf38034.1391177880.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_ functions for printk messages.
+Use of_property_read_u32 functions to clean OF probing.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/watchdog/of_xilinx_wdt.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/watchdog/of_xilinx_wdt.c | 25 ++++++++++---------------
+ 1 file changed, 10 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index d28bd3f..c229cc4 100644
+index c229cc4..475440a6 100644
 --- a/drivers/watchdog/of_xilinx_wdt.c
 +++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -10,8 +10,6 @@
-  * 2 of the License, or (at your option) any later version.
-  */
+@@ -147,8 +147,7 @@ static u32 xwdt_selftest(struct xwdt_device *xdev)
+ static int xwdt_probe(struct platform_device *pdev)
+ {
+ 	int rc;
+-	u32 *tmptr;
+-	u32 *pfreq;
++	u32 pfreq, enable_once;
+ 	struct resource *res;
+ 	struct xwdt_device *xdev;
+ 	bool no_timeout = false;
+@@ -168,28 +167,24 @@ static int xwdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(xdev->base))
+ 		return PTR_ERR(xdev->base);
 
--#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+-	pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+-					"clock-frequency", NULL);
 -
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/types.h>
-@@ -42,7 +40,6 @@
- #define XWT_TIMER_FAILED            0xFFFFFFFF
-
- #define WATCHDOG_NAME     "Xilinx Watchdog"
--#define PFX WATCHDOG_NAME ": "
-
- struct xwdt_device {
- 	void __iomem *base;
-@@ -175,14 +172,16 @@ static int xwdt_probe(struct platform_device *pdev)
- 					"clock-frequency", NULL);
-
- 	if (pfreq == NULL) {
--		pr_warn("The watchdog clock frequency cannot be obtained!\n");
-+		dev_warn(&pdev->dev,
-+			 "The watchdog clock frequency cannot be obtained\n");
+-	if (pfreq == NULL) {
++	rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency", &pfreq);
++	if (rc) {
+ 		dev_warn(&pdev->dev,
+ 			 "The watchdog clock frequency cannot be obtained\n");
  		no_timeout = true;
  	}
 
- 	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
- 					"xlnx,wdt-interval", NULL);
- 	if (tmptr == NULL) {
--		pr_warn("Parameter \"xlnx,wdt-interval\" not found in device tree!\n");
-+		dev_warn(&pdev->dev,
-+			 "Parameter \"xlnx,wdt-interval\" not found\n");
+-	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+-					"xlnx,wdt-interval", NULL);
+-	if (tmptr == NULL) {
++	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
++				  &xdev->wdt_interval);
++	if (rc) {
+ 		dev_warn(&pdev->dev,
+ 			 "Parameter \"xlnx,wdt-interval\" not found\n");
  		no_timeout = true;
- 	} else {
- 		xdev->wdt_interval = *tmptr;
-@@ -191,7 +190,8 @@ static int xwdt_probe(struct platform_device *pdev)
- 	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
- 					"xlnx,wdt-enable-once", NULL);
- 	if (tmptr == NULL) {
--		pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in device tree!\n");
-+		dev_warn(&pdev->dev,
-+			 "Parameter \"xlnx,wdt-enable-once\" not found\n");
+-	} else {
+-		xdev->wdt_interval = *tmptr;
+ 	}
+
+-	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+-					"xlnx,wdt-enable-once", NULL);
+-	if (tmptr == NULL) {
++	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
++				  &enable_once);
++	if (!rc && enable_once) {
+ 		dev_warn(&pdev->dev,
+ 			 "Parameter \"xlnx,wdt-enable-once\" not found\n");
  		watchdog_set_nowayout(xilinx_wdt_wdd, true);
- 	}
+@@ -201,7 +196,7 @@ static int xwdt_probe(struct platform_device *pdev)
+  */
+ 	if (!no_timeout)
+ 		xilinx_wdt_wdd->timeout = 2 * ((1 << xdev->wdt_interval) /
+-					  *pfreq);
++					  pfreq);
 
-@@ -208,13 +208,13 @@ static int xwdt_probe(struct platform_device *pdev)
-
- 	rc = xwdt_selftest(xdev);
- 	if (rc == XWT_TIMER_FAILED) {
--		pr_err("SelfTest routine error!\n");
-+		dev_err(&pdev->dev, "SelfTest routine error\n");
- 		return rc;
- 	}
-
- 	rc = watchdog_register_device(xilinx_wdt_wdd);
- 	if (rc) {
--		pr_err("cannot register watchdog (err=%d)\n", rc);
-+		dev_err(&pdev->dev, "Cannot register watchdog (err=%d)\n", rc);
- 		return rc;
- 	}
-
+ 	spin_lock_init(&xdev->spinlock);
+ 	watchdog_set_drvdata(xilinx_wdt_wdd, xdev);
 --
 1.8.2.3
 
@@ -90,4 +84,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/1f25b725/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/c88189ee/attachment.sig>
