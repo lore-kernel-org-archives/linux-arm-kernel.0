@@ -1,25 +1,87 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 30 Jan 2014 22:11:27 -0800
-Subject: [PATCH v2] ARM: iop32x: fix power off handling for the EM7210
- board
-In-Reply-To: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
- (Linus Walleij's message of "Wed, 29 Jan 2014 15:20:15 +0100")
-References: <1391005215-8520-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <8761p0vfxs.fsf@paris.lan>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Fri, 31 Jan 2014 15:47:33 +0900
+Subject: [PATCH v5 4/4] [media] exynos-scaler: Add DT bindings for SCALER
+ driver
+In-Reply-To: <52E29051.3070906@samsung.com>
+References: <1389238094-19386-1-git-send-email-shaik.ameer@samsung.com>
+ <1389238094-19386-5-git-send-email-shaik.ameer@samsung.com>
+ <52E29051.3070906@samsung.com>
+Message-ID: <CAOD6ATq1U1o4MVxM9g6rqfO7k2eebb_BzPO4JOtU3y4H=YHh9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi Tomasz,
 
-> This board was missed when converting all the others to proper
-> abstracted GPIO handling. Fix it up the right way by requesting
-> and driving GPIO line 0 high through gpiolib to power off the
-> machine.
+Thanks for the review.
+Will consider all your comments in the next version of patch series.
+
+Regards,
+Shaik Ameer Basha
+
+On Sat, Jan 25, 2014 at 1:09 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Shaik,
 >
-> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Queueing for fixes (w/ack from Arnd.)
-
-Kevin
+>
+> On 09.01.2014 04:28, Shaik Ameer Basha wrote:
+>>
+>> This patch adds the DT binding documentation for the
+>> Exynos5420/5410 based SCALER device driver.
+>>
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>>   .../devicetree/bindings/media/exynos5-scaler.txt   |   22
+>> ++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/media/exynos5-scaler.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/media/exynos5-scaler.txt
+>> b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
+>> new file mode 100644
+>> index 0000000..9328e7d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/media/exynos5-scaler.txt
+>> @@ -0,0 +1,22 @@
+>> +* Samsung Exynos5 SCALER device
+>> +
+>> +SCALER is used for scaling, blending, color fill and color space
+>> +conversion on EXYNOS[5420/5410] SoCs.
+>> +
+>> +Required properties:
+>> +- compatible: should be "samsung,exynos5420-scaler" or
+>> +                       "samsung,exynos5410-scaler"
+>> +- reg: should contain SCALER physical address location and length
+>> +- interrupts: should contain SCALER interrupt number
+>
+>
+> s/number/specifier/
+>
+>
+>> +- clocks: should contain the SCALER clock specifier, from the
+>> +                       common clock bindings
+>
+>
+> s/specifier/phandle and specifier pair for each clock listed in clock-names
+> property/
+>
+> s/from/according to/
+>
+>
+>> +- clock-names: should be "scaler"
+>
+>
+> should contain exactly one entry:
+>  - "scaler" - IP bus clock.
+>
+> Also this patch should be first in the series to let the driver added in
+> further patches use already present bindings.
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+>
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
