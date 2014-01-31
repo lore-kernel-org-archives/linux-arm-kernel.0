@@ -1,18 +1,39 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 31 Jan 2014 15:55:32 +0100 (CET)
-Subject: ALKML rejecting my mails
-Message-ID: <Pine.LNX.4.64.1401311553390.3234@axis700.grange>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 31 Jan 2014 16:04:36 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
+Message-ID: <52EBBB84.9050705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-thanks for offering to have a look at my mail. 2 days ago sending to ALKML 
-worked just fine for me, but not any longer.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+On 13/01/2014 14:39, Linus Walleij wrote:
+> On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+>> This passes the errata fix using a GPIO to control the RTS pin
+>> on one of the AT91 chips to use gpiolib instead of the
+>> AT91-specific interfaces. Also remove the reliance on
+>> compile-time #defines and the cpu_* check and rely on the
+>> platform passing down the proper GPIO pin through platform
+>> data.
+>>
+>> This is a prerequisite for getting rid of the local GPIO
+>> implementation in the AT91 platform and move toward
+>> multiplatform.
+>>
+>> The patch also adds device tree support for getting the
+>> RTS GPIO pin from the device tree on DT boot paths.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ChangeLog v3->v4:
+> 
+> ARM SoC folks, if you're not taking this in through the <timex.h> removal
+> series then please ACK this patch so I can take it through the GPIO
+> tree instead (unless you want to apply this single patch, which would
+> be even better, you have Greg's ACK in this thread).
+> 
+I can't find this patch in linux-next, did I missed something ?
