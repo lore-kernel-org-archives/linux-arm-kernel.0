@@ -1,84 +1,142 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 31 Jan 2014 12:35:51 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Lager USB0 cable detection workaround
-In-Reply-To: <1682649.H5bjffAvcD@avalon>
-References: <20140129230959.22655.55645.sendpatchset@w520>
- <20140129231029.22655.58864.sendpatchset@w520>
- <1682649.H5bjffAvcD@avalon>
-Message-ID: <CANqRtoQ6HErKuV01Mg2oV7S8UwTayCcsJAQtxhJGJcy8UeYCNQ@mail.gmail.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Fri, 31 Jan 2014 09:42:04 +0530
+Subject: [PATCH V3 6/8] SPEAr13xx: Fixup: Move SPEAr1340 SATA platform
+ code to phy driver
+In-Reply-To: <201401301421.00990.arnd@arndb.de>
+References: <cover.1391077731.git.mohit.kumar@st.com>
+ <7b9e0a98a6873f66e519791dfba20418e2a68c5a.1391077731.git.mohit.kumar@st.com>
+ <201401301421.00990.arnd@arndb.de>
+Message-ID: <20140131041204.GC2618@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Thu, Jan 30, 2014 at 09:21:00PM +0800, Arnd Bergmann wrote:
+> On Thursday 30 January 2014, Mohit Kumar wrote:
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
+> > new file mode 100644
+> > index 0000000..208b37d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
+> > @@ -0,0 +1,8 @@
+> > +Required properties:
+> > +- compatible : should be "st,spear1340-sata-pcie-phy".
+> 
+> Just for confirmation: This phy is by design only capable of driving
+> sata or pcie, but nothing else if reused in a different SoC, right?
+> 
+> If the phy is actually more generic than that, I'd suggest changing
+> the name, otherwise it's ok.
 
-[CC Morimoto-san, the author of the USBHS driver]
+OK, we will give a generic name as it can be used for sata/pcie/usb3.0.
+Although, phy register definition may vary from version to version,
+but that can be managed,as and when support of new soc is added. 
 
-On Fri, Jan 31, 2014 at 10:14 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> Thank you for the patch.
->
-> On Thursday 30 January 2014 08:10:29 Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> Add Lager board code to check the PWEN GPIO signal and refuse to
->> allow probe of the USBHS driver in case of DIP misconfiguration.
->>
->> For correct operation Lager DIP switches SW5 and SW6 shall be
->> configured in 2-3 position to enable USB Function support.
->>
->> If the DIP switch is configured incorrectly then the user can
->> simply adjust the hardware and either reboot or use the bind interface
->> to try to probe again:
->>
->> # echo renesas_usbhs > /sys/bus/platform/drivers/renesas_usbhs/bind
->
-> Our of curiosity, and I know you will love the question, have you thought
-> about how to implement this on multiplatform kernels without a board file ?
-> :-)
+> 
+> > +- reg : offset and length of the PHY register set.
+> > +- misc: phandle for the syscon node to access misc registers
+> > +- #phy-cells : from the generic PHY bindings, must be 2.
+> > +	- 1st arg: phandle to the phy node.
+> > +	- 2nd arg: 0 if phy (in 1st arg) is to be used for sata else 1.
+> > +	- 3rd arg: Instance id of the phy (in 1st arg).
+> 
+> I would count "arg" differently: There are three cells, and the first
+> cell is the phandle, while the second and third cells contain the first
+> and second argument.
 
-Thanks for asking. =)
+Ok..will modify accordingly.
 
-Actually I've been giving this some thought already. And it happens to
-be that the sister board "Koelsch" has similar but slightly improved
-hardware.
+> 
+> The third cell seems redundant, more on that below.
+> 
+> > +		ahci0: ahci at b1000000 {
+> >  			compatible = "snps,spear-ahci";
+> >  			reg = <0xb1000000 0x10000>;
+> >  			interrupts = <0 68 0x4>;
+> > +			phys = <&miphy0 0 0>;
+> > +			phy-names = "ahci-phy";
+> >  			status = "disabled";
+> >  		};
+> >  
+> > -		ahci at b1800000 {
+> > +		ahci1: ahci at b1800000 {
+> >  			compatible = "snps,spear-ahci";
+> >  			reg = <0xb1800000 0x10000>;
+> >  			interrupts = <0 69 0x4>;
+> > +			phys = <&miphy1 0 1>;
+> > +			phy-names = "ahci-phy";
+> >  			status = "disabled";
+> >  		};
+> >  
+> > -		ahci at b4000000 {
+> > +		ahci2: ahci at b4000000 {
+> >  			compatible = "snps,spear-ahci";
+> >  			reg = <0xb4000000 0x10000>;
+> >  			interrupts = <0 70 0x4>;
+> > +			phys = <&miphy2 0 2>;
+> > +			phy-names = "ahci-phy";
+> >  			status = "disabled";
+> >  		};
+> 
+> In each case, the number of the phy 'miphyX' is identical to the
+> third cell, and I suspect this is by design. In the driver, the
+> 'id' field is set in the xlate function, but I could not find any
+> place where it actually gets used, so unless you know that it's
+> needed, I'd suggest simply removing it.
 
-In the Lager case we can only support USB Function properly and
-safely, and to avoid shooting ourselves in the foot we need a check
-like this patch implements. So on Lager RCAR_GP_PIN(5, 18) needs to be
-high for proper USB Function operation. If not we give up.
+It has not been used in this patch, as SATA support is currently only
+for SPEAr1340, where we have only one instance.
 
-In case of Koelsch a MAX3355E chip is hooked up to handle dual
-function or OTG. So on that platform we can use either Function or
-Host. To figure out which cable is hooked up we can check the ID pin
-of the USB connector through the MAX3355E ID_OUT signal.
+Will be using it in PCIe for SPEAr1310 where 3 instances are present.
 
-In general with a USB connector (and the MAX3355E chip) there are
-standard signal levels for ID pin detection. The ID signal for the USB
-micro-AB connector will be High in case of Function cable (pull-up,
-left open), and Low in case of Host (tied to GND).
+> 
+> Even if you need it, it may be better to have the instance encoded
+> in the phy node itself, since it's a property of the phy hardware
+> (e.g. if you have to pass the number into a generic register that
+> is global to all phys.
 
-So, to answer your question about how to support this without
-board-specific code written in C, I believe we need to add
-abstractions to support the MAX3355E chip and/or external ID pin
-somehow. Perhaps there is almost nothing to abstract there?
+Ok..ll do that.
 
-Regarding how to support Lager then I think we can use the same code
-as Koelsch because the ID pin signal is following the same signal
-level. So perhaps it is enough to add support for the USBHS driver to
-handle the ID pin as GPIO? If so, then we can use the same style for
-both Lager and Koelsch, but on Lager we also somehow need to tell the
-the USBHS driver that only Function is OK.
+> 
+> Alternatively, you could have a different representation, where you
+> have a single DT device node representing all three PHYs, with
+> "reg = <0xeb800000 0xc000>;" In that case, all sata devices would
+> point to the same phy node and pass the instance id so the phy
+> driver can operated the correct register set.
 
-> This might be one of the valid cases where we won't be able to do without a
-> board file. The callback functions in platform data, however, probably need to
-> go.
+Instance ID is mainly needed to manipulate wrapper register present
+within SPEAr13xx misc space. We have a single register in misc space
+having bit fields controlling all 3 phys, and there we need this id.
 
-I think it is possible to get rid of the board file. And especially if
-we can reuse the code for multiple boards or SoC then this starts
-making sense - even to me! =)
+> 
+> > +static int spear1340_sata_miphy_init(struct spear13xx_phy_priv *phypriv)
+> > +{
+> > +	regmap_update_bits(phypriv->misc, SPEAR1340_PCIE_SATA_CFG,
+> > +			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_SATA_CFG_VAL);
+> > +	regmap_update_bits(phypriv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> > +			SPEAR1340_PCIE_MIPHY_CFG_MASK,
+> > +			SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
+> > +	/* Switch on sata power domain */
+> > +	regmap_update_bits(phypriv->misc, SPEAR1340_PCM_CFG,
+> > +			SPEAR1340_PCM_CFG_SATA_POWER_EN,
+> > +			SPEAR1340_PCM_CFG_SATA_POWER_EN);
+> > +	msleep(20);
+> > +	/* Disable PCIE SATA Controller reset */
+> > +	regmap_update_bits(phypriv->misc, SPEAR1340_PERIP1_SW_RST,
+> > +			SPEAR1340_PERIP1_SW_RST_SATA, 0);
+> > +	msleep(20);
+> > +
+> > +	return 0;
+> > +}
+> 
+> I guess some of the parts above can eventually get moved into other
+> drivers (reset controller, power domains) that get called directly
+> by the SATA driver (e.g. though reset_device()). Since that won't
+> impact the PHY binding, it seems fine to leave it here for now.
 
-Thanks,
+thanks :)
 
-/ magnus
+Regards
+Pratyush
+> 
+> 	Arnd
