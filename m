@@ -1,63 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 Jan 2014 15:32:05 -0600
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 31 Jan 2014 16:34:27 -0500 (EST)
 Subject: [RFC/PATCH] base: platform: add generic clock handling for
  platform-bus
-In-Reply-To: <20140131200434.GR27282@n2100.arm.linux.org.uk>
-References: <1391191965-31102-1-git-send-email-balbi@ti.com>
- <20140131200434.GR27282@n2100.arm.linux.org.uk>
-Message-ID: <20140131213205.GB2502@saruman.home>
+In-Reply-To: <1391191965-31102-1-git-send-email-balbi@ti.com>
+Message-ID: <Pine.LNX.4.44L0.1401311614100.12368-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 31 Jan 2014, Felipe Balbi wrote:
 
-On Fri, Jan 31, 2014 at 08:04:35PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 31, 2014 at 12:12:45PM -0600, Felipe Balbi wrote:
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index 3a94b79..86aeb5b 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -484,6 +484,21 @@ static int platform_drv_probe(struct device *_dev)
-> >  	if (ACPI_HANDLE(_dev))
-> >  		acpi_dev_pm_attach(_dev, true);
-> >  
-> > +	dev->fck = devm_clk_get(_dev, "fck");
-> > +	dev->ick = devm_clk_get(_dev, "ick");
-> > +
-> > +	if (!IS_ERR(dev->fck))
-> > +		clk_prepare_enable(dev->fck);
-> > +	else
-> > +		dev->fck = NULL;
-> > +
-> > +	if (!IS_ERR(dev->ick))
-> > +		clk_prepare_enable(dev->ick);
-> > +	else
-> > +		dev->ick = NULL;
+> Still TODO a commit log. Not for merging!!!!!
 > 
-> If people are going to continue doing this (converting error values to
-> NULL) can we please have a check in devm_clk_get() which prevents it
-> returning NULL if the implementation happens to do so?
+> NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
 > 
-> It's either that or we force all users to conform to the API which
-> specifies that the error values are defined by IS_ERR() returning
-> true and everything else must be considered as a potential valid return.
+> This patch is an idea I've had recently in order to combine several different
+> PM implementations into the platform-bus.
+> 
+> This patch is bare minimum for platforms which need to handle functional and
+> interface clocks but the whole thing is made optional.
+> 
+> Note that this patch makes sure that by the time a platform_driver's probe is
+> called, we already have clocks enabled and pm_runtime_set_active() has been
+> called, thus making sure that a device driver's pm_runtime_get_sync() will
+> solely increase the pm usage counter.
+> 
+> I have *NOT* tested this anywhere *YET*, but I suppose it shouldn't cause any
+> issues since the clock API has ref counting too.
+> 
+> Would really like to get some review from several folks involved with ARM SoC
+> PM so that's the reason for the wide audience. If I have missed anybody, please
+> add them to Cc.
+> 
+> As mentioned above, this is *NOT* meant for merging, but serves as a starting
+> point for discussing some convergence of several PM domain implementations on
+> different arch/arm/mach-* directories.
 
-The idea here was just to avoid IS_ERR() checks every time we want to
-enable/disable a clock since clk API already copes with NULL pointers.
+You might want to copy the runtime-PM approach used by the PCI 
+subsystem.  It works like this:
 
-This also helps with the fact that platform_bus is also used with
-platforms which don't have (or otherwise don't need) any clock control
-whatsoever, thus made it optional.
+	The core invokes a driver's probe routine with runtime PM 
+	enabled, the device in the ACTIVE state, and the usage counter 
+	incremented by 1.
 
-If everybody prefers duplication of IS_ERR() all over the place, that's
-fine too.
+	If the driver wants to support runtime PM, the probe routine
+	can call pm_runtime_put_noidle.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/af65712a/attachment.sig>
+	The core does pm_runtime_get_sync before invoking the driver's
+	remove routine.  At this point a runtime-PM-aware driver whould 
+	call pm_runtime_get_noresume, to balance the _put during probe.
+
+	After invoking the remove routine, the core does a put_noidle
+	(to balance the get_sync) and a final put_sync (to balance the
+	increment before probe and to leave the device at low power.)
+
+A nice consequence is that everything is transparent for drivers that 
+don't support runtime PM.  The usage counter remains > 0 the entire 
+time the driver is bound.
+
+Conversely, drivers that do support runtime PM merely have to add one 
+call during probe and one during remove.
+
+There is one tricky aspect to all this.  The driver core sets the
+dev->driver field before calling the subsystem core's probe routine.  
+As a result, the subsystem has to be very careful about performing
+runtime PM before invoking the driver's probe routine.  Otherwise you
+will end up calling the driver's runtime_resume callback before the
+driver's probe!  (And of course, the same problem exists in reverse
+during remove.)
+
+Alan Stern
