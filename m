@@ -1,41 +1,37 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 31 Jan 2014 18:03:09 +0200
-Subject: [PATCH] ARM: dts: k2hk-evm: rename clock node to clocks
-In-Reply-To: <52EBB4F6.3050202@ti.com>
-References: <1391175066-13862-1-git-send-email-grygorii.strashko@ti.com>
- <52EBB4F6.3050202@ti.com>
-Message-ID: <52EBC93D.9000402@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 Jan 2014 15:18:10 +0000
+Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
+ dependencies for XEN
+In-Reply-To: <20140121180750.GO30706@mudshark.cambridge.arm.com>
+References: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20140121180750.GO30706@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1401311517260.4373@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2014 04:36 PM, Santosh Shilimkar wrote:
-> On Friday 31 January 2014 08:31 AM, Grygorii Strashko wrote:
->> Fix type in clock(s) node name: "clock"-->"clocks".
->>
-> s/type/typo ;-)
->
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
-> No need to resend, I will fix it up while applying it
+On Tue, 21 Jan 2014, Will Deacon wrote:
+> On Tue, Jan 21, 2014 at 01:44:24PM +0000, Stefano Stabellini wrote:
+> > Remove !GENERIC_ATOMIC64 build dependency:
+> > - introduce xen_atomic64_xchg
+> > - use it to implement xchg_xen_ulong
+> > 
+> > Remove !CPU_V6 build dependency:
+> > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
+> >   CONFIG_CPU_V6
+> > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: arnd at arndb.de
+> > CC: linux at arm.linux.org.uk
+> > CC: will.deacon at arm.com
+> > CC: catalin.marinas at arm.com
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: linux-kernel at vger.kernel.org
+> > CC: xen-devel at lists.xenproject.org
+> 
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
+> 
+> Cheers Stefano,
 
-Thanks
-
->
->>   arch/arm/boot/dts/k2hk-evm.dts |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
->> index eaefdfe..c02c3a8 100644
->> --- a/arch/arm/boot/dts/k2hk-evm.dts
->> +++ b/arch/arm/boot/dts/k2hk-evm.dts
->> @@ -15,7 +15,7 @@
->>   	compatible =  "ti,keystone-evm";
->>
->>   	soc {
->> -		clock {
->> +		clocks {
->>   			refclksys: refclksys {
->>   				#clock-cells = <0>;
->>   				compatible = "fixed-clock";
->>
->
+Do you think it is acceptable to have this in 3.14?
+Maybe we should aim at 3.15?
