@@ -1,40 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Jan 2014 16:27:50 +0100
-Subject: [PATCH V3 6/8] SPEAr13xx: Fixup: Move SPEAr1340 SATA platform
- code to phy driver
-In-Reply-To: <20140131041204.GC2618@pratyush-vbox>
-References: <cover.1391077731.git.mohit.kumar@st.com>
- <201401301421.00990.arnd@arndb.de> <20140131041204.GC2618@pratyush-vbox>
-Message-ID: <201401311627.50482.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 31 Jan 2014 10:43:21 -0500
+Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
+In-Reply-To: <20140131151955.GB20736@saruman.home>
+References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+ <20140131151955.GB20736@saruman.home>
+Message-ID: <52EBC499.2070302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 January 2014, Pratyush Anand wrote:
-> On Thu, Jan 30, 2014 at 09:21:00PM +0800, Arnd Bergmann wrote:
-> > On Thursday 30 January 2014, Mohit Kumar wrote:
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
-> > > new file mode 100644
-> > > index 0000000..208b37d
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/phy/spear13xx-miphy.txt
-> > > @@ -0,0 +1,8 @@
-> > > +Required properties:
-> > > +- compatible : should be "st,spear1340-sata-pcie-phy".
-> > 
-> > Just for confirmation: This phy is by design only capable of driving
-> > sata or pcie, but nothing else if reused in a different SoC, right?
-> > 
-> > If the phy is actually more generic than that, I'd suggest changing
-> > the name, otherwise it's ok.
+On Friday 31 January 2014 10:19 AM, Felipe Balbi wrote:
+> Hi,
 > 
-> OK, we will give a generic name as it can be used for sata/pcie/usb3.0.
-> Although, phy register definition may vary from version to version,
-> but that can be managed,as and when support of new soc is added. 
+> On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
+>> The Keystone PM management layer has been implemented using PM bus for
+>> power management clocks. As result, most of Keystone drivers don't need
+>> to manage clocks directly. They just need to enable runtime PM and use it
+>> to handle their PM state and clocks.
+>>
+>> Hence, remove clock management code and switch to use runtime PM.
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> quite a few weeks back I sent a series enabling runtime pm for all glue
+> layers. I'll use that version instead, sorry.
+> 
+That should be fine but you need to drop clk_*() related code
+from that patch. I assume you will send refresh version of it then.
 
-It probably doesn't hurt to already define a list of possible
-modes in the binding that you already know about. That way, you
-don't have to update the binding in sync with the driver if you
-add another mode, such as USB.
-
-	Arnd
+Regards,
+Santosh
