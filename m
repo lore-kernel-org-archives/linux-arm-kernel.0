@@ -1,72 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 31 Jan 2014 11:07:59 -0500
-Subject: recommended action for bootloaders regarding modifying
- device-tree nodes
-In-Reply-To: <CAJ+vNU2zis+1DUCzmegUFw+Z6XATBEPJ+yqMsttp4ENcckHUYA@mail.gmail.com>
-References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
- <20140130204558.GC29184@titan.lakedaemon.net>
- <CAJ+vNU2zis+1DUCzmegUFw+Z6XATBEPJ+yqMsttp4ENcckHUYA@mail.gmail.com>
-Message-ID: <20140131160759.GI29184@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 31 Jan 2014 09:18:21 -0700
+Subject: [PATCH 3/3] spi: switch to devm_spi_alloc_master
+In-Reply-To: <1391163792-21819-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1391163792-21819-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52EBCCCD.301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 08:39:00PM -0800, Tim Harvey wrote:
-> On Thu, Jan 30, 2014 at 12:45 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Hi Tim,
-> >
-> > On Thu, Jan 30, 2014 at 01:11:18AM -0800, Tim Harvey wrote:
-> >> My approach has been to define a per-baseboard device-tree in Linux
-> >> for a 'fully loaded' board, then remove nodes which the EEPROM claims
-> >> are not present in the bootloader before it passes the DTB to the
-> >> kernel.  I do this by defining aliases in the device-tree for the
-> >> peripherals that are 'optional' so that the bootloader itself does not
-> >> need to know the details about how the device is connected.
-> >
-> > This is more of a process question:  Is there any information captured
-> > in your EEPROM that can't be represented in the dtb?  iow, at the point
-> > when you write the EEPROM, why not write the dtb to it as configured?
-> >
-> > You could have pre-configured dtsi fragments for each config option, and
-> > then dynamically create the board dts from the order.
-> >
-> > I only ask because it would solve the problem below.  However, there's a
-> > lot more to changing a manufacturing process than meets the eye. :)
-> >
-> 
-> our eeprom config section is only 40 bytes.  It contains a SKU string,
-> mac addrs, and some bitwise fields for the various optional components
-> that we can subload.
+On 01/31/2014 03:23 AM, Maxime Ripard wrote:
+> Make the existing users of devm_spi_register_master use the
+> devm_spi_alloc_master function to avoid leaking memory.
 
-Ok.
+> diff --git a/drivers/spi/spi-tegra114.c b/drivers/spi/spi-tegra114.c
 
-> >> Is it more appropriate for the bootloader to 'remove' nodes for
-> >> devices that are not physically present or should I be setting their
-> >> status property to 'disabled' instead?  I'm not clear if either option
-> >> really has any pros or cons.
-> >
-> > That depends on how you have it structured.  Is it a valid dtb?
-> > Meaning, do you have four nodes all at the same register address?
-> > Perhaps you could provide an example dts?
-> 
-> yes its a valid dtb - it is just the superset of everything the
-> baseboard (ie schematic design) can support.
-> 
-> A good example is a custom SKU of a baseboard with ethernet subloaded.
->  If the EEPROM says there is no ethernet mac or phy, I would want to
-> remove or disable the ethernet node from the devicetree.
-> 
-> Another example would be a node for 'gpio-pps' (GPIO based
-> pulse-per-second) support.  A baseboard design that has a GPS with its
-> PPS signal tied to a GPIO would define this in the device-tree, but if
-> the EEPROM says the GPS isn't loaded, I would want to remove or
-> disable the gps-pps node.
+> @@ -1087,14 +1085,13 @@ static int tegra_spi_probe(struct platform_device *pdev)
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "Failed to register ISR for IRQ %d\n",
+>  					tspi->irq);
+> -		goto exit_free_master;
+> +		return ret;
+>  	}
+>  
+>  	tspi->clk = devm_clk_get(&pdev->dev, "spi");
+>  	if (IS_ERR(tspi->clk)) {
+>  		dev_err(&pdev->dev, "can not get clock\n");
+> -		ret = PTR_ERR(tspi->clk);
+> -		goto exit_free_irq;
+> +		return PTR_ERR(tspi->clk);
+>  	}
+>  
+>  	tspi->max_buf_size = SPI_FIFO_DEPTH << 2;
+> @@ -1152,8 +1149,6 @@ exit_rx_dma_free:
+>  	tegra_spi_deinit_dma_param(tspi, true);
+>  exit_free_irq:
+>  	free_irq(spi_irq, tspi);
+> -exit_free_master:
+> -	spi_master_put(master);
+>  	return ret;
 
-I think JasonG's approach is the way to go (inserting nops).  But it's a
-matter of preference as long as the output is a valid dtb.
+Doesn't that s/goto exit_free_irq/return/ leak spi_irq? It's only OK to
+replace goto free_master with a direct return.
 
-on a side note:  Do you still have to tie your dtb to a version of the
-kernel?
-
-thx,
-
-Jason.
+The other two Tegra drivers don't seem to have this problem.
