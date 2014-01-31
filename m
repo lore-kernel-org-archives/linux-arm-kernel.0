@@ -1,47 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 Jan 2014 15:16:18 -0800
-Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
-In-Reply-To: <52EBBB84.9050705@gmail.com>
-References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
- <52EBBB84.9050705@gmail.com>
-Message-ID: <20140131231618.GC11138@quad.lixom.net>
+Date: Fri, 31 Jan 2014 15:23:33 -0800
+Subject: [PATCH V3 2/2] ARM: multi_v7_defconfig: add mvebu drivers
+In-Reply-To: <8a95aff6b85c8974e3e5cfea0b0765b3a9bedc80.1390936638.git.jason@lakedaemon.net>
+References: <9609875ac4d1bd7d628bd994e0646340d78e423d.1390936638.git.jason@lakedaemon.net>
+ <8a95aff6b85c8974e3e5cfea0b0765b3a9bedc80.1390936638.git.jason@lakedaemon.net>
+Message-ID: <20140131232333.GD11138@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 04:04:36PM +0100, Richard Genoud wrote:
-> On 13/01/2014 14:39, Linus Walleij wrote:
-> > On Thu, Nov 7, 2013 at 10:25 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > 
-> >> This passes the errata fix using a GPIO to control the RTS pin
-> >> on one of the AT91 chips to use gpiolib instead of the
-> >> AT91-specific interfaces. Also remove the reliance on
-> >> compile-time #defines and the cpu_* check and rely on the
-> >> platform passing down the proper GPIO pin through platform
-> >> data.
-> >>
-> >> This is a prerequisite for getting rid of the local GPIO
-> >> implementation in the AT91 platform and move toward
-> >> multiplatform.
-> >>
-> >> The patch also adds device tree support for getting the
-> >> RTS GPIO pin from the device tree on DT boot paths.
-> >>
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >> ChangeLog v3->v4:
-> > 
-> > ARM SoC folks, if you're not taking this in through the <timex.h> removal
-> > series then please ACK this patch so I can take it through the GPIO
-> > tree instead (unless you want to apply this single patch, which would
-> > be even better, you have Greg's ACK in this thread).
-> > 
-> I can't find this patch in linux-next, did I missed something ?
+On Tue, Jan 28, 2014 at 07:27:15PM +0000, Jason Cooper wrote:
+> Recent boot farm testing has highlighted some issues with mvebu and
+> multiplatform kernels.  Increase the test coverage so we can discover
+> these issues earlier.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> v2 -> v3:
+>  - rebase onto arm-soc/for-next so arm-soc can apply directly for v3.14-rcX
+> 
+> v1 -> v2:
+>  - split into two patches, update and +mvebu
+> 
+>  arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
-Yeah, looks like we dropped the ball on it. We'll queue it up for 3.15 as soon
-as -rc1 is out.
+Applied. I ended up redoing the 1/2 patch myself but this one is applied as-is
+with minor fixup.
 
 
 -Olof
