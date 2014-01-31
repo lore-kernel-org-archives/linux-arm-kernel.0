@@ -1,346 +1,76 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 31 Jan 2014 15:18:10 +0100
-Subject: [PATCH 01/10] watchdog: xilinx: Convert driver to the watchdog
- framework
-Message-ID: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 31 Jan 2014 09:35:41 -0500
+Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
+In-Reply-To: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <52EBB4BD.8070808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Remove uneeded headers, fops functions
-- Use xilinx_wdt prefix in start/stop/keepalive functions
-  and in new structures
+On Friday 31 January 2014 08:20 AM, Grygorii Strashko wrote:
+> The Keystone PM management layer has been implemented using PM bus for
+> power management clocks. As result, most of Keystone drivers don't need
+> to manage clocks directly. They just need to enable runtime PM and use it
+> to handle their PM state and clocks.
+> 
+> Hence, remove clock management code and switch to use runtime PM.
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+Please capture why now it allowes us to remove the clock code.
+Commit 8a6720e {PM / clock_ops: fix up clk prepare/unprepare count}
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Without that information, the change log will be miss-leading
 
- drivers/watchdog/Kconfig         |   1 +
- drivers/watchdog/of_xilinx_wdt.c | 204 ++++++---------------------------------
- 2 files changed, 33 insertions(+), 172 deletions(-)
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 4c4c566..9db5d3c 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -1025,6 +1025,7 @@ config M54xx_WATCHDOG
- config XILINX_WATCHDOG
- 	tristate "Xilinx Watchdog timer"
- 	depends on MICROBLAZE
-+	select WATCHDOG_CORE
- 	---help---
- 	  Watchdog driver for the xps_timebase_wdt ip core.
-
-diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index fb57103..8c2814e 100644
---- a/drivers/watchdog/of_xilinx_wdt.c
-+++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -1,6 +1,7 @@
- /*
-  * Watchdog Device Driver for Xilinx axi/xps_timebase_wdt
-  *
-+ * (C) Copyright 2013 - 2014 Xilinx, Inc.
-  * (C) Copyright 2011 (Alejandro Cabrera <aldaya@gmail.com>)
-  *
-  * This program is free software; you can redistribute it and/or
-@@ -14,13 +15,10 @@
- #include <linux/module.h>
- #include <linux/types.h>
- #include <linux/kernel.h>
--#include <linux/fs.h>
--#include <linux/miscdevice.h>
- #include <linux/init.h>
- #include <linux/ioport.h>
- #include <linux/watchdog.h>
- #include <linux/io.h>
--#include <linux/uaccess.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_address.h>
-@@ -48,22 +46,18 @@
- struct xwdt_device {
- 	struct resource  res;
- 	void __iomem *base;
--	u32 nowayout;
- 	u32 wdt_interval;
--	u32 boot_status;
- };
-
- static struct xwdt_device xdev;
-
- static  u32 timeout;
- static  u32 control_status_reg;
--static  u8  expect_close;
- static  u8  no_timeout;
--static unsigned long driver_open;
-
- static  DEFINE_SPINLOCK(spinlock);
-
--static void xwdt_start(void)
-+static int xilinx_wdt_start(struct watchdog_device *wdd)
- {
- 	spin_lock(&spinlock);
-
-@@ -77,9 +71,11 @@ static void xwdt_start(void)
- 	iowrite32(XWT_CSRX_EWDT2_MASK, xdev.base + XWT_TWCSR1_OFFSET);
-
- 	spin_unlock(&spinlock);
-+
-+	return 0;
- }
-
--static void xwdt_stop(void)
-+static int xilinx_wdt_stop(struct watchdog_device *wdd)
- {
- 	spin_lock(&spinlock);
-
-@@ -92,9 +88,11 @@ static void xwdt_stop(void)
-
- 	spin_unlock(&spinlock);
- 	pr_info("Stopped!\n");
-+
-+	return 0;
- }
-
--static void xwdt_keepalive(void)
-+static int xilinx_wdt_keepalive(struct watchdog_device *wdd)
- {
- 	spin_lock(&spinlock);
-
-@@ -103,23 +101,28 @@ static void xwdt_keepalive(void)
- 	iowrite32(control_status_reg, xdev.base + XWT_TWCSR0_OFFSET);
-
- 	spin_unlock(&spinlock);
--}
-
--static void xwdt_get_status(int *status)
--{
--	int new_status;
-+	return 0;
-+}
-
--	spin_lock(&spinlock);
-+static const struct watchdog_info xilinx_wdt_ident = {
-+	.options =  WDIOF_MAGICCLOSE |
-+		    WDIOF_KEEPALIVEPING,
-+	.firmware_version =	1,
-+	.identity =	WATCHDOG_NAME,
-+};
-
--	control_status_reg = ioread32(xdev.base + XWT_TWCSR0_OFFSET);
--	new_status = ((control_status_reg &
--			(XWT_CSR0_WRS_MASK | XWT_CSR0_WDS_MASK)) != 0);
--	spin_unlock(&spinlock);
-+static const struct watchdog_ops xilinx_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = xilinx_wdt_start,
-+	.stop = xilinx_wdt_stop,
-+	.ping = xilinx_wdt_keepalive,
-+};
-
--	*status = 0;
--	if (new_status & 1)
--		*status |= WDIOF_CARDRESET;
--}
-+static struct watchdog_device xilinx_wdt_wdd = {
-+	.info = &xilinx_wdt_ident,
-+	.ops = &xilinx_wdt_ops,
-+};
-
- static u32 xwdt_selftest(void)
- {
-@@ -146,139 +149,6 @@ static u32 xwdt_selftest(void)
- 		return XWT_TIMER_FAILED;
- }
-
--static int xwdt_open(struct inode *inode, struct file *file)
--{
--	/* Only one process can handle the wdt at a time */
--	if (test_and_set_bit(0, &driver_open))
--		return -EBUSY;
--
--	/* Make sure that the module are always loaded...*/
--	if (xdev.nowayout)
--		__module_get(THIS_MODULE);
--
--	xwdt_start();
--	pr_info("Started...\n");
--
--	return nonseekable_open(inode, file);
--}
--
--static int xwdt_release(struct inode *inode, struct file *file)
--{
--	if (expect_close == 42) {
--		xwdt_stop();
--	} else {
--		pr_crit("Unexpected close, not stopping watchdog!\n");
--		xwdt_keepalive();
--	}
--
--	clear_bit(0, &driver_open);
--	expect_close = 0;
--	return 0;
--}
--
--/*
-- *      xwdt_write:
-- *      @file: file handle to the watchdog
-- *      @buf: buffer to write (unused as data does not matter here
-- *      @count: count of bytes
-- *      @ppos: pointer to the position to write. No seeks allowed
-- *
-- *      A write to a watchdog device is defined as a keepalive signal. Any
-- *      write of data will do, as we don't define content meaning.
-- */
--static ssize_t xwdt_write(struct file *file, const char __user *buf,
--						size_t len, loff_t *ppos)
--{
--	if (len) {
--		if (!xdev.nowayout) {
--			size_t i;
--
--			/* In case it was set long ago */
--			expect_close = 0;
--
--			for (i = 0; i != len; i++) {
--				char c;
--
--				if (get_user(c, buf + i))
--					return -EFAULT;
--				if (c == 'V')
--					expect_close = 42;
--			}
--		}
--		xwdt_keepalive();
--	}
--	return len;
--}
--
--static const struct watchdog_info ident = {
--	.options =  WDIOF_MAGICCLOSE |
--		    WDIOF_KEEPALIVEPING,
--	.firmware_version =	1,
--	.identity =	WATCHDOG_NAME,
--};
--
--/*
-- *      xwdt_ioctl:
-- *      @file: file handle to the device
-- *      @cmd: watchdog command
-- *      @arg: argument pointer
-- *
-- *      The watchdog API defines a common set of functions for all watchdogs
-- *      according to their available features.
-- */
--static long xwdt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
--{
--	int status;
--
--	union {
--		struct watchdog_info __user *ident;
--		int __user *i;
--	} uarg;
--
--	uarg.i = (int __user *)arg;
--
--	switch (cmd) {
--	case WDIOC_GETSUPPORT:
--		return copy_to_user(uarg.ident, &ident,
--					sizeof(ident)) ? -EFAULT : 0;
--
--	case WDIOC_GETBOOTSTATUS:
--		return put_user(xdev.boot_status, uarg.i);
--
--	case WDIOC_GETSTATUS:
--		xwdt_get_status(&status);
--		return put_user(status, uarg.i);
--
--	case WDIOC_KEEPALIVE:
--		xwdt_keepalive();
--		return 0;
--
--	case WDIOC_GETTIMEOUT:
--		if (no_timeout)
--			return -ENOTTY;
--		else
--			return put_user(timeout, uarg.i);
--
--	default:
--		return -ENOTTY;
--	}
--}
--
--static const struct file_operations xwdt_fops = {
--	.owner      = THIS_MODULE,
--	.llseek     = no_llseek,
--	.write      = xwdt_write,
--	.open       = xwdt_open,
--	.release    = xwdt_release,
--	.unlocked_ioctl = xwdt_ioctl,
--};
--
--static struct miscdevice xwdt_miscdev = {
--	.minor      = WATCHDOG_MINOR,
--	.name       = "watchdog",
--	.fops       = &xwdt_fops,
--};
--
- static int xwdt_probe(struct platform_device *pdev)
- {
- 	int rc;
-@@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device *pdev)
- 					"xlnx,wdt-enable-once", NULL);
- 	if (tmptr == NULL) {
- 		pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in device tree!\n");
--		xdev.nowayout = WATCHDOG_NOWAYOUT;
-+		watchdog_set_nowayout(&xilinx_wdt_wdd, true);
- 	}
-
- /*
-@@ -344,24 +214,14 @@ static int xwdt_probe(struct platform_device *pdev)
- 		goto unmap_io;
- 	}
-
--	xwdt_get_status(&xdev.boot_status);
--
--	rc = misc_register(&xwdt_miscdev);
-+	rc = watchdog_register_device(&xilinx_wdt_wdd);
- 	if (rc) {
--		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
--		       xwdt_miscdev.minor, rc);
-+		pr_err("cannot register watchdog (err=%d)\n", rc);
- 		goto unmap_io;
- 	}
-
--	if (no_timeout)
--		pr_info("driver loaded (timeout=? sec, nowayout=%d)\n",
--			xdev.nowayout);
--	else
--		pr_info("driver loaded (timeout=%d sec, nowayout=%d)\n",
--			timeout, xdev.nowayout);
--
--	expect_close = 0;
--	clear_bit(0, &driver_open);
-+	dev_info(&pdev->dev, "Xilinx Watchdog Timer at %p with timeout %ds\n",
-+		 xdev.base, timeout);
-
- 	return 0;
-
-@@ -375,7 +235,7 @@ err_out:
-
- static int xwdt_remove(struct platform_device *dev)
- {
--	misc_deregister(&xwdt_miscdev);
-+	watchdog_unregister_device(&xilinx_wdt_wdd);
- 	iounmap(xdev.base);
- 	release_mem_region(xdev.res.start, resource_size(&xdev.res));
-
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/f7c50fdd/attachment-0001.sig>
+>  drivers/usb/dwc3/dwc3-keystone.c |   15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
+> index 1fad161..a810b41 100644
+> --- a/drivers/usb/dwc3/dwc3-keystone.c
+> +++ b/drivers/usb/dwc3/dwc3-keystone.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  /* USBSS register offsets */
+>  #define USBSS_REVISION		0x0000
+> @@ -116,12 +117,10 @@ static int kdwc3_probe(struct platform_device *pdev)
+>  	kdwc3_dma_mask = dma_get_mask(dev);
+>  	dev->dma_mask = &kdwc3_dma_mask;
+>  
+> -	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
+> -
+> -	error = clk_prepare_enable(kdwc->clk);
+> +	pm_runtime_enable(dev);
+> +	error = pm_runtime_get_sync(dev);
+>  	if (error < 0) {
+> -		dev_dbg(kdwc->dev, "unable to enable usb clock, err %d\n",
+> -			error);
+> +		dev_dbg(dev, "unable to enable usb dev, err %d\n", error);
+>  		return error;
+>  	}
+>  
+> @@ -152,7 +151,8 @@ static int kdwc3_probe(struct platform_device *pdev)
+>  err_core:
+>  	kdwc3_disable_irqs(kdwc);
+>  err_irq:
+> -	clk_disable_unprepare(kdwc->clk);
+> +	pm_runtime_put_sync(dev);
+> +	pm_runtime_disable(dev);
+>  
+>  	return error;
+>  }
+> @@ -172,7 +172,8 @@ static int kdwc3_remove(struct platform_device *pdev)
+>  
+>  	kdwc3_disable_irqs(kdwc);
+>  	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
+> -	clk_disable_unprepare(kdwc->clk);
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+>  	platform_set_drvdata(pdev, NULL);
+>  
+>  	return 0;
+> 
