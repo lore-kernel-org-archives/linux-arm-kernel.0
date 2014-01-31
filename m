@@ -1,100 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 Jan 2014 10:45:34 -0600
-Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
-In-Reply-To: <52EBC650.50305@ti.com>
-References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
- <20140131151955.GB20736@saruman.home> <52EBC499.2070302@ti.com>
- <20140131154721.GD20736@saruman.home> <52EBC650.50305@ti.com>
-Message-ID: <20140131164534.GL20736@saruman.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Jan 2014 17:08:27 +0000
+Subject: Why are imprecise external aborts masked on recent kernel
+ while booting ?
+In-Reply-To: <52EBC86D.1010509@st.com>
+References: <52EBC86D.1010509@st.com>
+Message-ID: <20140131170827.GH15937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 10:50:40AM -0500, Santosh Shilimkar wrote:
-> On Friday 31 January 2014 10:47 AM, Felipe Balbi wrote:
-> > On Fri, Jan 31, 2014 at 10:43:21AM -0500, Santosh Shilimkar wrote:
-> >> On Friday 31 January 2014 10:19 AM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
-> >>>> The Keystone PM management layer has been implemented using PM bus for
-> >>>> power management clocks. As result, most of Keystone drivers don't need
-> >>>> to manage clocks directly. They just need to enable runtime PM and use it
-> >>>> to handle their PM state and clocks.
-> >>>>
-> >>>> Hence, remove clock management code and switch to use runtime PM.
-> >>>>
-> >>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >>>
-> >>> quite a few weeks back I sent a series enabling runtime pm for all glue
-> >>> layers. I'll use that version instead, sorry.
-> >>>
-> >> That should be fine but you need to drop clk_*() related code
-> >> from that patch. I assume you will send refresh version of it then.
-> > 
-> > why ? it makes no difference if you enable twice and disable twice.
-> > 
-> Sure but why do you want to have the clock node handling code in drivers
-> if it is not needed. Isn't that better ?
+On Fri, Jan 31, 2014 at 04:59:41PM +0100, Fabrice Gasnier wrote:
+> Is it a desired change in recent kernels ?
 
-It might, but then way that I wanted to see it is so that I can make
-assumptions about the device state. From a driver perspective, what I
-would love to see is the ability to assume that when my probe gets
-called the device is already enabled. So if you can make sure that
-clk_enable() happens before my probe and that you call
-pm_runtime_set_active() before my probe too, then I can more than
-hapilly remove clk_* calls from the driver ;-)
+I think it was an unnoticed behavioural change.
 
-either that or maintain the driver like so:
+> Is it possible to unmask imprecise data aborts earlier in the boot  
+> process (e.g. before PCIe bus enumeration, when drivers are being probed) 
+> ?
 
-probe()
-{
-	...
+How about this patch?
 
-	clk_get(dev, "fck");
-	clk_prepare(clk);
-	clk_enable(clk);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-	pm_runtime_get_sync(dev);
-	...
-}
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 172ee18ff124..b0ff06f49cd0 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -900,6 +900,15 @@ void __init early_trap_init(void *vectors_base)
+ 
+ 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++
++	/* Enable imprecise aborts */
++	asm volatile(
++		"mrs	%0, cpsr\n"
++	"	bic	%0, %0, %1\n"
++	"	msr	cpsr_c, %0"
++		: "=&r" (i)
++		: "r" (PSR_A_BIT));
++
+ #else /* ifndef CONFIG_CPU_V7M */
+ 	/*
+ 	 * on V7-M there is no need to copy the vector table to a dedicated
 
-runtime_suspend()
-{
-	clk_disable(dev);
-}
-
-runtime_resume()
-{
-	clk_enable(dev);
-}
-
-note that because of pm_runtime_set_active() that first
-pm_runtime_get_sync() in probe() will simply increase the reference
-counter without calling my ->runtime_resume() callback, which is exactly
-what we want, as that would completely avoid situations of bad context
-being restored because of that initial pm_runtime_get_sync().
-
-Then, we can even make pm_runtime completely async easily, because
-clk_prepare() was called only on probe() (or before it, for that
-matter).
-
-Bottomline is, if you can guarantee me that clk_get(), clk_prepare(),
-clk_enable() and pm_runtime_set_active() will be called properly before
-my probe, i'll be more than happy to comply with your request above as
-that will greatly simplify my driver.
-
-Just make, also, that if this clock is shared between dwc3-keystone
-wrapper and dwc3 core, you clk_get() on both driver's probe.
-
-cheers
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/e709d095/attachment.sig>
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
