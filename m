@@ -1,83 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 31 Jan 2014 14:11:40 -0600
-Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
- multiplatform
-In-Reply-To: <1391107002-21470-3-git-send-email-galak@codeaurora.org>
-References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
- <1391107002-21470-3-git-send-email-galak@codeaurora.org>
-Message-ID: <CAL_JsqKWa91vDu2oFdOb7Y8XSB-UecYDOK6CmyjXr1ZW81Snqg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Jan 2014 21:15:33 +0100
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <52EB96BB.6070800@st.com>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+ <201401301939.08302.arnd@arndb.de> <52EB96BB.6070800@st.com>
+Message-ID: <201401312115.33731.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 12:36 PM, Kumar Gala <galak@codeaurora.org> wrote:
-> Introduce a new mach-qcom that will support SoCs that intend to be
-> multiplatform compatiable while keeping mach-msm to legacy SoC/board
-> support that will not transition over to multiplatform.
+On Friday 31 January 2014, srinivas kandagatla wrote:
+
+> > Sorry if I missed the initial review, but can you explain
+> > why this is needed to start with?
 >
-> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
-> to mach-qcom.
->
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> ---
+> On ST SoCs the default value for L2 AUX_CTRL register is 0x0, so we  set
+> the way-size explicit here.
 
-[snip]
+Unfortunately, we keep going back and forth on the L2 cache controller
+setup between "it should work automatically" and "we don't want to
+have configuration data in DT", where my personal opinion is that
+the first one is more important here.
 
-> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-> new file mode 100644
-> index 0000000..8830431
-> --- /dev/null
-> +++ b/arch/arm/mach-qcom/Kconfig
-> @@ -0,0 +1,34 @@
-> +config ARCH_QCOM
-> +       bool "Qualcomm Support" if ARCH_MULTI_V7
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select CLKSRC_OF
-> +       select GENERIC_CLOCKEVENTS
-> +       select ARM_GIC
-> +       select CPU_V7
+Now, there are a couple of properties that are defined in
+Documentation/devicetree/bindings/arm/l2cc.txt to let some of the
+things get set up automatically already. Can you check which bits
+are missing there, if any? Are they better described as "configuration"
+or "hardware" settings?
 
-CPU_V7 is already selected by MULTI_V7.
-
-
-[snip]
-
-> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-qcom/smp.c
-> similarity index 97%
-> rename from arch/arm/mach-msm/platsmp.c
-> rename to arch/arm/mach-qcom/smp.c
-> index 42eb6b7..28364cb 100644
-> --- a/arch/arm/mach-msm/platsmp.c
-> +++ b/arch/arm/mach-qcom/smp.c
-> @@ -2,6 +2,7 @@
->   *  Copyright (C) 2002 ARM Ltd.
->   *  All Rights Reserved
->   *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -20,7 +21,6 @@
->  #include <asm/smp_plat.h>
->
->  #include "scm-boot.h"
-> -#include "common.h"
->
->  #define VDD_SC1_ARRAY_CLAMP_GFS_CTL    0x35a0
->  #define SCSS_CPU1CORE_RESET            0x2d80
-> @@ -48,6 +48,15 @@ extern void secondary_startup(void);
->
->  static DEFINE_SPINLOCK(boot_lock);
->
-> +static void __ref msm_cpu_die(unsigned int cpu)
-> +{
-> +
-> +       asm("wfi"
-> +           :
-> +           :
-> +           : "memory", "cc");
-> +}
-
-I realize this is just a move, but there is a wfi() macro that can be
-used here instead.
-
-Rob
+	Arnd
