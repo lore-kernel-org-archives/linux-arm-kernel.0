@@ -1,36 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 31 Jan 2014 11:48:06 -0600
-Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <52EA8CFE.7020404@arm.com>
-References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
- <201401301828.59294.arnd@arndb.de> <52EA8CFE.7020404@arm.com>
-Message-ID: <CAL_JsqJeka0KeejY4LpGFd7hfYo_OKnnH8QWjSXkcgedvA6BZg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 31 Jan 2014 18:05:16 +0000
+Subject: [GIT PULL] arm64 patches for 3.14
+Message-ID: <20140131180510.GA20546@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 11:33 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/01/14 17:28, Arnd Bergmann wrote:
->> On Thursday 30 January 2014, Ian Campbell wrote:
->>> mach-virt has existed for a while but it is not written down what it actually
->>> consists of. Although it seems a bit unusual to document a binding for an
->>> entire platform since mach-virt is entirely virtual it is helpful to have
->>> something to refer to in the absence of a single concrete implementation.
->>>
->>> I've done my best to capture the requirements based on the git log and my
->>> memory/understanding.
->>>
->>> While here remove the xenvm dts example, the Xen tools will now build a
->>> suitable mach-virt compatible dts when launching the guest.
->>
->> It might be worth noting in the changeset comment that the 'compatible'
->> string is actually no longer needed on newer kernels: All the members
->> of the machine descriptor are now the defaults (we should remove the
->> virt_init() function as well), and the fallback machine descriptor should
->> work just fine if any other string gets passed.
->
-> I will ack the patch that removes the mach-virt directory altogether!
+Hi Linus,
 
-Did I never send that one out? I know I started something. Finding new
-employment has had me distracted...
+Please pull the arm64 patches below. Thanks.
 
-Rob
+
+The following changes since commit 883c057367014d20a14b5054e4eb0d81ce3bea5c:
+
+  arm64: fix typo in entry.S (2014-01-13 13:55:13 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
+
+for you to fetch changes up to c2c93e5b7f3f42277ec25ff3746096abc0c0d0f7:
+
+  arm64: mm: Introduce PTE_WRITE (2014-01-31 11:30:49 +0000)
+
+----------------------------------------------------------------
+- Build fix with DMA_CMA enabled
+- Introduction of PTE_WRITE to distinguish between writable but clean
+  and truly read-only pages
+- FIQs enabling/disabling clean-up (they aren't used on arm64)
+- CPU resume fix for the per-cpu offset restoring
+- Code comment typos
+
+----------------------------------------------------------------
+Jingoo Han (3):
+      arm64: mm: use ubfm for dcache_line_size
+      arm64: mm: fix the function name in comment of __flush_dcache_area
+      arm64: mm: fix the function name in comment of cpu_do_switch_mm
+
+Lorenzo Pieralisi (1):
+      arm64: kernel: fix per-cpu offset restore on resume
+
+Nicolas Pitre (1):
+      arm64: FIQs are unused
+
+Pankaj Dubey (1):
+      arm64: fix build error if DMA_CMA is enabled
+
+Steve Capper (2):
+      arm64: mm: Remove PTE_BIT_FUNC macro
+      arm64: mm: Introduce PTE_WRITE
+
+ arch/arm64/include/asm/dma-contiguous.h |  1 -
+ arch/arm64/include/asm/pgtable.h        | 93 ++++++++++++++++++++++-----------
+ arch/arm64/kernel/process.c             |  6 ---
+ arch/arm64/kernel/smp.c                 |  2 -
+ arch/arm64/kernel/suspend.c             |  8 +++
+ arch/arm64/mm/cache.S                   |  2 +-
+ arch/arm64/mm/proc-macros.S             |  3 +-
+ arch/arm64/mm/proc.S                    |  2 +-
+ 8 files changed, 74 insertions(+), 43 deletions(-)
+
+-- 
+Catalin
