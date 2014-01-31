@@ -1,35 +1,35 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Fri, 31 Jan 2014 16:50:07 +0800
-Subject: [PATCH V3 3/8] SPEAr13xx: defconfig: Update
-In-Reply-To: <201401301402.01842.arnd@arndb.de>
-References: <cover.1391077731.git.mohit.kumar@st.com>
- <77553346b18c3978b12329161a85dba7d50242ca.1391077731.git.mohit.kumar@st.com>
- <201401301402.01842.arnd@arndb.de>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FCF3F0BB@EAPEX1MAIL1.st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 Jan 2014 09:57:30 +0100
+Subject: [PATCH v2 1/2] at91: gpio: use gpiolib API to mark a GPIO used
+ as an IRQ
+In-Reply-To: <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
+References: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>	<1390473478-5591-2-git-send-email-jjhiblot@traphandler.com>
+ <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
+Message-ID: <52EB657A.4040601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, January 30, 2014 6:32 PM
-> To: Mohit KUMAR DCG
-> Cc: Pratyush ANAND; spear-devel; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V3 3/8] SPEAr13xx: defconfig: Update
+On 31/01/2014 08:55, Linus Walleij :
+> On Thu, Jan 23, 2014 at 11:37 AM, Jean-Jacques Hiblot
+> <jjhiblot@traphandler.com> wrote:
 > 
-> On Thursday 30 January 2014, Mohit Kumar wrote:
-> > Enable EABI, OEABI, VFP and NFS configs in default configuration file
-> > for SPEAr13xx.
+>> When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
+>> the gpiolib so we can keep track of the usage centrally.
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 > 
-> Are you sure about OABI_COMPAT? That seems unusual.
-
-- yes, this option is not required
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Also, please add all the options you need to multi_v7_defconfig and ensure
-> that this configuration works with your hardware as well.
+> Nicolas, are you queueing this patch?
 
-- OK, will do this and test with SPEAr1310.
+Yes, I will.
 
-Thanks
-Mohit
+> I guess this custom GPIO implementation is going away with
+> the transition to pinctrl else I'd requested that it be moved to
+> drivers/gpio...
+
+Absolutely. But I suspect it will still be around for some time...
+
+Thanks for your review. Bye,
+-- 
+Nicolas Ferre
