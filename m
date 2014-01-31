@@ -1,30 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 31 Jan 2014 16:03:28 +0000
-Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140131081147.GC2950@lukather>
-References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
- <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140129122520.GY11841@sirena.org.uk>
- <20140129133227.GQ3867@lukather>
- <CAGa+x854huSmiWmEv2EgOPUgZKcp3iitNaBvKXt8DiEj8msSVg@mail.gmail.com>
- <20140131081147.GC2950@lukather>
-Message-ID: <20140131160328.GI22609@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 31 Jan 2014 11:07:59 -0500
+Subject: recommended action for bootloaders regarding modifying
+ device-tree nodes
+In-Reply-To: <CAJ+vNU2zis+1DUCzmegUFw+Z6XATBEPJ+yqMsttp4ENcckHUYA@mail.gmail.com>
+References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
+ <20140130204558.GC29184@titan.lakedaemon.net>
+ <CAJ+vNU2zis+1DUCzmegUFw+Z6XATBEPJ+yqMsttp4ENcckHUYA@mail.gmail.com>
+Message-ID: <20140131160759.GI29184@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 09:11:47AM +0100, Maxime Ripard wrote:
+On Thu, Jan 30, 2014 at 08:39:00PM -0800, Tim Harvey wrote:
+> On Thu, Jan 30, 2014 at 12:45 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Hi Tim,
+> >
+> > On Thu, Jan 30, 2014 at 01:11:18AM -0800, Tim Harvey wrote:
+> >> My approach has been to define a per-baseboard device-tree in Linux
+> >> for a 'fully loaded' board, then remove nodes which the EEPROM claims
+> >> are not present in the bootloader before it passes the DTB to the
+> >> kernel.  I do this by defining aliases in the device-tree for the
+> >> peripherals that are 'optional' so that the bootloader itself does not
+> >> need to know the details about how the device is connected.
+> >
+> > This is more of a process question:  Is there any information captured
+> > in your EEPROM that can't be represented in the dtb?  iow, at the point
+> > when you write the EEPROM, why not write the dtb to it as configured?
+> >
+> > You could have pre-configured dtsi fragments for each config option, and
+> > then dynamically create the board dts from the order.
+> >
+> > I only ask because it would solve the problem below.  However, there's a
+> > lot more to changing a manufacturing process than meets the eye. :)
+> >
+> 
+> our eeprom config section is only 40 bytes.  It contains a SKU string,
+> mac addrs, and some bitwise fields for the various optional components
+> that we can subload.
 
-> Wouldn't it be better if it was suspended by default, and just waken
-> up whenever the framework needs it?
+Ok.
 
-The aim should be to come out of probe in that state if runtime PM is
-enabled but don't do it with these hacks, do it by idling the device
-at the end of probe for example.  Apart from anything else this code
-just looks ugly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/2482bece/attachment.sig>
+> >> Is it more appropriate for the bootloader to 'remove' nodes for
+> >> devices that are not physically present or should I be setting their
+> >> status property to 'disabled' instead?  I'm not clear if either option
+> >> really has any pros or cons.
+> >
+> > That depends on how you have it structured.  Is it a valid dtb?
+> > Meaning, do you have four nodes all at the same register address?
+> > Perhaps you could provide an example dts?
+> 
+> yes its a valid dtb - it is just the superset of everything the
+> baseboard (ie schematic design) can support.
+> 
+> A good example is a custom SKU of a baseboard with ethernet subloaded.
+>  If the EEPROM says there is no ethernet mac or phy, I would want to
+> remove or disable the ethernet node from the devicetree.
+> 
+> Another example would be a node for 'gpio-pps' (GPIO based
+> pulse-per-second) support.  A baseboard design that has a GPS with its
+> PPS signal tied to a GPIO would define this in the device-tree, but if
+> the EEPROM says the GPS isn't loaded, I would want to remove or
+> disable the gps-pps node.
+
+I think JasonG's approach is the way to go (inserting nops).  But it's a
+matter of preference as long as the output is a valid dtb.
+
+on a side note:  Do you still have to tie your dtb to a version of the
+kernel?
+
+thx,
+
+Jason.
