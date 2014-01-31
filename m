@@ -1,42 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 31 Jan 2014 12:20:22 -0600
-Subject: [PATCH] of: add vendor prefix for Allwinner Technology
-In-Reply-To: <1391045798-7053-1-git-send-email-emilio@elopez.com.ar>
-References: <1391045798-7053-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAL_Jsq+arxoJ-Ghg-wAB5odcXrBoQ8y_=v=YoExUg8=AojKACw@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 31 Jan 2014 13:33:13 -0500
+Subject: [PATCH] Detect section mismatches in thumb relocations
+Message-ID: <1391193193-28572-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 7:36 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> We have been using the "allwinner" prefix for everything so far; let's
-> document it here.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+From: "David A. Long" <dave.long@linaro.org>
 
-Applied.
+Add processing for normally encountered thumb relocation types so that
+section mismatches will be detected.
 
-Rob
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ scripts/mod/modpost.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index edbb8d8..5a2904b 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -7,6 +7,7 @@ ad      Avionic Design GmbH
->  adi    Analog Devices, Inc.
->  aeroflexgaisler        Aeroflex Gaisler AB
->  ak     Asahi Kasei Corp.
-> +allwinner      Allwinner Technology Co., Ltd.
->  altr   Altera Corp.
->  amcc   Applied Micro Circuits Corporation (APM, formally AMCC)
->  apm    Applied Micro Circuits Corporation (APM)
-> --
-> 1.8.5.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
+index 1785576..9e6c996 100644
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -1498,6 +1498,16 @@ static int addend_386_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ #define R_ARM_JUMP24	29
+ #endif
+ 
++#ifndef	R_ARM_THM_CALL
++#define	R_ARM_THM_CALL		10
++#endif
++#ifndef	R_ARM_THM_JUMP24
++#define	R_ARM_THM_JUMP24	30
++#endif
++#ifndef	R_ARM_THM_JUMP19
++#define	R_ARM_THM_JUMP19	51
++#endif
++
+ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ {
+ 	unsigned int r_typ = ELF_R_TYPE(r->r_info);
+@@ -1511,6 +1521,9 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ 	case R_ARM_PC24:
+ 	case R_ARM_CALL:
+ 	case R_ARM_JUMP24:
++	case R_ARM_THM_CALL:
++	case R_ARM_THM_JUMP24:
++	case R_ARM_THM_JUMP19:
+ 		/* From ARM ABI: ((S + A) | T) - P */
+ 		r->r_addend = (int)(long)(elf->hdr +
+ 		              sechdr->sh_offset +
+-- 
+1.8.1.2
