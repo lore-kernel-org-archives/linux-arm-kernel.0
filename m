@@ -1,37 +1,33 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 31 Jan 2014 15:18:10 +0000
-Subject: [PATCH v4] arm: remove !CPU_V6 and !GENERIC_ATOMIC64 build
- dependencies for XEN
-In-Reply-To: <20140121180750.GO30706@mudshark.cambridge.arm.com>
-References: <1390311864-19119-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20140121180750.GO30706@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1401311517260.4373@kaball.uk.xensource.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 31 Jan 2014 09:19:55 -0600
+Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
+In-Reply-To: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20140131151955.GB20736@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jan 2014, Will Deacon wrote:
-> On Tue, Jan 21, 2014 at 01:44:24PM +0000, Stefano Stabellini wrote:
-> > Remove !GENERIC_ATOMIC64 build dependency:
-> > - introduce xen_atomic64_xchg
-> > - use it to implement xchg_xen_ulong
-> > 
-> > Remove !CPU_V6 build dependency:
-> > - introduce __cmpxchg8 and __cmpxchg16, compiled even ifdef
-> >   CONFIG_CPU_V6
-> > - implement sync_cmpxchg using __cmpxchg8 and __cmpxchg16
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: arnd at arndb.de
-> > CC: linux at arm.linux.org.uk
-> > CC: will.deacon at arm.com
-> > CC: catalin.marinas at arm.com
-> > CC: linux-arm-kernel at lists.infradead.org
-> > CC: linux-kernel at vger.kernel.org
-> > CC: xen-devel at lists.xenproject.org
-> 
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
-> 
-> Cheers Stefano,
+Hi,
 
-Do you think it is acceptable to have this in 3.14?
-Maybe we should aim at 3.15?
+On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
+> The Keystone PM management layer has been implemented using PM bus for
+> power management clocks. As result, most of Keystone drivers don't need
+> to manage clocks directly. They just need to enable runtime PM and use it
+> to handle their PM state and clocks.
+> 
+> Hence, remove clock management code and switch to use runtime PM.
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+quite a few weeks back I sent a series enabling runtime pm for all glue
+layers. I'll use that version instead, sorry.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/53f35523/attachment.sig>
