@@ -1,72 +1,87 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 30 Jan 2014 20:39:00 -0800
-Subject: recommended action for bootloaders regarding modifying
- device-tree nodes
-In-Reply-To: <20140130204558.GC29184@titan.lakedaemon.net>
-References: <CAJ+vNU366GiY4k_rnh1Jf0kra+PU99w4tDdM2sNioUAJCiZqOA@mail.gmail.com>
- <20140130204558.GC29184@titan.lakedaemon.net>
-Message-ID: <CAJ+vNU2zis+1DUCzmegUFw+Z6XATBEPJ+yqMsttp4ENcckHUYA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 30 Jan 2014 21:06:00 -0800
+Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
+In-Reply-To: <20140131022954.GB8163@saruman.home>
+References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140129122520.GY11841@sirena.org.uk>
+ <20140129133227.GQ3867@lukather>
+ <CAGa+x854huSmiWmEv2EgOPUgZKcp3iitNaBvKXt8DiEj8msSVg@mail.gmail.com>
+ <20140131022954.GB8163@saruman.home>
+Message-ID: <CAGa+x84O3PoOyrnHHR5WV+b52nOz_=k2NeXvD_GsPRjvXcgOiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 12:45 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Hi Tim,
+On Thu, Jan 30, 2014 at 6:29 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
 >
-> On Thu, Jan 30, 2014 at 01:11:18AM -0800, Tim Harvey wrote:
->> My approach has been to define a per-baseboard device-tree in Linux
->> for a 'fully loaded' board, then remove nodes which the EEPROM claims
->> are not present in the bootloader before it passes the DTB to the
->> kernel.  I do this by defining aliases in the device-tree for the
->> peripherals that are 'optional' so that the bootloader itself does not
->> need to know the details about how the device is connected.
+> On Thu, Jan 30, 2014 at 03:52:16PM -0800, Kevin Hilman wrote:
+>> On Wed, Jan 29, 2014 at 5:32 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
+>> >> On Wed, Jan 29, 2014 at 12:10:48PM +0100, Maxime Ripard wrote:
+>> >>
+>> >> > +config SPI_SUN6I
+>> >> > +   tristate "Allwinner A31 SPI controller"
+>> >> > +   depends on ARCH_SUNXI || COMPILE_TEST
+>> >> > +   select PM_RUNTIME
+>> >> > +   help
+>> >> > +     This enables using the SPI controller on the Allwinner A31 SoCs.
+>> >> > +
+>> >>
+>> >> A select of PM_RUNTIME is both surprising and odd - why is that there?
+>> >> The usual idiom is that the device starts out powered up (flagged using
+>> >> pm_runtime_set_active()) and then runtime PM then suspends it when it's
+>> >> compiled in.  That way if for some reason people want to avoid runtime
+>> >> PM they can still use the device.
+>> >
+>> > Since pm_runtime_set_active and all the pm_runtime* callbacks in
+>> > general are defined to pretty much empty functions, how the
+>> > suspend/resume callbacks are called then? Obviously, we need them to
+>> > be run, hence why I added the select here, but now I'm seeing a
+>> > construct like what's following acceptable then?
+>>
+>> Even with your 'select', The runtime PM callbacks will never be called
+>> in the current driver.  pm_runtime_enable() doesn't do any runtime PM
+>> transitions.  It just allows transitions to happen when they're
+>> triggered by _get()/_put()/etc.
+>>
+>> > pm_runtime_enable(&pdev->dev);
+>> > if (!pm_runtime_enabled(&pdev->dev))
+>> >    sun6i_spi_runtime_resume(&pdev->dev);
+>>
+>> Similarily here, it's not the pm_runtime_enable that will fail when
+>> runtime PM is disabled (or not built-in), it's a pm_runtime_get_sync()
+>> that will fail.
+>>
+>> What you want is something like this in ->probe()
+>>
+>>    sun6i_spi_runtime_resume();
+>>    /* now, device is always activated whether or not runtime PM is enabled */
+>>    pm_runtime_enable();
+>>    pm_runtime_set_active();  /* tells runtime PM core device is
+>> already active */
 >
-> This is more of a process question:  Is there any information captured
-> in your EEPROM that can't be represented in the dtb?  iow, at the point
-> when you write the EEPROM, why not write the dtb to it as configured?
->
-> You could have pre-configured dtsi fragments for each config option, and
-> then dynamically create the board dts from the order.
->
-> I only ask because it would solve the problem below.  However, there's a
-> lot more to changing a manufacturing process than meets the eye. :)
->
+> shouldn't this be done before pm_runtime_enable() ?
 
-our eeprom config section is only 40 bytes.  It contains a SKU string,
-mac addrs, and some bitwise fields for the various optional components
-that we can subload.
+hmm, possibly yes.  I was doing this from the top of my head without
+looking to closely at the code.
 
->> Is it more appropriate for the bootloader to 'remove' nodes for
->> devices that are not physically present or should I be setting their
->> status property to 'disabled' instead?  I'm not clear if either option
->> really has any pros or cons.
+>>    pm_runtime_get_sync();
+>>
+>> This 'get' will increase the usecount, but not actually call the
+>> callbacks because we told the RPM core that the device was already
+>> activated with _set_active().
+>>
+>> And then, in ->remove(), you'll want
+>>
+>>    pm_runtime_put();
 >
-> That depends on how you have it structured.  Is it a valid dtb?
-> Meaning, do you have four nodes all at the same register address?
-> Perhaps you could provide an example dts?
+> in ->remove() you actually want a put_sync() right ? You don't want to
+> schedule anything since you're just about to disable pm_runtime.
 
-yes its a valid dtb - it is just the superset of everything the
-baseboard (ie schematic design) can support.
+Yes, you're correct.
 
-A good example is a custom SKU of a baseboard with ethernet subloaded.
- If the EEPROM says there is no ethernet mac or phy, I would want to
-remove or disable the ethernet node from the devicetree.
+Thanks for the corrections.
 
-Another example would be a node for 'gpio-pps' (GPIO based
-pulse-per-second) support.  A baseboard design that has a GPS with its
-PPS signal tied to a GPIO would define this in the device-tree, but if
-the EEPROM says the GPS isn't loaded, I would want to remove or
-disable the gps-pps node.
-
-Tim
-
->
-> thx,
->
-> Jason.
->
->> Tim Harvey - Principal Software Engineer
->> Gateworks Corporation
->
-> btw - one of my first embedded projects was on one of your boards. An
-> ixp425 with 4 mini-pci slots.
->
+Kevin
