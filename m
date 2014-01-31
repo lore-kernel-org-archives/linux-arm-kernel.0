@@ -1,47 +1,70 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 31 Jan 2014 03:18:50 +0100
-Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove hardcoded
- addresses from Dove pinctrl
-In-Reply-To: <20140130202500.GN10864@lunn.ch>
-References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140130182925.GM10864@lunn.ch> <52EA9EFA.1030609@gmail.com>
- <20140130202500.GN10864@lunn.ch>
-Message-ID: <52EB080A.2020200@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 30 Jan 2014 21:22:05 -0500 (EST)
+Subject: [PATCH V2] arm64: add DSB after icache flush in
+ __flush_icache_all()
+In-Reply-To: <20140131001647.GA5525@mudshark.cambridge.arm.com>
+References: <1390892813-30407-1-git-send-email-vkale@apm.com>
+ <20140128161402.GI2885@mudshark.cambridge.arm.com>
+ <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
+ <20140130180706.GO7575@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.11.1401301640500.1652@knanqh.ubzr>
+ <20140131001647.GA5525@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.11.1401302112550.1652@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2014 09:25 PM, Andrew Lunn wrote:
-> On Thu, Jan 30, 2014 at 07:50:34PM +0100, Sebastian Hesselbarth wrote:
->> On 01/30/2014 07:29 PM, Andrew Lunn wrote:
->>> On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
->>>> This patch set is one required step for Dove to hop into mach-mvebu.
->>>> Until now, pinctrl-dove was hardcoding some registers that do not
->>>> directly belong to MPP core registers. This is not compatible with
->>>> what we want for mach-mvebu.
->>>
->>> I think there might be something wrong here....
->>
->> There _is_ something wrong. I'll have a look at it. For the record,
->> what SoC are you testing with? From the base address, I guess it is
->> Kirkwood?
->
-> Yes, Kirkwood. Sorry for not saying.
+On Fri, 31 Jan 2014, Will Deacon wrote:
 
-This time I push a branch before sending out the patches. Also, I
-think I'll postpone removal of hardcoded addresses until this is
-sorted out. The patch set was growing way to quick and I have to
-do this step-by-step for me and everybody else to actually understand ;)
+> Hi Nico,
+> 
+> On Thu, Jan 30, 2014 at 09:42:29PM +0000, Nicolas Pitre wrote:
+> > On Thu, 30 Jan 2014, Will Deacon wrote:
+> > > On Thu, Jan 30, 2014 at 06:04:43AM +0000, Vinayak Kale wrote:
+> > > > Can you please elaborate whether you are referring to lack of memory
+> > > > clobber or missing barriers?
+> > > 
+> > > The clobbers. For example:
+> > > 
+> > > arch/arm64/kvm/sys_regs.c:
+> > > 
+> > >         /* Make sure noone else changes CSSELR during this! */
+> > >         local_irq_disable();
+> > >         /* Put value into CSSELR */
+> > >         asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
+> > >         isb();
+> > >         /* Read result out of CCSIDR */
+> > >         asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
+> > >         local_irq_enable();
+> > > 
+> > > Just about everything can be re-ordered in that block, because the asm
+> > > volatile statements don't have "memory" clobbers.
+> > 
+> > I don't think they would be reordered at all with the 
+> > volatile qualifiers.
+> 
+> Whilst that may be the case in current compilers (i.e. I've not actually
+> seen the above sequence get re-ordered), the GCC documentation states that:
+> 
+>   Similarly, you can't expect a sequence of volatile asm instructions to remain
+>   perfectly consecutive. If you want consecutive output, use a single asm. Also,
+>   GCC performs some optimizations across a volatile asm instruction; GCC does not
+>   `forget everything' when it encounters a volatile asm instruction the way some
+>   other compilers do.
+> 
+> so I really think that the "memory" clobbers are needed to ensure strict
+> ordering. This matches my understanding from discussions with the compiler
+> engineers at ARM.
 
-So, at least the MVEBU guys should test the following branch on
-their SoCs. Again, I have tested Dove and now confirmed that settings
-are still correct. The others are compile-tested.
+Well, the key sentence above is: "you can't expect a sequence of 
+volatile asm instructions to remain perfectly consecutive."  That 
+doesn't mean the "ordering" won't be respected.
 
-https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v3
+If you need a certain ordering, then a volatile is all that you need.  
+If nothing else should happen in between, then just use a single asm 
+statement as suggested.
 
-@Thomas, Gregory: Do you think that the above branch will be
-restructured enough allow support for orion5x and mv78xx0? I had a
-quick look at mach-{orion5x,mv78xx0}/mpp.h and didn't see anything
-weird.
+Only if you need ordering with regards to other memory accesses as well 
+then yes you need a memory clobber in that case.
 
-Sebastian
+
+Nicolas
