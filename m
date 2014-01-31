@@ -1,35 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 31 Jan 2014 09:57:30 +0100
-Subject: [PATCH v2 1/2] at91: gpio: use gpiolib API to mark a GPIO used
- as an IRQ
-In-Reply-To: <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
-References: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>	<1390473478-5591-2-git-send-email-jjhiblot@traphandler.com>
- <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
-Message-ID: <52EB657A.4040601@atmel.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 31 Jan 2014 10:58:09 +0100
+Subject: iommu/arm-smmu: Regression (sleeping function called from
+ invalid context)
+In-Reply-To: <20140131084623.GN13543@alberich>
+References: <20140130235552.GL13543@alberich> <20140131084623.GN13543@alberich>
+Message-ID: <20140131095809.GO13543@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/2014 08:55, Linus Walleij :
-> On Thu, Jan 23, 2014 at 11:37 AM, Jean-Jacques Hiblot
-> <jjhiblot@traphandler.com> wrote:
+On Fri, Jan 31, 2014 at 09:46:23AM +0100, Andreas Herrmann wrote:
+> On Fri, Jan 31, 2014 at 12:55:52AM +0100, Andreas Herrmann wrote:
+> > Hi Will,
+> > 
+> > Seems that commit a44a9791e778d9ccda50d5534028ed4057a9a45b
+> > (iommu/arm-smmu: use mutex instead of spinlock for locking page tables)
+> > introduced a regression.
+> > 
+> > At least I've hit
+> > 
+> >   BUG: scheduling while atomic: ksoftirqd/0/3/0x00000100
+> >...
 > 
->> When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
->> the gpiolib so we can keep track of the usage centrally.
->>
->> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> >   BUG: sleeping function called from invalid context at mm/page_alloc.c:2679
+> >   in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+> >   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.13.0-00016-g6e90346 #413
+> >   [<c0014740>] (unwind_backtrace+0x0/0xf8) from [<c00115b0>] (show_stack+0x10/0x14)
+> >   [<c00115b0>] (show_stack+0x10/0x14) from [<c057ea24>] (dump_stack+0x74/0xa8)
+> >   [<c057ea24>] (dump_stack+0x74/0xa8) from [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930)
+> >   [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930) from [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c)
+> >   [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c) from [<c0428e74>] (iommu_map+0xf0/0x148)
+> >   [<c0428e74>] (iommu_map+0xf0/0x148) from [<c001935c>] (__map_sg_chunk+0x198/0x2d4)
+> >...
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Maybe that was the reason why the offending commit was introduced(?).
+> > 
+> > I think with the current code "atomic allocations" should be used when
+> > IO page tables are created. With below patch I've not triggered above
+> > errors.
 > 
-> Nicolas, are you queueing this patch?
+> I think allocating memory with GFP_KERNEL in this dma-mapping path
+> doesn't seem to be a good idea. What if the DMA operation for which we
+> modify IO page tables was triggered to free pages (page cache, swap)?
 
-Yes, I will.
+I mean in case we run out of memory wouldn't we worsen the situation
+by triggering additional IO (and thus DMA)? Whereas when we let the
+mapping fail, the OS "just might have to wait a little bit" until
+other DMA activities are completed, pages unmapped and iova freed. The
+freed resources instantly can be used for further DMA activities.
 
-> I guess this custom GPIO implementation is going away with
-> the transition to pinctrl else I'd requested that it be moved to
-> drivers/gpio...
+Hmm, but maybe I need to rethink this (and look more closely into
+page_alloc.c).
 
-Absolutely. But I suspect it will still be around for some time...
 
-Thanks for your review. Bye,
--- 
-Nicolas Ferre
+Andreas
