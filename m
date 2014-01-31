@@ -1,29 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 31 Jan 2014 12:12:15 +0000
-Subject: [PATCH 0/3] spi: core: Introduce devm_spi_alloc_master
-In-Reply-To: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140131121215.GB22609@sirena.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 31 Jan 2014 15:20:26 +0200
+Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
+Message-ID: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 11:23:09AM +0100, Maxime Ripard wrote:
+The Keystone PM management layer has been implemented using PM bus for
+power management clocks. As result, most of Keystone drivers don't need
+to manage clocks directly. They just need to enable runtime PM and use it
+to handle their PM state and clocks.
 
-> This patchset introduces a devm_spi_alloc_master to the spi core. While most of
-> the drivers have a spi_master_put call in the probe, a lot of them using the
-> devm_spi_register_master function are missing it in the remove function,
-> leading to leaked resources.
+Hence, remove clock management code and switch to use runtime PM.
 
-This seems confusing - the idea here is that if we've handed the device
-off to the managed function then the managed function deals with
-destroying it.  Note that spi_alloc_master() says that the put is only
-required after errors adding the device (which would be the expected
-behaviour if you look at other APIs).  Looking at the code I think there
-is an issue here but I'm not at all clear that this is the best fix.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/b7e655ca/attachment.sig>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/usb/dwc3/dwc3-keystone.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
+index 1fad161..a810b41 100644
+--- a/drivers/usb/dwc3/dwc3-keystone.c
++++ b/drivers/usb/dwc3/dwc3-keystone.c
+@@ -23,6 +23,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/of_platform.h>
++#include <linux/pm_runtime.h>
+ 
+ /* USBSS register offsets */
+ #define USBSS_REVISION		0x0000
+@@ -116,12 +117,10 @@ static int kdwc3_probe(struct platform_device *pdev)
+ 	kdwc3_dma_mask = dma_get_mask(dev);
+ 	dev->dma_mask = &kdwc3_dma_mask;
+ 
+-	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
+-
+-	error = clk_prepare_enable(kdwc->clk);
++	pm_runtime_enable(dev);
++	error = pm_runtime_get_sync(dev);
+ 	if (error < 0) {
+-		dev_dbg(kdwc->dev, "unable to enable usb clock, err %d\n",
+-			error);
++		dev_dbg(dev, "unable to enable usb dev, err %d\n", error);
+ 		return error;
+ 	}
+ 
+@@ -152,7 +151,8 @@ static int kdwc3_probe(struct platform_device *pdev)
+ err_core:
+ 	kdwc3_disable_irqs(kdwc);
+ err_irq:
+-	clk_disable_unprepare(kdwc->clk);
++	pm_runtime_put_sync(dev);
++	pm_runtime_disable(dev);
+ 
+ 	return error;
+ }
+@@ -172,7 +172,8 @@ static int kdwc3_remove(struct platform_device *pdev)
+ 
+ 	kdwc3_disable_irqs(kdwc);
+ 	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
+-	clk_disable_unprepare(kdwc->clk);
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	return 0;
+-- 
+1.7.9.5
