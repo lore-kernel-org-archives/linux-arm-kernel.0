@@ -1,37 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jan 2014 11:55:52 +0100
-Subject: [PATCH v3 5/5] ARM: sunxi: Enable A31 SPI and SID in the defconfig
+Date: Fri, 31 Jan 2014 11:55:51 +0100
+Subject: [PATCH v3 4/5] ARM: sun6i: dt: Add SPI controllers to the A31 DTSI
 In-Reply-To: <1391165752-1819-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1391165752-1819-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1391165752-1819-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391165752-1819-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The A31 has 4 SPI controllers. Add them in the DTSI.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/configs/sunxi_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 3e2259b..b5df4a5 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -24,6 +24,7 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_WIRELESS is not set
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_EEPROM_SUNXI_SID=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_CADENCE is not set
-@@ -48,6 +49,8 @@ CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MV64XXX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_SUN6I=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 0eea325..57af66f 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -340,6 +340,46 @@
+ 			status = "disabled";
+ 		};
+ 
++		spi0: spi at 01c68000 {
++			compatible = "allwinner,sun6i-a31-spi";
++			reg = <0x01c68000 0x1000>;
++			interrupts = <0 65 4>;
++			clocks = <&ahb1_gates 20>, <&spi0_clk>;
++			clock-names = "ahb", "mod";
++			resets = <&ahb1_rst 20>;
++			status = "disabled";
++		};
++
++		spi1: spi at 01c69000 {
++			compatible = "allwinner,sun6i-a31-spi";
++			reg = <0x01c69000 0x1000>;
++			interrupts = <0 66 4>;
++			clocks = <&ahb1_gates 21>, <&spi1_clk>;
++			clock-names = "ahb", "mod";
++			resets = <&ahb1_rst 21>;
++			status = "disabled";
++		};
++
++		spi2: spi at 01c6a000 {
++			compatible = "allwinner,sun6i-a31-spi";
++			reg = <0x01c6a000 0x1000>;
++			interrupts = <0 67 4>;
++			clocks = <&ahb1_gates 22>, <&spi2_clk>;
++			clock-names = "ahb", "mod";
++			resets = <&ahb1_rst 22>;
++			status = "disabled";
++		};
++
++		spi3: spi at 01c6b000 {
++			compatible = "allwinner,sun6i-a31-spi";
++			reg = <0x01c6b000 0x1000>;
++			interrupts = <0 68 4>;
++			clocks = <&ahb1_gates 23>, <&spi3_clk>;
++			clock-names = "ahb", "mod";
++			resets = <&ahb1_rst 23>;
++			status = "disabled";
++		};
++
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 1.8.4.2
