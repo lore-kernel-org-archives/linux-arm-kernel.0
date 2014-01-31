@@ -1,35 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 31 Jan 2014 11:22:39 +0100
-Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove hardcoded
- addresses from Dove pinctrl
-In-Reply-To: <CACRpkda5HRxpLWWizT_58SJ6Fb=TQpO=Y5yFThpZkUbUYmU8fg@mail.gmail.com>
-References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkda5HRxpLWWizT_58SJ6Fb=TQpO=Y5yFThpZkUbUYmU8fg@mail.gmail.com>
-Message-ID: <52EB796F.9000109@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Jan 2014 11:23:11 +0100
+Subject: [PATCH 2/3] spi: core: Update the devm_spi_register_master
+ documentation
+In-Reply-To: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391163792-21819-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/14 11:17, Linus Walleij wrote:
-> On Tue, Jan 28, 2014 at 1:39 AM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
->
->> This patch set is one required step for Dove to hop into mach-mvebu.
->> Until now, pinctrl-dove was hardcoding some registers that do not
->> directly belong to MPP core registers. This is not compatible with
->> what we want for mach-mvebu.
->
-> All this stuff is really nice, so if you can get Thomas to add his
-> review-tag on this stuff and maybe have some Tested-by:s
-> from other parties, I'd be happy to pull the end result to the
-> pinctrl tree, or alternatively provide my ACK for you to take this
-> through ARM SoC.
+If the devm_spi_register_master function is used together with the
+spi_alloc_master as advertised in the documentation, it will either lead to a
+memory leak if spi_put_master is removed, or we will try to access an already
+freed memory area during the unregistration function.
 
-Luckily, we have a "pinctrl/mvebu" subfolder these patches will mess
-with. I think it will be better to keep then all together and take
-them through the MVEBU branch. This way we can have an eye on it and 
-base off subsequent patches without bothering you.
+Advertise that you want to use the devm_spi_alloc_master function in such case.
 
-I'll come back to request your ACK as soon as we have sorted it out.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/spi/spi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sebastian
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index eb728ec..dc577b7 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1444,7 +1444,7 @@ static void devm_spi_unregister(struct device *dev, void *res)
+ /**
+  * dev_spi_register_master - register managed SPI master controller
+  * @dev:    device managing SPI master
+- * @master: initialized master, originally from spi_alloc_master()
++ * @master: initialized master, originally from devm_spi_alloc_master()
+  * Context: can sleep
+  *
+  * Register a SPI device as with spi_register_master() which will
+-- 
+1.8.4.2
