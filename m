@@ -1,47 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Jan 2014 17:08:27 +0000
-Subject: Why are imprecise external aborts masked on recent kernel
- while booting ?
-In-Reply-To: <52EBC86D.1010509@st.com>
-References: <52EBC86D.1010509@st.com>
-Message-ID: <20140131170827.GH15937@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 31 Jan 2014 11:17:51 -0600
+Subject: Extending OPP bindings
+In-Reply-To: <20140131124620.GC2616@e102568-lin.cambridge.arm.com>
+References: <52EA570A.8040501@arm.com> <52EAF1CA.3040702@ti.com>
+ <20140131124620.GC2616@e102568-lin.cambridge.arm.com>
+Message-ID: <CAL_Jsq+Kq9C39xr9tY8gSX+6QFkNDqwmTyC+dBhLNcxKMweCpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 04:59:41PM +0100, Fabrice Gasnier wrote:
-> Is it a desired change in recent kernels ?
+On Fri, Jan 31, 2014 at 6:46 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Hi Nishanth,
+>
+> On Fri, Jan 31, 2014 at 12:43:54AM +0000, Nishanth Menon wrote:
+>> Hi Sudeep,
+>>
+>> On 01/30/2014 07:43 AM, Sudeep Holla wrote:
+>>
+>> >
+>> > I am looking into a couple shortcomings in the current OPP bindings and
+>> > how to address them. Feel free to add to the list if you think of any more
+>> > issues that needs to be addressed or if and how any problem mentioned below
+>> > can be handled with the existing bindings.
+>> >
+>> > 1. indexing: currently there are no indices in the operating-points.
+>> indexing is based on frequency which is why the accessors use
+>> frequency to pull out the OPP data.
+>>
+>> indexing is a horrible idea - on platforms where OPP may be disabled
+>> or enabled for various reasons(see arch/arm/mach-imx/mach-imx6q.c,
+>> arch/arm/mach-omap2/board-omap3beagle.c etc) - the indexing you see in
+>> dts is just a myth that may not exist once the nodes are loaded and
+>> operated upon depending on SoC variations (example efuse describing
+>> which OPPs can be used and which not).
+>
+> I do not understand why. As long as a mapping from DT to data structures
+> in the kernel is done at boot, I can see how by indexing device nodes
+> can refer to specific OPPs. If they are disabled, amen, as long as we
+> can point at specific operating points that should be ok.
+>
+> Indexing does not mean that the index in the DT is the same as the one
+> allocated by the OS. Indexing is there to point at specific OPPs from
+> different DT nodes, a good example are clock bindings and that's exactly
+> how they work.
 
-I think it was an unnoticed behavioural change.
+That is not a good comparison. With clocks, you are describing which
+physical signal coming out of a hardware block much like interrupts.
+Granted the h/w is not typically documented that way for clocks
+although the numbering could correspond to register bit locations as
+interrupt numbers do. With OPP indexes, they are a totally made up
+software construct.
 
-> Is it possible to unmask imprecise data aborts earlier in the boot  
-> process (e.g. before PCIe bus enumeration, when drivers are being probed) 
-> ?
+Perhaps OPPs should be nodes so new fields can be added easily and
+then you have a phandle for each OPP.
 
-How about this patch?
+>
+> Can you provide me with an example where the indexing would go wrong
+> please ?
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 172ee18ff124..b0ff06f49cd0 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -900,6 +900,15 @@ void __init early_trap_init(void *vectors_base)
- 
- 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-+
-+	/* Enable imprecise aborts */
-+	asm volatile(
-+		"mrs	%0, cpsr\n"
-+	"	bic	%0, %0, %1\n"
-+	"	msr	cpsr_c, %0"
-+		: "=&r" (i)
-+		: "r" (PSR_A_BIT));
-+
- #else /* ifndef CONFIG_CPU_V7M */
- 	/*
- 	 * on V7-M there is no need to copy the vector table to a dedicated
+Putting s/w indexes into DT. Using cell-index for uarts to define
+their tty number was one example.
 
+> Certainly relying on implicit ordering is not great either, actually I
+> would say that it is broken.
+>
+>> That said, the original OPP[1][2] series discussion started by trying
+>> to kill indexing precisely for the same reason.. once you have it - it
+>> becomes just crazy to deal with.
+>
+> I could not find any "index killing" :) discussion in there, but I will
+> keep reading.
+>
+>> >     It's assumed that the list is either in ascending or descending
+>> >     order of frequency but not explicit in the binding document.
+>> >     There are arch/arm/boot/dts/* files with opps in both styles.
+>> it should not matter -> opp library should do an insertion sort and
+>> organize it in ascending order once all the data is inserted. (line
+>> 449ish in opp.c)
+>
+> That's OS details and they must not be mandated by the bindings.
+> We cannot rely on word of mouth for things to work, I do not like
+> implicit rules, so the bindings should speficy the ordering or better
+> a way to reference OPPs.
+>
+>> if you see issues with the insertion sort not functioning, it is a bug
+>> and should be easy to track down and fix.
+>
+> Problem is not the insertion sort, problem is that DT bindings do not
+> define a way to refer to a specific OPP, unless we do that implicitly
+> and again, I rest my case, that is broken.
+>
+>> >     Few other bindings like thermal defines bindings like
+>> >     cooling-{min,max}-state assuming some order which is broken IMO.
+>> Now that you bring it up, I missed it :(.. yeah, I might have
+>> preferred it to be min frequency and max_frequency - I agree it is
+>> probably broken. I'd let Eduardo comment more about it.
+>>
+>> >
+>> >     One such use-case that came up recently[0] is the c-state latencies
+>> >     which could be different for each OPP. It would be good if the
+>> >     latencies are specified with the indices to OPP table to avoid
+>> >     inconsistency between the bindings.
+>>
+>> You can define C states based on frequencies as well - which really
+>> makes sense - since that sounds really like our constraint (say
+>> valid-at-frequency "xyz"
+>
+> I do not think that's generic enough, I do not like the idea of looking
+> up frequencies (eg a C-state target_residency does not depend on the
+> frequency only - ie voltage and other factors play a role, it really
+> depends on an operating point- looking it up by frequency is misleading IMO).
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+It seems we are trying to fit a square peg into a round hole here.
+
+Rob
