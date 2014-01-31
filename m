@@ -1,20 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 Jan 2014 14:51:16 -0800
-Subject: [PATCH] ARM: hisi: don't select SMP
-In-Reply-To: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
-References: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140131225116.GA6284@quad.lixom.net>
+Date: Fri, 31 Jan 2014 14:52:56 -0800
+Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.14
+In-Reply-To: <52EA7976.7030709@monstr.eu>
+References: <52EA7976.7030709@monstr.eu>
+Message-ID: <20140131225256.GB6284@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 04:06:30PM -0600, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+On Thu, Jan 30, 2014 at 05:10:30PM +0100, Michal Simek wrote:
+> Hi guys,
 > 
-> SMP is a user configurable option, not a hardware feature and should not
-> be selected.
+> please consider to queue this patch to 3.14 because it enables Arasan
+> SDHCI driver which has been merged to the tree. It took for a while
+> to get it to the mainline that's why I didn't push this patch
+> in regular arm-soc merge window. I was talking about it
+> with Kevin some weeks ago.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> There will be one more patch which I have discussed with Russell but
+> I will send it out for reviewed first.
+> https://lkml.org/lkml/2014/1/27/212
 
-Yep, you're right. applied to fixes.
+I ended up cherry-picking the patch instead, since your base is different from
+what we have today. But the patch has been applied to our fixes branch now and
+will be sent up.
+
 
 -Olof
