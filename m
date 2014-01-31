@@ -1,29 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Jan 2014 09:18:09 +0100
-Subject: [PATCH v2 RESEND] vt8500: pinctrl: Change devicetree data parsing
-In-Reply-To: <1390467453-8841-1-git-send-email-linux@prisktech.co.nz>
-References: <1390467453-8841-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdaUJkTrT1=VST76dSxFhkJYhB6hMM_TRkTCYaX58QHp6Q@mail.gmail.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 31 Jan 2014 09:46:23 +0100
+Subject: iommu/arm-smmu: Regression (sleeping function called from
+ invalid context)
+In-Reply-To: <20140130235552.GL13543@alberich>
+References: <20140130235552.GL13543@alberich>
+Message-ID: <20140131084623.GN13543@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 9:57 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+On Fri, Jan 31, 2014 at 12:55:52AM +0100, Andreas Herrmann wrote:
+> Hi Will,
+> 
+> Seems that commit a44a9791e778d9ccda50d5534028ed4057a9a45b
+> (iommu/arm-smmu: use mutex instead of spinlock for locking page tables)
+> introduced a regression.
+> 
+> At least I've hit
+> 
+>   BUG: scheduling while atomic: ksoftirqd/0/3/0x00000100
+>...
 
-> Due to an assumption in the VT8500 pinctrl driver, the value passed
-> from devicetree for 'wm,pull' was not explicitly translated before
-> being passed to pinconf.
->
-> Since v3.10, changes to 'enum pin_config_param', PIN_CONFIG_BIAS_PULL_(UP/DOWN)
-> no longer map 1-to-1 with the expected values in devicetree.
->
-> This patch adds a small translation between the devicetree values (0..2)
-> and the enum pin_config_param equivalent values.
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
-> v2:
+>   BUG: sleeping function called from invalid context at mm/page_alloc.c:2679
+>   in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+>   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.13.0-00016-g6e90346 #413
+>   [<c0014740>] (unwind_backtrace+0x0/0xf8) from [<c00115b0>] (show_stack+0x10/0x14)
+>   [<c00115b0>] (show_stack+0x10/0x14) from [<c057ea24>] (dump_stack+0x74/0xa8)
+>   [<c057ea24>] (dump_stack+0x74/0xa8) from [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930)
+>   [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930) from [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c)
+>   [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c) from [<c0428e74>] (iommu_map+0xf0/0x148)
+>   [<c0428e74>] (iommu_map+0xf0/0x148) from [<c001935c>] (__map_sg_chunk+0x198/0x2d4)
+>...
 
-Patch applied to fixes and tagged for stable v3.10+
+> Maybe that was the reason why the offending commit was introduced(?).
+> 
+> I think with the current code "atomic allocations" should be used when
+> IO page tables are created. With below patch I've not triggered above
+> errors.
 
-Yours,
-Linus Walleij
+I think allocating memory with GFP_KERNEL in this dma-mapping path
+doesn't seem to be a good idea. What if the DMA operation for which we
+modify IO page tables was triggered to free pages (page cache, swap)?
+
+
+Andreas
