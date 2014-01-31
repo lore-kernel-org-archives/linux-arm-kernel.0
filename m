@@ -1,45 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 31 Jan 2014 09:18:21 -0700
-Subject: [PATCH 3/3] spi: switch to devm_spi_alloc_master
-In-Reply-To: <1391163792-21819-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391163792-21819-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <52EBCCCD.301@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 31 Jan 2014 10:24:09 -0600
+Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
+In-Reply-To: <20140130174546.GF13543@alberich>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
+ <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
+ <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
+ <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
+ <52E939CB.1020705@amd.com> <20140130174546.GF13543@alberich>
+Message-ID: <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2014 03:23 AM, Maxime Ripard wrote:
-> Make the existing users of devm_spi_register_master use the
-> devm_spi_alloc_master function to avoid leaking memory.
+On Thu, Jan 30, 2014 at 11:45 AM, Andreas Herrmann
+<andreas.herrmann@calxeda.com> wrote:
+> On Wed, Jan 29, 2014 at 12:26:35PM -0500, Suravee Suthikulanit wrote:
+>> On 1/29/2014 11:16 AM, Andreas Herrmann wrote:
+>> > On Wed, Jan 29, 2014 at 11:59:12AM -0500, Suravee Suthikulanit wrote:
+>> >> On 1/29/2014 10:57 AM, Rob Herring wrote:
+>> >>>>> diff --git a/include/linux/of.h b/include/linux/of.h
+>> >>>>>>> index 276c546..24e1b28 100644
+>> >>>>>>> --- a/include/linux/of.h
+>> >>>>>>> +++ b/include/linux/of.h
+>> >>>>>>> @@ -67,7 +67,7 @@ struct device_node {
+>> >>>>>>>    #endif
+>> >>>>>>>    };
+>> >>>>>>>
+>> >>>>>>> -#define MAX_PHANDLE_ARGS 8
+>> >>>>>>> +#define MAX_PHANDLE_ARGS 16
+>> >>>>>
+>> >>>>>
+>> >>>>> Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't
+>> >>>>> this be changed to be able to support 128 StreamIDs as well?  Although I am
+>> >>>>> not sure if this would be too big to have on the stack per Rob's comment in
+>> >>>>> the previous patch set.
+>> >>> Do you actually need 128 now? If not, then we can deal with that when
+>> >>> we get there. There are lots of things in spec's that are not actually
+>> >>> implemented or supported.
+>> >>
+>> >> Actually, we are using 32 on the AMD system. So, do you think we can set
+>> >> this to 32 instead?
+>> >
+>> > I think that's ok.
+>> >
+>> > But are we really talking about number of SMRs or number of StreamIDs
+>> > per master device here? Ie. are you just having 32 SMRs for an SMMU on
+>> > your AMD system or do you have master devices which have 32 StreamIDs?
+>> >
+>> > If it's just number of SMRs we don't need to modify this macro.
+>
+>> I am referring to the case where each mmu-master can have upto 32 streamID.
+>
+> Rob,
+>
+> Do you agree on increasing MAX_PHANDLE_ARGS to 32?
 
-> diff --git a/drivers/spi/spi-tegra114.c b/drivers/spi/spi-tegra114.c
+Yes, but more than that will require a closer look. Please get this
+into next early in the cycle.
 
-> @@ -1087,14 +1085,13 @@ static int tegra_spi_probe(struct platform_device *pdev)
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "Failed to register ISR for IRQ %d\n",
->  					tspi->irq);
-> -		goto exit_free_master;
-> +		return ret;
->  	}
->  
->  	tspi->clk = devm_clk_get(&pdev->dev, "spi");
->  	if (IS_ERR(tspi->clk)) {
->  		dev_err(&pdev->dev, "can not get clock\n");
-> -		ret = PTR_ERR(tspi->clk);
-> -		goto exit_free_irq;
-> +		return PTR_ERR(tspi->clk);
->  	}
->  
->  	tspi->max_buf_size = SPI_FIFO_DEPTH << 2;
-> @@ -1152,8 +1149,6 @@ exit_rx_dma_free:
->  	tegra_spi_deinit_dma_param(tspi, true);
->  exit_free_irq:
->  	free_irq(spi_irq, tspi);
-> -exit_free_master:
-> -	spi_master_put(master);
->  	return ret;
+> Or should this be done when someone (e.g. Suravee) submits a DTS
+> update with an SMMU node description containing more than 16 stream
+> IDs for a master device?
 
-Doesn't that s/goto exit_free_irq/return/ leak spi_irq? It's only OK to
-replace goto free_master with a direct return.
+Well, I am inclined to not care having seen no upstream activity for
+AMD's platform.
 
-The other two Tegra drivers don't seem to have this problem.
+Rob
