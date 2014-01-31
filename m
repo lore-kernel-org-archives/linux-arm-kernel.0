@@ -1,26 +1,20 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 31 Jan 2014 14:50:43 -0800
-Subject: [PATCHv3] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
-References: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 31 Jan 2014 14:51:16 -0800
+Subject: [PATCH] ARM: hisi: don't select SMP
+In-Reply-To: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
+References: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20140131225116.GA6284@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 1:05 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> arm64 currently lacks support for -fstack-protector. Add
-> similar functionality to arm to detect stack corruption.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On Fri, Jan 31, 2014 at 04:06:30PM -0600, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> SMP is a user configurable option, not a hardware feature and should not
+> be selected.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Thanks!
+Yep, you're right. applied to fixes.
 
-Acked-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+-Olof
