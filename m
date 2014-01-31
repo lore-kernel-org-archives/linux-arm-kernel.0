@@ -1,44 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Jan 2014 20:04:35 +0000
-Subject: [RFC/PATCH] base: platform: add generic clock handling for
- platform-bus
-In-Reply-To: <1391191965-31102-1-git-send-email-balbi@ti.com>
-References: <1391191965-31102-1-git-send-email-balbi@ti.com>
-Message-ID: <20140131200434.GR27282@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 31 Jan 2014 14:11:40 -0600
+Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
+ multiplatform
+In-Reply-To: <1391107002-21470-3-git-send-email-galak@codeaurora.org>
+References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
+ <1391107002-21470-3-git-send-email-galak@codeaurora.org>
+Message-ID: <CAL_JsqKWa91vDu2oFdOb7Y8XSB-UecYDOK6CmyjXr1ZW81Snqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 12:12:45PM -0600, Felipe Balbi wrote:
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index 3a94b79..86aeb5b 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -484,6 +484,21 @@ static int platform_drv_probe(struct device *_dev)
->  	if (ACPI_HANDLE(_dev))
->  		acpi_dev_pm_attach(_dev, true);
->  
-> +	dev->fck = devm_clk_get(_dev, "fck");
-> +	dev->ick = devm_clk_get(_dev, "ick");
+On Thu, Jan 30, 2014 at 12:36 PM, Kumar Gala <galak@codeaurora.org> wrote:
+> Introduce a new mach-qcom that will support SoCs that intend to be
+> multiplatform compatiable while keeping mach-msm to legacy SoC/board
+> support that will not transition over to multiplatform.
+>
+> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
+> to mach-qcom.
+>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+
+[snip]
+
+> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+> new file mode 100644
+> index 0000000..8830431
+> --- /dev/null
+> +++ b/arch/arm/mach-qcom/Kconfig
+> @@ -0,0 +1,34 @@
+> +config ARCH_QCOM
+> +       bool "Qualcomm Support" if ARCH_MULTI_V7
+> +       select ARCH_REQUIRE_GPIOLIB
+> +       select CLKSRC_OF
+> +       select GENERIC_CLOCKEVENTS
+> +       select ARM_GIC
+> +       select CPU_V7
+
+CPU_V7 is already selected by MULTI_V7.
+
+
+[snip]
+
+> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-qcom/smp.c
+> similarity index 97%
+> rename from arch/arm/mach-msm/platsmp.c
+> rename to arch/arm/mach-qcom/smp.c
+> index 42eb6b7..28364cb 100644
+> --- a/arch/arm/mach-msm/platsmp.c
+> +++ b/arch/arm/mach-qcom/smp.c
+> @@ -2,6 +2,7 @@
+>   *  Copyright (C) 2002 ARM Ltd.
+>   *  All Rights Reserved
+>   *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -20,7 +21,6 @@
+>  #include <asm/smp_plat.h>
+>
+>  #include "scm-boot.h"
+> -#include "common.h"
+>
+>  #define VDD_SC1_ARRAY_CLAMP_GFS_CTL    0x35a0
+>  #define SCSS_CPU1CORE_RESET            0x2d80
+> @@ -48,6 +48,15 @@ extern void secondary_startup(void);
+>
+>  static DEFINE_SPINLOCK(boot_lock);
+>
+> +static void __ref msm_cpu_die(unsigned int cpu)
+> +{
 > +
-> +	if (!IS_ERR(dev->fck))
-> +		clk_prepare_enable(dev->fck);
-> +	else
-> +		dev->fck = NULL;
-> +
-> +	if (!IS_ERR(dev->ick))
-> +		clk_prepare_enable(dev->ick);
-> +	else
-> +		dev->ick = NULL;
+> +       asm("wfi"
+> +           :
+> +           :
+> +           : "memory", "cc");
+> +}
 
-If people are going to continue doing this (converting error values to
-NULL) can we please have a check in devm_clk_get() which prevents it
-returning NULL if the implementation happens to do so?
+I realize this is just a move, but there is a wfi() macro that can be
+used here instead.
 
-It's either that or we force all users to conform to the API which
-specifies that the error values are defined by IS_ERR() returning
-true and everything else must be considered as a potential valid return.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Rob
