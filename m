@@ -1,92 +1,76 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 Jan 2014 15:44:05 -0600
-Subject: [RFC/PATCH] base: platform: add generic clock handling for
- platform-bus
-In-Reply-To: <Pine.LNX.4.44L0.1401311614100.12368-100000@netrider.rowland.org>
-References: <1391191965-31102-1-git-send-email-balbi@ti.com>
- <Pine.LNX.4.44L0.1401311614100.12368-100000@netrider.rowland.org>
-Message-ID: <20140131214405.GC2502@saruman.home>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 31 Jan 2014 23:03:03 +0100
+Subject: [PATCH v7 0/7] ARM: rockchip: add smp functionality
+In-Reply-To: <4970034.fqvMoHdOyd@phil>
+References: <4970034.fqvMoHdOyd@phil>
+Message-ID: <13010296.nzTT2PqdSR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday, 20. January 2014 16:41:43 Heiko St?bner wrote:
+> This series enables the use of the additional cores on Rockchip
+> Cortex-A9 SoCs.
 
-On Fri, Jan 31, 2014 at 04:34:27PM -0500, Alan Stern wrote:
-> On Fri, 31 Jan 2014, Felipe Balbi wrote:
-> 
-> > Still TODO a commit log. Not for merging!!!!!
-> > 
-> > NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > This patch is an idea I've had recently in order to combine several different
-> > PM implementations into the platform-bus.
-> > 
-> > This patch is bare minimum for platforms which need to handle functional and
-> > interface clocks but the whole thing is made optional.
-> > 
-> > Note that this patch makes sure that by the time a platform_driver's probe is
-> > called, we already have clocks enabled and pm_runtime_set_active() has been
-> > called, thus making sure that a device driver's pm_runtime_get_sync() will
-> > solely increase the pm usage counter.
-> > 
-> > I have *NOT* tested this anywhere *YET*, but I suppose it shouldn't cause any
-> > issues since the clock API has ref counting too.
-> > 
-> > Would really like to get some review from several folks involved with ARM SoC
-> > PM so that's the reason for the wide audience. If I have missed anybody, please
-> > add them to Cc.
-> > 
-> > As mentioned above, this is *NOT* meant for merging, but serves as a starting
-> > point for discussing some convergence of several PM domain implementations on
-> > different arch/arm/mach-* directories.
-> 
-> You might want to copy the runtime-PM approach used by the PCI 
-> subsystem.  It works like this:
-> 
-> 	The core invokes a driver's probe routine with runtime PM 
-> 	enabled, the device in the ACTIVE state, and the usage counter 
-> 	incremented by 1.
-> 
-> 	If the driver wants to support runtime PM, the probe routine
-> 	can call pm_runtime_put_noidle.
-> 
-> 	The core does pm_runtime_get_sync before invoking the driver's
-> 	remove routine.  At this point a runtime-PM-aware driver whould 
-> 	call pm_runtime_get_noresume, to balance the _put during probe.
-> 
-> 	After invoking the remove routine, the core does a put_noidle
-> 	(to balance the get_sync) and a final put_sync (to balance the
-> 	increment before probe and to leave the device at low power.)
-> 
-> A nice consequence is that everything is transparent for drivers that 
-> don't support runtime PM.  The usage counter remains > 0 the entire 
-> time the driver is bound.
-> 
-> Conversely, drivers that do support runtime PM merely have to add one 
-> call during probe and one during remove.
-> 
-> There is one tricky aspect to all this.  The driver core sets the
-> dev->driver field before calling the subsystem core's probe routine.  
-> As a result, the subsystem has to be very careful about performing
-> runtime PM before invoking the driver's probe routine.  Otherwise you
-> will end up calling the driver's runtime_resume callback before the
-> driver's probe!  (And of course, the same problem exists in reverse
-> during remove.)
+So, two weeks without any general complaints, but I guess part of the more 
+general patches could use an ack.
 
-I can, certainly, do that and that would, most likely, simplify a whole
-bunch of drivers. But that change, I suppose, would be a whole lot more
-invasive. I'll spend some time studying PCI pm_runtime support, thanks
-for the tip.
+Going forward, what would be best way to merge them?
+As one pull request to arm-soc, or for example splitting them into the first 
+three patches going through the misc tree and the rockchip specific stuff going 
+through arm-soc? Or something else altogether?
 
-cheers
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/8008aa52/attachment-0001.sig>
+> Heiko Stuebner (7):
+>   of: add functions to count number of elements in a property
+
+One of the intermediate versions of this patch got a
+	Reviewed-by: Mark Rutland <mark.rutland@arm.com> .
+Mark, is this still true for this variant addressing some additional wished 
+from Rob?
+
+And this final version got a "Looks good" from Rob Herring in the original 
+thread, but a more formal "ack" might be nice :-) .
+
+
+>   dt-bindings: sram: describe option to reserve parts of the memory
+>   misc: sram: implement mmio-sram-reserved option
+
+Philipp, you acked an intermediate version, and this v7 now should also 
+contain the two separate loops (1st gathering data and 2nd creating the pool 
+parts) you asked for.
+
+Could I persuade you to take a look again?
+
+
+Thanks
+Heiko
+
+
+>   ARM: rockchip: add snoop-control-unit
+>   ARM: rockchip: add sram dt nodes and documentation
+>   ARM: rockchip: add power-management-unit
+>   ARM: rockchip: add smp bringup code
+> 
+>  .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+>  .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   23 +++
+>  Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+>  arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
+>  arch/arm/boot/dts/rk3188.dtsi                      |    6 +
+>  arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
+>  arch/arm/mach-rockchip/Kconfig                     |    1 +
+>  arch/arm/mach-rockchip/Makefile                    |    1 +
+>  arch/arm/mach-rockchip/core.h                      |   22 +++
+>  arch/arm/mach-rockchip/headsmp.S                   |   30 +++
+>  arch/arm/mach-rockchip/platsmp.c                   |  208
+> ++++++++++++++++++++ arch/arm/mach-rockchip/rockchip.c                  |  
+>  2 +
+>  drivers/misc/sram.c                                |  121 +++++++++++-
+>  drivers/of/base.c                                  |   32 +++
+>  include/linux/of.h                                 |   76 +++++++
+>  15 files changed, 554 insertions(+), 8 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+>  create mode 100644
+> Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt create mode
+> 100644 arch/arm/mach-rockchip/core.h
+>  create mode 100644 arch/arm/mach-rockchip/headsmp.S
+>  create mode 100644 arch/arm/mach-rockchip/platsmp.c
