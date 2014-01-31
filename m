@@ -1,45 +1,35 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 31 Jan 2014 09:46:23 +0100
-Subject: iommu/arm-smmu: Regression (sleeping function called from
- invalid context)
-In-Reply-To: <20140130235552.GL13543@alberich>
-References: <20140130235552.GL13543@alberich>
-Message-ID: <20140131084623.GN13543@alberich>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Fri, 31 Jan 2014 16:50:07 +0800
+Subject: [PATCH V3 3/8] SPEAr13xx: defconfig: Update
+In-Reply-To: <201401301402.01842.arnd@arndb.de>
+References: <cover.1391077731.git.mohit.kumar@st.com>
+ <77553346b18c3978b12329161a85dba7d50242ca.1391077731.git.mohit.kumar@st.com>
+ <201401301402.01842.arnd@arndb.de>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FCF3F0BB@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 12:55:52AM +0100, Andreas Herrmann wrote:
-> Hi Will,
+Hello Arnd,
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, January 30, 2014 6:32 PM
+> To: Mohit KUMAR DCG
+> Cc: Pratyush ANAND; spear-devel; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V3 3/8] SPEAr13xx: defconfig: Update
 > 
-> Seems that commit a44a9791e778d9ccda50d5534028ed4057a9a45b
-> (iommu/arm-smmu: use mutex instead of spinlock for locking page tables)
-> introduced a regression.
+> On Thursday 30 January 2014, Mohit Kumar wrote:
+> > Enable EABI, OEABI, VFP and NFS configs in default configuration file
+> > for SPEAr13xx.
 > 
-> At least I've hit
+> Are you sure about OABI_COMPAT? That seems unusual.
+
+- yes, this option is not required
 > 
->   BUG: scheduling while atomic: ksoftirqd/0/3/0x00000100
->...
+> Also, please add all the options you need to multi_v7_defconfig and ensure
+> that this configuration works with your hardware as well.
 
->   BUG: sleeping function called from invalid context at mm/page_alloc.c:2679
->   in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
->   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.13.0-00016-g6e90346 #413
->   [<c0014740>] (unwind_backtrace+0x0/0xf8) from [<c00115b0>] (show_stack+0x10/0x14)
->   [<c00115b0>] (show_stack+0x10/0x14) from [<c057ea24>] (dump_stack+0x74/0xa8)
->   [<c057ea24>] (dump_stack+0x74/0xa8) from [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930)
->   [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930) from [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c)
->   [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c) from [<c0428e74>] (iommu_map+0xf0/0x148)
->   [<c0428e74>] (iommu_map+0xf0/0x148) from [<c001935c>] (__map_sg_chunk+0x198/0x2d4)
->...
+- OK, will do this and test with SPEAr1310.
 
-> Maybe that was the reason why the offending commit was introduced(?).
-> 
-> I think with the current code "atomic allocations" should be used when
-> IO page tables are created. With below patch I've not triggered above
-> errors.
-
-I think allocating memory with GFP_KERNEL in this dma-mapping path
-doesn't seem to be a good idea. What if the DMA operation for which we
-modify IO page tables was triggered to free pages (page cache, swap)?
-
-
-Andreas
+Thanks
+Mohit
