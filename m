@@ -1,136 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jan 2014 14:45:05 +0100
-Subject: [PATCH v5 13/14] ARM: sun4i: dts: Add ahci / sata support
-In-Reply-To: <1390417489-5354-14-git-send-email-hdegoede@redhat.com>
-References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
- <1390417489-5354-14-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140131134505.GG2950@lukather>
+Date: Fri, 31 Jan 2014 14:31:11 +0100
+Subject: [PATCH 0/3] spi: core: Introduce devm_spi_alloc_master
+In-Reply-To: <20140131121215.GB22609@sirena.org.uk>
+References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140131121215.GB22609@sirena.org.uk>
+Message-ID: <20140131133111.GF2950@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Wed, Jan 22, 2014 at 08:04:48PM +0100, Hans de Goede wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
+On Fri, Jan 31, 2014 at 12:12:15PM +0000, Mark Brown wrote:
+> On Fri, Jan 31, 2014 at 11:23:09AM +0100, Maxime Ripard wrote:
 > 
-> This patch adds sunxi sata support to A10 boards that have such a connector.
-> Some boards also feature a regulator via a GPIO and support for this is also
-> added.
+> > This patchset introduces a devm_spi_alloc_master to the spi core. While most of
+> > the drivers have a spi_master_put call in the probe, a lot of them using the
+> > devm_spi_register_master function are missing it in the remove function,
+> > leading to leaked resources.
 > 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 +++++
->  arch/arm/boot/dts/sun4i-a10.dtsi           |  8 +++++++
->  arch/arm/boot/dts/sunxi-ahci-reg.dtsi      | 38 ++++++++++++++++++++++++++++++
+> This seems confusing - the idea here is that if we've handed the device
+> off to the managed function then the managed function deals with
+> destroying it.  Note that spi_alloc_master() says that the put is only
+> required after errors adding the device (which would be the expected
+> behaviour if you look at other APIs).  Looking at the code I think there
+> is an issue here but I'm not at all clear that this is the best fix.
 
-I'm still half convinced about this at the moment, given the number of
-platforms we support, we can always change it back if things become too messy.
+Ah, right, spi_master_put doesn't free the memory either...
 
->  4 files changed, 56 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> index aef8207..3fb7305 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> @@ -48,6 +48,10 @@
->  			status = "okay";
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			status = "okay";
-> +		};
-> +
->  		pinctrl at 01c20800 {
->  			mmc0_cd_pin_a1000: mmc0_cd_pin at 0 {
->  				allwinner,pins = "PH1";
-> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> index f50fb2b..6ae1110 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> @@ -12,6 +12,7 @@
->  
->  /dts-v1/;
->  /include/ "sun4i-a10.dtsi"
-> +/include/ "sunxi-ahci-reg.dtsi"
->  
->  / {
->  	model = "Cubietech Cubieboard";
-> @@ -51,6 +52,11 @@
->  			status = "okay";
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			target-supply = <&reg_ahci_5v>;
-> +			status = "okay";
-> +		};
-> +
->  		pinctrl at 01c20800 {
->  			mmc0_cd_pin_cubieboard: mmc0_cd_pin at 0 {
->  				allwinner,pins = "PH1";
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 4736dd2..198dcda 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -331,6 +331,14 @@
->  			status = "disabled";
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			compatible = "allwinner,sun4i-a10-ahci";
+I guess we have a few choices here, either:
+  - Add a devm_kzalloc to spi_alloc_master, since most of the drivers
+    I've been looking at fail to free the memory, this would be the
+    least intrusive solution. We'd still have to remove all the kfree
+    calls in the driver that rightfully free the memory.
+  - Make devm_unregister_master also call kfree on the master
+  - Add a kfree to my devm_put_master so that the memory is reclaimed,
+    which isn't the case for now.
 
-To be consistent with the rest of the sun4i devices compatible, It
-should be sun4i-ahci.
+I don't have a strong preference here, maybe for the third one, since
+it makes obvious that it's managed and you don't have to do anything
+about it, while the other do not.
 
-However, since these devices don't use the same compatible pattern as
-their own machine compatible, and are consisent with the rest of the
-compatibles for the other SoCs, we can probably make this a go to
-transition progressively to this pattern.
-
-I'll cook up some patches for the other devices.
-
-> +			reg = <0x01c18000 0x1000>;
-> +			interrupts = <56>;
-> +			clocks = <&pll6 0>, <&ahb_gates 25>;
-> +			status = "disabled";
-> +		};
-> +
->  		intc: interrupt-controller at 01c20400 {
->  			compatible = "allwinner,sun4i-ic";
->  			reg = <0x01c20400 0x400>;
-> diff --git a/arch/arm/boot/dts/sunxi-ahci-reg.dtsi b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> new file mode 100644
-> index 0000000..955b197
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> @@ -0,0 +1,38 @@
-> +/*
-> + * sunxi boards sata target power supply common code
-> + *
-> + * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/ {
-> +	soc at 01c00000 {
-> +		ahci_pwr_pin_a: ahci_pwr_pin at 0 {
-> +			allwinner,pins = "PB8";
-> +			allwinner,function = "gpio_out";
-> +			allwinner,drive = <0>;
-> +			allwinner,pull = <0>;
-> +		};
-
-This should be under the pinctrl node.
-
-Thanks!
 Maxime
 
 -- 
@@ -143,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/4caca1fa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/a8aa0f8d/attachment.sig>
