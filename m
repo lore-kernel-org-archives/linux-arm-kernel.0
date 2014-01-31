@@ -1,68 +1,100 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 31 Jan 2014 10:24:09 -0600
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <20140130174546.GF13543@alberich>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
- <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
- <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
- <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
- <52E939CB.1020705@amd.com> <20140130174546.GF13543@alberich>
-Message-ID: <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 31 Jan 2014 10:45:34 -0600
+Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
+In-Reply-To: <52EBC650.50305@ti.com>
+References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
+ <20140131151955.GB20736@saruman.home> <52EBC499.2070302@ti.com>
+ <20140131154721.GD20736@saruman.home> <52EBC650.50305@ti.com>
+Message-ID: <20140131164534.GL20736@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 11:45 AM, Andreas Herrmann
-<andreas.herrmann@calxeda.com> wrote:
-> On Wed, Jan 29, 2014 at 12:26:35PM -0500, Suravee Suthikulanit wrote:
->> On 1/29/2014 11:16 AM, Andreas Herrmann wrote:
->> > On Wed, Jan 29, 2014 at 11:59:12AM -0500, Suravee Suthikulanit wrote:
->> >> On 1/29/2014 10:57 AM, Rob Herring wrote:
->> >>>>> diff --git a/include/linux/of.h b/include/linux/of.h
->> >>>>>>> index 276c546..24e1b28 100644
->> >>>>>>> --- a/include/linux/of.h
->> >>>>>>> +++ b/include/linux/of.h
->> >>>>>>> @@ -67,7 +67,7 @@ struct device_node {
->> >>>>>>>    #endif
->> >>>>>>>    };
->> >>>>>>>
->> >>>>>>> -#define MAX_PHANDLE_ARGS 8
->> >>>>>>> +#define MAX_PHANDLE_ARGS 16
->> >>>>>
->> >>>>>
->> >>>>> Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't
->> >>>>> this be changed to be able to support 128 StreamIDs as well?  Although I am
->> >>>>> not sure if this would be too big to have on the stack per Rob's comment in
->> >>>>> the previous patch set.
->> >>> Do you actually need 128 now? If not, then we can deal with that when
->> >>> we get there. There are lots of things in spec's that are not actually
->> >>> implemented or supported.
->> >>
->> >> Actually, we are using 32 on the AMD system. So, do you think we can set
->> >> this to 32 instead?
->> >
->> > I think that's ok.
->> >
->> > But are we really talking about number of SMRs or number of StreamIDs
->> > per master device here? Ie. are you just having 32 SMRs for an SMMU on
->> > your AMD system or do you have master devices which have 32 StreamIDs?
->> >
->> > If it's just number of SMRs we don't need to modify this macro.
->
->> I am referring to the case where each mmu-master can have upto 32 streamID.
->
-> Rob,
->
-> Do you agree on increasing MAX_PHANDLE_ARGS to 32?
+On Fri, Jan 31, 2014 at 10:50:40AM -0500, Santosh Shilimkar wrote:
+> On Friday 31 January 2014 10:47 AM, Felipe Balbi wrote:
+> > On Fri, Jan 31, 2014 at 10:43:21AM -0500, Santosh Shilimkar wrote:
+> >> On Friday 31 January 2014 10:19 AM, Felipe Balbi wrote:
+> >>> Hi,
+> >>>
+> >>> On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
+> >>>> The Keystone PM management layer has been implemented using PM bus for
+> >>>> power management clocks. As result, most of Keystone drivers don't need
+> >>>> to manage clocks directly. They just need to enable runtime PM and use it
+> >>>> to handle their PM state and clocks.
+> >>>>
+> >>>> Hence, remove clock management code and switch to use runtime PM.
+> >>>>
+> >>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> >>>
+> >>> quite a few weeks back I sent a series enabling runtime pm for all glue
+> >>> layers. I'll use that version instead, sorry.
+> >>>
+> >> That should be fine but you need to drop clk_*() related code
+> >> from that patch. I assume you will send refresh version of it then.
+> > 
+> > why ? it makes no difference if you enable twice and disable twice.
+> > 
+> Sure but why do you want to have the clock node handling code in drivers
+> if it is not needed. Isn't that better ?
 
-Yes, but more than that will require a closer look. Please get this
-into next early in the cycle.
+It might, but then way that I wanted to see it is so that I can make
+assumptions about the device state. From a driver perspective, what I
+would love to see is the ability to assume that when my probe gets
+called the device is already enabled. So if you can make sure that
+clk_enable() happens before my probe and that you call
+pm_runtime_set_active() before my probe too, then I can more than
+hapilly remove clk_* calls from the driver ;-)
 
-> Or should this be done when someone (e.g. Suravee) submits a DTS
-> update with an SMMU node description containing more than 16 stream
-> IDs for a master device?
+either that or maintain the driver like so:
 
-Well, I am inclined to not care having seen no upstream activity for
-AMD's platform.
+probe()
+{
+	...
 
-Rob
+	clk_get(dev, "fck");
+	clk_prepare(clk);
+	clk_enable(clk);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
+	...
+}
+
+runtime_suspend()
+{
+	clk_disable(dev);
+}
+
+runtime_resume()
+{
+	clk_enable(dev);
+}
+
+note that because of pm_runtime_set_active() that first
+pm_runtime_get_sync() in probe() will simply increase the reference
+counter without calling my ->runtime_resume() callback, which is exactly
+what we want, as that would completely avoid situations of bad context
+being restored because of that initial pm_runtime_get_sync().
+
+Then, we can even make pm_runtime completely async easily, because
+clk_prepare() was called only on probe() (or before it, for that
+matter).
+
+Bottomline is, if you can guarantee me that clk_get(), clk_prepare(),
+clk_enable() and pm_runtime_set_active() will be called properly before
+my probe, i'll be more than happy to comply with your request above as
+that will greatly simplify my driver.
+
+Just make, also, that if this clock is shared between dwc3-keystone
+wrapper and dwc3 core, you clk_get() on both driver's probe.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/e709d095/attachment.sig>
