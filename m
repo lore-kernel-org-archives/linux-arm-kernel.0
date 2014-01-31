@@ -1,33 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 Jan 2014 09:19:55 -0600
-Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
-In-Reply-To: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
-References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20140131151955.GB20736@saruman.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Jan 2014 16:23:56 +0100
+Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
+In-Reply-To: <CAGsJ_4xFKytv=Mj9eVwGY7RjyUy2W=iSXvnULKyBETYVzMVbOg@mail.gmail.com>
+References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
+ <201401302049.27521.arnd@arndb.de>
+ <CAGsJ_4xFKytv=Mj9eVwGY7RjyUy2W=iSXvnULKyBETYVzMVbOg@mail.gmail.com>
+Message-ID: <201401311623.56902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
-> The Keystone PM management layer has been implemented using PM bus for
-> power management clocks. As result, most of Keystone drivers don't need
-> to manage clocks directly. They just need to enable runtime PM and use it
-> to handle their PM state and clocks.
+On Friday 31 January 2014, Barry Song wrote:
+> >
+> > Is SRC_OSC_RATE the rate of spwm->clk? If so, it would be nice to just call
+> > clk_get_rate() here, in case you ever have a chip with a different rate.
+> >
 > 
-> Hence, remove clock management code and switch to use runtime PM.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> SRC_OSC_RATE is the fixed frequency of crystal oscillator, but
+> spwm->clk comes from the IO bus. the design is a little strange, pwm
+> channels don't use the clock of PWM controller to generate
+> period/duty, but use other sources.
 
-quite a few weeks back I sent a series enabling runtime pm for all glue
-layers. I'll use that version instead, sorry.
+How about modeling  that other source as a fixed-rate clock in DT
+then?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/53f35523/attachment.sig>
+	Arnd
