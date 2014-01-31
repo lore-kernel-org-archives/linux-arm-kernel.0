@@ -1,27 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 Jan 2014 11:11:42 -0800
-Subject: [PATCH 0/4] Split mach-msm into legacy and mach-qcom
- (multiplatform)
-In-Reply-To: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Jan 2014 20:20:16 +0100
+Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
+ multiplatform
+In-Reply-To: <1391107002-21470-3-git-send-email-galak@codeaurora.org>
 References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
-Message-ID: <20140131191142.GB32295@quad.lixom.net>
+ <1391107002-21470-3-git-send-email-galak@codeaurora.org>
+Message-ID: <201401312020.16984.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 12:36:38PM -0600, Kumar Gala wrote:
-> This is the starts of splitting the Qualcomm MSM platform into legacy support
-> that we will not try and convert to multiplatform and multiplatform support.
-> These patches are based on the 'CPU enable method based SMP' patches.
+On Thursday 30 January 2014, Kumar Gala wrote:
+> Introduce a new mach-qcom that will support SoCs that intend to be
+> multiplatform compatiable while keeping mach-msm to legacy SoC/board
+> support that will not transition over to multiplatform.
 > 
-> I wanted to get these out for review, will add a few more patches for defconfig
-> updates/additions, as well as some additional driver being enabled for ARCH_QCOM.
+> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
+> to mach-qcom.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  MAINTAINERS                                        |  7 +++
+>  arch/arm/Kconfig                                   |  7 +--
+>  arch/arm/Makefile                                  |  1 +
+>  arch/arm/boot/dts/Makefile                         |  6 +--
+>  arch/arm/mach-msm/Kconfig                          | 45 +------------------
+>  arch/arm/mach-msm/Makefile                         |  7 ---
+>  arch/arm/mach-msm/hotplug.c                        | 51 ----------------------
+>  arch/arm/mach-qcom/Kconfig                         | 34 +++++++++++++++
+>  arch/arm/mach-qcom/Makefile                        |  5 +++
+>  .../arm/{mach-msm/board-dt.c => mach-qcom/board.c} |  9 ++--
+>  arch/arm/{mach-msm => mach-qcom}/scm-boot.c        |  0
+>  arch/arm/{mach-msm => mach-qcom}/scm-boot.h        |  0
+>  arch/arm/{mach-msm => mach-qcom}/scm.c             |  0
+>  arch/arm/{mach-msm => mach-qcom}/scm.h             |  0
+>  arch/arm/{mach-msm/platsmp.c => mach-qcom/smp.c}   | 11 ++++-
 
-Series:
+The hotplug.c change sticks out as something that isn't just a move
+of code to another place, but deletion of unused code. It would
+be nice to split that out into a separate change, possibly together
+with the trivial board.c and smp.c changes.
 
-Acked-by: Olof Johansson <olof@lixom.net>
-
-See comment on the MAINTAINERS addition; let me know how you prefer to send us
-patches. We can apply from mailing lists we just need to know your preference.
-
-
--Olof
+	Arnd
