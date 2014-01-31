@@ -1,24 +1,22 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 31 Jan 2014 09:45:09 -0500
-Subject: [PATCH v2] ARM: keystone: dts: drop "msmcsram" clock node
-In-Reply-To: <1391105400-31602-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1391105400-31602-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52EBB6F5.8080701@ti.com>
+Date: Fri, 31 Jan 2014 09:46:03 -0500
+Subject: [PATCH v2] clk: keystone: gate: fix clk_init_data initialization
+In-Reply-To: <1391104991-15000-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1391104991-15000-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52EBB72B.20708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 January 2014 01:10 PM, Ivan Khoronzhuk wrote:
-> At late init all unused clocks are disabled. So clocks that were not
-> get before will be gated. In Keysone 2 SoC we have at least one
-> necessary clock that is not used by any driver - "msmcsram". This
-> clock is necessary, because it supplies the Multicore Shared Memory
-> Controller (MSMC). MSMC is the coherency interconnect and all the
-> coherent masters are connected to it including devices which are not
-> under Linux OS control. MSMC clock should not be touched even in low
-> power states.
+On Thursday 30 January 2014 01:03 PM, Ivan Khoronzhuk wrote:
+> The clk_init_data struct is allocated in the stack. All members of
+> this struct should be initialized before using otherwise it will
+> lead to unpredictable situation as it can contain garbage.
 > 
-> So drop the clock node, otherwise 'clk_ignore_unused' parameter will
-> disable the clock leading to system stall.
+> Ultimately the clk->flag field contains garbage. In my case it leads
+> that flag CLK_IGNORE_UNUSED is set for most of clocks. As result a
+> bunch of unused clocks cannot be disabled.
+> 
+> So initialize flags in this structure too.
 > 
 > Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 > ---
@@ -27,34 +25,23 @@ On Thursday 30 January 2014 01:10 PM, Ivan Khoronzhuk wrote:
 > keystone/master
 > 
 > v1..v2:
-> - dropped "msmcsram" clock node, instead disabling
-> - updated comment message
+> - updated commit description only
 > 
-Thanks for the update. Would be good to get blessing from DT folks.
-I want to send this one during the rc's since its a bug fix.
+Thanks for the update. 
 
->  arch/arm/boot/dts/keystone-clocks.dtsi | 10 ----------
->  1 file changed, 10 deletions(-)
+>  drivers/clk/keystone/gate.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-> index 2363593..98ad488 100644
-> --- a/arch/arm/boot/dts/keystone-clocks.dtsi
-> +++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-> @@ -327,16 +327,6 @@ clocks {
->  		domain-id = <6>;
->  	};
+> diff --git a/drivers/clk/keystone/gate.c b/drivers/clk/keystone/gate.c
+> index 17a5983..86f1e36 100644
+> --- a/drivers/clk/keystone/gate.c
+> +++ b/drivers/clk/keystone/gate.c
+> @@ -179,6 +179,7 @@ static struct clk *clk_register_psc(struct device *dev,
 >  
-> -	clkmsmcsram: clkmsmcsram {
-> -		#clock-cells = <0>;
-> -		compatible = "ti,keystone,psc-clock";
-> -		clocks = <&chipclk1>;
-> -		clock-output-names = "msmcsram";
-> -		reg = <0x02350038 0xb00>, <0x0235001c 0x400>;
-> -		reg-names = "control", "domain";
-> -		domain-id = <7>;
-> -	};
-> -
->  	clkgem0: clkgem0 {
->  		#clock-cells = <0>;
->  		compatible = "ti,keystone,psc-clock";
+>  	init.name = name;
+>  	init.ops = &clk_psc_ops;
+> +	init.flags = 0;
+>  	init.parent_names = (parent_name ? &parent_name : NULL);
+>  	init.num_parents = (parent_name ? 1 : 0);
+>  
 > 
