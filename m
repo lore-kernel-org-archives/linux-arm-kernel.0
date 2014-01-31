@@ -1,60 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Jan 2014 11:55:47 +0100
-Subject: [PATCH v3 0/5] Add Allwinner A31 SPI controller support
-Message-ID: <1391165752-1819-1-git-send-email-maxime.ripard@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Jan 2014 12:31:46 +0100
+Subject: [PATCH] pinctrl: sirf: correct the pin index of ac97_pins group
+In-Reply-To: <1390802489-2535-1-git-send-email-21cnbao@gmail.com>
+References: <1390802489-2535-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdbopf3_OF6xw0r14Xk6q+bAQrcPGpUmBhWqXEop5NWPvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Mon, Jan 27, 2014 at 7:01 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-This patchset brings support for the SPI controller found in the
-Allwinner A31 SoC.
+> From: Qipan Li <Qipan.Li@csr.com>
+>
+> according to datasheet and ac97_muxmask assignment, ac97_pins should be
+> corrected.
+>
+> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Even though the controller supports DMA, the driver only supports PIO
-mode for now. This driver will be used to bring up and test DMA on the
-SoC, so support for the DMA will come eventually.
+Patch applied for fixes.
 
-It doesn't support transfer larger than the FIFO size (128 bytes) for
-now, I expect it to be fixed in the future.
-
-Thanks!
-Maxime
-
-Changes from v2:
-  - Removed the select on runtime_pm
-  - Fixed the clock error messages
-  - Trigger the CS manually, and honour the enable bit in set_cs
-  - Convert to devm_* functions
-  - Remove useless clk_disable_unprepare in probe
-
-Changes from v1:
-  - Switched to using the transfer_one and set_cs callbacks
-  - Switched to using runtime_pm
-  - Report an error when we try to do a transfer larger than the FIFO
-    size, instead of silently timeouting.
-  - Added a Kconfig symbol
-  - Move the clock ratio change at transfer time
-  - Fixed the PLL6 cell size in the DTSI
-  - A few fixes here and there: typos, etc.
-
-Maxime Ripard (5):
-  clk: sunxi: Add support for PLL6 on the A31
-  ARM: sun6i: dt: Add PLL6 and SPI module clocks
-  spi: sunxi: Add Allwinner A31 SPI controller driver
-  ARM: sun6i: dt: Add SPI controllers to the A31 DTSI
-  ARM: sunxi: Enable A31 SPI and SID in the defconfig
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
- .../devicetree/bindings/spi/spi-sun6i.txt          |  24 ++
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  86 +++-
- arch/arm/configs/sunxi_defconfig                   |   3 +
- drivers/clk/sunxi/clk-sunxi.c                      |  45 ++
- drivers/spi/Kconfig                                |   6 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-sun6i.c                            | 473 +++++++++++++++++++++
- 8 files changed, 630 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-sun6i.txt
- create mode 100644 drivers/spi/spi-sun6i.c
-
--- 
-1.8.4.2
+Yours,
+Linus Walleij
