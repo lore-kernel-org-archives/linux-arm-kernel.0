@@ -1,73 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 31 Jan 2014 02:17:55 +0100
-Subject: [PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS
-In-Reply-To: <20140129231019.22655.41456.sendpatchset@w520>
-References: <20140129230959.22655.55645.sendpatchset@w520>
- <20140129231019.22655.41456.sendpatchset@w520>
-Message-ID: <1397857.qyLQY9XTlp@avalon>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 31 Jan 2014 03:18:50 +0100
+Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove hardcoded
+ addresses from Dove pinctrl
+In-Reply-To: <20140130202500.GN10864@lunn.ch>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140130182925.GM10864@lunn.ch> <52EA9EFA.1030609@gmail.com>
+ <20140130202500.GN10864@lunn.ch>
+Message-ID: <52EB080A.2020200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-Thank you for the patch.
-
-On Thursday 30 January 2014 08:10:19 Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Create a new group for the USB0 OVC/VBUS pin by itself. This
-> allows us to monitor PWEN as GPIO on the Lager board.
+On 01/30/2014 09:25 PM, Andrew Lunn wrote:
+> On Thu, Jan 30, 2014 at 07:50:34PM +0100, Sebastian Hesselbarth wrote:
+>> On 01/30/2014 07:29 PM, Andrew Lunn wrote:
+>>> On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
+>>>> This patch set is one required step for Dove to hop into mach-mvebu.
+>>>> Until now, pinctrl-dove was hardcoding some registers that do not
+>>>> directly belong to MPP core registers. This is not compatible with
+>>>> what we want for mach-mvebu.
+>>>
+>>> I think there might be something wrong here....
+>>
+>> There _is_ something wrong. I'll have a look at it. For the record,
+>> what SoC are you testing with? From the base address, I guess it is
+>> Kirkwood?
 >
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  drivers/pinctrl/sh-pfc/pfc-r8a7790.c |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> --- 0001/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7790.c	2014-01-24 
-10:23:32.000000000
-> +0900 @@ -3231,6 +3231,13 @@ static const unsigned int usb0_pins[] =
->  static const unsigned int usb0_mux[] = {
->  	USB0_PWEN_MARK, USB0_OVC_VBUS_MARK,
->  };
-> +static const unsigned int usb0_ovc_vbus_pins[] = {
-> +	/* OVC/VBUS */
-> +	RCAR_GP_PIN(5, 19),
-> +};
-> +static const unsigned int usb0_ovc_vbus_mux[] = {
-> +	USB0_OVC_VBUS_MARK,
-> +};
+> Yes, Kirkwood. Sorry for not saying.
 
-Another option would have been to split the existing usb0 group in usb0_pwen 
-and usb0_ovc. I'm not sure which is better though, I'd just like to know if 
-you had given it a thought.
+This time I push a branch before sending out the patches. Also, I
+think I'll postpone removal of hardcoded addresses until this is
+sorted out. The patch set was growing way to quick and I have to
+do this step-by-step for me and everybody else to actually understand ;)
 
-Regardless, what about naming the new group usb0_ovc instead of usb0_ovc_bus 
-to keep names short ?
+So, at least the MVEBU guys should test the following branch on
+their SoCs. Again, I have tested Dove and now confirmed that settings
+are still correct. The others are compile-tested.
 
->  /* - USB1
-> ------------------------------------------------------------------- */
-> static const unsigned int usb1_pins[] = {
->  	/* PWEN, OVC */
-> @@ -3789,6 +3796,7 @@ static const struct sh_pfc_pin_group pin
->  	SH_PFC_PIN_GROUP(tpu0_to2),
->  	SH_PFC_PIN_GROUP(tpu0_to3),
->  	SH_PFC_PIN_GROUP(usb0),
-> +	SH_PFC_PIN_GROUP(usb0_ovc_vbus),
->  	SH_PFC_PIN_GROUP(usb1),
->  	SH_PFC_PIN_GROUP(usb2),
->  	VIN_DATA_PIN_GROUP(vin0_data, 24),
-> @@ -4134,6 +4142,7 @@ static const char * const tpu0_groups[]
-> 
->  static const char * const usb0_groups[] = {
->  	"usb0",
-> +	"usb0_ovc_vbus",
->  };
-> 
->  static const char * const usb1_groups[] = {
+https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v3
 
--- 
-Regards,
+@Thomas, Gregory: Do you think that the above branch will be
+restructured enough allow support for orion5x and mv78xx0? I had a
+quick look at mach-{orion5x,mv78xx0}/mpp.h and didn't see anything
+weird.
 
-Laurent Pinchart
+Sebastian
