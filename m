@@ -1,55 +1,232 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 31 Jan 2014 10:58:09 +0100
-Subject: iommu/arm-smmu: Regression (sleeping function called from
- invalid context)
-In-Reply-To: <20140131084623.GN13543@alberich>
-References: <20140130235552.GL13543@alberich> <20140131084623.GN13543@alberich>
-Message-ID: <20140131095809.GO13543@alberich>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 31 Jan 2014 11:13:15 +0100
+Subject: [PATCH resend 1/2] arm64: defer reloading a task's FPSIMD state to
+ userland resume
+Message-ID: <1391163196-27619-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 09:46:23AM +0100, Andreas Herrmann wrote:
-> On Fri, Jan 31, 2014 at 12:55:52AM +0100, Andreas Herrmann wrote:
-> > Hi Will,
-> > 
-> > Seems that commit a44a9791e778d9ccda50d5534028ed4057a9a45b
-> > (iommu/arm-smmu: use mutex instead of spinlock for locking page tables)
-> > introduced a regression.
-> > 
-> > At least I've hit
-> > 
-> >   BUG: scheduling while atomic: ksoftirqd/0/3/0x00000100
-> >...
-> 
-> >   BUG: sleeping function called from invalid context at mm/page_alloc.c:2679
-> >   in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
-> >   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.13.0-00016-g6e90346 #413
-> >   [<c0014740>] (unwind_backtrace+0x0/0xf8) from [<c00115b0>] (show_stack+0x10/0x14)
-> >   [<c00115b0>] (show_stack+0x10/0x14) from [<c057ea24>] (dump_stack+0x74/0xa8)
-> >   [<c057ea24>] (dump_stack+0x74/0xa8) from [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930)
-> >   [<c00acc1c>] (__alloc_pages_nodemask+0x174/0x930) from [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c)
-> >   [<c042a250>] (arm_smmu_handle_mapping+0x470/0x66c) from [<c0428e74>] (iommu_map+0xf0/0x148)
-> >   [<c0428e74>] (iommu_map+0xf0/0x148) from [<c001935c>] (__map_sg_chunk+0x198/0x2d4)
-> >...
-> 
-> > Maybe that was the reason why the offending commit was introduced(?).
-> > 
-> > I think with the current code "atomic allocations" should be used when
-> > IO page tables are created. With below patch I've not triggered above
-> > errors.
-> 
-> I think allocating memory with GFP_KERNEL in this dma-mapping path
-> doesn't seem to be a good idea. What if the DMA operation for which we
-> modify IO page tables was triggered to free pages (page cache, swap)?
+If a task gets scheduled out and back in again and nothing has touched
+its FPSIMD state in the mean time, there is really no reason to reload
+it from memory. Similarly, repeated calls to kernel_neon_begin() and
+kernel_neon_end() will preserve and restore the FPSIMD state every time.
 
-I mean in case we run out of memory wouldn't we worsen the situation
-by triggering additional IO (and thus DMA)? Whereas when we let the
-mapping fail, the OS "just might have to wait a little bit" until
-other DMA activities are completed, pages unmapped and iova freed. The
-freed resources instantly can be used for further DMA activities.
+This patch defers the FPSIMD state restore to the last possible moment,
+i.e., right before the task re-enters userland. If a task does not enter
+userland at all (for any reason), the existing FPSIMD state is preserved
+and may be reused by the owning task if it gets scheduled in again on the
+same CPU.
 
-Hmm, but maybe I need to rethink this (and look more closely into
-page_alloc.c).
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/fpsimd.h      |  3 ++
+ arch/arm64/include/asm/thread_info.h |  4 +-
+ arch/arm64/kernel/entry.S            |  2 +-
+ arch/arm64/kernel/fpsimd.c           | 79 +++++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/process.c          |  3 +-
+ arch/arm64/kernel/signal.c           |  3 ++
+ 6 files changed, 81 insertions(+), 13 deletions(-)
 
-
-Andreas
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index c43b4ac13008..609bc44ceb8d 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -37,6 +37,8 @@ struct fpsimd_state {
+ 			u32 fpcr;
+ 		};
+ 	};
++	/* the id of the last cpu to have restored this state */
++	unsigned int last_cpu;
+ };
+ 
+ #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+@@ -57,6 +59,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
+ 
+ extern void fpsimd_thread_switch(struct task_struct *next);
+ extern void fpsimd_flush_thread(void);
++extern void fpsimd_reload_fpstate(void);
+ 
+ #endif
+ 
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 720e70b66ffd..4a1ca1cfb2f8 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -100,6 +100,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_SIGPENDING		0
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
++#define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
+ #define TIF_SYSCALL_TRACE	8
+ #define TIF_POLLING_NRFLAG	16
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+@@ -112,10 +113,11 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+ #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
++#define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
+ 
+ #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+-				 _TIF_NOTIFY_RESUME)
++				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
+ 
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_THREAD_INFO_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 39ac630d83de..80464e2fb1a5 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -576,7 +576,7 @@ fast_work_pending:
+ 	str	x0, [sp, #S_X0]			// returned x0
+ work_pending:
+ 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+-	/* TIF_SIGPENDING or TIF_NOTIFY_RESUME case */
++	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+ 	ldr	x2, [sp, #S_PSTATE]
+ 	mov	x0, sp				// 'regs'
+ 	tst	x2, #PSR_MODE_MASK		// user mode regs?
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 4aef42a04bdc..226a495e019c 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -35,6 +35,23 @@
+ #define FPEXC_IDF	(1 << 7)
+ 
+ /*
++ * In order to reduce the number of times the fpsimd state is needlessly saved
++ * and restored, keep track here of which task's userland owns the current state
++ * of the FPSIMD register file.
++ *
++ * This percpu variable points to the fpsimd_state.last_cpu field of the task
++ * whose FPSIMD state was most recently loaded onto this cpu. The last_cpu field
++ * itself contains the id of the cpu onto which the task's FPSIMD state was
++ * loaded most recently. So, to decide whether we can skip reloading the FPSIMD
++ * state, we need to check
++ * (a) whether this task was the last one to have its FPSIMD state loaded onto
++ *     this cpu
++ * (b) whether this task may have manipulated its FPSIMD state on another cpu in
++ *     the meantime
++ */
++static DEFINE_PER_CPU(unsigned int *, fpsimd_last_task);
++
++/*
+  * Trapped FP/ASIMD access.
+  */
+ void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+@@ -72,18 +89,56 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+ 
+ void fpsimd_thread_switch(struct task_struct *next)
+ {
+-	/* check if not kernel threads */
+-	if (current->mm)
++	/*
++	 * The thread flag TIF_FOREIGN_FPSTATE conveys that the userland FPSIMD
++	 * state belonging to the current task is not present in the registers
++	 * but has (already) been saved to memory in order for the kernel to be
++	 * able to go off and use the registers for something else. Therefore,
++	 * we must not (re)save the register contents if this flag is set.
++	 */
++	if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+ 		fpsimd_save_state(&current->thread.fpsimd_state);
+-	if (next->mm)
+-		fpsimd_load_state(&next->thread.fpsimd_state);
++
++	if (next->mm) {
++		/*
++		 * If we are switching to a task whose most recent userland NEON
++		 * contents are already in the registers of *this* cpu, we can
++		 * skip loading the state from memory. Otherwise, set the
++		 * TIF_FOREIGN_FPSTATE flag so the state will be loaded upon the
++		 * next entry of userland.
++		 */
++		struct fpsimd_state *st = &next->thread.fpsimd_state;
++
++		if (__get_cpu_var(fpsimd_last_task) == &st->last_cpu
++		    && st->last_cpu == smp_processor_id())
++			clear_ti_thread_flag(task_thread_info(next),
++					     TIF_FOREIGN_FPSTATE);
++		else
++			set_ti_thread_flag(task_thread_info(next),
++					   TIF_FOREIGN_FPSTATE);
++	}
+ }
+ 
+ void fpsimd_flush_thread(void)
+ {
+-	preempt_disable();
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+-	fpsimd_load_state(&current->thread.fpsimd_state);
++	set_thread_flag(TIF_FOREIGN_FPSTATE);
++}
++
++void fpsimd_reload_fpstate(void)
++{
++	preempt_disable();
++	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
++		/*
++		 * We are entering userland and the userland context is not yet
++		 * present in the registers.
++		 */
++		struct fpsimd_state *st = &current->thread.fpsimd_state;
++
++		fpsimd_load_state(st);
++		__get_cpu_var(fpsimd_last_task) = &st->last_cpu;
++		st->last_cpu = smp_processor_id();
++	}
+ 	preempt_enable();
+ }
+ 
+@@ -98,16 +153,20 @@ void kernel_neon_begin(void)
+ 	BUG_ON(in_interrupt());
+ 	preempt_disable();
+ 
+-	if (current->mm)
++	/*
++	 * Save the userland FPSIMD state if we have one and if we haven't done
++	 * so already. Clear fpsimd_last_task to indicate that there is no
++	 * longer userland context in the registers.
++	 */
++	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+ 		fpsimd_save_state(&current->thread.fpsimd_state);
++	__get_cpu_var(fpsimd_last_task) = NULL;
++
+ }
+ EXPORT_SYMBOL(kernel_neon_begin);
+ 
+ void kernel_neon_end(void)
+ {
+-	if (current->mm)
+-		fpsimd_load_state(&current->thread.fpsimd_state);
+-
+ 	preempt_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 248a15db37f2..274316df860f 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -205,7 +205,8 @@ void release_thread(struct task_struct *dead_task)
+ 
+ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+ {
+-	fpsimd_save_state(&current->thread.fpsimd_state);
++	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
++		fpsimd_save_state(&current->thread.fpsimd_state);
+ 	*dst = *src;
+ 	return 0;
+ }
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 890a591f75dd..0a9eccf4fc0f 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -416,4 +416,7 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		clear_thread_flag(TIF_NOTIFY_RESUME);
+ 		tracehook_notify_resume(regs);
+ 	}
++
++	if (thread_flags & _TIF_FOREIGN_FPSTATE)
++		fpsimd_reload_fpstate();
+ }
+-- 
+1.8.3.2
