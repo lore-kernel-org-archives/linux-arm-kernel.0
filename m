@@ -1,39 +1,50 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 31 Jan 2014 15:18:17 +0100
-Subject: [PATCH 08/10] watchdog: xilinx: Use correct comment indentation
+Date: Fri, 31 Jan 2014 15:18:18 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
 In-Reply-To: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
 References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
-Message-ID: <45680208de6e22a49fe8311d49877096ccd702af.1391177880.git.michal.simek@xilinx.com>
+Message-ID: <9c721b89ed2ceb6997809bb3363f852277e67dc2.1391177880.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional changes.
+Document current driver binding.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/watchdog/of_xilinx_wdt.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/watchdog/of-xilinx-wdt.txt | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt
 
-diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index 475440a6..7948def 100644
---- a/drivers/watchdog/of_xilinx_wdt.c
-+++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -190,10 +190,10 @@ static int xwdt_probe(struct platform_device *pdev)
- 		watchdog_set_nowayout(xilinx_wdt_wdd, true);
- 	}
-
--/*
-- *  Twice of the 2^wdt_interval / freq  because the first wdt overflow is
-- *  ignored (interrupt), reset is only generated at second wdt overflow
-- */
-+	/*
-+	 * Twice of the 2^wdt_interval / freq  because the first wdt overflow is
-+	 * ignored (interrupt), reset is only generated at second wdt overflow
-+	 */
- 	if (!no_timeout)
- 		xilinx_wdt_wdd->timeout = 2 * ((1 << xdev->wdt_interval) /
- 					  pfreq);
+diff --git a/Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt b/Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt
+new file mode 100644
+index 0000000..6d63782
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt
+@@ -0,0 +1,23 @@
++Xilinx AXI/PLB soft-core watchdog Device Tree Bindings
++---------------------------------------------------------
++
++Required properties:
++- compatible		: Should be "xlnx,xps-timebase-wdt-1.00.a" or
++			  "xlnx,xps-timebase-wdt-1.01.a".
++- reg			: Physical base address and size
++
++Optional properties:
++- clock-frequency	: Frequency of clock in Hz
++- xlnx,wdt-enable-once	: 0 - Watchdog can be restarted
++			  1 - Watchdog can be enabled just once
++- xlnx,wdt-interval	: Watchdog timeout interval in 2^<val> clock cycles,
++			  <val> is integer from 8 to 31.
++
++Example:
++axi-timebase-wdt at 40100000 {
++	clock-frequency = <50000000>;
++	compatible = "xlnx,xps-timebase-wdt-1.00.a";
++	reg = <0x40100000 0x10000>;
++	xlnx,wdt-enable-once = <0x0>;
++	xlnx,wdt-interval = <0x1b>;
++} ;
 --
 1.8.2.3
 
@@ -43,4 +54,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/05786710/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140131/5590c2ae/attachment.sig>
