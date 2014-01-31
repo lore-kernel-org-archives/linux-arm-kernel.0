@@ -1,36 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 31 Jan 2014 10:50:40 -0500
-Subject: [PATCH] usb: dwc3: keystone: switch to use runtime pm
-In-Reply-To: <20140131154721.GD20736@saruman.home>
-References: <1391174426-13773-1-git-send-email-grygorii.strashko@ti.com>
- <20140131151955.GB20736@saruman.home> <52EBC499.2070302@ti.com>
- <20140131154721.GD20736@saruman.home>
-Message-ID: <52EBC650.50305@ti.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 31 Jan 2014 16:59:41 +0100
+Subject: Why are imprecise external aborts masked on recent kernel while
+ booting ?
+Message-ID: <52EBC86D.1010509@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 January 2014 10:47 AM, Felipe Balbi wrote:
-> On Fri, Jan 31, 2014 at 10:43:21AM -0500, Santosh Shilimkar wrote:
->> On Friday 31 January 2014 10:19 AM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Fri, Jan 31, 2014 at 03:20:26PM +0200, Grygorii Strashko wrote:
->>>> The Keystone PM management layer has been implemented using PM bus for
->>>> power management clocks. As result, most of Keystone drivers don't need
->>>> to manage clocks directly. They just need to enable runtime PM and use it
->>>> to handle their PM state and clocks.
->>>>
->>>> Hence, remove clock management code and switch to use runtime PM.
->>>>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>
->>> quite a few weeks back I sent a series enabling runtime pm for all glue
->>> layers. I'll use that version instead, sorry.
->>>
->> That should be fine but you need to drop clk_*() related code
->> from that patch. I assume you will send refresh version of it then.
-> 
-> why ? it makes no difference if you enable twice and disable twice.
-> 
-Sure but why do you want to have the clock node handling code in drivers
-if it is not needed. Isn't that better ?
+Hi all,
+
+I'm working on a PCIe driver that uses an "imprecise external abort" 
+handler to detect when a port is behind a switch.
+This mechanism is used when enumerating PCIe bus upon kernel boot.
+
+In prior kernel (3.4), I noticed it's possible to use an abort handler 
+registered by using hook_fault_code(16+6, ...);
+These aborts are detected and the relevant handler is called as long as 
+it is registered, when probing the bus.
+
+In more recent kernel (3.10), abort handler is no longer triggered 
+during kernel boot. At PCIe bus enumeration, imprecise aborts are not 
+enabled. It seems unmasked later when starting userland init process 
+(e.g. when CPSR.A bit on arm is cleared). Aborts are deferred until then.
+
+I found another thread that looks like similar :
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/208641.html
+
+I looked for where imprecise aborts were enabled on 3.4. I found out 
+that it was enabled when the first schedule() happens. More precisely in 
+kernel_thread_helper() when doing: "msr	cpsr_c, r7".
+There has been changes beetween 3.6 or 3.7, like in commit 
+9e14f828ee4a7a4a98703e380d180717a579fb35 (and others) that i believe 
+changes the behavior of unmasking CPSR.A bit. kernel_thread_helper has 
+been removed in that patch.
+
+Is it a desired change in recent kernels ?
+
+Is it possible to unmask imprecise data aborts earlier in the boot 
+process (e.g. before PCIe bus enumeration, when drivers are being probed) ?
+
+
+Best regards,
+Fabrice
