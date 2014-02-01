@@ -1,47 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat,  1 Feb 2014 16:35:43 -0600
-Subject: [PATCH 2/3] ARM: moxart: move DMA_OF selection to driver
-In-Reply-To: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
-References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1391294144-27787-3-git-send-email-robherring2@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 1 Feb 2014 23:56:45 +0100
+Subject: imx-drm: screen flickering
+In-Reply-To: <20140130074526.GQ16215@pengutronix.de>
+References: <CAH9NwWe673znThNPWRvOCyAU2o7M-oouHD7+1tyRcmWTeJ8YFw@mail.gmail.com>
+ <201401291553.15040.marex@denx.de> <20140130074526.GQ16215@pengutronix.de>
+Message-ID: <201402012356.45736.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Thursday, January 30, 2014 at 08:45:26 AM, Sascha Hauer wrote:
+> On Wed, Jan 29, 2014 at 03:53:14PM +0100, Marek Vasut wrote:
+> > On Wednesday, January 29, 2014 at 12:15:57 PM, Sascha Hauer wrote:
+> > > Hi Christian,
+> > > 
+> > > On Tue, Jan 28, 2014 at 09:11:32AM +0100, Christian Gmeiner wrote:
+> > > > Hi all.
+> > > > 
+> > > > From time to time it happens that my LVDS display is flickering (look
+> > > > at scroll bar in the video).
+> > > > https://drive.google.com/file/d/0B_fznDimUHVubWtvVFlMTkdBbUU/edit?usp
+> > > > =sha ring
+> > > > 
+> > > > I really want to find the root cause of it, but I do not know where
+> > > > to start. I can trigger this
+> > > > sometimes after xscreensever "blanks" the screen and the screensafer
+> > > > gets disabled
+> > > > via user input.
+> > > > 
+> > > > Any hints?
+> > > 
+> > > Sorry, no idea. Philipp and me watched the video, but we both haven't
+> > > seen something like this before.
+> > 
+> > Isn't it the clock polarity being inverted thing again [1]?
+> 
+> Could be, at least the result should look similar. I just wonder why it
+> only happens after a few times doing something. I would expect the clock
+> is always inverted then.
 
-Move the DMA_OF selection to the DMA driver to fix kconfig warning:
+I actually noticed a rather strange behavior when the clock polarity was 
+inverted as well. The flicker was not always there in my case either, but I used 
+parallel LCD .
 
-warning: (ARCH_MOXART) selects DMA_OF which has unmet direct dependencies (DMADEVICES && OF)
-
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm/mach-moxart/Kconfig | 1 -
- drivers/dma/Kconfig          | 1 +
- 2 files changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
-index ba470d6..3795ae2 100644
---- a/arch/arm/mach-moxart/Kconfig
-+++ b/arch/arm/mach-moxart/Kconfig
-@@ -2,7 +2,6 @@ config ARCH_MOXART
- 	bool "MOXA ART SoC" if ARCH_MULTI_V4T
- 	select CPU_FA526
- 	select ARM_DMA_MEM_BUFFERABLE
--	select DMA_OF
- 	select USE_OF
- 	select CLKSRC_OF
- 	select CLKSRC_MMIO
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 9bed1a2..605b016 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -346,6 +346,7 @@ config MOXART_DMA
- 	tristate "MOXART DMA support"
- 	depends on ARCH_MOXART
- 	select DMA_ENGINE
-+	select DMA_OF
- 	select DMA_VIRTUAL_CHANNELS
- 	help
- 	  Enable support for the MOXA ART SoC DMA controller.
--- 
-1.8.3.2
+Best regards,
+Marek Vasut
