@@ -1,50 +1,139 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 1 Feb 2014 15:14:47 -0500
-Subject: [PATCH] ARM: mm: Fix the memblock allocation for LPAE machines
-Message-ID: <1391285687-20534-1-git-send-email-santosh.shilimkar@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 1 Feb 2014 12:28:44 -0800
+Subject: [GIT PULL] ARM: SoC "fixes" for 3.14-rc1
+Message-ID: <20140201202844.GA12650@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ad6492b8 added much needed memblock_virt_alloc_low() and further
-commit 07bacb3 {memblock, bootmem: restore goal for alloc_low} fixed the
-issue with low memory limit thansk to Yinghai. But even after all these fixes,
-there is still one case where the limit check done with ARCH_LOW_ADDRESS_LIMIT
-for low memory fails. Russell pointed out the issue with 32 bit LPAE machines
-in below thread.
-	https://lkml.org/lkml/2014/1/28/364
+Hi Linus,
 
-Since on some LPAE machines where memory start address is beyond 4GB,
-the low memory marker in memblock will be set to default
-ARCH_LOW_ADDRESS_LIMIT which is wrong. We can fix this by letting
-architectures set the ARCH_LOW_ADDRESS_LIMIT using another export
-similar to memblock_set_current_limit() but am not sure whether
-its worth the trouble. Tell me if you think otherwise.
+See tag for branch contents. As you'll see, the commit dates are recent;
+we've mostly collected these fixes in the last few days but I also had
+to rebuild the branch yesterday to sort out some internal conflicts
+which reset the timestamps. The changes should have been tested by each
+platform maintainer already (and few of them have cross-platform impact)
+so I'm personally not too concerned by it at this time.
 
-Rather am just trying to fix that one broken case using memblock_virt_alloc()
-in setup code since the memblock.current_limit is updated appropriately
-makes it work on all ARM 32 bit machines.
+Please pull.
 
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Strashko, Grygorii <grygorii.strashko@ti.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/kernel/setup.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks!
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index b0df976..1e8b030 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -731,7 +731,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
- 	kernel_data.end     = virt_to_phys(_end - 1);
- 
- 	for_each_memblock(memory, region) {
--		res = memblock_virt_alloc_low(sizeof(*res), 0);
-+		res = memblock_virt_alloc(sizeof(*res), 0);
- 		res->name  = "System RAM";
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
--- 
-1.7.9.5
+
+-Olof
+
+The following changes since commit e7651b819e90da924991d727d3c007200a18670d:
+
+  Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/mason/linux-btrfs (2014-01-30 20:08:20 -0800)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to f39aa2753724215706d150fac5cb4a989793faef:
+
+  ARM: multi_v7_defconfig: remove redundant entries and re-enable TI_EDMA (2014-01-31 21:04:33 -0800)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.14-rc1
+
+Here's a set of patches for (hopefully) -rc1. Some of them are fixes,
+but a good number of them also do things such as enable new drivers in
+the defconfigs for platforms that have such devices, increases coverage
+of the multiplatform defconfig and some DTS changes that plumbs up some
+of the devices that now have bindings and driver support.
+
+----------------------------------------------------------------
+Arnaud Ebalard (1):
+      ARM: mvebu: fix compilation warning on Armada 370 (i.e. non-SMP)
+
+Barry Song (1):
+      MAINTAINERS: ARM: SiRF: use regex patterns to involve all SiRF drivers
+
+Ben Dooks (1):
+      ARM: shmobile: r8a7790.dtsi: ficx i2c[0-3] clock reference
+
+Ezequiel Garcia (1):
+      ARM: kirkwood: kirkwood_pm_init() should return void
+
+Fabio Estevam (1):
+      ARM: multi_v7_defconfig: Select CONFIG_AT803X_PHY
+
+Gregory CLEMENT (1):
+      ARM: mvebu: Fix kernel hang in mvebu_soc_id_init() when of_iomap failed
+
+Grygorii Strashko (1):
+      ARM: keystone: config: fix build warning when CONFIG_DMADEVICES is not set
+
+Linus Walleij (2):
+      ARM: integrator: restore static map on the CP
+      ARM: iop32x: fix power off handling for the EM7210 board
+
+Lorenzo Pieralisi (1):
+      drivers: bus: fix CCI driver kcalloc call parameters swap
+
+Nishanth Menon (1):
+      ARM: OMAP4+: move errata initialization to omap4_pm_init_early
+
+Olof Johansson (4):
+      Merge tag 'mvebu-fixes-3.13-2' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'renesas-dt-fixes2-for-v3.14' of git://git.kernel.org/.../horms/renesas into fixes
+      ARM: multi_v7_defconfig: add mvebu drivers
+      ARM: multi_v7_defconfig: remove redundant entries and re-enable TI_EDMA
+
+Rob Herring (1):
+      ARM: hisi: don't select SMP
+
+Sebastian Hesselbarth (1):
+      ARM: orion: provide C-style interrupt handler for MULTI_IRQ_HANDLER
+
+Soren Brinkmann (1):
+      ARM: dts: zynq: Add SDHCI nodes
+
+Stephen Boyd (2):
+      ARM: dts: msm: Add clock controller nodes and hook into uart
+      ARM: msm_defconfig: Enable MSM clock drivers
+
+Stephen Warren (2):
+      ARM: multi_v7: copy most options from tegra_defconfig
+      ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS
+
+Strashko, Grygorii (1):
+      ARM: OMAP4460: cpuidle: Extend PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
+
+Tim Kryger (2):
+      ARM: dts: bcm28155-ap: Fix Card Detection GPIO
+      clocksource: kona: Add basic use of external clock
+
+ MAINTAINERS                               |   9 +-
+ arch/arm/boot/dts/bcm28155-ap.dts         |   4 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts   |  11 +++
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts    |  18 ++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi       |  24 +++++
+ arch/arm/boot/dts/r8a7790.dtsi            |   8 +-
+ arch/arm/boot/dts/zynq-7000.dtsi          |  20 ++++
+ arch/arm/boot/dts/zynq-zc702.dts          |   4 +
+ arch/arm/boot/dts/zynq-zc706.dts          |   4 +
+ arch/arm/boot/dts/zynq-zed.dts            |   4 +
+ arch/arm/configs/keystone_defconfig       |   1 +
+ arch/arm/configs/msm_defconfig            |   4 +
+ arch/arm/configs/multi_v7_defconfig       | 154 ++++++++++++++++++++++++++++--
+ arch/arm/configs/tegra_defconfig          |  11 +--
+ arch/arm/mach-hisi/Kconfig                |   1 -
+ arch/arm/mach-integrator/integrator_cp.c  |   6 ++
+ arch/arm/mach-iop32x/em7210.c             |  32 ++++++-
+ arch/arm/mach-keystone/Kconfig            |   1 -
+ arch/arm/mach-kirkwood/pm.c               |   4 +-
+ arch/arm/mach-mvebu/mvebu-soc-id.c        |   2 +-
+ arch/arm/mach-omap2/common.h              |   7 ++
+ arch/arm/mach-omap2/cpuidle44xx.c         |  26 ++++-
+ arch/arm/mach-omap2/io.c                  |   1 +
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   3 +
+ arch/arm/mach-omap2/omap-smp.c            |   6 +-
+ arch/arm/mach-omap2/omap4-common.c        |   6 ++
+ arch/arm/mach-omap2/pm44xx.c              |  15 +++
+ arch/arm/plat-orion/irq.c                 |  47 +++++++++
+ drivers/bus/arm-cci.c                     |   2 +-
+ drivers/clocksource/bcm_kona_timer.c      |  14 ++-
+ drivers/irqchip/irq-armada-370-xp.c       |   4 +-
+ 31 files changed, 396 insertions(+), 57 deletions(-)
