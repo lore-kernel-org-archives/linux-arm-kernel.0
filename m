@@ -1,52 +1,52 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 1 Feb 2014 17:48:49 +0100
-Subject: [PATCH v3 3/5] ASoC: tda998x: add DT documentation of the tda998x
- CODEC
-In-Reply-To: <cover.1391274627.git.moinejf@free.fr>
-References: <cover.1391274627.git.moinejf@free.fr>
-Message-ID: <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 1 Feb 2014 17:38:41 +0000
+Subject: [PATCH 0/3] spi: core: Introduce devm_spi_alloc_master
+In-Reply-To: <20140131133111.GF2950@lukather>
+References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140131121215.GB22609@sirena.org.uk>
+ <20140131133111.GF2950@lukather>
+Message-ID: <20140201173841.GU22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT documentation of the NXP TDA998x CODEC.
+On Fri, Jan 31, 2014 at 02:31:11PM +0100, Maxime Ripard wrote:
+> On Fri, Jan 31, 2014 at 12:12:15PM +0000, Mark Brown wrote:
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+> > This seems confusing - the idea here is that if we've handed the device
+> > off to the managed function then the managed function deals with
+> > destroying it.  Note that spi_alloc_master() says that the put is only
+> > required after errors adding the device (which would be the expected
+> > behaviour if you look at other APIs).  Looking at the code I think there
+> > is an issue here but I'm not at all clear that this is the best fix.
 
-diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-index d7df01c..aa0d81b 100644
---- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-+++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-@@ -15,6 +15,17 @@ Optional properties:
-   - video-ports: 24 bits value which defines how the video controller
- 	output is wired to the TDA998x input - default: <0x230145>
- 
-+Optional subnodes:
-+
-+	- codec: audio CODEC
-+
-+Required codec subnode properties:
-+	- compatible: must be "nxp,tda998x-codec".
-+	- audio-ports: one or two values corresponding to entries in
-+		the audio-port-names property.
-+	- audio-port-names: must contain "i2s", "spdif" entries
-+		matching entries in the audio-ports property.
-+
- Example:
- 
- 	tda998x: hdmi-encoder {
-@@ -24,4 +35,10 @@ Example:
- 		interrupts = <27 2>;		/* falling edge */
- 		pinctrl-0 = <&pmx_camera>;
- 		pinctrl-names = "default";
-+			hdmi_codec: codec {
-+			compatible = "nxp,tda998x-codec";
-+			audio-ports = <0x03>, <0x04>;
-+			audio-port-names = "i2s", "spdif";
-+			#sound-dai-cells = <1>;
-+		};
- 	};
--- 
-1.9.rc1
+> Ah, right, spi_master_put doesn't free the memory either...
+
+The memory is freed by the driver core calling the spi_master_release()
+callback when it's safe to do so (after the last reference to the device
+has gone away).
+
+> I guess we have a few choices here, either:
+>   - Add a devm_kzalloc to spi_alloc_master, since most of the drivers
+>     I've been looking at fail to free the memory, this would be the
+>     least intrusive solution. We'd still have to remove all the kfree
+>     calls in the driver that rightfully free the memory.
+>   - Make devm_unregister_master also call kfree on the master
+>   - Add a kfree to my devm_put_master so that the memory is reclaimed,
+>     which isn't the case for now.
+
+> I don't have a strong preference here, maybe for the third one, since
+> it makes obvious that it's managed and you don't have to do anything
+> about it, while the other do not.
+
+None of the above, definitely nothing to do with calling kfree() once
+the device is registered.  We already have that free, it's not the
+issue.  The issue is making sure that we hold references when we need
+them and drop them when we don't.  I (or someone) needs to sit down and
+think it through since things are a bit confused in the code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140201/40180c68/attachment.sig>
