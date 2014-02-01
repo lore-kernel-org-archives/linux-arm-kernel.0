@@ -1,34 +1,70 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 31 Jan 2014 16:23:54 -0800
-Subject: [PATCH] arm64: Align CMA sizes to PAGE_SIZE
-Message-ID: <1391214234-23526-1-git-send-email-lauraa@codeaurora.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 31 Jan 2014 17:49:25 -0800
+Subject: [PATCH] clk: Fix notifier documentation
+In-Reply-To: <1390420117-25930-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1390420117-25930-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <57c43634-23a6-4dcf-8aff-f49961d7f4d6@TX2EHSMHS005.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_alloc_from_contiguous takes number of pages for a size.
-Align up the dma size passed in to page size to avoid truncation
-and allocation failures on sizes less than PAGE_SIZE.
+ping?
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/mm/dma-mapping.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 864b256..be2696e 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -44,6 +44,8 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
- 		flags |= GFP_DMA32;
- 	if (IS_ENABLED(CONFIG_CMA)) {
- 		unsigned long pfn;
-+
-+		size = PAGE_ALIGN(size);
- 		pfn = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
- 							get_order(size));
- 		if (!pfn)
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+On Wed, Jan 22, 2014 at 11:48:37AM -0800, Soren Brinkmann wrote:
+> Contradicting to documenation, the notifier callbacks do receive
+> the original clock rate in struct clk_notifier_data.old_rate and the new
+> frequency struct clk_notifier_data.new_rate, independent of the
+> notification reason.
+> 
+> This behavior also seems to make more sense, since callbacks can use the
+> same code to deterimine whether clocks are scaled up or down. Something
+> which would not even possible in the post-rate-change case if the
+> behavior was as documented.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> Hi Mike,
+> 
+> I am working with some clock notifiers and if my results are correct the
+> notifiers behave differently from how they are documented.
+> I think the actual behavior makes more sense than the documented and my original
+> plan was to change the behavior, but it seems I might get away with a
+> doc-update.
+> 
+> 	Thanks,
+> 	S?ren
+> 
+>  drivers/clk/clk.c | 15 +++------------
+>  1 file changed, 3 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 2cf2ea6b77a1..26825db03e64 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1983,20 +1983,11 @@ EXPORT_SYMBOL_GPL(devm_clk_unregister);
+>   * re-enter into the clk framework by calling any top-level clk APIs;
+>   * this will cause a nested prepare_lock mutex.
+>   *
+> - * Pre-change notifier callbacks will be passed the current, pre-change
+> - * rate of the clk via struct clk_notifier_data.old_rate.  The new,
+> - * post-change rate of the clk is passed via struct
+> + * In all notification cases cases (pre, post and abort rate change) the
+> + * original clock rate is passed to the callback via struct
+> + * clk_notifier_data.old_rate and the new frequency is passed via struct
+>   * clk_notifier_data.new_rate.
+>   *
+> - * Post-change notifiers will pass the now-current, post-change rate of
+> - * the clk in both struct clk_notifier_data.old_rate and struct
+> - * clk_notifier_data.new_rate.
+> - *
+> - * Abort-change notifiers are effectively the opposite of pre-change
+> - * notifiers: the original pre-change clk rate is passed in via struct
+> - * clk_notifier_data.new_rate and the failed post-change rate is passed
+> - * in via struct clk_notifier_data.old_rate.
+> - *
+>   * clk_notifier_register() must be called from non-atomic context.
+>   * Returns -EINVAL if called with null arguments, -ENOMEM upon
+>   * allocation failure; otherwise, passes along the return value of
+> -- 
+> 1.8.5.3
+> 
+> 
