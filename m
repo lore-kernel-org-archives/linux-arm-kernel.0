@@ -1,51 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat,  1 Feb 2014 16:35:44 -0600
-Subject: [PATCH 3/3] ARM: fix HAVE_ARM_TWD selection for OMAP and shmobile
+Date: Sat,  1 Feb 2014 16:35:43 -0600
+Subject: [PATCH 2/3] ARM: moxart: move DMA_OF selection to driver
 In-Reply-To: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
 References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1391294144-27787-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1391294144-27787-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-The selection of HAVE_ARM_TWD for OMAP and shmobile depend on LOCAL_TIMER
-which no longer exists. They should depend on SMP instead.
+Move the DMA_OF selection to the DMA driver to fix kconfig warning:
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
+warning: (ARCH_MOXART) selects DMA_OF which has unmet direct dependencies (DMADEVICES && OF)
+
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/mach-omap2/Kconfig    | 2 +-
- arch/arm/mach-shmobile/Kconfig | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-moxart/Kconfig | 1 -
+ drivers/dma/Kconfig          | 1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 653b489..e2ce4f8 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -54,7 +54,7 @@ config SOC_OMAP5
- 	select ARM_GIC
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select HAVE_ARM_ARCH_TIMER
- 	select ARM_ERRATA_798181 if SMP
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 3386406..05fa505 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select ARM_GIC
- 	select MIGHT_HAVE_CACHE_L2X0
+diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
+index ba470d6..3795ae2 100644
+--- a/arch/arm/mach-moxart/Kconfig
++++ b/arch/arm/mach-moxart/Kconfig
+@@ -2,7 +2,6 @@ config ARCH_MOXART
+ 	bool "MOXA ART SoC" if ARCH_MULTI_V4T
+ 	select CPU_FA526
+ 	select ARM_DMA_MEM_BUFFERABLE
+-	select DMA_OF
+ 	select USE_OF
+ 	select CLKSRC_OF
+ 	select CLKSRC_MMIO
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 9bed1a2..605b016 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -346,6 +346,7 @@ config MOXART_DMA
+ 	tristate "MOXART DMA support"
+ 	depends on ARCH_MOXART
+ 	select DMA_ENGINE
++	select DMA_OF
+ 	select DMA_VIRTUAL_CHANNELS
+ 	help
+ 	  Enable support for the MOXA ART SoC DMA controller.
 -- 
 1.8.3.2
