@@ -1,61 +1,52 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Sat, 01 Feb 2014 21:23:16 +1030
-Subject: [PATCH] Detect section mismatches in thumb relocations
-In-Reply-To: <1391193193-28572-1-git-send-email-dave.long@linaro.org>
-References: <1391193193-28572-1-git-send-email-dave.long@linaro.org>
-Message-ID: <8738k35ckj.fsf@rustcorp.com.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 1 Feb 2014 12:13:59 +0100
+Subject: [PATCH v2 00/21] pinctrl: mvebu: restructure and remove
+ hardcoded addresses from Dove pinctrl
+In-Reply-To: <52EB080A.2020200@gmail.com>
+References: <1390674856-4993-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140130182925.GM10864@lunn.ch> <52EA9EFA.1030609@gmail.com>
+ <20140130202500.GN10864@lunn.ch> <52EB080A.2020200@gmail.com>
+Message-ID: <20140201111359.GE26003@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Long <dave.long@linaro.org> writes:
-> From: "David A. Long" <dave.long@linaro.org>
->
-> Add processing for normally encountered thumb relocation types so that
-> section mismatches will be detected.
->
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+On Fri, Jan 31, 2014 at 03:18:50AM +0100, Sebastian Hesselbarth wrote:
+> On 01/30/2014 09:25 PM, Andrew Lunn wrote:
+> >On Thu, Jan 30, 2014 at 07:50:34PM +0100, Sebastian Hesselbarth wrote:
+> >>On 01/30/2014 07:29 PM, Andrew Lunn wrote:
+> >>>On Tue, Jan 28, 2014 at 01:39:12AM +0100, Sebastian Hesselbarth wrote:
+> >>>>This patch set is one required step for Dove to hop into mach-mvebu.
+> >>>>Until now, pinctrl-dove was hardcoding some registers that do not
+> >>>>directly belong to MPP core registers. This is not compatible with
+> >>>>what we want for mach-mvebu.
+> >>>
+> >>>I think there might be something wrong here....
+> >>
+> >>There _is_ something wrong. I'll have a look at it. For the record,
+> >>what SoC are you testing with? From the base address, I guess it is
+> >>Kirkwood?
+> >
+> >Yes, Kirkwood. Sorry for not saying.
+> 
+> This time I push a branch before sending out the patches. Also, I
+> think I'll postpone removal of hardcoded addresses until this is
+> sorted out. The patch set was growing way to quick and I have to
+> do this step-by-step for me and everybody else to actually understand ;)
+> 
+> So, at least the MVEBU guys should test the following branch on
+> their SoCs. Again, I have tested Dove and now confirmed that settings
+> are still correct. The others are compile-tested.
+> 
+> https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v3
 
-Happiest for this to go through an ARM tree, so:
+Hi Sebastian
 
-Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+Tested on Kirkwood. /debug/pinctrl is now identical with and without
+the patch.
 
-Cheers,
-Rusty.
+I've not looked at the actual patches, but please add a 
 
-> ---
->  scripts/mod/modpost.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->
-> diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
-> index 1785576..9e6c996 100644
-> --- a/scripts/mod/modpost.c
-> +++ b/scripts/mod/modpost.c
-> @@ -1498,6 +1498,16 @@ static int addend_386_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
->  #define R_ARM_JUMP24	29
->  #endif
->  
-> +#ifndef	R_ARM_THM_CALL
-> +#define	R_ARM_THM_CALL		10
-> +#endif
-> +#ifndef	R_ARM_THM_JUMP24
-> +#define	R_ARM_THM_JUMP24	30
-> +#endif
-> +#ifndef	R_ARM_THM_JUMP19
-> +#define	R_ARM_THM_JUMP19	51
-> +#endif
-> +
->  static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
->  {
->  	unsigned int r_typ = ELF_R_TYPE(r->r_info);
-> @@ -1511,6 +1521,9 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
->  	case R_ARM_PC24:
->  	case R_ARM_CALL:
->  	case R_ARM_JUMP24:
-> +	case R_ARM_THM_CALL:
-> +	case R_ARM_THM_JUMP24:
-> +	case R_ARM_THM_JUMP19:
->  		/* From ARM ABI: ((S + A) | T) - P */
->  		r->r_addend = (int)(long)(elf->hdr +
->  		              sechdr->sh_offset +
-> -- 
-> 1.8.1.2
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+	   Andrew
