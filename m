@@ -1,52 +1,99 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 1 Feb 2014 17:38:41 +0000
-Subject: [PATCH 0/3] spi: core: Introduce devm_spi_alloc_master
-In-Reply-To: <20140131133111.GF2950@lukather>
-References: <1391163792-21819-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140131121215.GB22609@sirena.org.uk>
- <20140131133111.GF2950@lukather>
-Message-ID: <20140201173841.GU22609@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 01 Feb 2014 18:55:42 +0100
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio
+ A701
+References: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+ <87zjn9v7xx.fsf@free.fr> <87txd8vka8.fsf@free.fr>
+ <87ha8y76rn.fsf@free.fr>
+Message-ID: <87k3deiuox.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 02:31:11PM +0100, Maxime Ripard wrote:
-> On Fri, Jan 31, 2014 at 12:12:15PM +0000, Mark Brown wrote:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>> Hi Arnd,
+>>
+>> I cannot reach Haojian, and my platform is currently screen-broken without
+>> Thierry's patch (see [1] and [2]). I'm trying to have it since -rc6, with no luck.
+... zip ...
 
-> > This seems confusing - the idea here is that if we've handed the device
-> > off to the managed function then the managed function deals with
-> > destroying it.  Note that spi_alloc_master() says that the put is only
-> > required after errors adding the device (which would be the expected
-> > behaviour if you look at other APIs).  Looking at the code I think there
-> > is an issue here but I'm not at all clear that this is the best fix.
+Hi Eric and Russell,
 
-> Ah, right, spi_master_put doesn't free the memory either...
+Since more than a month I've been trying to have a fix applied in the PXA tree,
+since v3.13-rc6. I cannot reach Haojian, and Arnd seems unresponsive too.
 
-The memory is freed by the driver core calling the spi_master_release()
-callback when it's safe to do so (after the last reference to the device
-has gone away).
+The history mails are in [1], the patch in [2].
 
-> I guess we have a few choices here, either:
->   - Add a devm_kzalloc to spi_alloc_master, since most of the drivers
->     I've been looking at fail to free the memory, this would be the
->     least intrusive solution. We'd still have to remove all the kfree
->     calls in the driver that rightfully free the memory.
->   - Make devm_unregister_master also call kfree on the master
->   - Add a kfree to my devm_put_master so that the memory is reclaimed,
->     which isn't the case for now.
+Your are the 2 other maintainers of the PXA tree, Could you please help me ?
 
-> I don't have a strong preference here, maybe for the third one, since
-> it makes obvious that it's managed and you don't have to do anything
-> about it, while the other do not.
+Cheers.
 
-None of the above, definitely nothing to do with calling kfree() once
-the device is registered.  We already have that free, it's not the
-issue.  The issue is making sure that we hold references when we need
-them and drop them when we don't.  I (or someone) needs to sit down and
-think it through since things are a bit confused in the code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140201/40180c68/attachment.sig>
+--
+Robert
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/223116.html
+
+
+[2]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221013.html
+
+---8>---
+
+From: Thierry Reding <thierry.reding@gmail.com>
+Subject: [PATCH] ARM: pxa: Add dummy backlight power supply on Mitac Mio A701
+To: Haojian Zhuang <haojian.zhuang@gmail.com>, Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: linux-pwm at vger.kernel.org, linux-arm-kernel at lists.infradead.org
+Date: Fri, 20 Dec 2013 10:46:52 +0100 (6 weeks, 1 day, 8 hours ago)
+Message-Id: <1387532812-11742-1-git-send-email-thierry.reding@gmail.com>
+X-Mailer: git-send-email 1.8.4.2
+
+Recent changes to the pwm-backlight driver have made the power supply
+mandatory. There is code in the regulator core to deal with situations
+where no regulator is specified and provide a dummy, but that works on
+DT-based boards only.
+
+The situation can be remedied by adding a dummy regulator during board
+initialization.
+
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+---
+ arch/arm/mach-pxa/mioa701.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index f70583fee59f..29997bde277d 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -38,6 +38,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/reboot.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/regulator/max1586.h>
+ #include <linux/slab.h>
+ #include <linux/i2c/pxa-i2c.h>
+@@ -714,6 +715,10 @@ static struct gpio global_gpios[] = {
+ 	{ GPIO56_MT9M111_nOE, GPIOF_OUT_INIT_LOW, "Camera nOE" },
+ };
+ 
++static struct regulator_consumer_supply fixed_5v0_consumers[] = {
++	REGULATOR_SUPPLY("power", "pwm-backlight"),
++};
++
+ static void __init mioa701_machine_init(void)
+ {
+ 	int rc;
+@@ -753,6 +758,10 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_i2c_info(&i2c_pdata);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_camera_info(&mioa701_pxacamera_platform_data);
++
++	regulator_register_always_on(0, "fixed-5.0V", fixed_5v0_consumers,
++				     ARRAY_SIZE(fixed_5v0_consumers),
++				     5000000);
+ }
+ 
+ static void mioa701_machine_exit(void)
+-- 
+1.8.4.2
