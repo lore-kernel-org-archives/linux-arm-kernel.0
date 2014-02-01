@@ -1,51 +1,41 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Sat, 1 Feb 2014 22:51:40 +0100
-Subject: [PATCH v7 0/7] ARM: rockchip: add smp functionality
-In-Reply-To: <13010296.nzTT2PqdSR@phil>
-References: <4970034.fqvMoHdOyd@phil>
- <13010296.nzTT2PqdSR@phil>
-Message-ID: <20140201215140.GA1375@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 1 Feb 2014 16:24:23 -0600
+Subject: [PATCH] ARM: hisi: don't select SMP
+In-Reply-To: <CAOesGMgQG=ozUDZzp2Pu7uLt3EZRxaBM-kO3XZJ0y+RDdaLqeA@mail.gmail.com>
+References: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
+ <20140131225116.GA6284@quad.lixom.net>
+ <CAL_JsqJPVDQ1_gpMKWxMpUYcU0HyedrNvOsu0qa2gZnXnDUHbA@mail.gmail.com>
+ <CAOesGMgQG=ozUDZzp2Pu7uLt3EZRxaBM-kO3XZJ0y+RDdaLqeA@mail.gmail.com>
+Message-ID: <CAL_JsqJqPMLaL=8rwayJhKbZu+nLXozpTiATc9OvZv6JLNkOgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Sat, Feb 1, 2014 at 10:43 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Feb 1, 2014 at 7:52 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Fri, Jan 31, 2014 at 4:51 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Fri, Jan 31, 2014 at 04:06:30PM -0600, Rob Herring wrote:
+>>>> From: Rob Herring <robh@kernel.org>
+>>>>
+>>>> SMP is a user configurable option, not a hardware feature and should not
+>>>> be selected.
+>>>>
+>>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>>
+>>> Yep, you're right. applied to fixes.
+>>
+>> After doing some randconfig builds I found HAVE_ARM_TWD and
+>> HAVE_ARM_SCU need to have "if SMP" added here. I also found OMAP and
+>> SH-Mobile are still using LOCAL_TIMER which has been gone for a year.
+>> I guess everyone tests with other platforms enabled or don't notice
+>> they are using broadcast timer. Patch is coming.
+>
+> Yep, I noticed the same yesterday but please send the patch over and
+> I'll apply it before sending up the current batch.
+>
+> The OMAP platform that uses LOCAL_TIMER is OMAP5, and 5 isn't
+> functional in mainline yet -- I can guarantee you that nobody is
+> testing it. :(
 
-On Fri, Jan 31, 2014 at 11:03:03PM +0100, Heiko St?bner wrote:
-> On Monday, 20. January 2014 16:41:43 Heiko St?bner wrote:
-> > This series enables the use of the additional cores on Rockchip
-> > Cortex-A9 SoCs.
-> 
-> So, two weeks without any general complaints, but I guess part of the more 
-> general patches could use an ack.
-> 
-> Going forward, what would be best way to merge them?
-> As one pull request to arm-soc, or for example splitting them into the first 
-> three patches going through the misc tree and the rockchip specific stuff going 
-> through arm-soc? Or something else altogether?
-> 
-> 
-> > Heiko Stuebner (7):
-> >   of: add functions to count number of elements in a property
-> 
-> One of the intermediate versions of this patch got a
-> 	Reviewed-by: Mark Rutland <mark.rutland@arm.com> .
-> Mark, is this still true for this variant addressing some additional wished 
-> from Rob?
-> 
-> And this final version got a "Looks good" from Rob Herring in the original 
-> thread, but a more formal "ack" might be nice :-) .
-> 
-> 
-> >   dt-bindings: sram: describe option to reserve parts of the memory
-> >   misc: sram: implement mmio-sram-reserved option
-> 
-> Philipp, you acked an intermediate version, and this v7 now should also 
-> contain the two separate loops (1st gathering data and 2nd creating the pool 
-> parts) you asked for.
-> 
-> Could I persuade you to take a look again?
+Actually that is needed for OMAP4 as ARM_TWD is the Cortex-A9 timers.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-regards
-Philipp
+Rob
