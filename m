@@ -1,48 +1,61 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  1 Jan 2014 08:25:01 +0400
-Subject: [PATCH] ARM: i.MX51: Fix IOMUX settings
-Message-ID: <1388550301-31215-1-git-send-email-shc_work@mail.ru>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Sat, 01 Feb 2014 21:23:16 +1030
+Subject: [PATCH] Detect section mismatches in thumb relocations
+In-Reply-To: <1391193193-28572-1-git-send-email-dave.long@linaro.org>
+References: <1391193193-28572-1-git-send-email-dave.long@linaro.org>
+Message-ID: <8738k35ckj.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix daisy channel settings for MX51_PAD_EIM_D26__UART3_TXD and
-MX51_PAD_AUD3_BB_FS__UART3_TXD pads. Add missing SION bit for W1 pad.
+David Long <dave.long@linaro.org> writes:
+> From: "David A. Long" <dave.long@linaro.org>
+>
+> Add processing for normally encountered thumb relocation types so that
+> section mismatches will be detected.
+>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/iomux-mx51.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Happiest for this to go through an ARM tree, so:
 
-diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
-index 75bbcc4..e370c98 100644
---- a/arch/arm/mach-imx/iomux-mx51.h
-+++ b/arch/arm/mach-imx/iomux-mx51.h
-@@ -111,7 +111,7 @@
- #define MX51_PAD_EIM_D26__EIM_D26		IOMUX_PAD(0x418, 0x084, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__KEY_COL7		IOMUX_PAD(0x418, 0x084, 1, 0x9cc, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__UART2_RTS		IOMUX_PAD(0x418, 0x084, 4, 0x9e8, 3, MX51_UART_PAD_CTRL)
--#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, __NA_, 0, MX51_UART_PAD_CTRL)
-+#define MX51_PAD_EIM_D26__UART3_TXD		IOMUX_PAD(0x418, 0x084, 3, 0x9f4, 1, MX51_UART_PAD_CTRL)
- #define MX51_PAD_EIM_D26__USBOTG_DATA2		IOMUX_PAD(0x418, 0x084, 2, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D26__GPT_CMPOUT2		IOMUX_PAD(0x418, 0x084, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_D27__AUD6_RXC		IOMUX_PAD(0x41c, 0x088, 5, 0x8f4, 0, NO_PAD_CTRL)
-@@ -451,7 +451,7 @@
- #define MX51_PAD_AUD3_BB_CK__GPIO4_20		IOMUX_PAD(0x5f8, 0x208, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_AUD3_BB_FS__AUD3_TXFS		IOMUX_PAD(0x5fc, 0x20c, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_AUD3_BB_FS__GPIO4_21		IOMUX_PAD(0x5fc, 0x20c, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, __NA_, 0, MX51_UART_PAD_CTRL)
-+#define MX51_PAD_AUD3_BB_FS__UART3_TXD		IOMUX_PAD(0x5fc, 0x20c, 1, 0x9f4, 3, MX51_UART_PAD_CTRL)
- #define MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	IOMUX_PAD(0x600, 0x210, 0, __NA_, 0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_CSPI1_MOSI__GPIO4_22		IOMUX_PAD(0x600, 0x210, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_CSPI1_MOSI__I2C1_SDA		IOMUX_PAD(0x600, 0x210, 0x11, 0x9b4, 1, MX51_I2C_PAD_CTRL)
-@@ -494,7 +494,7 @@
- #define MX51_PAD_UART3_TXD__UART1_DSR		IOMUX_PAD(0x634, 0x244, 0, __NA_, 0, MX51_UART_PAD_CTRL)
- #define MX51_PAD_UART3_TXD__UART3_TXD		IOMUX_PAD(0x634, 0x244, 1, __NA_, 0, MX51_UART_PAD_CTRL)
- #define MX51_PAD_OWIRE_LINE__GPIO1_24		IOMUX_PAD(0x638, 0x248, 3, __NA_, 0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0, __NA_, 0, NO_PAD_CTRL)
-+#define MX51_PAD_OWIRE_LINE__OWIRE_LINE		IOMUX_PAD(0x638, 0x248, 0x10, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_OWIRE_LINE__SPDIF_OUT		IOMUX_PAD(0x638, 0x248, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_KEY_ROW0__KEY_ROW0		IOMUX_PAD(0x63c, 0x24c, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX51_PAD_KEY_ROW1__KEY_ROW1		IOMUX_PAD(0x640, 0x250, 0, __NA_, 0, NO_PAD_CTRL)
--- 
-1.8.3.2
+Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+
+Cheers,
+Rusty.
+
+> ---
+>  scripts/mod/modpost.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
+> index 1785576..9e6c996 100644
+> --- a/scripts/mod/modpost.c
+> +++ b/scripts/mod/modpost.c
+> @@ -1498,6 +1498,16 @@ static int addend_386_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+>  #define R_ARM_JUMP24	29
+>  #endif
+>  
+> +#ifndef	R_ARM_THM_CALL
+> +#define	R_ARM_THM_CALL		10
+> +#endif
+> +#ifndef	R_ARM_THM_JUMP24
+> +#define	R_ARM_THM_JUMP24	30
+> +#endif
+> +#ifndef	R_ARM_THM_JUMP19
+> +#define	R_ARM_THM_JUMP19	51
+> +#endif
+> +
+>  static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+>  {
+>  	unsigned int r_typ = ELF_R_TYPE(r->r_info);
+> @@ -1511,6 +1521,9 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+>  	case R_ARM_PC24:
+>  	case R_ARM_CALL:
+>  	case R_ARM_JUMP24:
+> +	case R_ARM_THM_CALL:
+> +	case R_ARM_THM_JUMP24:
+> +	case R_ARM_THM_JUMP19:
+>  		/* From ARM ABI: ((S + A) | T) - P */
+>  		r->r_addend = (int)(long)(elf->hdr +
+>  		              sechdr->sh_offset +
+> -- 
+> 1.8.1.2
