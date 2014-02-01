@@ -1,43 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 01 Feb 2014 22:30:00 +0400
-Subject: [PATCH v3 3/5] ASoC: tda998x: add DT documentation of the tda998x
- CODEC
-In-Reply-To: <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
-References: <cover.1391274627.git.moinejf@free.fr>
- <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
-Message-ID: <52ED3D28.7020709@cogentembedded.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 1 Feb 2014 15:14:47 -0500
+Subject: [PATCH] ARM: mm: Fix the memblock allocation for LPAE machines
+Message-ID: <1391285687-20534-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Commit ad6492b8 added much needed memblock_virt_alloc_low() and further
+commit 07bacb3 {memblock, bootmem: restore goal for alloc_low} fixed the
+issue with low memory limit thansk to Yinghai. But even after all these fixes,
+there is still one case where the limit check done with ARCH_LOW_ADDRESS_LIMIT
+for low memory fails. Russell pointed out the issue with 32 bit LPAE machines
+in below thread.
+	https://lkml.org/lkml/2014/1/28/364
 
-On 01-02-2014 20:48, Jean-Francois Moine wrote:
+Since on some LPAE machines where memory start address is beyond 4GB,
+the low memory marker in memblock will be set to default
+ARCH_LOW_ADDRESS_LIMIT which is wrong. We can fix this by letting
+architectures set the ARCH_LOW_ADDRESS_LIMIT using another export
+similar to memblock_set_current_limit() but am not sure whether
+its worth the trouble. Tell me if you think otherwise.
 
-> This patch adds the DT documentation of the NXP TDA998x CODEC.
+Rather am just trying to fix that one broken case using memblock_virt_alloc()
+in setup code since the memblock.current_limit is updated appropriately
+makes it work on all ARM 32 bit machines.
 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->   Documentation/devicetree/bindings/drm/i2c/tda998x.txt | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
+Cc: Yinghai Lu <yinghai@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Strashko, Grygorii <grygorii.strashko@ti.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/kernel/setup.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> diff --git a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-> index d7df01c..aa0d81b 100644
-> --- a/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-> +++ b/Documentation/devicetree/bindings/drm/i2c/tda998x.txt
-[...]
-> @@ -24,4 +35,10 @@ Example:
->   		interrupts = <27 2>;		/* falling edge */
->   		pinctrl-0 = <&pmx_camera>;
->   		pinctrl-names = "default";
-> +			hdmi_codec: codec {
-
-    This line is indented too far to the right.
-
-> +			compatible = "nxp,tda998x-codec";
-> +			audio-ports = <0x03>, <0x04>;
-> +			audio-port-names = "i2s", "spdif";
-> +			#sound-dai-cells = <1>;
-> +		};
->   	};
-
-WBR, Sergei
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index b0df976..1e8b030 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -731,7 +731,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+ 	for_each_memblock(memory, region) {
+-		res = memblock_virt_alloc_low(sizeof(*res), 0);
++		res = memblock_virt_alloc(sizeof(*res), 0);
+ 		res->name  = "System RAM";
+ 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+ 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+-- 
+1.7.9.5
