@@ -1,41 +1,33 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 1 Feb 2014 16:24:23 -0600
-Subject: [PATCH] ARM: hisi: don't select SMP
-In-Reply-To: <CAOesGMgQG=ozUDZzp2Pu7uLt3EZRxaBM-kO3XZJ0y+RDdaLqeA@mail.gmail.com>
-References: <1391205990-22506-1-git-send-email-robherring2@gmail.com>
- <20140131225116.GA6284@quad.lixom.net>
- <CAL_JsqJPVDQ1_gpMKWxMpUYcU0HyedrNvOsu0qa2gZnXnDUHbA@mail.gmail.com>
- <CAOesGMgQG=ozUDZzp2Pu7uLt3EZRxaBM-kO3XZJ0y+RDdaLqeA@mail.gmail.com>
-Message-ID: <CAL_JsqJqPMLaL=8rwayJhKbZu+nLXozpTiATc9OvZv6JLNkOgQ@mail.gmail.com>
+Date: Sat,  1 Feb 2014 16:35:41 -0600
+Subject: [PATCH 0/3] kconfig selection fixes
+Message-ID: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 1, 2014 at 10:43 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Feb 1, 2014 at 7:52 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On Fri, Jan 31, 2014 at 4:51 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Fri, Jan 31, 2014 at 04:06:30PM -0600, Rob Herring wrote:
->>>> From: Rob Herring <robh@kernel.org>
->>>>
->>>> SMP is a user configurable option, not a hardware feature and should not
->>>> be selected.
->>>>
->>>> Signed-off-by: Rob Herring <robh@kernel.org>
->>>
->>> Yep, you're right. applied to fixes.
->>
->> After doing some randconfig builds I found HAVE_ARM_TWD and
->> HAVE_ARM_SCU need to have "if SMP" added here. I also found OMAP and
->> SH-Mobile are still using LOCAL_TIMER which has been gone for a year.
->> I guess everyone tests with other platforms enabled or don't notice
->> they are using broadcast timer. Patch is coming.
->
-> Yep, I noticed the same yesterday but please send the patch over and
-> I'll apply it before sending up the current batch.
->
-> The OMAP platform that uses LOCAL_TIMER is OMAP5, and 5 isn't
-> functional in mainline yet -- I can guarantee you that nobody is
-> testing it. :(
+From: Rob Herring <robh@kernel.org>
 
-Actually that is needed for OMAP4 as ARM_TWD is the Cortex-A9 timers.
+Olof,
+
+Here are a few kconfig select fixes. The first one can be squashed into
+my previous patch for HiSilicon removing SMP select if you want to. 
+
+I'm still looking into the cpufreq select issue with highbank. I'll
+follow-up with Viresh on that.
 
 Rob
+
+Rob Herring (3):
+  ARM: hisi: fix kconfig warning on HAVE_ARM_TWD
+  ARM: moxart: move DMA_OF selection to driver
+  ARM: fix HAVE_ARM_TWD selection for OMAP and shmobile
+
+ arch/arm/mach-hisi/Kconfig     | 2 +-
+ arch/arm/mach-moxart/Kconfig   | 1 -
+ arch/arm/mach-omap2/Kconfig    | 2 +-
+ arch/arm/mach-shmobile/Kconfig | 2 +-
+ drivers/dma/Kconfig            | 1 +
+ 5 files changed, 4 insertions(+), 4 deletions(-)
+
+-- 
+1.8.3.2
