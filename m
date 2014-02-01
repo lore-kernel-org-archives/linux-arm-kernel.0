@@ -1,33 +1,36 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat,  1 Feb 2014 16:35:41 -0600
-Subject: [PATCH 0/3] kconfig selection fixes
-Message-ID: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
+Date: Sat,  1 Feb 2014 16:35:42 -0600
+Subject: [PATCH 1/3] ARM: hisi: fix kconfig warning on HAVE_ARM_TWD
+In-Reply-To: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
+References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1391294144-27787-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Olof,
+Commit "ARM: hisi: don't select SMP" introduced a kconfig warning:
+warning: (ARCH_HI3xxx) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
 
-Here are a few kconfig select fixes. The first one can be squashed into
-my previous patch for HiSilicon removing SMP select if you want to. 
+Fix HAVE_ARM_TWD to depend on SMP.
 
-I'm still looking into the cpufreq select issue with highbank. I'll
-follow-up with Viresh on that.
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ arch/arm/mach-hisi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rob
-
-Rob Herring (3):
-  ARM: hisi: fix kconfig warning on HAVE_ARM_TWD
-  ARM: moxart: move DMA_OF selection to driver
-  ARM: fix HAVE_ARM_TWD selection for OMAP and shmobile
-
- arch/arm/mach-hisi/Kconfig     | 2 +-
- arch/arm/mach-moxart/Kconfig   | 1 -
- arch/arm/mach-omap2/Kconfig    | 2 +-
- arch/arm/mach-shmobile/Kconfig | 2 +-
- drivers/dma/Kconfig            | 1 +
- 5 files changed, 4 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 8f4649b..1abae5f 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -8,7 +8,7 @@ config ARCH_HI3xxx
+ 	select CLKSRC_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU
+-	select HAVE_ARM_TWD
++	select HAVE_ARM_TWD if SMP
+ 	select HAVE_SMP
+ 	select PINCTRL
+ 	select PINCTRL_SINGLE
 -- 
 1.8.3.2
