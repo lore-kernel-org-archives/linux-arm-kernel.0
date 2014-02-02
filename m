@@ -1,52 +1,82 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Feb 2014 17:57:36 +0000
-Subject: [PATCH v5 09/23] drm/i2c: tda998x: don't read write-only registers
-In-Reply-To: <20140202184512.7fa2e3cf@armhf>
+Date: Sun, 2 Feb 2014 18:04:34 +0000
+Subject: [PATCH v5 00/23]
+In-Reply-To: <20140202124358.GD26684@n2100.arm.linux.org.uk>
 References: <cover.1390986082.git.moinejf@free.fr>
- <5269e596e16dfe40253dce38ceb0dc4a617384c1.1390986083.git.moinejf@free.fr>
- <20140202162309.GF26684@n2100.arm.linux.org.uk>
- <20140202184512.7fa2e3cf@armhf>
-Message-ID: <20140202175736.GH26684@n2100.arm.linux.org.uk>
+ <20140202124358.GD26684@n2100.arm.linux.org.uk>
+Message-ID: <20140202180433.GI26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 02, 2014 at 06:45:12PM +0100, Jean-Francois Moine wrote:
-> On Sun, 2 Feb 2014 16:23:09 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Sun, Feb 02, 2014 at 12:43:58PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 29, 2014 at 10:01:22AM +0100, Jean-Francois Moine wrote:
+> > This patch set contains various extensions to the tda998x driver:
+> > 
+> > - simplify the i2c read/write
+> > - code cleanup and fix some small errors
+> > - use global constants
+> > - don't read write-only registers
+> > - add DT support
+> > - use IRQ for connection status and EDID read
 > 
-> > On Sat, Jan 25, 2014 at 06:14:42PM +0100, Jean-Francois Moine wrote:  
-> > > This patch takes care of the write-only registers of the tda998x.
-> > > 
-> > > The registers SOFTRESET, TBG_CNTRL_0 and TBG_CNTRL_1 have all bits
-> > > cleared after reset, so, they may be fully re-written.
-> > > 
-> > > The register MAT_CONTRL is set to
-> > > 	MAT_CONTRL_MAT_BP | MAT_CONTRL_MAT_SC(1)
-> > > after reset, so, it may be fully set again to this value.  
-> > 
-> > I said in v3 of this patch, which seems to remain unaddressed:
-> >   
-> > >       /* must be last register set: */
-> > > -     reg_clear(priv, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
-> > > +     reg_write(priv, REG_TBG_CNTRL_0, 0);  
-> > 
-> > Register changes which have a potential effect shouldn't be part of a
-> > patch which is really only trying to avoid reading from write only
-> > registers.
-> > 
-> > This could be a potential functional change - and it's probably one
-> > which Rob Clark should at least be made aware of.  As I commented last
-> > time, when you're changing register values in an otherwise innocuous
-> > patch, you should comment about them in the patch description.  
+> I discussed these patches with Rob Clark recently, and the conclusion
+> we came to is that I'll merge them into a git tree, test them, and
+> once I'm happy I'll send a pull request as appropriate.
 > 
-> According to the tda9983b documentation, the register TBG_CNTRL_0 is
-> set to 0 at reset time. I think that it is the same for all the tda998x
-> family. In the other hand, this register is supposed to be write only,
-> so reading it may return any value, and the reg_clear() function may
-> set any other bits. Then, clearing one bit is less secure than clearing
-> the full register.
+> I'll go through them later today.  Those patches which have been re-
+> posted without any change for the last few times (the first few) I'll
+> take into my git tree today so you don't have to keep re-posting them
+> (more importantly, I won't have to keep on looking at them either.)
 
-Okay, in that case I'm happy with this patch.
+Okay, out of your patches, I would like to queue up the following
+for submission into -rc kernels:
+
+drm/i2c: tda998x: fix bad value in the AIF
+drm/i2c: tda998x: check the CEC device creation
+drm/i2c: tda998x: free the CEC device on encoder_destroy
+drm/i2c: tda998x: force the page register at startup time
+drm/i2c: tda998x: set the PLL division factor in range 0..3
+drm/i2c: tda998x: fix the ENABLE_SPACE register
+
+since these fix real bugs.  Moving them to the front of the queue isn't
+that big a deal (I've done it here in my git tree - yes, there were a
+few conflicts, but nothing serious.)
+
+I'll also consider these for -rc too:
+
+drm/i2c: tda998x: use HDMI constants
+drm/i2c: tda998x: add the active aspect in HDMI AVI frame
+drm/i2c: tda998x: change the frequence in the audio channel
+
+if we have reports of display devices affected by the info frame errors.
+
+As far as the last summary line goes, I'll change it to:
+
+	"Use ALSA IEC958 definitions and update audio frequency"
+
+Note that in general, bug fixes should always be towards the beginning
+of a patch series, so that they can be applied independently of the
+remainder of the development, which also makes them easier to backport
+to stable kernels if that's deemed necessary.
+
+As for the remainder, I think moving the DT documentation patch
+immediately after the addition of DT code (or even just before it) is
+good form.
+
+So, in summary, I'm pretty happy with this again - and it's all been
+tested here with no apparant detrimental effects.  All committed and
+queued up here:
+
+http://ftp.arm.linux.org.uk/cgit/linux-cubox.git/log/?h=tda998x-devel
+
+If you want to pull it back to check:
+
+  git://ftp.arm.linux.org.uk/~rmk/linux-cubox.git tda998x-devel
+
+I'm proposing to send everything up to the tda998x-fixes tag next week
+for 3.13-rc kernels.
+
+Rob, do you want to provide any acks for this or are you happy?
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
