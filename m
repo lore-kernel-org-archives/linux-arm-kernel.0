@@ -1,54 +1,77 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun,  2 Feb 2014 13:41:02 -0800
-Subject: [PATCH] arm64: KVM: Add VGIC device control for arm64
-Message-ID: <1391377262-30188-1-git-send-email-christoffer.dall@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 2 Feb 2014 15:48:26 -0600
+Subject: [PATCH v2 RESEND 2/3] ARM: dts: clps711x: Add bindings
+ documentation for CLPS711X irqchip driver
+In-Reply-To: <1391328520-30923-1-git-send-email-shc_work@mail.ru>
+References: <1391328520-30923-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CAL_JsqJPSsdT2zgXyvzQjYfyVbgZKG0Bt9b-7NGCgbT3Fuhq1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the build breakage introduced by
-c07a0191ef2de1f9510f12d1f88e3b0b5cd8d66f and adds support for the device
-control API and save/restore of the VGIC state for ARMv8.
+On Sun, Feb 2, 2014 at 2:08 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Add OF document for Cirrus Logic CLPS711X irqchip driver.
+>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  .../interrupt-controller/cirrus,clps711x-intc.txt  | 41 ++++++++++++++++++++++
 
-The defines were simply missing from the arm64 header files and
-uaccess.h must be implicitly imported from somewhere else on arm.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/uapi/asm/kvm.h | 9 +++++++++
- virt/kvm/arm/vgic.c               | 1 +
- 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 495ab6f..eaf54a3 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -148,6 +148,15 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
- #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
- 
-+/* Device Control API: ARM VGIC */
-+#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
-+#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-+#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
-+#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
-+#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-+#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
-+#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
- #define KVM_ARM_IRQ_TYPE_MASK		0xff
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index be456ce..8ca405c 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -24,6 +24,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/uaccess.h>
- 
- #include <linux/irqchip/arm-gic.h>
- 
--- 
-1.8.5.2
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+> new file mode 100644
+> index 0000000..759339c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+> @@ -0,0 +1,41 @@
+> +Cirrus Logic CLPS711X Interrupt Controller
+> +
+> +Required properties:
+> +
+> +- compatible: Should be "cirrus,clps711x-intc".
+> +- reg: Specifies base physical address of the registers set.
+> +- interrupt-controller: Identifies the node as an interrupt controller.
+> +- #interrupt-cells: Specifies the number of cells needed to encode an
+> +  interrupt source. The value shall be 1.
+> +
+> +The interrupt sources are as follows:
+> +ID     Name    Description
+> +---------------------------
+> +1:     BLINT   Battery low (FIQ)
+> +3:     MCINT   Media changed (FIQ)
+> +4:     CSINT   CODEC sound
+> +5:     EINT1   External 1
+> +6:     EINT2   External 2
+> +7:     EINT3   External 3
+> +8:     TC1OI   TC1 under flow
+> +9:     TC2OI   TC2 under flow
+> +10:    RTCMI   RTC compare match
+> +11:    TINT    64Hz tick
+> +12:    UTXINT1 UART1 transmit FIFO half empty
+> +13:    URXINT1 UART1 receive FIFO half full
+> +14:    UMSINT  UART1 modem status changed
+> +15:    SSEOTI  SSI1 end of transfer
+> +16:    KBDINT  Keyboard
+> +17:    SS2RX   SSI2 receive FIFO half or greater full
+> +18:    SS2TX   SSI2 transmit FIFO less than half empty
+> +28:    UTXINT2 UART2 transmit FIFO half empty
+> +29:    URXINT2 UART2 receive FIFO half full
+> +32:    DAIINT  DAI interface (FIQ)
+> +
+> +Example:
+> +       intc: interrupt-controller {
+> +               compatible = "cirrus,clps711x-intc";
+> +               reg = <0x80000000 0x4000>;
+> +               interrupt-controller;
+> +               #interrupt-cells = <1>;
+> +       };
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
