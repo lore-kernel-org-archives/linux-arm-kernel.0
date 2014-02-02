@@ -1,39 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Feb 2014 16:23:09 +0000
-Subject: [PATCH v5 09/23] drm/i2c: tda998x: don't read write-only registers
-In-Reply-To: <5269e596e16dfe40253dce38ceb0dc4a617384c1.1390986083.git.moinejf@free.fr>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 2 Feb 2014 18:30:00 +0100
+Subject: [PATCH v5 02/23] drm/i2c: tda998x: check more I/O errors
+In-Reply-To: <20140202162057.GE26684@n2100.arm.linux.org.uk>
 References: <cover.1390986082.git.moinejf@free.fr>
- <5269e596e16dfe40253dce38ceb0dc4a617384c1.1390986083.git.moinejf@free.fr>
-Message-ID: <20140202162309.GF26684@n2100.arm.linux.org.uk>
+ <9ebf1fdd613b5747aefb3ee21c9c246d102f1a47.1390986082.git.moinejf@free.fr>
+ <20140202162057.GE26684@n2100.arm.linux.org.uk>
+Message-ID: <20140202183000.1cf9ca9c@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 25, 2014 at 06:14:42PM +0100, Jean-Francois Moine wrote:
-> This patch takes care of the write-only registers of the tda998x.
+On Sun, 2 Feb 2014 16:20:58 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Sat, Jan 25, 2014 at 06:14:45PM +0100, Jean-Francois Moine wrote:
+> > This patch adds more error checking inn I2C I/O functions.
+> > In case of I/O error, this permits to avoid writing in bad controller
+> > pages, a bad chipset detection or looping when getting the EDID.
 > 
-> The registers SOFTRESET, TBG_CNTRL_0 and TBG_CNTRL_1 have all bits
-> cleared after reset, so, they may be fully re-written.
+> I've just looked at this again, and spotted something:
 > 
-> The register MAT_CONTRL is set to
-> 	MAT_CONTRL_MAT_BP | MAT_CONTRL_MAT_SC(1)
-> after reset, so, it may be fully set again to this value.
+> > -static uint8_t
+> > +static int
+> >  reg_read(struct tda998x_priv *priv, uint16_t reg)
+> >  {
+> >  	uint8_t val = 0;
+> > -	reg_read_range(priv, reg, &val, sizeof(val));
+> > +	int ret;
+> > +
+> > +	ret = reg_read_range(priv, reg, &val, sizeof(val));
+> > +	if (ret < 0)
+> > +		return ret;
+> 
+> So yes, this can return negative numbers.
+> 
+> > @@ -1158,8 +1184,11 @@ tda998x_encoder_init(struct i2c_client *client,
+> >  	tda998x_reset(priv);
+> >  
+> >  	/* read version: */
+> > -	priv->rev = reg_read(priv, REG_VERSION_LSB) |
+> > -			reg_read(priv, REG_VERSION_MSB) << 8;
+> > +	ret = reg_read(priv, REG_VERSION_LSB) |
+> > +		(reg_read(priv, REG_VERSION_MSB) << 8);
+> > +	if (ret < 0)
+> > +		goto fail;
+> > +	priv->rev = ret;
+> 
+> Two issues here:
+> 
+> 1. The additional parens are /really/ not required.
+> 2. What if reg_read(priv, REG_VERSION_MSB) returns a negative number?
+> 
+> If we're going to the extent of attempting to make the read/write
+> functions return errors, we should at least handle errors generated
+> by them properly, otherwise it's pointless making them return errors.
+> 
+> 	ret = reg_read(priv, REG_VERSION_LSB);
+> 	if (ret < 0)
+> 		goto fail;
+> 
+> 	priv->rev = ret;
+> 
+> 	ret = reg_read(priv, REG_VERSION_MSB);
+> 	if (ret < 0)
+> 		goto fail;
+> 
+> 	priv->rev |= ret << 8;
+> 
+> If you want it to look slightly nicer:
+> 
+> 	int rev_lo, rev_hi;
+> 
+> 	rev_lo = reg_read(priv, REG_VERSION_LSB);
+> 	rev_hi = reg_read(priv, REG_VERSION_MSB);
+> 	if (rev_lo < 0 || rev_hi < 0) {
+> 		ret = rev_lo < 0 ? rev_lo : rev_hi;
+> 		goto fail;
+> 	}
+> 
+> 	priv->rev = rev_lo | rev_hi << 8;
+> 
+> I'm happy to commit such a change after this patch to clean it up, or if
+> you want to regenerate your patch 2 and post /just/ that incorporating
+> this change.
 
-I said in v3 of this patch, which seems to remain unaddressed:
+I think that my code works correctly: when there is an error, the
+result of reg_read() is minus the error code, and this error code is
+always lower than 8388607 (0x7fffff). Then, reg_read() << 8 will always
+be negative.
 
->       /* must be last register set: */
-> -     reg_clear(priv, REG_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
-> +     reg_write(priv, REG_TBG_CNTRL_0, 0);
-
-Register changes which have a potential effect shouldn't be part of a
-patch which is really only trying to avoid reading from write only
-registers.
-
-This could be a potential functional change - and it's probably one
-which Rob Clark should at least be made aware of.  As I commented last
-time, when you're changing register values in an otherwise innocuous
-patch, you should comment about them in the patch description.
+Otherwise, I may redo a patch about the useless parenthesis.
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
