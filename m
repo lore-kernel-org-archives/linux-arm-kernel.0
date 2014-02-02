@@ -1,57 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  2 Feb 2014 14:41:47 +0100
-Subject: [PATCH 1/2] irqchip: sunxi: Add new compatibles
-Message-ID: <1391348508-9908-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  2 Feb 2014 14:49:12 +0100
+Subject: [PATCH 2/3] net: phy: sunxi: Add new compatibles
+In-Reply-To: <1391348953-10662-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391348953-10662-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391348953-10662-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Allwinner A10 compatibles were following a slightly different compatible
 patterns than the rest of the SoCs for historical reasons. Add compatibles
-matching the other pattern to the irq controller driver for consistency, and
-keep the older one for backward compatibility.
+matching the other pattern to the mdio driver for consistency, and keep the
+older one for backward compatibility.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt  | 5 +++--
- drivers/irqchip/irq-sun4i.c                                          | 3 +++
+ Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt | 5 +++--
+ drivers/net/phy/mdio-sun4i.c                                   | 3 +++
  2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-index 32cec4b..fb38f32 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
-@@ -2,7 +2,8 @@ Allwinner Sunxi Interrupt Controller
+diff --git a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+index 00b9f9a..4ec5641 100644
+--- a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
++++ b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+@@ -1,7 +1,8 @@
+ * Allwinner A10 MDIO Ethernet Controller interface
  
  Required properties:
+-- compatible: should be "allwinner,sun4i-mdio".
++- compatible: should be "allwinner,sun4i-a10-mdio"
++              (Deprecated: "allwinner,sun4i-mdio").
+ - reg: address and length of the register set for the device.
  
--- compatible : should be "allwinner,sun4i-ic"
-+- compatible : should be "allwinner,sun4i-a10-ic"
-+               (Deprecated: "allwinner,sun4i-ic")
- - reg : Specifies base physical address and size of the registers.
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
-@@ -11,7 +12,7 @@ Required properties:
- Example:
+ Optional properties:
+@@ -9,7 +10,7 @@ Optional properties:
  
- intc: interrupt-controller {
--	compatible = "allwinner,sun4i-ic";
-+	compatible = "allwinner,sun4i-a10-ic";
- 	reg = <0x01c20400 0x400>;
- 	interrupt-controller;
- 	#interrupt-cells = <1>;
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index a5438d8..6ddeb5f 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -134,6 +134,9 @@ static int __init sun4i_of_init(struct device_node *node,
- 
- 	return 0;
+ Example at the SoC level:
+ mdio at 01c0b080 {
+-	compatible = "allwinner,sun4i-mdio";
++	compatible = "allwinner,sun4i-a10-mdio";
+ 	reg = <0x01c0b080 0x14>;
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+diff --git a/drivers/net/phy/mdio-sun4i.c b/drivers/net/phy/mdio-sun4i.c
+index 18969b3..7f4a66d 100644
+--- a/drivers/net/phy/mdio-sun4i.c
++++ b/drivers/net/phy/mdio-sun4i.c
+@@ -171,6 +171,9 @@ static int sun4i_mdio_remove(struct platform_device *pdev)
  }
-+IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-a10-ic", sun4i_of_init);
-+
-+/* Deprecated */
- IRQCHIP_DECLARE(allwinner_sun4i_ic, "allwinner,sun4i-ic", sun4i_of_init);
  
- static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+ static const struct of_device_id sun4i_mdio_dt_ids[] = {
++	{ .compatible = "allwinner,sun4i-a10-mdio" },
++
++	/* Deprecated */
+ 	{ .compatible = "allwinner,sun4i-mdio" },
+ 	{ }
+ };
 -- 
 1.8.4.2
