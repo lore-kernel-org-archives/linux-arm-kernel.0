@@ -1,57 +1,222 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  2 Feb 2014 14:37:59 +0100
-Subject: [PATCH 1/2] clocksource: sunxi: Add new compatibles
-Message-ID: <1391348280-9484-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  2 Feb 2014 14:36:30 +0100
+Subject: [PATCH 1/2] clk: sunxi: Add new clock compatibles
+Message-ID: <1391348191-9375-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Allwinner A10 compatibles were following a slightly different compatible
 patterns than the rest of the SoCs for historical reasons. Add compatibles
-matching the other pattern to the timer driver for consistency, and keep the
+matching the other pattern to the clock driver for consistency, and keep the
 older one for backward compatibility.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 5 +++--
- drivers/clocksource/sun4i_timer.c                                 | 4 ++++
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 53 +++++++++++++++--------
+ drivers/clk/sunxi/clk-sunxi.c                     | 42 ++++++++++++++----
+ 2 files changed, 69 insertions(+), 26 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-index 48aeb78..d9e35ae 100644
---- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-@@ -2,7 +2,8 @@ Allwinner A1X SoCs Timer Controller
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index c2cb762..b103e64 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -6,38 +6,55 @@ This binding uses the common clock binding[1].
  
  Required properties:
+ - compatible : shall be one of the following:
+-	"allwinner,sun4i-osc-clk" - for a gatable oscillator
+-	"allwinner,sun4i-pll1-clk" - for the main PLL clock and PLL4
++	"allwinner,sun4i-a10-osc-clk" - for a gatable oscillator
++	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+ 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+-	"allwinner,sun4i-pll5-clk" - for the PLL5 clock
+-	"allwinner,sun4i-pll6-clk" - for the PLL6 clock
+-	"allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+-	"allwinner,sun4i-axi-clk" - for the AXI clock
+-	"allwinner,sun4i-axi-gates-clk" - for the AXI gates
+-	"allwinner,sun4i-ahb-clk" - for the AHB clock
+-	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
++	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
++	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
++	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
++	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
++	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
++	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
++	"allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
+ 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+ 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+ 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+ 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+-	"allwinner,sun4i-apb0-clk" - for the APB0 clock
+-	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
++	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
++	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+ 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+ 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+ 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+-	"allwinner,sun4i-apb1-clk" - for the APB1 clock
+-	"allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+-	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
++	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
++	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
++	"allwinner,sun4i-a10-apb1-gates-clk" - for the APB1 gates on A10
+ 	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+ 	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
+ 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+ 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+ 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+-	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
++	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
  
--- compatible : should be "allwinner,sun4i-timer"
-+- compatible : should be "allwinner,sun4i-a10-timer"
-+               (Deprecated "allwinner,sun4i-timer")
- - reg : Specifies base physical address and size of the registers.
- - interrupts : The interrupt of the first timer
- - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
-@@ -10,7 +11,7 @@ Required properties:
- Example:
- 
- timer {
--	compatible = "allwinner,sun4i-timer";
-+	compatible = "allwinner,sun4i-a10-timer";
- 	reg = <0x01c20c00 0x400>;
- 	interrupts = <22>;
- 	clocks = <&osc>;
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index bf497af..de03895 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -196,5 +196,9 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	clockevents_config_and_register(&sun4i_clockevent, rate,
- 					TIMER_SYNC_TICKS, 0xffffffff);
- }
-+CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
-+		       sun4i_timer_init);
++Deprecated compatibles (replaced by their allwinner,sun4i-a10-* counterparts):
++	"allwinner,sun4i-osc-clk"
++	"allwinner,sun4i-pll1-clk"
++	"allwinner,sun4i-pll5-clk"
++	"allwinner,sun4i-pll6-clk"
++	"allwinner,sun4i-cpu-clk"
++	"allwinner,sun4i-axi-clk"
++	"allwinner,sun4i-axi-gates-clk"
++	"allwinner,sun4i-ahb-clk"
++	"allwinner,sun4i-ahb-gates-clk"
++	"allwinner,sun4i-apb0-clk"
++	"allwinner,sun4i-apb0-gates-clk"
++	"allwinner,sun4i-apb1-clk"
++	"allwinner,sun4i-apb1-mux-clk"
++	"allwinner,sun4i-apb1-gates-clk"
++	"allwinner,sun4i-mod0-clk"
 +
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+ - clocks : shall be the input parent clock(s) phandle for the clock. For
+@@ -58,21 +75,21 @@ For example:
+ 
+ osc24M: osc24M at 01c20050 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-osc-clk";
++	compatible = "allwinner,sun4i-a10-osc-clk";
+ 	reg = <0x01c20050 0x4>;
+ 	clocks = <&osc24M_fixed>;
+ };
+ 
+ pll1: pll1 at 01c20000 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-pll1-clk";
++	compatible = "allwinner,sun4i-a10-pll1-clk";
+ 	reg = <0x01c20000 0x4>;
+ 	clocks = <&osc24M>;
+ };
+ 
+ cpu: cpu at 01c20054 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-cpu-clk";
++	compatible = "allwinner,sun4i-a10-cpu-clk";
+ 	reg = <0x01c20054 0x4>;
+ 	clocks = <&osc32k>, <&osc24M>, <&pll1>;
+ };
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 659e4ea..91203f3 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -77,6 +77,8 @@ err_free_gate:
+ err_free_fixed:
+ 	kfree(fixed);
+ }
++CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-a10-osc-clk", sun4i_osc_clk_setup);
 +/* Deprecated */
- CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
- 		       sun4i_timer_init);
+ CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-osc-clk", sun4i_osc_clk_setup);
+ 
+ 
+@@ -970,25 +972,39 @@ free_clkdata:
+ 
+ /* Matches for factors clocks */
+ static const struct of_device_id clk_factors_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
++	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
+ 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
++	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
++	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
++
++	/* Deprecated */
++	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
+ 	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
+ 	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
+-	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+ 	{}
+ };
+ 
+ /* Matches for divider clocks */
+ static const struct of_device_id clk_div_match[] __initconst = {
++	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
++	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
++	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
++	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
++
++	/* Deprecated */
+ 	{.compatible = "allwinner,sun4i-axi-clk", .data = &sun4i_axi_data,},
+ 	{.compatible = "allwinner,sun4i-ahb-clk", .data = &sun4i_ahb_data,},
+ 	{.compatible = "allwinner,sun4i-apb0-clk", .data = &sun4i_apb0_data,},
+-	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
+ 	{}
+ };
+ 
+ /* Matches for divided outputs */
+ static const struct of_device_id clk_divs_match[] __initconst = {
++	{.compatible = "allwinner,sun4i-a10-pll5-clk", .data = &pll5_divs_data,},
++	{.compatible = "allwinner,sun4i-a10-pll6-clk", .data = &pll6_divs_data,},
++
++	/* Deprecated */
+ 	{.compatible = "allwinner,sun4i-pll5-clk", .data = &pll5_divs_data,},
+ 	{.compatible = "allwinner,sun4i-pll6-clk", .data = &pll6_divs_data,},
+ 	{}
+@@ -996,30 +1012,40 @@ static const struct of_device_id clk_divs_match[] __initconst = {
+ 
+ /* Matches for mux clocks */
+ static const struct of_device_id clk_mux_match[] __initconst = {
++	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
++	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
++
++	/* Deprecated */
+ 	{.compatible = "allwinner,sun4i-cpu-clk", .data = &sun4i_cpu_mux_data,},
+ 	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
+-	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
+ 	{}
+ };
+ 
+ /* Matches for gate clocks */
+ static const struct of_device_id clk_gates_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
+-	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-axi-gates-clk", .data = &sun4i_axi_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-ahb-gates-clk", .data = &sun5i_a10s_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
+-	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
+-	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
++
++	/* Deprecated */
++	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
++	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
++	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
++	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
+ 	{}
+ };
+ 
 -- 
 1.8.4.2
