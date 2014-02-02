@@ -1,59 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  2 Feb 2014 14:49:12 +0100
-Subject: [PATCH 2/3] net: phy: sunxi: Add new compatibles
-In-Reply-To: <1391348953-10662-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391348953-10662-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1391348953-10662-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  2 Feb 2014 14:55:23 +0100
+Subject: [PATCH 1/3] wdt: sunxi: Introduce a new compatible for the A10 and A31
+Message-ID: <1391349325-11132-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10 compatibles were following a slightly different compatible
-patterns than the rest of the SoCs for historical reasons. Add compatibles
-matching the other pattern to the mdio driver for consistency, and keep the
-older one for backward compatibility.
+For historical reasons, the Allwinner A10 compatibles are not following the
+patterns used for this other Allwinner SoCs.
+
+Introduce a new compatible following the usual pattern, and deprecate the olders.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt | 5 +++--
- drivers/net/phy/mdio-sun4i.c                                   | 3 +++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 7 ++++---
+ drivers/watchdog/sunxi_wdt.c                             | 1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
-index 00b9f9a..4ec5641 100644
---- a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
-+++ b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
-@@ -1,7 +1,8 @@
- * Allwinner A10 MDIO Ethernet Controller interface
+diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+index e39cb26..6e8c937 100644
+--- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+@@ -2,13 +2,14 @@ Allwinner SoCs Watchdog timer
  
  Required properties:
--- compatible: should be "allwinner,sun4i-mdio".
-+- compatible: should be "allwinner,sun4i-a10-mdio"
-+              (Deprecated: "allwinner,sun4i-mdio").
- - reg: address and length of the register set for the device.
  
- Optional properties:
-@@ -9,7 +10,7 @@ Optional properties:
+-- compatible : should be "allwinner,<soc-family>-wdt", the currently supported
+-  SoC families being sun4i and sun6i
++- compatible : should be either "allwinner,sun4i-a10-wdt" or
++               "allwinner,sun6i-a31-wdt" (deprecated:
++               "allwinner,sun4i-wdt", "allwinner,sun6i-wdt")
+ - reg : Specifies base physical address and size of the registers.
  
- Example at the SoC level:
- mdio at 01c0b080 {
--	compatible = "allwinner,sun4i-mdio";
-+	compatible = "allwinner,sun4i-a10-mdio";
- 	reg = <0x01c0b080 0x14>;
- 	#address-cells = <1>;
- 	#size-cells = <0>;
-diff --git a/drivers/net/phy/mdio-sun4i.c b/drivers/net/phy/mdio-sun4i.c
-index 18969b3..7f4a66d 100644
---- a/drivers/net/phy/mdio-sun4i.c
-+++ b/drivers/net/phy/mdio-sun4i.c
-@@ -171,6 +171,9 @@ static int sun4i_mdio_remove(struct platform_device *pdev)
- }
+ Example:
  
- static const struct of_device_id sun4i_mdio_dt_ids[] = {
-+	{ .compatible = "allwinner,sun4i-a10-mdio" },
-+
-+	/* Deprecated */
- 	{ .compatible = "allwinner,sun4i-mdio" },
- 	{ }
+ wdt: watchdog at 01c20c90 {
+-	compatible = "allwinner,sun4i-wdt";
++	compatible = "allwinner,sun4i-a10-wdt";
+ 	reg = <0x01c20c90 0x10>;
  };
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index 76332d8..7c8923d 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -206,6 +206,7 @@ static void sunxi_wdt_shutdown(struct platform_device *pdev)
+ 
+ static const struct of_device_id sunxi_wdt_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun4i-wdt" },
++	{ .compatible = "allwinner,sun4i-a10-wdt" },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
 -- 
 1.8.4.2
