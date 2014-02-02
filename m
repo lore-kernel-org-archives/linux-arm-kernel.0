@@ -1,14 +1,16 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Feb 2014 18:04:34 +0000
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 2 Feb 2014 19:06:06 +0100
 Subject: [PATCH v5 00/23]
 In-Reply-To: <20140202124358.GD26684@n2100.arm.linux.org.uk>
 References: <cover.1390986082.git.moinejf@free.fr>
  <20140202124358.GD26684@n2100.arm.linux.org.uk>
-Message-ID: <20140202180433.GI26684@n2100.arm.linux.org.uk>
+Message-ID: <20140202190606.6fa193ce@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 02, 2014 at 12:43:58PM +0000, Russell King - ARM Linux wrote:
+On Sun, 2 Feb 2014 12:43:58 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
 > On Wed, Jan 29, 2014 at 10:01:22AM +0100, Jean-Francois Moine wrote:
 > > This patch set contains various extensions to the tda998x driver:
 > > 
@@ -28,57 +30,20 @@ On Sun, Feb 02, 2014 at 12:43:58PM +0000, Russell King - ARM Linux wrote:
 > take into my git tree today so you don't have to keep re-posting them
 > (more importantly, I won't have to keep on looking at them either.)
 
-Okay, out of your patches, I would like to queue up the following
-for submission into -rc kernels:
+Thanks.
 
-drm/i2c: tda998x: fix bad value in the AIF
-drm/i2c: tda998x: check the CEC device creation
-drm/i2c: tda998x: free the CEC device on encoder_destroy
-drm/i2c: tda998x: force the page register at startup time
-drm/i2c: tda998x: set the PLL division factor in range 0..3
-drm/i2c: tda998x: fix the ENABLE_SPACE register
+BTW, I found some problems with the patch 12 'add DT support' you
+already acked:
 
-since these fix real bugs.  Moving them to the front of the queue isn't
-that big a deal (I've done it here in my git tree - yes, there were a
-few conflicts, but nothing serious.)
+- the .of_match_table is not needed because the i2c client is created by
+  the i2c subsystem from the 'reg' in the DT,
 
-I'll also consider these for -rc too:
+- on encoder_destroy(), the function drm_i2c_encoder_destroy()
+  unregisters the i2c client, so, with a DT, a second encoder_init()
+  would crash.
 
-drm/i2c: tda998x: use HDMI constants
-drm/i2c: tda998x: add the active aspect in HDMI AVI frame
-drm/i2c: tda998x: change the frequence in the audio channel
-
-if we have reports of display devices affected by the info frame errors.
-
-As far as the last summary line goes, I'll change it to:
-
-	"Use ALSA IEC958 definitions and update audio frequency"
-
-Note that in general, bug fixes should always be towards the beginning
-of a patch series, so that they can be applied independently of the
-remainder of the development, which also makes them easier to backport
-to stable kernels if that's deemed necessary.
-
-As for the remainder, I think moving the DT documentation patch
-immediately after the addition of DT code (or even just before it) is
-good form.
-
-So, in summary, I'm pretty happy with this again - and it's all been
-tested here with no apparant detrimental effects.  All committed and
-queued up here:
-
-http://ftp.arm.linux.org.uk/cgit/linux-cubox.git/log/?h=tda998x-devel
-
-If you want to pull it back to check:
-
-  git://ftp.arm.linux.org.uk/~rmk/linux-cubox.git tda998x-devel
-
-I'm proposing to send everything up to the tda998x-fixes tag next week
-for 3.13-rc kernels.
-
-Rob, do you want to provide any acks for this or are you happy?
+Do you better like a new patch or a fix?
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
