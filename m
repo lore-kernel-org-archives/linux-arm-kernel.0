@@ -1,222 +1,164 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  2 Feb 2014 14:36:30 +0100
-Subject: [PATCH 1/2] clk: sunxi: Add new clock compatibles
-Message-ID: <1391348191-9375-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  2 Feb 2014 14:39:47 +0100
+Subject: [PATCH 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
+In-Reply-To: <1391348387-9577-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391348387-9577-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391348387-9577-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10 compatibles were following a slightly different compatible
-patterns than the rest of the SoCs for historical reasons. Add compatibles
-matching the other pattern to the clock driver for consistency, and keep the
-older one for backward compatibility.
+Switch the device tree to the new compatibles introduced in the i2c drivers
+to have a common pattern accross all Allwinner SoCs.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt | 53 +++++++++++++++--------
- drivers/clk/sunxi/clk-sunxi.c                     | 42 ++++++++++++++----
- 2 files changed, 69 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi  |  6 +++---
+ arch/arm/boot/dts/sun5i-a10s.dtsi |  6 +++---
+ arch/arm/boot/dts/sun5i-a13.dtsi  |  6 +++---
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 10 +++++-----
+ 4 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index c2cb762..b103e64 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -6,38 +6,55 @@ This binding uses the common clock binding[1].
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 040bb0e..9508fb7 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -512,7 +512,7 @@
+ 		};
  
- Required properties:
- - compatible : shall be one of the following:
--	"allwinner,sun4i-osc-clk" - for a gatable oscillator
--	"allwinner,sun4i-pll1-clk" - for the main PLL clock and PLL4
-+	"allwinner,sun4i-a10-osc-clk" - for a gatable oscillator
-+	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
- 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
--	"allwinner,sun4i-pll5-clk" - for the PLL5 clock
--	"allwinner,sun4i-pll6-clk" - for the PLL6 clock
--	"allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
--	"allwinner,sun4i-axi-clk" - for the AXI clock
--	"allwinner,sun4i-axi-gates-clk" - for the AXI gates
--	"allwinner,sun4i-ahb-clk" - for the AHB clock
--	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
-+	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
-+	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
-+	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
-+	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
-+	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
-+	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
-+	"allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
- 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
--	"allwinner,sun4i-apb0-clk" - for the APB0 clock
--	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
-+	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
-+	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
- 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
--	"allwinner,sun4i-apb1-clk" - for the APB1 clock
--	"allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
--	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
-+	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
-+	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
-+	"allwinner,sun4i-a10-apb1-gates-clk" - for the APB1 gates on A10
- 	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
- 	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
- 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
- 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
- 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
--	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
-+	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+ 		i2c0: i2c at 01c2ac00 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+ 			interrupts = <7>;
+ 			clocks = <&apb1_gates 0>;
+@@ -521,7 +521,7 @@
+ 		};
  
-+Deprecated compatibles (replaced by their allwinner,sun4i-a10-* counterparts):
-+	"allwinner,sun4i-osc-clk"
-+	"allwinner,sun4i-pll1-clk"
-+	"allwinner,sun4i-pll5-clk"
-+	"allwinner,sun4i-pll6-clk"
-+	"allwinner,sun4i-cpu-clk"
-+	"allwinner,sun4i-axi-clk"
-+	"allwinner,sun4i-axi-gates-clk"
-+	"allwinner,sun4i-ahb-clk"
-+	"allwinner,sun4i-ahb-gates-clk"
-+	"allwinner,sun4i-apb0-clk"
-+	"allwinner,sun4i-apb0-gates-clk"
-+	"allwinner,sun4i-apb1-clk"
-+	"allwinner,sun4i-apb1-mux-clk"
-+	"allwinner,sun4i-apb1-gates-clk"
-+	"allwinner,sun4i-mod0-clk"
-+
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
- - clocks : shall be the input parent clock(s) phandle for the clock. For
-@@ -58,21 +75,21 @@ For example:
+ 		i2c1: i2c at 01c2b000 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b000 0x400>;
+ 			interrupts = <8>;
+ 			clocks = <&apb1_gates 1>;
+@@ -530,7 +530,7 @@
+ 		};
  
- osc24M: osc24M at 01c20050 {
- 	#clock-cells = <0>;
--	compatible = "allwinner,sun4i-osc-clk";
-+	compatible = "allwinner,sun4i-a10-osc-clk";
- 	reg = <0x01c20050 0x4>;
- 	clocks = <&osc24M_fixed>;
- };
+ 		i2c2: i2c at 01c2b400 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b400 0x400>;
+ 			interrupts = <9>;
+ 			clocks = <&apb1_gates 2>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index ea16054..0d1a3bf 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -431,7 +431,7 @@
+ 		i2c0: i2c at 01c2ac00 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+ 			interrupts = <7>;
+ 			clocks = <&apb1_gates 0>;
+@@ -442,7 +442,7 @@
+ 		i2c1: i2c at 01c2b000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b000 0x400>;
+ 			interrupts = <8>;
+ 			clocks = <&apb1_gates 1>;
+@@ -453,7 +453,7 @@
+ 		i2c2: i2c at 01c2b400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b400 0x400>;
+ 			interrupts = <9>;
+ 			clocks = <&apb1_gates 2>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 320335a..9e6f031 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -372,7 +372,7 @@
+ 		};
  
- pll1: pll1 at 01c20000 {
- 	#clock-cells = <0>;
--	compatible = "allwinner,sun4i-pll1-clk";
-+	compatible = "allwinner,sun4i-a10-pll1-clk";
- 	reg = <0x01c20000 0x4>;
- 	clocks = <&osc24M>;
- };
+ 		i2c0: i2c at 01c2ac00 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+ 			interrupts = <7>;
+ 			clocks = <&apb1_gates 0>;
+@@ -381,7 +381,7 @@
+ 		};
  
- cpu: cpu at 01c20054 {
- 	#clock-cells = <0>;
--	compatible = "allwinner,sun4i-cpu-clk";
-+	compatible = "allwinner,sun4i-a10-cpu-clk";
- 	reg = <0x01c20054 0x4>;
- 	clocks = <&osc32k>, <&osc24M>, <&pll1>;
- };
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 659e4ea..91203f3 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -77,6 +77,8 @@ err_free_gate:
- err_free_fixed:
- 	kfree(fixed);
- }
-+CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-a10-osc-clk", sun4i_osc_clk_setup);
-+/* Deprecated */
- CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-osc-clk", sun4i_osc_clk_setup);
+ 		i2c1: i2c at 01c2b000 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b000 0x400>;
+ 			interrupts = <8>;
+ 			clocks = <&apb1_gates 1>;
+@@ -390,7 +390,7 @@
+ 		};
  
+ 		i2c2: i2c at 01c2b400 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b400 0x400>;
+ 			interrupts = <9>;
+ 			clocks = <&apb1_gates 2>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 119f066..0a368d2 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -549,7 +549,7 @@
+ 		};
  
-@@ -970,25 +972,39 @@ free_clkdata:
+ 		i2c0: i2c at 01c2ac00 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+ 			interrupts = <0 7 4>;
+ 			clocks = <&apb1_gates 0>;
+@@ -558,7 +558,7 @@
+ 		};
  
- /* Matches for factors clocks */
- static const struct of_device_id clk_factors_match[] __initconst = {
--	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
-+	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
-+	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
-+	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
-+	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
-+
-+	/* Deprecated */
-+	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
- 	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
--	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
- 	{}
- };
+ 		i2c1: i2c at 01c2b000 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b000 0x400>;
+ 			interrupts = <0 8 4>;
+ 			clocks = <&apb1_gates 1>;
+@@ -567,7 +567,7 @@
+ 		};
  
- /* Matches for divider clocks */
- static const struct of_device_id clk_div_match[] __initconst = {
-+	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
-+	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
-+	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
-+	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
-+
-+	/* Deprecated */
- 	{.compatible = "allwinner,sun4i-axi-clk", .data = &sun4i_axi_data,},
- 	{.compatible = "allwinner,sun4i-ahb-clk", .data = &sun4i_ahb_data,},
- 	{.compatible = "allwinner,sun4i-apb0-clk", .data = &sun4i_apb0_data,},
--	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
- 	{}
- };
+ 		i2c2: i2c at 01c2b400 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b400 0x400>;
+ 			interrupts = <0 9 4>;
+ 			clocks = <&apb1_gates 2>;
+@@ -576,7 +576,7 @@
+ 		};
  
- /* Matches for divided outputs */
- static const struct of_device_id clk_divs_match[] __initconst = {
-+	{.compatible = "allwinner,sun4i-a10-pll5-clk", .data = &pll5_divs_data,},
-+	{.compatible = "allwinner,sun4i-a10-pll6-clk", .data = &pll6_divs_data,},
-+
-+	/* Deprecated */
- 	{.compatible = "allwinner,sun4i-pll5-clk", .data = &pll5_divs_data,},
- 	{.compatible = "allwinner,sun4i-pll6-clk", .data = &pll6_divs_data,},
- 	{}
-@@ -996,30 +1012,40 @@ static const struct of_device_id clk_divs_match[] __initconst = {
+ 		i2c3: i2c at 01c2b800 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b800 0x400>;
+ 			interrupts = <0 88 4>;
+ 			clocks = <&apb1_gates 3>;
+@@ -585,7 +585,7 @@
+ 		};
  
- /* Matches for mux clocks */
- static const struct of_device_id clk_mux_match[] __initconst = {
-+	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
-+	{.compatible = "allwinner,sun4i-a10-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
-+	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
-+
-+	/* Deprecated */
- 	{.compatible = "allwinner,sun4i-cpu-clk", .data = &sun4i_cpu_mux_data,},
- 	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
--	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
- 	{}
- };
- 
- /* Matches for gate clocks */
- static const struct of_device_id clk_gates_match[] __initconst = {
--	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
--	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
-+	{.compatible = "allwinner,sun4i-a10-axi-gates-clk", .data = &sun4i_axi_gates_data,},
-+	{.compatible = "allwinner,sun4i-a10-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-ahb-gates-clk", .data = &sun5i_a10s_ahb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
--	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
-+	{.compatible = "allwinner,sun4i-a10-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
--	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
-+	{.compatible = "allwinner,sun4i-a10-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
-+
-+	/* Deprecated */
-+	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
-+	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
-+	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
-+	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
- 	{}
- };
- 
+ 		i2c4: i2c at 01c2bc00 {
+-			compatible = "allwinner,sun4i-i2c";
++			compatible = "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2bc00 0x400>;
+ 			interrupts = <0 89 4>;
+ 			clocks = <&apb1_gates 15>;
 -- 
 1.8.4.2
