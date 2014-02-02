@@ -1,51 +1,54 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 2 Feb 2014 21:07:54 +0100
-Subject: [PATCH v5 00/23]
-In-Reply-To: <20140202191505.GK26684@n2100.arm.linux.org.uk>
-References: <cover.1390986082.git.moinejf@free.fr>
- <20140202124358.GD26684@n2100.arm.linux.org.uk>
- <20140202190606.6fa193ce@armhf>
- <20140202182349.GJ26684@n2100.arm.linux.org.uk>
- <20140202195400.073f4eb4@armhf>
- <20140202191505.GK26684@n2100.arm.linux.org.uk>
-Message-ID: <20140202210754.307b41e8@armhf>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun,  2 Feb 2014 13:41:02 -0800
+Subject: [PATCH] arm64: KVM: Add VGIC device control for arm64
+Message-ID: <1391377262-30188-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2 Feb 2014 19:15:05 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+This fixes the build breakage introduced by
+c07a0191ef2de1f9510f12d1f88e3b0b5cd8d66f and adds support for the device
+control API and save/restore of the VGIC state for ARMv8.
 
-> In which case, it may be better to reorder the remaining patches such
-> that the DT changes are at the very end - which means we can still
-> benefit from the rest of the patches if the DT solution remains an
-> open question.
-> 
-> We do have another option now that my generic component support is in
-> mainline (merged during this window), which should result in a much
-> cleaner solution.  If we convert TDA998x to a component, armada DRM
-> to a component master (and same for other tda998x users) then we don't
-> need the drm_encoder_slave stuff - all that goes away since it's no
-> longer necessary.
-> 
-> We also solve this problem as well - because we're then not messing
-> around with working out if there's a DT node present: the TDA998x
-> device must pre-exist.  For non-DT setups, this can be done when
-> the I2C bus is created - devices on it would be created using the
-> standard mechanisms already present via the i2c_board_data array.
-> For DT setups, the devices are created by parsing the I2C bus node
-> in DT.
-> 
-> Both cases result in a component being registered upon invocation of
-> tda998x_probe(), and removal of the component when tda998x_remove()
-> is called.  The tda998x driver becomes a standard I2C driver.
-> 
-> This is something I've been intending to look at now that the component
-> stuff is in place - as I said previously when the questions around DT
-> and Armada DRM were first posed, we need to solve these issues in a
-> generic way first, rather than hacking around them.
+The defines were simply missing from the arm64 header files and
+uaccess.h must be implicitly imported from somewhere else on arm.
 
-Agree. I was looking in the same direction...
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/uapi/asm/kvm.h | 9 +++++++++
+ virt/kvm/arm/vgic.c               | 1 +
+ 2 files changed, 10 insertions(+)
 
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 495ab6f..eaf54a3 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -148,6 +148,15 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+ #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
+ 
++/* Device Control API: ARM VGIC */
++#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
++#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
++#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
++#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
++#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
++#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
++#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
++
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+ #define KVM_ARM_IRQ_TYPE_MASK		0xff
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index be456ce..8ca405c 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -24,6 +24,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
++#include <linux/uaccess.h>
+ 
+ #include <linux/irqchip/arm-gic.h>
+ 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.8.5.2
