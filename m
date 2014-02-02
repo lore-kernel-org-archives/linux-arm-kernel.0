@@ -1,77 +1,129 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 2 Feb 2014 15:48:26 -0600
-Subject: [PATCH v2 RESEND 2/3] ARM: dts: clps711x: Add bindings
- documentation for CLPS711X irqchip driver
-In-Reply-To: <1391328520-30923-1-git-send-email-shc_work@mail.ru>
-References: <1391328520-30923-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CAL_JsqJPSsdT2zgXyvzQjYfyVbgZKG0Bt9b-7NGCgbT3Fuhq1A@mail.gmail.com>
+From: trond.myklebust@primarydata.com (Trond Myklebust)
+Date: Sun, 02 Feb 2014 17:04:38 -0500
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <20140202122757.GC26684@n2100.arm.linux.org.uk>
+References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
+ <20140130141405.GA23985@infradead.org>
+ <20140130142752.GX15937@n2100.arm.linux.org.uk>
+ <20140130143208.GB9573@infradead.org>
+ <20140130153812.GA15937@n2100.arm.linux.org.uk>
+ <1391201970.6978.1.camel@leira.trondhjem.org>
+ <20140201010328.GI15937@n2100.arm.linux.org.uk>
+ <20140202122757.GC26684@n2100.arm.linux.org.uk>
+Message-ID: <1391378678.8123.5.camel@leira.trondhjem.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 2, 2014 at 2:08 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Add OF document for Cirrus Logic CLPS711X irqchip driver.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  .../interrupt-controller/cirrus,clps711x-intc.txt  | 41 ++++++++++++++++++++++
+On Sun, 2014-02-02 at 12:27 +0000, Russell King - ARM Linux wrote:
+> On Sat, Feb 01, 2014 at 01:03:28AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Jan 31, 2014 at 03:59:30PM -0500, Trond Myklebust wrote:
+> > > On Thu, 2014-01-30 at 15:38 +0000, Russell King - ARM Linux wrote:
+> > > > On Thu, Jan 30, 2014 at 06:32:08AM -0800, Christoph Hellwig wrote:
+> > > > > On Thu, Jan 30, 2014 at 02:27:52PM +0000, Russell King - ARM Linux wrote:
+> > > > > > Yes and no.  I still end up with an empty /etc/mtab, but the file now
+> > > > > > exists.  However, I can create and echo data into /etc/mtab, but it seems
+> > > > > > that can't happen at boot time.
+> > > > > 
+> > > > > Odd.  Can you disable CONFIG_NFSD_V3_ACL for now to isolate the issue?
+> > > > 
+> > > > Unfortunately, that results in some problem at boot time, which
+> > > > ultimately ends up with the other three CPUs being stopped, and
+> > > > hence the original reason scrolls off the screen before it can be
+> > > > read... even at 1920p.
+> > > > 
+> > > Hi Russell,
+> > > 
+> > > The following patch fixes the issue for me.
+> > 
+> > It doesn't entirely fix the issue for me, instead we've got even weirder
+> > behaviour:
+> > 
+> > root at cubox-i4:~# ls -al test
+> > ls: cannot access test: No such file or directory
+> > root at cubox-i4:~# touch test
+> > root at cubox-i4:~# ls -al test
+> > -rw-r--r-- 1 root root 0 Feb  1 01:01 test
+> > root at cubox-i4:~# echo foo > test
+> > root at cubox-i4:~# ls -al test
+> > -rw-r--r-- 1 root root 4 Feb  1 01:01 test
+> > root at cubox-i4:~# cat test
+> > foo
+> > root at cubox-i4:~# rm test
+> > root at cubox-i4:~# echo foo > test
+> > -bash: test: Operation not supported
+> > root at cubox-i4:~# ls -al test
+> > -rw-r--r-- 1 root root 0 Feb  1 01:01 test
+> 
+> FYI, I just tested Linus' tip, and NFS is still broken.
+> 
+Hi Russell,
 
-Acked-by: Rob Herring <robh@kernel.org>
+The following patch should fix the above problem. It needs to be applied
+on top of the one I sent you previously. In addition, you will want to
+apply Noah Massey's patch from
+http://lkml.kernel.org/r/1391135472-9639-1-git-send-email-Noah.Massey at gmail.com 
+
+Cheers,
+  Trond
+
+8<------------------------------------------------------------------------------
+>From f9ad7a7b43554bc36eccf03d33617c05b8a2c77d Mon Sep 17 00:00:00 2001
+From: Trond Myklebust <trond.myklebust@primarydata.com>
+Date: Sun, 2 Feb 2014 14:36:42 -0500
+Subject: [PATCH] NFSv3: Fix return value of nfs3_proc_setacls
+
+nfs3_proc_setacls is used internally by the NFSv3 create operations
+to set the acl after the file has been created. If the operation
+fails because the server doesn't support acls, then it must return '0',
+not -EOPNOTSUPP.
+
+Signed-off-by: Trond Myklebust <trond.myklebust@primarydata.com>
+---
+ fs/nfs/nfs3acl.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/fs/nfs/nfs3acl.c b/fs/nfs/nfs3acl.c
+index 9271a6bb9a41..871d6eda8dba 100644
+--- a/fs/nfs/nfs3acl.c
++++ b/fs/nfs/nfs3acl.c
+@@ -113,7 +113,7 @@ getout:
+ 	return ERR_PTR(status);
+ }
+ 
+-int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
++static int __nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
+ 		struct posix_acl *dfacl)
+ {
+ 	struct nfs_server *server = NFS_SERVER(inode);
+@@ -198,6 +198,15 @@ out:
+ 	return status;
+ }
+ 
++int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
++		struct posix_acl *dfacl)
++{
++	int ret;
++	ret = __nfs3_proc_setacls(inode, acl, dfacl);
++	return (ret == -EOPNOTSUPP) ? 0 : ret;
++
++}
++
+ int nfs3_set_acl(struct inode *inode, struct posix_acl *acl, int type)
+ {
+ 	struct posix_acl *alloc = NULL, *dfacl = NULL;
+@@ -225,7 +234,7 @@ int nfs3_set_acl(struct inode *inode, struct posix_acl *acl, int type)
+ 		if (IS_ERR(alloc))
+ 			goto fail;
+ 	}
+-	status = nfs3_proc_setacls(inode, acl, dfacl);
++	status = __nfs3_proc_setacls(inode, acl, dfacl);
+ 	posix_acl_release(alloc);
+ 	return status;
+ 
+-- 
+1.8.5.3
 
 
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
->
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> new file mode 100644
-> index 0000000..759339c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-> @@ -0,0 +1,41 @@
-> +Cirrus Logic CLPS711X Interrupt Controller
-> +
-> +Required properties:
-> +
-> +- compatible: Should be "cirrus,clps711x-intc".
-> +- reg: Specifies base physical address of the registers set.
-> +- interrupt-controller: Identifies the node as an interrupt controller.
-> +- #interrupt-cells: Specifies the number of cells needed to encode an
-> +  interrupt source. The value shall be 1.
-> +
-> +The interrupt sources are as follows:
-> +ID     Name    Description
-> +---------------------------
-> +1:     BLINT   Battery low (FIQ)
-> +3:     MCINT   Media changed (FIQ)
-> +4:     CSINT   CODEC sound
-> +5:     EINT1   External 1
-> +6:     EINT2   External 2
-> +7:     EINT3   External 3
-> +8:     TC1OI   TC1 under flow
-> +9:     TC2OI   TC2 under flow
-> +10:    RTCMI   RTC compare match
-> +11:    TINT    64Hz tick
-> +12:    UTXINT1 UART1 transmit FIFO half empty
-> +13:    URXINT1 UART1 receive FIFO half full
-> +14:    UMSINT  UART1 modem status changed
-> +15:    SSEOTI  SSI1 end of transfer
-> +16:    KBDINT  Keyboard
-> +17:    SS2RX   SSI2 receive FIFO half or greater full
-> +18:    SS2TX   SSI2 transmit FIFO less than half empty
-> +28:    UTXINT2 UART2 transmit FIFO half empty
-> +29:    URXINT2 UART2 receive FIFO half full
-> +32:    DAIINT  DAI interface (FIQ)
-> +
-> +Example:
-> +       intc: interrupt-controller {
-> +               compatible = "cirrus,clps711x-intc";
-> +               reg = <0x80000000 0x4000>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +       };
-> --
-> 1.8.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Trond Myklebust
+Linux NFS client maintainer
