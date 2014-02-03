@@ -1,28 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Feb 2014 19:59:44 -0800
-Subject: [PATCH 0/3] kconfig selection fixes
-In-Reply-To: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
-References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140203035944.GB20055@quad.lixom.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 2 Feb 2014 20:54:02 -0800
+Subject: [PATCH] arm: document "mach-virt" platform.
+In-Reply-To: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
+References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <20140203045402.GA4167@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 01, 2014 at 04:35:41PM -0600, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+On Thu, Jan 30, 2014 at 04:11:02PM +0000, Ian Campbell wrote:
+> mach-virt has existed for a while but it is not written down what it actually
+> consists of. Although it seems a bit unusual to document a binding for an
+> entire platform since mach-virt is entirely virtual it is helpful to have
+> something to refer to in the absence of a single concrete implementation.
 > 
-> Olof,
+> I've done my best to capture the requirements based on the git log and my
+> memory/understanding.
+
+[...]
+
 > 
-> Here are a few kconfig select fixes. The first one can be squashed into
-> my previous patch for HiSilicon removing SMP select if you want to. 
-> 
-> I'm still looking into the cpufreq select issue with highbank. I'll
-> follow-up with Viresh on that.
+> +
+> +The platform may also provide hypervisor specific functionality
+> +(e.g. PV I/O), if it does so then this functionality must be
+> +discoverable (directly or indirectly) via device tree.
 
-Since I had already applied the first version of the hisi patch (and sent the
-pull request for it), I held this off until -rc1. I've applied it to fixes now,
-so it'll be in the next batch we send up.
+While this is obviously true, I'm not sure I see the value of this text.
 
-Thanks!
+Isn't it more essential to just say that *any* functionality provided to
+the platform must be discoverable via device tree?
 
-
--Olof
+-Christoffer
