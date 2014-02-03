@@ -1,24 +1,42 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 3 Feb 2014 08:36:57 -0800
-Subject: [PATCH] clk: Fix notifier documentation
-In-Reply-To: <CAPtuhTj7QmB-xFU40x_MCvbvo07M2_2sDfiOQNkf4oEGFPKiOg@mail.gmail.com>
-References: <1390420117-25930-1-git-send-email-soren.brinkmann@xilinx.com>
- <57c43634-23a6-4dcf-8aff-f49961d7f4d6@TX2EHSMHS005.ehs.local>
- <CAPtuhTj7QmB-xFU40x_MCvbvo07M2_2sDfiOQNkf4oEGFPKiOg@mail.gmail.com>
-Message-ID: <7c0808b4-aac3-4add-a5dd-1a69ee815f4b@CO9EHSMHS003.ehs.local>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  3 Feb 2014 17:37:20 +0100
+Subject: [PATCH 0/3] ARM: v7m: updates for 3.15
+Message-ID: <1391445443-28971-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 10:01:27PM -0800, Mike Turquette wrote:
-> On Fri, Jan 31, 2014 at 5:49 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > ping?
-> 
-> Hi Soren,
-> 
-> I'm a bit slow to review patches during the merge window. Thanks for
-> the doc update. I'll take it in after -rc1 drops.
+Hello Russell,
 
-Sorry for my impatience. Thank you!
+I'd like these three patches to go in during the 3.15 merge window. The
+first two were already send earlier on this list (Message-Id:
+20131210212550.GF18888 at pengutronix.de), I only squashed in a fix for a format
+warning and an unused variable warning into the 2nd. The third is a trivial
+patch to allow power management on v7-M.
 
-	S?ren
+The series is available in my repository in the v7m branch:
+
+	git://git.pengutronix.de/git/ukl/linux.git v7m
+
+If you are ok with the changes, tell how you want them to pick up:
+signed tag to pull, patch system, pull as is, ...
+
+Also I wonder if you still have 7889/1 on your radar, I expected it to
+go in for 3.14-rc1. Is it just -ENOTIME on your side, or do you have any
+concerns?
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (3):
+  ARM: make isa_mode macro more robust and fix for v7-M
+  ARM: show_regs: on v7-M there are no FIQs, different processor modes,
+    ...
+  ARM: v7m: add trivial suspend support
+
+ arch/arm/Kconfig              | 2 +-
+ arch/arm/include/asm/ptrace.h | 8 ++++++--
+ arch/arm/kernel/process.c     | 5 +++++
+ 3 files changed, 12 insertions(+), 3 deletions(-)
+
+-- 
+1.8.5.3
