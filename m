@@ -1,89 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  2 Feb 2014 14:55:25 +0100
-Subject: [PATCH 3/3] ARM: sunxi: dt: Update the watchdog compatibles
-In-Reply-To: <1391349325-11132-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391349325-11132-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1391349325-11132-3-git-send-email-maxime.ripard@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Feb 2014 09:34:31 +0100
+Subject: [PATCH v4] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <20140131231618.GC11138@quad.lixom.net>
+References: <1383816355-2956-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZNe0L+yZnqrY51Oeg+k5NHXebJAiqxi+p5Scy-BQ2+1w@mail.gmail.com>
+ <52EBBB84.9050705@gmail.com>
+ <20140131231618.GC11138@quad.lixom.net>
+Message-ID: <CACRpkdbHNo1bLxKaCCuOBiRq+JEpEPXdmQpr4BKAiORcb2snfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog compatibles were following a different pattern than the one found
-in the other devices. Now that the driver supports the right pattern, switch to
-it in the DT.
+On Sat, Feb 1, 2014 at 12:16 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Jan 31, 2014 at 04:04:36PM +0100, Richard Genoud wrote:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi  | 2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
- arch/arm/boot/dts/sun6i-a31.dtsi  | 2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi  | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+>> I can't find this patch in linux-next, did I missed something ?
+>
+> Yeah, looks like we dropped the ball on it. We'll queue it up for 3.15 as soon
+> as -rc1 is out.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 040bb0e..f1eb8718 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -410,7 +410,7 @@
- 		};
- 
- 		wdt: watchdog at 01c20c90 {
--			compatible = "allwinner,sun4i-wdt";
-+			compatible = "allwinner,sun4i-a10-wdt";
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index ea16054..c4a4b23 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -373,7 +373,7 @@
- 		};
- 
- 		wdt: watchdog at 01c20c90 {
--			compatible = "allwinner,sun4i-wdt";
-+			compatible = "allwinner,sun4i-a10-wdt";
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 320335a..143656b 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -336,7 +336,7 @@
- 		};
- 
- 		wdt: watchdog at 01c20c90 {
--			compatible = "allwinner,sun4i-wdt";
-+			compatible = "allwinner,sun4i-a10-wdt";
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 5256ad9..cc691d1 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -242,7 +242,7 @@
- 		};
- 
- 		wdt1: watchdog at 01c20ca0 {
--			compatible = "allwinner,sun6i-wdt";
-+			compatible = "allwinner,sun6i-a31-wdt";
- 			reg = <0x01c20ca0 0x20>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 119f066..aaa7b3d 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -447,7 +447,7 @@
- 		};
- 
- 		wdt: watchdog at 01c20c90 {
--			compatible = "allwinner,sun4i-wdt";
-+			compatible = "allwinner,sun4i-a10-wdt";
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
--- 
-1.8.4.2
+OK it's out now ;-)
+
+Yours,
+Linus Walleij
