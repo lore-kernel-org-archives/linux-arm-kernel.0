@@ -1,30 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Feb 2014 09:27:05 +0000
-Subject: [PATCH 04/18] mfd: max14577: Add of_compatible to extcon mfd_cell
-In-Reply-To: <1390911522-28209-5-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 3 Feb 2014 09:30:13 +0000
+Subject: [PATCH 05/18] mfd: max14577: Use of_match_ptr() in i2c_driver
+In-Reply-To: <1390911522-28209-6-git-send-email-k.kozlowski@samsung.com>
 References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140203092705.GF13529@lee--X1>
+ <1390911522-28209-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140203093013.GG13529@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jan 2014, Krzysztof Kozlowski wrote:
-
-> Add of_compatible ("maxim,max14577-muic") to the mfd_cell for extcon
-> driver. If entry with such compatible is present in the DTS, the extcon
-> driver will have of_node set.
-> 
-> This may be useful for extcon consumers and it is documented in
-> bindings documentation.
+> Use of_match_ptr() in assignment of i2c_driver.of_match_table.
 > 
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > Cc: Kyungmin Park <kyungmin.park@samsung.com>
 > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  drivers/mfd/max14577.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+>  drivers/mfd/max14577.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
+> index 2ac2f2d7cea6..75b37082a3fe 100644
+> --- a/drivers/mfd/max14577.c
+> +++ b/drivers/mfd/max14577.c
+> @@ -224,7 +224,7 @@ static struct i2c_driver max14577_i2c_driver = {
+>  		.name = "max14577",
+>  		.owner = THIS_MODULE,
+>  		.pm = &max14577_pm,
+> -		.of_match_table = max14577_dt_match,
+> +		.of_match_table = of_match_ptr(max14577_dt_match),
 
-Applied, thanks.
+Are you sure this is required?
+
+>  	},
+>  	.probe = max14577_i2c_probe,
+>  	.remove = max14577_i2c_remove,
 
 -- 
 Lee Jones
