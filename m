@@ -1,44 +1,58 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 3 Feb 2014 16:47:55 +0100
-Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
-In-Reply-To: <3121595.GbLMuGPlvA@wuerfel>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <201402031606.11753.arnd@arndb.de>
- <24ecacca-2714-4834-921c-b827c0e592a3@VA3EHSMHS003.ehs.local>
- <3121595.GbLMuGPlvA@wuerfel>
-Message-ID: <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 3 Feb 2014 15:55:42 +0000
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140203103415.GA12187@mudshark.cambridge.arm.com>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+ <1391029124.2488.50.camel@deneb.redhat.com>
+ <20140130131247.GG11329@bivouac.eciton.net>
+ <20140203103415.GA12187@mudshark.cambridge.arm.com>
+Message-ID: <20140203155542.GI11329@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2014 04:32 PM, Arnd Bergmann wrote:
-> On Monday 03 February 2014 16:13:47 Michal Simek wrote:
->> Intention wasn't to fix binding but document current one
->> which is in mainline for a long time.
+On Mon, Feb 03, 2014 at 10:34:15AM +0000, Will Deacon wrote:
+> On Thu, Jan 30, 2014 at 01:12:47PM +0000, Leif Lindholm wrote:
+> > Oh, that's neat - thanks!
+> > 
+> > Well, given that, I can think of two less horrible options:
+> > 1)
+> > 	.macro  update_sctlr, tmp:req, set=, clear=
+> >         mrc	p15, 0, \tmp, c1, c0, 0
+> > 	.ifnc	\set,
+> >         orr	\tmp, \set
+> > 	.endif
+> > 	.ifnc	\clear,
+> > 	mvn	\clear, \clear
+> > 	and	\tmp, \tmp, \clear
 > 
-> Ok, I see.
+> Can't you use bic here?
+
+Yeah.
+
+> > 	.endif
+> >         mcr	p15, 0, \tmp, c1, c0, 0
+> > 	.endm
+> > 
+> > With the two call sites in uefi_phys.S as:
+> > 
+> > 	ldr	r5, =(CR_M)
+> > 	update_sctlr	r12, , r5
+> > and
+> > 	ldr	r4, =(CR_I | CR_C | CR_M)
+> > 	update_sctlr	r12, r4
 > 
->> Apart of this - yes, wdt-enable-once is nowayout and wdt-interval should be timeout
->> is seconds, and clock-frequency should go out and use CCF for getting clock.
-> 
-> Could we make a common binding then, and document that the xilinx
-> watchdog can optionally provide either one?
+> These ldr= could be movs, right?
 
-Do you mean to have 2 DT bindings?
+The first one could.
+The second one could be movw on armv7+.
 
-This binding is used from 2011-07.
-It means it was generated for all hw designs at least from this time.
-I would say from DT usage on Microblaze because it is not special case
-in our dt generator.
+> If so, I definitely prefer this to putting an ldr = into the macro itself
+> (option 2).
 
-xlnx,XXX are XXX parameters which you have to setup in tools
-and get synthesized. This is valid for all xilinx IPs. We have full
-IP description by generating xlnx,XXX parameters directly from tools
-because we know all variants which can happen.
+And your preference between 1) and 2) is?
 
-Just back to your previous post:
-"I'm not sure about the enable-once flag, which seems to just map to the
-"nowayout" watchdog option that is not a hardware feature at all"
-this is hw feature which you can select in tools because this is fpga. :-)
-
-Thanks,
-Michal
+/
+    Leif
