@@ -1,44 +1,86 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Feb 2014 09:51:40 +0800
-Subject: [PATCH v4 4/8] clk: sunxi: get divs parent clock name from parent
- factor clock
+Date: Mon,  3 Feb 2014 09:51:38 +0800
+Subject: [PATCH v4 2/8] clk: sunxi: update clock-output-names dt binding
+ documentation
 In-Reply-To: <1391392304-4660-1-git-send-email-wens@csie.org>
 References: <1391392304-4660-1-git-send-email-wens@csie.org>
-Message-ID: <1391392304-4660-5-git-send-email-wens@csie.org>
+Message-ID: <1391392304-4660-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Divs clocks consist of a parent factor clock with multiple outputs,
-and seperate clocks for each output. Get the name of the parent
-clock from the parent factor clock, instead of the DT node name.
+clock-output-names is now required for most of sunxi clock nodes, to
+provide the name of the corresponding clock. Add the new requirements,
+exceptions, as well as examples.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 32 ++++++++++++++++++-----
+ 1 file changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 7a2ed98..736fb60 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -869,7 +869,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 					struct divs_data *data)
- {
- 	struct clk_onecell_data *clk_data;
--	const char *parent  = node->name;
-+	const char *parent;
- 	const char *clk_name;
- 	struct clk **clks, *pclk;
- 	struct clk_hw *gate_hw, *rate_hw;
-@@ -883,6 +883,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index c2cb762..0cf679b 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -44,10 +44,11 @@ Required properties for all clocks:
+ 	multiplexed clocks, the list order must match the hardware
+ 	programming order.
+ - #clock-cells : from common clock binding; shall be set to 0 except for
+-	"allwinner,*-gates-clk" where it shall be set to 1
+-
+-Additionally, "allwinner,*-gates-clk" clocks require:
+-- clock-output-names : the corresponding gate names that the clock controls
++	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk" and
++	"allwinner,sun4i-pll6-clk" where it shall be set to 1
++- clock-output-names : shall be the corresponding names of the outputs.
++	If the clock module only has one output, the name shall be the
++	module name.
  
- 	/* Set up factor clock that we will be dividing */
- 	pclk = sunxi_factors_clk_setup(node, data->factors);
-+	parent = __clk_get_name(pclk);
+ Clock consumers should specify the desired clocks they use with a
+ "clocks" phandle cell. Consumers that are using a gated clock should
+@@ -56,18 +57,28 @@ offset of the bit controlling this particular gate in the register.
  
- 	reg = of_iomap(node, 0);
+ For example:
  
+-osc24M: osc24M at 01c20050 {
++osc24M: clk at 01c20050 {
+ 	#clock-cells = <0>;
+ 	compatible = "allwinner,sun4i-osc-clk";
+ 	reg = <0x01c20050 0x4>;
+ 	clocks = <&osc24M_fixed>;
++	clock-output-names = "osc24M";
+ };
+ 
+-pll1: pll1 at 01c20000 {
++pll1: clk at 01c20000 {
+ 	#clock-cells = <0>;
+ 	compatible = "allwinner,sun4i-pll1-clk";
+ 	reg = <0x01c20000 0x4>;
+ 	clocks = <&osc24M>;
++	clock-output-names = "pll1";
++};
++
++pll5: clk at 01c20020 {
++	#clock-cells = <1>;
++	compatible = "allwinner,sun4i-pll5-clk";
++	reg = <0x01c20020 0x4>;
++	clocks = <&osc24M>;
++	clock-output-names = "pll5_ddr", "pll5_other";
+ };
+ 
+ cpu: cpu at 01c20054 {
+@@ -75,4 +86,13 @@ cpu: cpu at 01c20054 {
+ 	compatible = "allwinner,sun4i-cpu-clk";
+ 	reg = <0x01c20054 0x4>;
+ 	clocks = <&osc32k>, <&osc24M>, <&pll1>;
++	clock-output-names = "cpu";
++};
++
++mmc0_clk: clk at 01c20088 {
++	#clock-cells = <0>;
++	compatible = "allwinner,sun4i-mod0-clk";
++	reg = <0x01c20088 0x4>;
++	clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
++	clock-output-names = "mmc0";
+ };
 -- 
 1.9.rc1
