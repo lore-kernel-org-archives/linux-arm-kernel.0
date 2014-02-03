@@ -1,168 +1,113 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Mon, 3 Feb 2014 21:36:39 +0530
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <20140201041051.9977.46568@quantum>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <CAPtuhTj2ZOb+5LDbqghuOhQZfVy8i1xuWotoZ6ocbJFgMxnSMQ@mail.gmail.com>
- <CAJuA9ajLUPtsReomPuuzMpshTEiUz81sc4584DEVQnG=iwGb-g@mail.gmail.com>
- <2009408.gnUEcoqA3p@phil> <20140201041051.9977.46568@quantum>
-Message-ID: <CAJuA9aiKAq5Q_PR_aCGU2QvLDhRWkc3JFHTzKFhcv9q=rJbbSw@mail.gmail.com>
+From: rgb@redhat.com (Richard Guy Briggs)
+Date: Mon, 3 Feb 2014 11:06:59 -0500
+Subject: [PATCH v2 1/6] audit: Enable arm64 support
+In-Reply-To: <52EF304F.80202@linaro.org>
+References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140123141808.GD27520@arm.com> <52E5EAC1.2070306@linaro.org>
+ <20140129202127.GA24068@madcap2.tricolour.ca>
+ <20140129223652.GA13702@madcap2.tricolour.ca>
+ <52EF304F.80202@linaro.org>
+Message-ID: <20140203160659.GA19292@madcap2.tricolour.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 1, 2014 at 9:40 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Heiko St?bner (2014-01-30 07:09:04)
->> On Thursday, 30. January 2014 18:23:44 Thomas Abraham wrote:
->> > Hi Mike,
->> >
->> > On Wed, Jan 29, 2014 at 12:17 AM, Mike Turquette <mturquette@linaro.org>
->> wrote:
->> > > On Mon, Jan 27, 2014 at 9:30 PM, Thomas Abraham <ta.omasab@gmail.com>
->> wrote:
->> > >> Hi Mike,
->> > >>
->> > >> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette <mturquette@linaro.org>
->> wrote:
->> > >>> Quoting Thomas Abraham (2014-01-18 04:10:51)
->> > >>>
->> > > As far as I can tell
->> > > the remux does not happen because it is necessary to generate the
->> > > required clock rate, but because we don't want to run the ARM core out
->> > > of spec for a short time while the PLL relocks. Assuming I have that
->> > > part of it right, I prefer for the parent mux operation to be a part
->> > > of the CPUfreq driver's .target callback instead of hidden away in the
->> > > clock driver.
->> >
->> > The re-parenting is mostly done to keep the ARM CPU clocked while the
->> > PLL is stopped, reprogrammed and restarted. One of the side effects of
->> > that is, the clock speed of the temporary parent could be higher then
->> > what is allowed due to the ARM voltage at the time of re-parenting.
->> > That is the reason to use the safe voltage.
->>
->> The Rockchip-SoCs use something similar, so I'm following quite closely what
->> Thomas is trying to do here, as similar solution would also solve this issue
->> for me.
->>
->> On some Rockchip-SoCs even stuff like pclk and hclk seems to be sourced from
->> the divided armclk, creating additional constraints.
->>
->> But on the RKs (at least in the upstream sources) the armclk is simply equal
->> to the pll output. A divider exists, but is only used to make sure that the
->> armclk stays below the original rate when sourced from the temp-parent, like
->>
->>         if (clk_get_rate(temp_parent) > clk_get_rate(main_parent)
->>                 set_divider(something so that rate(temp) <= rate(main)
->>         clk_set_parent(...)
->>
->> Isn't there a similar possiblity on your platform, as it would remove the need
->> for the safe-voltage?
->>
->>
->> In general I also like the approach of hiding the rate-change logic inside
->> this composite clock, as the depending clocks can be easily kept in sync. As
->> with the Rockchips the depending clocks are different for each of the three
->> Cortex-A9 SoCs I looked at, it would be "interesting" if all of this would
->> need to be done in a cpufreq driver.
->
-> I wonder if hiding these details inside of the composite clock
-> implementation indicates the lack of some needed feature in the clk
-> core? I've discussed the idea of "coordinated rate changes" before. E.g:
->
-> _________________________________________________________
-> |  clk  |  opp-low      |  opp-mid      |  opp-fast     |
-> |       |               |               |               |
-> |pll    | 300000        |  600000       |  600000       |
-> |       |               |               |               |
-> |div    | 150000        |  300000       |  600000       |
-> |       |               |               |               |
-> |mpu_clk| 150000        |  300000       |  600000       |
-> |       |               |               |               |
-> |periph | 150000        |  150000       |  300000       |
-> ---------------------------------------------------------
->
-> A call to clk_set_rate() against any of those clocks will result in all
-> of their dividers being updated. At the implementation level this might
-> look something like this extremely simplified pseudocode:
->
-> int clk_set_rate(struct clk* clk, unsigned long rate)
-> {
->         /* trap clks that support coordinated rate changes */
->         if (clk->ops->coordinate_rate)
->                 return clk->ops->coordinate_rate(clk->hw, rate);
->         ...
-> }
->
-> and,
->
-> struct coord_rates {
->         struct clk_hw *hw;
->         struct clk *parent;
->         struct clk *rate;
-> };
->
-> and in the clock driver,
->
-> #define PLL 0
-> #define DIV 1
-> #define MPU 2
-> #define PER 3
->
-> #define NR_OPP 4
-> #define NR_CLK 4
->
-> struct coord_rates my_opps[NR_OPP][NR_CLK]; // populated from DT data
->
-> int my_coordinate_rate_callback(struct clk_hw *hw, unsigned long rate)
-> {
->         struct coord_rate **selected_opp;
->
->         for(i = 0; i < NR_OPP; i++) {
->                 for(j = 0; j < NR_CLK; j++) {
->                         if (my_opps[i][j]->hw == hw &&
->                                 my_opps[i][j]->rate == rate)
->                                 selected_opp = my_opps[i];
->                                 break;
->                 }
->         }
->
->         /*
->          * order of operations is specific to my hardware and should be
->          * managed by my clock driver, not generic code
->          */
->
->         __clk_set_parent(selected_opp[DIV]->hw, temp_parent);
->         __clk_set_rate(selected_opp[PLL]->hw, selected_opp[PLL]->rate);
->         __clk_set_parent(selected_opp[DIV]->hw,
->                                 selected_opp[PLL]->hw->clk);
->         ...
->
->         /*
->          * note that the above could be handled by a switch-case or
->          * something else
->          */
-> }
->
-> Thoughts? Please forgive any gaps in my logic or abuse of C.
->
-> I have long thought that something like the above would someday go into
-> a generic dvfs layer instead of the clock framework, but maybe starting
-> with the clk framework makes more sense?
+On 14/02/03, AKASHI Takahiro wrote:
+> Richard,
 
-Hi Mike,
+Takahiro,
 
-Yes, this will be very helpful for atomically controlling the rates of
-a group of clocks. This coordinated rate change method can be used
-during the armclk rate changes on Samsung platforms.
+> On 01/30/2014 07:36 AM, Richard Guy Briggs wrote:
+> >On 14/01/29, Richard Guy Briggs wrote:
+> >>On 14/01/27, AKASHI Takahiro wrote:
+> >>>[To audit maintainers]
+> >>>
+> >>>On 01/23/2014 11:18 PM, Catalin Marinas wrote:
+> >>>>On Fri, Jan 17, 2014 at 08:13:14AM +0000, AKASHI Takahiro wrote:
+> >>>>>--- a/include/uapi/linux/audit.h
+> >>>>>+++ b/include/uapi/linux/audit.h
+> >>>>>@@ -327,6 +327,8 @@ enum {
+> >>>>>  /* distinguish syscall tables */
+> >>>>>  #define __AUDIT_ARCH_64BIT 0x80000000
+> >>>>>  #define __AUDIT_ARCH_LE	   0x40000000
+> >>>>>+#define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+> >>>>>+#define AUDIT_ARCH_AARCH64EB	(EM_AARCH64|__AUDIT_ARCH_64BIT)
+> >>>>>  #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+> >>>>>  #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
+> >>>>>  #define AUDIT_ARCH_ARMEB	(EM_ARM)
+> >>>>>diff --git a/init/Kconfig b/init/Kconfig
+> >>>>>index 79383d3..3aae602 100644
+> >>>>>--- a/init/Kconfig
+> >>>>>+++ b/init/Kconfig
+> >>>>>@@ -284,7 +284,7 @@ config AUDIT
+> >>>>>
+> >>>>>  config AUDITSYSCALL
+> >>>>>  	bool "Enable system-call auditing support"
+> >>>>>-	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
+> >>>>>+	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ARM64)
+> >>>>
+> >>>>The usual comment for such changes: could you please clean this up and
+> >>>>just use something like "depends on HAVE_ARCH_AUDITSYSCALL"?
+> >>>
+> >>>Do you agree to this change?
+> >>>
+> >>>If so, I can create a patch, but have some concerns:
+> >>>1) I can't verify it on other architectures than (arm &) arm64.
+> >>>2) Some architectures (microblaze, mips, openrisc) are not listed here, but
+> >>>    their ptrace.c have a call to audit_syscall_entry/exit().
+> >>>    (audit_syscall_entry/exit are null if !AUDITSYSCALL, though)
+> >>
+> >>I can try: ppc s390 x86_64 ppc64 i686 s390x
+> >
+> >These arches above all pass compile and basic tests with the following patches applied:
+> >
+> >	audit: correct a type mismatch in audit_syscall_exit() pending (already upstream)
+> >
+> >	audit: Modify a set of system calls in audit class definitions (already upstream)
+> >
+> >	[PATCH v3] audit: Add generic compat syscall support
+> >
+> >	[PATCH v2] audit: Enable arm64 support
+> >	[PATCH v2] arm64: Add regs_return_value() in syscall.h
+> >	[PATCH v2] arm64: Add audit support
+> >	[PATCH v2] arm64: audit: Add 32-bit (compat) syscall support
+> >	[PATCH v2] arm64: audit: Add makefile rule to create unistd_32.h for compat syscalls
+> >	[PATCH v2] arm64: audit: Add audit hook in ptrace/syscall_trace
+> 
+> I think that you missed Catalin's suggestion.
 
-Thanks,
-Thomas.
+I didn't miss his suggestions.  I think they are a good way to go, but I
+wanted to make a test at referrable point in time to validate the work
+to that point and to avoid introducing errors by mis-interpreting ideas
+that were not yet fully-formed patches.
 
->
-> Regards,
-> Mike
->
->>
->>
->> Heiko
->>
+> Please use the patch I will post after this message and try it again, please?
+
+I was certainly intending to do so.
+
+> Thanks,
+> -Takahiro AKASHI
+> 
+> >>>So I'm afraid that the change might break someone's assumption.
+> >>>
+> >>>Thanks,
+> >>>-Takahiro AKASHI
+> >>
+> >>- RGB
+> >
+> >- RGB
+> >
+> >--
+> >Richard Guy Briggs <rbriggs@redhat.com>
+> >Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+> >Remote, Ottawa, Canada
+> >Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+> >
+
+- RGB
+
+--
+Richard Guy Briggs <rbriggs@redhat.com>
+Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+Remote, Ottawa, Canada
+Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
