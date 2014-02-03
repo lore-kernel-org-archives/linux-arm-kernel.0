@@ -1,73 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Feb 2014 16:17:50 +0000
-Subject: [PATCH 5/5] arm64: add Crypto Extensions based synchronous core
- AES cipher
-In-Reply-To: <CAKv+Gu_NdVHawdVz3KUeZPHUL4ZPNSpeq7EWAgsVy+DfS6Kaqw@mail.gmail.com>
-References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391014246-9715-6-git-send-email-ard.biesheuvel@linaro.org>
- <20140130185645.GC4437@mudshark.cambridge.arm.com>
- <CAKv+Gu_NdVHawdVz3KUeZPHUL4ZPNSpeq7EWAgsVy+DfS6Kaqw@mail.gmail.com>
-Message-ID: <20140203161750.GH14112@mudshark.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 3 Feb 2014 10:20:09 -0600
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140203160051.GG14112@mudshark.cambridge.arm.com>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+ <1391029124.2488.50.camel@deneb.redhat.com>
+ <20140130131247.GG11329@bivouac.eciton.net>
+ <20140203103415.GA12187@mudshark.cambridge.arm.com>
+ <20140203155542.GI11329@bivouac.eciton.net>
+ <20140203160051.GG14112@mudshark.cambridge.arm.com>
+Message-ID: <CAL_Jsq+rKfEJjC=G=351xGn3E_4RyBfJGSjJ0xsZiBK6MSb6GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 07:20:38PM +0000, Ard Biesheuvel wrote:
-> On 30 January 2014 19:56, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jan 29, 2014 at 04:50:46PM +0000, Ard Biesheuvel wrote:
-> >> +static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
-> >> +{
-> >> +     struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-> >> +     u32 rounds = 6 + ctx->key_length / 4;
-> >
-> > Can you document these constants please?
-> >
-> 
-> Sure.
+On Mon, Feb 3, 2014 at 10:00 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Feb 03, 2014 at 03:55:42PM +0000, Leif Lindholm wrote:
+>> On Mon, Feb 03, 2014 at 10:34:15AM +0000, Will Deacon wrote:
+>> > On Thu, Jan 30, 2014 at 01:12:47PM +0000, Leif Lindholm wrote:
+>> > > Oh, that's neat - thanks!
+>> > >
+>> > > Well, given that, I can think of two less horrible options:
+>> > > 1)
+>> > >   .macro  update_sctlr, tmp:req, set=, clear=
+>> > >         mrc       p15, 0, \tmp, c1, c0, 0
+>> > >   .ifnc   \set,
+>> > >         orr       \tmp, \set
+>> > >   .endif
+>> > >   .ifnc   \clear,
+>> > >   mvn     \clear, \clear
+>> > >   and     \tmp, \tmp, \clear
+>> >
+>> > Can't you use bic here?
+>>
+>> Yeah.
+>>
+>> > >   .endif
+>> > >         mcr       p15, 0, \tmp, c1, c0, 0
+>> > >   .endm
+>> > >
+>> > > With the two call sites in uefi_phys.S as:
+>> > >
+>> > >   ldr     r5, =(CR_M)
+>> > >   update_sctlr    r12, , r5
+>> > > and
+>> > >   ldr     r4, =(CR_I | CR_C | CR_M)
+>> > >   update_sctlr    r12, r4
+>> >
+>> > These ldr= could be movs, right?
+>>
+>> The first one could.
+>> The second one could be movw on armv7+.
+>>
+>> > If so, I definitely prefer this to putting an ldr = into the macro itself
+>> > (option 2).
+>>
+>> And your preference between 1) and 2) is?
+>
+> (1), using bic and mov[tw] where possible.
 
-Thanks.
+Using mov[tw] will break on V6 enabled builds.
 
-> >> +
-> >> +     kernel_neon_begin();
-> >> +
-> >> +     __asm__("       ld1             {v0.16b}, [%[in]]               ;"
-> >> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
-> >> +             "0:     aese            v0.16b, v1.16b                  ;"
-> >> +             "       subs            %[rounds], %[rounds], #1        ;"
-> >> +             "       ld1             {v1.16b}, [%[key]], #16         ;"
-> >> +             "       beq             1f                              ;"
-> >> +             "       aesmc           v0.16b, v0.16b                  ;"
-> >> +             "       b               0b                              ;"
-> >> +             "1:     eor             v0.16b, v0.16b, v1.16b          ;"
-> >> +             "       st1             {v0.16b}, [%[out]]              ;"
-> >> +     : :
-> >> +             [out]           "r"(dst),
-> >> +             [in]            "r"(src),
-> >> +             [rounds]        "r"(rounds),
-> >> +             [key]           "r"(ctx->key_enc)
-> >> +     :                       "cc");
-> >
-> > You probably need a memory output to stop this being re-ordered by the
-> > compiler. Can GCC not generate the addressing modes you need directly,
-> > allowing you to avoid moving everything into registers?
-> >
-> 
-> Would a memory clobber work as well?
-
-It would, but it could lead to suboptimal code generation by GCC (although
-neon_{begin,end} may well stop GCC in its tracks anyway, so worth looking at
-the disassembly).
-
-> Re addressing modes: I would prefer to explicitly use v0 and v1, I
-> have another patch pending that allows partial saves/restores of the
-> NEON register file when called from interrupt context. I suppose I
-> could use 'register asm("v0")' or something like that, but that won't
-> make it any prettier.
-
-It's not the use of v0/v1 that I was objecting to. I was hoping that we
-could describe [in] and [out] as memory operands, so that GCC could
-potentially reduce register usage for base + offset style addressing modes.
-Unfortunately, I don't think we have such a constraint for AArch64 :(
-
-If the disassembly looks ok, the "memory" clobber is probably our best bet.
-
-Will
+Rob
