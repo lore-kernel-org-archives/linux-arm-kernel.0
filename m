@@ -1,41 +1,40 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  3 Feb 2014 14:34:30 -0800
-Subject: [PATCH v3 0/7] ARM: zynq: cpufreq support
-Message-ID: <1391466877-28908-1-git-send-email-soren.brinkmann@xilinx.com>
+From: amurray@embedded-bits.co.uk (Andrew Murray)
+Date: Mon, 3 Feb 2014 22:34:40 +0000
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <CAPcvp5EF_=G=VwWLfbw6mwczErTHeq4AbVALYpuAzb3c5eb2rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 3 February 2014 18:43, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 4cc813e..ce5bad2 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>  /*
+>   *  I/O port access primitives.
+>   */
+> +#define arch_has_dev_port()    (0)
+>  #define IO_SPACE_LIMIT         0xffff
+>  #define PCI_IOBASE             ((void __iomem *)(MODULES_VADDR - SZ_2M))
+>
+> +#define ioport_map(port, nr)   (PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
+> +#define ioport_unmap(addr)
 
-the merge window is over and ARM is also booting again. So, time to
-restart the discussion on this series.
-I rebased the series on 3.14-rc1 which removed some of the patches of
-the original submission due to them already having been merged.
-Other than that, I didn't do many changes compared to the patches that
-have been sent out in early December. Changelogs are included with the
-patches.
+I'm not sure that this will work. The in[bwl], out[bwl] macros in
+arch/arm64/include/asm/io.h already add the PCI_IOBASE offset.
 
-	Thanks,
-	S?ren
+Instead of these two #defines, why not just enforce that
+GENERIC_PCI_IOMAP is enabled? Or at least wrap these defines with 'if
+(!config_enabled(CONFIG_GENERIC_PCI_IOMAP))' or similar.
 
-Soren Brinkmann (7):
-  time: Serialize calls to 'clockevents_update_freq' in the timing core
-  time: clockevents: Adjust timer interval when frequency changes
-  clocksource/cadence_ttc: Call clockevents_update_freq() with IRQs
-    enabled
-  clocksource/cadence_ttc: Overhaul clocksource frequency adjustment
-  clocksource/cadence_ttc: Use only one counter
-  arm: zynq: Don't use arm_global_timer with cpufreq
-  arm: zynq: Add support for cpufreq
+> +
+>  static inline u8 inb(unsigned long addr)
+>  {
+>         return readb(addr + PCI_IOBASE);
 
- arch/arm/boot/dts/zynq-7000.dtsi        |   6 +
- arch/arm/mach-zynq/Kconfig              |   4 +-
- arch/arm/mach-zynq/common.c             |   3 +
- drivers/clocksource/cadence_ttc_timer.c | 213 ++++++++++++++++++--------------
- kernel/time/clockevents.c               |  32 +++--
- kernel/time/tick-broadcast.c            |  25 +++-
- kernel/time/tick-internal.h             |   4 +
- 7 files changed, 177 insertions(+), 110 deletions(-)
 
--- 
-1.8.5.3
+Andrew Murray
