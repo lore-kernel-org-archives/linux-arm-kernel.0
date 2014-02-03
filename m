@@ -1,50 +1,39 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon,  3 Feb 2014 08:40:26 -0500
-Subject: [PATCH v2 0/6] IIO pulse capture support for TI ECAP
-Message-ID: <1391434832-23807-1-git-send-email-mporter@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 3 Feb 2014 16:15:29 +0200
+Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <1390962378.2398.11.camel@jilin-desktop>
+References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
+ <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
+ <1390962378.2398.11.camel@jilin-desktop>
+Message-ID: <20140203141529.GF19389@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-	- Rebased to 3.14-rc1
-	- Renamed in_pulse_polarity to pulse_polarity
-	- Added ABI entries for pulse devices and TI ECAP
+On Wed, Jan 29, 2014 at 03:26:18AM +0100, Jim Lin wrote:
+> On Wed, 2014-01-29 at 07:36 +0800, Peter De Schrijver wrote:
+> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > ---
+> >  Documentation/ABI/testing/sysfs-driver-tegra-fuse |    8 +
+> >  drivers/misc/fuse/Makefile                        |    1 +
+> >  drivers/misc/fuse/tegra/Makefile                  |    7 +
+> >  drivers/misc/fuse/tegra/fuse-tegra.c              |  228 ++++++++++++++++
+> >  drivers/misc/fuse/tegra/fuse-tegra20.c            |  136 ++++++++++
+> >  drivers/misc/fuse/tegra/fuse-tegra30.c            |  178 +++++++++++++
+> >  drivers/misc/fuse/tegra/fuse.h                    |   82 ++++++
+> Could we move this fuse.h to other folder under /include/linux
+> (like /include/linux/platform_data)
+> for other driver to include?
 
-This series adds support for PWM capture devices within IIO and
-adds a TI ECAP IIO driver.
+I don't think we should expose everything in fuse.h to the world.
 
-PWM capture devices are supported using a new IIO "pulse" channel type.
+> So other driver can invoke function to read fuse data if needed.
 
-The IIO ECAP driver implements interrupt driven triggered buffer capture
-only as raw sample reads are not applicable to this hardware.
-Initially, the driver supports a single pulse width measurement with
-configurable polarity. The ECAP hardware can support measurement of a
-complete period and duty cycle but this is not yet implemented.
+Which functionality do you want? Just reading the fuse data exposed in
+the sysfs file from a driver? exporting tegra_fuse_readl() should do
+that I think?
 
-Matt Porter (6):
-  iio: add support for pulse width capture devices
-  iio: pulse: add TI ECAP driver
-  iio: enable selection and build of pulse drivers
-  iio: Add ABI docs for pulse capture devices
-  pwm: enable TI PWMSS if the IIO tiecap driver is selected
-  ARM: dts: AM33XX: Add ecap interrupt properties
+Cheers,
 
- Documentation/ABI/testing/sysfs-bus-iio            |  18 +
- .../ABI/testing/sysfs-bus-iio-pulse-tiecap         |   9 +
- arch/arm/boot/dts/am33xx.dtsi                      |   6 +
- drivers/iio/Kconfig                                |   1 +
- drivers/iio/Makefile                               |   1 +
- drivers/iio/industrialio-core.c                    |   1 +
- drivers/iio/pulse/Kconfig                          |  20 +
- drivers/iio/pulse/Makefile                         |   6 +
- drivers/iio/pulse/tiecap.c                         | 493 +++++++++++++++++++++
- drivers/pwm/Kconfig                                |   2 +-
- include/linux/iio/types.h                          |   1 +
- 11 files changed, 557 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
- create mode 100644 drivers/iio/pulse/Kconfig
- create mode 100644 drivers/iio/pulse/Makefile
- create mode 100644 drivers/iio/pulse/tiecap.c
-
--- 
-1.8.4
+Peter.
