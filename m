@@ -1,29 +1,28 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 03 Feb 2014 16:44:53 +0000
-Subject: [PATCH v5 00/16] uprobes: Add uprobes support for ARM
-In-Reply-To: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
-References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1391445893.3509.36.camel@linaro1.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Feb 2014 16:44:59 +0000
+Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
+In-Reply-To: <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
+ <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
+ <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
+ <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
+ <52E939CB.1020705@amd.com> <20140130174546.GF13543@alberich>
+ <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
+Message-ID: <20140203164459.GL14112@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On Fri, Jan 31, 2014 at 04:24:09PM +0000, Rob Herring wrote:
+> On Thu, Jan 30, 2014 at 11:45 AM, Andreas Herrmann
+> <andreas.herrmann@calxeda.com> wrote:
+> > Do you agree on increasing MAX_PHANDLE_ARGS to 32?
 > 
-> This patch series adds basic uprobes support to ARM. It is based on patches
-> developed earlier by Rabin Vincent. That approach of adding hooks into
-> the kprobes instruction parsing code was not well received. This approach
-> separates the ARM instruction parsing code in kprobes out into a separate set
-> of functions which can be used by both kprobes and uprobes. Both kprobes and
-> uprobes then provide their own semantic action tables to process the results of
-> the parsing.
+> Yes, but more than that will require a closer look. Please get this
+> into next early in the cycle.
 
-Assuming my comment about 'const' use in patch 5 is addressed, then for
-patches 2 to 14 you can add:
+If you want to get this patch in early, I suggest taking it via a tree other
+than mine. I don't put my iommu queue into -next, since it goes to Joerg
+around -rc4, who then sticks it in after that.
 
-Acked-by: Jon Medhurst <tixy@linaro.org>
-
-Thanks Dave for persevering.
-
--- 
-Tixy
+Will
