@@ -1,129 +1,44 @@
-From: trond.myklebust@primarydata.com (Trond Myklebust)
-Date: Sun, 02 Feb 2014 17:04:38 -0500
-Subject: NFS client broken in Linus' tip
-In-Reply-To: <20140202122757.GC26684@n2100.arm.linux.org.uk>
-References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
- <20140130141405.GA23985@infradead.org>
- <20140130142752.GX15937@n2100.arm.linux.org.uk>
- <20140130143208.GB9573@infradead.org>
- <20140130153812.GA15937@n2100.arm.linux.org.uk>
- <1391201970.6978.1.camel@leira.trondhjem.org>
- <20140201010328.GI15937@n2100.arm.linux.org.uk>
- <20140202122757.GC26684@n2100.arm.linux.org.uk>
-Message-ID: <1391378678.8123.5.camel@leira.trondhjem.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  3 Feb 2014 09:51:40 +0800
+Subject: [PATCH v4 4/8] clk: sunxi: get divs parent clock name from parent
+ factor clock
+In-Reply-To: <1391392304-4660-1-git-send-email-wens@csie.org>
+References: <1391392304-4660-1-git-send-email-wens@csie.org>
+Message-ID: <1391392304-4660-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-02-02 at 12:27 +0000, Russell King - ARM Linux wrote:
-> On Sat, Feb 01, 2014 at 01:03:28AM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 31, 2014 at 03:59:30PM -0500, Trond Myklebust wrote:
-> > > On Thu, 2014-01-30 at 15:38 +0000, Russell King - ARM Linux wrote:
-> > > > On Thu, Jan 30, 2014 at 06:32:08AM -0800, Christoph Hellwig wrote:
-> > > > > On Thu, Jan 30, 2014 at 02:27:52PM +0000, Russell King - ARM Linux wrote:
-> > > > > > Yes and no.  I still end up with an empty /etc/mtab, but the file now
-> > > > > > exists.  However, I can create and echo data into /etc/mtab, but it seems
-> > > > > > that can't happen at boot time.
-> > > > > 
-> > > > > Odd.  Can you disable CONFIG_NFSD_V3_ACL for now to isolate the issue?
-> > > > 
-> > > > Unfortunately, that results in some problem at boot time, which
-> > > > ultimately ends up with the other three CPUs being stopped, and
-> > > > hence the original reason scrolls off the screen before it can be
-> > > > read... even at 1920p.
-> > > > 
-> > > Hi Russell,
-> > > 
-> > > The following patch fixes the issue for me.
-> > 
-> > It doesn't entirely fix the issue for me, instead we've got even weirder
-> > behaviour:
-> > 
-> > root at cubox-i4:~# ls -al test
-> > ls: cannot access test: No such file or directory
-> > root at cubox-i4:~# touch test
-> > root at cubox-i4:~# ls -al test
-> > -rw-r--r-- 1 root root 0 Feb  1 01:01 test
-> > root at cubox-i4:~# echo foo > test
-> > root at cubox-i4:~# ls -al test
-> > -rw-r--r-- 1 root root 4 Feb  1 01:01 test
-> > root at cubox-i4:~# cat test
-> > foo
-> > root at cubox-i4:~# rm test
-> > root at cubox-i4:~# echo foo > test
-> > -bash: test: Operation not supported
-> > root at cubox-i4:~# ls -al test
-> > -rw-r--r-- 1 root root 0 Feb  1 01:01 test
-> 
-> FYI, I just tested Linus' tip, and NFS is still broken.
-> 
-Hi Russell,
+Divs clocks consist of a parent factor clock with multiple outputs,
+and seperate clocks for each output. Get the name of the parent
+clock from the parent factor clock, instead of the DT node name.
 
-The following patch should fix the above problem. It needs to be applied
-on top of the one I sent you previously. In addition, you will want to
-apply Noah Massey's patch from
-http://lkml.kernel.org/r/1391135472-9639-1-git-send-email-Noah.Massey at gmail.com 
-
-Cheers,
-  Trond
-
-8<------------------------------------------------------------------------------
->From f9ad7a7b43554bc36eccf03d33617c05b8a2c77d Mon Sep 17 00:00:00 2001
-From: Trond Myklebust <trond.myklebust@primarydata.com>
-Date: Sun, 2 Feb 2014 14:36:42 -0500
-Subject: [PATCH] NFSv3: Fix return value of nfs3_proc_setacls
-
-nfs3_proc_setacls is used internally by the NFSv3 create operations
-to set the acl after the file has been created. If the operation
-fails because the server doesn't support acls, then it must return '0',
-not -EOPNOTSUPP.
-
-Signed-off-by: Trond Myklebust <trond.myklebust@primarydata.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- fs/nfs/nfs3acl.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/fs/nfs/nfs3acl.c b/fs/nfs/nfs3acl.c
-index 9271a6bb9a41..871d6eda8dba 100644
---- a/fs/nfs/nfs3acl.c
-+++ b/fs/nfs/nfs3acl.c
-@@ -113,7 +113,7 @@ getout:
- 	return ERR_PTR(status);
- }
- 
--int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
-+static int __nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
- 		struct posix_acl *dfacl)
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 7a2ed98..736fb60 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -869,7 +869,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 					struct divs_data *data)
  {
- 	struct nfs_server *server = NFS_SERVER(inode);
-@@ -198,6 +198,15 @@ out:
- 	return status;
- }
+ 	struct clk_onecell_data *clk_data;
+-	const char *parent  = node->name;
++	const char *parent;
+ 	const char *clk_name;
+ 	struct clk **clks, *pclk;
+ 	struct clk_hw *gate_hw, *rate_hw;
+@@ -883,6 +883,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
  
-+int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
-+		struct posix_acl *dfacl)
-+{
-+	int ret;
-+	ret = __nfs3_proc_setacls(inode, acl, dfacl);
-+	return (ret == -EOPNOTSUPP) ? 0 : ret;
-+
-+}
-+
- int nfs3_set_acl(struct inode *inode, struct posix_acl *acl, int type)
- {
- 	struct posix_acl *alloc = NULL, *dfacl = NULL;
-@@ -225,7 +234,7 @@ int nfs3_set_acl(struct inode *inode, struct posix_acl *acl, int type)
- 		if (IS_ERR(alloc))
- 			goto fail;
- 	}
--	status = nfs3_proc_setacls(inode, acl, dfacl);
-+	status = __nfs3_proc_setacls(inode, acl, dfacl);
- 	posix_acl_release(alloc);
- 	return status;
+ 	/* Set up factor clock that we will be dividing */
+ 	pclk = sunxi_factors_clk_setup(node, data->factors);
++	parent = __clk_get_name(pclk);
+ 
+ 	reg = of_iomap(node, 0);
  
 -- 
-1.8.5.3
-
-
--- 
-Trond Myklebust
-Linux NFS client maintainer
+1.9.rc1
