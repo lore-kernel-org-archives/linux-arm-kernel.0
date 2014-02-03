@@ -1,39 +1,33 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 3 Feb 2014 16:15:29 +0200
-Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <1390962378.2398.11.camel@jilin-desktop>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
- <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
- <1390962378.2398.11.camel@jilin-desktop>
-Message-ID: <20140203141529.GF19389@tbergstrom-lnx.Nvidia.com>
+From: trond.myklebust@primarydata.com (Trond Myklebust)
+Date: Mon, 3 Feb 2014 09:17:30 -0500
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <20140203080325.GB806@infradead.org>
+References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
+ <20140130141405.GA23985@infradead.org>
+ <20140130142752.GX15937@n2100.arm.linux.org.uk>
+ <20140130143208.GB9573@infradead.org>
+ <20140130153812.GA15937@n2100.arm.linux.org.uk>
+ <1391201970.6978.1.camel@leira.trondhjem.org>
+ <20140203080325.GB806@infradead.org>
+Message-ID: <85AAFCF5-60EE-42E5-B103-37A4613C5947@primarydata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 29, 2014 at 03:26:18AM +0100, Jim Lin wrote:
-> On Wed, 2014-01-29 at 07:36 +0800, Peter De Schrijver wrote:
-> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-> > 
-> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > ---
-> >  Documentation/ABI/testing/sysfs-driver-tegra-fuse |    8 +
-> >  drivers/misc/fuse/Makefile                        |    1 +
-> >  drivers/misc/fuse/tegra/Makefile                  |    7 +
-> >  drivers/misc/fuse/tegra/fuse-tegra.c              |  228 ++++++++++++++++
-> >  drivers/misc/fuse/tegra/fuse-tegra20.c            |  136 ++++++++++
-> >  drivers/misc/fuse/tegra/fuse-tegra30.c            |  178 +++++++++++++
-> >  drivers/misc/fuse/tegra/fuse.h                    |   82 ++++++
-> Could we move this fuse.h to other folder under /include/linux
-> (like /include/linux/platform_data)
-> for other driver to include?
 
-I don't think we should expose everything in fuse.h to the world.
+On Feb 3, 2014, at 3:03, Christoph Hellwig <hch@infradead.org> wrote:
 
-> So other driver can invoke function to read fuse data if needed.
+> On Fri, Jan 31, 2014 at 03:59:30PM -0500, Trond Myklebust wrote:
+>> posix_acl_xattr_get requires get_acl() to return EOPNOTSUPP if the
+>> filesystem cannot support acls. This is needed for NFS, which can't
+>> know whether or not the server supports acls until it tries to get/set
+>> one.
+>> This patch converts posix_acl_chmod and posix_acl_create to deal with
+>> EOPNOTSUPP return values from get_acl().
+> 
+> Shouldn't NFS just return a NULL ACL here?
 
-Which functionality do you want? Just reading the fuse data exposed in
-the sysfs file from a driver? exporting tegra_fuse_readl() should do
-that I think?
+As I said above, that causes posix_acl_xattr_get() to return the wrong answer (ENODATA instead of EOPNOTSUPP).
 
-Cheers,
-
-Peter.
+--
+Trond Myklebust
+Linux NFS client maintainer
