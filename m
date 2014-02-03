@@ -1,276 +1,105 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 3 Feb 2014 18:13:52 +0100
-Subject: [PATCH 2/5] cpu: add generic support for CPU feature based module
- autoloading
-In-Reply-To: <1391014246-9715-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1391014246-9715-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391014246-9715-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-UuVvPMSypZKqNt8Dk9Ex4URsjRZYybMxGo=FksXtW8w@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 03 Feb 2014 09:39:58 -0800
+Subject: [PATCH v2 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
+In-Reply-To: <20140131081147.GC2950@lukather> (Maxime Ripard's message of
+ "Fri, 31 Jan 2014 09:11:47 +0100")
+References: <1390993850-9054-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1390993850-9054-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140129122520.GY11841@sirena.org.uk>
+ <20140129133227.GQ3867@lukather>
+ <CAGa+x854huSmiWmEv2EgOPUgZKcp3iitNaBvKXt8DiEj8msSVg@mail.gmail.com>
+ <20140131081147.GC2950@lukather>
+Message-ID: <87ppn4t7rl.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-Would you care to comment on this patch?
+> Hi Kevin,
+>
+> On Thu, Jan 30, 2014 at 03:52:16PM -0800, Kevin Hilman wrote:
+>> On Wed, Jan 29, 2014 at 5:32 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Wed, Jan 29, 2014 at 12:25:20PM +0000, Mark Brown wrote:
+>> >> On Wed, Jan 29, 2014 at 12:10:48PM +0100, Maxime Ripard wrote:
+>> >>
+>> >> > +config SPI_SUN6I
+>> >> > +   tristate "Allwinner A31 SPI controller"
+>> >> > +   depends on ARCH_SUNXI || COMPILE_TEST
+>> >> > +   select PM_RUNTIME
+>> >> > +   help
+>> >> > +     This enables using the SPI controller on the Allwinner A31 SoCs.
+>> >> > +
+>> >>
+>> >> A select of PM_RUNTIME is both surprising and odd - why is that there?
+>> >> The usual idiom is that the device starts out powered up (flagged using
+>> >> pm_runtime_set_active()) and then runtime PM then suspends it when it's
+>> >> compiled in.  That way if for some reason people want to avoid runtime
+>> >> PM they can still use the device.
+>> >
+>> > Since pm_runtime_set_active and all the pm_runtime* callbacks in
+>> > general are defined to pretty much empty functions, how the
+>> > suspend/resume callbacks are called then? Obviously, we need them to
+>> > be run, hence why I added the select here, but now I'm seeing a
+>> > construct like what's following acceptable then?
+>> 
+>> Even with your 'select', The runtime PM callbacks will never be called
+>> in the current driver.  pm_runtime_enable() doesn't do any runtime PM
+>> transitions.  It just allows transitions to happen when they're
+>> triggered by _get()/_put()/etc.
+>
+> Actually, pm_runtime_get_sync is called by the SPI framework whenever
+> the device needs to be used. And pm_runtime_put whenever it's not used
+> anymore, so the callbacks are actually called.
 
-It adds some Kconfig clutter, but this is removed again in the next patch
-(http://marc.info/?l=linux-arm-kernel&m=139101443708663&w=2),
-which has already been acked by hpa here:
-http://marc.info/?l=linux-arm-kernel&m=139101589509168&w=2
+Ah, right.  I forgot that the SPI framework is using runtime PM now.
 
-Example enabling it for arm64:
-http://marc.info/?l=linux-arm-kernel&m=139101486308822&w=2
+>> 
+>> > pm_runtime_enable(&pdev->dev);
+>> > if (!pm_runtime_enabled(&pdev->dev))
+>> >    sun6i_spi_runtime_resume(&pdev->dev);
+>> 
+>> Similarily here, it's not the pm_runtime_enable that will fail when
+>> runtime PM is disabled (or not built-in), it's a pm_runtime_get_sync()
+>> that will fail.
+>
+> In the case where pm_runtime is disabled, pm_runtime_enabled will only
+> return false, and hence the resume callback will be called. get_sync
+> will fail too when the framework will call it, but since the device is
+> already initialized, it's fine I guess.
+>
+>> What you want is something like this in ->probe()
+>> 
+>>    sun6i_spi_runtime_resume();
+>>    /* now, device is always activated whether or not runtime PM is enabled */
+>>    pm_runtime_enable();
+>>    pm_runtime_set_active();  /* tells runtime PM core device is
+>> already active */
+>>    pm_runtime_get_sync();
+>> 
+>> This 'get' will increase the usecount, but not actually call the
+>> callbacks because we told the RPM core that the device was already
+>> activated with _set_active().
+>> 
+>> And then, in ->remove(), you'll want
+>> 
+>>    pm_runtime_put();
+>>    pm_runtime_disable();
+>> 
+>> And if runtime PM is not enabled in the kernel, then the device will
+>> be left on (which is kinda what you want if you didn't build runtime
+>> PM into the kernel.)
+>
+> Yes, but that also mean that the device is actually on after the
+> probe, even if it's never going to be used. From what I got reading
+> the pm_runtime code, the suspend callback is called only whenever you
+> call _put, so the device will be suspended only after it's been used
+> the first time, right?
+>
+> Wouldn't it be better if it was suspended by default, and just waken
+> up whenever the framework needs it?
 
-Example using it (optional AES instructions on arm64):
-http://marc.info/?l=linux-arm-kernel&m=139101446008665&w=2
+Yes, but that's the job of runtime PM.  Without runtime PM, you have to
+live with leaving the device powered up all the time.
 
-Best regards,
-Ard.
-
-
-
-On 29 January 2014 17:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This patch adds support for advertising optional CPU features over udev using
-> the modalias, and for declaring compatibility with/dependency upon such a
-> feature in a module.
->
-> This feature can be enabled by setting CONFIG_GENERIC_CPU_AUTOPROBE for the
-> architecture, and supplying a file <asm/cpufeature.h> which defines how the
-> numbers used in the modalias string map to actual CPU features.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/base/Kconfig              |  8 ++++++
->  drivers/base/cpu.c                | 39 +++++++++++++++++++++----
->  include/linux/cpufeature.h        | 60 +++++++++++++++++++++++++++++++++++++++
->  include/linux/mod_devicetable.h   |  9 ++++++
->  scripts/mod/devicetable-offsets.c |  3 ++
->  scripts/mod/file2alias.c          | 10 +++++++
->  6 files changed, 123 insertions(+), 6 deletions(-)
->  create mode 100644 include/linux/cpufeature.h
->
-> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-> index ec36e7772e57..3f0d3732df7f 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -185,6 +185,14 @@ config GENERIC_CPU_DEVICES
->         bool
->         default n
->
-> +config HAVE_CPU_AUTOPROBE
-> +       def_bool ARCH_HAS_CPU_AUTOPROBE
-> +
-> +config GENERIC_CPU_AUTOPROBE
-> +       bool
-> +       depends on !ARCH_HAS_CPU_AUTOPROBE
-> +       select HAVE_CPU_AUTOPROBE
-> +
->  config SOC_BUS
->         bool
->
-> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-> index 270649012e64..8a38bf8c792f 100644
-> --- a/drivers/base/cpu.c
-> +++ b/drivers/base/cpu.c
-> @@ -15,6 +15,7 @@
->  #include <linux/percpu.h>
->  #include <linux/acpi.h>
->  #include <linux/of.h>
-> +#include <linux/cpufeature.h>
->
->  #include "base.h"
->
-> @@ -286,12 +287,38 @@ static void cpu_device_release(struct device *dev)
->          */
->  }
->
-> -#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
-> +#ifdef CONFIG_HAVE_CPU_AUTOPROBE
-> +#ifdef CONFIG_GENERIC_CPU_AUTOPROBE
-> +static ssize_t print_cpu_modalias(struct device *dev,
-> +                                 struct device_attribute *attr,
-> +                                 char *buf)
-> +{
-> +       ssize_t n;
-> +       u32 i;
-> +
-> +       n = sprintf(buf, "cpu:type:" CPU_FEATURE_TYPEFMT ":feature:",
-> +                   CPU_FEATURE_TYPEVAL);
-> +
-> +       for (i = 0; i < MAX_CPU_FEATURES; i++)
-> +               if (cpu_have_feature(i)) {
-> +                       if (PAGE_SIZE < n + sizeof(",XXXX\n")) {
-> +                               WARN(1, "CPU features overflow page\n");
-> +                               break;
-> +                       }
-> +                       n += sprintf(&buf[n], ",%04X", i);
-> +               }
-> +       buf[n++] = '\n';
-> +       return n;
-> +}
-> +#else
-> +#define print_cpu_modalias     arch_print_cpu_modalias
-> +#endif
-> +
->  static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
->  {
->         char *buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
->         if (buf) {
-> -               arch_print_cpu_modalias(NULL, NULL, buf);
-> +               print_cpu_modalias(NULL, NULL, buf);
->                 add_uevent_var(env, "MODALIAS=%s", buf);
->                 kfree(buf);
->         }
-> @@ -319,7 +346,7 @@ int register_cpu(struct cpu *cpu, int num)
->         cpu->dev.offline_disabled = !cpu->hotpluggable;
->         cpu->dev.offline = !cpu_online(num);
->         cpu->dev.of_node = of_get_cpu_node(num, NULL);
-> -#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
-> +#ifdef CONFIG_HAVE_CPU_AUTOPROBE
->         cpu->dev.bus->uevent = cpu_uevent;
->  #endif
->         cpu->dev.groups = common_cpu_attr_groups;
-> @@ -343,8 +370,8 @@ struct device *get_cpu_device(unsigned cpu)
->  }
->  EXPORT_SYMBOL_GPL(get_cpu_device);
->
-> -#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
-> -static DEVICE_ATTR(modalias, 0444, arch_print_cpu_modalias, NULL);
-> +#ifdef CONFIG_HAVE_CPU_AUTOPROBE
-> +static DEVICE_ATTR(modalias, 0444, print_cpu_modalias, NULL);
->  #endif
->
->  static struct attribute *cpu_root_attrs[] = {
-> @@ -357,7 +384,7 @@ static struct attribute *cpu_root_attrs[] = {
->         &cpu_attrs[2].attr.attr,
->         &dev_attr_kernel_max.attr,
->         &dev_attr_offline.attr,
-> -#ifdef CONFIG_ARCH_HAS_CPU_AUTOPROBE
-> +#ifdef CONFIG_HAVE_CPU_AUTOPROBE
->         &dev_attr_modalias.attr,
->  #endif
->         NULL
-> diff --git a/include/linux/cpufeature.h b/include/linux/cpufeature.h
-> new file mode 100644
-> index 000000000000..c4d4eb8ac9fe
-> --- /dev/null
-> +++ b/include/linux/cpufeature.h
-> @@ -0,0 +1,60 @@
-> +/*
-> + * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __LINUX_CPUFEATURE_H
-> +#define __LINUX_CPUFEATURE_H
-> +
-> +#ifdef CONFIG_GENERIC_CPU_AUTOPROBE
-> +
-> +#include <linux/mod_devicetable.h>
-> +#include <asm/cpufeature.h>
-> +
-> +/*
-> + * Macros imported from <asm/cpufeature.h>:
-> + * - cpu_feature(x)            ordinal value of feature called 'x'
-> + * - cpu_have_feature(u32 n)   whether feature #n is available
-> + * - MAX_CPU_FEATURES          upper bound for feature ordinal values
-> + * Optional:
-> + * - CPU_FEATURE_TYPEFMT       format string fragment for printing the cpu type
-> + * - CPU_FEATURE_TYPEVAL       set of values matching the format string above
-> + */
-> +
-> +#ifndef CPU_FEATURE_TYPEFMT
-> +#define CPU_FEATURE_TYPEFMT    "%s"
-> +#endif
-> +
-> +#ifndef CPU_FEATURE_TYPEVAL
-> +#define CPU_FEATURE_TYPEVAL    ELF_PLATFORM
-> +#endif
-> +
-> +/*
-> + * Use module_cpu_feature_match(feature, module_init_function) to
-> + * declare that
-> + * a) the module shall be probed upon discovery of CPU feature 'feature'
-> + *    (typically at boot time using udev)
-> + * b) the module must not be loaded if CPU feature 'feature' is not present
-> + *    (not even by manual insmod).
-> + *
-> + * For a list of legal values for 'feature', please consult the file
-> + * 'asm/cpufeature.h' of your favorite architecture.
-> + */
-> +#define module_cpu_feature_match(x, __init)                    \
-> +static struct cpu_feature const cpu_feature_match_ ## x[] =    \
-> +       { { .feature = cpu_feature(x) }, { } };                 \
-> +MODULE_DEVICE_TABLE(cpu, cpu_feature_match_ ## x);             \
-> +                                                               \
-> +static int cpu_feature_match_ ## x ## _init(void)              \
-> +{                                                              \
-> +       if (!cpu_have_feature(cpu_feature(x)))                  \
-> +               return -ENODEV;                                 \
-> +       return __init();                                        \
-> +}                                                              \
-> +module_init(cpu_feature_match_ ## x ## _init)
-> +
-> +#endif
-> +#endif
-> diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-> index 45e921401b06..f2ac87c613a5 100644
-> --- a/include/linux/mod_devicetable.h
-> +++ b/include/linux/mod_devicetable.h
-> @@ -564,6 +564,15 @@ struct x86_cpu_id {
->  #define X86_MODEL_ANY  0
->  #define X86_FEATURE_ANY 0      /* Same as FPU, you can't test for that */
->
-> +/*
-> + * Generic table type for matching CPU features.
-> + * @feature:   the bit number of the feature (0 - 65535)
-> + */
-> +
-> +struct cpu_feature {
-> +       __u16   feature;
-> +};
-> +
->  #define IPACK_ANY_FORMAT 0xff
->  #define IPACK_ANY_ID (~0)
->  struct ipack_device_id {
-> diff --git a/scripts/mod/devicetable-offsets.c b/scripts/mod/devicetable-offsets.c
-> index bb5d115ca671..f282516acc7b 100644
-> --- a/scripts/mod/devicetable-offsets.c
-> +++ b/scripts/mod/devicetable-offsets.c
-> @@ -174,6 +174,9 @@ int main(void)
->         DEVID_FIELD(x86_cpu_id, model);
->         DEVID_FIELD(x86_cpu_id, vendor);
->
-> +       DEVID(cpu_feature);
-> +       DEVID_FIELD(cpu_feature, feature);
-> +
->         DEVID(mei_cl_device_id);
->         DEVID_FIELD(mei_cl_device_id, name);
->
-> diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-> index 23708636b05c..8a69005228d8 100644
-> --- a/scripts/mod/file2alias.c
-> +++ b/scripts/mod/file2alias.c
-> @@ -1135,6 +1135,16 @@ static int do_x86cpu_entry(const char *filename, void *symval,
->  }
->  ADD_TO_DEVTABLE("x86cpu", x86_cpu_id, do_x86cpu_entry);
->
-> +/* LOOKS like cpu:type:*:feature:*FEAT* */
-> +static int do_cpu_entry(const char *filename, void *symval, char *alias)
-> +{
-> +       DEF_FIELD(symval, cpu_feature, feature);
-> +
-> +       sprintf(alias, "cpu:type:*:feature:*%04X*", feature);
-> +       return 1;
-> +}
-> +ADD_TO_DEVTABLE("cpu", cpu_feature, do_cpu_entry);
-> +
->  /* Looks like: mei:S */
->  static int do_mei_entry(const char *filename, void *symval,
->                         char *alias)
-> --
-> 1.8.3.2
->
+Kevin
