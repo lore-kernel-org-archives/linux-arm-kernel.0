@@ -1,150 +1,145 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 3 Feb 2014 19:06:49 +0000
-Subject: [PATCH] pci: Add support for creating a generic host_bridge from
- device tree
-In-Reply-To: <7398333.9L5KlyFggU@wuerfel>
-References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
- <1391452428-22917-2-git-send-email-Liviu.Dudau@arm.com>
- <7398333.9L5KlyFggU@wuerfel>
-Message-ID: <20140203190649.GB4889@e106497-lin.cambridge.arm.com>
+Date: Mon, 3 Feb 2014 19:18:38 +0000
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <21596846.kVTqp7roW4@wuerfel>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+ <21596846.kVTqp7roW4@wuerfel>
+Message-ID: <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-First of all, thanks for reviewing this!
-
-On Mon, Feb 03, 2014 at 06:46:10PM +0000, Arnd Bergmann wrote:
-> On Monday 03 February 2014 18:33:48 Liviu Dudau wrote:
-> > +/**
-> > + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
-> > + * @dev: device node of the host bridge having the range property
-> > + * @resources: list where the range of resources will be added after DT parsing
-> > + *
-> > + * This function will parse the "ranges" property of a PCI host bridge device
-> > + * node and setup the resource mapping based on its content. It is expected
-> > + * that the property conforms with the Power ePAPR document.
-> > + *
-> > + * Each architecture will then apply their filtering based on the limitations
-> > + * of each platform. One general restriction seems to be the number of IO space
-> > + * ranges, the PCI framework makes intensive use of struct resource management,
-> > + * and for IORESOURCE_IO types they can only be requested if they are contained
-> > + * within the global ioport_resource, so that should be limited to one IO space
-> > + * range.
+On Mon, Feb 03, 2014 at 06:58:56PM +0000, Arnd Bergmann wrote:
+> On Monday 03 February 2014 18:43:48 Liviu Dudau wrote:
+> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> > index 4cc813e..ce5bad2 100644
+> > --- a/arch/arm64/include/asm/io.h
+> > +++ b/arch/arm64/include/asm/io.h
+> > @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+> >  /*
+> >   *  I/O port access primitives.
+> >   */
+> > +#define arch_has_dev_port()        (0)
 >
-> Actually we have quite a different set of restrictions around I/O space on ARM32
-> at the moment: Each host bridge can have its own 64KB range in an arbitrary
-> location on MMIO space, and the total must not exceed 2MB of I/O space.
+> Why not?
 
-And that is why the filtering is not (yet) imposed in the generic code. But once
-you use pci_request_region, that will call request_region which will check
-against ioport_resource as parent for the requested resource. That should fail
-if is is not in the correct range, so I don't know how arm arch code manages
-multiple IO ranges.
+Maybe I got it the wrong way around, but the comment in include/linux/io.h says:
+
+/*
+ * Some systems do not have legacy ISA devices.
+ * /dev/port is not a valid interface on these systems.
+ * So for those archs, <asm/io.h> should define the following symbol.
+ */
+
+So ... defining it should mean no legacy ISA devices, right?
 
 >
-> > + */
-> > +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
-> > +                                   struct list_head *resources)
+> >  #define IO_SPACE_LIMIT             0xffff
+>
+> You probably want to increase this a bit, to allow multiple host bridges
+> to have their own I/O space.
+
+OK, but to what size?
+
+>
+> >  #define PCI_IOBASE         ((void __iomem *)(MODULES_VADDR - SZ_2M))
+>
+> And modify this location: There is no particular reason to have the I/O space
+> mapped exactly 2MB below the loadable modules, as virtual address space is
+> essentially free.
+
+Will talk with Catalin about where to place this.
+
+>
+> > +#define ioport_map(port, nr)       (PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
+> > +#define ioport_unmap(addr)
+>
+> inline functions?
+
+Will do, thanks!
+
+>
+> >  static inline u8 inb(unsigned long addr)
+> >  {
+> >     return readb(addr + PCI_IOBASE);
+> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > new file mode 100644
+> > index 0000000..dd084a3
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/pci.h
+> > @@ -0,0 +1,35 @@
+> > +#ifndef __ASM_PCI_H
+> > +#define __ASM_PCI_H
+> > +#ifdef __KERNEL__
+> > +
+> > +#include <linux/types.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/dma-mapping.h>
+> > +
+> > +#include <asm/io.h>
+> > +#include <asm-generic/pci-bridge.h>
+> > +#include <asm-generic/pci-dma-compat.h>
+> > +
+> > +#define PCIBIOS_MIN_IO             0
+> > +#define PCIBIOS_MIN_MEM            0
+>
+> PCIBIOS_MIN_IO is normally set to 0x1000, to stay out of the ISA range.
+
+:) No ISA support! (Die ISA, die!!)
+
+>
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > new file mode 100644
+> > index 0000000..7b652cf
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -0,0 +1,112 @@
+>
+> None of this looks really arm64 specific, nor should it be. I think
+> we should try a little harder to move this as a default implementation
+> into common code, even if we start out by having all architectures
+> override it.
+
+Agree. This is the RFC version. I didn't dare to post a patch with fixes
+for all architectures. :)
+
+>
+> > +int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
 > > +{
-> > +   struct resource *res;
-> > +   struct of_pci_range range;
-> > +   struct of_pci_range_parser parser;
-> > +   int err;
+> > +   BUG_ON(offset + SZ_64K - 1 > IO_SPACE_LIMIT);
 > > +
-> > +   pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> > +
-> > +   /* Check for ranges property */
-> > +   err = of_pci_range_parser_init(&parser, dev);
-> > +   if (err)
-> > +           return err;
-> > +
-> > +   pr_debug("Parsing ranges property...\n");
-> > +   for_each_of_pci_range(&parser, &range) {
-> > +           /* Read next ranges element */
-> > +           pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
-> > +                           range.pci_space, range.pci_addr);
-> > +           pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
-> > +                                   range.cpu_addr, range.size);
-> > +
-> > +           /* If we failed translation or got a zero-sized region
-> > +            * (some FW try to feed us with non sensical zero sized regions
-> > +            * such as power3 which look like some kind of attempt
-> > +            * at exposing the VGA memory hole) then skip this range
-> > +            */
-> > +           if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> > +                   continue;
-> > +
-> > +           res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > +           if (!res) {
-> > +                   err = -ENOMEM;
-> > +                   goto bridge_ranges_nomem;
-> > +           }
-> > +
-> > +           of_pci_range_to_resource(&range, dev, res);
-> > +
-> > +           pci_add_resource_offset(resources, res,
-> > +                           range.cpu_addr - range.pci_addr);
-> > +   }
+> > +   return ioremap_page_range((unsigned long)PCI_IOBASE + offset,
+> > +                           (unsigned long)PCI_IOBASE + offset + SZ_64K,
+> > +                           phys_addr,
+> > +                           __pgprot(PROT_DEVICE_nGnRE));
+> > +}
 >
-> I believe of_pci_range_to_resource() will return the MMIO aperture for the
-> I/O space window here, which is not what you are supposed to pass into
-> pci_add_resource_offset.
+> Not sure if we want to treat this one as architecture specific though.
+> It certainly won't be portable to x86, but it could be shared with
+> a couple of others. We may also want to redesign the interface.
+> I've been thinking we could make this function allocate space in the
+> Linux virtual I/O space aperture, and pass two resources into it
+> (physical I/O aperture and bus I/O range), and get the actual
+> io_offset as the return value, or a negative error number.
 
-And that is why the code in probe.c has been added to deal with that. It is
-too early to do the adjustments here as all we have is the list of resources
-and that might get culled by the architecture fixup code. Remembering the
-io_offset will happen once the pci_host_bridge gets created, and the resources
-are then adjusted.
+Not sure I completely follow your idea.
 
 >
-> > +EXPORT_SYMBOL(pci_host_bridge_of_init);
->
-> EXPORT_SYMBOL_GPL
+> That way, you could have an arbitrary number of host bridges in the
+> system and each one gets a share of the virtual aperture until
+> it's full.
 
-Will change for v2, thanks!
-
->
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 6e34498..16febae 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1787,6 +1787,17 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >     list_for_each_entry_safe(window, n, resources, list) {
-> >             list_move_tail(&window->list, &bridge->windows);
-> >             res = window->res;
-> > +           /*
-> > +            * IO resources are stored in the kernel with a CPU start
-> > +            * address of zero. Adjust the data accordingly and remember
-> > +            * the offset
-> > +            */
-> > +           if (resource_type(res) == IORESOURCE_IO) {
-> > +                   bridge->io_offset = res->start;
-> > +                   res->end -= res->start;
-> > +                   window->offset -= res->start;
-> > +                   res->start = 0;
-> > +           }
-> >             offset = window->offset;
-> >             if (res->flags & IORESOURCE_BUS)
->
-> Won't this break all existing host bridges?
-
-I am not sure. I believe not, due to what I've explained earlier, but you might be right.
-
-The adjustment happens before the resource is added to the host bridge windows and translates
-it from MMIO range into IO range.
-
-Best regards,
-Liviu
+One still needs to fix the pci_request_region use that checks against
+ioport_resource. But it is an interesting idea.
 
 >
 >       Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
 >
+
+Thanks for reviewing this patch!
+
+Liviu
 
 --
 ====================
