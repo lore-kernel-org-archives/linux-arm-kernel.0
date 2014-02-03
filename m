@@ -1,54 +1,82 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Feb 2014 09:51:37 +0800
-Subject: [PATCH v4 1/8] clk: sunxi: add clock-output-names dt property support
+Date: Mon,  3 Feb 2014 09:51:39 +0800
+Subject: [PATCH v4 3/8] clk: sunxi: add names for pll5,
+ pll6 parent clocks to factors_data
 In-Reply-To: <1391392304-4660-1-git-send-email-wens@csie.org>
 References: <1391392304-4660-1-git-send-email-wens@csie.org>
-Message-ID: <1391392304-4660-2-git-send-email-wens@csie.org>
+Message-ID: <1391392304-4660-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sunxi clock drivers use dt node name as clock name, but clock
-nodes should be named clk at X, so the names would be the same.
-Let the drivers read clock names from dt clock-output-names
-property.
+Some factor clocks, such as the parent clock of pll5 and pll6, have
+multiple output names. Add the corresponding names to factors_data
+tied to compatible string.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 27 ++++++++++++++++++---------
+ 1 file changed, 18 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index abb6c5a..0ed9794 100644
+index 0ed9794..7a2ed98 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -51,6 +51,8 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
- 	if (!gate)
- 		goto err_free_fixed;
+@@ -389,6 +389,7 @@ struct factors_data {
+ 	int mux;
+ 	struct clk_factors_config *table;
+ 	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
++	const char *name;
+ };
  
-+	of_property_read_string(node, "clock-output-names", &clk_name);
+ static struct clk_factors_config sun4i_pll1_config = {
+@@ -457,6 +458,14 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll5_config,
+ 	.getter = sun4i_get_pll5_factors,
++	.name = "pll5",
++};
 +
- 	/* set up gate and fixed rate properties */
- 	gate->reg = of_iomap(node, 0);
- 	gate->bit_idx = SUNXI_OSC24M_GATE;
-@@ -601,6 +603,8 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
++static const struct factors_data sun4i_pll6_data __initconst = {
++	.enable = 31,
++	.table = &sun4i_pll5_config,
++	.getter = sun4i_get_pll5_factors,
++	.name = "pll6",
+ };
+ 
+ static const struct factors_data sun4i_apb1_data __initconst = {
+@@ -499,14 +508,14 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
  	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
  		i++;
  
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
- 	clk = clk_register_mux(NULL, clk_name, parents, i,
- 			       CLK_SET_RATE_NO_REPARENT, reg,
- 			       data->shift, SUNXI_MUX_GATE_WIDTH,
-@@ -660,6 +664,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+-	/* Nodes should be providing the name via clock-output-names
+-	 * but originally our dts didn't, and so we used node->name.
+-	 * The new, better nodes look like clk at deadbeef, so we pull the
+-	 * name just in this case */
+-	if (!strcmp("clk", clk_name)) {
+-		of_property_read_string_index(node, "clock-output-names",
+-					      0, &clk_name);
+-	}
++	/*
++	 * some factor clocks, such as pll5 and pll6, may have multiple
++	 * outputs, and have their name designated in factors_data
++	 */
++	if (data->name)
++		clk_name = data->name;
++	else
++		of_property_read_string(node, "clock-output-names", &clk_name);
  
- 	clk_parent = of_clk_get_parent_name(node, 0);
+ 	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
+ 	if (!factors)
+@@ -838,7 +847,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+ };
  
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
- 	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
- 				   reg, data->shift, data->width,
- 				   data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
+ static const struct divs_data pll6_divs_data __initconst = {
+-	.factors = &sun4i_pll5_data,
++	.factors = &sun4i_pll6_data,
+ 	.div = {
+ 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+ 		{ .fixed = 2 }, /* P, other */
 -- 
 1.9.rc1
