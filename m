@@ -1,83 +1,93 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  3 Feb 2014 14:34:37 -0800
-Subject: [PATCH v3 7/7] arm: zynq: Add support for cpufreq
-In-Reply-To: <1391466877-28908-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1391466877-28908-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1391466877-28908-8-git-send-email-soren.brinkmann@xilinx.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Tue,  4 Feb 2014 00:01:42 +0100
+Subject: [PATCH v8 0/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+Message-ID: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic cpufreq-cpu0 driver can scale the CPU frequency on Zynq
-SOCs. Add the required platform device to the BSP and appropriate
-OPPs to the dts.
+This adds initial support for Broadcom network SoC from the BCM5301X 
+and BCM470X line.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v3:
- - change lowest frequency to 222223 (F_max / 3)
----
- arch/arm/boot/dts/zynq-7000.dtsi | 6 ++++++
- arch/arm/mach-zynq/Kconfig       | 2 ++
- arch/arm/mach-zynq/common.c      | 3 +++
- 3 files changed, 11 insertions(+)
+I do not have any documentation, only the vendor source code published 
+by Asus and Netgear to conform with the GPL, it would be nice to get 
+some documentation for this Soc like this
+https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
+for the Broadcom BCM440X Ethernet controller.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 8b67b19392ec..789d0bacc110 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -24,6 +24,12 @@
- 			device_type = "cpu";
- 			reg = <0>;
- 			clocks = <&clkc 3>;
-+			operating-points = <
-+				/* kHz    uV */
-+				666667  1000000
-+				333334  1000000
-+				222223  1000000
-+			>;
- 		};
- 
- 		cpu at 1 {
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index f84fab14f0b7..f03e75bd0b2b 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -2,6 +2,8 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select COMMON_CLK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 1db2a5ca9ab8..644468151c04 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -51,6 +51,8 @@ static struct platform_device zynq_cpuidle_device = {
-  */
- static void __init zynq_init_machine(void)
- {
-+	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
-+
- 	/*
- 	 * 64KB way size, 8-way associativity, parity disabled
- 	 */
-@@ -59,6 +61,7 @@ static void __init zynq_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	platform_device_register(&zynq_cpuidle_device);
-+	platform_device_register_full(&devinfo);
- }
- 
- static void __init zynq_timer_init(void)
+With some additional patches I got Ethernet working with ~250 MBit/s.
+
+A bootlog can be found here:
+http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
+
+This is based on 3.14-rc1.
+
+Christian Daudt could you please take these patches.
+
+Changes since v7:
+ * reorder debug options
+ * rebase on 3.14-rc1
+
+Changes since v6:
+ * rebase on arm-soc.git branch next/soc
+ * use ranges in dts files for SoC blocks
+
+Changes since v5:
+ * restructured the dts files, own file for the SoC family, the SoC and
+   the device
+
+Changes since v4:
+ * removed bcm5301x_timer_init(), this function is not needed
+ * removed GENERIC_TIME this is dead
+ * made fault handler check for code and just catch the first fault.
+
+Changes since v3:
+ * rebase on Linus 3.13-rc7
+ * split the workaround into an own patch
+ * add L2 cache controller to Device tree
+ * rename config option
+ * add local-timer and SCU entry to device tree
+
+Changes since v2:
+ * use vendor prefix brcm
+ * move code to arch/arm/mach-bcm/
+ * cleanup arch/arm/mach-bcm/bcm5301x.c
+ * rename to bcm5301x
+ * split into more patches
+
+Changes since v1:
+ * add file Documentation/devicetree/bindings/arm/bcm4708.txt
+ * rename bcm5301x to bcm4708 in dts files
+ * use preprocessor includes in dts file
+ * add CONFIG_ARCH_BCM53XX to multi_v7_defconfig
+ * remove init_machine callback
+ * rename vendor prefix from brcm to bcm
+ * split into two patches 
+
+Hauke Mehrtens (4):
+  ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM
+    CPU
+  ARM: BCM5301X: add early debugging support
+  ARM: BCM5301X: add dts files for BCM4708 SoC
+  ARM: BCM5301X: workaround suppress fault
+
+ Documentation/devicetree/bindings/arm/bcm4708.txt |    8 ++
+ MAINTAINERS                                       |    8 ++
+ arch/arm/Kconfig.debug                            |    7 ++
+ arch/arm/boot/dts/Makefile                        |    1 +
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts       |   35 ++++++++
+ arch/arm/boot/dts/bcm4708.dtsi                    |   34 ++++++++
+ arch/arm/boot/dts/bcm5301x.dtsi                   |   95 +++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig               |    1 +
+ arch/arm/mach-bcm/Kconfig                         |   26 ++++++
+ arch/arm/mach-bcm/Makefile                        |    1 +
+ arch/arm/mach-bcm/bcm_5301x.c                     |   61 +++++++++++++
+ 11 files changed, 277 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
+ create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
+ create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
+
 -- 
-1.8.5.3
+1.7.10.4
