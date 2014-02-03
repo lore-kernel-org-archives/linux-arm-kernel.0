@@ -1,28 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Feb 2014 16:44:59 +0000
-Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
-In-Reply-To: <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
-References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
- <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>
- <20140117110830.GW3471@alberich> <52E92842.3000001@amd.com>
- <CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com>
- <52E93360.1000904@amd.com> <20140129171611.GB13543@alberich>
- <52E939CB.1020705@amd.com> <20140130174546.GF13543@alberich>
- <CAL_Jsq+=dm4kPk=e0h_up9=wvED4fd3MBtSNFxm2NEz_yag-uA@mail.gmail.com>
-Message-ID: <20140203164459.GL14112@mudshark.cambridge.arm.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 04 Feb 2014 00:49:40 +0800
+Subject: a LLC sched domain bug for panda board?
+In-Reply-To: <CAKfTPtDJ267W9UMRj-pgyha0yf1L-VWBMKgi+QdVEA4zFJYXLw@mail.gmail.com>
+References: <52EFC11A.8010709@linaro.org>
+ <CAKfTPtDD9g6PPx=cDkbH2VDO0k1HDAjcxwxeW2YLXwL5T4d6NA@mail.gmail.com>
+ <CAKfTPtDJ267W9UMRj-pgyha0yf1L-VWBMKgi+QdVEA4zFJYXLw@mail.gmail.com>
+Message-ID: <52EFC8A4.2060906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 04:24:09PM +0000, Rob Herring wrote:
-> On Thu, Jan 30, 2014 at 11:45 AM, Andreas Herrmann
-> <andreas.herrmann@calxeda.com> wrote:
-> > Do you agree on increasing MAX_PHANDLE_ARGS to 32?
+On 02/04/2014 12:28 AM, Vincent Guittot wrote:
+> On 3 February 2014 17:27, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+>> Have you checked that CONFIG_SCHED_LC is set ?
 > 
-> Yes, but more than that will require a closer look. Please get this
-> into next early in the cycle.
+> sorry it's CONFIG_SCHED_MC
 
-If you want to get this patch in early, I suggest taking it via a tree other
-than mine. I don't put my iommu queue into -next, since it goes to Joerg
-around -rc4, who then sticks it in after that.
+Thanks for reminder! no it wasn't set. Does it means
+arch/arm/configs/omap2plus_defconfig need add this config?
 
-Will
+> 
+>>
+>>
+>> On 3 February 2014 17:17, Alex Shi <alex.shi@linaro.org> wrote:
+>>> I just run the 3.14-rc1 kernel on panda board. The only domain for it is
+>>> 'CPU' domain, but this domain has no SD_SHARE_PKG_RESOURCES setting, it
+>>> has no sd_llc.
+>>>
+>>> Guess the right domain for this board should be MC. So is it a bug?
+>>>
+>>> ..
+>>> /proc/sys/kernel/sched_domain/cpu0/domain0/name:CPU
+>>> ..
+>>> /proc/sys/kernel/sched_domain/cpu1/domain0/name:CPU
+>>>
+>>> --
+>>> Thanks
+>>>     Alex
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+-- 
+Thanks
+    Alex
