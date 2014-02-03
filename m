@@ -1,50 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Feb 2014 13:46:36 +0000
-Subject: [PATCH v2 1/3] KVM: Add capability to advertise PSCI v0.2 support
-In-Reply-To: <CAAhSdy3E-BxTi=c3rrQn-WYPQrrzheTfZy3c7SBCKdftjLF1uA@mail.gmail.com>
-References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
- <20140203114835.GB2784@e106331-lin.cambridge.arm.com>
- <CAAhSdy3E-BxTi=c3rrQn-WYPQrrzheTfZy3c7SBCKdftjLF1uA@mail.gmail.com>
-Message-ID: <20140203134635.GC2784@e106331-lin.cambridge.arm.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon,  3 Feb 2014 08:40:26 -0500
+Subject: [PATCH v2 0/6] IIO pulse capture support for TI ECAP
+Message-ID: <1391434832-23807-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 12:09:22PM +0000, Anup Patel wrote:
-> On Mon, Feb 3, 2014 at 5:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jan 30, 2014 at 10:41:17AM +0000, Anup Patel wrote:
-> >> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
-> >> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
-> >> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> ---
-> >>  include/uapi/linux/kvm.h |    1 +
-> >>  1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> >> index 902f124..d64349e 100644
-> >> --- a/include/uapi/linux/kvm.h
-> >> +++ b/include/uapi/linux/kvm.h
-> >> @@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
-> >>  #define KVM_CAP_ARM_EL1_32BIT 93
-> >>  #define KVM_CAP_SPAPR_MULTITCE 94
-> >>  #define KVM_CAP_EXT_EMUL_CPUID 95
-> >> +#define KVM_CAP_ARM_PSCI_0_2 96
-> >
-> > To reiterate the point I made on patch 2, this does not do what it says
-> > on the tin, and does not make sense without mandatory PSCI 0.2
-> > functionality being present, as no software can derive any value from
-> > this flag until such functionality is implemented.
-> 
-> I handle this situation I would suggest to not advertise PSCI v0.2
-> capability to user space till all mandatory PSCI v0.2 functions
-> are implemented. We will also need to defer the change in
-> arch/arm/kvm/arm.c done by patch 2.
+Changes since v1:
+	- Rebased to 3.14-rc1
+	- Renamed in_pulse_polarity to pulse_polarity
+	- Added ABI entries for pulse devices and TI ECAP
 
-Until all the mandatory PSCI 0.2 functions are implemented it should not
-be possible to ask the kernel for a partial implementation, yes.
+This series adds support for PWM capture devices within IIO and
+adds a TI ECAP IIO driver.
 
-Thanks,
-Mark.
+PWM capture devices are supported using a new IIO "pulse" channel type.
+
+The IIO ECAP driver implements interrupt driven triggered buffer capture
+only as raw sample reads are not applicable to this hardware.
+Initially, the driver supports a single pulse width measurement with
+configurable polarity. The ECAP hardware can support measurement of a
+complete period and duty cycle but this is not yet implemented.
+
+Matt Porter (6):
+  iio: add support for pulse width capture devices
+  iio: pulse: add TI ECAP driver
+  iio: enable selection and build of pulse drivers
+  iio: Add ABI docs for pulse capture devices
+  pwm: enable TI PWMSS if the IIO tiecap driver is selected
+  ARM: dts: AM33XX: Add ecap interrupt properties
+
+ Documentation/ABI/testing/sysfs-bus-iio            |  18 +
+ .../ABI/testing/sysfs-bus-iio-pulse-tiecap         |   9 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   6 +
+ drivers/iio/Kconfig                                |   1 +
+ drivers/iio/Makefile                               |   1 +
+ drivers/iio/industrialio-core.c                    |   1 +
+ drivers/iio/pulse/Kconfig                          |  20 +
+ drivers/iio/pulse/Makefile                         |   6 +
+ drivers/iio/pulse/tiecap.c                         | 493 +++++++++++++++++++++
+ drivers/pwm/Kconfig                                |   2 +-
+ include/linux/iio/types.h                          |   1 +
+ 11 files changed, 557 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
+ create mode 100644 drivers/iio/pulse/Kconfig
+ create mode 100644 drivers/iio/pulse/Makefile
+ create mode 100644 drivers/iio/pulse/tiecap.c
+
+-- 
+1.8.4
