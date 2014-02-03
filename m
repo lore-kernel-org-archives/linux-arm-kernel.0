@@ -1,50 +1,118 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  3 Feb 2014 17:37:21 +0100
-Subject: [PATCH 1/3] ARM: make isa_mode macro more robust and fix for v7-M
-In-Reply-To: <1391445443-28971-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1391445443-28971-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1391445443-28971-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 3 Feb 2014 17:43:22 +0100
+Subject: Why are imprecise external aborts masked on recent kernel while
+ booting ?
+In-Reply-To: <52EF5D8E.4050600@st.com>
+References: <52EBC86D.1010509@st.com>
+ <20140131170827.GH15937@n2100.arm.linux.org.uk> <52EF5D8E.4050600@st.com>
+Message-ID: <52EFC72A.6060608@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of isa_mode hardcodes the values to shift PSR_J_BIT and
-PSR_T_BIT to move them to bits 1 and 0 respectively. Instead use __ffs to
-calculate the shift from the #define already used for masking.
+Hi,
 
-This is relevant on v7-M as there PSR_T_BIT is 0x01000000 instead of
-0x00000020 for V7-[AR] and earlier. Because of that isa_mode produced
-values >= 0x80000 which are unsuitable to index into isa_modes[4] there
-and so made __show_regs read from undefined memory which resulted in
-hangs and crashes.
+I had no success with msr instruction to set CPSR.A bit.
 
-Moreover isa_mode is wrong for v7-M even after this robustness fix as
-there is no J-bit in the PSR register. So hardcode isa_mode to "Thumb"
-for v7-M.
+I re-checked on a 3.4 kernel, msr instruction present in former 
+"kernel_thread_helper()" routine was not responsible for clearing CPSR.A 
+bit.
+'A' bit was cleared because SPSR was altered before executing following 
+instruction in arch/arm/kernel/entry-header.S :
+movs    pc, lr                @ return & move spsr_svc into cpsr
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/include/asm/ptrace.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Sorry for the confusion in my first email: that movs instruction was 
+responsible for clearing 'A' bit on 3.4 kernel. But on recent kernel, 
+"restore_user_regs" macro seems no longer called for a kernel thread.
 
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 04c99f36ff7f..627a03ebb987 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -27,9 +27,13 @@ struct pt_regs {
- #define thumb_mode(regs) (0)
- #endif
- 
-+#ifndef CONFIG_CPU_V7M
- #define isa_mode(regs) \
--	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
--	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
-+	((((regs)->ARM_cpsr & PSR_J_BIT) >> (__ffs(PSR_J_BIT) - 1)) | \
-+	 (((regs)->ARM_cpsr & PSR_T_BIT) >> (__ffs(PSR_T_BIT))))
-+#else
-+#define isa_mode(regs) 1 /* Thumb */
-+#endif
- 
- #define processor_mode(regs) \
- 	((regs)->ARM_cpsr & MODE_MASK)
--- 
-1.8.5.3
+So, I tried the 'cps'instruction that does it! I re-worked slightly your 
+previous patch.
+I also noticed that secondary needs to be set separately.
+
+Please, could you comment on the following patch ? (I can resend 
+correctly formated patch if you wish) :
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index dc894ab..e22b109 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -378,6 +378,9 @@ asmlinkage void secondary_start_kernel(void)
+         local_irq_enable();
+         local_fiq_enable();
+
++       /* Enable imprecise aborts */
++       asm volatile("cpsie     a");
++
+         /*
+          * OK, it's off to the idle thread for us
+          */
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4636d56..a9567bb 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+
+         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+         modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++
++       /* Enable imprecise aborts */
++       asm volatile("cpsie     a");
++
+  #else /* ifndef CONFIG_CPU_V7M */
+         /*
+          * on V7-M there is no need to copy the vector table to a dedicated
+
+Thanks,
+BR,
+Fabrice
+
+On 02/03/2014 10:12 AM, Fabrice Gasnier wrote:
+> Hi Russell,
+>
+> Thank you for your help.
+> I just tried following patch on both 3.10 and above vanilla 3.13.1.
+> Unfortunately, these instructions have no effect on the arm cpsr.
+> I dumped regs right after msr instruction have been executed. It 
+> remains untouched :
+>
+> Here is assembly from gdb:
+>
+>    0xc064a400 <+128>:    mov    r3, #256    ; 0x100
+>    0xc064a404 <+132>:    mrs    r2, CPSR
+>    0xc064a408 <+136>:    bic    r2, r2, r3
+>    0xc064a40c <+140>:    msr    CPSR_c, r2
+>
+> CPSR.A bit is still set after these instructions : 0x600001d3
+> Although, I see it has been cleared in r2: 0x600000d3
+>
+> Please advise.
+> Thanks,
+> BR,
+> Fabrice
+> On 01/31/2014 06:08 PM, Russell King - ARM Linux wrote:
+>>> Is it possible to unmask imprecise data aborts earlier in the boot
+>>> >process (e.g. before PCIe bus enumeration, when drivers are being 
+>>> probed)
+>>> >?
+>> How about this patch?
+>>
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index 172ee18ff124..b0ff06f49cd0 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -900,6 +900,15 @@ void __init early_trap_init(void *vectors_base)
+>>         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>>       modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+>> +
+>> +    /* Enable imprecise aborts */
+>> +    asm volatile(
+>> +        "mrs    %0, cpsr\n"
+>> +    "    bic    %0, %0, %1\n"
+>> +    "    msr    cpsr_c, %0"
+>> +        : "=&r" (i)
+>> +        : "r" (PSR_A_BIT));
+>> +
+>>   #else /* ifndef CONFIG_CPU_V7M */
+>>       /*
+>>        * on V7-M there is no need to copy the vector table to a 
+>> dedicated
+>
