@@ -1,157 +1,95 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  3 Feb 2014 15:00:32 +0900
-Subject: [PATCH] audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL
+Date: Mon, 03 Feb 2014 14:59:43 +0900
+Subject: [PATCH v2 1/6] audit: Enable arm64 support
 In-Reply-To: <20140129223652.GA13702@madcap2.tricolour.ca>
-References: <20140129223652.GA13702@madcap2.tricolour.ca>
-Message-ID: <1391407232-4623-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1389946399-4525-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140123141808.GD27520@arm.com> <52E5EAC1.2070306@linaro.org>
+ <20140129202127.GA24068@madcap2.tricolour.ca>
+ <20140129223652.GA13702@madcap2.tricolour.ca>
+Message-ID: <52EF304F.80202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently AUDITSYSCALL has a long list of architecture depencency:
-       depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML ||
-		SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
-The purpose of this patch is to replace it with HAVE_ARCH_AUDITSYSCALL
-for simplicity.
+Richard,
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm/Kconfig       |    1 +
- arch/ia64/Kconfig      |    1 +
- arch/parisc/Kconfig    |    1 +
- arch/powerpc/Kconfig   |    1 +
- arch/s390/Kconfig      |    1 +
- arch/sh/Kconfig        |    1 +
- arch/sparc/Kconfig     |    1 +
- arch/um/Kconfig.common |    1 +
- arch/x86/Kconfig       |    1 +
- init/Kconfig           |    5 ++++-
- 10 files changed, 13 insertions(+), 1 deletion(-)
+On 01/30/2014 07:36 AM, Richard Guy Briggs wrote:
+> On 14/01/29, Richard Guy Briggs wrote:
+>> On 14/01/27, AKASHI Takahiro wrote:
+>>> [To audit maintainers]
+>>>
+>>> On 01/23/2014 11:18 PM, Catalin Marinas wrote:
+>>>> On Fri, Jan 17, 2014 at 08:13:14AM +0000, AKASHI Takahiro wrote:
+>>>>> --- a/include/uapi/linux/audit.h
+>>>>> +++ b/include/uapi/linux/audit.h
+>>>>> @@ -327,6 +327,8 @@ enum {
+>>>>>   /* distinguish syscall tables */
+>>>>>   #define __AUDIT_ARCH_64BIT 0x80000000
+>>>>>   #define __AUDIT_ARCH_LE	   0x40000000
+>>>>> +#define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+>>>>> +#define AUDIT_ARCH_AARCH64EB	(EM_AARCH64|__AUDIT_ARCH_64BIT)
+>>>>>   #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+>>>>>   #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
+>>>>>   #define AUDIT_ARCH_ARMEB	(EM_ARM)
+>>>>> diff --git a/init/Kconfig b/init/Kconfig
+>>>>> index 79383d3..3aae602 100644
+>>>>> --- a/init/Kconfig
+>>>>> +++ b/init/Kconfig
+>>>>> @@ -284,7 +284,7 @@ config AUDIT
+>>>>>
+>>>>>   config AUDITSYSCALL
+>>>>>   	bool "Enable system-call auditing support"
+>>>>> -	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
+>>>>> +	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ARM64)
+>>>>
+>>>> The usual comment for such changes: could you please clean this up and
+>>>> just use something like "depends on HAVE_ARCH_AUDITSYSCALL"?
+>>>
+>>> Do you agree to this change?
+>>>
+>>> If so, I can create a patch, but have some concerns:
+>>> 1) I can't verify it on other architectures than (arm &) arm64.
+>>> 2) Some architectures (microblaze, mips, openrisc) are not listed here, but
+>>>     their ptrace.c have a call to audit_syscall_entry/exit().
+>>>     (audit_syscall_entry/exit are null if !AUDITSYSCALL, though)
+>>
+>> I can try: ppc s390 x86_64 ppc64 i686 s390x
+>
+> These arches above all pass compile and basic tests with the following patches applied:
+>
+> 	audit: correct a type mismatch in audit_syscall_exit() pending (already upstream)
+>
+> 	audit: Modify a set of system calls in audit class definitions (already upstream)
+>
+> 	[PATCH v3] audit: Add generic compat syscall support
+>
+> 	[PATCH v2] audit: Enable arm64 support
+> 	[PATCH v2] arm64: Add regs_return_value() in syscall.h
+> 	[PATCH v2] arm64: Add audit support
+> 	[PATCH v2] arm64: audit: Add 32-bit (compat) syscall support
+> 	[PATCH v2] arm64: audit: Add makefile rule to create unistd_32.h for compat syscalls
+> 	[PATCH v2] arm64: audit: Add audit hook in ptrace/syscall_trace
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c1f1a7e..cf69f89 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -23,6 +23,7 @@ config ARM
- 	select GENERIC_STRNCPY_FROM_USER
- 	select GENERIC_STRNLEN_USER
- 	select HARDIRQS_SW_RESEND
-+	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 4e4119b..9143d91 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -43,6 +43,7 @@ config IA64
- 	select HAVE_MOD_ARCH_SPECIFIC
- 	select MODULES_USE_ELF_RELA
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select HAVE_ARCH_AUDITSYSCALL
- 	default y
- 	help
- 	  The Itanium Processor Family is Intel's 64-bit successor to
-diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
-index b5f1858..0821e83 100644
---- a/arch/parisc/Kconfig
-+++ b/arch/parisc/Kconfig
-@@ -28,6 +28,7 @@ config PARISC
- 	select CLONE_BACKWARDS
- 	select TTY # Needed for pdc_cons.c
- 	select HAVE_DEBUG_STACKOVERFLOW
-+	select HAVE_ARCH_AUDITSYSCALL
- 
- 	help
- 	  The PA-RISC microprocessor is designed by Hewlett-Packard and used
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index b44b52c..96627d6 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -139,6 +139,7 @@ config PPC
- 	select OLD_SIGACTION if PPC32
- 	select HAVE_DEBUG_STACKOVERFLOW
- 	select HAVE_IRQ_EXIT_ON_IRQ_STACK
-+	select HAVE_ARCH_AUDITSYSCALL
- 
- config GENERIC_CSUM
- 	def_bool CPU_LITTLE_ENDIAN
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index 1e1a03d..b3b9853 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -103,6 +103,7 @@ config S390
- 	select GENERIC_SMP_IDLE_THREAD
- 	select GENERIC_TIME_VSYSCALL
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
-+	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_JUMP_LABEL if !MARCH_G5
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 9b0979f..675fb7c 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -42,6 +42,7 @@ config SUPERH
- 	select MODULES_USE_ELF_RELA
- 	select OLD_SIGSUSPEND
- 	select OLD_SIGACTION
-+	select HAVE_ARCH_AUDITSYSCALL
- 	help
- 	  The SuperH is a RISC processor targeted for use in embedded systems
- 	  and consumer electronics; it was also used in the Sega Dreamcast
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index d4f7a6a..7f7ad7e 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -76,6 +76,7 @@ config SPARC64
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select HAVE_C_RECORDMCOUNT
- 	select NO_BOOTMEM
-+	select HAVE_ARCH_AUDITSYSCALL
- 
- config ARCH_DEFCONFIG
- 	string
-diff --git a/arch/um/Kconfig.common b/arch/um/Kconfig.common
-index 21ca44c..6915d28 100644
---- a/arch/um/Kconfig.common
-+++ b/arch/um/Kconfig.common
-@@ -1,6 +1,7 @@
- config UML
- 	bool
- 	default y
-+	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_UID16
- 	select GENERIC_IRQ_SHOW
- 	select GENERIC_CPU_DEVICES
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index e903c71..6ef682f 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -124,6 +124,7 @@ config X86
- 	select RTC_LIB
- 	select HAVE_DEBUG_STACKOVERFLOW
- 	select HAVE_IRQ_EXIT_ON_IRQ_STACK if X86_64
-+	select HAVE_ARCH_AUDITSYSCALL
- 
- config INSTRUCTION_DECODER
- 	def_bool y
-diff --git a/init/Kconfig b/init/Kconfig
-index 79383d3..9fe22d2 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -282,9 +282,12 @@ config AUDIT
- 	  logging of avc messages output).  Does not do system-call
- 	  auditing without CONFIG_AUDITSYSCALL.
- 
-+config HAVE_ARCH_AUDITSYSCALL
-+	bool
-+
- config AUDITSYSCALL
- 	bool "Enable system-call auditing support"
--	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
-+	depends on AUDIT && HAVE_ARCH_AUDITSYSCALL
- 	default y if SECURITY_SELINUX
- 	help
- 	  Enable low-overhead system-call auditing infrastructure that
--- 
-1.7.9.5
+I think that you missed Catalin's suggestion.
+Please use the patch I will post after this message and try it again, please?
+
+Thanks,
+-Takahiro AKASHI
+
+
+
+>>> So I'm afraid that the change might break someone's assumption.
+>>>
+>>> Thanks,
+>>> -Takahiro AKASHI
+>>
+>> - RGB
+>
+> - RGB
+>
+> --
+> Richard Guy Briggs <rbriggs@redhat.com>
+> Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+> Remote, Ottawa, Canada
+> Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+>
