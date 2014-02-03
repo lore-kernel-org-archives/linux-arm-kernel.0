@@ -1,82 +1,114 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Feb 2014 09:51:39 +0800
-Subject: [PATCH v4 3/8] clk: sunxi: add names for pll5,
- pll6 parent clocks to factors_data
+Date: Mon,  3 Feb 2014 09:51:43 +0800
+Subject: [PATCH v4 7/8] ARM: dts: sun6i: rename clock node names to clk@N
 In-Reply-To: <1391392304-4660-1-git-send-email-wens@csie.org>
 References: <1391392304-4660-1-git-send-email-wens@csie.org>
-Message-ID: <1391392304-4660-4-git-send-email-wens@csie.org>
+Message-ID: <1391392304-4660-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some factor clocks, such as the parent clock of pll5 and pll6, have
-multiple output names. Add the corresponding names to factors_data
-tied to compatible string.
+Device tree naming conventions state that node names should match
+node function. Change fully functioning clock nodes to match and
+add clock-output-names to all sunxi clock nodes.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 0ed9794..7a2ed98 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -389,6 +389,7 @@ struct factors_data {
- 	int mux;
- 	struct clk_factors_config *table;
- 	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
-+	const char *name;
- };
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 5256ad9..dbc2d29 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -60,17 +60,19 @@
+ 			clock-frequency = <24000000>;
+ 		};
  
- static struct clk_factors_config sun4i_pll1_config = {
-@@ -457,6 +458,14 @@ static const struct factors_data sun4i_pll5_data __initconst = {
- 	.enable = 31,
- 	.table = &sun4i_pll5_config,
- 	.getter = sun4i_get_pll5_factors,
-+	.name = "pll5",
-+};
-+
-+static const struct factors_data sun4i_pll6_data __initconst = {
-+	.enable = 31,
-+	.table = &sun4i_pll5_config,
-+	.getter = sun4i_get_pll5_factors,
-+	.name = "pll6",
- };
+-		osc32k: osc32k {
++		osc32k: clk at 0 {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
+ 		};
  
- static const struct factors_data sun4i_apb1_data __initconst = {
-@@ -499,14 +508,14 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
- 	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
- 		i++;
+-		pll1: pll1 at 01c20000 {
++		pll1: clk at 01c20000 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun6i-a31-pll1-clk";
+ 			reg = <0x01c20000 0x4>;
+ 			clocks = <&osc24M>;
++			clock-output-names = "pll1";
+ 		};
  
--	/* Nodes should be providing the name via clock-output-names
--	 * but originally our dts didn't, and so we used node->name.
--	 * The new, better nodes look like clk at deadbeef, so we pull the
--	 * name just in this case */
--	if (!strcmp("clk", clk_name)) {
--		of_property_read_string_index(node, "clock-output-names",
--					      0, &clk_name);
--	}
-+	/*
-+	 * some factor clocks, such as pll5 and pll6, may have multiple
-+	 * outputs, and have their name designated in factors_data
-+	 */
-+	if (data->name)
-+		clk_name = data->name;
-+	else
-+		of_property_read_string(node, "clock-output-names", &clk_name);
+ 		/*
+@@ -97,6 +99,7 @@
+ 			 * Allwinner.
+ 			 */
+ 			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
++			clock-output-names = "cpu";
+ 		};
  
- 	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
- 	if (!factors)
-@@ -838,7 +847,7 @@ static const struct divs_data pll5_divs_data __initconst = {
- };
+ 		axi: axi at 01c20050 {
+@@ -104,6 +107,7 @@
+ 			compatible = "allwinner,sun4i-axi-clk";
+ 			reg = <0x01c20050 0x4>;
+ 			clocks = <&cpu>;
++			clock-output-names = "axi";
+ 		};
  
- static const struct divs_data pll6_divs_data __initconst = {
--	.factors = &sun4i_pll5_data,
-+	.factors = &sun4i_pll6_data,
- 	.div = {
- 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
- 		{ .fixed = 2 }, /* P, other */
+ 		ahb1_mux: ahb1_mux at 01c20054 {
+@@ -111,6 +115,7 @@
+ 			compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
+ 			reg = <0x01c20054 0x4>;
+ 			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
++			clock-output-names = "ahb1_mux";
+ 		};
+ 
+ 		ahb1: ahb1 at 01c20054 {
+@@ -118,9 +123,10 @@
+ 			compatible = "allwinner,sun4i-ahb-clk";
+ 			reg = <0x01c20054 0x4>;
+ 			clocks = <&ahb1_mux>;
++			clock-output-names = "ahb1";
+ 		};
+ 
+-		ahb1_gates: ahb1_gates at 01c20060 {
++		ahb1_gates: clk at 01c20060 {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun6i-a31-ahb1-gates-clk";
+ 			reg = <0x01c20060 0x8>;
+@@ -146,9 +152,10 @@
+ 			compatible = "allwinner,sun4i-apb0-clk";
+ 			reg = <0x01c20054 0x4>;
+ 			clocks = <&ahb1>;
++			clock-output-names = "apb1";
+ 		};
+ 
+-		apb1_gates: apb1_gates at 01c20060 {
++		apb1_gates: clk at 01c20068 {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun6i-a31-apb1-gates-clk";
+ 			reg = <0x01c20068 0x4>;
+@@ -163,6 +170,7 @@
+ 			compatible = "allwinner,sun4i-apb1-mux-clk";
+ 			reg = <0x01c20058 0x4>;
+ 			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
++			clock-output-names = "apb2_mux";
+ 		};
+ 
+ 		apb2: apb2 at 01c20058 {
+@@ -170,9 +178,10 @@
+ 			compatible = "allwinner,sun6i-a31-apb2-div-clk";
+ 			reg = <0x01c20058 0x4>;
+ 			clocks = <&apb2_mux>;
++			clock-output-names = "apb2";
+ 		};
+ 
+-		apb2_gates: apb2_gates at 01c2006c {
++		apb2_gates: clk at 01c2006c {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun6i-a31-apb2-gates-clk";
+ 			reg = <0x01c2006c 0x4>;
 -- 
 1.9.rc1
