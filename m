@@ -1,32 +1,62 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 03 Feb 2014 23:08:52 +0100
-Subject: [PATCH RFC v4 00/10] ahci: library-ise ahci_platform, add sunxi
- driver and cleanup imx driver
-In-Reply-To: <CAL_JsqKnus+9rgLAQ990eD-1F6-2G-SuqYuPkmc+Tw6QP1CT4g@mail.gmail.com>
-References: <1390236303-22538-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqKnus+9rgLAQ990eD-1F6-2G-SuqYuPkmc+Tw6QP1CT4g@mail.gmail.com>
-Message-ID: <52F01374.70405@redhat.com>
+Date: Mon, 03 Feb 2014 23:10:51 +0100
+Subject: [PATCH v5 14/14] ARM: sun7i: dts: Add ahci / sata support
+In-Reply-To: <20140131134638.GH2950@lukather>
+References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
+ <1390417489-5354-15-git-send-email-hdegoede@redhat.com>
+ <20140131134638.GH2950@lukather>
+Message-ID: <52F013EB.4050900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
 Hi,
 
-On 02/03/2014 05:31 PM, Rob Herring wrote:
-> On Mon, Jan 20, 2014 at 10:44 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi All,
->>
->> Here is v4 of my patchset for adding ahci-sunxi support. It has grown quite
->> a bit since I've been going for a more generic approach this time and I've
->> also cleaned up the ahci-imx driver to use the same generic approach.
+On 01/31/2014 02:46 PM, Maxime Ripard wrote:
+> On Wed, Jan 22, 2014 at 08:04:49PM +0100, Hans de Goede wrote:
+>> This patch adds sunxi sata support to A20 boards that have such a connector. Some boards also feature a regulator via a GPIO and support for this is also added.
+>> 
+>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl> Signed-off-by: Hans de Goede <hdegoede@redhat.com> --- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     |  6 ++++++ arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 20 ++++++++++++++++++++ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |  6 ++++++ arch/arm/boot/dts/sun7i-a20.dtsi                |  8 ++++++++ 4 files changed, 40 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts index 48777cd..1cab521 100644 --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts @@ -13,6 +13,7 @@
+>> 
+>> /dts-v1/; /include/ "sun7i-a20.dtsi" +/include/ "sunxi-ahci-reg.dtsi"
+>> 
+>> / { model = "Cubietech Cubieboard2"; @@ -28,6 +29,11 @@ status = "okay"; };
+>> 
+>> +		ahci: sata at 01c18000 { +			target-supply = <&reg_ahci_5v>; +			status = "okay"; +		}; + pinctrl at 01c20800 { mmc0_cd_pin_cubieboard2: mmc0_cd_pin at 0 { allwinner,pins = "PH1"; diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts index 2684f27..1247ea1 100644 --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts @@ -13,6 +13,7 @@
+>> 
+>> /dts-v1/; /include/ "sun7i-a20.dtsi" +/include/ "sunxi-ahci-reg.dtsi"
+>> 
+>> / { model = "Cubietech Cubietruck"; @@ -28,6 +29,11 @@ status = "okay"; };
+>> 
+>> +		ahci: sata at 01c18000 { +			target-supply = <&reg_ahci_5v>; +			status = "okay"; +		}; + pinctrl at 01c20800 { mmc0_cd_pin_cubietruck: mmc0_cd_pin at 0 { allwinner,pins = "PH1"; @@ -36,6 +42,13 @@ allwinner,pull = <0>; };
+>> 
+>> +			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 { +				allwinner,pins = "PH12"; +				allwinner,function = "gpio_out"; +				allwinner,drive = <0>; +				allwinner,pull = <0>; +			}; + led_pins_cubietruck: led_pins at 0 { allwinner,pins = "PH7", "PH11", "PH20", "PH21"; allwinner,function = "gpio_out"; @@ -84,4 +97,11 @@ gpios = <&pio 7 7 0>; }; }; + +	regulators { +		reg_ahci_5v: ahci-5v { +			pinctrl-0 = <&ahci_pwr_pin_cubietruck>; +			gpio = <&pio 7 12 0>; +		}; +	}; }; diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts index
+>> bf6f6c8..f135886 100644 --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts @@ -13,6 +13,7 @@
+>> 
+>> /dts-v1/; /include/ "sun7i-a20.dtsi" +/include/ "sunxi-ahci-reg.dtsi"
+>> 
+>> / { model = "Olimex A20-Olinuxino Micro"; @@ -37,6 +38,11 @@ status = "okay"; };
+>> 
+>> +		ahci: sata at 01c18000 { +			target-supply = <&reg_ahci_5v>; +			status = "okay"; +		}; + pinctrl at 01c20800 { mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 { allwinner,pins = "PH1"; diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi index c9c123a..0657bad 100644 --- a/arch/arm/boot/dts/sun7i-a20.dtsi +++ b/arch/arm/boot/dts/sun7i-a20.dtsi @@ -347,6 +347,14 @@ status = "disabled"; };
+>> 
+>> +		ahci: sata at 01c18000 { +			compatible = "allwinner,sun4i-a10-ahci"; +			reg = <0x01c18000 0x1000>; +			interrupts = <0 56 1>;
 > 
-> I don't know if you missed it or just don't intend to refactor all
-> AHCI drivers, but the highbank driver could benefit from this as well.
+> This is supposed to be a level triggered interrupt, not an edge triggered one.
 
-I don't intend to refactor all of them, esp. not the ones for which I don't
-have hardware to test.
-
-As they say: patches welcome :)
+Good catch, will fix for the next version.
 
 Regards,
 
 Hans
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iEYEARECAAYFAlLwE+sACgkQF3VEtJrzE/tKaACgmEEVd28Oubd7hEy5chG3/XM9
+0x0AmwctbAFVFC9OCBaNZix8cX3d/CAI
+=otiv
+-----END PGP SIGNATURE-----
