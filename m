@@ -1,45 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Feb 2014 08:26:48 -0800
-Subject: [PATCH v2 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
-In-Reply-To: <20140203105409.GF30209@e106331-lin.cambridge.arm.com>
-References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-3-git-send-email-anup.patel@linaro.org>
- <20140203105409.GF30209@e106331-lin.cambridge.arm.com>
-Message-ID: <20140203162648.GC4167@cbox>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 03 Feb 2014 17:36:03 +0100
+Subject: [PATCH 1/2] clocksource: sunxi: Add new compatibles
+In-Reply-To: <1391348280-9484-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391348280-9484-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52EFC573.2050302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 10:54:09AM +0000, Mark Rutland wrote:
-> On Thu, Jan 30, 2014 at 10:41:18AM +0000, Anup Patel wrote:
-> > Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
-> > VCPUs. This patch extends current in-kernel PSCI emulation to provide
-> > PSCI v0.2 interface to VCPUs.
-> > 
-> > By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
-> > keeping the ABI backward-compatible.
-> > 
-> > To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
-> > KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
-> > init using KVM_ARM_VCPU_INIT ioctl.
-> 
-> I have an issue with this. PSCI 0.2 makes all but two functions (MIGRATE
-> and MIGRATE_INFO_CPU_UP) mandatory, and hence not allowed to return
-> NOT_SUPPORTED.
-> 
-> Additionally, for correct behaviour across a kexec in future, we'll
-> require AFFINITY_INFO for PSCI 0.2+ systems to determint when a CPU is
-> actually dead (and cannot affect the cache hierarchy). I'd very much
-> like to make that a hard requirement to ensure correctness.
-> 
-> I would very much like to see at least trivial implementations of those
-> mandatory functions, so that we don't need a
-> KVM_ARM_VCPU_PSCI_REALLY_0_2 or similar in future. As it stands this
-> series does not implement PSCI 0.2.
-> 
-I didn't realize that PSCI 0.2 mandates more functions, that should
-clearly be implemented first, and the patch series should also be
-ordered with first supporting the implementation and then finally
-exposing the functionality to user space.
+On 02/02/2014 02:37 PM, Maxime Ripard wrote:
+> The Allwinner A10 compatibles were following a slightly different compatible
+> patterns than the rest of the SoCs for historical reasons. Add compatibles
+> matching the other pattern to the timer driver for consistency, and keep the
+> older one for backward compatibility.
 
-Thanks,
--Christoffer
+Hi Maxime,
+
+is it really needed to keep the old pattern ?
+
+
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 5 +++--
+>   drivers/clocksource/sun4i_timer.c                                 | 4 ++++
+>   2 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+> index 48aeb78..d9e35ae 100644
+> --- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+> @@ -2,7 +2,8 @@ Allwinner A1X SoCs Timer Controller
+>
+>   Required properties:
+>
+> -- compatible : should be "allwinner,sun4i-timer"
+> +- compatible : should be "allwinner,sun4i-a10-timer"
+> +               (Deprecated "allwinner,sun4i-timer")
+>   - reg : Specifies base physical address and size of the registers.
+>   - interrupts : The interrupt of the first timer
+>   - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
+> @@ -10,7 +11,7 @@ Required properties:
+>   Example:
+>
+>   timer {
+> -	compatible = "allwinner,sun4i-timer";
+> +	compatible = "allwinner,sun4i-a10-timer";
+>   	reg = <0x01c20c00 0x400>;
+>   	interrupts = <22>;
+>   	clocks = <&osc>;
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index bf497af..de03895 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -196,5 +196,9 @@ static void __init sun4i_timer_init(struct device_node *node)
+>   	clockevents_config_and_register(&sun4i_clockevent, rate,
+>   					TIMER_SYNC_TICKS, 0xffffffff);
+>   }
+> +CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
+> +		       sun4i_timer_init);
+> +
+> +/* Deprecated */
+>   CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
+>   		       sun4i_timer_init);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
