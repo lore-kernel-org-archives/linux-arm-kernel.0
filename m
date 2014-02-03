@@ -1,42 +1,65 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Feb 2014 11:32:21 +0800
-Subject: [PATCH v3 3/8] ARM: dts: sun7i: Add GMAC controller node to sun7i DTSI
+Date: Mon,  3 Feb 2014 11:32:24 +0800
+Subject: [PATCH v3 6/8] ARM: dts: sun7i: cubieboard2: Enable GMAC instead of
+ EMAC
 In-Reply-To: <1391398346-5094-1-git-send-email-wens@csie.org>
 References: <1391398346-5094-1-git-send-email-wens@csie.org>
-Message-ID: <1391398346-5094-4-git-send-email-wens@csie.org>
+Message-ID: <1391398346-5094-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+GMAC has better performance and fewer hardware issues.
+Use the GMAC in MII mode for ethernet instead of the EMAC.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index fc7f470..5fbac23 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -630,6 +630,21 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 5c51cb8..7bf4935 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -19,21 +19,6 @@
+ 	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
  
-+		gmac: ethernet at 01c50000 {
-+			compatible = "allwinner,sun7i-a20-gmac";
-+			reg = <0x01c50000 0x10000>;
-+			interrupts = <0 85 4>;
-+			interrupt-names = "macirq";
-+			clocks = <&ahb_gates 49>, <&gmac_tx_clk>;
-+			clock-names = "stmmaceth", "allwinner_gmac_tx";
-+			snps,pbl = <2>;
-+			snps,fixed-burst;
-+			snps,force_sf_dma_mode;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+ 	soc at 01c00000 {
+-		emac: ethernet at 01c0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&emac_pins_a>;
+-			phy = <&phy1>;
+-			status = "okay";
+-		};
+-
+-		mdio at 01c0b080 {
+-			status = "okay";
+-
+-			phy1: ethernet-phy at 1 {
+-				reg = <1>;
+-			};
+-		};
+-
+ 		pinctrl at 01c20800 {
+ 			led_pins_cubieboard2: led_pins at 0 {
+ 				allwinner,pins = "PH20", "PH21";
+@@ -60,6 +45,18 @@
+ 			pinctrl-0 = <&i2c1_pins_a>;
+ 			status = "okay";
+ 		};
 +
- 		hstimer at 01c60000 {
- 			compatible = "allwinner,sun7i-a20-hstimer";
- 			reg = <0x01c60000 0x1000>;
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_mii_a>;
++			phy = <&phy1>;
++			phy-mode = "mii";
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
+ 	};
+ 
+ 	leds {
 -- 
 1.9.rc1
