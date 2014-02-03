@@ -1,38 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Feb 2014 11:48:35 +0000
-Subject: [PATCH v2 1/3] KVM: Add capability to advertise PSCI v0.2 support
-In-Reply-To: <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
-References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140203114835.GB2784@e106331-lin.cambridge.arm.com>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Mon, 3 Feb 2014 11:59:47 +0000
+Subject: [PATCH v1 0/3] net: stmmac: Add STi GMAC ethernet
+Message-ID: <1391428787-27143-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 10:41:17AM +0000, Anup Patel wrote:
-> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
-> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
-> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  include/uapi/linux/kvm.h |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 902f124..d64349e 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
->  #define KVM_CAP_ARM_EL1_32BIT 93
->  #define KVM_CAP_SPAPR_MULTITCE 94
->  #define KVM_CAP_EXT_EMUL_CPUID 95
-> +#define KVM_CAP_ARM_PSCI_0_2 96
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-To reiterate the point I made on patch 2, this does not do what it says
-on the tin, and does not make sense without mandatory PSCI 0.2
-functionality being present, as no software can derive any value from
-this flag until such functionality is implemented.
+Hi All,
+
+This patch series adds Ethernet support to STi series SOCs STiH415 and STiH416.
+STi SOC series integrates dwmac IP from synopsis, however there is a hardware
+glue on top of this standard IP, this glue needs to configured before the
+actual dwmac can be used.  Also the glue logic needs re-configuring when the
+link speed changes, This is because the clk source can change as the link
+speed.
+
+This patch just adds STi specific callbacks into of_data for configuring the
+glue layer.
+
+I have rebased my original patches (http://lkml.org/lkml/2013/11/12/243)
+to latest stmmac which updates callbacks to suit glue drivers like this.
+
+These patches are tested on b2000 and B2020 with STiH415 and STiH416.
 
 Thanks,
-Mark.
+srini
+
+Srinivas Kandagatla (3):
+  net: stmmac:sti: Add STi SOC glue driver.
+  ARM: STi: Add STiH415 ethernet support.
+  ARM: STi: Add STiH416 ethernet support.
+
+ .../devicetree/bindings/net/sti-dwmac.txt          |   58 ++++
+ arch/arm/boot/dts/stih415-clock.dtsi               |   14 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  121 +++++++
+ arch/arm/boot/dts/stih415.dtsi                     |   48 +++
+ arch/arm/boot/dts/stih416-clock.dtsi               |   14 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  109 +++++++
+ arch/arm/boot/dts/stih416.dtsi                     |   44 +++
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |   22 ++
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |   26 ++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |   11 +
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  331 ++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    3 +
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    5 +
+ 14 files changed, 807 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+
+-- 
+1.7.9.5
