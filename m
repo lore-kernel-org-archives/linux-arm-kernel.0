@@ -1,53 +1,77 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Mon, 3 Feb 2014 17:39:22 +0530
-Subject: [PATCH v2 1/3] KVM: Add capability to advertise PSCI v0.2 support
-In-Reply-To: <20140203114835.GB2784@e106331-lin.cambridge.arm.com>
-References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
- <20140203114835.GB2784@e106331-lin.cambridge.arm.com>
-Message-ID: <CAAhSdy3E-BxTi=c3rrQn-WYPQrrzheTfZy3c7SBCKdftjLF1uA@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 03 Feb 2014 13:13:30 +0100
+Subject: [PATCH] ARM: zynq: Reserve not DMAable space in front of the
+ kernel
+In-Reply-To: <CAL_Jsq+4Ea7=WP+mj_k1Q3q7DKm-hk6WXpv2DOBQwefp-zxzjg@mail.gmail.com>
+References: <780bb8c8fd752eeace2fd2fbe1d8ed8572dc0d76.1391170073.git.michal.simek@xilinx.com>
+ <CAL_Jsq+4Ea7=WP+mj_k1Q3q7DKm-hk6WXpv2DOBQwefp-zxzjg@mail.gmail.com>
+Message-ID: <52EF87EA.4010501@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 3, 2014 at 5:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jan 30, 2014 at 10:41:17AM +0000, Anup Patel wrote:
->> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
->> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
->> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
+On 01/31/2014 06:38 PM, Rob Herring wrote:
+> On Fri, Jan 31, 2014 at 6:08 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Reserve space from 0x0 - __pa(swapper_pg_dir),
+>> if kernel is loaded from 0, which is not DMAable.
+>> It is causing problem with MMC driver and others
+>> which want to add dma buffers to this space.
 >>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 >> ---
->>  include/uapi/linux/kvm.h |    1 +
->>  1 file changed, 1 insertion(+)
 >>
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index 902f124..d64349e 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
->>  #define KVM_CAP_ARM_EL1_32BIT 93
->>  #define KVM_CAP_SPAPR_MULTITCE 94
->>  #define KVM_CAP_EXT_EMUL_CPUID 95
->> +#define KVM_CAP_ARM_PSCI_0_2 96
->
-> To reiterate the point I made on patch 2, this does not do what it says
-> on the tin, and does not make sense without mandatory PSCI 0.2
-> functionality being present, as no software can derive any value from
-> this flag until such functionality is implemented.
+>> Jason: I don't think it is worth to bring 0x8000 magic
+>> value and count minimum from it and phys_addr of swapper_pg_dir.
+>> Full 512k of memory shouldn't be used by DMA.
+>>
+>> ---
+>>  arch/arm/mach-zynq/common.c | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+> 
+> The existing DT reserved range can't be used for this purpose?
 
-I handle this situation I would suggest to not advertise PSCI v0.2
-capability to user space till all mandatory PSCI v0.2 functions
-are implemented. We will also need to defer the change in
-arch/arm/kvm/arm.c done by patch 2.
+I expect you are talking about memreserve.
 
-Regards,
-Anup
+Two cases which are valid for us which have the same DTS file
+with this setup.
 
->
-> Thanks,
-> Mark.
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+memreserve 0 - 0x4000
+memory node 0x0 - 0x40000000
+
+
+1. standard
+kernel starting addr is 0x8000 and kernel is using 1GB memory which just works
+
+2. AMP which we are also using
+kernel starting for example from 0x10008000 and use just 768MB, 256MB for remoteproc.
+With memreserve in DTS this ends in mark_bootmem BUG because reserved memory is not in memory
+which Linux can handle (at least this is my theory).
+
+Case 2 require one small fix which Russell is aware of,
+I have to check status on it.
+
+But with this current implementation both cases just work
+without changing dts file because for both cases
+dts file is just the same and user decides where kernel is placed
+and how much memory user wants to use.
+
+If you know how to fix this with any better dt description please
+let me know. I am not aware about it.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140203/17e879ac/attachment-0001.sig>
