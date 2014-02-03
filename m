@@ -1,74 +1,100 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Mon, 3 Feb 2014 12:14:15 -0800
-Subject: [RFC PATCH V3 1/4] pci: APM X-Gene PCIe controller driver
-In-Reply-To: <4985267.LnsktRmabM@wuerfel>
-References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
- <201401301516.27091.arnd@arndb.de>
- <CACoXjcnXoysMeBsGuOb3t5b10zdeJ8pOnuOOzR8AaZhsOOYVEw@mail.gmail.com>
- <4985267.LnsktRmabM@wuerfel>
-Message-ID: <CACoXjc=fKMaR9-ScX3SSOojw2POZF8HPzXsN3rp=6sZpVu489g@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 03 Feb 2014 21:17:46 +0100
+Subject: [PATCH 1/2] clocksource: sunxi: Add new compatibles
+In-Reply-To: <20140203194505.GF25625@lukather>
+References: <1391348280-9484-1-git-send-email-maxime.ripard@free-electrons.com>
+ <52EFC573.2050302@linaro.org> <20140203194505.GF25625@lukather>
+Message-ID: <52EFF96A.1020302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 3, 2014 at 12:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 03 February 2014 11:42:22 Tanmay Inamdar wrote:
->> On Thu, Jan 30, 2014 at 6:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 24 January 2014, Tanmay Inamdar wrote:
->> >
->> >> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
->> >> +{
->> >> +     int i;
->> >> +
->> >> +     /* Hide the PCI host BARs from the kernel as their content doesn't
->> >> +      * fit well in the resource management
->> >> +      */
->> >> +     for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
->> >> +             dev->resource[i].start = dev->resource[i].end = 0;
->> >> +             dev->resource[i].flags = 0;
->> >> +     }
->> >> +     dev_info(&dev->dev, "Hiding X-Gene pci host bridge resources %s\n",
->> >> +              pci_name(dev));
->> >> +}
->> >> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_DEVICEID,
->> >> +                      xgene_pcie_fixup_bridge);
->> >
->> > Shouldn't this be gone now that the host bridge is correctly shown
->> > at the domain root?
->>
->> In inbound region configuration, whole DDR space is mapped into the
->> BAR of RC. When Linux PCI mid-layer starts enumerating, it reads the
->> size of BAR of RC and tries to fit it into the memory resource. First
->> thing is that the outbound memory is not enough to map the inbound BAR
->> space. This creates problem with the resource management logic and
->> second thing is that, it is not required to map inbound BAR space RC
->> bar as no one will be accessing it further.
->>
->> As Jason suggested, Bridge BAR's should be 0 size unless the bridge
->> itself has registers. However this is not the case with XGene PCIe
->> controller. It may have been inherited from the legacy design.
->> 'arch/powerpc/sysdev/ppc4xx_pci.c' has similar fixup function.
+On 02/03/2014 08:45 PM, Maxime Ripard wrote:
+> Hi Daniel,
 >
-> Are you sure that is true for the root bridge as well? I don't
-> remember the details, but I though that for the host bridge,
-> we don't actually look at the BARs at all.
+> (Adding DT mailing-list in CC)
 >
->> > If you want to try out the I/O space, I'd suggest using an Intel
->> > e1000 network card, which has both memory and i/o space. There
->> > is a patch at http://www.spinics.net/lists/linux-pci/msg27684.html
->> > that lets you check the I/O registers on it, or you can go
->> > through /dev/port from user space.
->> >
->> > I also haven't seen your patch that adds pci_ioremap_io() for
->> > arm64. It would be helpful to keep it in the same patch
->> > series, since it won't build without this patch.
+> On Mon, Feb 03, 2014 at 05:36:03PM +0100, Daniel Lezcano wrote:
+>> On 02/02/2014 02:37 PM, Maxime Ripard wrote:
+>>> The Allwinner A10 compatibles were following a slightly different compatible
+>>> patterns than the rest of the SoCs for historical reasons. Add compatibles
+>>> matching the other pattern to the timer driver for consistency, and keep the
+>>> older one for backward compatibility.
 >>
->> I will post the arm64 pci patch along with next revision of this
->> driver. That will cover the 'pci_ioremap_io' as well.
+>> Hi Maxime,
+>>
+>> is it really needed to keep the old pattern ?
 >
-> Please note that today, Liviu Dudau has also posted patches for this,
-> so you should coordinate a bit.
+> We agreed during the ARM Kernel Summit to consider the DT as a stable
+> ABI.
+>
+> While I'd be ok with removing the older ones, that also means that we
+> would break the boot of newer kernels with older DT, so yes, we
+> actually need to keep the old compatibles.
 
-Yes. Just looking at his patches. Looks similar to what I have. I will
-wait till your solution shapes up.
+Thanks for the clarification.
+
+So these old compatibles will stay there 'ad vitam aeternam', right ?
+
+
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 5 +++--
+>>>   drivers/clocksource/sun4i_timer.c                                 | 4 ++++
+>>>   2 files changed, 7 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+>>> index 48aeb78..d9e35ae 100644
+>>> --- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+>>> +++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+>>> @@ -2,7 +2,8 @@ Allwinner A1X SoCs Timer Controller
+>>>
+>>>   Required properties:
+>>>
+>>> -- compatible : should be "allwinner,sun4i-timer"
+>>> +- compatible : should be "allwinner,sun4i-a10-timer"
+>>> +               (Deprecated "allwinner,sun4i-timer")
+>>>   - reg : Specifies base physical address and size of the registers.
+>>>   - interrupts : The interrupt of the first timer
+>>>   - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
+>>> @@ -10,7 +11,7 @@ Required properties:
+>>>   Example:
+>>>
+>>>   timer {
+>>> -	compatible = "allwinner,sun4i-timer";
+>>> +	compatible = "allwinner,sun4i-a10-timer";
+>>>   	reg = <0x01c20c00 0x400>;
+>>>   	interrupts = <22>;
+>>>   	clocks = <&osc>;
+>>> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+>>> index bf497af..de03895 100644
+>>> --- a/drivers/clocksource/sun4i_timer.c
+>>> +++ b/drivers/clocksource/sun4i_timer.c
+>>> @@ -196,5 +196,9 @@ static void __init sun4i_timer_init(struct device_node *node)
+>>>   	clockevents_config_and_register(&sun4i_clockevent, rate,
+>>>   					TIMER_SYNC_TICKS, 0xffffffff);
+>>>   }
+>>> +CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
+>>> +		       sun4i_timer_init);
+>>> +
+>>> +/* Deprecated */
+>>>   CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
+>>>   		       sun4i_timer_init);
+>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
 >
->         Arnd
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
