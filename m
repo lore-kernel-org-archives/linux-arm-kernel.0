@@ -1,59 +1,36 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 03 Feb 2014 15:31:47 -0500
-Subject: [PATCH v2 1/7] ARM: perf_event: Support percpu irqs for the CPU
- PMU
-In-Reply-To: <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
-References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
- <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <52EFFCB3.1020208@codeaurora.org>
+From: trond.myklebust@primarydata.com (Trond Myklebust)
+Date: Mon, 3 Feb 2014 15:32:39 -0500
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <20140203202543.GA7070@infradead.org>
+References: <20140130141405.GA23985@infradead.org>
+ <20140130142752.GX15937@n2100.arm.linux.org.uk>
+ <20140130143208.GB9573@infradead.org>
+ <20140130153812.GA15937@n2100.arm.linux.org.uk>
+ <1391201970.6978.1.camel@leira.trondhjem.org>
+ <20140203080325.GB806@infradead.org>
+ <85AAFCF5-60EE-42E5-B103-37A4613C5947@primarydata.com>
+ <20140203145759.GA30263@infradead.org>
+ <3003D7E5-93F8-4B32-ACDB-07ED3F6CE70D@primarydata.com>
+ <1391458935.17089.1.camel@leira.trondhjem.org>
+ <20140203202543.GA7070@infradead.org>
+Message-ID: <93466B34-9D46-4AF2-8806-8CC5D3371F4D@primarydata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2014 12:55 PM, Stephen Boyd wrote:
-> Some CPU PMUs are wired up with one PPI for all the CPUs instead
-> of with a different SPI for each CPU. Add support for these
-> devices.
+
+On Feb 3, 2014, at 15:25, Christoph Hellwig <hch@infradead.org> wrote:
+
+> On Mon, Feb 03, 2014 at 03:22:15PM -0500, Trond Myklebust wrote:
+>> FWIW, here is the alternative patch. I've tested it, and it seems to
+>> work.
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/perf_event.c     | 14 ++++--
->  arch/arm/kernel/perf_event_cpu.c | 97 ++++++++++++++++++++++++++++------------
->  2 files changed, 80 insertions(+), 31 deletions(-)
+> I much prefer the original one.  One major point of the series was to
+> get individual filesystems out of the business of providing xattr
+> handlers for ACLs.
 > 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 789d846a9184..e76750980b38 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -16,6 +16,8 @@
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/uaccess.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdesc.h>
->  
->  #include <asm/irq_regs.h>
->  #include <asm/pmu.h>
-> @@ -295,9 +297,15 @@ validate_group(struct perf_event *event)
->  
->  static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
->  {
-> -	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
-> -	struct platform_device *plat_device = armpmu->plat_device;
-> -	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
-> +	struct arm_pmu *armpmu;
-> +	struct platform_device *plat_device;
-> +	struct arm_pmu_platdata *plat;
-> +
-> +	if (irq_is_percpu(irq))
 
-In case anyone else is trying to follow along, this requires:
+Then could you and Al please provide an Acked-by? This is a userspace API, so we shouldn?t be changing return values without good reason.
 
-http://lkml.org/lkml/2013/12/4/316
-
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+--
+Trond Myklebust
+Linux NFS client maintainer
