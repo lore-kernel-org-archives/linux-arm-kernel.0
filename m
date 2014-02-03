@@ -1,64 +1,83 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon,  3 Feb 2014 17:05:34 -0600
-Subject: [PATCH v5 2/6] spmi: add generic SPMI controller binding documentation
+Date: Mon,  3 Feb 2014 17:05:37 -0600
+Subject: [PATCH v5 5/6] spmi: document the PMIC arbiter SPMI bindings
 In-Reply-To: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
 References: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1391468739-20987-3-git-send-email-joshc@codeaurora.org>
+Message-ID: <1391468739-20987-6-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- Documentation/devicetree/bindings/spmi/spmi.txt | 41 +++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spmi/spmi.txt
+ .../bindings/spmi/qcom,spmi-pmic-arb.txt           | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
 
-diff --git a/Documentation/devicetree/bindings/spmi/spmi.txt b/Documentation/devicetree/bindings/spmi/spmi.txt
+diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
 new file mode 100644
-index 0000000..462a42f
+index 0000000..a0a5759
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/spmi/spmi.txt
-@@ -0,0 +1,41 @@
-+System Power Management Interface (SPMI) Controller
++++ b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+@@ -0,0 +1,60 @@
++Qualcomm SPMI Controller (PMIC Arbiter)
 +
-+This document defines a generic set of bindings for use by SPMI controllers.  A
-+controller is modelled in device tree as a node with zero or more child nodes,
-+each representing a unique slave on the bus.
++The SPMI PMIC Arbiter is found on the Snapdragon 800 Series.  It is an SPMI
++controller with wrapping arbitration logic to allow for multiple on-chip
++devices to control a single SPMI master.
++
++The PMIC Arbiter can also act as an interrupt controller, providing interrupts
++to slave devices.
++
++See spmi.txt for the generic SPMI controller binding requirements for child
++nodes.
++
++See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt for
++generic interrupt controller binding documentation.
 +
 +Required properties:
++- compatible : should be "qcom,spmi-pmic-arb".
++- reg-names  : should be "core", "intr", "cnfg"
++- reg : register specifiers, must contain:
++     "core" - core registers
++     "intr" - interrupt controller registers
++     "cnfg" - configuration registers
 +- #address-cells : must be set to 2
 +- #size-cells : must be set to 0
++- qcom,ee : indicates the active Execution Environment identifier (0-5)
++- qcom,channel : which of the PMIC Arb provided channels to use for accesses (0-5)
++- interrupts : interrupt list for the PMIC Arb controller, must contain a
++               single interrupt entry for the peripheral interrupt
++- interrupt-names : corresponding interrupt names for the interrupts
++                    listed in the 'interrupts' property, must contain:
++     "periph_irq" - summary interrupt for PMIC peripherals
++- interrupt-controller : boolean indicator that the PMIC arbiter is an interrupt controller
++- #interrupt-cells :  must be set to 4. Interrupts are specified as a 4-tuple:
++    cell 1: slave ID for the requested interrupt (0-15)
++    cell 2: peripheral ID for requested interrupt (0-255)
++    cell 3: the requested peripheral interrupt (0-7)
++    cell 4: interrupt flags indicating level-sense information, as defined in
++            dt-bindings/interrupt-controller/irq.h
 +
-+Child nodes:
++Example:
 +
-+An SPMI controller node can contain zero or more child nodes representing slave
-+devices on the bus.  Child 'reg' properties are specified as an address, type
-+pair.  The address must be in the range 0-15 (4 bits).  The type must be one of
-+SPMI_USID (0) or SPMI_GSID (1) for Unique Slave ID or Group Slave ID respectively.
-+These are the identifiers "statically assigned by the system integrator", as
-+per the SPMI spec.
++	spmi {
++		compatible = "qcom,spmi-pmic-arb";
++		reg-names = "core", "intr", "cnfg";
++		reg = <0xfc4cf000 0x1000>,
++		      <0xfc4cb000 0x1000>,
++		      <0xfc4ca000 0x1000>;
 +
-+Each child node must have one and only one 'reg' entry of type SPMI_USID.
++		interrupt-names = "periph_irq";
++		interrupts = <0 190 0>;
 +
-+#include <dt-bindings/spmi/spmi.h>
-+
-+	spmi at .. {
-+		compatible = "...";
-+		reg = <...>;
++		qcom,ee = <0>;
++		qcom,channel = <0>;
 +
 +		#address-cells = <2>;
-+		#size-cells <0>;
++		#size-cells = <0>;
 +
-+		child at 0 {
-+			compatible = "...";
-+			reg = <0 SPMI_USID>;
-+		};
-+
-+		child at 7 {
-+			compatible = "...";
-+			reg = <7 SPMI_USID
-+			       3 SPMI_GSID>;
-+		};
++		interrupt-controller;
++		#interrupt-cells = <4>;
 +	};
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
