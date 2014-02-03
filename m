@@ -1,60 +1,189 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 03 Feb 2014 14:24:58 +0000
-Subject: [PATCH v5 05/16] ARM: use a function table for determining
- instruction interpreter action
-In-Reply-To: <1390507559-4697-6-git-send-email-dave.long@linaro.org>
-References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
- <1390507559-4697-6-git-send-email-dave.long@linaro.org>
-Message-ID: <1391437498.3509.11.camel@linaro1.home>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Mon, 3 Feb 2014 14:28:43 +0000
+Subject: [PATCH v2 3/6] drivers: reset: Reset controller driver for STiH416
+In-Reply-To: <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1391437723-12055-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Make the instruction interpreter call back to semantic action functions
-> through a function pointer array provided by the invoker.  The interpreter
-> decodes the instructions into groups and uses the group number to index
-> into the supplied array.  kprobes and uprobes code will each supply their
-> own array of functions.
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
+From: Stephen Gallimore <stephen.gallimore@st.com>
 
-[...]
+This patch adds a reset controller platform driver for the STiH416
+SoC. This initial version provides a compatible driver for the
+"st,stih416-powerdown" device, which registers a system configuration
+register based reset controller that controls the powerdown state of
+hardware such as the on-chip USB host controllers.
 
-> --- a/arch/arm/kernel/probes.c
-> +++ b/arch/arm/kernel/probes.c
-> @@ -378,10 +378,11 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
->   */
->  int __kprobes
->  kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
-> -		   const union decode_item *table, bool thumb)
-> +		   const union decode_item *table, bool thumb,
-> +		   const union decode_action *actions)
->  {
-> -	const struct decode_header *h = (struct decode_header *)table;
-> -	const struct decode_header *next;
-> +	struct decode_header *h = (struct decode_header *)table;
-> +	struct decode_header *next;
+Signed-off-by: Stephen Gallimore <stephen.gallimore@st.com>
+---
+ arch/arm/boot/dts/stih416.dtsi                     |    6 ++
+ drivers/reset/sti/Kconfig                          |    4 +
+ drivers/reset/sti/Makefile                         |    2 +-
+ drivers/reset/sti/reset-stih416.c                  |   79 ++++++++++++++++++++
+ .../dt-bindings/reset-controller/stih416-resets.h  |   21 ++++++
+ 5 files changed, 111 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/reset/sti/reset-stih416.c
+ create mode 100644 include/dt-bindings/reset-controller/stih416-resets.h
 
-The decode tables are fixed structures which nothing should want to
-modify, so I think the const's above should be kept. I believe that
-you've had to resort to changing them because the following typedef
-lacks a 'const' on the final argument....
-
-[...]
-> diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
-> index c610fa9..81b6e61 100644
-[...]
->  
-> +typedef enum kprobe_insn (probes_custom_decode_t)(kprobe_opcode_t,
-> +						  struct arch_specific_insn *,
-> +						  struct decode_header *);
-> +
-
-Adding 'const' above will also have the knock on effect of requiring
-const on all the 'custom decode' functions as well.
-
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index b7ab47b..e5bec66 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -10,6 +10,7 @@
+ #include "stih416-clock.dtsi"
+ #include "stih416-pinctrl.dtsi"
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset-controller/stih416-resets.h>
+ / {
+ 	L2: cache-controller {
+ 		compatible = "arm,pl310-cache";
+@@ -27,6 +28,11 @@
+ 		ranges;
+ 		compatible	= "simple-bus";
+ 
++		powerdown: powerdown-controller {
++			#reset-cells = <1>;
++			compatible = "st,stih416-powerdown";
++		};
++
+ 		syscfg_sbc:sbc-syscfg at fe600000{
+ 			compatible	= "st,stih416-sbc-syscfg", "syscon";
+ 			reg		= <0xfe600000 0x1000>;
+diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
+index ef6654a..88d2d03 100644
+--- a/drivers/reset/sti/Kconfig
++++ b/drivers/reset/sti/Kconfig
+@@ -8,4 +8,8 @@ config STIH415_RESET
+ 	bool
+ 	select STI_RESET_SYSCFG
+ 
++config STIH416_RESET
++	bool
++	select STI_RESET_SYSCFG
++
+ endif
+diff --git a/drivers/reset/sti/Makefile b/drivers/reset/sti/Makefile
+index fce4433..be1c976 100644
+--- a/drivers/reset/sti/Makefile
++++ b/drivers/reset/sti/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_STI_RESET_SYSCFG) += reset-syscfg.o
+ 
+-# SoC specific reset devices
+ obj-$(CONFIG_STIH415_RESET) += reset-stih415.o
++obj-$(CONFIG_STIH416_RESET) += reset-stih416.o
+diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+new file mode 100644
+index 0000000..0becfc5
+--- /dev/null
++++ b/drivers/reset/sti/reset-stih416.c
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (C) 2013 STMicroelectronics (R&D) Limited
++ * Author: Stephen Gallimore <stephen.gallimore@st.com>
++ * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++
++#include <dt-bindings/reset-controller/stih416-resets.h>
++
++#include "reset-syscfg.h"
++
++/*
++ * STiH416 Peripheral powerdown definitions.
++ */
++static const char stih416_front[] = "st,stih416-front-syscfg";
++static const char stih416_rear[] = "st,stih416-rear-syscfg";
++static const char stih416_sbc[] = "st,stih416-sbc-syscfg";
++static const char stih416_lpm[] = "st,stih416-lpm-syscfg";
++
++#define STIH416_PDN_FRONT(_bit) \
++	_SYSCFG_RST_CH(stih416_front, SYSCFG_1500, _bit, SYSSTAT_1578, _bit)
++
++#define STIH416_PDN_REAR(_cntl, _stat) \
++	_SYSCFG_RST_CH(stih416_rear, SYSCFG_2525, _cntl, SYSSTAT_2583, _stat)
++
++#define SYSCFG_1500	0x7d0 /* Powerdown request EMI/NAND/Keyscan */
++#define SYSSTAT_1578	0x908 /* Powerdown status EMI/NAND/Keyscan */
++
++#define SYSCFG_2525	0x834 /* Powerdown request USB/SATA/PCIe */
++#define SYSSTAT_2583	0x91c /* Powerdown status USB/SATA/PCIe */
++
++static const struct syscfg_reset_channel_data stih416_powerdowns[] = {
++	[STIH416_EMISS_POWERDOWN]	= STIH416_PDN_FRONT(0),
++	[STIH416_NAND_POWERDOWN]	= STIH416_PDN_FRONT(1),
++	[STIH416_KEYSCAN_POWERDOWN]	= STIH416_PDN_FRONT(2),
++	[STIH416_USB0_POWERDOWN]	= STIH416_PDN_REAR(0, 0),
++	[STIH416_USB1_POWERDOWN]	= STIH416_PDN_REAR(1, 1),
++	[STIH416_USB2_POWERDOWN]	= STIH416_PDN_REAR(2, 2),
++	[STIH416_USB3_POWERDOWN]	= STIH416_PDN_REAR(6, 5),
++	[STIH416_SATA0_POWERDOWN]	= STIH416_PDN_REAR(3, 3),
++	[STIH416_SATA1_POWERDOWN]	= STIH416_PDN_REAR(4, 4),
++	[STIH416_PCIE0_POWERDOWN]	= STIH416_PDN_REAR(7, 9),
++	[STIH416_PCIE1_POWERDOWN]	= STIH416_PDN_REAR(5, 8),
++};
++
++static struct syscfg_reset_controller_data stih416_powerdown_controller = {
++	.wait_for_ack	= true,
++	.nr_channels	= ARRAY_SIZE(stih416_powerdowns),
++	.channels	= stih416_powerdowns,
++};
++
++static struct of_device_id stih416_reset_match[] = {
++	{ .compatible = "st,stih416-powerdown",
++	  .data = &stih416_powerdown_controller, },
++	{},
++};
++
++static struct platform_driver stih416_reset_driver = {
++	.probe = syscfg_reset_probe,
++	.driver = {
++		.name = "reset-stih416",
++		.owner = THIS_MODULE,
++		.of_match_table = stih416_reset_match,
++	},
++};
++
++static int __init stih416_reset_init(void)
++{
++	return platform_driver_register(&stih416_reset_driver);
++}
++arch_initcall(stih416_reset_init);
+diff --git a/include/dt-bindings/reset-controller/stih416-resets.h b/include/dt-bindings/reset-controller/stih416-resets.h
+new file mode 100644
+index 0000000..d7da55f
+--- /dev/null
++++ b/include/dt-bindings/reset-controller/stih416-resets.h
+@@ -0,0 +1,21 @@
++/*
++ * This header provides constants for the reset controller
++ * based peripheral powerdown requests on the STMicroelectronics
++ * STiH416 SoC.
++ */
++#ifndef _DT_BINDINGS_RESET_CONTROLLER_STIH416
++#define _DT_BINDINGS_RESET_CONTROLLER_STIH416
++
++#define STIH416_EMISS_POWERDOWN		0
++#define STIH416_NAND_POWERDOWN		1
++#define STIH416_KEYSCAN_POWERDOWN	2
++#define STIH416_USB0_POWERDOWN		3
++#define STIH416_USB1_POWERDOWN		4
++#define STIH416_USB2_POWERDOWN		5
++#define STIH416_USB3_POWERDOWN		6
++#define STIH416_SATA0_POWERDOWN		7
++#define STIH416_SATA1_POWERDOWN		8
++#define STIH416_PCIE0_POWERDOWN		9
++#define STIH416_PCIE1_POWERDOWN		10
++
++#endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH416 */
 -- 
-Tixy
+1.7.9.5
