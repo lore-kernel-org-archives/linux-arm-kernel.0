@@ -1,325 +1,104 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 09 Feb 2014 03:25:21 +0100
-Subject: [PATCH 03/12] clk: samsung: add clock driver for external clock
- outputs
-In-Reply-To: <201312131359.36576.heiko@sntech.de>
-References: <201312131356.40755.heiko@sntech.de>
- <201312131359.36576.heiko@sntech.de>
-Message-ID: <52F6E711.4020109@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon,  3 Feb 2014 18:33:47 +0000
+Subject: [PATCH] [RFC] Support for creating generic host_bridge from device
+ tree
+Message-ID: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Following the discussion started here [1], I now have a proposal for tackling
+generic support for host bridges described via device tree. It is an initial
+stab at it, to try to get feedback and suggestions, but it is functional enough
+that I have PCI Express for arm64 working on an FPGA using the patch that I am
+also publishing that adds support for PCI for that platform.
 
-On 13.12.2013 13:59, Heiko St?bner wrote:
-> This adds a driver for controlling the external clock outputs of
-> s3c24xx architectures including the dclk muxes and dividers.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   drivers/clk/samsung/Makefile                     |    1 +
->   drivers/clk/samsung/clk-s3c2410-dclk.c           |  517 ++++++++++++++++++++++
->   include/dt-bindings/clock/samsung,s3c2410-dclk.h |   28 ++
->   3 files changed, 546 insertions(+)
->   create mode 100644 drivers/clk/samsung/clk-s3c2410-dclk.c
->   create mode 100644 include/dt-bindings/clock/samsung,s3c2410-dclk.h
->
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 4c892c6..568683c 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -8,5 +8,6 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
->   obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
->   obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
->   obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
-> +obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
->   obj-$(CONFIG_S3C2443_COMMON_CLK)+= clk-s3c2443.o
->   obj-$(CONFIG_ARCH_S3C64XX)	+= clk-s3c64xx.o
-> diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-> new file mode 100644
-> index 0000000..de10e5c
-> --- /dev/null
-> +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-> @@ -0,0 +1,517 @@
-> +/*
-> + * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Common Clock Framework support for s3c24xx external clock output.
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/module.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/regmap.h>
-> +#include <linux/of.h>
-> +#include <dt-bindings/clock/samsung,s3c2410-dclk.h>
-> +#include "clk.h"
-> +
-> +/* legacy access to misccr, until dt conversion is finished */
-> +#include <mach/hardware.h>
-> +#include <mach/regs-gpio.h>
-> +
-> +enum supported_socs {
-> +	S3C2410,
-> +	S3C2412,
-> +	S3C2440,
-> +	S3C2443,
-> +};
-> +
-> +struct s3c24xx_dclk_drv_data {
-> +	int cpu_type;
-> +};
-> +
-> +/*
-> + * Clock for output-parent selection in misccr
-> + */
-> +
-> +struct s3c24xx_clkout {
-> +	struct clk_hw		hw;
-> +	struct regmap		*misccr;
-> +	u32			mask;
-> +	u8			shift;
-> +};
-> +
-> +#define to_s3c24xx_clkout(_hw) container_of(_hw, struct s3c24xx_clkout, hw)
-> +
-> +static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
-> +{
-> +	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
-> +	int num_parents = __clk_get_num_parents(hw->clk);
-> +	u32 val;
-> +	int ret = 0;
-> +
-> +	if (clkout->misccr)
-> +		ret = regmap_read(clkout->misccr, 0, &val);
-> +	else
-> +		val = readl_relaxed(S3C24XX_MISCCR) >> clkout->shift;
+Looking at the existing architectures that fit the requirements (use of device
+tree and PCI) yields the powerpc and microblaze as generic enough to make them
+candidates for conversion. I have a tentative patch for microblaze that I can
+only compile test it, unfortunately using qemu-microblaze leads to an early
+crash in the kernel.
 
-I wonder if this couldn't be simplified by always providing a regmap.
+As Bjorn has mentioned in the previous discussion, the idea is to add to
+struct pci_host_bridge enough data to be able to reduce the size or remove the
+architecture specific pci_controller structure. arm64 support actually manages
+to get rid of all the architecture static data and has no pci_controller structure
+defined. For host bridge drivers that means a change of API unless architectures
+decide to provide a compatibility layer (comments here please).
 
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	val >>= clkout->shift;
-> +	val &= clkout->mask;
-> +
-> +	if (val >= num_parents)
-> +		return -EINVAL;
-> +
-> +	return val;
-> +}
+In order to initialise a host bridge with the new API, the following example
+code is sufficient for a _probe() function:
 
-[snip]
+static int myhostbridge_probe(struct platform_device *pdev)
+{
+	int err;
+	struct device_node *dev;
+	struct pci_host_bridge *bridge;
+	struct resource bus_range;
+	struct myhostbridge_port *pp;
+	LIST_HEAD(resources);
 
-> +#define to_s3c24xx_dclk0(x) \
-> +		container_of(x, struct s3c24xx_dclk, dclk0_div_change_nb)
-> +
-> +#define to_s3c24xx_dclk1(x) \
-> +		container_of(x, struct s3c24xx_dclk, dclk1_div_change_nb)
-> +
-> +static const char dummy_nm[] __initconst = "dummy_name";
+	dev = pdev->dev.of_node;
 
-What's the advantage of having it defined this way instead of using 
-"dummy_name" (or probably "reserved" or "none", as in Samsung clock 
-drivers) directly in parent lists?
+	if (!of_device_is_available(dev)) {
+		pr_warn("%s: disabled\n", dev->full_name);
+		return -ENODEV;
+	}
 
-> +
-> +PNAME(dclk_s3c2410_p) = { "pclk", "uclk" };
-> +PNAME(clkout0_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-> +			     "gate_dclk0" };
-> +PNAME(clkout1_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-> +			     "gate_dclk1" };
-> +
-> +PNAME(clkout0_s3c2412_p) = { "mpll", "upll", dummy_nm /* rtc clock output */,
-> +			     "hclk", "pclk", "gate_dclk0" };
+	pp = kzalloc(sizeof(struct myhostbridge_port), GFP_KERNEL);
+	if (!pp)
+		return -ENOMEM;
 
-Hmm, this would suggest that instead of dummy_nm, a real name should be 
-used here, even if such clock doesn't exist yet. CCF will handle this fine.
+	err = of_pci_parse_bus_range(dev, &bus_range);
+	if (err) {
+		bus_range.start = 0;
+		bus_range.end = 255;
+		bus_range.flags = IORESOURCE_BUS;
+	}
+	pci_add_resource(&resources, &bus_range);
 
-> +PNAME(clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
-> +			     "gate_dclk1" };
-> +
-> +PNAME(clkout0_s3c2440_p) = { "xti", "upll", "fclk", "hclk", "pclk",
-> +			     "gate_dclk0" };
-> +PNAME(clkout1_s3c2440_p) = { "mpll", "upll", dummy_nm /* rtc clock output */,
-> +			     "hclk", "pclk", "gate_dclk1" };
+	bridge = pci_host_bridge_of_init(&pdev->dev, 0, &myhostbridge_ops, pp, &resources);
+	if (!bridge) {
+		err = -EINVAL;
+		goto bridge_init_fail;
+	}
 
-[snip]
+	err = myhostbridge_setup(bridge->bus);
+	if (err)
+		goto bridge_init_fail;
 
-> +static int s3c24xx_dclk_probe(struct platform_device *pdev)
-> +{
-> +	struct s3c24xx_dclk *s3c24xx_dclk;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct regmap *misccr = NULL;
-> +	struct resource *mem;
-> +	struct clk **clk_table;
-> +	const char **clkout0_parent_names, **clkout1_parent_names;
-> +	u8 clkout0_num_parents, clkout1_num_parents;
-> +	int current_soc, ret, i;
-> +
-> +	s3c24xx_dclk = devm_kzalloc(&pdev->dev, sizeof(*s3c24xx_dclk),
-> +				    GFP_KERNEL);
-> +	if (!s3c24xx_dclk)
-> +		return -ENOMEM;
-> +
-> +	s3c24xx_dclk->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, s3c24xx_dclk);
-> +	spin_lock_init(&s3c24xx_dclk->dclk_lock);
-> +
-> +	clk_table = devm_kzalloc(&pdev->dev,
-> +				 sizeof(struct clk *) * DCLK_MAX_CLKS,
-> +				 GFP_KERNEL);
-> +	if (!clk_table)
-> +		return -ENOMEM;
-> +
-> +	s3c24xx_dclk->clk_data.clks = clk_table;
-> +	s3c24xx_dclk->clk_data.clk_num = DCLK_MAX_CLKS;
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	s3c24xx_dclk->base = devm_ioremap_resource(&pdev->dev, mem);
-> +	if (IS_ERR(s3c24xx_dclk->base))
-> +		return PTR_ERR(s3c24xx_dclk->base);
-> +
-> +	/* when run from devicetree, get the misccr through a syscon-regmap */
-> +	if (np) {
-> +		misccr = syscon_regmap_lookup_by_phandle(np, "samsung,misccr");
-> +		if (IS_ERR(misccr)) {
-> +			dev_err(&pdev->dev, "could not get misccr syscon, %ld\n",
-> +				PTR_ERR(misccr));
-> +			return PTR_ERR(misccr);
-> +		}
-> +	}
-> +
-> +	current_soc = s3c24xx_dclk_get_driver_data(pdev);
-> +
-> +	if (current_soc == S3C2443) {
-> +		clk_table[MUX_DCLK0] = clk_register_mux(&pdev->dev,
-> +					"mux_dclk0", dclk_s3c2443_p,
-> +					ARRAY_SIZE(dclk_s3c2443_p), 0,
-> +					s3c24xx_dclk->base, 1, 1, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +		clk_table[MUX_DCLK1] = clk_register_mux(&pdev->dev,
-> +					"mux_dclk1", dclk_s3c2443_p,
-> +					ARRAY_SIZE(dclk_s3c2443_p), 0,
-> +					s3c24xx_dclk->base, 17, 1, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +	} else {
-> +		clk_table[MUX_DCLK0] = clk_register_mux(&pdev->dev,
-> +					"mux_dclk0", dclk_s3c2410_p,
-> +					ARRAY_SIZE(dclk_s3c2410_p), 0,
-> +					s3c24xx_dclk->base, 1, 1, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +		clk_table[MUX_DCLK1] = clk_register_mux(&pdev->dev,
-> +					"mux_dclk1", dclk_s3c2410_p,
-> +					ARRAY_SIZE(dclk_s3c2410_p), 0,
-> +					s3c24xx_dclk->base, 17, 1, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +	}
+	/*
+	 * Add flags here, this is just an example
+	 */
+	pci_add_flags(PCI_ENABLE_PROC_DOMAINS | PCI_COMPAT_DOMAIN_0);
+	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
 
-What about using a variant struct instead? Match tables would simply 
-contain pointers to respective structs and here the code would refer to 
-appropriate fields in a struct returned by s3c24xx_dclk_get_driver_data().
+	bus_range.end = pci_scan_child_bus(bridge->bus);
+	pci_bus_update_busn_res_end(bridge->bus, bus_range.end);
 
-> +
-> +	clk_table[DIV_DCLK0] = clk_register_divider(&pdev->dev, "div_dclk0",
-> +					"mux_dclk0", 0, s3c24xx_dclk->base,
-> +					4, 4, 0, &s3c24xx_dclk->dclk_lock);
-> +	clk_table[DIV_DCLK1] = clk_register_divider(&pdev->dev, "div_dclk1",
-> +					"mux_dclk1", 0, s3c24xx_dclk->base,
-> +					20, 4, 0, &s3c24xx_dclk->dclk_lock);
-> +
-> +	clk_table[GATE_DCLK0] = clk_register_gate(&pdev->dev, "gate_dclk0",
-> +					"div_dclk0", CLK_SET_RATE_PARENT,
-> +					s3c24xx_dclk->base, 0, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +	clk_table[GATE_DCLK1] = clk_register_gate(&pdev->dev, "gate_dclk1",
-> +					"div_dclk1", CLK_SET_RATE_PARENT,
-> +					s3c24xx_dclk->base, 16, 0,
-> +					&s3c24xx_dclk->dclk_lock);
-> +
-> +	switch (current_soc) {
-> +	case S3C2410:
-> +		clkout0_parent_names = clkout0_s3c2410_p;
-> +		clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2410_p);
-> +		clkout1_parent_names = clkout1_s3c2410_p;
-> +		clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2410_p);
-> +		break;
-> +	case S3C2412:
-> +		clkout0_parent_names = clkout0_s3c2412_p;
-> +		clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2412_p);
-> +		clkout1_parent_names = clkout1_s3c2412_p;
-> +		clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2412_p);
-> +		break;
-> +	case S3C2440:
-> +		clkout0_parent_names = clkout0_s3c2440_p;
-> +		clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2440_p);
-> +		clkout1_parent_names = clkout1_s3c2440_p;
-> +		clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2440_p);
-> +		break;
-> +	case S3C2443:
-> +		clkout0_parent_names = clkout0_s3c2443_p;
-> +		clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2443_p);
-> +		clkout1_parent_names = clkout1_s3c2443_p;
-> +		clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2443_p);
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "unsupported soc %d\n", current_soc);
-> +		ret = -EINVAL;
-> +		goto err_clk_register;
-> +	}
+	pci_assign_unassigned_bus_resources(bridge->bus);
 
-Ditto.
+	pci_bus_add_devices(bridge->bus);
 
-> +
-> +	clk_table[MUX_CLKOUT0] = s3c24xx_register_clkout(&pdev->dev,
-> +				"clkout0", clkout0_parent_names,
-> +				clkout0_num_parents, misccr, 4, 7);
-> +	clk_table[MUX_CLKOUT1] = s3c24xx_register_clkout(&pdev->dev, "clkout1",
-> +				clkout1_parent_names,
-> +				clkout1_num_parents, misccr, 8, 7);
-> +
-> +	for (i = 0; i < DCLK_MAX_CLKS; i++)
-> +		if (IS_ERR(clk_table[i])) {
-> +			dev_err(&pdev->dev, "clock %d failed to register\n", i);
-> +			ret = PTR_ERR(clk_table[i]);
-> +			goto err_clk_register;
-> +		}
-> +
-> +	ret = clk_register_clkdev(clk_table[MUX_DCLK0], "dclk0", NULL);
-> +	ret |= clk_register_clkdev(clk_table[MUX_DCLK1], "dclk1", NULL);
-> +	ret |= clk_register_clkdev(clk_table[MUX_CLKOUT0], "clkout0", NULL);
-> +	ret |= clk_register_clkdev(clk_table[MUX_CLKOUT1], "clkout1", NULL);
+	return 0;
 
-Hmm, won't it break the error value if two calls return different error 
-codes?
-
-I guess that
-
-if (!ret)
-	ret = ...
-if (!ret)
-	ret = ...
-
-construct would be more appropriate here, if you don't want error 
-message per call.
-
-
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to register aliases\n");
-> +		goto err_clk_register;
-> +	}
-> +
-> +	s3c24xx_dclk->dclk0_div_change_nb.notifier_call =
-> +						s3c24xx_dclk0_div_notify;
-> +	s3c24xx_dclk->dclk0_div_change_nb.next = NULL;
-
-Do you need to set this field to NULL explicitly?
+bridge_init_fail:
+	kfree(pp);
+	pci_free_resource_list(&resources);
+	return err;
+}
 
 Best regards,
-Tomasz
+Liviu Dudau
+
+[1] http://thread.gmane.org/gmane.linux.kernel.pci/25946
+
+Liviu Dudau (1):
+  pci: Add support for creating a generic host_bridge from device tree
+
+ drivers/pci/host-bridge.c | 92 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/probe.c       | 11 ++++++
+ include/linux/pci.h       | 14 ++++++++
+ 3 files changed, 117 insertions(+)
+
+-- 
+1.8.5.3
