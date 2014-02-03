@@ -1,52 +1,99 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue,  4 Feb 2014 00:01:44 +0100
-Subject: [PATCH v8 2/4] ARM: BCM5301X: add early debugging support
+Date: Tue,  4 Feb 2014 00:01:46 +0100
+Subject: [PATCH v8 4/4] ARM: BCM5301X: workaround suppress fault
 In-Reply-To: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
 References: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1391468506-5800-3-git-send-email-hauke@hauke-m.de>
+Message-ID: <1391468506-5800-5-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for early debugging of BCM5301X SoC.
+Without this patch I am getting a unhandled fault exception like this
+one after "Freeing unused kernel memory":
+
+Freeing unused kernel memory: 1260K (c02c1000 - c03fc000)
+Unhandled fault: imprecise external abort (0x1c06) at 0xb6f89005
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
+
+The address which is here 0xb6f89005 changes from boot to boot, with a
+new build the changes are bigger. With kernel 3.10 I have also seen
+this fault at different places in the boot process, but starting with
+3.11 they are always occurring after the "Freeing unused kernel memory"
+message. I never was able to completely boot to userspace without this
+handler. The abort code is constant 0x1c06. This fault just happens
+once in the boot process I have never seen it happing twice or more.
+
+I also tried changing the CPSR.A bit to 0 in init_early, with this code
+like Afzal suggested, but that did not change anything:
+asm volatile("mrs r12, cpsr\n"
+	"bic r12, r12, #0x00000100\n"
+	"msr cpsr_c, r12" ::: "r12", "cc", "memory");
+
+Disabling the L2 cache by building with CONFIG_CACHE_L2X0 unset did not
+help.
+
+This workaround was copied from the vendor code including most of the
+comments. It says it they think this is caused by the CFE boot loader
+used on this device. I do not have any access to any datasheet or
+errata document to check this.
 
 Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Christian Daudt <bcm@fixthebug.org>
 ---
- arch/arm/Kconfig.debug |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-bcm/bcm_5301x.c |   33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0531da8..315ce91 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -106,6 +106,11 @@ choice
- 		depends on ARCH_BCM2835
- 		select DEBUG_UART_PL01X
+diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+index ef9740a..edff6976 100644
+--- a/arch/arm/mach-bcm/bcm_5301x.c
++++ b/arch/arm/mach-bcm/bcm_5301x.c
+@@ -9,8 +9,40 @@
+ #include <asm/hardware/cache-l2x0.h>
  
-+	config DEBUG_BCM_5301X
-+		bool "Kernel low-level debugging on BCM5301X UART1"
-+		depends on ARCH_BCM_5301X
-+		select DEBUG_UART_PL01X
+ #include <asm/mach/arch.h>
++#include <asm/siginfo.h>
++#include <asm/signal.h>
+ 
+ 
++static bool first_fault = true;
 +
- 	config DEBUG_BCM_KONA_UART
- 		bool "Kernel low-level debugging messages via BCM KONA UART"
- 		depends on ARCH_BCM
-@@ -1023,6 +1028,7 @@ config DEBUG_UART_PHYS
- 	default 0x101f1000 if ARCH_VERSATILE
- 	default 0x101fb000 if DEBUG_NOMADIK_UART
- 	default 0x16000000 if ARCH_INTEGRATOR
-+	default 0x18000300 if DEBUG_BCM_5301X
- 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0x20060000 if DEBUG_RK29_UART0
- 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
-@@ -1071,6 +1077,7 @@ config DEBUG_UART_VIRT
- 	default 0xf0009000 if DEBUG_CNS3XXX
- 	default 0xf01fb000 if DEBUG_NOMADIK_UART
- 	default 0xf0201000 if DEBUG_BCM2835
-+	default 0xf1000300 if DEBUG_BCM_5301X
- 	default 0xf11f1000 if ARCH_VERSATILE
- 	default 0xf1600000 if ARCH_INTEGRATOR
- 	default 0xf1c28000 if DEBUG_SUNXI_UART0
++static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
++				 struct pt_regs *regs)
++{
++	if (fsr == 0x1c06 && first_fault) {
++		first_fault = false;
++
++		/*
++		 * These faults with code 0x1c06 happens for no good reason,
++		 * possibly left over from the CFE boot loader.
++		 */
++		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
++		addr, fsr);
++
++		/* Returning non-zero causes fault display and panic */
++		return 0;
++	}
++
++	/* Others should cause a fault */
++	return 1;
++}
++
++static void __init bcm5301x_init_early(void)
++{
++	/* Install our hook */
++	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
++			"imprecise external abort");
++}
++
+ static void __init bcm5301x_dt_init(void)
+ {
+ 	l2x0_of_init(0, ~0UL);
+@@ -23,6 +55,7 @@ static const char __initconst *bcm5301x_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(BCM5301X, "BCM5301X")
++	.init_early	= bcm5301x_init_early,
+ 	.init_machine	= bcm5301x_dt_init,
+ 	.dt_compat	= bcm5301x_dt_compat,
+ MACHINE_END
 -- 
 1.7.10.4
