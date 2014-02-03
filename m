@@ -1,24 +1,21 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 3 Feb 2014 11:09:36 -0500
-Subject: [PATCH v5 00/14] ahci: library-ise ahci_platform, add sunxi
- driver and cleanup imx driver
-In-Reply-To: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
-References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140203160936.GC30250@htj.dyndns.org>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 04 Feb 2014 00:17:30 +0800
+Subject: a LLC sched domain bug for panda board?
+Message-ID: <52EFC11A.8010709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+I just run the 3.14-rc1 kernel on panda board. The only domain for it is
+'CPU' domain, but this domain has no SD_SHARE_PKG_RESOURCES setting, it
+has no sd_llc.
 
-On Wed, Jan 22, 2014 at 08:04:35PM +0100, Hans de Goede wrote:
-> Here is v4 of my patchset for adding ahci-sunxi support. It has grown quite
-> a bit since I've been going for a more generic approach this time and I've
-> also cleaned up the ahci-imx driver to use the same generic approach.
+Guess the right domain for this board should be MC. So is it a bug?
 
-On top of which tree were these patches generated?  They don't apply
-to 3.14-rc1.
-
-Thanks.
+..
+/proc/sys/kernel/sched_domain/cpu0/domain0/name:CPU
+..
+/proc/sys/kernel/sched_domain/cpu1/domain0/name:CPU
 
 -- 
-tejun
+Thanks
+    Alex
