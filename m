@@ -1,67 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Feb 2014 15:31:15 +0900
-Subject: [PATCH 3/3] ARM: fix HAVE_ARM_TWD selection for OMAP and shmobile
-In-Reply-To: <1391294144-27787-4-git-send-email-robherring2@gmail.com>
-References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
- <1391294144-27787-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20140203063114.GB30047@verge.net.au>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon,  3 Feb 2014 15:55:27 +0900
+Subject: [PATCH v4 0/1] audit: generic compat system call support
+In-Reply-To: <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1389945795-4255-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1391410528-4844-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arm64 supports 32-bit mode(AArch32) and 64-bit mode(AArch64).
+To enable audit on arm64, we want to use lib/audit.c and re-work it
+to support compat system calls as well without copying it under
+arch sub-directory.
 
-could you split the shmobile portion out into a separate patch
-so that I can take it through my tree?
+Since this patch is implemented in much the same way as on existing
+bi-architectures (ie. ppc, s390, sparc and x86), it's not difficult
+for them to utilize this generic code instead of their own implementation.
 
-Thanks
+The code was tested on armv8 fast model with 64-bit and 32-bit userland
+by using modified audit-test-code. As this patch is mandatory for my
+"system call audit support for arm64" patch, please review it as well
+for better understandings.
 
-On Sat, Feb 01, 2014 at 04:35:44PM -0600, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> The selection of HAVE_ARM_TWD for OMAP and shmobile depend on LOCAL_TIMER
-> which no longer exists. They should depend on SMP instead.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  arch/arm/mach-omap2/Kconfig    | 2 +-
->  arch/arm/mach-shmobile/Kconfig | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 653b489..e2ce4f8 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -54,7 +54,7 @@ config SOC_OMAP5
->  	select ARM_GIC
->  	select CPU_V7
->  	select HAVE_ARM_SCU if SMP
-> -	select HAVE_ARM_TWD if LOCAL_TIMERS
-> +	select HAVE_ARM_TWD if SMP
->  	select HAVE_SMP
->  	select HAVE_ARM_ARCH_TIMER
->  	select ARM_ERRATA_798181 if SMP
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 3386406..05fa505 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
->  	select CPU_V7
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_ARM_SCU if SMP
-> -	select HAVE_ARM_TWD if LOCAL_TIMERS
-> +	select HAVE_ARM_TWD if SMP
->  	select HAVE_SMP
->  	select ARM_GIC
->  	select MIGHT_HAVE_CACHE_L2X0
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Changes v2 -> v3:
+* Specify AUDIT_CLASS_XYZ_32 instead of AUDIT_CLASS_XYZ when registering
+  compat syscalls (bug fix)
+
+Changes v3 -> v4:
+* Add CONFIG_AUDIT_COMPAT_GENERIC to compile in compat_audit.c
+* Re-define audit_is_compat() in generic way in order to eliminate
+  necessity of asm/audit.h.
+
+AKASHI Takahiro (1):
+  audit: Add generic compat syscall support
+
+ include/linux/audit.h      |    8 +++++++
+ include/uapi/linux/audit.h |    6 ++++++
+ lib/Kconfig                |    5 +++++
+ lib/Makefile               |    1 +
+ lib/audit.c                |   15 ++++++++++++-
+ lib/compat_audit.c         |   50 ++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 84 insertions(+), 1 deletion(-)
+ create mode 100644 lib/compat_audit.c
+
+-- 
+1.7.9.5
