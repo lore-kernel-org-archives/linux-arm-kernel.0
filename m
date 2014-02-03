@@ -1,36 +1,58 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 3 Feb 2014 18:15:44 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <20140203165718.GO14112@mudshark.cambridge.arm.com>
-References: <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
- <20140122112055.GF1621@mudshark.cambridge.arm.com>
- <20140129182805.GF11329@bivouac.eciton.net>
- <1391029124.2488.50.camel@deneb.redhat.com>
- <20140130131247.GG11329@bivouac.eciton.net>
- <20140203103415.GA12187@mudshark.cambridge.arm.com>
- <20140203155542.GI11329@bivouac.eciton.net>
- <20140203160051.GG14112@mudshark.cambridge.arm.com>
- <20140203164636.GJ11329@bivouac.eciton.net>
- <20140203165718.GO14112@mudshark.cambridge.arm.com>
-Message-ID: <20140203181544.GK11329@bivouac.eciton.net>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 3 Feb 2014 19:22:42 +0100
+Subject: [PATCH v5 0/4] perf: AARCH64 arch support
+In-Reply-To: <20140124163548.GH31040@mudshark.cambridge.arm.com>
+References: <1390399879-5109-1-git-send-email-jean.pihet@linaro.org>
+ <20140124163548.GH31040@mudshark.cambridge.arm.com>
+Message-ID: <CAFrcx1kgxYJX6HvRSivZxShPrj8S3YsHUWwMkzD8dumxmE5z2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 04:57:18PM +0000, Will Deacon wrote:
-> > mov[tw]: why?
-> > Then we end up battling different available immediate fields in A32/T32
-> > instruction sets and v5/v6/v7 architecture versions.
-> 
-> I was making the assumption that UEFI was going to be v7 only... is this not
-> true?
+Hi Will, Arnaldo,
 
-There is no such requirement in the specification.
-It even mentions requirements for ARMv4 in one place :)
+On 24 January 2014 17:35, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Jean,
+>
+> On Wed, Jan 22, 2014 at 02:11:15PM +0000, Jean Pihet wrote:
+>> Add AARCH64 specific support. This includes the following:
+>> - AARCH64 perf registers definition and hooks,
+>> - compat mode registers use, i.e. profiling a 32-bit binary on
+>>    a 64-bit system,
+>> - unwinding using the dwarf information from the .debug_frame
+>>    section of the ELF binary,
+>> - unwinding using the frame pointer information; in 64-bit and
+>>    compat modes.
+>>
+>> Note: support for unwinding using the dwarf information in compat
+>> mode requires some changes to the libunwind code. Those changes
+>> have been submitted on the libunwind ML and are in discussion.
+>>
+>> Tested on ARMv7, ARMv8 and x86_64 platforms. The compat mode has been
+>> tested on ARMv8 using statically built 32-bit binaries.
+>
+> This is look alright to me now, but there are still two blockers:
+>
+>  (1) Getting the libunwind code merged
+This one is independent of the kernel changes. The libunwind stuff is
+under disuccsion atm, cf. libunwind ML.
 
-But I also don't understand why ldr= should be avoided.
-This is not performance sensitive (called once on system boot), and
-it's already executing with the caches off, so even if it ends up
-being a literal load it does not pollute.
+>  (2) Splitting this into an arch/arm64 series and a tools/perf series, so
+>      that acme can merge the latter independently (and avoid the mess we had
+>      last time).
+Split into:
+- the tools/perf change: '[PATCH] perf: ARM64: wire up perf_regs and
+unwind support'
+and
+- the arch/arm64 changes: '[PATCH v6 0/3] perf: AARCH64 arch support'.
 
-/
-    Leif
+
+>
+> Anyway, for the series:
+>
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+Thanks! I have added your Acked-By in the series.
+
+>
+> Will
+
+Jean
