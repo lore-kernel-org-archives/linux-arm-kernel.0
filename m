@@ -1,54 +1,96 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Feb 2014 20:38:02 +0100
-Subject: [PATCH v3 8/8] ARM: dts: sun7i: Add ethernet alias for GMAC
-In-Reply-To: <1391398346-5094-9-git-send-email-wens@csie.org>
-References: <1391398346-5094-1-git-send-email-wens@csie.org>
- <1391398346-5094-9-git-send-email-wens@csie.org>
-Message-ID: <20140203193802.GE25625@lukather>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Mon, 3 Feb 2014 11:42:22 -0800
+Subject: [RFC PATCH V3 1/4] pci: APM X-Gene PCIe controller driver
+In-Reply-To: <201401301516.27091.arnd@arndb.de>
+References: <1390599168-13150-1-git-send-email-tinamdar@apm.com>
+ <1390599168-13150-2-git-send-email-tinamdar@apm.com>
+ <201401301516.27091.arnd@arndb.de>
+Message-ID: <CACoXjcnXoysMeBsGuOb3t5b10zdeJ8pOnuOOzR8AaZhsOOYVEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 11:32:26AM +0800, Chen-Yu Tsai wrote:
-> U-Boot will insert MAC address into the device tree image.
-> It looks up ethernet[0-5] aliases to find the ethernet nodes.
-> Alias GMAC as ethernet0, as it is the only ethernet controller used.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 65fb8d0..c48fb11 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -17,7 +17,7 @@
->  	interrupt-parent = <&gic>;
->  
->  	aliases {
-> -		ethernet0 = &emac;
-> +		ethernet0 = &gmac;
->  	};
+On Thu, Jan 30, 2014 at 6:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 24 January 2014, Tanmay Inamdar wrote:
+>
+>> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+>> +{
+>> +     int i;
+>> +
+>> +     /* Hide the PCI host BARs from the kernel as their content doesn't
+>> +      * fit well in the resource management
+>> +      */
+>> +     for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+>> +             dev->resource[i].start = dev->resource[i].end = 0;
+>> +             dev->resource[i].flags = 0;
+>> +     }
+>> +     dev_info(&dev->dev, "Hiding X-Gene pci host bridge resources %s\n",
+>> +              pci_name(dev));
+>> +}
+>> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_DEVICEID,
+>> +                      xgene_pcie_fixup_bridge);
+>
+> Shouldn't this be gone now that the host bridge is correctly shown
+> at the domain root?
 
-I'm not very fond of this patch.
+In inbound region configuration, whole DDR space is mapped into the
+BAR of RC. When Linux PCI mid-layer starts enumerating, it reads the
+size of BAR of RC and tries to fit it into the memory resource. First
+thing is that the outbound memory is not enough to map the inbound BAR
+space. This creates problem with the resource management logic and
+second thing is that, it is not required to map inbound BAR space RC
+bar as no one will be accessing it further.
 
-People might rely on the fact that ethernet0 is actually the emac, and
-are expecting u-boot to fill the ethaddr variable to the emac, and not
-the gmac.
+As Jason suggested, Bridge BAR's should be 0 size unless the bridge
+itself has registers. However this is not the case with XGene PCIe
+controller. It may have been inherited from the legacy design.
+'arch/powerpc/sysdev/ppc4xx_pci.c' has similar fixup function.
 
-Since u-boot is totally able to deal with several ethernet addresses,
-please add it as ethernet1.
+>
+>> +static int xgene_pcie_setup(int nr, struct pci_sys_data *sys)
+>> +{
+>> +     struct xgene_pcie_port *pp = sys->private_data;
+>> +     struct resource *io = &pp->realio;
+>> +
+>> +     io->start = sys->domain * SZ_64K;
+>> +     io->end = io->start + SZ_64K;
+>> +     io->flags = pp->io.res.flags;
+>> +     io->name = "PCI IO";
+>> +     pci_ioremap_io(io->start, pp->io.res.start);
+>> +
+>> +     pci_add_resource_offset(&sys->resources, io, sys->io_offset);
+>> +     sys->mem_offset = pp->mem.res.start - pp->mem.pci_addr;
+>> +     pci_add_resource_offset(&sys->resources, &pp->mem.res,
+>> +                             sys->mem_offset);
+>> +     return 1;
+>> +}
+>
+> Thanks for bringing back the I/O space handling.
+>
+> You don't seem to set sys->io_offset anywhere, but each of the
+> ports listed in your DT starts a local bus I/O register range
+> at port 0.
+>
+> AFAICT, you need to add (somewhere)
+>
+>         sys->io_offset = pp->realio.start - pp->io.pci_addr;
+>
+> but there could be something else missing. You clearly haven't
+> tested if the I/O space actually works.
 
-Maxime
+That is correct :-). Could not find the card. Thanks for the patch below.
+>
+> If you want to try out the I/O space, I'd suggest using an Intel
+> e1000 network card, which has both memory and i/o space. There
+> is a patch at http://www.spinics.net/lists/linux-pci/msg27684.html
+> that lets you check the I/O registers on it, or you can go
+> through /dev/port from user space.
+>
+> I also haven't seen your patch that adds pci_ioremap_io() for
+> arm64. It would be helpful to keep it in the same patch
+> series, since it won't build without this patch.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140203/27a51970/attachment-0001.sig>
+I will post the arm64 pci patch along with next revision of this
+driver. That will cover the 'pci_ioremap_io' as well.
+
+>
+>         Arnd
