@@ -1,398 +1,59 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Mon, 3 Feb 2014 16:49:16 +0530
-Subject: [PATCH v2 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
-In-Reply-To: <CAMwBHsbQ_5tGNuHC=OBs7+CxZ4xJ-s6HHEX04ZKo4FtofpgGgA@mail.gmail.com>
-References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-3-git-send-email-anup.patel@linaro.org>
- <20140203105409.GF30209@e106331-lin.cambridge.arm.com>
- <CAMwBHsbQ_5tGNuHC=OBs7+CxZ4xJ-s6HHEX04ZKo4FtofpgGgA@mail.gmail.com>
-Message-ID: <CAAhSdy0K2jQOE+Wjf-mf57UX-CXFd0yBRFT_Xgjiw2fP4-TGrw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Feb 2014 11:17:54 +0000
+Subject: [PATCH V2] arm64: add DSB after icache flush in
+ __flush_icache_all()
+In-Reply-To: <20140131104850.GG15937@n2100.arm.linux.org.uk>
+References: <1390892813-30407-1-git-send-email-vkale@apm.com>
+ <20140128161402.GI2885@mudshark.cambridge.arm.com>
+ <CAPrCYkfpGJD+GQBmxqNZ8NM+9LhRvf5HiJrpMxHQzjrmPRhonA@mail.gmail.com>
+ <20140130180706.GO7575@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.11.1401301640500.1652@knanqh.ubzr>
+ <20140131001647.GA5525@mudshark.cambridge.arm.com>
+ <20140131104850.GG15937@n2100.arm.linux.org.uk>
+Message-ID: <20140203111754.GB14112@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 3, 2014 at 4:46 PM, Anup Patel <apatel@apm.com> wrote:
-> Hi Mark,
->
-> On Mon, Feb 3, 2014 at 4:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Thu, Jan 30, 2014 at 10:41:18AM +0000, Anup Patel wrote:
->>> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
->>> VCPUs. This patch extends current in-kernel PSCI emulation to provide
->>> PSCI v0.2 interface to VCPUs.
->>>
->>> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
->>> keeping the ABI backward-compatible.
->>>
->>> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
->>> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
->>> init using KVM_ARM_VCPU_INIT ioctl.
->>
->> I have an issue with this. PSCI 0.2 makes all but two functions (MIGRATE
->> and MIGRATE_INFO_CPU_UP) mandatory, and hence not allowed to return
->> NOT_SUPPORTED.
->>
->> Additionally, for correct behaviour across a kexec in future, we'll
->> require AFFINITY_INFO for PSCI 0.2+ systems to determint when a CPU is
->> actually dead (and cannot affect the cache hierarchy). I'd very much
->> like to make that a hard requirement to ensure correctness.
->>
->> I would very much like to see at least trivial implementations of those
->> mandatory functions, so that we don't need a
->> KVM_ARM_VCPU_PSCI_REALLY_0_2 or similar in future. As it stands this
->> series does not implement PSCI 0.2.
->
-> The intention behind this series was to provide a base implementation of
-> PSCI v0.2 which can be extended by subsequent patches that implement
-> other PSCI v0.2 functions.
->
-> I already have a patch series that implement PSCI v0.2 SYSTEM_OFF and
-> SYSTEM_RESET based on this series.
->
-> Regards,
-> Anup
->
->>
->> Thanks,
->> Mark.
->>
->>>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> ---
->>>  arch/arm/include/asm/kvm_host.h   |    2 +-
->>>  arch/arm/include/asm/kvm_psci.h   |    4 ++
->>>  arch/arm/include/uapi/asm/kvm.h   |   35 ++++++++++++++-
->>>  arch/arm/kvm/arm.c                |    1 +
->>>  arch/arm/kvm/psci.c               |   85 +++++++++++++++++++++++++++++++------
->>>  arch/arm64/include/asm/kvm_host.h |    2 +-
->>>  arch/arm64/include/asm/kvm_psci.h |    4 ++
->>>  arch/arm64/include/uapi/asm/kvm.h |   35 ++++++++++++++-
->>>  8 files changed, 152 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>> index bce6d32..dc4e3ed 100644
->>> --- a/arch/arm/include/asm/kvm_host.h
->>> +++ b/arch/arm/include/asm/kvm_host.h
->>> @@ -36,7 +36,7 @@
->>>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->>>  #define KVM_HAVE_ONE_REG
->>>
->>> -#define KVM_VCPU_MAX_FEATURES 1
->>> +#define KVM_VCPU_MAX_FEATURES 2
->>>
->>>  #include <kvm/arm_vgic.h>
->>>
->>> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
->>> index 9a83d98..4c0e3e1 100644
->>> --- a/arch/arm/include/asm/kvm_psci.h
->>> +++ b/arch/arm/include/asm/kvm_psci.h
->>> @@ -18,6 +18,10 @@
->>>  #ifndef __ARM_KVM_PSCI_H__
->>>  #define __ARM_KVM_PSCI_H__
->>>
->>> +#define KVM_ARM_PSCI_0_1       1
->>> +#define KVM_ARM_PSCI_0_2       2
->>> +
->>> +int kvm_psci_version(struct kvm_vcpu *vcpu);
->>>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
->>>
->>>  #endif /* __ARM_KVM_PSCI_H__ */
->>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->>> index c498b60..bf860e2 100644
->>> --- a/arch/arm/include/uapi/asm/kvm.h
->>> +++ b/arch/arm/include/uapi/asm/kvm.h
->>> @@ -83,6 +83,7 @@ struct kvm_regs {
->>>  #define KVM_VGIC_V2_CPU_SIZE           0x2000
->>>
->>>  #define KVM_ARM_VCPU_POWER_OFF         0 /* CPU is started in OFF state */
->>> +#define KVM_ARM_VCPU_PSCI_0_2          1 /* CPU uses PSCI v0.2 */
->>>
->>>  struct kvm_vcpu_init {
->>>         __u32 target;
->>> @@ -164,7 +165,7 @@ struct kvm_arch_memory_slot {
->>>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>>  #define KVM_ARM_IRQ_GIC_MAX            127
->>>
->>> -/* PSCI interface */
->>> +/* PSCI v0.1 interface */
->>>  #define KVM_PSCI_FN_BASE               0x95c1ba5e
->>>  #define KVM_PSCI_FN(n)                 (KVM_PSCI_FN_BASE + (n))
->>>
->>> @@ -173,9 +174,41 @@ struct kvm_arch_memory_slot {
->>>  #define KVM_PSCI_FN_CPU_ON             KVM_PSCI_FN(2)
->>>  #define KVM_PSCI_FN_MIGRATE            KVM_PSCI_FN(3)
->>>
->>> +/* PSCI v0.2 interface */
->>> +#define KVM_PSCI_0_2_FN_BASE           0x84000000
->>> +#define KVM_PSCI_0_2_FN(n)             (KVM_PSCI_0_2_FN_BASE + (n))
->>> +#define KVM_PSCI_0_2_FN64_BASE         0xC4000000
->>> +#define KVM_PSCI_0_2_FN64(n)           (KVM_PSCI_0_2_FN64_BASE + (n))
->>> +
->>> +#define KVM_PSCI_0_2_FN_PSCI_VERSION   KVM_PSCI_0_2_FN(0)
->>> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND    KVM_PSCI_0_2_FN(1)
->>> +#define KVM_PSCI_0_2_FN_CPU_OFF                KVM_PSCI_0_2_FN(2)
->>> +#define KVM_PSCI_0_2_FN_CPU_ON         KVM_PSCI_0_2_FN(3)
->>> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO  KVM_PSCI_0_2_FN(4)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE                KVM_PSCI_0_2_FN(5)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->>> +                                       KVM_PSCI_0_2_FN(6)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->>> +                                       KVM_PSCI_0_2_FN(7)
->>> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF     KVM_PSCI_0_2_FN(8)
->>> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET   KVM_PSCI_0_2_FN(9)
->>> +
->>> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND  KVM_PSCI_0_2_FN64(1)
->>> +#define KVM_PSCI_0_2_FN64_CPU_ON       KVM_PSCI_0_2_FN64(3)
->>> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO        KVM_PSCI_0_2_FN64(4)
->>> +#define KVM_PSCI_0_2_FN64_MIGRATE      KVM_PSCI_0_2_FN64(5)
->>> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->>> +                                       KVM_PSCI_0_2_FN64(7)
->>> +
->>> +/* PSCI return values */
->>>  #define KVM_PSCI_RET_SUCCESS           0
->>>  #define KVM_PSCI_RET_NI                        ((unsigned long)-1)
->>>  #define KVM_PSCI_RET_INVAL             ((unsigned long)-2)
->>>  #define KVM_PSCI_RET_DENIED            ((unsigned long)-3)
->>> +#define KVM_PSCI_RET_ALREADY_ON                ((unsigned long)-4)
->>> +#define KVM_PSCI_RET_ON_PENDING                ((unsigned long)-5)
->>> +#define KVM_PSCI_RET_INTERNAL_FAILURE  ((unsigned long)-6)
->>> +#define KVM_PSCI_RET_NOT_PRESENT       ((unsigned long)-7)
->>> +#define KVM_PSCI_RET_DISABLED          ((unsigned long)-8)
->>>
->>>  #endif /* __ARM_KVM_H__ */
->>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>> index 151eb91..e508125 100644
->>> --- a/arch/arm/kvm/arm.c
->>> +++ b/arch/arm/kvm/arm.c
->>> @@ -193,6 +193,7 @@ int kvm_dev_ioctl_check_extension(long ext)
->>>         case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
->>>         case KVM_CAP_ONE_REG:
->>>         case KVM_CAP_ARM_PSCI:
->>> +       case KVM_CAP_ARM_PSCI_0_2:
->>>                 r = 1;
->>>                 break;
->>>         case KVM_CAP_COALESCED_MMIO:
->>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
->>> index 448f60e..7fdc881 100644
->>> --- a/arch/arm/kvm/psci.c
->>> +++ b/arch/arm/kvm/psci.c
->>> @@ -85,17 +85,57 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>>         return KVM_PSCI_RET_SUCCESS;
->>>  }
->>>
->>> -/**
->>> - * kvm_psci_call - handle PSCI call if r0 value is in range
->>> - * @vcpu: Pointer to the VCPU struct
->>> - *
->>> - * Handle PSCI calls from guests through traps from HVC instructions.
->>> - * The calling convention is similar to SMC calls to the secure world where
->>> - * the function number is placed in r0 and this function returns true if the
->>> - * function number specified in r0 is withing the PSCI range, and false
->>> - * otherwise.
->>> - */
->>> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>> +int kvm_psci_version(struct kvm_vcpu *vcpu)
->>> +{
->>> +       if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
->>> +               return KVM_ARM_PSCI_0_2;
->>> +
->>> +       return KVM_ARM_PSCI_0_1;
->>> +}
->>> +
->>> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->>> +{
->>> +       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>> +       unsigned long val;
->>> +
->>> +       switch (psci_fn) {
->>> +       case KVM_PSCI_0_2_FN_PSCI_VERSION:
->>> +               /*
->>> +                * Bits[31:16] = Major Version = 0
->>> +                * Bits[15:0] = Minor Version = 2
->>> +                */
->>> +               val = 2;
->>> +               break;
->>> +       case KVM_PSCI_0_2_FN_CPU_OFF:
->>> +               kvm_psci_vcpu_off(vcpu);
->>> +               val = KVM_PSCI_RET_SUCCESS;
->>> +               break;
->>> +       case KVM_PSCI_0_2_FN_CPU_ON:
->>> +       case KVM_PSCI_0_2_FN64_CPU_ON:
->>> +               val = kvm_psci_vcpu_on(vcpu);
->>> +               break;
->>> +       case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->>> +       case KVM_PSCI_0_2_FN_AFFINITY_INFO:
->>> +       case KVM_PSCI_0_2_FN_MIGRATE:
->>> +       case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
->>> +       case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
->>> +       case KVM_PSCI_0_2_FN_SYSTEM_OFF:
->>> +       case KVM_PSCI_0_2_FN_SYSTEM_RESET:
->>> +       case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
->>> +       case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
->>> +       case KVM_PSCI_0_2_FN64_MIGRATE:
->>> +       case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
->>> +               val = KVM_PSCI_RET_NI;
->>> +               break;
->>> +       default:
->>> +               return false;
->>> +       }
->>> +
->>> +       *vcpu_reg(vcpu, 0) = val;
->>> +       return true;
->>> +}
->>> +
->>> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->>>  {
->>>         unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>>         unsigned long val;
->>> @@ -112,7 +152,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>>         case KVM_PSCI_FN_MIGRATE:
->>>                 val = KVM_PSCI_RET_NI;
->>>                 break;
->>> -
->>>         default:
->>>                 return false;
->>>         }
->>> @@ -120,3 +159,25 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>>         *vcpu_reg(vcpu, 0) = val;
->>>         return true;
->>>  }
->>> +
->>> +/**
->>> + * kvm_psci_call - handle PSCI call if r0 value is in range
->>> + * @vcpu: Pointer to the VCPU struct
->>> + *
->>> + * Handle PSCI calls from guests through traps from HVC instructions.
->>> + * The calling convention is similar to SMC calls to the secure world where
->>> + * the function number is placed in r0 and this function returns true if the
->>> + * function number specified in r0 is withing the PSCI range, and false
->>> + * otherwise.
->>> + */
->>> +bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>> +{
->>> +       switch (kvm_psci_version(vcpu)) {
->>> +       case KVM_ARM_PSCI_0_2:
->>> +               return kvm_psci_0_2_call(vcpu);
->>> +       case KVM_ARM_PSCI_0_1:
->>> +               return kvm_psci_0_1_call(vcpu);
->>> +       default:
->>> +               return false;
->>> +       };
->>> +}
->>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>> index 0a1d697..92242ce 100644
->>> --- a/arch/arm64/include/asm/kvm_host.h
->>> +++ b/arch/arm64/include/asm/kvm_host.h
->>> @@ -39,7 +39,7 @@
->>>  #include <kvm/arm_vgic.h>
->>>  #include <kvm/arm_arch_timer.h>
->>>
->>> -#define KVM_VCPU_MAX_FEATURES 2
->>> +#define KVM_VCPU_MAX_FEATURES 3
->>>
->>>  struct kvm_vcpu;
->>>  int kvm_target_cpu(void);
->>> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
->>> index e301a48..e25c658 100644
->>> --- a/arch/arm64/include/asm/kvm_psci.h
->>> +++ b/arch/arm64/include/asm/kvm_psci.h
->>> @@ -18,6 +18,10 @@
->>>  #ifndef __ARM64_KVM_PSCI_H__
->>>  #define __ARM64_KVM_PSCI_H__
->>>
->>> +#define KVM_ARM_PSCI_0_1       1
->>> +#define KVM_ARM_PSCI_0_2       2
->>> +
->>> +int kvm_psci_version(struct kvm_vcpu *vcpu);
->>>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
->>>
->>>  #endif /* __ARM64_KVM_PSCI_H__ */
->>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>> index d9f026b..b7555d3 100644
->>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>> @@ -77,6 +77,7 @@ struct kvm_regs {
->>>
->>>  #define KVM_ARM_VCPU_POWER_OFF         0 /* CPU is started in OFF state */
->>>  #define KVM_ARM_VCPU_EL1_32BIT         1 /* CPU running a 32bit VM */
->>> +#define KVM_ARM_VCPU_PSCI_0_2          2 /* CPU uses PSCI v0.2 */
->>>
->>>  struct kvm_vcpu_init {
->>>         __u32 target;
->>> @@ -150,7 +151,7 @@ struct kvm_arch_memory_slot {
->>>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>>  #define KVM_ARM_IRQ_GIC_MAX            127
->>>
->>> -/* PSCI interface */
->>> +/* PSCI v0.1 interface */
->>>  #define KVM_PSCI_FN_BASE               0x95c1ba5e
->>>  #define KVM_PSCI_FN(n)                 (KVM_PSCI_FN_BASE + (n))
->>>
->>> @@ -159,10 +160,42 @@ struct kvm_arch_memory_slot {
->>>  #define KVM_PSCI_FN_CPU_ON             KVM_PSCI_FN(2)
->>>  #define KVM_PSCI_FN_MIGRATE            KVM_PSCI_FN(3)
->>>
->>> +/* PSCI v0.2 interface */
->>> +#define KVM_PSCI_0_2_FN_BASE           0x84000000
->>> +#define KVM_PSCI_0_2_FN(n)             (KVM_PSCI_0_2_FN_BASE + (n))
->>> +#define KVM_PSCI_0_2_FN64_BASE         0xC4000000
->>> +#define KVM_PSCI_0_2_FN64(n)           (KVM_PSCI_0_2_FN64_BASE + (n))
->>> +
->>> +#define KVM_PSCI_0_2_FN_PSCI_VERSION   KVM_PSCI_0_2_FN(0)
->>> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND    KVM_PSCI_0_2_FN(1)
->>> +#define KVM_PSCI_0_2_FN_CPU_OFF                KVM_PSCI_0_2_FN(2)
->>> +#define KVM_PSCI_0_2_FN_CPU_ON         KVM_PSCI_0_2_FN(3)
->>> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO  KVM_PSCI_0_2_FN(4)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE                KVM_PSCI_0_2_FN(5)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->>> +                                       KVM_PSCI_0_2_FN(6)
->>> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->>> +                                       KVM_PSCI_0_2_FN(7)
->>> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF     KVM_PSCI_0_2_FN(8)
->>> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET   KVM_PSCI_0_2_FN(9)
->>> +
->>> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND  KVM_PSCI_0_2_FN64(1)
->>> +#define KVM_PSCI_0_2_FN64_CPU_ON       KVM_PSCI_0_2_FN64(3)
->>> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO        KVM_PSCI_0_2_FN64(4)
->>> +#define KVM_PSCI_0_2_FN64_MIGRATE      KVM_PSCI_0_2_FN64(5)
->>> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->>> +                                       KVM_PSCI_0_2_FN64(7)
->>> +
->>> +/* PSCI return values */
->>>  #define KVM_PSCI_RET_SUCCESS           0
->>>  #define KVM_PSCI_RET_NI                        ((unsigned long)-1)
->>>  #define KVM_PSCI_RET_INVAL             ((unsigned long)-2)
->>>  #define KVM_PSCI_RET_DENIED            ((unsigned long)-3)
->>> +#define KVM_PSCI_RET_ALREADY_ON                ((unsigned long)-4)
->>> +#define KVM_PSCI_RET_ON_PENDING                ((unsigned long)-5)
->>> +#define KVM_PSCI_RET_INTERNAL_FAILURE  ((unsigned long)-6)
->>> +#define KVM_PSCI_RET_NOT_PRESENT       ((unsigned long)-7)
->>> +#define KVM_PSCI_RET_DISABLED          ((unsigned long)-8)
->>>
->>>  #endif
->>>
->>> --
->>> 1.7.9.5
->>>
->>>
->> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
->> is for the sole use of the intended recipient(s) and contains information
->> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
->> It is to be used solely for the purpose of furthering the parties' business relationship.
->> All unauthorized review, use, disclosure or distribution is prohibited.
->> If you are not the intended recipient, please contact the sender by reply e-mail
->> and destroy all copies of the original message.
->>
+Hi Nico, Russell,
 
-I accidentally used wrong email-id for my last reply.
+Thanks for the replies.
 
-Please ignore this confidentiality notice.
+On Fri, Jan 31, 2014 at 10:48:50AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 31, 2014 at 12:16:48AM +0000, Will Deacon wrote:
+> > On Thu, Jan 30, 2014 at 09:42:29PM +0000, Nicolas Pitre wrote:
+> > > I don't think they would be reordered at all with the 
+> > > volatile qualifiers.
+> > 
+> > Whilst that may be the case in current compilers (i.e. I've not actually
+> > seen the above sequence get re-ordered), the GCC documentation states that:
+> > 
+> >   Similarly, you can't expect a sequence of volatile asm instructions to remain
+> >   perfectly consecutive. If you want consecutive output, use a single asm. Also,
+> >   GCC performs some optimizations across a volatile asm instruction; GCC does not
+> >   `forget everything' when it encounters a volatile asm instruction the way some
+> >   other compilers do.
+> > 
+> > so I really think that the "memory" clobbers are needed to ensure strict
+> > ordering. This matches my understanding from discussions with the compiler
+> > engineers at ARM.
+> 
+> What it means is that the compiler may introduce additional instructions
+> between your consecutive asm() statements.  So there's no guarantee that
+> the ISB will immediately follow the MSR instruction - there may be other
+> instructions which the compiler may decide to schedule between the two.
+> 
+> For example, instructions to load the address of the variable(s) may be
+> inserted between the assembly specified in the asm() statements which
+> may involve loading from a literal pool.
 
-Sorry for the noise.
+That matches what Nicolas said and, to be honest, makes a lot of sense. I'm
+just slightly concerned that it doesn't match the explanation I received
+from some compiler guys, but I can chase that down separately.
 
-Regards,
-Anup
+Vinayak: sorry for leading you down the garden path on this. Please can you
+stick with your original patch, but adding something equivalent for
+arch/arm?
 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Cheers,
+
+Will
