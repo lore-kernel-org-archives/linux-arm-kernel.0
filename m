@@ -1,56 +1,36 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon,  3 Feb 2014 19:18:29 +0100
-Subject: [PATCH 3/3] ARM64: perf: support dwarf unwinding in compat mode
-In-Reply-To: <1391451509-31265-1-git-send-email-jean.pihet@linaro.org>
-References: <1391451509-31265-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1391451509-31265-4-git-send-email-jean.pihet@linaro.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 3 Feb 2014 18:15:44 +0000
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140203165718.GO14112@mudshark.cambridge.arm.com>
+References: <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+ <1391029124.2488.50.camel@deneb.redhat.com>
+ <20140130131247.GG11329@bivouac.eciton.net>
+ <20140203103415.GA12187@mudshark.cambridge.arm.com>
+ <20140203155542.GI11329@bivouac.eciton.net>
+ <20140203160051.GG14112@mudshark.cambridge.arm.com>
+ <20140203164636.GJ11329@bivouac.eciton.net>
+ <20140203165718.GO14112@mudshark.cambridge.arm.com>
+Message-ID: <20140203181544.GK11329@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for unwinding using the dwarf information in compat
-mode. Using the correct user stack pointer allows perf to record
-the frames correctly in the native and compat modes.
+On Mon, Feb 03, 2014 at 04:57:18PM +0000, Will Deacon wrote:
+> > mov[tw]: why?
+> > Then we end up battling different available immediate fields in A32/T32
+> > instruction sets and v5/v6/v7 architecture versions.
+> 
+> I was making the assumption that UEFI was going to be v7 only... is this not
+> true?
 
-Note that although the dwarf frame unwinding works ok using
-libunwind in native mode (on ARMv7 & ARMv8), some changes are
-required to the libunwind code for the compat mode. Those changes
-are posted separately on the libunwind mailing list.
+There is no such requirement in the specification.
+It even mentions requirements for ARMv4 in one place :)
 
-Tested on ARMv8 platform with v8 and compat v7 binaries, the latter
-are statically built.
+But I also don't understand why ldr= should be avoided.
+This is not performance sensitive (called once on system boot), and
+it's already executing with the caches off, so even if it ends up
+being a literal load it does not pollute.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/compat.h | 2 +-
- arch/arm64/include/asm/ptrace.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index fda2704..e71f81f 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -228,7 +228,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
- 	return (u32)(unsigned long)uptr;
- }
- 
--#define compat_user_stack_pointer() (current_pt_regs()->compat_sp)
-+#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
- 
- static inline void __user *arch_compat_alloc_user_space(long len)
- {
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index fbb0020..86d5b54 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -133,7 +133,7 @@ struct pt_regs {
- 	(!((regs)->pstate & PSR_F_BIT))
- 
- #define user_stack_pointer(regs) \
--	((regs)->sp)
-+	(!compat_user_mode(regs)) ? ((regs)->sp) : ((regs)->compat_sp)
- 
- /*
-  * Are the current registers suitable for user mode? (used to maintain
--- 
-1.7.11.7
+/
+    Leif
