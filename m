@@ -1,52 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Feb 2014 16:57:18 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <20140203164636.GJ11329@bivouac.eciton.net>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
- <20140122112055.GF1621@mudshark.cambridge.arm.com>
- <20140129182805.GF11329@bivouac.eciton.net>
- <1391029124.2488.50.camel@deneb.redhat.com>
- <20140130131247.GG11329@bivouac.eciton.net>
- <20140203103415.GA12187@mudshark.cambridge.arm.com>
- <20140203155542.GI11329@bivouac.eciton.net>
- <20140203160051.GG14112@mudshark.cambridge.arm.com>
- <20140203164636.GJ11329@bivouac.eciton.net>
-Message-ID: <20140203165718.GO14112@mudshark.cambridge.arm.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 03 Feb 2014 18:13:21 +0100
+Subject: [PATCH] at91: pmc: Fixed irq's name allocation for programmable
+ clocks
+In-Reply-To: <1391445961-20755-1-git-send-email-jjhiblot@traphandler.com>
+References: <1391445961-20755-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52EFCE31.7010900@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 04:46:36PM +0000, Leif Lindholm wrote:
-> On Mon, Feb 03, 2014 at 04:00:51PM +0000, Will Deacon wrote:
-> > > > > With the two call sites in uefi_phys.S as:
-> > > > > 
-> > > > > 	ldr	r5, =(CR_M)
-> > > > > 	update_sctlr	r12, , r5
-> > > > > and
-> > > > > 	ldr	r4, =(CR_I | CR_C | CR_M)
-> > > > > 	update_sctlr	r12, r4
-> > > > 
-> > > > These ldr= could be movs, right?
-> > > 
-> > > The first one could.
-> > > The second one could be movw on armv7+.
-> > > 
-> > > > If so, I definitely prefer this to putting an ldr = into the macro itself
-> > > > (option 2).
-> > > 
-> > > And your preference between 1) and 2) is?
-> > 
-> > (1), using bic and mov[tw] where possible.
-> 
-> (1): ok, thanks.
-> 
-> bic: sure, that was an oversight.
-> 
-> mov[tw]: why?
-> Then we end up battling different available immediate fields in A32/T32
-> instruction sets and v5/v6/v7 architecture versions.
+Hello JJ,
 
-I was making the assumption that UEFI was going to be v7 only... is this not
-true?
+On 03/02/2014 17:46, Jean-Jacques Hiblot wrote:
+> The name provided to request_irq() must be valid until the irq is
+> released.
+> This patch allocates and formats the string with kasprintf().
 
-Will
+Thanks for reporting this bug.
+
+>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   drivers/clk/at91/clk-programmable.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+> index 8e242c7..0f8bf0f 100644
+> --- a/drivers/clk/at91/clk-programmable.c
+> +++ b/drivers/clk/at91/clk-programmable.c
+> @@ -19,6 +19,7 @@
+>   #include <linux/sched.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/irq.h>
+> +#include <linux/string.h>
+>   
+>   #include "pmc.h"
+>   
+> @@ -247,7 +248,7 @@ at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
+>   	struct clk_programmable *prog;
+>   	struct clk *clk = NULL;
+>   	struct clk_init_data init;
+> -	char irq_name[11];
+> +	char *irq_name;
+>   
+>   	if (id > PROG_ID_MAX)
+>   		return ERR_PTR(-EINVAL);
+> @@ -269,7 +270,7 @@ at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
+>   	prog->irq = irq;
+>   	init_waitqueue_head(&prog->wait);
+>   	irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
+> -	snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
+> +	irq_name = kasprintf(GFP_KERNEL, "clk-prog%d", id);
+
+Could you either use a static table with the prog clk names or store the 
+name in
+the clk_programmable struct ?
+This way we could avoid the additional dynamic allocation.
+
+static prog_clk_names = {
+   "clk-prog0",
+[...]
+   "clk-prog7",
+};
+
+[...]
+     ret = request_irq(prog->irq, clk_programmable_irq_handler, 
+IRQF_TRIGGER_HIGH, prog_clk_names[id], prog);
+
+
+or
+
+struct clk_programmable {
+[...]
+     char irq_name[11];
+[...]
+};
+
+[...]
+
+snprintf(prog->irq_name, sizeof(prog->irq_name), "clk-prog%d", id);
+ret = request_irq(prog->irq, clk_programmable_irq_handler, 
+IRQF_TRIGGER_HIGH, prog->irq_name, prog);
+
+Best Regards,
+
+Boris
+>   	ret = request_irq(prog->irq, clk_programmable_irq_handler,
+>   			  IRQF_TRIGGER_HIGH, irq_name, prog);
+>   	if (ret)
