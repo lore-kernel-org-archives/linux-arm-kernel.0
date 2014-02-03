@@ -1,80 +1,38 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Feb 2014 11:46:38 +0000
-Subject: [PATCH v2 2/3] ARM/ARM64: KVM: Add support for PSCI v0.2 emulation
-In-Reply-To: <CAMwBHsbQ_5tGNuHC=OBs7+CxZ4xJ-s6HHEX04ZKo4FtofpgGgA@mail.gmail.com>
+Date: Mon, 3 Feb 2014 11:48:35 +0000
+Subject: [PATCH v2 1/3] KVM: Add capability to advertise PSCI v0.2 support
+In-Reply-To: <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
 References: <1391078479-7406-1-git-send-email-anup.patel@linaro.org>
- <1391078479-7406-3-git-send-email-anup.patel@linaro.org>
- <20140203105409.GF30209@e106331-lin.cambridge.arm.com>
- <CAMwBHsbQ_5tGNuHC=OBs7+CxZ4xJ-s6HHEX04ZKo4FtofpgGgA@mail.gmail.com>
-Message-ID: <20140203114638.GA2784@e106331-lin.cambridge.arm.com>
+ <1391078479-7406-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140203114835.GB2784@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 11:16:35AM +0000, Anup Patel wrote:
-> Hi Mark,
-
-Hi Anup,
-
-> On Mon, Feb 3, 2014 at 4:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jan 30, 2014 at 10:41:18AM +0000, Anup Patel wrote:
-> >> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
-> >> VCPUs. This patch extends current in-kernel PSCI emulation to provide
-> >> PSCI v0.2 interface to VCPUs.
-> >>
-> >> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
-> >> keeping the ABI backward-compatible.
-> >>
-> >> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
-> >> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
-> >> init using KVM_ARM_VCPU_INIT ioctl.
-> >
-> > I have an issue with this. PSCI 0.2 makes all but two functions (MIGRATE
-> > and MIGRATE_INFO_CPU_UP) mandatory, and hence not allowed to return
-> > NOT_SUPPORTED.
-> >
-> > Additionally, for correct behaviour across a kexec in future, we'll
-> > require AFFINITY_INFO for PSCI 0.2+ systems to determint when a CPU is
-> > actually dead (and cannot affect the cache hierarchy). I'd very much
-> > like to make that a hard requirement to ensure correctness.
-> >
-> > I would very much like to see at least trivial implementations of those
-> > mandatory functions, so that we don't need a
-> > KVM_ARM_VCPU_PSCI_REALLY_0_2 or similar in future. As it stands this
-> > series does not implement PSCI 0.2.
+On Thu, Jan 30, 2014 at 10:41:17AM +0000, Anup Patel wrote:
+> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
 > 
-> The intention behind this series was to provide a base implementation of
-> PSCI v0.2 which can be extended by subsequent patches that implement
-> other PSCI v0.2 functions.
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  include/uapi/linux/kvm.h |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 902f124..d64349e 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -674,6 +674,7 @@ struct kvm_ppc_smmu_info {
+>  #define KVM_CAP_ARM_EL1_32BIT 93
+>  #define KVM_CAP_SPAPR_MULTITCE 94
+>  #define KVM_CAP_EXT_EMUL_CPUID 95
+> +#define KVM_CAP_ARM_PSCI_0_2 96
 
-I understand your intention, however I disagree with the approach.
-
-This exposes the implementation to userspace before _mandatory_
-functionality is present. This exposes a feature flag to userspace
-advertising functionality which is not present, and violates the PSCI
-0.2 specification.
-
-Userspace will check if the functionality is present, and then advertise
-it to whatever kernel it wants to run with KVM. However, as _mandatory_
-functionality is missing, the guest cannot use the information, and must
-assume that the PSCI implementation violates the spec. This is broken.
-
-The only things that this series does is change the set of IDs in use,
-and add PSCI_VERSION. Worse, PSCI_VERSION lies, because the mandatory
-functionality isn't present. Guests requiring PSCI 0.2 don't get
-everything they need, and existing supported guests work with the
-existing function IDs, so _nothing_ of value is added.
-
-We also haven't got the PSCI 0.2 binding finalised, so no guest can even
-make use of the PSCI_VERSION call. The only apparent change of the
-series is therefore to rearrange some IDs. This holds _no_ value.
-
-The only sane thing to do is to implement the mandatory functionality
-before exposing it.
-
-The only way to make that work would be to later add more flags stating
-that we _really_ have PSCI 0.2 support, and then have userspace use that
-to figure out when to advertise PSCI 0.2 support to a guest. So
-_nothing_ can make use of the flag as it currently stands.
+To reiterate the point I made on patch 2, this does not do what it says
+on the tin, and does not make sense without mandatory PSCI 0.2
+functionality being present, as no software can derive any value from
+this flag until such functionality is implemented.
 
 Thanks,
 Mark.
