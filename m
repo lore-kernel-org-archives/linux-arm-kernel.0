@@ -1,97 +1,183 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Feb 2014 20:45:05 +0100
-Subject: [PATCH 1/2] clocksource: sunxi: Add new compatibles
-In-Reply-To: <52EFC573.2050302@linaro.org>
-References: <1391348280-9484-1-git-send-email-maxime.ripard@free-electrons.com>
- <52EFC573.2050302@linaro.org>
-Message-ID: <20140203194505.GF25625@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Feb 2014 21:05:56 +0100
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <21596846.kVTqp7roW4@wuerfel>
+ <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
+Message-ID: <3808209.DeG1VobanZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-(Adding DT mailing-list in CC)
-
-On Mon, Feb 03, 2014 at 05:36:03PM +0100, Daniel Lezcano wrote:
-> On 02/02/2014 02:37 PM, Maxime Ripard wrote:
-> >The Allwinner A10 compatibles were following a slightly different compatible
-> >patterns than the rest of the SoCs for historical reasons. Add compatibles
-> >matching the other pattern to the timer driver for consistency, and keep the
-> >older one for backward compatibility.
+On Monday 03 February 2014 19:18:38 Liviu Dudau wrote:
+> On Mon, Feb 03, 2014 at 06:58:56PM +0000, Arnd Bergmann wrote:
+> > On Monday 03 February 2014 18:43:48 Liviu Dudau wrote:
+> > > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> > > index 4cc813e..ce5bad2 100644
+> > > --- a/arch/arm64/include/asm/io.h
+> > > +++ b/arch/arm64/include/asm/io.h
+> > > @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+> > >  /*
+> > >   *  I/O port access primitives.
+> > >   */
+> > > +#define arch_has_dev_port()	(0)
+> > 
+> > Why not?
 > 
-> Hi Maxime,
+> Maybe I got it the wrong way around, but the comment in include/linux/io.h says:
 > 
-> is it really needed to keep the old pattern ?
+> /*
+>  * Some systems do not have legacy ISA devices.
+>  * /dev/port is not a valid interface on these systems.
+>  * So for those archs, <asm/io.h> should define the following symbol.
+>  */
+> 
+> So ... defining it should mean no legacy ISA devices, right?
 
-We agreed during the ARM Kernel Summit to consider the DT as a stable
-ABI.
+I would read that comment as referring to systems that don't have
+any I/O space. If you have PCI, you can by definition have ISA
+compatible devices behind a bridge. A typical example would be
+a VGA card that supports the 03c0-03df port range.
 
-While I'd be ok with removing the older ones, that also means that we
-would break the boot of newer kernels with older DT, so yes, we
-actually need to keep the old compatibles.
+> > 
+> > >  #define IO_SPACE_LIMIT		0xffff
+> > 
+> > You probably want to increase this a bit, to allow multiple host bridges
+> > to have their own I/O space.
+> 
+> OK, but to what size?
 
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >---
-> >  Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 5 +++--
-> >  drivers/clocksource/sun4i_timer.c                                 | 4 ++++
-> >  2 files changed, 7 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-> >index 48aeb78..d9e35ae 100644
-> >--- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-> >+++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-> >@@ -2,7 +2,8 @@ Allwinner A1X SoCs Timer Controller
-> >
-> >  Required properties:
-> >
-> >-- compatible : should be "allwinner,sun4i-timer"
-> >+- compatible : should be "allwinner,sun4i-a10-timer"
-> >+               (Deprecated "allwinner,sun4i-timer")
-> >  - reg : Specifies base physical address and size of the registers.
-> >  - interrupts : The interrupt of the first timer
-> >  - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
-> >@@ -10,7 +11,7 @@ Required properties:
-> >  Example:
-> >
-> >  timer {
-> >-	compatible = "allwinner,sun4i-timer";
-> >+	compatible = "allwinner,sun4i-a10-timer";
-> >  	reg = <0x01c20c00 0x400>;
-> >  	interrupts = <22>;
-> >  	clocks = <&osc>;
-> >diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> >index bf497af..de03895 100644
-> >--- a/drivers/clocksource/sun4i_timer.c
-> >+++ b/drivers/clocksource/sun4i_timer.c
-> >@@ -196,5 +196,9 @@ static void __init sun4i_timer_init(struct device_node *node)
-> >  	clockevents_config_and_register(&sun4i_clockevent, rate,
-> >  					TIMER_SYNC_TICKS, 0xffffffff);
-> >  }
-> >+CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
-> >+		       sun4i_timer_init);
-> >+
-> >+/* Deprecated */
-> >  CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
-> >  		       sun4i_timer_init);
-> >
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+2 MB was a compromise on arm32 to allow up to 32 PCI host bridges but not
+take up too much virtual space. On arm64 it should be at least as big.
+Could be more than that, although I don't see a reason why it should be,
+unless we expect to see systems with tons of host bridges, or buses
+that exceed 64KB of I/O space.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140203/63754870/attachment.sig>
+> > > +#define ioport_map(port, nr)	(PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
+> > > +#define ioport_unmap(addr)
+> > 
+> > inline functions?
+> 
+> Will do, thanks!
+
+I suppose you can actually use the generic implementation from
+asm-generic/io.h, and fix it by using the definition you have
+above, since it's currently broken.
+
+> > > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > > new file mode 100644
+> > > index 0000000..dd084a3
+> > > --- /dev/null
+> > > +++ b/arch/arm64/include/asm/pci.h
+> > > @@ -0,0 +1,35 @@
+> > > +#ifndef __ASM_PCI_H
+> > > +#define __ASM_PCI_H
+> > > +#ifdef __KERNEL__
+> > > +
+> > > +#include <linux/types.h>
+> > > +#include <linux/slab.h>
+> > > +#include <linux/dma-mapping.h>
+> > > +
+> > > +#include <asm/io.h>
+> > > +#include <asm-generic/pci-bridge.h>
+> > > +#include <asm-generic/pci-dma-compat.h>
+> > > +
+> > > +#define PCIBIOS_MIN_IO		0
+> > > +#define PCIBIOS_MIN_MEM		0
+> > 
+> > PCIBIOS_MIN_IO is normally set to 0x1000, to stay out of the ISA range.
+> 
+> :) No ISA support! (Die ISA, die!!) 
+
+If only it were that easy.
+
+> > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > > new file mode 100644
+> > > index 0000000..7b652cf
+> > > --- /dev/null
+> > > +++ b/arch/arm64/kernel/pci.c
+> > > @@ -0,0 +1,112 @@
+> > 
+> > None of this looks really arm64 specific, nor should it be. I think
+> > we should try a little harder to move this as a default implementation
+> > into common code, even if we start out by having all architectures
+> > override it.
+> 
+> Agree. This is the RFC version. I didn't dare to post a patch with fixes
+> for all architectures. :)
+
+No need to change the other architectures. You can make it opt-in for
+now and just put the code into a common location.
+ 
+An interesting question however is what the transition plan is to
+have the code shared between arm32 and arm64: We will certainly need
+to share at least the dw-pcie and the generic SBSA compliant pci
+implementation.
+
+> > > +int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+> > > +{
+> > > +	BUG_ON(offset + SZ_64K - 1 > IO_SPACE_LIMIT);
+> > > +
+> > > +	return ioremap_page_range((unsigned long)PCI_IOBASE + offset,
+> > > +				(unsigned long)PCI_IOBASE + offset + SZ_64K,
+> > > +				phys_addr,
+> > > +				__pgprot(PROT_DEVICE_nGnRE));
+> > > +}
+> > 
+> > Not sure if we want to treat this one as architecture specific though.
+> > It certainly won't be portable to x86, but it could be shared with
+> > a couple of others. We may also want to redesign the interface.
+> > I've been thinking we could make this function allocate space in the
+> > Linux virtual I/O space aperture, and pass two resources into it
+> > (physical I/O aperture and bus I/O range), and get the actual
+> > io_offset as the return value, or a negative error number.
+> 
+> Not sure I completely follow your idea.
+
+Something like this (coded in mail client, don't try to compile):
+
+#define IO_SPACE_PAGES (IO_SPACE_LIMIT + 1) / PAGE_SIZE)
+static DECLARE_BITMAP(pci_iospace, IO_SPACE_PAGES);
+unsigned long pci_ioremap_io(const struct resource *bus, const struct resource phys)
+{
+	unsigned long start, len, virt_start;
+	int error;
+
+	/* use logical address == bus address if possible */
+	start = bus->start / PAGE_SIZE;
+	if (start > IO_SPACE_LIMIT / PAGE_SIZE)
+		start = 0;
+
+	/*
+	 * try finding free space for the whole size first,
+	 * fall back to 64K if not available
+	 */
+	len = min(resource_size(bus), resource_size(phys);
+	start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+				start, len / PAGE_SIZE, 0);
+	if (start == IO_SPACE_PAGES && len > SZ_64K)
+		len = SZ_64K;
+		start = 0;
+		start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+				start, len / PAGE_SIZE, 0);
+	}
+
+	/* no 64K area found */
+	if (start == IO_SPACE_PAGES)
+		return -ENOMEM;
+
+	/* ioremap physical aperture to virtual aperture */
+	virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
+	error = ioremap_page_range(virt_start, virt_start + len,
+				    phys->start, __pgprot(PROT_DEVICE_nGnRE));
+	if (error)
+		return error;
+
+	bitmap_set(start, len / PAGE_SIZE);
+
+	/* return io_offset */
+	return start * PAGE_SIZE - bus->start;
+}
+EXPORT_SYMBOL_GPL(pci_ioremap_io);
+
+	Arnd
