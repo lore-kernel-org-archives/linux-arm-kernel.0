@@ -1,35 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Feb 2014 15:53:45 +0100
-Subject: [PATCH v5 08/14] ahci-platform: "Library-ise" suspend / resume
- functionality
-In-Reply-To: <1390417489-5354-9-git-send-email-hdegoede@redhat.com>
-References: <1390417489-5354-1-git-send-email-hdegoede@redhat.com>
- <1390417489-5354-9-git-send-email-hdegoede@redhat.com>
-Message-ID: <201402031553.46083.arnd@arndb.de>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 03 Feb 2014 14:57:05 +0000
+Subject: [PATCH v5 07/16] ARM: Remove use of struct kprobe from generic
+ probes code
+In-Reply-To: <1390507559-4697-8-git-send-email-dave.long@linaro.org>
+References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+ <1390507559-4697-8-git-send-email-dave.long@linaro.org>
+Message-ID: <1391439425.3509.16.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 January 2014, Hans de Goede wrote:
-> --- a/include/linux/ahci_platform.h
-> +++ b/include/linux/ahci_platform.h
-> @@ -50,4 +50,11 @@ int ahci_platform_init_host(struct platform_device *pdev,
->                             unsigned int force_port_map,
->                             unsigned int mask_port_map);
+On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> Change the generic ARM probes code to pass in the opcode and architecture-specific
+> structure separately instead of using struct kprobe, so we do not pollute
+> code being used only for uprobes or other non-kprobes instruction
+> interpretation.
+> 
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+
+One minor nit-pick...
+
+[...]
+> diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
+> index c7ee290..cea707a 100644
+> --- a/arch/arm/kernel/kprobes-thumb.c
+> +++ b/arch/arm/kernel/kprobes-thumb.c
+[...]
+> @@ -593,7 +590,7 @@ t16_emulate_pop_pc(struct kprobe *p, struct pt_regs *regs)
+>  	bx_write_pc(pc, regs);
+>  }
 >  
-> +#ifdef CONFIG_PM_SLEEP
-> +int ahci_platform_suspend_host(struct device *dev);
-> +int ahci_platform_resume_host(struct device *dev);
-> +int ahci_platform_suspend(struct device *dev);
-> +int ahci_platform_resume(struct device *dev);
-> +#endif
-> +
+> -static enum kprobe_insn __kprobes
+> +enum kprobe_insn __kprobes
+>  t16_decode_pop(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>  		struct decode_header *d)
+>  {
 
-Not sure if the #ifdef does any good here. Normally, we don't hide declarations
-so we can do stuff like
+The above removal of 'static' appears to be an unneeded accidental
+change?
 
-	if (IS_ENABLED(CONFIG_PM_SLEEP))
-		ret = ahci_platform_suspend_host(dev);
-
-and expect the code to compile and link just fine.
-
-	Arnd
+-- 
+Tixy
