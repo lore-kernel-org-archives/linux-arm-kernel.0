@@ -1,70 +1,85 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  3 Feb 2014 21:21:54 +0200
-Subject: [PATCH] ARM: unistd.h: relocate comments back to place
-Message-ID: <98efb0a6377be2ae7d92eab50ed30f6258e8a28d.1391455314.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Feb 2014 20:22:15 +0100
+Subject: [RFC] dtc: add ability to make nodes conditional on them being
+ referenced
+In-Reply-To: <1578575.rVWgTPdq1W@phil>
+References: <1578575.rVWgTPdq1W@phil>
+Message-ID: <20140203192215.GA25625@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cb8db5d45 (UAPI: (Scripted) Disintegrate arch/arm/include/asm) moved
-these syscall comments out of their context into the UAPI headers. Fix this.
+Hi,
 
-Fixes: cb8db5d4578a ("UAPI: (Scripted) Disintegrate arch/arm/include/asm")
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/include/asm/unistd.h      | 10 ++++++++++
- arch/arm/include/uapi/asm/unistd.h | 11 -----------
- 2 files changed, 10 insertions(+), 11 deletions(-)
+On Thu, Jan 30, 2014 at 01:25:56PM +0100, Heiko St?bner wrote:
+> From: Heiko Stuebner <heiko.stuebner@bqreaders.com>
+> 
+> On i.MX, which carries a lot of pin-groups of which most are unused on
+> individual boards, they noticed that this plehora of nodes also results
+> in the runtime-lookup-performance also degrading [0].
+> 
+> A i.MX-specific solution defining the pingroups in the board files but
+> using macros to reference the pingroup-data was not well received
+> 
+> This patch is trying to solve this issue in a more general way, by
+> adding the ability to mark nodes as needing to be referenced somewhere
+> in the tree.
+> 
+> To mark a node a needing to be referenced it must be prefixed with
+> /delete-unreferenced/. This makes dtc check the nodes reference-status
+> when creating the flattened tree, dropping it if unreferenced.
+> 
+> For example, the i.MX6SL pingroup
+> 
+> 	/delete-uneferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
+> 		fsl,pins = <
+> 			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
+> 			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
+> 			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
+> 		>;
+> 	};
+> 
+> would only be included in the dtb if it got referenced somewhere
+> as pingroup via
+> 
+> 	node {
+> 		pinctrl-0 <&pinctrl_ecscpi1_1>;
+> 	};
+> 
+> [0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
+> 
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@bqreaders.com>
+> ---
+> This is just the idea I had in [1] explored a bit more. I'm definitely
+> not sure if this is a valid approach to the problem.
+> Also this is my first venture into dtc as well as flex and bison :-) .
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg303731.html
 
-diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-index acabef1a75df..4229595e5c04 100644
---- a/arch/arm/include/asm/unistd.h
-+++ b/arch/arm/include/asm/unistd.h
-@@ -15,7 +15,17 @@
- 
- #include <uapi/asm/unistd.h>
- 
-+/*
-+ * This may need to be greater than __NR_last_syscall+1 in order to
-+ * account for the padding in the syscall table
-+ */
- #define __NR_syscalls  (384)
-+
-+/*
-+ * *NOTE*: This is a ghost syscall private to the kernel.  Only the
-+ * __kuser_cmpxchg code in entry-armv.S should be aware of its
-+ * existence.  Don't ever use this from user code.
-+ */
- #define __ARM_NR_cmpxchg		(__ARM_NR_BASE+0x00fff0)
- 
- #define __ARCH_WANT_STAT64
-diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-index fb5584d0cc05..c3776331f407 100644
---- a/arch/arm/include/uapi/asm/unistd.h
-+++ b/arch/arm/include/uapi/asm/unistd.h
-@@ -410,11 +410,6 @@
- #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
- 
- /*
-- * This may need to be greater than __NR_last_syscall+1 in order to
-- * account for the padding in the syscall table
-- */
--
--/*
-  * The following SWIs are ARM private.
-  */
- #define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
-@@ -425,12 +420,6 @@
- #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
- 
- /*
-- * *NOTE*: This is a ghost syscall private to the kernel.  Only the
-- * __kuser_cmpxchg code in entry-armv.S should be aware of its
-- * existence.  Don't ever use this from user code.
-- */
--
--/*
-  * The following syscalls are obsolete and no longer available for EABI.
-  */
- #if !defined(__KERNEL__)
+This is a nice feature to have :)
+
+However, I wonder wether it's the right way of implementing it. I'd
+have another use case for this, which would be to embed a DT in a
+first-stage bootloader. We have around 7kB available currently for the
+DT, and this is actually less than any of our (very small already)
+DTBs. So having this of feature makes complete sense to us
+too. However, we also have some other tools that require most of the
+nodes to be in the DTB.
+
+So I guess turning wether we should delete a node if unreferenced into
+a dtc option would make sense, since every DT user will be able to
+choose, without having to duplicate the DT and make conflicting
+changes.
+
+Maxime
+
 -- 
-1.8.5.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140203/4771d4c2/attachment-0001.sig>
