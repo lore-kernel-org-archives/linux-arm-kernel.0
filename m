@@ -1,18 +1,34 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 3 Feb 2014 15:03:22 +0000
-Subject: about last level cache on big little cpu
-In-Reply-To: <52EFACDC.7090103@linaro.org>
-References: <52EFACDC.7090103@linaro.org>
-Message-ID: <20140203150322.GC18860@e103034-lin>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 3 Feb 2014 16:06:11 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <9c721b89ed2ceb6997809bb3363f852277e67dc2.1391177880.git.michal.simek@xilinx.com>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <9c721b89ed2ceb6997809bb3363f852277e67dc2.1391177880.git.michal.simek@xilinx.com>
+Message-ID: <201402031606.11753.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 02:51:08PM +0000, Alex Shi wrote:
-> Does all the big.LITTLE cpu share the same llc? or it depends on
-> different vendor's products?
+On Friday 31 January 2014, Michal Simek wrote:
+> +Optional properties:
+> +- clock-frequency      : Frequency of clock in Hz
+> +- xlnx,wdt-enable-once : 0 - Watchdog can be restarted
+> +                         1 - Watchdog can be enabled just once
+> +- xlnx,wdt-interval    : Watchdog timeout interval in 2^<val> clock cycles,
+> +                         <val> is integer from 8 to 31.
+> +
 
-No. I don't know of any big.LITTLE implementation that does have a
-shared last level cache. TC2 has per cluster L2 caches as last level
-caches, so no cache is shared between the big and little clusters.
+The latter two don't really seem to be xilinx specific, it would be
+reasonable to have a standard watchdog binding that mandates a common
+format for them.
 
-Morten
+I'm not sure about the enable-once flag, which seems to just map to the
+"nowayout" watchdog option that is not a hardware feature at all
+and should probably be kept as a software setting only, rather than
+settable through DT. If it is kept, it should have a standard name and
+get turned into a boolean (present/absent) property rather than a
+0/1 integer property.
+
+The interval should really be specified in terms of seconds or miliseconds,
+not in clock cycles.
+
+	Arnd
