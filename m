@@ -1,72 +1,59 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 3 Feb 2014 16:31:37 -0700
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <21596846.kVTqp7roW4@wuerfel>
- <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
- <3808209.DeG1VobanZ@wuerfel>
- <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
-Message-ID: <20140203233137.GH2519@obsidianresearch.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 04 Feb 2014 00:36:54 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140203231603.GA11613@1wt.eu>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52EA2875.5020807@free-electrons.com> <52EA2A04.2070109@gmail.com>
+ <20140203231603.GA11613@1wt.eu>
+Message-ID: <52F02816.1050708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 05:07:48PM -0600, Rob Herring wrote:
+On 02/04/2014 12:16 AM, Willy Tarreau wrote:
+> On Thu, Jan 30, 2014 at 11:31:32AM +0100, Sebastian Hesselbarth wrote:
+>> On 01/30/14 11:24, Gregory CLEMENT wrote:
+>>> On 25/01/2014 19:19, Sebastian Hesselbarth wrote:
+>>>> This patch set fixes clk init order that went upside-down with
+>>>> v3.14. I haven't really investigated what caused this, but I assume
+>>>> it is related with DT node reordering by addresses.
+>>>
+>>> Can you explain what kind of issue do you observe?
+>>
+>> Sure. When probing CLK_OF_DECLAREed clock drivers, clock-gating driver
+>> gets registered before core-clocks. It therefore cannot resolve it's
+>> parent clock name for tclk and all clock gates will have no parent
+>> clock.
+>>
+>> Usually, you'll see in some drivers (e.g. v643xx_eth) div_by_zero errors
+>> poping up, when they calculate a frequency division factors based on
+>> clock gate frequency, which should have been tclk but is 0 now.
+>
+> Well, to be honnest, I have no idea whether your patch is the right way
+> to fix the problem or not, but what I can say is that it fixes such oopses
+> that appear in 3.14-rc1 when booting on mirabox :
+>
+> Division by zero in kernel.
 
-> > An interesting question however is what the transition plan is to
-> > have the code shared between arm32 and arm64: We will certainly need
-> > to share at least the dw-pcie and the generic SBSA compliant pci
-> > implementation.
-> 
-> You might want to re-read the SBSA. Unless ARM provides an IP block or
-> there is some other standard such as EHCI or AHCI, there is no generic
-> implementation. You only have to go look at the Linux EHCI or AHCI
-> drivers and see how meaningless and inadequate "use EHCI" is. For PCI,
-> the text is so brief in the SBSA there will be no way PCI is going to
-> just work given all the variations of root complexes, bridges, address
-> windows, etc. we typically see on ARM platforms. I could be wrong and
-> some AML magic will solve all the problems. :)
+Willy,
 
-The biggest hinderance I've seen while looking at ARM PCI drivers is
-quite simply - they don't follow the PCI-E spec. There is a spec, and
-it is not followed.
+you have hit exactly the reason for this patch.
 
-This fixup in the X-Gene is a solid example, the purpose of the BAR in
-a PCI-PCI bridge is very clear: using it to specify the system
-DRAM aperature is completely wrong.
+[...]
+> By the way, seeing how often a trick related to the DT is nedeed to solve an
+> oops or a panic, I'm really scared that this whole DT mess is just becoming
+> the exact copy of the ACPI mess (but 15 years later) and we'll experience the
+> same horrible things :-( Sometimes I'm wondering whether there are not too
+> many structural things put in there...
 
-Not having working aperture windows in the root complex's bridges is
-completely wrong.
+To be precise, it is not a DT-related trick at all. You would have the
+same issues, if you'd register those "low-level" (i.e. early) drivers
+without DT. It is more about missing init ordering, here.
 
-Lacking any ability to generate 8 and 16 bit config write TLP's is
-wrong.
+There could be different ways to work this out, even elevating clock
+devices to "normal" probed devices could be possible. I am sure, in the
+long run, it will work out, but now this is a fix for v3.14-rc1.
 
-Starting with an end-port PCI-E core and re-tasking it to be a root
-port bridge and ignoring all the requirements with the bridge's config
-space is utterly and completely WRONG.
+@Jason, Andrew, Gregory, Thomas:
+Now that v3.14 is out, anything against taking this in as fixes for rc1?
 
-Specifying 'use EHCI, AHCI, etc' - which are all PCI based standards
-without clearly specifying exactly how PCI is suppose to work is
-completely bonkers.
-
-What is needed is a spec that says:
- 1) Here is how you generate config TLPs. A MMIO region that
-    conforms to the already specified x86 ECAM would
-    be perfect
- 2) Here is a dword by dword break down of the entire config space in
-    a SOC. Here is where a on-board AHCI controller must show up in
-    config space. Here is how an external PCI-E port must show
-    up. Etc. Most of this is already specified, but it clearly needs
-    to be layed out explicitly for ARM SOCs to actually follow it.
- 3) Here is how you specify the aperture(s) associated with PCI BAR's
-    and bridge windows in config space. And yes: The CONFIG SPACE
-    BARS MUST WORK.
- 4) Here is how MSI works, these are the values you put in the
-    address/data and here is how you collect the interrupt.
- 5) Here is how Legacy INTx must be mapped into the GIC.
-
-This is what x86 does, and they have been doing it well for 10
-years. If you want to play in the server game you have to properly
-implement PCI.
-
-Jason
+Sebastian
