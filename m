@@ -1,23 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Feb 2014 10:23:57 +0100
-Subject: [PATCH 4/5] clk: versatile: pass a parent to the ICST clock
-In-Reply-To: <1390251324-6369-1-git-send-email-linus.walleij@linaro.org>
-References: <1390251324-6369-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZ7Kx3mp63k=QACtB6aafL-qFj5KHQ0CWKWG8cN_EA8qQ@mail.gmail.com>
+Date: Mon, 3 Feb 2014 10:24:34 +0100
+Subject: [PATCH 5/5 v2] clk: versatile: respect parent rate in ICST clock
+In-Reply-To: <1390254865-15488-1-git-send-email-linus.walleij@linaro.org>
+References: <1390254865-15488-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbyVkq8VQDmoP6-caKoWERMPFdEkgw8EJymbzjeFQpNjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 9:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Mon, Jan 20, 2014 at 10:54 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-> As we want to actually define the parent frequency in the device
-> tree for the ICST clocks, modify the clock registration function
-> to take a parent argument.
+> If the ICST clock has a parent, respect the rate of the parent
+> when calculating the clock frequency. As this involves modifying
+> the ICST parameter struct, make a cloned copy (the divisor
+> arrays should be safe) so we can update the .ref field.
+>
+> Do not define the reference clock on the Integrator as we have
+> the reference clock from the device tree. Keep it everywhere
+> else.
 >
 > Cc: Mike Turquette <mturquette@linaro.org>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> Hi Mike, looking for an ACK to take this through the Integrator
-> and ARM SOC tree.
+> ChangeLog v1->v2:
+> - As Russell observed: the params are static objects, so if
+>   we want to alter them, we better make a copy of them.
+>
+> Hi Mike, looking for an ACK for this one as well.
 
 Hi Mike,
 
