@@ -1,118 +1,29 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 3 Feb 2014 17:43:22 +0100
-Subject: Why are imprecise external aborts masked on recent kernel while
- booting ?
-In-Reply-To: <52EF5D8E.4050600@st.com>
-References: <52EBC86D.1010509@st.com>
- <20140131170827.GH15937@n2100.arm.linux.org.uk> <52EF5D8E.4050600@st.com>
-Message-ID: <52EFC72A.6060608@st.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 03 Feb 2014 16:44:53 +0000
+Subject: [PATCH v5 00/16] uprobes: Add uprobes support for ARM
+In-Reply-To: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1391445893.3509.36.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> This patch series adds basic uprobes support to ARM. It is based on patches
+> developed earlier by Rabin Vincent. That approach of adding hooks into
+> the kprobes instruction parsing code was not well received. This approach
+> separates the ARM instruction parsing code in kprobes out into a separate set
+> of functions which can be used by both kprobes and uprobes. Both kprobes and
+> uprobes then provide their own semantic action tables to process the results of
+> the parsing.
 
-I had no success with msr instruction to set CPSR.A bit.
+Assuming my comment about 'const' use in patch 5 is addressed, then for
+patches 2 to 14 you can add:
 
-I re-checked on a 3.4 kernel, msr instruction present in former 
-"kernel_thread_helper()" routine was not responsible for clearing CPSR.A 
-bit.
-'A' bit was cleared because SPSR was altered before executing following 
-instruction in arch/arm/kernel/entry-header.S :
-movs    pc, lr                @ return & move spsr_svc into cpsr
+Acked-by: Jon Medhurst <tixy@linaro.org>
 
-Sorry for the confusion in my first email: that movs instruction was 
-responsible for clearing 'A' bit on 3.4 kernel. But on recent kernel, 
-"restore_user_regs" macro seems no longer called for a kernel thread.
+Thanks Dave for persevering.
 
-So, I tried the 'cps'instruction that does it! I re-worked slightly your 
-previous patch.
-I also noticed that secondary needs to be set separately.
-
-Please, could you comment on the following patch ? (I can resend 
-correctly formated patch if you wish) :
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dc894ab..e22b109 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -378,6 +378,9 @@ asmlinkage void secondary_start_kernel(void)
-         local_irq_enable();
-         local_fiq_enable();
-
-+       /* Enable imprecise aborts */
-+       asm volatile("cpsie     a");
-+
-         /*
-          * OK, it's off to the idle thread for us
-          */
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4636d56..a9567bb 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
-
-         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
-         modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-+
-+       /* Enable imprecise aborts */
-+       asm volatile("cpsie     a");
-+
-  #else /* ifndef CONFIG_CPU_V7M */
-         /*
-          * on V7-M there is no need to copy the vector table to a dedicated
-
-Thanks,
-BR,
-Fabrice
-
-On 02/03/2014 10:12 AM, Fabrice Gasnier wrote:
-> Hi Russell,
->
-> Thank you for your help.
-> I just tried following patch on both 3.10 and above vanilla 3.13.1.
-> Unfortunately, these instructions have no effect on the arm cpsr.
-> I dumped regs right after msr instruction have been executed. It 
-> remains untouched :
->
-> Here is assembly from gdb:
->
->    0xc064a400 <+128>:    mov    r3, #256    ; 0x100
->    0xc064a404 <+132>:    mrs    r2, CPSR
->    0xc064a408 <+136>:    bic    r2, r2, r3
->    0xc064a40c <+140>:    msr    CPSR_c, r2
->
-> CPSR.A bit is still set after these instructions : 0x600001d3
-> Although, I see it has been cleared in r2: 0x600000d3
->
-> Please advise.
-> Thanks,
-> BR,
-> Fabrice
-> On 01/31/2014 06:08 PM, Russell King - ARM Linux wrote:
->>> Is it possible to unmask imprecise data aborts earlier in the boot
->>> >process (e.g. before PCIe bus enumeration, when drivers are being 
->>> probed)
->>> >?
->> How about this patch?
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 172ee18ff124..b0ff06f49cd0 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -900,6 +900,15 @@ void __init early_trap_init(void *vectors_base)
->>         flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->>       modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
->> +
->> +    /* Enable imprecise aborts */
->> +    asm volatile(
->> +        "mrs    %0, cpsr\n"
->> +    "    bic    %0, %0, %1\n"
->> +    "    msr    cpsr_c, %0"
->> +        : "=&r" (i)
->> +        : "r" (PSR_A_BIT));
->> +
->>   #else /* ifndef CONFIG_CPU_V7M */
->>       /*
->>        * on V7-M there is no need to copy the vector table to a 
->> dedicated
->
+-- 
+Tixy
