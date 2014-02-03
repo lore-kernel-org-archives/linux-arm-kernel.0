@@ -1,45 +1,25 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 03 Feb 2014 14:57:05 +0000
-Subject: [PATCH v5 07/16] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <1390507559-4697-8-git-send-email-dave.long@linaro.org>
-References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
- <1390507559-4697-8-git-send-email-dave.long@linaro.org>
-Message-ID: <1391439425.3509.16.camel@linaro1.home>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 3 Feb 2014 06:57:59 -0800
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <85AAFCF5-60EE-42E5-B103-37A4613C5947@primarydata.com>
+References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
+ <20140130141405.GA23985@infradead.org>
+ <20140130142752.GX15937@n2100.arm.linux.org.uk>
+ <20140130143208.GB9573@infradead.org>
+ <20140130153812.GA15937@n2100.arm.linux.org.uk>
+ <1391201970.6978.1.camel@leira.trondhjem.org>
+ <20140203080325.GB806@infradead.org>
+ <85AAFCF5-60EE-42E5-B103-37A4613C5947@primarydata.com>
+Message-ID: <20140203145759.GA30263@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Change the generic ARM probes code to pass in the opcode and architecture-specific
-> structure separately instead of using struct kprobe, so we do not pollute
-> code being used only for uprobes or other non-kprobes instruction
-> interpretation.
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
+On Mon, Feb 03, 2014 at 09:17:30AM -0500, Trond Myklebust wrote:
+> As I said above, that causes posix_acl_xattr_get() to return the wrong answer (ENODATA instead of EOPNOTSUPP).
 
-One minor nit-pick...
+Is it really the wrong answer?  How does userspace care wether this
+server doesn't support ACLs at all or none is set?  The resulting
+behavior is the same.
 
-[...]
-> diff --git a/arch/arm/kernel/kprobes-thumb.c b/arch/arm/kernel/kprobes-thumb.c
-> index c7ee290..cea707a 100644
-> --- a/arch/arm/kernel/kprobes-thumb.c
-> +++ b/arch/arm/kernel/kprobes-thumb.c
-[...]
-> @@ -593,7 +590,7 @@ t16_emulate_pop_pc(struct kprobe *p, struct pt_regs *regs)
->  	bx_write_pc(pc, regs);
->  }
->  
-> -static enum kprobe_insn __kprobes
-> +enum kprobe_insn __kprobes
->  t16_decode_pop(kprobe_opcode_t insn, struct arch_specific_insn *asi,
->  		struct decode_header *d)
->  {
-
-The above removal of 'static' appears to be an unneeded accidental
-change?
-
--- 
-Tixy
+If there's a good reason to care we might have to go with your patch,
+but if we can avoid it I'd prefer to keep things simple.
