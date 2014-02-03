@@ -1,32 +1,42 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 2 Feb 2014 20:54:02 -0800
+Date: Sun, 2 Feb 2014 20:56:38 -0800
 Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
+In-Reply-To: <52EA83D6.9050506@codeaurora.org>
 References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <20140203045402.GA4167@cbox>
+ <52EA83D6.9050506@codeaurora.org>
+Message-ID: <20140203045638.GB4167@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 04:11:02PM +0000, Ian Campbell wrote:
-> mach-virt has existed for a while but it is not written down what it actually
-> consists of. Although it seems a bit unusual to document a binding for an
-> entire platform since mach-virt is entirely virtual it is helpful to have
-> something to refer to in the absence of a single concrete implementation.
+On Thu, Jan 30, 2014 at 11:54:46AM -0500, Christopher Covington wrote:
+> Hi Ian,
 > 
-> I've done my best to capture the requirements based on the git log and my
-> memory/understanding.
+> On 01/30/2014 11:11 AM, Ian Campbell wrote:
+> > mach-virt has existed for a while but it is not written down what it actually
+> > consists of. Although it seems a bit unusual to document a binding for an
+> > entire platform since mach-virt is entirely virtual it is helpful to have
+> > something to refer to in the absence of a single concrete implementation.
+> > 
+> > I've done my best to capture the requirements based on the git log and my
+> > memory/understanding.
+> > 
+> > While here remove the xenvm dts example, the Xen tools will now build a
+> > suitable mach-virt compatible dts when launching the guest.
+> 
 
 [...]
 
+> > +The platform may also provide hypervisor specific functionality
+> > +(e.g. PV I/O), if it does so then this functionality must be
+> > +discoverable (directly or indirectly) via device tree.
 > 
-> +
-> +The platform may also provide hypervisor specific functionality
-> +(e.g. PV I/O), if it does so then this functionality must be
-> +discoverable (directly or indirectly) via device tree.
+> I think it would be informative to provide pointers here to commonly used
+> paravirtualized devices, especially VirtIO PCI/MMIO.
+> 
 
-While this is obviously true, I'm not sure I see the value of this text.
-
-Isn't it more essential to just say that *any* functionality provided to
-the platform must be discoverable via device tree?
+I disagree: that would only encourage limited testing or assumptions
+about these specific devices when really this platform is just a
+bare-bones platform driven by device tree which should make no
+preference, whatsoever, about which devices are used with the platform.
 
 -Christoffer
