@@ -1,41 +1,44 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 03 Feb 2014 15:45:58 +0000
-Subject: [PATCH v5 16/16] ARM: Remove uprobes dependency on kprobes
-In-Reply-To: <1390507559-4697-17-git-send-email-dave.long@linaro.org>
-References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
- <1390507559-4697-17-git-send-email-dave.long@linaro.org>
-Message-ID: <1391442358.3509.19.camel@linaro1.home>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 3 Feb 2014 16:47:55 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <3121595.GbLMuGPlvA@wuerfel>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <201402031606.11753.arnd@arndb.de>
+ <24ecacca-2714-4834-921c-b827c0e592a3@VA3EHSMHS003.ehs.local>
+ <3121595.GbLMuGPlvA@wuerfel>
+Message-ID: <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On 02/03/2014 04:32 PM, Arnd Bergmann wrote:
+> On Monday 03 February 2014 16:13:47 Michal Simek wrote:
+>> Intention wasn't to fix binding but document current one
+>> which is in mainline for a long time.
 > 
-> Now that arm uprobes support has been made separate from the arm kprobes code
-> the Kconfig can be changed to reflect that.
+> Ok, I see.
 > 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
+>> Apart of this - yes, wdt-enable-once is nowayout and wdt-interval should be timeout
+>> is seconds, and clock-frequency should go out and use CCF for getting clock.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index fec5a6b..9ddc4ae 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -204,7 +204,6 @@ config NEED_DMA_MAP_STATE
->         def_bool y
->  
->  config ARCH_SUPPORTS_UPROBES
-> -	depends on KPROBES
->  	def_bool y
->  
->  config ARCH_HAS_DMA_SET_COHERENT_MASK
+> Could we make a common binding then, and document that the xilinx
+> watchdog can optionally provide either one?
 
+Do you mean to have 2 DT bindings?
 
-Was this patch meant to have other contents? If not, it seems a bit
-pointless as all it does is remove a line added in the previous patch,
-so should just be folded into that one.
+This binding is used from 2011-07.
+It means it was generated for all hw designs at least from this time.
+I would say from DT usage on Microblaze because it is not special case
+in our dt generator.
 
--- 
-Tixy
+xlnx,XXX are XXX parameters which you have to setup in tools
+and get synthesized. This is valid for all xilinx IPs. We have full
+IP description by generating xlnx,XXX parameters directly from tools
+because we know all variants which can happen.
+
+Just back to your previous post:
+"I'm not sure about the enable-once flag, which seems to just map to the
+"nowayout" watchdog option that is not a hardware feature at all"
+this is hw feature which you can select in tools because this is fpga. :-)
+
+Thanks,
+Michal
