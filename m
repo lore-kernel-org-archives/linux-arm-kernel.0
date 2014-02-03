@@ -1,30 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Feb 2014 11:32:23 +0100
-Subject: [PATCH 2/3 RESEND] mfd: tc3589x: Reform device tree probing
-In-Reply-To: <20140123151123.GE8586@lee--X1>
-References: <1390481008-23900-1-git-send-email-linus.walleij@linaro.org>
- <20140123133141.GD8586@lee--X1>
- <CACRpkdZjRG=cmWHmmFNS+=guCwQoFpu8T3r4YHr6t_XihvmaWA@mail.gmail.com>
- <20140123151123.GE8586@lee--X1>
-Message-ID: <CACRpkdaX7AO3C-N+OMCqtQvFUmHmVRfMhPqGY2LciZQHT7iq+g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Feb 2014 10:46:41 +0000
+Subject: [PATCH V3 5/5] ARM CoreSight: ETM: Add PID control support
+In-Reply-To: <1391098270-8867-6-git-send-email-adrienverge@gmail.com>
+References: <1391098270-8867-1-git-send-email-adrienverge@gmail.com>
+ <1391098270-8867-6-git-send-email-adrienverge@gmail.com>
+Message-ID: <20140203104641.GB12187@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 23, 2014 at 4:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > Patch looks good to me. Is there any reason why we should rush this in
->> > for v3.14, or is it okay to go to -next?
->>
->> No rush, but it's been on review like forever so unless there is
->> some noise from the DT people at -rc1 I'd be very happy if you
->> could apply patches 1 & 2 by then.
->
-> I'm just waiting for their Ack. If I don't have it soon I'll review it
-> myself and any changes will have to come in via subsequent patch
-> submissions.
->
-> I think it's sensible to head for v3.15 for this set.
+On Thu, Jan 30, 2014 at 04:11:10PM +0000, Adrien Verg? wrote:
+> In the same manner as for enabling tracing, an entry is created in
+> sysfs to set the PID that triggers tracing. This change is effective
+> only if CONFIG_PID_IN_CONTEXTIDR is set.
+> 
+> When using PID namespaces, the virtual PID given by the user is
+> converted to the globally unique ID (task_pid_nr) that is present
+> in the Context ID register.
 
-So now that v3.14-rc1 is out can we queue this stuff?
+Hmm, I wonder whether debugfs would be more suitable for this?
 
-Yours,
-Linus Walleij
+Will
