@@ -1,219 +1,74 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue,  4 Feb 2014 00:01:45 +0100
-Subject: [PATCH v8 3/4] ARM: BCM5301X: add dts files for BCM4708 SoC
-In-Reply-To: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
-References: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1391468506-5800-4-git-send-email-hauke@hauke-m.de>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon,  3 Feb 2014 17:04:47 -0600
+Subject: [Patch v4 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <1391468687-4347-1-git-send-email-agross@codeaurora.org>
+References: <1391468687-4347-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1391468687-4347-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses the newly added BCM5301X SoC code.
+Add device tree binding support for the QCOM BAM DMA driver.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile                  |    1 +
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts |   35 ++++++++++
- arch/arm/boot/dts/bcm4708.dtsi              |   34 ++++++++++
- arch/arm/boot/dts/bcm5301x.dtsi             |   95 +++++++++++++++++++++++++++
- 4 files changed, 165 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
- create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
- create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |   48 ++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9d6a8b..b72e359 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -49,6 +49,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
- 	bcm28155-ap.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-+dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2-sony-nsz-gs7.dtb	\
- 	berlin2cd-google-chromecast.dtb
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
 new file mode 100644
-index 0000000..3b5259d
+index 0000000..86344f1
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X arm platform code.
-+ * DTS for Netgear R6250 V1
-+ *
-+ * Copyright 2013 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
++++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+@@ -0,0 +1,48 @@
++QCOM BAM DMA controller
 +
-+/dts-v1/;
++Required properties:
++- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
++		Must be "qcom,bam-v1.4.1" for MSM8974 V2
++- reg: Address range for DMA registers
++- interrupts: single interrupt for this controller
++- #dma-cells: must be <1>
++- clocks: required clock
++- clock-names: name of clock
++- qcom,ee : indicates the active Execution Environment identifier (0-7)
 +
-+#include "bcm4708.dtsi"
++Example:
 +
-+/ {
-+	compatible = "netgear,r6250v1", "brcm,bcm4708";
-+	model = "Netgear R6250 V1 (BCM4708)";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
++	uart-bam: dma at f9984000 = {
++		compatible = "qcom,bam-v1.4.1";
++		reg = <0xf9984000 0x15000>;
++		interrupts = <0 94 0>;
++		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
++		clock-names = "bam_clk";
++		#dma-cells = <1>;
++		qcom,ee = <0>;
 +	};
 +
-+	memory {
-+		reg = <0x00000000 0x08000000>;
++Client:
++Required properties:
++- dmas: List of dma channel requests
++- dma-names: Names of aforementioned requested channels
++
++Clients must use the format described in the dma.txt file, using a two cell
++specifier for each channel.
++
++The three cells in order are:
++  1. A phandle pointing to the DMA controller
++  2. The channel number
++
++Example:
++	serial at f991e000 {
++		compatible = "qcom,msm-uart";
++		reg = <0xf991e000 0x1000>
++			<0xf9944000 0x19000>;
++		interrupts = <0 108 0>;
++		clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
++		clock-names = "core", "iface";
++
++		dmas = <&uart-bam 0>, <&uart-bam 1>;
++		dma-names = "rx", "tx";
 +	};
-+
-+	chipcommonA {
-+		uart0: serial at 0300 {
-+			status = "okay";
-+		};
-+
-+		uart1: serial at 0400 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-new file mode 100644
-index 0000000..31141e8
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -0,0 +1,34 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for BCM4708 SoC.
-+ *
-+ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include "bcm5301x.dtsi"
-+
-+/ {
-+	compatible = "brcm,bcm4708";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			reg = <0x0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			reg = <0x1>;
-+		};
-+	};
-+
-+};
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-new file mode 100644
-index 0000000..53c624f
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -0,0 +1,95 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * Generic DTS part for all BCM53010, BCM53011, BCM53012, BCM53014, BCM53015,
-+ * BCM53016, BCM53017, BCM53018, BCM4707, BCM4708 and BCM4709 SoCs
-+ *
-+ * Copyright 2013-2014 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	chipcommonA {
-+		compatible = "simple-bus";
-+		ranges = <0x00000000 0x18000000 0x00001000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		uart0: serial at 0300 {
-+			compatible = "ns16550";
-+			reg = <0x0300 0x100>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <100000000>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 0400 {
-+			compatible = "ns16550";
-+			reg = <0x0400 0x100>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <100000000>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	mpcore {
-+		compatible = "simple-bus";
-+		ranges = <0x00000000 0x19020000 0x00003000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		scu at 0000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0x0000 0x100>;
-+		};
-+
-+		timer at 0200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x0200 0x100>;
-+			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_periph>;
-+		};
-+
-+		local-timer at 0600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x0600 0x100>;
-+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_periph>;
-+		};
-+
-+		gic: interrupt-controller at 1000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x1000 0x1000>,
-+			      <0x0100 0x100>;
-+		};
-+
-+		L2: cache-controller at 2000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x2000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* As long as we do not have a real clock driver us this
-+		 * fixed clock */
-+		clk_periph: periph {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <400000000>;
-+		};
-+	};
-+};
 -- 
-1.7.10.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
