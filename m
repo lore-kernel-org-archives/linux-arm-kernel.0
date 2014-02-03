@@ -1,43 +1,100 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Mon,  3 Feb 2014 08:40:29 -0500
-Subject: [PATCH v2 3/6] iio: enable selection and build of pulse drivers
+Date: Mon,  3 Feb 2014 08:40:30 -0500
+Subject: [PATCH v2 4/6] iio: Add ABI docs for pulse capture devices
 In-Reply-To: <1391434832-23807-1-git-send-email-mporter@linaro.org>
 References: <1391434832-23807-1-git-send-email-mporter@linaro.org>
-Message-ID: <1391434832-23807-4-git-send-email-mporter@linaro.org>
+Message-ID: <1391434832-23807-5-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pulse driver subdirectory when configuring and building
-IIO.
+Add standard ABI entries for pulse capture devices. Also add
+a separate ABI entry for the TI ECAP driver polarity option.
 
 Signed-off-by: Matt Porter <mporter@linaro.org>
 ---
- drivers/iio/Kconfig  | 1 +
- drivers/iio/Makefile | 1 +
- 2 files changed, 2 insertions(+)
+ Documentation/ABI/testing/sysfs-bus-iio              | 18 ++++++++++++++++++
+ Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap |  9 +++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
 
-diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-index 5dd0e12..286acc3 100644
---- a/drivers/iio/Kconfig
-+++ b/drivers/iio/Kconfig
-@@ -74,6 +74,7 @@ if IIO_TRIGGER
-    source "drivers/iio/trigger/Kconfig"
- endif #IIO_TRIGGER
- source "drivers/iio/pressure/Kconfig"
-+source "drivers/iio/pulse/Kconfig"
- source "drivers/iio/temperature/Kconfig"
+diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
+index 6e02c50..918a201 100644
+--- a/Documentation/ABI/testing/sysfs-bus-iio
++++ b/Documentation/ABI/testing/sysfs-bus-iio
+@@ -210,6 +210,14 @@ Contact:	linux-iio at vger.kernel.org
+ Description:
+ 		Scaled humidity measurement in milli percent.
  
- endif # IIO
-diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
-index 887d390..9a953c9 100644
---- a/drivers/iio/Makefile
-+++ b/drivers/iio/Makefile
-@@ -24,5 +24,6 @@ obj-y += light/
- obj-y += magnetometer/
- obj-y += orientation/
- obj-y += pressure/
-+obj-y += pulse/
- obj-y += temperature/
- obj-y += trigger/
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulseY_raw
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulse_raw
++KernelVersion:	3.15
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Raw pulse measurement from channel Y. Units after
++		application of scale and offset are nanoseconds.
++
+ What:		/sys/bus/iio/devices/iio:deviceX/in_accel_offset
+ What:		/sys/bus/iio/devices/iio:deviceX/in_accel_x_offset
+ What:		/sys/bus/iio/devices/iio:deviceX/in_accel_y_offset
+@@ -220,6 +228,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_offset
+ What:		/sys/bus/iio/devices/iio:deviceX/in_temp_offset
+ What:		/sys/bus/iio/devices/iio:deviceX/in_pressureY_offset
+ What:		/sys/bus/iio/devices/iio:deviceX/in_pressure_offset
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulseY_offset
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulse_offset
+ KernelVersion:	2.6.35
+ Contact:	linux-iio at vger.kernel.org
+ Description:
+@@ -251,6 +261,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_magn_y_scale
+ What:		/sys/bus/iio/devices/iio:deviceX/in_magn_z_scale
+ What:		/sys/bus/iio/devices/iio:deviceX/in_pressureY_scale
+ What:		/sys/bus/iio/devices/iio:deviceX/in_pressure_scale
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulseY_scale
++What:		/sys/bus/iio/devices/iio:deviceX/in_pulse_scale
+ KernelVersion:	2.6.35
+ Contact:	linux-iio at vger.kernel.org
+ Description:
+@@ -784,6 +796,8 @@ What:		/sys/.../iio:deviceX/scan_elements/in_incli_x_en
+ What:		/sys/.../iio:deviceX/scan_elements/in_incli_y_en
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressureY_en
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressure_en
++What:		/sys/.../iio:deviceX/scan_elements/in_pulseY_en
++What:		/sys/.../iio:deviceX/scan_elements/in_pulse_en
+ KernelVersion:	2.6.37
+ Contact:	linux-iio at vger.kernel.org
+ Description:
+@@ -799,6 +813,8 @@ What:		/sys/.../iio:deviceX/scan_elements/in_voltageY_supply_type
+ What:		/sys/.../iio:deviceX/scan_elements/in_timestamp_type
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressureY_type
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressure_type
++What:		/sys/.../iio:deviceX/scan_elements/in_pulseY_type
++What:		/sys/.../iio:deviceX/scan_elements/in_pulse_type
+ KernelVersion:	2.6.37
+ Contact:	linux-iio at vger.kernel.org
+ Description:
+@@ -845,6 +861,8 @@ What:		/sys/.../iio:deviceX/scan_elements/in_incli_y_index
+ What:		/sys/.../iio:deviceX/scan_elements/in_timestamp_index
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressureY_index
+ What:		/sys/.../iio:deviceX/scan_elements/in_pressure_index
++What:		/sys/.../iio:deviceX/scan_elements/in_pulseY_index
++What:		/sys/.../iio:deviceX/scan_elements/in_pulse_index
+ KernelVersion:	2.6.37
+ Contact:	linux-iio at vger.kernel.org
+ Description:
+diff --git a/Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap b/Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
+new file mode 100644
+index 0000000..a9e4a9f
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
+@@ -0,0 +1,9 @@
++What:		/sys/bus/iio/devices/iio:deviceX/pulse_polarityY
++What:		/sys/bus/iio/devices/iio:deviceX/pulse_polarity
++Date:		January 2014
++KernelVersion:	3.15
++Contact:	Matt Porter <mporter@linaro.org>
++Description:
++		Get and set the polarity of the pulse signal to be captured
++		for channel Y.  1 indicates a high pulse signal and 0
++		indicates a low pulse signal.
 -- 
 1.8.4
