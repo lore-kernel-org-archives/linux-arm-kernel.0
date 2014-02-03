@@ -1,55 +1,37 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 3 Feb 2014 15:33:37 +0000
-Subject: [PATCH] asm-generic: add sched_setattr/sched_getattr syscalls
-Message-ID: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
+From: trond.myklebust@primarydata.com (Trond Myklebust)
+Date: Mon, 3 Feb 2014 10:45:48 -0500
+Subject: NFS client broken in Linus' tip
+In-Reply-To: <20140203145759.GA30263@infradead.org>
+References: <20140130140834.GW15937@n2100.arm.linux.org.uk>
+ <20140130141405.GA23985@infradead.org>
+ <20140130142752.GX15937@n2100.arm.linux.org.uk>
+ <20140130143208.GB9573@infradead.org>
+ <20140130153812.GA15937@n2100.arm.linux.org.uk>
+ <1391201970.6978.1.camel@leira.trondhjem.org>
+ <20140203080325.GB806@infradead.org>
+ <85AAFCF5-60EE-42E5-B103-37A4613C5947@primarydata.com>
+ <20140203145759.GA30263@infradead.org>
+Message-ID: <3003D7E5-93F8-4B32-ACDB-07ED3F6CE70D@primarydata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the sched_setattr and sched_getattr syscalls to the generic syscall
-list, which is used by the following architectures: arc, arm64, c6x,
-hexagon, metag, openrisc, score, tile, unicore32.
 
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arch at vger.kernel.org
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-Cc: linux-c6x-dev at linux-c6x.org
-Cc: Richard Kuo <rkuo@codeaurora.org>
-Cc: linux-hexagon at vger.kernel.org
-Cc: linux-metag at vger.kernel.org
-Cc: Jonas Bonn <jonas@southpole.se>
-Cc: linux at lists.openrisc.net
-Cc: Chen Liqin <liqin.linux@gmail.com>
-Cc: Lennox Wu <lennox.wu@gmail.com>
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
----
- include/uapi/asm-generic/unistd.h | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On Feb 3, 2014, at 9:57, Christoph Hellwig <hch@infradead.org> wrote:
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index a20a9b4d3871..dde8041f40d2 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -692,9 +692,13 @@ __SC_COMP(__NR_process_vm_writev, sys_process_vm_writev, \
- __SYSCALL(__NR_kcmp, sys_kcmp)
- #define __NR_finit_module 273
- __SYSCALL(__NR_finit_module, sys_finit_module)
-+#define __NR_sched_setattr 274
-+__SYSCALL(__NR_sched_setattr, sys_sched_setattr)
-+#define __NR_sched_getattr 275
-+__SYSCALL(__NR_sched_getattr, sys_sched_getattr)
- 
- #undef __NR_syscalls
--#define __NR_syscalls 274
-+#define __NR_syscalls 276
- 
- /*
-  * All syscalls below here should go away really,
--- 
-1.8.1.2
+> On Mon, Feb 03, 2014 at 09:17:30AM -0500, Trond Myklebust wrote:
+>> As I said above, that causes posix_acl_xattr_get() to return the wrong answer (ENODATA instead of EOPNOTSUPP).
+> 
+> Is it really the wrong answer?  How does userspace care wether this
+> server doesn't support ACLs at all or none is set?  The resulting
+> behavior is the same.
+
+It will certainly cause acl_get_file() to behave differently than previously. I?ve no idea how that will affect applications, though.
+
+> If there's a good reason to care we might have to go with your patch,
+> but if we can avoid it I'd prefer to keep things simple.
+
+One alternative is to simply wrap posix_acl_xattr_get() in fs/nfs/nfs3acl.c, and have it check the value of nfs_server_capable(inode, NFS_CAP_ACLS) before returning ENODATA. That?s rather ugly too...
+
+--
+Trond Myklebust
+Linux NFS client maintainer
