@@ -1,48 +1,48 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Mon,  3 Feb 2014 17:46:01 +0100
-Subject: [PATCH] at91: pmc: Fixed irq's name allocation for programmable clocks
-Message-ID: <1391445961-20755-1-git-send-email-jjhiblot@traphandler.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 3 Feb 2014 16:46:36 +0000
+Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
+In-Reply-To: <20140203160051.GG14112@mudshark.cambridge.arm.com>
+References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
+ <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
+ <20140122112055.GF1621@mudshark.cambridge.arm.com>
+ <20140129182805.GF11329@bivouac.eciton.net>
+ <1391029124.2488.50.camel@deneb.redhat.com>
+ <20140130131247.GG11329@bivouac.eciton.net>
+ <20140203103415.GA12187@mudshark.cambridge.arm.com>
+ <20140203155542.GI11329@bivouac.eciton.net>
+ <20140203160051.GG14112@mudshark.cambridge.arm.com>
+Message-ID: <20140203164636.GJ11329@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name provided to request_irq() must be valid until the irq is
-released.
-This patch allocates and formats the string with kasprintf().
+On Mon, Feb 03, 2014 at 04:00:51PM +0000, Will Deacon wrote:
+> > > > With the two call sites in uefi_phys.S as:
+> > > > 
+> > > > 	ldr	r5, =(CR_M)
+> > > > 	update_sctlr	r12, , r5
+> > > > and
+> > > > 	ldr	r4, =(CR_I | CR_C | CR_M)
+> > > > 	update_sctlr	r12, r4
+> > > 
+> > > These ldr= could be movs, right?
+> > 
+> > The first one could.
+> > The second one could be movw on armv7+.
+> > 
+> > > If so, I definitely prefer this to putting an ldr = into the macro itself
+> > > (option 2).
+> > 
+> > And your preference between 1) and 2) is?
+> 
+> (1), using bic and mov[tw] where possible.
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- drivers/clk/at91/clk-programmable.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+(1): ok, thanks.
 
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 8e242c7..0f8bf0f 100644
---- a/drivers/clk/at91/clk-programmable.c
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -19,6 +19,7 @@
- #include <linux/sched.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/string.h>
- 
- #include "pmc.h"
- 
-@@ -247,7 +248,7 @@ at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
- 	struct clk_programmable *prog;
- 	struct clk *clk = NULL;
- 	struct clk_init_data init;
--	char irq_name[11];
-+	char *irq_name;
- 
- 	if (id > PROG_ID_MAX)
- 		return ERR_PTR(-EINVAL);
-@@ -269,7 +270,7 @@ at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
- 	prog->irq = irq;
- 	init_waitqueue_head(&prog->wait);
- 	irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
--	snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
-+	irq_name = kasprintf(GFP_KERNEL, "clk-prog%d", id);
- 	ret = request_irq(prog->irq, clk_programmable_irq_handler,
- 			  IRQF_TRIGGER_HIGH, irq_name, prog);
- 	if (ret)
--- 
-1.8.5.2
+bic: sure, that was an oversight.
+
+mov[tw]: why?
+Then we end up battling different available immediate fields in A32/T32
+instruction sets and v5/v6/v7 architecture versions.
+
+/
+    Leif
