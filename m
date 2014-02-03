@@ -1,157 +1,70 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 3 Feb 2014 19:18:38 +0000
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <21596846.kVTqp7roW4@wuerfel>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
- <21596846.kVTqp7roW4@wuerfel>
-Message-ID: <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  3 Feb 2014 21:21:54 +0200
+Subject: [PATCH] ARM: unistd.h: relocate comments back to place
+Message-ID: <98efb0a6377be2ae7d92eab50ed30f6258e8a28d.1391455314.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 06:58:56PM +0000, Arnd Bergmann wrote:
-> On Monday 03 February 2014 18:43:48 Liviu Dudau wrote:
-> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> > index 4cc813e..ce5bad2 100644
-> > --- a/arch/arm64/include/asm/io.h
-> > +++ b/arch/arm64/include/asm/io.h
-> > @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-> >  /*
-> >   *  I/O port access primitives.
-> >   */
-> > +#define arch_has_dev_port()        (0)
->
-> Why not?
+Commit cb8db5d45 (UAPI: (Scripted) Disintegrate arch/arm/include/asm) moved
+these syscall comments out of their context into the UAPI headers. Fix this.
 
-Maybe I got it the wrong way around, but the comment in include/linux/io.h says:
+Fixes: cb8db5d4578a ("UAPI: (Scripted) Disintegrate arch/arm/include/asm")
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/include/asm/unistd.h      | 10 ++++++++++
+ arch/arm/include/uapi/asm/unistd.h | 11 -----------
+ 2 files changed, 10 insertions(+), 11 deletions(-)
 
-/*
- * Some systems do not have legacy ISA devices.
- * /dev/port is not a valid interface on these systems.
- * So for those archs, <asm/io.h> should define the following symbol.
- */
-
-So ... defining it should mean no legacy ISA devices, right?
-
->
-> >  #define IO_SPACE_LIMIT             0xffff
->
-> You probably want to increase this a bit, to allow multiple host bridges
-> to have their own I/O space.
-
-OK, but to what size?
-
->
-> >  #define PCI_IOBASE         ((void __iomem *)(MODULES_VADDR - SZ_2M))
->
-> And modify this location: There is no particular reason to have the I/O space
-> mapped exactly 2MB below the loadable modules, as virtual address space is
-> essentially free.
-
-Will talk with Catalin about where to place this.
-
->
-> > +#define ioport_map(port, nr)       (PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
-> > +#define ioport_unmap(addr)
->
-> inline functions?
-
-Will do, thanks!
-
->
-> >  static inline u8 inb(unsigned long addr)
-> >  {
-> >     return readb(addr + PCI_IOBASE);
-> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> > new file mode 100644
-> > index 0000000..dd084a3
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/pci.h
-> > @@ -0,0 +1,35 @@
-> > +#ifndef __ASM_PCI_H
-> > +#define __ASM_PCI_H
-> > +#ifdef __KERNEL__
-> > +
-> > +#include <linux/types.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/dma-mapping.h>
-> > +
-> > +#include <asm/io.h>
-> > +#include <asm-generic/pci-bridge.h>
-> > +#include <asm-generic/pci-dma-compat.h>
-> > +
-> > +#define PCIBIOS_MIN_IO             0
-> > +#define PCIBIOS_MIN_MEM            0
->
-> PCIBIOS_MIN_IO is normally set to 0x1000, to stay out of the ISA range.
-
-:) No ISA support! (Die ISA, die!!)
-
->
-> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > new file mode 100644
-> > index 0000000..7b652cf
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/pci.c
-> > @@ -0,0 +1,112 @@
->
-> None of this looks really arm64 specific, nor should it be. I think
-> we should try a little harder to move this as a default implementation
-> into common code, even if we start out by having all architectures
-> override it.
-
-Agree. This is the RFC version. I didn't dare to post a patch with fixes
-for all architectures. :)
-
->
-> > +int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
-> > +{
-> > +   BUG_ON(offset + SZ_64K - 1 > IO_SPACE_LIMIT);
-> > +
-> > +   return ioremap_page_range((unsigned long)PCI_IOBASE + offset,
-> > +                           (unsigned long)PCI_IOBASE + offset + SZ_64K,
-> > +                           phys_addr,
-> > +                           __pgprot(PROT_DEVICE_nGnRE));
-> > +}
->
-> Not sure if we want to treat this one as architecture specific though.
-> It certainly won't be portable to x86, but it could be shared with
-> a couple of others. We may also want to redesign the interface.
-> I've been thinking we could make this function allocate space in the
-> Linux virtual I/O space aperture, and pass two resources into it
-> (physical I/O aperture and bus I/O range), and get the actual
-> io_offset as the return value, or a negative error number.
-
-Not sure I completely follow your idea.
-
->
-> That way, you could have an arbitrary number of host bridges in the
-> system and each one gets a share of the virtual aperture until
-> it's full.
-
-One still needs to fix the pci_request_region use that checks against
-ioport_resource. But it is an interesting idea.
-
->
->       Arnd
->
->
-
-Thanks for reviewing this patch!
-
-Liviu
-
---
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+index acabef1a75df..4229595e5c04 100644
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -15,7 +15,17 @@
+ 
+ #include <uapi/asm/unistd.h>
+ 
++/*
++ * This may need to be greater than __NR_last_syscall+1 in order to
++ * account for the padding in the syscall table
++ */
+ #define __NR_syscalls  (384)
++
++/*
++ * *NOTE*: This is a ghost syscall private to the kernel.  Only the
++ * __kuser_cmpxchg code in entry-armv.S should be aware of its
++ * existence.  Don't ever use this from user code.
++ */
+ #define __ARM_NR_cmpxchg		(__ARM_NR_BASE+0x00fff0)
+ 
+ #define __ARCH_WANT_STAT64
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index fb5584d0cc05..c3776331f407 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -410,11 +410,6 @@
+ #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
+ 
+ /*
+- * This may need to be greater than __NR_last_syscall+1 in order to
+- * account for the padding in the syscall table
+- */
+-
+-/*
+  * The following SWIs are ARM private.
+  */
+ #define __ARM_NR_BASE			(__NR_SYSCALL_BASE+0x0f0000)
+@@ -425,12 +420,6 @@
+ #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
+ 
+ /*
+- * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+- * __kuser_cmpxchg code in entry-armv.S should be aware of its
+- * existence.  Don't ever use this from user code.
+- */
+-
+-/*
+  * The following syscalls are obsolete and no longer available for EABI.
+  */
+ #if !defined(__KERNEL__)
+-- 
+1.8.5.3
