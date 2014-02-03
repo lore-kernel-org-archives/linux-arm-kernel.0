@@ -1,42 +1,157 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 2 Feb 2014 20:56:38 -0800
-Subject: [PATCH] arm: document "mach-virt" platform.
-In-Reply-To: <52EA83D6.9050506@codeaurora.org>
-References: <1391098262-15944-1-git-send-email-ian.campbell@citrix.com>
- <52EA83D6.9050506@codeaurora.org>
-Message-ID: <20140203045638.GB4167@cbox>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon,  3 Feb 2014 15:00:32 +0900
+Subject: [PATCH] audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL
+In-Reply-To: <20140129223652.GA13702@madcap2.tricolour.ca>
+References: <20140129223652.GA13702@madcap2.tricolour.ca>
+Message-ID: <1391407232-4623-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 11:54:46AM -0500, Christopher Covington wrote:
-> Hi Ian,
-> 
-> On 01/30/2014 11:11 AM, Ian Campbell wrote:
-> > mach-virt has existed for a while but it is not written down what it actually
-> > consists of. Although it seems a bit unusual to document a binding for an
-> > entire platform since mach-virt is entirely virtual it is helpful to have
-> > something to refer to in the absence of a single concrete implementation.
-> > 
-> > I've done my best to capture the requirements based on the git log and my
-> > memory/understanding.
-> > 
-> > While here remove the xenvm dts example, the Xen tools will now build a
-> > suitable mach-virt compatible dts when launching the guest.
-> 
+Currently AUDITSYSCALL has a long list of architecture depencency:
+       depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML ||
+		SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
+The purpose of this patch is to replace it with HAVE_ARCH_AUDITSYSCALL
+for simplicity.
 
-[...]
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm/Kconfig       |    1 +
+ arch/ia64/Kconfig      |    1 +
+ arch/parisc/Kconfig    |    1 +
+ arch/powerpc/Kconfig   |    1 +
+ arch/s390/Kconfig      |    1 +
+ arch/sh/Kconfig        |    1 +
+ arch/sparc/Kconfig     |    1 +
+ arch/um/Kconfig.common |    1 +
+ arch/x86/Kconfig       |    1 +
+ init/Kconfig           |    5 ++++-
+ 10 files changed, 13 insertions(+), 1 deletion(-)
 
-> > +The platform may also provide hypervisor specific functionality
-> > +(e.g. PV I/O), if it does so then this functionality must be
-> > +discoverable (directly or indirectly) via device tree.
-> 
-> I think it would be informative to provide pointers here to commonly used
-> paravirtualized devices, especially VirtIO PCI/MMIO.
-> 
-
-I disagree: that would only encourage limited testing or assumptions
-about these specific devices when really this platform is just a
-bare-bones platform driven by device tree which should make no
-preference, whatsoever, about which devices are used with the platform.
-
--Christoffer
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..cf69f89 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -23,6 +23,7 @@ config ARM
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
+ 	select HARDIRQS_SW_RESEND
++	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 4e4119b..9143d91 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -43,6 +43,7 @@ config IA64
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 	select MODULES_USE_ELF_RELA
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select HAVE_ARCH_AUDITSYSCALL
+ 	default y
+ 	help
+ 	  The Itanium Processor Family is Intel's 64-bit successor to
+diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
+index b5f1858..0821e83 100644
+--- a/arch/parisc/Kconfig
++++ b/arch/parisc/Kconfig
+@@ -28,6 +28,7 @@ config PARISC
+ 	select CLONE_BACKWARDS
+ 	select TTY # Needed for pdc_cons.c
+ 	select HAVE_DEBUG_STACKOVERFLOW
++	select HAVE_ARCH_AUDITSYSCALL
+ 
+ 	help
+ 	  The PA-RISC microprocessor is designed by Hewlett-Packard and used
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index b44b52c..96627d6 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -139,6 +139,7 @@ config PPC
+ 	select OLD_SIGACTION if PPC32
+ 	select HAVE_DEBUG_STACKOVERFLOW
+ 	select HAVE_IRQ_EXIT_ON_IRQ_STACK
++	select HAVE_ARCH_AUDITSYSCALL
+ 
+ config GENERIC_CSUM
+ 	def_bool CPU_LITTLE_ENDIAN
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index 1e1a03d..b3b9853 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -103,6 +103,7 @@ config S390
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select GENERIC_TIME_VSYSCALL
+ 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
++	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_JUMP_LABEL if !MARCH_G5
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index 9b0979f..675fb7c 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -42,6 +42,7 @@ config SUPERH
+ 	select MODULES_USE_ELF_RELA
+ 	select OLD_SIGSUSPEND
+ 	select OLD_SIGACTION
++	select HAVE_ARCH_AUDITSYSCALL
+ 	help
+ 	  The SuperH is a RISC processor targeted for use in embedded systems
+ 	  and consumer electronics; it was also used in the Sega Dreamcast
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index d4f7a6a..7f7ad7e 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -76,6 +76,7 @@ config SPARC64
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	select HAVE_C_RECORDMCOUNT
+ 	select NO_BOOTMEM
++	select HAVE_ARCH_AUDITSYSCALL
+ 
+ config ARCH_DEFCONFIG
+ 	string
+diff --git a/arch/um/Kconfig.common b/arch/um/Kconfig.common
+index 21ca44c..6915d28 100644
+--- a/arch/um/Kconfig.common
++++ b/arch/um/Kconfig.common
+@@ -1,6 +1,7 @@
+ config UML
+ 	bool
+ 	default y
++	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_UID16
+ 	select GENERIC_IRQ_SHOW
+ 	select GENERIC_CPU_DEVICES
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index e903c71..6ef682f 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -124,6 +124,7 @@ config X86
+ 	select RTC_LIB
+ 	select HAVE_DEBUG_STACKOVERFLOW
+ 	select HAVE_IRQ_EXIT_ON_IRQ_STACK if X86_64
++	select HAVE_ARCH_AUDITSYSCALL
+ 
+ config INSTRUCTION_DECODER
+ 	def_bool y
+diff --git a/init/Kconfig b/init/Kconfig
+index 79383d3..9fe22d2 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -282,9 +282,12 @@ config AUDIT
+ 	  logging of avc messages output).  Does not do system-call
+ 	  auditing without CONFIG_AUDITSYSCALL.
+ 
++config HAVE_ARCH_AUDITSYSCALL
++	bool
++
+ config AUDITSYSCALL
+ 	bool "Enable system-call auditing support"
+-	depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML || SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT))
++	depends on AUDIT && HAVE_ARCH_AUDITSYSCALL
+ 	default y if SECURITY_SELINUX
+ 	help
+ 	  Enable low-overhead system-call auditing infrastructure that
+-- 
+1.7.9.5
