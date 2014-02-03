@@ -1,85 +1,152 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Feb 2014 20:22:15 +0100
-Subject: [RFC] dtc: add ability to make nodes conditional on them being
- referenced
-In-Reply-To: <1578575.rVWgTPdq1W@phil>
-References: <1578575.rVWgTPdq1W@phil>
-Message-ID: <20140203192215.GA25625@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Feb 2014 20:31:31 +0100
+Subject: [PATCH] pci: Add support for creating a generic host_bridge from
+ device tree
+In-Reply-To: <20140203190649.GB4889@e106497-lin.cambridge.arm.com>
+References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
+ <7398333.9L5KlyFggU@wuerfel>
+ <20140203190649.GB4889@e106497-lin.cambridge.arm.com>
+Message-ID: <3523674.i9iUPinOAk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 03 February 2014 19:06:49 Liviu Dudau wrote:
+> On Mon, Feb 03, 2014 at 06:46:10PM +0000, Arnd Bergmann wrote:
+> > On Monday 03 February 2014 18:33:48 Liviu Dudau wrote:
+> > > +/**
+> > > + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
+> > > + * @dev: device node of the host bridge having the range property
+> > > + * @resources: list where the range of resources will be added after DT parsing
+> > > + *
+> > > + * This function will parse the "ranges" property of a PCI host bridge device
+> > > + * node and setup the resource mapping based on its content. It is expected
+> > > + * that the property conforms with the Power ePAPR document.
+> > > + *
+> > > + * Each architecture will then apply their filtering based on the limitations
+> > > + * of each platform. One general restriction seems to be the number of IO space
+> > > + * ranges, the PCI framework makes intensive use of struct resource management,
+> > > + * and for IORESOURCE_IO types they can only be requested if they are contained
+> > > + * within the global ioport_resource, so that should be limited to one IO space
+> > > + * range.
+> >
+> > Actually we have quite a different set of restrictions around I/O space on ARM32
+> > at the moment: Each host bridge can have its own 64KB range in an arbitrary
+> > location on MMIO space, and the total must not exceed 2MB of I/O space.
+> 
+> And that is why the filtering is not (yet) imposed in the generic code. But once
+> you use pci_request_region, that will call request_region which will check
+> against ioport_resource as parent for the requested resource. That should fail
+> if is is not in the correct range, so I don't know how arm arch code manages
+> multiple IO ranges.
 
-On Thu, Jan 30, 2014 at 01:25:56PM +0100, Heiko St?bner wrote:
-> From: Heiko Stuebner <heiko.stuebner@bqreaders.com>
-> 
-> On i.MX, which carries a lot of pin-groups of which most are unused on
-> individual boards, they noticed that this plehora of nodes also results
-> in the runtime-lookup-performance also degrading [0].
-> 
-> A i.MX-specific solution defining the pingroups in the board files but
-> using macros to reference the pingroup-data was not well received
-> 
-> This patch is trying to solve this issue in a more general way, by
-> adding the ability to mark nodes as needing to be referenced somewhere
-> in the tree.
-> 
-> To mark a node a needing to be referenced it must be prefixed with
-> /delete-unreferenced/. This makes dtc check the nodes reference-status
-> when creating the flattened tree, dropping it if unreferenced.
-> 
-> For example, the i.MX6SL pingroup
-> 
-> 	/delete-uneferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
-> 		fsl,pins = <
-> 			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
-> 			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
-> 			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
-> 		>;
-> 	};
-> 
-> would only be included in the dtb if it got referenced somewhere
-> as pingroup via
-> 
-> 	node {
-> 		pinctrl-0 <&pinctrl_ecscpi1_1>;
-> 	};
-> 
-> [0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
-> 
-> Signed-off-by: Heiko Stuebner <heiko.stuebner@bqreaders.com>
-> ---
-> This is just the idea I had in [1] explored a bit more. I'm definitely
-> not sure if this is a valid approach to the problem.
-> Also this is my first venture into dtc as well as flex and bison :-) .
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg303731.html
+Let's try to come up with nomenclature so we can talk about this better
 
-This is a nice feature to have :)
+The ioport_resource is in "logical I/O space", which is a Linux fiction,
+it goes from 0 to IO_SPACE_LIMIT (2MB on ARM) and is mapped into "virtual
+I/O space", which start at (void __iomem *)PCI_IO_VIRT_BASE.
 
-However, I wonder wether it's the right way of implementing it. I'd
-have another use case for this, which would be to embed a DT in a
-first-stage bootloader. We have around 7kB available currently for the
-DT, and this is actually less than any of our (very small already)
-DTBs. So having this of feature makes complete sense to us
-too. However, we also have some other tools that require most of the
-nodes to be in the DTB.
+Each PCI domain can have its own "bus I/O aperture", which is typically
+between 0x1000 and 0xffff and reflects the address that is used in PCI
+transactions and in BARs. The aperture here reflects the subset of the
+4GB bus I/O space that is actually mapped into a CPU visible "physical
+I/O aperture" using an inbound mapping of the host bridge. The physical
+I/O aperture in turn gets mapped to the virtual I/O space using 
+pci_ioremap_io. The difference between a bus I/O address and a logical
+I/O address is stored in the io_offset.
 
-So I guess turning wether we should delete a node if unreferenced into
-a dtc option would make sense, since every DT user will be able to
-choose, without having to duplicate the DT and make conflicting
-changes.
+So much for basic definitions. When a device driver calls pci_request_region,
+the port number it sees is the bus I/O port number adjusted using the
+io_offset to turn it into a logical I/O port number, which should
+always be within the host bridge window, which in turn is a subset
+of the ioport_resource.
 
-Maxime
+> > > +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
+> > > +                                   struct list_head *resources)
+> > > +{
+> > > +   struct resource *res;
+> > > +   struct of_pci_range range;
+> > > +   struct of_pci_range_parser parser;
+> > > +   int err;
+> > > +
+> > > +   pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> > > +
+> > > +   /* Check for ranges property */
+> > > +   err = of_pci_range_parser_init(&parser, dev);
+> > > +   if (err)
+> > > +           return err;
+> > > +
+> > > +   pr_debug("Parsing ranges property...\n");
+> > > +   for_each_of_pci_range(&parser, &range) {
+> > > +           /* Read next ranges element */
+> > > +           pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> > > +                           range.pci_space, range.pci_addr);
+> > > +           pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> > > +                                   range.cpu_addr, range.size);
+> > > +
+> > > +           /* If we failed translation or got a zero-sized region
+> > > +            * (some FW try to feed us with non sensical zero sized regions
+> > > +            * such as power3 which look like some kind of attempt
+> > > +            * at exposing the VGA memory hole) then skip this range
+> > > +            */
+> > > +           if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > > +                   continue;
+> > > +
+> > > +           res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > > +           if (!res) {
+> > > +                   err = -ENOMEM;
+> > > +                   goto bridge_ranges_nomem;
+> > > +           }
+> > > +
+> > > +           of_pci_range_to_resource(&range, dev, res);
+> > > +
+> > > +           pci_add_resource_offset(resources, res,
+> > > +                           range.cpu_addr - range.pci_addr);
+> > > +   }
+> >
+> > I believe of_pci_range_to_resource() will return the MMIO aperture for the
+> > I/O space window here, which is not what you are supposed to pass into
+> > pci_add_resource_offset.
+> 
+> And that is why the code in probe.c has been added to deal with that. It is
+> too early to do the adjustments here as all we have is the list of resources
+> and that might get culled by the architecture fixup code. Remembering the
+> io_offset will happen once the pci_host_bridge gets created, and the resources
+> are then adjusted.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140203/4771d4c2/attachment-0001.sig>
+So you want to register an incorrect I/O resource first and then
+have it fixed up later, rather than registering the correct
+one from the start as everyone else?
+
+> > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > index 6e34498..16febae 100644
+> > > --- a/drivers/pci/probe.c
+> > > +++ b/drivers/pci/probe.c
+> > > @@ -1787,6 +1787,17 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> > >     list_for_each_entry_safe(window, n, resources, list) {
+> > >             list_move_tail(&window->list, &bridge->windows);
+> > >             res = window->res;
+> > > +           /*
+> > > +            * IO resources are stored in the kernel with a CPU start
+> > > +            * address of zero. Adjust the data accordingly and remember
+> > > +            * the offset
+> > > +            */
+> > > +           if (resource_type(res) == IORESOURCE_IO) {
+> > > +                   bridge->io_offset = res->start;
+> > > +                   res->end -= res->start;
+> > > +                   window->offset -= res->start;
+> > > +                   res->start = 0;
+> > > +           }
+> > >             offset = window->offset;
+> > >             if (res->flags & IORESOURCE_BUS)
+> >
+> > Won't this break all existing host bridges?
+> 
+> I am not sure. I believe not, due to what I've explained earlier, but you might be right.
+> 
+> The adjustment happens before the resource is added to the host bridge windows and translates
+> it from MMIO range into IO range.
+
+AFAICT, the resource_type of the resource you register above should be
+IORESOURCE_MEM, so you are not actually matching it here.
+
+	Arnd
