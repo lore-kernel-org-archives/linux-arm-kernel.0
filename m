@@ -1,61 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Feb 2014 16:00:51 +0000
-Subject: [PATCH v4 2/5] arm: add new asm macro update_sctlr
-In-Reply-To: <20140203155542.GI11329@bivouac.eciton.net>
-References: <1389445524-30623-1-git-send-email-leif.lindholm@linaro.org>
- <1389445524-30623-3-git-send-email-leif.lindholm@linaro.org>
- <20140122112055.GF1621@mudshark.cambridge.arm.com>
- <20140129182805.GF11329@bivouac.eciton.net>
- <1391029124.2488.50.camel@deneb.redhat.com>
- <20140130131247.GG11329@bivouac.eciton.net>
- <20140203103415.GA12187@mudshark.cambridge.arm.com>
- <20140203155542.GI11329@bivouac.eciton.net>
-Message-ID: <20140203160051.GG14112@mudshark.cambridge.arm.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Mon, 3 Feb 2014 21:36:23 +0530
+Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
+ during frequency transitions
+In-Reply-To: <2009408.gnUEcoqA3p@phil>
+References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
+ <CAPtuhTj2ZOb+5LDbqghuOhQZfVy8i1xuWotoZ6ocbJFgMxnSMQ@mail.gmail.com>
+ <CAJuA9ajLUPtsReomPuuzMpshTEiUz81sc4584DEVQnG=iwGb-g@mail.gmail.com>
+ <2009408.gnUEcoqA3p@phil>
+Message-ID: <CAJuA9ahFqcT9oEUY5zU6pWxZLMkgQx9F521qAS0HQ-KvBjdRbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 03:55:42PM +0000, Leif Lindholm wrote:
-> On Mon, Feb 03, 2014 at 10:34:15AM +0000, Will Deacon wrote:
-> > On Thu, Jan 30, 2014 at 01:12:47PM +0000, Leif Lindholm wrote:
-> > > Oh, that's neat - thanks!
-> > > 
-> > > Well, given that, I can think of two less horrible options:
-> > > 1)
-> > > 	.macro  update_sctlr, tmp:req, set=, clear=
-> > >         mrc	p15, 0, \tmp, c1, c0, 0
-> > > 	.ifnc	\set,
-> > >         orr	\tmp, \set
-> > > 	.endif
-> > > 	.ifnc	\clear,
-> > > 	mvn	\clear, \clear
-> > > 	and	\tmp, \tmp, \clear
-> > 
-> > Can't you use bic here?
-> 
-> Yeah.
-> 
-> > > 	.endif
-> > >         mcr	p15, 0, \tmp, c1, c0, 0
-> > > 	.endm
-> > > 
-> > > With the two call sites in uefi_phys.S as:
-> > > 
-> > > 	ldr	r5, =(CR_M)
-> > > 	update_sctlr	r12, , r5
-> > > and
-> > > 	ldr	r4, =(CR_I | CR_C | CR_M)
-> > > 	update_sctlr	r12, r4
-> > 
-> > These ldr= could be movs, right?
-> 
-> The first one could.
-> The second one could be movw on armv7+.
-> 
-> > If so, I definitely prefer this to putting an ldr = into the macro itself
-> > (option 2).
-> 
-> And your preference between 1) and 2) is?
+On Thu, Jan 30, 2014 at 8:39 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> On Thursday, 30. January 2014 18:23:44 Thomas Abraham wrote:
+>> Hi Mike,
+>>
+>> On Wed, Jan 29, 2014 at 12:17 AM, Mike Turquette <mturquette@linaro.org>
+> wrote:
+>> > On Mon, Jan 27, 2014 at 9:30 PM, Thomas Abraham <ta.omasab@gmail.com>
+> wrote:
+>> >> Hi Mike,
+>> >>
+>> >> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette <mturquette@linaro.org>
+> wrote:
+>> >>> Quoting Thomas Abraham (2014-01-18 04:10:51)
+>> >>>
+>> > As far as I can tell
+>> > the remux does not happen because it is necessary to generate the
+>> > required clock rate, but because we don't want to run the ARM core out
+>> > of spec for a short time while the PLL relocks. Assuming I have that
+>> > part of it right, I prefer for the parent mux operation to be a part
+>> > of the CPUfreq driver's .target callback instead of hidden away in the
+>> > clock driver.
+>>
+>> The re-parenting is mostly done to keep the ARM CPU clocked while the
+>> PLL is stopped, reprogrammed and restarted. One of the side effects of
+>> that is, the clock speed of the temporary parent could be higher then
+>> what is allowed due to the ARM voltage at the time of re-parenting.
+>> That is the reason to use the safe voltage.
+>
+> The Rockchip-SoCs use something similar, so I'm following quite closely what
+> Thomas is trying to do here, as similar solution would also solve this issue
+> for me.
+>
+> On some Rockchip-SoCs even stuff like pclk and hclk seems to be sourced from
+> the divided armclk, creating additional constraints.
+>
+> But on the RKs (at least in the upstream sources) the armclk is simply equal
+> to the pll output. A divider exists, but is only used to make sure that the
+> armclk stays below the original rate when sourced from the temp-parent, like
+>
+>         if (clk_get_rate(temp_parent) > clk_get_rate(main_parent)
+>                 set_divider(something so that rate(temp) <= rate(main)
+>         clk_set_parent(...)
+>
+> Isn't there a similar possiblity on your platform, as it would remove the need
+> for the safe-voltage?
 
-(1), using bic and mov[tw] where possible.
+Hi Heiko,
 
-Will
+Yes, this works too! I have tested this method on Exynos4210,
+Exynos4412 and Exynos5250 and it works fine without any need for safe
+voltage. This is much better than using safe voltage. Thank you for
+suggesting this.
+
+Regards,
+Thomas.
+
+>
+>
+> In general I also like the approach of hiding the rate-change logic inside
+> this composite clock, as the depending clocks can be easily kept in sync. As
+> with the Rockchips the depending clocks are different for each of the three
+> Cortex-A9 SoCs I looked at, it would be "interesting" if all of this would
+> need to be done in a cpufreq driver.
+>
+>
+> Heiko
+>
