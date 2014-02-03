@@ -1,57 +1,42 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Mon,  3 Feb 2014 13:48:51 -0600
-Subject: [PATCH 1/2] arm64: vdso: fix coarse clock handling
+Date: Mon,  3 Feb 2014 13:48:52 -0600
+Subject: [PATCH 2/2] arm64: vdso: update wtm fields for CLOCK_MONOTONIC_COARSE
 In-Reply-To: <1391456932-17815-1-git-send-email-nathan_lynch@mentor.com>
 References: <1391456932-17815-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1391456932-17815-3-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When __kernel_clock_gettime is called with a CLOCK_MONOTONIC_COARSE or
-CLOCK_REALTIME_COARSE clock id, it returns incorrectly to whatever the
-caller has placed in x2.  Fix this by saving x30/LR to x2
-unconditionally.
-
-Also: the tv_nsec field in the result is shifted by the value in x12.
-In the high-precision case x12 is cs_shift from the data page, but
-for coarse clocks x12 is uninitialized.  Fix this by setting x12 to 0
-once we know we are dealing with a coarse clock.
+Update wall-to-monotonic fields in the VDSO data page
+unconditionally.  These are used to service CLOCK_MONOTONIC_COARSE,
+which is not guarded by use_syscall.
 
 Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 ---
- arch/arm64/kernel/vdso/gettimeofday.S | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/vdso.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-index f0a6d10b5211..6c37ae4a70c0 100644
---- a/arch/arm64/kernel/vdso/gettimeofday.S
-+++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -88,13 +88,13 @@ ENDPROC(__kernel_gettimeofday)
- /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
- ENTRY(__kernel_clock_gettime)
- 	.cfi_startproc
-+	mov	x2, x30
-+	.cfi_register x30, x2
-+
- 	cmp	w0, #CLOCK_REALTIME
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
- 	b.ne	2f
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 65d40cf6945a..a7149cae1615 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -238,6 +238,8 @@ void update_vsyscall(struct timekeeper *tk)
+ 	vdso_data->use_syscall			= use_syscall;
+ 	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
+ 	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
++	vdso_data->wtm_clock_sec		= tk->wall_to_monotonic.tv_sec;
++	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
  
--	mov	x2, x30
--	.cfi_register x30, x2
--
- 	/* Get kernel timespec. */
- 	adr	vdso_data, _vdso_data
- 1:	seqcnt_acquire
-@@ -118,6 +118,9 @@ ENTRY(__kernel_clock_gettime)
- 	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
- 	b.ne	8f
+ 	if (!use_syscall) {
+ 		vdso_data->cs_cycle_last	= tk->clock->cycle_last;
+@@ -245,8 +247,6 @@ void update_vsyscall(struct timekeeper *tk)
+ 		vdso_data->xtime_clock_nsec	= tk->xtime_nsec;
+ 		vdso_data->cs_mult		= tk->mult;
+ 		vdso_data->cs_shift		= tk->shift;
+-		vdso_data->wtm_clock_sec	= tk->wall_to_monotonic.tv_sec;
+-		vdso_data->wtm_clock_nsec	= tk->wall_to_monotonic.tv_nsec;
+ 	}
  
-+	/* Set shift to 0 for coarse clocks */
-+	mov	x12, #0
-+
- 	/* Get coarse timespec. */
- 	adr	vdso_data, _vdso_data
- 3:	seqcnt_acquire
+ 	smp_wmb();
 -- 
 1.8.3.1
