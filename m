@@ -1,46 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 3 Feb 2014 18:28:25 -0500
-Subject: [RFC/RFT 0/2] ARM: mm: Introduce arch hooks for dma address
- translation
-Message-ID: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 3 Feb 2014 16:31:37 -0700
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <21596846.kVTqp7roW4@wuerfel>
+ <20140203191837.GC4889@e106497-lin.cambridge.arm.com>
+ <3808209.DeG1VobanZ@wuerfel>
+ <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
+Message-ID: <20140203233137.GH2519@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently arch specific DMA address translation routines can be enabled
-using only defines wtth "mach/memory.h" which makes impossible to use them
-in with multi-platform, single zImage builds.
+On Mon, Feb 03, 2014 at 05:07:48PM -0600, Rob Herring wrote:
 
-Hence, introduce arch specific hooks for DMA address translations
-routines to be compatible with multi-platform builds. In case if
-an architecture won't use it - DMA address translation routines
-will fall-back to existing implementation.
+> > An interesting question however is what the transition plan is to
+> > have the code shared between arm32 and arm64: We will certainly need
+> > to share at least the dw-pcie and the generic SBSA compliant pci
+> > implementation.
+> 
+> You might want to re-read the SBSA. Unless ARM provides an IP block or
+> there is some other standard such as EHCI or AHCI, there is no generic
+> implementation. You only have to go look at the Linux EHCI or AHCI
+> drivers and see how meaningless and inadequate "use EHCI" is. For PCI,
+> the text is so brief in the SBSA there will be no way PCI is going to
+> just work given all the variations of root complexes, bridges, address
+> windows, etc. we typically see on ARM platforms. I could be wrong and
+> some AML magic will solve all the problems. :)
 
-Series updates existing machines like omap1, ks8695, iop13xx to
-use new DMA hooks.
+The biggest hinderance I've seen while looking at ARM PCI drivers is
+quite simply - they don't follow the PCI-E spec. There is a spec, and
+it is not followed.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-CC: Grygorii Strashko <grygorii.strashko@ti.com>
+This fixup in the X-Gene is a solid example, the purpose of the BAR in
+a PCI-PCI bridge is very clear: using it to specify the system
+DRAM aperature is completely wrong.
 
-Santosh Shilimkar (2):
-  ARM: mm: introduce arch hooks for dma address translation routines
-  ARM: keystone: Install hooks for dma address translation routines
+Not having working aperture windows in the root complex's bridges is
+completely wrong.
 
- arch/arm/include/asm/dma-mapping.h          |   25 +++--------
- arch/arm/mach-iop13xx/include/mach/memory.h |   61 ---------------------------
- arch/arm/mach-iop13xx/setup.c               |   58 +++++++++++++++++++++++++
- arch/arm/mach-keystone/keystone.c           |   31 ++++++++++++++
- arch/arm/mach-ks8695/cpu.c                  |   50 ++++++++++++++++++++++
- arch/arm/mach-ks8695/include/mach/memory.h  |   33 ---------------
- arch/arm/mach-omap1/include/mach/memory.h   |   39 -----------------
- arch/arm/mach-omap1/io.c                    |   52 +++++++++++++++++++++++
- arch/arm/mm/dma-mapping.c                   |   29 +++++++++++++
- 9 files changed, 226 insertions(+), 152 deletions(-)
+Lacking any ability to generate 8 and 16 bit config write TLP's is
+wrong.
 
--- 
-1.7.9.5
+Starting with an end-port PCI-E core and re-tasking it to be a root
+port bridge and ignoring all the requirements with the bridge's config
+space is utterly and completely WRONG.
+
+Specifying 'use EHCI, AHCI, etc' - which are all PCI based standards
+without clearly specifying exactly how PCI is suppose to work is
+completely bonkers.
+
+What is needed is a spec that says:
+ 1) Here is how you generate config TLPs. A MMIO region that
+    conforms to the already specified x86 ECAM would
+    be perfect
+ 2) Here is a dword by dword break down of the entire config space in
+    a SOC. Here is where a on-board AHCI controller must show up in
+    config space. Here is how an external PCI-E port must show
+    up. Etc. Most of this is already specified, but it clearly needs
+    to be layed out explicitly for ARM SOCs to actually follow it.
+ 3) Here is how you specify the aperture(s) associated with PCI BAR's
+    and bridge windows in config space. And yes: The CONFIG SPACE
+    BARS MUST WORK.
+ 4) Here is how MSI works, these are the values you put in the
+    address/data and here is how you collect the interrupt.
+ 5) Here is how Legacy INTx must be mapped into the GIC.
+
+This is what x86 does, and they have been doing it well for 10
+years. If you want to play in the server game you have to properly
+implement PCI.
+
+Jason
