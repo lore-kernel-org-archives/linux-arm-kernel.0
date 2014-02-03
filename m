@@ -1,56 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Feb 2014 11:32:22 +0800
-Subject: [PATCH v3 4/8] ARM: dts: sun7i: Add pin muxing options for the GMAC
-In-Reply-To: <1391398346-5094-1-git-send-email-wens@csie.org>
-References: <1391398346-5094-1-git-send-email-wens@csie.org>
-Message-ID: <1391398346-5094-5-git-send-email-wens@csie.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 2 Feb 2014 19:59:44 -0800
+Subject: [PATCH 0/3] kconfig selection fixes
+In-Reply-To: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
+References: <1391294144-27787-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20140203035944.GB20055@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 has EMAC and GMAC muxed on the same pins.
-Add pin sets with gmac function for MII and RGMII mode to the DTSI.
+On Sat, Feb 01, 2014 at 04:35:41PM -0600, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> Olof,
+> 
+> Here are a few kconfig select fixes. The first one can be squashed into
+> my previous patch for HiSilicon removing SMP select if you want to. 
+> 
+> I'm still looking into the cpufreq select issue with highbank. I'll
+> follow-up with Viresh on that.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Since I had already applied the first version of the hisi patch (and sent the
+pull request for it), I held this off until -rc1. I've applied it to fixes now,
+so it'll be in the next batch we send up.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 5fbac23..65fb8d0 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -469,6 +469,32 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			gmac_pins_mii_a: gmac_mii at 0 {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA9", "PA10",
-+						"PA11", "PA12", "PA13", "PA14",
-+						"PA15", "PA16";
-+				allwinner,function = "gmac";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			gmac_pins_rgmii_a: gmac_rgmii at 0 {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA10",
-+						"PA11", "PA12", "PA13",
-+						"PA15", "PA16";
-+				allwinner,function = "gmac";
-+				/*
-+				 * data lines in RGMII mode use DDR mode
-+				 * and need a higher signal drive strength
-+				 */
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
--- 
-1.9.rc1
+Thanks!
+
+
+-Olof
