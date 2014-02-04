@@ -1,90 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Feb 2014 17:31:33 +0000
-Subject: [PATCH v3 3/3] arm64: audit: Add audit hook in
- ptrace/syscall_trace
-In-Reply-To: <1391410590-4884-4-git-send-email-takahiro.akashi@linaro.org>
-References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
- <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
- <1391410590-4884-4-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140204173133.GG664@mudshark.cambridge.arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 04 Feb 2014 17:33:35 +0000
+Subject: [PATCH v2 08/11] of: Increase MAX_PHANDLE_ARGS
+In-Reply-To: <52E93360.1000904@amd.com>
+References: <1389876263-25759-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1389876263-25759-9-git-send-email-andreas.herrmann@calxeda.com>	<
+ 20140117110830.GW3471@alberich>	<52E92842.3000001@amd.com> <
+ CAL_JsqLhzp5jUJPA91rNkQ07kCDYCDZLxw8LxxFEVP9b12e1Jw@mail.gmail.com> <
+ 52E93360.1000904@amd.com>
+Message-ID: <20140204173335.8C7CBC40B12@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 06:56:30AM +0000, AKASHI Takahiro wrote:
-> This patch adds auditing functions on entry to or exit from
-> every system call invocation.
+On Wed, 29 Jan 2014 10:59:12 -0600, Suravee Suthikulanit <suravee.suthikulpanit@amd.com> wrote:
+> On 1/29/2014 10:57 AM, Rob Herring wrote:
+> >>> diff --git a/include/linux/of.h b/include/linux/of.h
+> >>> >>index 276c546..24e1b28 100644
+> >>> >>--- a/include/linux/of.h
+> >>> >>+++ b/include/linux/of.h
+> >>> >>@@ -67,7 +67,7 @@ struct device_node {
+> >>> >>   #endif
+> >>> >>   };
+> >>> >>
+> >>> >>-#define MAX_PHANDLE_ARGS 8
+> >>> >>+#define MAX_PHANDLE_ARGS 16
+> >> >
+> >> >
+> >> >Since the MMU-500 specify "Number of SMRs" upto 128 registers, shouldn't
+> >> >this be changed to be able to support 128 StreamIDs as well?  Although I am
+> >> >not sure if this would be too big to have on the stack per Rob's comment in
+> >> >the previous patch set.
+> > Do you actually need 128 now? If not, then we can deal with that when
+> > we get there. There are lots of things in spec's that are not actually
+> > implemented or supported.
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/thread_info.h |    1 +
->  arch/arm64/kernel/entry.S            |    3 +++
->  arch/arm64/kernel/ptrace.c           |   10 ++++++++++
->  3 files changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 720e70b..7468388 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -101,6 +101,7 @@ static inline struct thread_info *current_thread_info(void)
->  #define TIF_NEED_RESCHED	1
->  #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
->  #define TIF_SYSCALL_TRACE	8
-> +#define TIF_SYSCALL_AUDIT	9
->  #define TIF_POLLING_NRFLAG	16
->  #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
->  #define TIF_FREEZE		19
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 827cbad..83c4b29 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -630,6 +630,9 @@ el0_svc_naked:					// compat entry point
->  	get_thread_info tsk
->  	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
->  	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
-> +#ifdef CONFIG_AUDITSYSCALL
-> +	tbnz	x16, #TIF_SYSCALL_AUDIT, __sys_trace // auditing syscalls?
-> +#endif
+> Actually, we are using 32 on the AMD system. So, do you think we can set 
+> this to 32 instead?
 
-Could we avoid the back-to-back tbnz instructions with a single mask? It's
-not obvious that it will end up any better, but it would be good to know.
+The helper really wasn't designed for large number of arguments to a
+phandle. If the phandle args are really that large, then it may be
+better to have a parser that allocates the space needed and/or puts the
+data directly into the destination data structure.
 
->  	adr	lr, ret_fast_syscall		// return address
->  	cmp     scno, sc_nr                     // check upper syscall limit
->  	b.hs	ni_sys
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 6777a21..75a3f23 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -19,6 +19,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/audit.h>
->  #include <linux/kernel.h>
->  #include <linux/sched.h>
->  #include <linux/mm.h>
-> @@ -38,6 +39,7 @@
->  #include <asm/compat.h>
->  #include <asm/debug-monitors.h>
->  #include <asm/pgtable.h>
-> +#include <asm/syscall.h>
->  #include <asm/traps.h>
->  #include <asm/system_misc.h>
->  
-> @@ -1064,6 +1066,14 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->  {
->  	unsigned long saved_reg;
->  
-> +	if (dir)
-> +		audit_syscall_exit(regs);
-> +	else
-> +		audit_syscall_entry(syscall_get_arch(current, regs),
-> +			(int)regs->syscallno,
-> +			regs->orig_x0, regs->regs[1],
-> +			regs->regs[2], regs->regs[3]);
-> +
-
-Do we really want to perform the audit checks before the tracehook calls?
-Remember that the latter can rewrite all of the registers.
-
-Will
+g.
