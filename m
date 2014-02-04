@@ -1,266 +1,32 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 4 Feb 2014 21:30:54 +0100
-Subject: [PATCH] ARM: at91: add Atmel's SAMA5D3 Xplained board
-In-Reply-To: <1391535767-30749-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1391535767-30749-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20140204203054.GA21958@ldesroches-Latitude-E6320>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Feb 2014 20:40:08 +0000
+Subject: [PATCH] ARM: ux500: disable msp2 device tree node
+In-Reply-To: <1391544372-16863-1-git-send-email-linus.walleij@linaro.org>
+References: <1391544372-16863-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140204204008.GC5196@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 06:42:47PM +0100, Nicolas Ferre wrote:
-> Add DT file for new SAMA5D3 Xpained board.
-> This board is based on Atmel's SAMA5D36 Cortex-A5 SoC.
+On Tue, 04 Feb 2014, Linus Walleij wrote:
+
+> Commit 70b41abc151f9
+> "ARM: ux500: move MSP pin control to the device tree"
+> accidentally activated MSP2, giving rise to a boot scroll
+> scream as the kernel attempts to probe a driver for it and
+> fails to obtain DMA channel 14.
 > 
-
-You may also add the board to the Makefile.
-
-Ludovic
-
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Fix this up by marking the node disabled again.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 233 ++++++++++++++++++++++++++++
->  1 file changed, 233 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> new file mode 100644
-> index 000000000000..fb1349ca60a4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -0,0 +1,233 @@
-> +/*
-> + * at91-sama5d3_xplained.dts - Device Tree file for the SAMA5D3 Xplained board
-> + *
-> + *  Copyright (C) 2014 Atmel,
-> + *		  2014 Nicolas Ferre <nicolas.ferre@atmel.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +/dts-v1/;
-> +#include "sama5d36.dtsi"
-> +
-> +/ {
-> +	model = "SAMA5D3 Xplained";
-> +	compatible = "atmel,sama5d3-xplained", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x10000000>;
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			mmc0: mmc at f0000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7 &pinctrl_mmc0_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <8>;
-> +					cd-gpios = <&pioE 0 GPIO_ACTIVE_LOW>;
-> +				};
-> +			};
-> +
-> +			spi0: spi at f0004000 {
-> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
-> +				status = "okay";
-> +			};
-> +
-> +			can0: can at f000c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c0: i2c at f0014000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				status = "okay";
-> +			};
-> +
-> +			macb0: ethernet at f0028000 {
-> +				phy-mode = "rgmii";
-> +				status = "okay";
-> +			};
-> +
-> +			usart0: serial at f001c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			usart1: serial at f0020000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
-> +				status = "okay";
-> +			};
-> +
-> +			uart0: serial at f0024000 {
-> +				status = "okay";
-> +			};
-> +
-> +			mmc1: mmc at f8000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioE 1 GPIO_ACTIVE_HIGH>;
-> +				};
-> +			};
-> +
-> +			spi1: spi at f8008000 {
-> +				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
-> +				status = "okay";
-> +			};
-> +
-> +			adc0: adc at f8018000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <
-> +					&pinctrl_adc0_adtrg
-> +					&pinctrl_adc0_ad0
-> +					&pinctrl_adc0_ad1
-> +					&pinctrl_adc0_ad2
-> +					&pinctrl_adc0_ad3
-> +					&pinctrl_adc0_ad4
-> +					&pinctrl_adc0_ad5
-> +					&pinctrl_adc0_ad6
-> +					&pinctrl_adc0_ad7
-> +					&pinctrl_adc0_ad8
-> +					&pinctrl_adc0_ad9
-> +					>;
-> +				status = "okay";
-> +			};
-> +
-> +			i2c2: i2c at f801c000 {
-> +				dmas = <0>, <0>;	/* Do not use DMA for i2c2 */
-> +				status = "okay";
-> +			};
-> +
-> +			macb1: ethernet at f802c000 {
-> +				phy-mode = "rmii";
-> +				status = "okay";
-> +			};
-> +
-> +			dbgu: serial at ffffee00 {
-> +				status = "okay";
-> +			};
-> +
-> +			pinctrl at fffff200 {
-> +				board {
-> +					pinctrl_mmc0_cd: mmc0_cd {
-> +						atmel,pins =
-> +							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +
-> +					pinctrl_mmc1_cd: mmc1_cd {
-> +						atmel,pins =
-> +							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +
-> +					pinctrl_usba_vbus: usba_vbus {
-> +						atmel,pins =
-> +							<AT91_PIOE 9 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;	/* PE9, conflicts with A9 */
-> +					};
-> +				};
-> +			};
-> +
-> +			pmc: pmc at fffffc00 {
-> +				main: mainck {
-> +					clock-frequency = <12000000>;
-> +				};
-> +			};
-> +		};
-> +
-> +		nand0: nand at 60000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "hw";
-> +			atmel,has-pmecc;
-> +			atmel,pmecc-cap = <4>;
-> +			atmel,pmecc-sector-size = <512>;
-> +			nand-on-flash-bbt;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +
-> +		usb0: gadget at 00500000 {
-> +			atmel,vbus-gpio = <&pioE 9 GPIO_ACTIVE_HIGH>;	/* PE9, conflicts with A9 */
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usba_vbus>;
-> +			status = "okay";
-> +		};
-> +
-> +		usb1: ohci at 00600000 {
-> +			num-ports = <3>;
-> +			atmel,vbus-gpio = <0
-> +					   &pioE 3 GPIO_ACTIVE_LOW
-> +					   &pioE 4 GPIO_ACTIVE_LOW
-> +					  >;
-> +			status = "okay";
-> +		};
-> +
-> +		usb2: ehci at 00700000 {
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +
-> +		bp3 {
-> +			label = "PB_USER";
-> +			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
-> +			linux,code = <0x104>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		d2 {
-> +			label = "d2";
-> +			gpios = <&pioE 23 GPIO_ACTIVE_LOW>;	/* PE23, conflicts with A23, CTS2 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		d3 {
-> +			label = "d3";
-> +			gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.8.2.2
-> 
+>  arch/arm/boot/dts/ste-href.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
