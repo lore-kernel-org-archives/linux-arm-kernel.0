@@ -1,42 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 4 Feb 2014 15:09:56 -0800
-Subject: [PATCH v2 2/5] clocksource: qcom: Move clocksource code out of
- mach-msm
-In-Reply-To: <1391553532-27001-3-git-send-email-galak@codeaurora.org>
-References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
- <1391553532-27001-3-git-send-email-galak@codeaurora.org>
-Message-ID: <20140204230956.GE20528@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 23:21:17 +0000
+Subject: [PATCH 2/6] regulator: add bcm59056 pmu DT binding
+In-Reply-To: <20140204211638.GA16179@beef>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-3-git-send-email-mporter@linaro.org>
+ <20140204172309.GG22609@sirena.org.uk>
+ <20140204211638.GA16179@beef>
+Message-ID: <20140204232117.GD22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, Kumar Gala wrote:
-> We intent to share the clocksource code for MSM platforms between legacy
+On Tue, Feb 04, 2014 at 04:16:38PM -0500, Matt Porter wrote:
+> On Tue, Feb 04, 2014 at 05:23:09PM +0000, Mark Brown wrote:
 
-s/intent/intend/
+> > Is this really only a regulator - does the chip have no other functions?
 
-> and multiplatform supported qcom SoCs.
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> It's your average multi-function device with other functions as you are
+> suspecting.  Buried in the the MFD driver comments is me admitting that
+> I need to split this into two bindings. The base device, "bcm59056" and
+> then "bcm59056-reg". So point noted, I'll updated with the appropriate
+> binding for each.
 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index cd6950f..81caa16 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -140,3 +140,7 @@ config VF_PIT_TIMER
->  	bool
->  	help
->  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-> +
-> +config CLKSRC_QCOM
-> +	bool
-> +	depends on ARCH_MSM
-
-It would be a a little less noisy if  you left this as MSM_TIMER
-(msm is all over the code in that file anyway). Also, why do we
-care about depending on ARCH_MSM here? This is a hidden Kconfig
-option anyway.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+It doesn't need to be two bindings - just move it to the MFD section and
+document it there.  The existing binding is totally fine from a
+regulator standpoint and should continue to be so as other functions are
+added.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/638d2eb9/attachment.sig>
