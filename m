@@ -1,36 +1,37 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 4 Feb 2014 14:57:14 -0600
-Subject: [PATCH v5 4/6] spmi: pmic_arb: add support for interrupt handling
-In-Reply-To: <alpine.DEB.2.02.1402042107311.24986@ionos.tec.linutronix.de>
-References: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
- <1391468739-20987-5-git-send-email-joshc@codeaurora.org>
- <alpine.DEB.2.02.1402042107311.24986@ionos.tec.linutronix.de>
-Message-ID: <20140204205714.GN20228@joshc.qualcomm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 4 Feb 2014 16:12:19 -0500
+Subject: [GIT PULL] irqchip: dove: drivers for v3.14
+In-Reply-To: <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
+References: <20131201172914.GV2879@titan.lakedaemon.net>
+ <20131211175037.GY10053@titan.lakedaemon.net>
+ <20140110183430.GO19878@titan.lakedaemon.net>
+ <20140128173531.GT29184@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
+Message-ID: <20140204211219.GK8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 09:10:45PM +0100, Thomas Gleixner wrote:
-> On Mon, 3 Feb 2014, Josh Cartwright wrote:
-> > +static void qpnpint_irq_ack(struct irq_data *d)
-> > +{
-> > +	struct spmi_pmic_arb_dev *pa = irq_data_get_irq_chip_data(d);
-> > +	u8 irq  = d->hwirq >> 8;
-> > +	u8 apid = d->hwirq;
-> > +	unsigned long flags;
-> > +	u8 data;
-> > +
-> > +	spin_lock_irqsave(&pa->lock, flags);
+On Tue, Feb 04, 2014 at 07:59:58PM +0100, Thomas Gleixner wrote:
+> On Tue, 28 Jan 2014, Jason Cooper wrote:
+> > I see you pulled in mvebu/irqchip-fixes.  Thanks for that.  It's getting
+> > near to the end of the merge window and there's been no activity on this
+> > pull request.
+> > 
+> > Please let us know if there's anything we can do to assist.
 > 
-> This wants to be a raw_spinlock - think about RT!
+> Nah. I simply forgot about it. About to send a pull request to Linus.
 
-Indeed.  I'll change this in the next revision.
+hmmm.  I see the pull request contains the patches from
+mvebu/irqchip-fixes (armada), but not the patches from mvebu/irqchip
+(dove):
 
-> Looks sane otherwise.
+  40b367d95fb3 irqchip: irq-dove: Add PMU interrupt controller.
 
-Great, thanks for taking a look!
+which is what this thread was originally a pull request for.
 
-  Josh
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Are you planning to send a second pull request to Linus?
+
+thx,
+
+Jason.
