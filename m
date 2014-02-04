@@ -1,74 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Feb 2014 12:14:52 +0000
-Subject: arm64: kernel panic in paging_init()
-In-Reply-To: <1391460649.13327.51.camel@deneb.redhat.com>
-References: <1391460649.13327.51.camel@deneb.redhat.com>
-Message-ID: <20140204121452.GI30676@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 04 Feb 2014 13:16:07 +0100
+Subject: [RFC] dt-bindings: configuration of parent clocks and clock
+ frequency
+In-Reply-To: <20140201030614.9977.80501@quantum>
+References: <52DE6CAB.10008@samsung.com> <20140201030614.9977.80501@quantum>
+Message-ID: <52F0DA07.6050903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 08:50:49PM +0000, Mark Salter wrote:
-> I'm seeing the following panic in paging init. This is on the foundation
-> model with a modified dtb memory node which has a non section-aligned
-> bank:
-> 	memory at 80000000 {
-> 		device_type = "memory";
-> 		reg = <0x00000000 0x80000000 0 0x20000000>,
-> 		      <0x00000000 0xa0300000 0 0x1fd00000>;
-> 	};
-> 
-> I only see this with 64k pagesize configured. What happens is the
-> non section-aligned bank causes alloc_init_pte() to allocate a page
-> for the new pte from the end of the first bank (the failing address
-> 0xfffffe001fff0000 [0x9fff0000 phys]). This should be a valid page
-> since it was mapped during the create_mapping() call for the first
-> memory bank. A flush_tlb_all() added to the end of create_mapping()
-> makes the panic go away so I think the problem is something stale
-> cached before the page with the failing address was mapped.
+Hello,
 
-I think it goes like this:
+On 2014-02-01 04:06, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2014-01-21 04:48:43)
+> > 5. Similarly to the regulator bindings the clock names could be appended
+> >   to name of a DT property:
+> >
+> >  [clk_name]-assigned-clock-parent = <...>;
+> >  [clk_name]-assigned-clock-rate = <...>;
+>
+> I have always been partial to the way that the reg framework does its
+> [reg_name]-supply. We could shorten it to something like:
+>
+> [clk-name]-asn-parent = ....
+> [clk-name]-asn-rate = ...
+>
+> This is actually the format that was discussed at the ARM kernel summit
+> IIRC.
 
-head.S maps enough memory to get started but using 64K pages rather than
-512M sections with a single pgd entry and several ptes. This never gets
-to the end of the first block (just up to KERNEL_END).
+I think that "[clk-name]-clk-parent" and "[clk-name]-clk-rate" will be a bit
+more descriptive names instead of quite ambiguous "asn".
 
-create_mapping() realises it can do a 512M section mapping, overriding
-the original table pgd entry with a block one. The memblock limit is set
-correctly PGDIR_SIZE but create_mapping, when it replaces the table pgd
-with a block one doesn't do any TLB invalidation.
-
-So I wouldn't do a TLB invalidation all the time but only when the old
-pmd was set. Please give the patch below a try, I only compiled it (I'll
-add some text afterwards):
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f557ebbe7013..f8dc7e8fce6f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -203,10 +203,18 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 	do {
- 		next = pmd_addr_end(addr, end);
- 		/* try section mapping first */
--		if (((addr | next | phys) & ~SECTION_MASK) == 0)
-+		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-+			pmd_t old_pmd =*pmd;
- 			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
--		else
-+			/*
-+			 * Check for previous table entries created during
-+			 * boot (__create_page_tables) and flush them.
-+			 */
-+			if (!pmd_none(old_pmd))
-+				flush_tlb_all();
-+		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
-+		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
- }
-
-
-Thanks.
-
+Best regards
 -- 
-Catalin
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
