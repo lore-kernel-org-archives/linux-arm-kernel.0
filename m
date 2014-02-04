@@ -1,45 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  4 Feb 2014 13:30:05 +0100
-Subject: [PATCH] ARM: pxa: fix compilation problem on AM300EPD board
-Message-ID: <1391517005-12004-1-git-send-email-linus.walleij@linaro.org>
+From: balajitk@ti.com (Balaji T K)
+Date: Tue, 4 Feb 2014 18:06:47 +0530
+Subject: [PATCH/RFC] dmaengine: omap-dma: split header file
+In-Reply-To: <1390582316-4765-1-git-send-email-balajitk@ti.com>
+References: <20140119100235.GN27282@n2100.arm.linux.org.uk>
+ <1390582316-4765-1-git-send-email-balajitk@ti.com>
+Message-ID: <52F0DEDF.1080704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board fails compilation like this:
-arch/arm/mach-pxa/am300epd.c: In function ?am300_cleanup?:
-arch/arm/mach-pxa/am300epd.c:179:2: error: implicit declaration
-of function ?PXA_GPIO_TO_IRQ? [-Werror=implicit-function-declaration]
-  free_irq(PXA_GPIO_TO_IRQ(RDY_GPIO_PIN), par);
+On Friday 24 January 2014 10:21 PM, Balaji T K wrote:
+> To Resolve build failure seen with sh-allmodconfig:
+>      include/linux/omap-dma.h:171:8: error: expected identifier before numeric constant
+>      make[4]: *** [drivers/mmc/host/omap_hsmmc.o] Error 1
+> due to CCR redefinition, move dmaengine consumer specific function to omap-dmaengine.h
+>
+> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+Hi Russell,
 
-This was caused by commit 88f718e3fa4d67f3a8dbe79a2f97d722323e4051
-"ARM: pxa: delete the custom GPIO header"
+Ping,
+If this patch looks OK, I can drop RFC and post as Patch, let me know.
 
-This is because it was previously getting the macro PXA_GPIO_TO_IRQ
-implicitly from <linux/gpio.h> which in turn implicitly included
-<mach/gpio.h> which in turn included <mach/irqs.h>.
+Thanks and Regards,
+Balaji T K
 
-Add the missing include so that the board compiles again.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC folks: please apply this patch directly to the ARM
-SoC tree fixes branch if you are happy with it.
----
- arch/arm/mach-pxa/am300epd.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-pxa/am300epd.c b/arch/arm/mach-pxa/am300epd.c
-index c9f309ae88c5..8b90c4f2d430 100644
---- a/arch/arm/mach-pxa/am300epd.c
-+++ b/arch/arm/mach-pxa/am300epd.c
-@@ -30,6 +30,7 @@
- 
- #include <mach/gumstix.h>
- #include <mach/mfp-pxa25x.h>
-+#include <mach/irqs.h>
- #include <linux/platform_data/video-pxafb.h>
- 
- #include "generic.h"
--- 
-1.8.5.3
+> ---
+>   drivers/mmc/host/omap_hsmmc.c  |    2 +-
+>   include/linux/omap-dma.h       |   19 +------------------
+>   include/linux/omap-dmaengine.h |   21 +++++++++++++++++++++
+>   3 files changed, 23 insertions(+), 19 deletions(-)
+>   create mode 100644 include/linux/omap-dmaengine.h
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index dbd32ad..2f57e36 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -31,7 +31,7 @@
+>   #include <linux/of.h>
+>   #include <linux/of_gpio.h>
+>   #include <linux/of_device.h>
+> -#include <linux/omap-dma.h>
+> +#include <linux/omap-dmaengine.h>
+>   #include <linux/mmc/host.h>
+>   #include <linux/mmc/core.h>
+>   #include <linux/mmc/mmc.h>
+> diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
+> index 7af25a9..6aa97e5 100644
+> --- a/include/linux/omap-dma.h
+> +++ b/include/linux/omap-dma.h
+> @@ -1,23 +1,6 @@
+> -/*
+> - * OMAP DMA Engine support
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+>   #ifndef __LINUX_OMAP_DMA_H
+>   #define __LINUX_OMAP_DMA_H
+> -
+> -struct dma_chan;
+> -
+> -#if defined(CONFIG_DMA_OMAP) || defined(CONFIG_DMA_OMAP_MODULE)
+> -bool omap_dma_filter_fn(struct dma_chan *, void *);
+> -#else
+> -static inline bool omap_dma_filter_fn(struct dma_chan *c, void *d)
+> -{
+> -	return false;
+> -}
+> -#endif
+> +#include <linux/omap-dmaengine.h>
+>
+>   /*
+>    *  Legacy OMAP DMA handling defines and functions
+> diff --git a/include/linux/omap-dmaengine.h b/include/linux/omap-dmaengine.h
+> new file mode 100644
+> index 0000000..2b0b6aa
+> --- /dev/null
+> +++ b/include/linux/omap-dmaengine.h
+> @@ -0,0 +1,21 @@
+> +/*
+> + * OMAP DMA Engine support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __LINUX_OMAP_DMAENGINE_H
+> +#define __LINUX_OMAP_DMAENGINE_H
+> +
+> +struct dma_chan;
+> +
+> +#if defined(CONFIG_DMA_OMAP) || defined(CONFIG_DMA_OMAP_MODULE)
+> +bool omap_dma_filter_fn(struct dma_chan *, void *);
+> +#else
+> +static inline bool omap_dma_filter_fn(struct dma_chan *c, void *d)
+> +{
+> +	return false;
+> +}
+> +#endif
+> +#endif /* __LINUX_OMAP_DMAENGINE_H */
+>
