@@ -1,38 +1,46 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Feb 2014 22:30:53 +0100 (CET)
-Subject: [GIT PULL] irqchip: dove: drivers for v3.14
-In-Reply-To: <20140204211219.GK8533@titan.lakedaemon.net>
-References: <20131201172914.GV2879@titan.lakedaemon.net>
- <20131211175037.GY10053@titan.lakedaemon.net>
- <20140110183430.GO19878@titan.lakedaemon.net>
- <20140128173531.GT29184@titan.lakedaemon.net>
- <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
- <20140204211219.GK8533@titan.lakedaemon.net>
-Message-ID: <alpine.DEB.2.02.1402042230230.24986@ionos.tec.linutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 4 Feb 2014 15:49:23 -0600
+Subject: Extending OPP bindings
+In-Reply-To: <20140204201122.GB22609@sirena.org.uk>
+References: <52EA570A.8040501@arm.com> <52EAF1CA.3040702@ti.com>
+ <20140131124620.GC2616@e102568-lin.cambridge.arm.com>
+ <CAL_Jsq+Kq9C39xr9tY8gSX+6QFkNDqwmTyC+dBhLNcxKMweCpw@mail.gmail.com>
+ <20140131180929.GH2616@e102568-lin.cambridge.arm.com> <52F12AE7.904@ti.com>
+ <20140204182220.GQ22609@sirena.org.uk> <52F13F54.5060000@ti.com>
+ <20140204201122.GB22609@sirena.org.uk>
+Message-ID: <52F16063.6070804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Feb 2014, Jason Cooper wrote:
+On 02/04/2014 02:11 PM, Mark Brown wrote:
+> On Tue, Feb 04, 2014 at 01:28:20PM -0600, Nishanth Menon wrote:
+>> On 02/04/2014 12:22 PM, Mark Brown wrote:
+> 
+>>> You're assuming that the frequency is a unique key here.  That may not
+>>> be the case, for example two OPPs might have the same CPU clock
+>>> (assuming that's the frequency you're referring to) but different bus
+>>> clocking and of course the CPUs or CPU clusters might be individually
+>>> scalable (this is common in big.LITTLE designs I think).
+> 
+>> Which is why OPPs are maintained per device, bus OPPs belong to bus
+>> device (in TI terminology, we'd be talking of cross domain dependency
+>> here for maintaining asynchronous bridge timing closure constraints -
+>> but ofcourse, other SoCs may or maynot have such constraints). For
+>> scaling bus frequency, we already have infrastructure in place - clock
+>> notifiers - discussion of using that is much deeper topic of it's own.
+> 
+>> for each processor that is uniquely transitioning, we'd have it's own
+>> sets of OPPs - the correct representation of the device node is the
+>> key there.
+> 
+> I've seen some SoCs characterised over the whole device rather than with
+> individual parts of the SoC done separately.
+> 
+Fair enough - however, the data characterized will imply individual
+processor/bus specific tuples/parameters - the specific parameters
+might be very unique for SoC, but we have ability to abstract it per
+SoC already.
 
-> On Tue, Feb 04, 2014 at 07:59:58PM +0100, Thomas Gleixner wrote:
-> > On Tue, 28 Jan 2014, Jason Cooper wrote:
-> > > I see you pulled in mvebu/irqchip-fixes.  Thanks for that.  It's getting
-> > > near to the end of the merge window and there's been no activity on this
-> > > pull request.
-> > > 
-> > > Please let us know if there's anything we can do to assist.
-> > 
-> > Nah. I simply forgot about it. About to send a pull request to Linus.
-> 
-> hmmm.  I see the pull request contains the patches from
-> mvebu/irqchip-fixes (armada), but not the patches from mvebu/irqchip
-> (dove):
-> 
->   40b367d95fb3 irqchip: irq-dove: Add PMU interrupt controller.
-> 
-> which is what this thread was originally a pull request for.
-> 
-> 
-> Are you planning to send a second pull request to Linus?
-
-Duh. I'll pick that up tomorrow
+-- 
+Regards,
+Nishanth Menon
