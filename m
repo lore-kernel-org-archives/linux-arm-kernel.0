@@ -1,30 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Feb 2014 17:07:46 +0000
-Subject: [PATCH 08/17] spi: pl022: Fully gate clocks at request inactivity
-In-Reply-To: <1391529538-21685-9-git-send-email-ulf.hansson@linaro.org>
-References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
- <1391529538-21685-9-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140204170746.GD22609@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Feb 2014 17:08:32 +0000
+Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
+In-Reply-To: <20140204165906.GC22609@sirena.org.uk>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-4-git-send-email-mporter@linaro.org>
+ <20140204132951.GE13529@lee--X1> <20140204143119.GA4627@beef>
+ <20140204165906.GC22609@sirena.org.uk>
+Message-ID: <20140204170832.GA5196@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 04:58:49PM +0100, Ulf Hansson wrote:
-> Use clk_disable_unprepare and clk_prepare_enable from the runtime PM
-> callbacks, to fully gate|ungate clocks. Potentially this will save more
-> power, depending on the clock tree for the current SOC.
+> > > > +static struct i2c_driver bcm59056_i2c_driver = {
+> > > > +	.driver = {
+> > > > +		   .name = "bcm59056",
+> > > > +		   .owner = THIS_MODULE,
+> > > > +		   .of_match_table = of_match_ptr(bcm59056_of_match),
+> 
+> > > No need to use of_match_ptr() here.
+> 
+> > Will remove.
+> 
+> What using of_match_ptr() should do is allow the compiler to figure out
+> that the table isn't used when DT is disabled and discard it without
+> ifdefs.  Not sure if that actually works yet but that's the idea.
 
-The same patch has already been applied (I noticed and fixed it while
-doing unrelated code review).
+Right, but I'm guessing that as there is no support for platform data
+then this device(s) is going to be DT only? If that's the case perhaps
+a 'depends OF' might be in order. If that's not the case then I'm more
+than happy to leave the of_match_ptr() in.
 
->  	pinctrl_pm_select_default_state(dev);
-> -	clk_enable(pl022->clk);
-> +	clk_prepare_enable(pl022->clk);
-
-Someone should really make this check errors though!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/c63f5f55/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
