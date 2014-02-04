@@ -1,60 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 4 Feb 2014 11:15:00 -0800
-Subject: [PATCH] ARM: footbridge: Switch to sched_clock_register()
-In-Reply-To: <1389922207-5154-1-git-send-email-sboyd@codeaurora.org>
-References: <1389922207-5154-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140204191500.GB20528@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 19:16:09 +0000
+Subject: [PATCH 07/17] spi: pl022: Don't ignore power domain and amba bus
+ at system suspend
+In-Reply-To: <1391529538-21685-8-git-send-email-ulf.hansson@linaro.org>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140204191609.GU22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16, Stephen Boyd wrote:
-> The 32 bit sched_clock interface supports 64 bits since 3.13-rc1.
-> Upgrade to the 64 bit function to allow us to remove the 32 bit
-> registration interface.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Tue, Feb 04, 2014 at 04:58:48PM +0100, Ulf Hansson wrote:
 
-Russell,
-
-Can you please apply this for 3.14? This is the last user of the
-deprecated interface in linus' tree. Once this is merged I will
-remove setup_sched_clock(). It's 7945/1 in the patch tracker.
-
-> 
-> Based on rmk/for-next
-> 
->  arch/arm/mach-footbridge/dc21285-timer.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
-> index 3971104d32d4..5d2725fd878c 100644
-> --- a/arch/arm/mach-footbridge/dc21285-timer.c > +++ b/arch/arm/mach-footbridge/dc21285-timer.c
-> @@ -125,7 +125,7 @@ void __init footbridge_timer_init(void)
->  	clockevents_config_and_register(ce, rate, 0x4, 0xffffff);
->  }
+> @@ -2328,8 +2300,23 @@ static int pl022_suspend(struct device *dev)
+>  		return ret;
+>  	}
 >  
-> -static u32 notrace footbridge_read_sched_clock(void)
-> +static u64 notrace footbridge_read_sched_clock(void)
->  {
->  	return ~*CSR_TIMER3_VALUE;
->  }
-> @@ -138,5 +138,5 @@ void __init footbridge_sched_clock(void)
->  	*CSR_TIMER3_CLR = 0;
->  	*CSR_TIMER3_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_DIV16;
->  
-> -	setup_sched_clock(footbridge_read_sched_clock, 24, rate);
-> +	sched_clock_register(footbridge_read_sched_clock, 24, rate);
->  }
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -	pm_runtime_get_sync(dev);
+> -	pl022_suspend_resources(pl022, false);
+> +	pm_runtime_disable(dev);
+> +
+> +	if (!pm_runtime_status_suspended(dev)) {
+> +		if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
+> +			ret = dev->pm_domain->ops.runtime_suspend(dev);
+> +		else
+> +			ret = dev->bus->pm->runtime_suspend(dev);
+> +
+> +		if (ret) {
+> +			pm_runtime_enable(dev);
+> +			return ret;
+> +		}
+> +
+> +		pm_runtime_set_suspended(dev);
+> +	}
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+This seems like a fairly hideous thing to be having to open code in an
+individual driver, it all looks generic and like something that most if
+not all devices ought to be doing and it looks very vulnerable to being
+broken by changes in the core.  At the very least I would expect this to
+be done in a helper function, though it would be even nicer if the
+driver core were figuring this stuff out for us based on the device
+level callback so that drivers didn't need to worry about being in power
+domains or manually calling bus level callbacks.  
+
+Putting it in a helper would at least mean that it's easier for the
+mechanics to be transferred to the core proper later on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/c6740df7/attachment.sig>
