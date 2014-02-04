@@ -1,114 +1,266 @@
-From: kevin@bracey.fi (Kevin Bracey)
-Date: Tue,  4 Feb 2014 22:19:06 +0200
-Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
-Message-ID: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 4 Feb 2014 21:30:54 +0100
+Subject: [PATCH] ARM: at91: add Atmel's SAMA5D3 Xplained board
+In-Reply-To: <1391535767-30749-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1391535767-30749-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140204203054.GA21958@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an abort occurs while loading an instruction from user space in
-__und_usr, the resulting do_page_fault() can output "sleeping function
-called from invalid context" warnings, due to IRQs being disabled in
-__und_usr, and hence in do_page_fault().
+On Tue, Feb 04, 2014 at 06:42:47PM +0100, Nicolas Ferre wrote:
+> Add DT file for new SAMA5D3 Xpained board.
+> This board is based on Atmel's SAMA5D36 Cortex-A5 SoC.
+> 
 
-Avoid the problem by enabling IRQs in __und_usr before attempting to
-load the instruction, and modify code and comments in the undefined
-instruction handlers to note that IRQs are enabled on entry iff the
-instruction was executed in user mode.
+You may also add the board to the Makefile.
 
-See http://comments.gmane.org/gmane.linux.ports.arm.omap/59256 for
-an earlier report of the observed might_sleep() warning.
+Ludovic
 
-The proposed patch in that thread, which adds a "!irqs_disabled()" test
-to do_page_fault(), has already been applied to Android, but that patch
-causes an execution failure if another CPU ages the page between the
-instruction execution and __und_usr; it prevents do_page_fault() from
-attempting to handle the fault and __und_usr's fixup handler is called
-instead, but the fixup handler just continues execution from the next
-instruction, so the original instruction is silently skipped.
-
-This patch modifies the fixup handler to attempt to re-execute the
-original instruction, bringing it in line with the SWI fixup handler;
-this also avoids the possibility of the instruction being skipped if
-do_page_fault() doesn't handle a fault.
-
-Signed-off-by: Kevin Bracey <kevin@bracey.fi>
----
- arch/arm/kernel/entry-armv.S       | 11 ++++++++---
- arch/arm/mach-ep93xx/crunch-bits.S |  7 ++++++-
- arch/arm/vfp/entry.S               |  2 +-
- 3 files changed, 15 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index b3fb8c9..bed1567 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -399,6 +399,7 @@ ENDPROC(__irq_usr)
- 	.align	5
- __und_usr:
- 	usr_entry
-+	enable_irq
- 
- 	mov	r2, r4
- 	mov	r3, r5
-@@ -478,11 +479,14 @@ __und_usr_thumb:
- ENDPROC(__und_usr)
- 
- /*
-- * The out of line fixup for the ldrt instructions above.
-+ * The out of line fixup for the ldrt instructions above. Called when there
-+ * was an unrecoverable fault accessing the instruction. Attempt to re-execute
-+ * the instruction, which should trigger the user fault handling path.
-  */
- 	.pushsection .fixup, "ax"
- 	.align	2
--4:	mov	pc, r9
-+4:	str	r4, [sp, #S_PC]
-+	mov	pc, r9
- 	.popsection
- 	.pushsection __ex_table,"a"
- 	.long	1b, 4b
-@@ -515,7 +519,8 @@ ENDPROC(__und_usr)
-  *  r9  = normal "successful" return address
-  *  r10 = this threads thread_info structure
-  *  lr  = unrecognised instruction return address
-- * IRQs disabled, FIQs enabled.
-+ * IRQs enabled iff the instruction was executed in user mode.
-+ * FIQs enabled.
-  */
- 	@
- 	@ Fall-through from Thumb-2 __und_usr
-diff --git a/arch/arm/mach-ep93xx/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
-index 0ec9bb4..413d46c 100644
---- a/arch/arm/mach-ep93xx/crunch-bits.S
-+++ b/arch/arm/mach-ep93xx/crunch-bits.S
-@@ -62,9 +62,14 @@
-  * r9  = ret_from_exception
-  * lr  = undefined instr exit
-  *
-- * called from prefetch exception handler with interrupts disabled
-+ * Called from undefined instruction handler.
-+ * Interrupts enabled iff instruction executed in user mode.
-  */
- ENTRY(crunch_task_enable)
-+	mrs	r1, cpsr
-+	orr	r2, r1, #PSR_I_BIT		@ disable interrupts
-+	msr	cpsr_c, r2
-+
- 	ldr	r8, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
- 
- 	ldr	r1, [r8, #0x80]
-diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 46e1749..e0e3a00 100644
---- a/arch/arm/vfp/entry.S
-+++ b/arch/arm/vfp/entry.S
-@@ -19,7 +19,7 @@
- @  r9  = normal "successful" return address
- @  r10 = this threads thread_info structure
- @  lr  = unrecognised instruction return address
--@  IRQs disabled.
-+@  IRQs enabled iff the instruction was executed in user mode.
- @
- ENTRY(do_vfp)
- #ifdef CONFIG_PREEMPT_COUNT
--- 
-1.8.4.dirty
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 233 ++++++++++++++++++++++++++++
+>  1 file changed, 233 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> new file mode 100644
+> index 000000000000..fb1349ca60a4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -0,0 +1,233 @@
+> +/*
+> + * at91-sama5d3_xplained.dts - Device Tree file for the SAMA5D3 Xplained board
+> + *
+> + *  Copyright (C) 2014 Atmel,
+> + *		  2014 Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "sama5d36.dtsi"
+> +
+> +/ {
+> +	model = "SAMA5D3 Xplained";
+> +	compatible = "atmel,sama5d3-xplained", "atmel,sama5d3", "atmel,sama5";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x10000000>;
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			mmc0: mmc at f0000000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7 &pinctrl_mmc0_cd>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <8>;
+> +					cd-gpios = <&pioE 0 GPIO_ACTIVE_LOW>;
+> +				};
+> +			};
+> +
+> +			spi0: spi at f0004000 {
+> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
+> +				status = "okay";
+> +			};
+> +
+> +			can0: can at f000c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c0: i2c at f0014000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c1: i2c at f0018000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at f0028000 {
+> +				phy-mode = "rgmii";
+> +				status = "okay";
+> +			};
+> +
+> +			usart0: serial at f001c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart1: serial at f0020000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
+> +				status = "okay";
+> +			};
+> +
+> +			uart0: serial at f0024000 {
+> +				status = "okay";
+> +			};
+> +
+> +			mmc1: mmc at f8000000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <4>;
+> +					cd-gpios = <&pioE 1 GPIO_ACTIVE_HIGH>;
+> +				};
+> +			};
+> +
+> +			spi1: spi at f8008000 {
+> +				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			adc0: adc at f8018000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <
+> +					&pinctrl_adc0_adtrg
+> +					&pinctrl_adc0_ad0
+> +					&pinctrl_adc0_ad1
+> +					&pinctrl_adc0_ad2
+> +					&pinctrl_adc0_ad3
+> +					&pinctrl_adc0_ad4
+> +					&pinctrl_adc0_ad5
+> +					&pinctrl_adc0_ad6
+> +					&pinctrl_adc0_ad7
+> +					&pinctrl_adc0_ad8
+> +					&pinctrl_adc0_ad9
+> +					>;
+> +				status = "okay";
+> +			};
+> +
+> +			i2c2: i2c at f801c000 {
+> +				dmas = <0>, <0>;	/* Do not use DMA for i2c2 */
+> +				status = "okay";
+> +			};
+> +
+> +			macb1: ethernet at f802c000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			dbgu: serial at ffffee00 {
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl at fffff200 {
+> +				board {
+> +					pinctrl_mmc0_cd: mmc0_cd {
+> +						atmel,pins =
+> +							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> +					};
+> +
+> +					pinctrl_mmc1_cd: mmc1_cd {
+> +						atmel,pins =
+> +							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> +					};
+> +
+> +					pinctrl_usba_vbus: usba_vbus {
+> +						atmel,pins =
+> +							<AT91_PIOE 9 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;	/* PE9, conflicts with A9 */
+> +					};
+> +				};
+> +			};
+> +
+> +			pmc: pmc at fffffc00 {
+> +				main: mainck {
+> +					clock-frequency = <12000000>;
+> +				};
+> +			};
+> +		};
+> +
+> +		nand0: nand at 60000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "hw";
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-cap = <4>;
+> +			atmel,pmecc-sector-size = <512>;
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			at91bootstrap at 0 {
+> +				label = "at91bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			bootloader at 40000 {
+> +				label = "bootloader";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +
+> +			bootloaderenv at c0000 {
+> +				label = "bootloader env";
+> +				reg = <0xc0000 0xc0000>;
+> +			};
+> +
+> +			dtb at 180000 {
+> +				label = "device tree";
+> +				reg = <0x180000 0x80000>;
+> +			};
+> +
+> +			kernel at 200000 {
+> +				label = "kernel";
+> +				reg = <0x200000 0x600000>;
+> +			};
+> +
+> +			rootfs at 800000 {
+> +				label = "rootfs";
+> +				reg = <0x800000 0x0f800000>;
+> +			};
+> +		};
+> +
+> +		usb0: gadget at 00500000 {
+> +			atmel,vbus-gpio = <&pioE 9 GPIO_ACTIVE_HIGH>;	/* PE9, conflicts with A9 */
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_usba_vbus>;
+> +			status = "okay";
+> +		};
+> +
+> +		usb1: ohci at 00600000 {
+> +			num-ports = <3>;
+> +			atmel,vbus-gpio = <0
+> +					   &pioE 3 GPIO_ACTIVE_LOW
+> +					   &pioE 4 GPIO_ACTIVE_LOW
+> +					  >;
+> +			status = "okay";
+> +		};
+> +
+> +		usb2: ehci at 00700000 {
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +
+> +		bp3 {
+> +			label = "PB_USER";
+> +			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x104>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		d2 {
+> +			label = "d2";
+> +			gpios = <&pioE 23 GPIO_ACTIVE_LOW>;	/* PE23, conflicts with A23, CTS2 */
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		d3 {
+> +			label = "d3";
+> +			gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.2.2
+> 
