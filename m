@@ -1,13 +1,25 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 04 Feb 2014 09:29:50 +0100
+Date: Tue, 04 Feb 2014 09:42:29 +0100
 Subject: [PATCH v2] at91: pmc: Fixed irq's name allocation for programmable
  clocks
 In-Reply-To: <1391502105-24612-1-git-send-email-jjhiblot@traphandler.com>
 References: <1391445961-20755-1-git-send-email-jjhiblot@traphandler.com>
  <1391502105-24612-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <52F0A4FE.9020909@overkiz.com>
+Message-ID: <52F0A7F5.6070201@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hello JJ,
+
+Sorry for the noise (I added Mike in the CC list).
+
+BTW, thanks for fixing this bug.
+
+Mike, could you take this bug fix for the next 3.14 release ?
+
+Best Regards,
+
+Boris
 
 On 04/02/2014 09:21, Jean-Jacques Hiblot wrote:
 > The name provided to request_irq() must be valid until the irq is released.
