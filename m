@@ -1,40 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Feb 2014 09:38:44 +0000
-Subject: [PATCH] security: select correct default LSM_MMAP_MIN_ADDR on
- arm on arm64
-In-Reply-To: <1391480133-27149-1-git-send-email-ccross@android.com>
-References: <1391480133-27149-1-git-send-email-ccross@android.com>
-Message-ID: <20140204093843.GB16708@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Feb 2014 09:41:15 +0000
+Subject: [PATCH] ARM64: KVM: Fix VGIC compile error for Linux-3.14-rc1
+In-Reply-To: <1391506640-1901-1-git-send-email-anup.patel@linaro.org>
+References: <1391506640-1901-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <52F0B5BB.3060901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 02:15:32AM +0000, Colin Cross wrote:
-> Binaries compiled for arm may run on arm64 if CONFIG_COMPAT is
-> selected.  Set LSM_MMAP_MIN_ADDR to 32768 if ARM64 && COMPAT to
-> prevent selinux failures launching 32-bit static executables that
-> are mapped at 0x8000.
+On 04/02/14 09:37, Anup Patel wrote:
+> This patch fixes VGIC compilation for Linux-3.14-rc1 ARM64 kernel.
 > 
-> Signed-off-by: Colin Cross <ccross@android.com>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+
+Already posted by Christoffer, and hopefully on its way to mainline.
+
+	M.
+
 > ---
->  security/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/include/uapi/asm/kvm.h |    9 +++++++++
+>  virt/kvm/arm/vgic.c               |    1 +
+>  2 files changed, 10 insertions(+)
 > 
-> diff --git a/security/Kconfig b/security/Kconfig
-> index e9c6ac724fef..beb86b500adf 100644
-> --- a/security/Kconfig
-> +++ b/security/Kconfig
-> @@ -103,7 +103,7 @@ config INTEL_TXT
->  config LSM_MMAP_MIN_ADDR
->  	int "Low address space for LSM to protect from user allocation"
->  	depends on SECURITY && SECURITY_SELINUX
-> -	default 32768 if ARM
-> +	default 32768 if ARM || (ARM64 && COMPAT)
->  	default 65536
->  	help
->  	  This is the portion of low virtual memory which should be protected
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 31c2f54..cadc318 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -149,6 +149,15 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
+>  #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
+>  
+> +/* Device Control API: ARM VGIC */
+> +#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> +#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+> +#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
+> +#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
+> +#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+> +#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+> +#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+> +
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index be456ce..55b0609 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> +#include <linux/uaccess.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> 
 
-Since ARM64 && COMPAT implies 4k pages, this change looks ok to me.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+-- 
+Jazz is not dead. It just smells funny...
