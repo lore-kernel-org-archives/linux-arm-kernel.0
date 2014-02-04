@@ -1,43 +1,64 @@
 From: william.towle@codethink.co.uk (William Towle)
-Date: Tue,  4 Feb 2014 18:17:36 +0000
-Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+Date: Tue,  4 Feb 2014 18:17:38 +0000
+Subject: [PATCH 3/3] clk: shmobile: handle multiple parent clocks for cpg
+ clocks
 In-Reply-To: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
 References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
-Message-ID: <1391537858-28593-2-git-send-email-william.towle@codethink.co.uk>
+Message-ID: <1391537858-28593-4-git-send-email-william.towle@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_div_table for cpg_sd01_div_table[] concurs with the manual
-but not with values found in the device itself (which are also the
-same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
+The current action on registering the cpg_clocks is to have
+them all registered with a single parent clock. This is not
+the correct action, as some of the clocks such as the SDHI
+and QSPI are actually parented to PLL1 or PLL1/2.
 
-Update the clk-rcar-gen2.c driver to have the same table as the one
-used by the mach-shmobile driver which work once further issues are
-fixed in the clk-rcar-gen2.c driver.
-
-Part of the fix for the following error where the driver reports the
-output as 1MHz but is really 97.5MHz:
-    sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
+This also requires a change to the device-tree files to make
+sure that appropriate parent clocks are assigned.
 
 [ben.dooks at codethink.co.uk: updated patch description]
 Signed-off-by: William Towle <william.towle@codethink.co.uk>
 Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/clk/shmobile/clk-rcar-gen2.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/shmobile/clk-rcar-gen2.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c b/drivers/clk/shmobile/clk-rcar-gen2.c
-index a59ec21..df4a1e6 100644
+index df4a1e6..57bc2e4 100644
 --- a/drivers/clk/shmobile/clk-rcar-gen2.c
 +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
-@@ -170,6 +170,8 @@ static const struct clk_div_table cpg_sdh_div_table[] = {
- };
+@@ -185,7 +185,7 @@ static u32 cpg_mode __initdata;
+ static struct clk * __init
+ rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
+ 			     const struct cpg_pll_config *config,
+-			     const char *name)
++			     const char *name, int index)
+ {
+ 	const struct clk_div_table *table = NULL;
+ 	const char *parent_name = "main";
+@@ -193,8 +193,13 @@ rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
+ 	unsigned int mult = 1;
+ 	unsigned int div = 1;
  
- static const struct clk_div_table cpg_sd01_div_table[] = {
-+	{  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
-+	{  4,  8 },
- 	{  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
- 	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
- };
++	parent_name = of_clk_get_parent_name(np, index);
++	if (!parent_name) {
++		pr_err("no parent set for clocks array\n");
++		return ERR_PTR(-ENOENT);
++	}
++
+ 	if (!strcmp(name, "main")) {
+-		parent_name = of_clk_get_parent_name(np, 0);
+ 		div = config->extal_div;
+ 	} else if (!strcmp(name, "pll0")) {
+ 		/* PLL0 is a configurable multiplier clock. Register it as a
+@@ -279,7 +284,7 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
+ 		of_property_read_string_index(np, "clock-output-names", i,
+ 					      &name);
+ 
+-		clk = rcar_gen2_cpg_register_clock(np, cpg, config, name);
++		clk = rcar_gen2_cpg_register_clock(np, cpg, config, name, i);
+ 		if (IS_ERR(clk))
+ 			pr_err("%s: failed to register %s %s clock (%ld)\n",
+ 			       __func__, np->name, name, PTR_ERR(clk));
 -- 
 1.7.10.4
