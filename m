@@ -1,51 +1,121 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Tue, 04 Feb 2014 12:05:06 -0500
-Subject: UBI leb_write_unlock NULL pointer Oops (continuation) on ARM926
-In-Reply-To: <878utq51b4.fsf@nbsps.com> (Bill Pringlemeir's message of "Tue,
- 04 Feb 2014 10:45:35 -0500")
-References: <D7B1B5F4F3F27A4CB073BF422331203F2A18997F1F@Exchange1.lawo.de>
- <CAFLxGvya5WXoKcYmOgeM_SmVVEht1jEzeLG9vHhwFudFU+Ny8A@mail.gmail.com>
- <D7B1B5F4F3F27A4CB073BF422331203F2A18997F8B@Exchange1.lawo.de>
- <52EF772D.8080207@nod.at>
- <D7B1B5F4F3F27A4CB073BF422331203F2A18DD7989@Exchange1.lawo.de>
- <52EF9FFE.4020405@nod.at>
- <1391498545.1795.29.camel@sauron.fi.intel.com>
- <52F09AC9.6090604@nod.at>
- <1391500492.1795.36.camel@sauron.fi.intel.com>
- <878utq51b4.fsf@nbsps.com>
-Message-ID: <874n4e4xml.fsf@nbsps.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 4 Feb 2014 18:16:05 +0100
+Subject: [PATCH v3 2/5] ASoC: tda998x: add a codec driver for the TDA998x
+In-Reply-To: <20140204133014.GA22609@sirena.org.uk>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <ae68394f080f0ea5acaf3377cb1d18f29e42c646.1391274628.git.moinejf@free.fr>
+ <20140204133014.GA22609@sirena.org.uk>
+Message-ID: <20140204181605.5b837a70@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  4 Feb 2014, bpringlemeir at nbsps.com wrote:
+On Tue, 4 Feb 2014 13:30:14 +0000
+Mark Brown <broonie@kernel.org> wrote:
 
-> The ARM926 systems do not have proper 'lock free' idioms like
-> 'ldrex/strex' and they try to do atomic operations by locking
-> interrupts.  I think that UbiFs/UBI maybe called on a 'data fault' or
-> 'program fault' (in user space) when memory pressure is present.  I have
-> seen this occur in some sound drivers where the data source is coming
-> from disk (or maybe the driver uses vmalloc() or something).  So I think
-> on occasion, the ltree_lookup() may not work or there is something weird
-> with the atomic primatives and data/page faults.
+> On Sun, Jan 26, 2014 at 07:45:36PM +0100, Jean-Francois Moine wrote:
+> 
+> > +	/* load the optional CODEC */
+> > +	of_platform_populate(np, NULL, NULL, &client->dev);
+> > +
+> 
+> Why is this using of_platform_populate()?  That's a very odd way of
+> doing things.
 
+The i2c does not populate the subnodes in the DT. I did not find why,
+but, what is sure is that if of_platform_populate() is not called, the
+tda CODEC module is not loaded.
 
- https://www.google.ca/#q=site:infradead.org+leb_write_unlock+oops
+You may find an other example in drivers/mfd/twl-core.c.
 
- http://lists.infradead.org/pipermail/linux-mtd/2013-May/046907.html
+> > +config SND_SOC_TDA998X
+> > +	tristate
+> > +	depends on OF
+> > +	default y if DRM_I2C_NXP_TDA998X=y
+> > +	default m if DRM_I2C_NXP_TDA998X=m
+> > +
+> 
+> Make this visible if it can be selected from DT so it can be used with
+> generic cards.
 
- at91sam9g20 - arm926, different MTD driver. Linux 3.6.9
+I don't understand. The tda CODEC can only be used with the TDA998x I2C
+driver. It might have been included in the tda998x source as well.
 
- Code: e5903004 e58d2004 e1560003 0a00002a (e593200c)
+> > +static int tda_get_encoder(struct tda_priv *priv)
+> > +{
+> > +	struct snd_soc_codec *codec = priv->codec;
+> > +	struct device_node *np;
+> > +
+> > +	/* get the parent tda998x device */
+> > +	np = of_get_parent(codec->dev->of_node);
+> > +	if (!np || !of_device_is_compatible(np, "nxp,tda998x")) {
+> > +		dev_err(codec->dev, "no or bad parent!\n");
+> > +		return -EINVAL;
+> > +	}
+> > +	priv->i2c_client = of_find_i2c_device_by_node(np);
+> > +	of_node_put(np);
+> > +	return 0;
+> > +}
+> 
+> Why does this need to be checked like this?  We don't normally have this
+> sort of code to check that the parent is correct.
 
-   0:   e5903004        ldr     r3, [r0, #4]
-   4:   e58d2004        str     r2, [sp, #4]
-   8:   e1560003        cmp     r6, r3
-   c:   0a00002a        beq     0xbc
-  10:   e593200c        ldr     r2, [r3, #12]
+In my previous submit, the tda CODEC was not declared inside the
+tda998x I2c device, so, its location was searched from  phandle.
 
-The code sequence looks identical and the Oops trace, etc is the same.
-People from Pengutronix also indicated seeing the same type of Opps; I
-think they deal with the IMX, but maybe this was on another board.
+Now, the CODEC is declared inside the tda998x as a node child. But, in
+a bad DT, the tda CODEC could be declared anywhere, even inside a other
+DRM I2C slave encoder, in which case, bad things would happen...
 
-Regards,
-Bill Pringlemeir.
+> > +static int tda_start_stop(struct tda_priv *priv)
+> > +{
+> > +	int port;
+> > +
+> > +	/* give the audio parameters to the HDMI encoder */
+> > +	if (priv->dai_id == AFMT_I2S)
+> > +		port = priv->ports[0];
+> > +	else
+> > +		port = priv->ports[1];
+> > +	tda998x_audio_update(priv->i2c_client, priv->dai_id, port);
+> > +	return 0;
+> > +}
+> 
+> What does this actually do?  No information is being passed in to the
+> core function here, not even any information on if it's starting or
+> stopping.  Looking at the rest of the code I can't help thinking it
+> might be clearer to inline this possibly with a lookup helper, the code
+> is very small and the lack of parameters makes it hard to follow.
+
+I thought it was simple enough. The function tda_start_stop() is called
+from 2 places:
+
+- on audio start in tda_startup with the audio type (DAI id)
+	priv->dai_id = dai->id;
+
+- on audio stop with a null audio type
+	priv->dai_id = 0;		/* streaming stop */
+
+On stream start, the DAI id is never null, as explained in the patch 1:
+
+	The audio format values in the encoder configuration interface  are
+	changed to non null values so that the value 0 is used in the audio
+	function to indicate that audio streaming is stopped.
+
+and on streaming stop the port is not meaningful.
+
+I will add a null item in the enum (AFMT_NO_AUDIO).
+
+> > +static const struct snd_soc_dapm_route tda_routes[] = {
+> > +	{ "hdmi-out", NULL, "HDMI I2S Playback" },
+> > +	{ "hdmi-out", NULL, "HDMI SPDIF Playback" },
+> > +};
+> 
+> S/PDIF.
+
+Did you ever try that with debugfs?
+
+BTW, this patch series may be delayed for some time: the tda998x driver
+has to be reworked for DT support.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
