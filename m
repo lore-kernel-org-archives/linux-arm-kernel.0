@@ -1,70 +1,83 @@
-From: e.habicht@thiesen.com (Erik Habicht)
-Date: Tue, 04 Feb 2014 15:57:31 +0100
-Subject: Toradex Colibri PXA270 Sound Problem
-Message-ID: <52F0FFDB.4020503@thiesen.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 04 Feb 2014 15:58:44 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <52F02816.1050708@gmail.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <52EA2875.5020807@free-electrons.com> <52EA2A04.2070109@gmail.com>
+ <20140203231603.GA11613@1wt.eu> <52F02816.1050708@gmail.com>
+Message-ID: <52F10024.4030201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo List,
+On 04/02/2014 00:36, Sebastian Hesselbarth wrote:
+> On 02/04/2014 12:16 AM, Willy Tarreau wrote:
+>> On Thu, Jan 30, 2014 at 11:31:32AM +0100, Sebastian Hesselbarth wrote:
+>>> On 01/30/14 11:24, Gregory CLEMENT wrote:
+>>>> On 25/01/2014 19:19, Sebastian Hesselbarth wrote:
+>>>>> This patch set fixes clk init order that went upside-down with
+>>>>> v3.14. I haven't really investigated what caused this, but I assume
+>>>>> it is related with DT node reordering by addresses.
+>>>>
+>>>> Can you explain what kind of issue do you observe?
+>>>
+>>> Sure. When probing CLK_OF_DECLAREed clock drivers, clock-gating driver
+>>> gets registered before core-clocks. It therefore cannot resolve it's
+>>> parent clock name for tclk and all clock gates will have no parent
+>>> clock.
+>>>
+>>> Usually, you'll see in some drivers (e.g. v643xx_eth) div_by_zero errors
+>>> poping up, when they calculate a frequency division factors based on
+>>> clock gate frequency, which should have been tclk but is 0 now.
+>>
+>> Well, to be honnest, I have no idea whether your patch is the right way
+>> to fix the problem or not, but what I can say is that it fixes such oopses
+>> that appear in 3.14-rc1 when booting on mirabox :
+>>
+>> Division by zero in kernel.
+> 
+> Willy,
+> 
+> you have hit exactly the reason for this patch.
+> 
+> [...]
+>> By the way, seeing how often a trick related to the DT is nedeed to solve an
+>> oops or a panic, I'm really scared that this whole DT mess is just becoming
+>> the exact copy of the ACPI mess (but 15 years later) and we'll experience the
+>> same horrible things :-( Sometimes I'm wondering whether there are not too
+>> many structural things put in there...
+> 
+> To be precise, it is not a DT-related trick at all. You would have the
+> same issues, if you'd register those "low-level" (i.e. early) drivers
+> without DT. It is more about missing init ordering, here.
+> 
+> There could be different ways to work this out, even elevating clock
+> devices to "normal" probed devices could be possible. I am sure, in the
+> long run, it will work out, but now this is a fix for v3.14-rc1.
+> 
+> @Jason, Andrew, Gregory, Thomas:
+> Now that v3.14 is out, anything against taking this in as fixes for rc1?
 
-we are using a Toradex PXA270 SoC module with a patch to get the Wolfson
-WM9715 working on 2.6.37 (2.6.36, 2.6.35, 2.6.27). It works pretty well.
+Hi Sebastian,
 
-Now i decided to switch to a newer kernel version. I started with 2.6.38
-and modified the patch to compile it. The kernel boot to the
-system, but only capturing is working. I get no audio output anymore.
-
-In the previous kernel versions i always use the following amixer settings:
-amixer set 'Headphone' 100% on
-amixer set 'Speaker Mixer PCM' on
-amixer set 'Left HP Mixer PCM' on
-amixer set 'Right HP Mixer PCM' on
-
-This is the kernel output. It looks like all versions before:
-
-[    8.405110] WM9711/WM9712 SoC Audio Codec 0.4
-[    8.457947] pxa2xx_ac97_try_cold_reset: cold reset timeout (GSR=0x44)
-[    8.543333] asoc: wm9712-hifi <-> pxa2xx-ac97 mapping ok
-[    8.609104] asoc: wm9712-aux <-> pxa2xx-ac97-aux mapping ok
-[    8.687232] wm97xx-ts 0-0:wm9712-codec: detected a wm9712 codec
-[    8.760968] input: wm97xx touchscreen as
-/devices/platform/soc-audio/0-0:wm9712-codec/input/input0
-[    8.875466] ALSA device list:
-[    8.911416]   #0: Toradex Colibri
-
-I already tried 3.2.y with the same behavior.
-
-Maybe someone can help me to figure out whats going wrong?
-
-I attached the patches i used:
-working = patch-2.6.37.y.patch
-not working = patch-2.6.38.y.patch
-
-Best regards,
-
-Erik
+I am not found of this solution I still think it should be done
+at framework level. However we still have this very annoying issue,
+and this fix is better than nothing. So I am not against taking this
+for rc1 with the hope that it will be later revert with a better
+solution.
 
 
-_______________________________________________________
-Registergericht / Court of jurisdiction: Amtsgericht Gie?en HRB 5708
-Gesch?ftsf?hrer / Managing Director: Edith Thiesen, J?rgen Thiesen
-USt.-Id: DE 175 623 789
-Ust.-Nr: 018 246 00743 FA Fulda
+Thanks,
 
-Hauptsitz / Headquarters:
-Thiesen Hardware & Software Design GmbH / Im Tiegel 9 / 36367 Wartenberg / Germany
+Gregory
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch-2.6.37.y.patch
-Type: text/x-patch
-Size: 7300 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/d1fce0df/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch-2.6.38.y.patch
-Type: text/x-patch
-Size: 7556 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/d1fce0df/attachment-0003.bin>
+
+> 
+> Sebastian
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
