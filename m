@@ -1,53 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Feb 2014 15:20:56 +0000
-Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
-In-Reply-To: <20140204150156.GC4627@beef>
-References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
- <1391516352-32359-4-git-send-email-mporter@linaro.org>
- <20140204132951.GE13529@lee--X1> <20140204143119.GA4627@beef>
- <20140204144731.GA3154@lee--X1> <20140204150156.GC4627@beef>
-Message-ID: <20140204152056.GB3154@lee--X1>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue,  4 Feb 2014 16:24:05 +0100
+Subject: [PATCH v2 11/11] ARM: shmobile: lager legacy: Switch QSPI to named
+ IRQs
+In-Reply-To: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
+References: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1391527445-14881-12-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > ... then you'll still need this.
-> 
-> Yes, I was far too vague..I'm going to stop explicitly populating the
-> data field.
-> 
-> static const struct of_device_id bcm59056_of_match[] = {
-> 	{ .compatible = "brcm,bcm59056"},
-> 	{ }
-> };
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-+1
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+v2:
+  - s/DEFINE_RES_IRQ/DEFINE_RES_IRQ_NAMED/
+  - Rebased on top of renesas-devel-v3.14-rc1-20140204
 
-> > And I don't think you can drop this, as the I2C subsystem still
-> > insists on it.
-> 
-> Agreed. I'm just dropping explicit population of the driver_data field
-> here.
-> 
-> static const struct i2c_device_id bcm59056_i2c_id[] = {
-> 	{ "bcm59056" },
-> 	{ }
-> };
+ arch/arm/mach-shmobile/board-lager.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-+1
-
-> > I think you need to keep this to supply the silly I2C ID table.
-> > 
-> > I would just omit the '.data = (void *) VERSION' from the
-> > of_match_table until you require it. 
-> 
-> Well, it's not even necessary for I2C ID table. the I2C subsystem is
-> happy with just a matching entry on the i2c_device_id name field and
-> NULL driver_data. palmas is implemented in this manner.
-
-Guess what? +1 :)
-
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index fdcc868de1fa..3fe982b5ca87 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -293,7 +293,7 @@ static const struct spi_board_info spi_info[] __initconst = {
+ /* QSPI resource */
+ static const struct resource qspi_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe6b10000, 0x1000),
+-	DEFINE_RES_IRQ(gic_spi(184)),
++	DEFINE_RES_IRQ_NAMED(gic_spi(184), "mux"),
+ };
+ 
+ /* VIN */
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
