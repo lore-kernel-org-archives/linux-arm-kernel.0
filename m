@@ -1,52 +1,40 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Tue, 4 Feb 2014 11:51:39 -0800
-Subject: [PATCH v2 1/5] Documentation: dt: Add Kona PWM binding
-In-Reply-To: <1391543503-14773-1-git-send-email-tim.kryger@linaro.org>
-References: <1391543503-14773-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1391543503-14773-2-git-send-email-tim.kryger@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 19:54:47 +0000
+Subject: [PATCH v3 3/5] ASoC: tda998x: add DT documentation of the
+ tda998x CODEC
+In-Reply-To: <20140204200239.1baf309b@armhf>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
+ <20140204181213.GO22609@sirena.org.uk>
+ <20140204200239.1baf309b@armhf>
+Message-ID: <20140204195447.GY22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding description for the Kona PWM controller found on Broadcom's
-mobile SoCs.
+On Tue, Feb 04, 2014 at 08:02:39PM +0100, Jean-Francois Moine wrote:
+> Mark Brown <broonie@kernel.org> wrote:
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- .../devicetree/bindings/pwm/bcm-kona-pwm.txt       | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+> > On Sat, Feb 01, 2014 at 05:48:49PM +0100, Jean-Francois Moine wrote:
 
-diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-new file mode 100644
-index 0000000..c8e2d13
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-@@ -0,0 +1,24 @@
-+Broadcom Kona PWM controller device tree bindings
-+
-+This controller has 6 channels.
-+
-+Required Properties :
-+- compatible: should be "brcm,kona-pwm"
-+- reg: physical base address and length of the controller's registers
-+- clocks: phandle + clock specifier pair for the external clock
-+- #pwm-cells: should be 3.  The first cell specifies the per-chip index
-+  of the PWM to use, the second cell is the period in nanoseconds, and
-+  the third cell is the flags.
-+
-+Refer to pwm/pwm.txt for generic pwm controller node properties.
-+
-+Refer to clocks/clock-bindings.txt for generic clock consumer properties.
-+
-+Example:
-+
-+pwm: pwm at 3e01a000 {
-+	compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+	reg = <0x3e01a000 0xc4>;
-+	clocks = <&pwm_clk>;
-+	#pwm-cells = <3>;
-+};
--- 
-1.8.0.1
+> > > +	- compatible: must be "nxp,tda998x-codec".
+
+> > It's not clear to me why there's a separate compatible here - as far as
+> > I can see this can only appear as part of one of these devices and
+> > there's no addressing or other information that'd account for chip
+> > variation so I'd not expect to need to bind this independently of the
+> > parent.
+
+> If there is no 'compatible', the CODEC module is not loaded, and, when
+> the module is in the core, no CODEC device can be created from the DT.
+
+You're confusing implementation details with device tree specification
+here.  We can easily handle loading a subdriver without having to put
+anything in the device tree, just create a platform device like we do
+with MFDs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/3713efb2/attachment.sig>
