@@ -1,67 +1,39 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 4 Feb 2014 15:17:02 +0530
-Subject: [PATCH] ARM64: KVM: Fix VGIC compile error for Linux-3.14-rc1
-In-Reply-To: <52F0B5BB.3060901@arm.com>
-References: <1391506640-1901-1-git-send-email-anup.patel@linaro.org>
- <52F0B5BB.3060901@arm.com>
-Message-ID: <CALrVBksidyiGG1ksj0pWZx5zV8=kfy358eas7ZZ06X22YvWq0g@mail.gmail.com>
+From: amit.grover@samsung.com (Amit Grover)
+Date: Tue, 04 Feb 2014 15:29:57 +0530
+Subject: [PATCH v3 0/2] drivers/media: Add controls for Horizontal and Vertical
+ MV Search Range
+In-Reply-To: <52E0ED10.2020901@samsung.com>
+References: <52E0ED10.2020901@samsung.com>
+Message-ID: <1391507999-31437-1-git-send-email-amit.grover@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2014 15:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 04/02/14 09:37, Anup Patel wrote:
->> This patch fixes VGIC compilation for Linux-3.14-rc1 ARM64 kernel.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->
-> Already posted by Christoffer, and hopefully on its way to mainline.
+This is v3 version for the patch:
+s5p-mfc: Add Horizontal and Vertical search range for Video Macro Blocks
+(https://lkml.org/lkml/2013/12/30/83)
 
-Thanks,
-Anup
+Changes from v1:
+1) Splitted the patch into V4L2 and MFC driver patches.
+2) Incorporated review comments on v1.
 
->
->         M.
->
->> ---
->>  arch/arm64/include/uapi/asm/kvm.h |    9 +++++++++
->>  virt/kvm/arm/vgic.c               |    1 +
->>  2 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 31c2f54..cadc318 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -149,6 +149,15 @@ struct kvm_arch_memory_slot {
->>  #define KVM_REG_ARM_TIMER_CNT                ARM64_SYS_REG(3, 3, 14, 3, 2)
->>  #define KVM_REG_ARM_TIMER_CVAL               ARM64_SYS_REG(3, 3, 14, 0, 2)
->>
->> +/* Device Control API: ARM VGIC */
->> +#define KVM_DEV_ARM_VGIC_GRP_ADDR    0
->> +#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS       1
->> +#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS        2
->> +#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT       32
->> +#define   KVM_DEV_ARM_VGIC_CPUID_MASK        (0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
->> +#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT      0
->> +#define   KVM_DEV_ARM_VGIC_OFFSET_MASK       (0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->> +
->>  /* KVM_IRQ_LINE irq field index values */
->>  #define KVM_ARM_IRQ_TYPE_SHIFT               24
->>  #define KVM_ARM_IRQ_TYPE_MASK                0xff
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index be456ce..55b0609 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -21,6 +21,7 @@
->>  #include <linux/kvm_host.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/io.h>
->> +#include <linux/uaccess.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_irq.h>
->>
->
->
-> --
-> Jazz is not dead. It just smells funny...
+Changes from v2:
+1) Removed the range restrictions from drivers/media/v4l2-core/v4l2-ctrls.c.
+2) Rebased the patch to git://linuxtv.org/mchehab/media-next.git.
+3) Added [media] tag in title.
+
+Amit Grover (2):
+  [media] v4l2: Add settings for Horizontal and Vertical MV Search
+    Range
+  [media] s5p-mfc: Add Horizontal and Vertical MV Search Range
+
+ Documentation/DocBook/media/v4l/controls.xml    |   20 +++++++++++++++++++
+ drivers/media/platform/s5p-mfc/regs-mfc-v6.h    |    1 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |   24 +++++++++++++++++++++++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    8 ++------
+ drivers/media/v4l2-core/v4l2-ctrls.c            |    6 ++++++
+ include/uapi/linux/v4l2-controls.h              |    2 ++
+ 7 files changed, 57 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
