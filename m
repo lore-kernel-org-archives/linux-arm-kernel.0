@@ -1,27 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Feb 2014 18:12:13 +0000
-Subject: [PATCH v3 3/5] ASoC: tda998x: add DT documentation of the
- tda998x CODEC
-In-Reply-To: <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
-References: <cover.1391274627.git.moinejf@free.fr>
- <8e4231b7a55802f58a14dd07ac5cd8b0babb1dce.1391274628.git.moinejf@free.fr>
-Message-ID: <20140204181213.GO22609@sirena.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 4 Feb 2014 11:15:14 -0700
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <13031998.NR888KZWhk@wuerfel>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
+ <20140203233137.GH2519@obsidianresearch.com>
+ <13031998.NR888KZWhk@wuerfel>
+Message-ID: <20140204181514.GA25695@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 01, 2014 at 05:48:49PM +0100, Jean-Francois Moine wrote:
+On Tue, Feb 04, 2014 at 10:44:52AM +0100, Arnd Bergmann wrote:
 
-> +	- compatible: must be "nxp,tda998x-codec".
+>   Now I want to integrate the EHCI into my SoC and not waste one
+>   of my precious PCIe root ports, so I have to create another PCI
+>   domain with its own ECAM compliant config space to put it into.
+>   Fortunately SBSA lets me add an arbitrary number of PCI domains,
+>   as long as they are all strictly compliant. To software it will
 
-It's not clear to me why there's a separate compatible here - as far as
-I can see this can only appear as part of one of these devices and
-there's no addressing or other information that'd account for chip
-variation so I'd not expect to need to bind this independently of the
-parent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/fbac5b49/attachment.sig>
+Just to touch on this for others who might be reading..
+
+IMHO any simple SOC that requires multiple domains is *broken*. A
+single domain covers all reasonable needs until you get up to
+mega-scale NUMA systems, encouraging people to design with multiple
+domains only complicates the kernel :(
+
+SOC internal peripherals should all show up in the bus 0 config space
+of the only domain and SOC PCI-E physical ports should show up on bus
+0 as PCI-PCI bridges. This is all covered in the PCI-E specs regarding
+the root complex.
+
+Generally I would expect the internal peripherals to still be
+internally connected with AXI, but also connected through the ECAM
+space for configuration, control, power management and address
+assignment.
+
+> 2. all address windows are set up by the boot loader, we only
+>   need to know the location (IMHO this should be the
+>   preferred way to do things regardless of SBSA).
+
+Linux does a full address map re-assignment on boot, IIRC. You need
+more magics to inhibit that if your BAR's and bridge windows don't
+work.
+
+Hot plug is a whole other thing..
+
+> it's possible that the designware based ones get point 4 right.
+
+The designware one's also appear to be re-purposed end point cores, so
+their config handling is somewhat bonkers. Tegra got theirs sort of
+close because they re-used knowledge/IP from their x86 south bridges -
+but even then they didn't really implement ECAM properly for an ARM
+environment.
+
+Since config space is where everyone to date has fallen down, I think
+the SBSA would have been wise to list dword by dword what a typical
+ECAM config space should look like.
+
+Jason
