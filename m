@@ -1,21 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Feb 2014 18:28:00 +0000
-Subject: [PATCH 2/2] arm64: vdso: update wtm fields for
- CLOCK_MONOTONIC_COARSE
-In-Reply-To: <1391456932-17815-3-git-send-email-nathan_lynch@mentor.com>
-References: <1391456932-17815-1-git-send-email-nathan_lynch@mentor.com>
- <1391456932-17815-3-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140204182759.GJ664@mudshark.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 4 Feb 2014 10:30:39 -0800
+Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
+In-Reply-To: <20140204170019.GI8533@titan.lakedaemon.net>
+References: <1391476403-26099-1-git-send-email-olof@lixom.net>
+ <20140204052329.GN10628@intel.com>
+ <20140204170019.GI8533@titan.lakedaemon.net>
+Message-ID: <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 07:48:52PM +0000, Nathan Lynch wrote:
-> Update wall-to-monotonic fields in the VDSO data page
-> unconditionally.  These are used to service CLOCK_MONOTONIC_COARSE,
-> which is not guarded by use_syscall.
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
+>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
+>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
+>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
+>> > is enabled (thus making phys_addr_t 64-bit).
+>> >
+>> > Most changes are switching printk formats, but also a bit of changes to what
+>> > used to be array-based pointer arithmetic that could just be done with the
+>> > address types instead.
+>> >
+>> > The warnings were:
+>> >
+>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
+>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
+>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
+>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
+>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
+>> >     different size [-Wint-to-pointer-cast]
+>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
+>> >     different size [-Wpointer-to-int-cast]
+>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
+>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
+>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
+>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
+>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
+>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+>> >
+>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>> Acked-by: Vinod Koul <vinod.koul@intel.com>
+>
+> Olof, would you like me to queue it up?  Or do you want to take it
+> directly?
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+I'm confused. I sent the patch to the drivers/dma maintainers and they
+just acked it without asking me to pick it up myself.
 
-Will
+Vinod, did you ack it for me to pick it up, or for some other reason?
+If you don't want to take it through your tree I'll be happy to take
+it through arm-soc, just looking to clarify.
+
+(Jason, I can apply it directly)
+
+
+-Olof
