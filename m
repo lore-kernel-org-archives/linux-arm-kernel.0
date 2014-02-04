@@ -1,34 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Feb 2014 14:08:57 -0800
-Subject: [PATCH] ARM: spinlock: ensure we have a compiler barrier before
- sev
-In-Reply-To: <1391516926-14493-1-git-send-email-will.deacon@arm.com>
-References: <1391516926-14493-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20140204220857.GQ4167@cbox>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 4 Feb 2014 17:15:39 -0500
+Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
+References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
+ <52F11B5C.40407@ti.com>
+ <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
+Message-ID: <52F1668B.9040507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 12:28:46PM +0000, Will Deacon wrote:
-> When unlocking a spinlock, we require the following, strictly ordered
-> sequence of events:
+On Tuesday 04 February 2014 03:17 PM, Thomas Gleixner wrote:
+> On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
 > 
-> 	<barrier>	/* dmb */
-> 	<unlock>
-> 	<barrier>	/* dsb */
-> 	<sev>
+> Please do not top post.
 > 
-> Whilst the code does indeed reflect this in terms of the architecture,
-> the final <barrier> + <sev> have been contracted into a single inline
-> asm without a "memory" clobber, therefore the compiler is at liberty to
-> reorder the unlock to the end of the above sequence. In such a case,
-> a waiting CPU may be woken up before the lock has been unlocked, leading
-> to extremely poor performance.
+>> It was so in v1. But it was decided to use explicit memory barriers,
+>> because we're always sure the memory barriers are there and that
+>> they're properly documented. Also in this case I don't need to add
+>> keystone readl/writel relaxed function variants and to use mixed calls of
+>> writel/writel_relaxed functions.
+>>
+>> See:
+>> http://www.spinics.net/lists/arm-kernel/msg294941.html
 > 
-> This patch reworks the dsb_sev() function to make use of the dsb()
-> macro and ensure ordering against the unlock.
+> Fair enough, but we want a proper explanation for explicit barriers in
+> the code and not in some random discussion of patch version X on some
+> random mailing list.
 > 
-> Cc: <stable@vger.kernel.org>
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Aside of that it should be iowmb(), but I might miss something ...
+> 
+Agree. __iowmb() seems to be more appropriate.
 
-FWIW: Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Regards,
+Santosh
