@@ -1,125 +1,101 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 4 Feb 2014 10:53:29 +0530
-Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
-In-Reply-To: <1391476403-26099-1-git-send-email-olof@lixom.net>
-References: <1391476403-26099-1-git-send-email-olof@lixom.net>
-Message-ID: <20140204052329.GN10628@intel.com>
+Date: Tue, 4 Feb 2014 10:58:10 +0530
+Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CA+mB=1LyX0_VVXZQ-=m3gR2RBeumLrnPTUW3j+Zm1nj7a4exHg@mail.gmail.com>
+References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
+ <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
+ <52E0FC22.8060903@metafoo.de>
+ <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
+ <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
+ <CA+mB=1Jwjn+KSO9yFr=LNVjk3khf0b-LLQamYf+nnSF4bODGPA@mail.gmail.com>
+ <CA+mB=1LyX0_VVXZQ-=m3gR2RBeumLrnPTUW3j+Zm1nj7a4exHg@mail.gmail.com>
+Message-ID: <20140204052810.GO10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
-> Enabling some of the mvebu platforms in the multiplatform config for ARM
-> enabled these drivers, which also triggered a bunch of warnings when LPAE
-> is enabled (thus making phys_addr_t 64-bit).
-> 
-> Most changes are switching printk formats, but also a bit of changes to what
-> used to be array-based pointer arithmetic that could just be done with the
-> address types instead.
-> 
-> The warnings were:
-> 
-> drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
-> drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
->     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
-> drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
-> drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
->     different size [-Wint-to-pointer-cast]
-> drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
->     different size [-Wpointer-to-int-cast]
-> drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
-> drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
-> drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
-> drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
-> drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
->     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+On Fri, Jan 31, 2014 at 12:22:52PM +0530, Srikanth Thokala wrote:
+> >>> >> [...]
+> >>> >>> +/**
+> >>> >>> + * xilinx_vdma_device_control - Configure DMA channel of the device
+> >>> >>> + * @dchan: DMA Channel pointer
+> >>> >>> + * @cmd: DMA control command
+> >>> >>> + * @arg: Channel configuration
+> >>> >>> + *
+> >>> >>> + * Return: '0' on success and failure value on error
+> >>> >>> + */
+> >>> >>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
+> >>> >>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
+> >>> >>> +{
+> >>> >>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> >>> >>> +
+> >>> >>> +     switch (cmd) {
+> >>> >>> +     case DMA_TERMINATE_ALL:
+> >>> >>> +             xilinx_vdma_terminate_all(chan);
+> >>> >>> +             return 0;
+> >>> >>> +     case DMA_SLAVE_CONFIG:
+> >>> >>> +             return xilinx_vdma_slave_config(chan,
+> >>> >>> +                                     (struct xilinx_vdma_config *)arg);
+> >>> >>
+> >>> >> You really shouldn't be overloading the generic API with your own semantics.
+> >>> >> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
+> >>> >
+> >>> > Ok.  The driver needs few additional configuration from the slave
+> >>> > device like Vertical
+> >>> > Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
+> >>> > suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
+> >>> > defined for Freescale drivers?
+> >>>
+> >>> In my opinion it is not a good idea to have driver implement a generic API,
+> >>> but at the same time let the driver have custom semantics for those API
+> >>> calls. It's a bit like having a gpio driver that expects 23 and 42 as the
+> >>> values passed to gpio_set_value instead of 0 and 1. It completely defeats
+> >>> the purpose of a generic API, namely that you are able to write generic code
+> >>> that makes use of the API without having to know about which implementation
+> >>> API it is talking to. The dmaengine framework provides the
+> >>> dmaengine_prep_interleaved_dma() function to setup two dimensional
+> >>> transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
+> >>
+> >> The question here i think would be waht this device supports? Is the hardware
+> >> capable of doing interleaved transfers, then would make sense.
+> >>
+> >> While we do try to get users use dma_slave_config, but there will always be
+> >> someone who have specfic params. If we can generalize then we might want to add
+> >> to the dma_slave_config as well
+> >
+> > There are many configuration parameters which are specific to IP and I
+> > would like to
+> > give an overview of some of parameteres here:
+> >
+> > 1) Park Mode ('cfg->park'): In Park mode, engine will park on frame
+> > referenced by
+> >     'cfg->park_frm', so user will have control on each frame in this mode.
+> >
+> > 2) Interrupt Coalesce ('cfg->coalesce'):  Used for setting interrupt
+> > threshold. This value
+> >    determines the number of frame buffers to process. To use this feature,
+> >    'cfg->frm_cnt_en' should be set.
+> >
+> > 3) Frame Synchronization Source ('cfg->ext_fsync'):  Can be an
+> > external/internal frame
+> >     synchronization source. Used to synchronize one channel (MM2S/S2MM) with
+> >     another (S2MM/MM2S) channel.
+> >
+> > 4) Genlock Synchronization ('cfg->genlock'): Used to avoid mismatch rate between
+> >     master and slave.  In master mode (cfg->master), frames are not dropped and
+> >     slave can drop frames to adjust to master frame rate.
+> >
+> > And in future, this Engine being a soft IP, we could expect some more additional
+> > parameters.  Isn't a good idea to have a private member in dma_slave_config for
+> > sharing additional configuration between slave device and dma engine? Or a new
+> > dma_ctrl_cmd like FSLDMA_EXTERNAL_START?
+
+The idea of a generic API is that we can use it for most of the controllers. Even
+if you are planning to support a family of controllers
+
+ATM, lets not discuss the possiblity of private member and try to exhanust all
+possible options. Worst case you can embed the dma_slave_config in
+xilinx_dma_slave_config and retrieve it in dmac driver
 
 -- 
 ~Vinod
-
-> ---
->  drivers/dma/mv_xor.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> index 53fb0c8365b0..766b68ed505c 100644
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -497,8 +497,8 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
->  		if (!mv_can_chain(grp_start))
->  			goto submit_done;
->  
-> -		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
-> -			old_chain_tail->async_tx.phys);
-> +		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %pa\n",
-> +			&old_chain_tail->async_tx.phys);
->  
->  		/* fix up the hardware chain */
->  		mv_desc_set_next_desc(old_chain_tail, grp_start->async_tx.phys);
-> @@ -527,7 +527,8 @@ submit_done:
->  /* returns the number of allocated descriptors */
->  static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
->  {
-> -	char *hw_desc;
-> +	void *virt_desc;
-> +	dma_addr_t dma_desc;
->  	int idx;
->  	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
->  	struct mv_xor_desc_slot *slot = NULL;
-> @@ -542,17 +543,16 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
->  				" %d descriptor slots", idx);
->  			break;
->  		}
-> -		hw_desc = (char *) mv_chan->dma_desc_pool_virt;
-> -		slot->hw_desc = (void *) &hw_desc[idx * MV_XOR_SLOT_SIZE];
-> +		virt_desc = mv_chan->dma_desc_pool_virt;
-> +		slot->hw_desc = virt_desc + idx * MV_XOR_SLOT_SIZE;
->  
->  		dma_async_tx_descriptor_init(&slot->async_tx, chan);
->  		slot->async_tx.tx_submit = mv_xor_tx_submit;
->  		INIT_LIST_HEAD(&slot->chain_node);
->  		INIT_LIST_HEAD(&slot->slot_node);
->  		INIT_LIST_HEAD(&slot->tx_list);
-> -		hw_desc = (char *) mv_chan->dma_desc_pool;
-> -		slot->async_tx.phys =
-> -			(dma_addr_t) &hw_desc[idx * MV_XOR_SLOT_SIZE];
-> +		dma_desc = mv_chan->dma_desc_pool;
-> +		slot->async_tx.phys = dma_desc + idx * MV_XOR_SLOT_SIZE;
->  		slot->idx = idx++;
->  
->  		spin_lock_bh(&mv_chan->lock);
-> @@ -582,8 +582,8 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  	int slot_cnt;
->  
->  	dev_dbg(mv_chan_to_devp(mv_chan),
-> -		"%s dest: %x src %x len: %u flags: %ld\n",
-> -		__func__, dest, src, len, flags);
-> +		"%s dest: %pad src %pad len: %u flags: %ld\n",
-> +		__func__, &dest, &src, len, flags);
->  	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
->  		return NULL;
->  
-> @@ -626,8 +626,8 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
->  	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
->  
->  	dev_dbg(mv_chan_to_devp(mv_chan),
-> -		"%s src_cnt: %d len: dest %x %u flags: %ld\n",
-> -		__func__, src_cnt, len, dest, flags);
-> +		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
-> +		__func__, src_cnt, len, &dest, flags);
->  
->  	spin_lock_bh(&mv_chan->lock);
->  	slot_cnt = mv_chan_xor_slot_count(len, src_cnt);
-> -- 
-> 1.8.4.1.601.g02b3b1d
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
