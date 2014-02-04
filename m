@@ -1,174 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 04 Feb 2014 13:09:33 +0100
-Subject: [PATCH v2 5/5] of: document bindings for reserved-memory nodes
-In-Reply-To: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1391515773-6112-6-git-send-email-m.szyprowski@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Feb 2014 12:14:52 +0000
+Subject: arm64: kernel panic in paging_init()
+In-Reply-To: <1391460649.13327.51.camel@deneb.redhat.com>
+References: <1391460649.13327.51.camel@deneb.redhat.com>
+Message-ID: <20140204121452.GI30676@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grant Likely <grant.likely@linaro.org>
+On Mon, Feb 03, 2014 at 08:50:49PM +0000, Mark Salter wrote:
+> I'm seeing the following panic in paging init. This is on the foundation
+> model with a modified dtb memory node which has a non section-aligned
+> bank:
+> 	memory at 80000000 {
+> 		device_type = "memory";
+> 		reg = <0x00000000 0x80000000 0 0x20000000>,
+> 		      <0x00000000 0xa0300000 0 0x1fd00000>;
+> 	};
+> 
+> I only see this with 64k pagesize configured. What happens is the
+> non section-aligned bank causes alloc_init_pte() to allocate a page
+> for the new pte from the end of the first bank (the failing address
+> 0xfffffe001fff0000 [0x9fff0000 phys]). This should be a valid page
+> since it was mapped during the create_mapping() call for the first
+> memory bank. A flush_tlb_all() added to the end of create_mapping()
+> makes the panic go away so I think the problem is something stale
+> cached before the page with the failing address was mapped.
 
-Reserved memory nodes allow for the reservation of static (fixed
-address) regions, or dynamically allocated regions for a specific
-purpose.
+I think it goes like this:
 
-[joshc: Based on binding document proposed (in non-patch form) here:
- http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
- adapted to support #memory-region-cells]
+head.S maps enough memory to get started but using 64K pages rather than
+512M sections with a single pgd entry and several ptes. This never gets
+to the end of the first block (just up to KERNEL_END).
 
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+create_mapping() realises it can do a 512M section mapping, overriding
+the original table pgd entry with a block one. The memblock limit is set
+correctly PGDIR_SIZE but create_mapping, when it replaces the table pgd
+with a block one doesn't do any TLB invalidation.
 
-diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-new file mode 100644
-index 000000000000..a606ce90c9c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-@@ -0,0 +1,138 @@
-+*** Reserved memory regions ***
-+
-+Reserved memory is specified as a node under the /reserved-memory node.
-+The operating system shall exclude reserved memory from normal usage
-+one can create child nodes describing particular reserved (excluded from
-+normal use) memory regions. Such memory regions are usually designed for
-+the special usage by various device drivers.
-+
-+Parameters for each memory region can be encoded into the device tree
-+with the following nodes:
-+
-+/reserved-memory node
-+---------------------
-+#address-cells, #size-cells (required) - standard definition
-+    - Should use the same values as the root node
-+#memory-region-cells (required) - dictates number of cells used in the child
-+                                  nodes memory-region specifier
-+ranges (required) - standard definition
-+    - Should be empty
-+
-+/reserved-memory/ child nodes
-+-----------------------------
-+Each child of the reserved-memory node specifies one or more regions of
-+reserved memory. Each child node may either use a 'reg' property to
-+specify a specific range of reserved memory, or a 'size' property with
-+optional constraints to request a dynamically allocated block of memory.
-+
-+Following the generic-names recommended practice, node names should
-+reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-+address (@<address>) should be appended to the name if the node is a
-+static allocation.
-+
-+Properties:
-+Requires either a) or b) below.
-+a) static allocation
-+   reg (required) - standard definition
-+b) dynamic allocation
-+   size (required) - length based on parent's #size-cells
-+                   - Size in bytes of memory to reserve.
-+   alignment (optional) - length based on parent's #size-cells
-+                        - Address boundary for alignment of allocation.
-+   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-+                           - Specifies regions of memory that are
-+                             acceptable to allocate from.
-+
-+If both reg and size are present, then the reg property takes precedence
-+and size is ignored.
-+
-+Additional properties:
-+compatible (optional) - standard definition
-+    - may contain the following strings:
-+        - shared-dma-pool: This indicates a region of memory meant to be
-+          used as a shared pool of DMA buffers for a set of devices. It can
-+          be used by an operating system to instanciate the necessary pool
-+          management subsystem if necessary.
-+        - vendor specific string in the form <vendor>,[<device>-]<usage>
-+no-map (optional) - empty property
-+    - Indicates the operating system must not create a virtual mapping
-+      of the region as part of its standard mapping of system memory,
-+      nor permit speculative access to it under any circumstances other
-+      than under the control of the device driver using the region.
-+reusable (optional) - empty property
-+    - The operating system can use the memory in this region with the
-+      limitation that the device driver(s) owning the region need to be
-+      able to reclaim it back. Typically that means that the operating
-+      system can use that region to store volatile or cached data that
-+      can be otherwise regenerated or migrated elsewhere.
-+
-+Linux implementation note:
-+- If a "linux,cma-default" property is present, then Linux will use the
-+  region for the default pool of the contiguous memory allocator.
-+
-+Device node references to reserved memory
-+-----------------------------------------
-+Regions in the /reserved-memory node may be referenced by other device
-+nodes by adding a memory-region property to the device node.
-+
-+memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-+
-+Example
-+-------
-+This example defines 3 contiguous regions are defined for Linux kernel:
-+one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-+one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-+one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* global autoconfigured region for contiguous allocations */
-+		linux,cma {
-+			compatible = "shared-dma-pool";
-+			reusable;
-+			#memory-region-cells = <0>;
-+			size = <0x4000000>;
-+			alignment = <0x2000>;
-+			linux,cma-default;
-+		};
-+
-+		display_reserved: framebuffer at 78000000 {
-+			#memory-region-cells = <0>;
-+			reg = <0x78000000 0x800000>;
-+		};
-+
-+		multimedia_reserved: multimedia at 77000000 {
-+			compatible = "acme,multimedia-memory";
-+			#memory-region-cells = <1>;
-+			reg = <0x77000000 0x4000000>;
-+		};
-+	};
-+
-+	/* ... */
-+
-+	fb0: video at 12300000 {
-+		memory-region = <&display_reserved>;
-+		/* ... */
-+	};
-+
-+	scaler: scaler at 12500000 {
-+		memory-region = <&multimedia_reserved 0xdeadbeef>;
-+		/* ... */
-+	};
-+
-+	codec: codec at 12600000 {
-+		memory-region = <&multimedia_reserved 0xfeebdaed>;
-+		/* ... */
-+	};
-+};
+So I wouldn't do a TLB invalidation all the time but only when the old
+pmd was set. Please give the patch below a try, I only compiled it (I'll
+add some text afterwards):
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f557ebbe7013..f8dc7e8fce6f 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -203,10 +203,18 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 	do {
+ 		next = pmd_addr_end(addr, end);
+ 		/* try section mapping first */
+-		if (((addr | next | phys) & ~SECTION_MASK) == 0)
++		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
++			pmd_t old_pmd =*pmd;
+ 			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
+-		else
++			/*
++			 * Check for previous table entries created during
++			 * boot (__create_page_tables) and flush them.
++			 */
++			if (!pmd_none(old_pmd))
++				flush_tlb_all();
++		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
++		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
+ }
+
+
+Thanks.
+
 -- 
-1.7.9.5
+Catalin
