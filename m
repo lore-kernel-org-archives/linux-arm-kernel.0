@@ -1,59 +1,110 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 4 Feb 2014 08:02:17 -0600
-Subject: [PATCH 2/2] Documentation: devicetree: Add boost-opp binding to
- list boost mode OPPs
-In-Reply-To: <1391506890-7335-3-git-send-email-thomas.ab@samsung.com>
-References: <1391506890-7335-1-git-send-email-thomas.ab@samsung.com>
- <1391506890-7335-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAL_JsqKRYCEadfpEPGwjsxdSaC4o0BrwDNL5bXDZeX-23=QKTg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 4 Feb 2014 09:30:17 -0500
+Subject: [RFC/RFT 2/2] ARM: keystone: Install hooks for dma address
+ translation routines
+In-Reply-To: <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
+Message-ID: <52F0F979.2090505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 3:41 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> Certain CPUs or devices can support optional boost operating modes. Add a new
-> binding to list OPPs to be additionally made available in boost operating modes.
->
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  Documentation/devicetree/bindings/power/opp.txt |    9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 74499e5..4df5cca 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -10,6 +10,10 @@ Properties:
->         freq: clock frequency in kHz
->         vol: voltage in microvolt
->
-> +Optional Properties:
-> +- boost-opp: Similar to "operating-points" property but usable only in
-> +  optional boost operating modes.
-> +
->  Examples:
->
->  cpu at 0 {
-> @@ -22,4 +26,9 @@ cpu at 0 {
->                 396000  950000
->                 198000  850000
->         >;
-> +       boost-opp = <
-> +               /* kHz     uV */
-> +               1500000 1350000
-> +               1400000 1285000
-> +       >;
+On Monday 03 February 2014 09:05 PM, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Feb 3, 2014 at 3:28 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Keystone platforms have their physical memory mapped at an address
+>> outside the 32-bit physical range.  A Keystone machine with 16G of RAM
+>> would find its memory at 0x0800000000 - 0x0bffffffff.
+>> The system interconnect allows to perform DMA transfers from first 2G of
+>> physical memory (0x08 0000 0000 to 08 7FFF FFFF) which aliased in
+>> hardware to the 32-bit addressable space (0x80000000 - 0xffffffff),
+>> because DMA HW supports only 32-bits addressing.
+>>
+>> Hence, add arch hooks for dma address translation routines.
+>>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  arch/arm/mach-keystone/keystone.c |   31 +++++++++++++++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+>> index 1b43a27..54dae03 100644
+>> --- a/arch/arm/mach-keystone/keystone.c
+>> +++ b/arch/arm/mach-keystone/keystone.c
+>> @@ -14,6 +14,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/of_address.h>
+>> +#include <linux/dma-mapping.h>
+>>
+>>  #include <asm/setup.h>
+>>  #include <asm/mach/map.h>
+>> @@ -53,6 +54,28 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>>         return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+>>  }
+>>
+>> +static unsigned long keystone_dma_pfn_offset __read_mostly;
+>> +
+>> +static dma_addr_t keystone_pfn_to_dma(struct device *dev, unsigned long pfn)
+>> +{
+>> +       return PFN_PHYS(pfn - keystone_dma_pfn_offset);
+>> +}
+>> +
+>> +static unsigned long keystone_dma_to_pfn(struct device *dev, dma_addr_t addr)
+>> +{
+>> +       return PFN_DOWN(addr) + keystone_dma_pfn_offset;
+>> +}
+>> +
+>> +static void *keystone_dma_to_virt(struct device *dev, dma_addr_t addr)
+>> +{
+>> +       return phys_to_virt(addr + PFN_PHYS(keystone_dma_pfn_offset));
+>> +}
+>> +
+>> +static dma_addr_t keystone_virt_to_dma(struct device *dev, void *addr)
+>> +{
+>> +       return virt_to_phys(addr) - PFN_PHYS(keystone_dma_pfn_offset);
+>> +}
+>> +
+>>  static void __init keystone_init_meminfo(void)
+>>  {
+>>         bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
+>> @@ -89,6 +112,14 @@ static void __init keystone_init_meminfo(void)
+>>         /* Populate the arch idmap hook */
+>>         arch_virt_to_idmap = keystone_virt_to_idmap;
+>>
+>> +       /* Populate the arch DMA hooks */
+>> +       keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
+>> +                                          KEYSTONE_LOW_PHYS_START);
+>> +       __arch_pfn_to_dma = keystone_pfn_to_dma;
+>> +       __arch_dma_to_pfn = keystone_dma_to_pfn;
+>> +       __arch_dma_to_virt = keystone_dma_to_virt;
+>> +       __arch_virt_to_dma = keystone_virt_to_dma;
+> 
+> Is this truly a static window, or is it going through an IOMMU that
+> just happens to have an identity mapping setup per default?
+> 
+Its true physical static window hardwired in Hardware. No IOMMU
+involvement.
 
-This looks like an example of needing to add more properties to the
-OPP table. There are ongoing discussions on how to extend OPP table
-and map to C states. This should be part of that discussion.
+> PPC servers use "ibm,dma-window" to describe the assigned dma address
+> space for busses/devices, but the window itself doesn't contain any
+> information about the physical address mapping (since it goes through
+> an iommu after that). It likely doesn't fit this particular use case,
+> but it's something we should look at as a base in case we need to
+> start looking at bindings for this instead of coding it per SoC. We'll
+> know more once we've seen what a few of the implementations out there
+> are.
+> 
+Understood.
 
-Rob
+Regards,
+Santosh
