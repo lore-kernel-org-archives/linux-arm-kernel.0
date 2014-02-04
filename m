@@ -1,97 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 4 Feb 2014 14:00:45 -0800
-Subject: Weird sched_clock behaviour during boot with -rc1
-In-Reply-To: <52F1518B.9010109@linaro.org>
-References: <20140204183641.GA25127@mudshark.cambridge.arm.com>
- <52F1518B.9010109@linaro.org>
-Message-ID: <20140204220045.GC20528@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Feb 2014 14:08:57 -0800
+Subject: [PATCH] ARM: spinlock: ensure we have a compiler barrier before
+ sev
+In-Reply-To: <1391516926-14493-1-git-send-email-will.deacon@arm.com>
+References: <1391516926-14493-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20140204220857.GQ4167@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, John Stultz wrote:
-> On 02/04/2014 10:36 AM, Will Deacon wrote:
-> > Hi guys,
-> >
-> > Booting -rc1 on my TC2 gives the following strange entries in the dmesg:
-> >
-> >
-> >   Uncompressing Linux... done, booting the kernel.
-> >   [    0.000000] Booting Linux on physical CPU 0x0
-> >
-> >   [...]
-> >
-> >   [    0.000000]   HighMem zone: 329728 pages, LIFO batch:31
-> >   [    7.789662] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
-> >   [    0.000129] PERCPU: Embedded 9 pages/cpu @ee7bd000 s12800 r8192 d15872 u36864
-> >
-> >   [...]
-> >
-> >   [    0.868297] NR_IRQS:16 nr_irqs:16 16
-> >   [    0.886350] Architected cp15 timer(s) running at 24.00MHz (phys).
-> >   [ 2915.164998] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
-> >   [    0.000002] Switching to timer-based delay loop
-> >   [    0.014249] Console: colour dummy device 80x30
-> >
-> >
-> > so it looks like something whacky goes on during sched_clock registration.
-> > Sure enough, we're doing a pr_info in-between updating cs.* and calling
-> > update_sched_clock(), so moving the print sorts things out (diff below).
+On Tue, Feb 04, 2014 at 12:28:46PM +0000, Will Deacon wrote:
+> When unlocking a spinlock, we require the following, strictly ordered
+> sequence of events:
 > 
-> Yea... we have to be particularly careful with sched_clock to avoid
-> locks since we don't want to deadlock, but in this case
-> sched_clock_register is a little too relaxed here.
+> 	<barrier>	/* dmb */
+> 	<unlock>
+> 	<barrier>	/* dsb */
+> 	<sev>
 > 
-> Stephen: Would it make sense to set cd.suspended = true at the top of
-> the registration? That should block any sched_clock calls from getting
-> half-updated data, but still allow the sched_clock_update function to work.
+> Whilst the code does indeed reflect this in terms of the architecture,
+> the final <barrier> + <sev> have been contracted into a single inline
+> asm without a "memory" clobber, therefore the compiler is at liberty to
+> reorder the unlock to the end of the above sequence. In such a case,
+> a waiting CPU may be woken up before the lock has been unlocked, leading
+> to extremely poor performance.
 > 
+> This patch reworks the dsb_sev() function to make use of the dsb()
+> macro and ensure ordering against the unlock.
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-That would work, but why can't we just hold the write seqlock
-during the registration? We would need to make a lockeless
-version of update_sched_clock() but that doesn't look too hard.
-It might actually turn out nicer because we call
-update_sched_clock() here just to set the epoch_cyc but we have
-to reset the epoch_ns back to 0 to start the count off right.
-
-How about this? The only concern is calling read_sched_clock()
-inside the seqlock, but I don't think that's a concern and if it
-is we can call it outside the lock at the beginning of this
-function.
-
-----8<----
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 0abb36464281..ae8f10a02c32 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -124,6 +124,7 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
- 		return;
- 
- 	WARN_ON(!irqs_disabled());
-+	raw_write_seqcount_begin(&cd.seq);
- 	read_sched_clock = read;
- 	sched_clock_mask = CLOCKSOURCE_MASK(bits);
- 	cd.rate = rate;
-@@ -147,15 +148,16 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
- 
- 	/* calculate the ns resolution of this counter */
- 	res = cyc_to_ns(1ULL, cd.mult, cd.shift);
--	pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
--		bits, r, r_unit, res, wrap);
--
--	update_sched_clock();
- 
- 	/*
- 	 * Ensure that sched_clock() starts off at 0ns
- 	 */
- 	cd.epoch_ns = 0;
-+	cd.epoch_cyc = read_sched_clock();
-+	raw_write_seqcount_end(&cd.seq);
-+
-+	pr_info("sched_clock: %u bits@%lu%cHz, resolution %lluns, wraps every %lluns\n",
-+		bits, r, r_unit, res, wrap);
- 
- 	/* Enable IRQ time accounting if we have a fast enough sched_clock */
- 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+FWIW: Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
