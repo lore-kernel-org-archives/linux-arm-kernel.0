@@ -1,49 +1,57 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 04 Feb 2014 20:38:22 +0100
-Subject: [PATCH v2 0/5] net: phy: Ethernet PHY powerdown optimization
-In-Reply-To: <20131217.144313.1563516273987934449.davem@davemloft.net>
-References: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131217.144313.1563516273987934449.davem@davemloft.net>
-Message-ID: <52F141AE.8010402@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 19:40:18 +0000
+Subject: [PATCH v3 2/5] ASoC: tda998x: add a codec driver for the TDA998x
+In-Reply-To: <20140204195921.5ace6163@armhf>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <ae68394f080f0ea5acaf3377cb1d18f29e42c646.1391274628.git.moinejf@free.fr>
+ <20140204133014.GA22609@sirena.org.uk>
+ <20140204181605.5b837a70@armhf>
+ <20140204175410.GL22609@sirena.org.uk>
+ <20140204195921.5ace6163@armhf>
+Message-ID: <20140204194018.GX22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2013 08:43 PM, David Miller wrote:
-> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Date: Fri, 13 Dec 2013 10:20:24 +0100
->
->> This is v2 of the ethernet PHY power optimization patches to reduce
->> power consumption of network PHYs with link that are either unused or
->> the corresponding netdev is down.
->>
->> Compared to the last version, this patch set drops a patch to disable
->> unused PHYs after late initcall, as it is not compatible with a modular
->> mdio bus [1]. I'll investigate different ways to have a modular mdio bus
->> driver get notified when driver loading is done.
->>
->> Again, a branch with v2 applied to v3.13-rc2 can also be found at
->> https://github.com/shesselba/linux-dove.git topic/ethphy-power-v2
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg293028.html
->
-> Series applied, thanks.
->
+On Tue, Feb 04, 2014 at 07:59:21PM +0100, Jean-Francois Moine wrote:
+> Mark Brown <broonie@kernel.org> wrote:
 
-David, Mungunthan, Florian,
+> > You shouldn't be representing this as a separate node in the DT unless
+> > there really is a distinct and reusable IP, otherwise you're putting
+> > Linux implementation details in there.  Describe the hardware, not the
+> > implemementation.
 
-as expected the above patches create a Linux to bootloader dependency
-that surfaces dumb bootloaders not initializing PHYs correctly.
+> If there is no 'compatible' node for the tda998x CODEC in the DT, the
+> simple-card is not usable, simply because you want the CODEC DAIs to be
+> defined by 'phandle + index' instead of by DAI name.
 
-Andrew has a Kirkwood based board that does not power-up and restart
-auto-negotiation on the powered down PHY after a warm restart. While
-this specific bootloader allows a soft-workaround by issuing the
-required PHY writes before accessing the interface, others may not.
+This is a bit circular, though - it's only happening because you decided
+to push everything onto a subnode in the DT.  If you just work with the
+existing device this is no different to any other device.
 
-I think we should allow the user to soft-disable the automatic
-power-down of PHYs, i.e. by exploiting a kernel parameter.
+> > > I don't understand. The tda CODEC can only be used with the TDA998x I2C
+> > > driver. It might have been included in the tda998x source as well.
 
-Do you have any preference for naming it? My call would be something
-like libphy.suspend_halted = [0,1] with 1 being the default.
+> > You shouldn't have the default settings there at all, that's not the
+> > normal idiom for MFDs.  I'd also not expect to have to build the CODEC
+> > driver just because I built the DRM component.
 
-Sebastian
+> As the tda998x handles audio in HDMI, it would be a pity if you should
+> connect an other cable to your screen.
+
+My screen doesn't have any speakers anyway :P (I'm writing this on a
+computer with the monitor connected via HDMI).  Besides, this is more
+about build coverage stuff than anything else.
+
+> So, as I understand from your remarks, the CODEC should be included in
+> the tda998x driver, and, then, as the simple-card cannot be used, there
+> should be a Cubox specific audio card driver for the (kirkwood audio +
+> tda998x HDMI + S/PDIF) set. Am I right?
+
+No, it shouldn't be.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/3a6f5542/attachment.sig>
