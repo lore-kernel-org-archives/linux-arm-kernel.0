@@ -1,66 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Feb 2014 18:36:41 +0000
-Subject: Weird sched_clock behaviour during boot with -rc1
-Message-ID: <20140204183641.GA25127@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Feb 2014 19:40:18 +0100
+Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
+In-Reply-To: <1391531796.2538.21.camel@joe-AO722>
+References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
+ <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
+ <1391531796.2538.21.camel@joe-AO722>
+Message-ID: <3469296.SINb5BZOG8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Tuesday 04 February 2014 08:36:36 Joe Perches wrote:
+> On Tue, 2014-02-04 at 08:03 +0100, Holger Schurig wrote:
+> > Joe, look in linux/arch/arm/include/asm/delay.h. The macro udelay
+> > cannot handle large values because of lost-of-precision.
+> > 
+> > IMHO udelay on ARM is broken, because it also cannot work with fast
+> > ARM processors (where bogomips >= 3355, which is in sight now). It's
+> > just not broken enought that someone did something against it ...   so
+> > the current kludge is good enought.
+> 
+> Maybe something like this would be better?
+> 
 
-Booting -rc1 on my TC2 gives the following strange entries in the dmesg:
+I actually like the fact that we get link errors for insane 'udelay'
+times. In most cases it's a driver bug because we shouldn't keep
+the CPU busy for an eternity in the kernel (and call msleep() instead).
+For the rare cases where mdelay makes sense, we also want to add
+a comment to the code explaining why msleep cannot be used.
 
-
-  Uncompressing Linux... done, booting the kernel.
-  [    0.000000] Booting Linux on physical CPU 0x0
-
-  [...]
-
-  [    0.000000]   HighMem zone: 329728 pages, LIFO batch:31
-  [    7.789662] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
-  [    0.000129] PERCPU: Embedded 9 pages/cpu @ee7bd000 s12800 r8192 d15872 u36864
-
-  [...]
-
-  [    0.868297] NR_IRQS:16 nr_irqs:16 16
-  [    0.886350] Architected cp15 timer(s) running at 24.00MHz (phys).
-  [ 2915.164998] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
-  [    0.000002] Switching to timer-based delay loop
-  [    0.014249] Console: colour dummy device 80x30
-
-
-so it looks like something whacky goes on during sched_clock registration.
-Sure enough, we're doing a pr_info in-between updating cs.* and calling
-update_sched_clock(), so moving the print sorts things out (diff below).
-
-What I can't figure out is why this has suddenly started happening with
-3.14. Any ideas?
-
-Cheers,
-
-Will
-
---->8
-
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 0abb36464281..f3de5d113afc 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -147,9 +147,6 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
- 
-        /* calculate the ns resolution of this counter */
-        res = cyc_to_ns(1ULL, cd.mult, cd.shift);
--       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
--               bits, r, r_unit, res, wrap);
--
-        update_sched_clock();
- 
-        /*
-@@ -161,6 +158,9 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
-        if (irqtime > 0 || (irqtime == -1 && rate >= 1000000))
-                enable_sched_clock_irqtime();
- 
-+       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
-+               bits, r, r_unit, res, wrap);
-+
-        pr_debug("Registered %pF as sched_clock source\n", read);
- }
+	Arnd
