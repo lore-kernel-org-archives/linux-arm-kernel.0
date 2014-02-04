@@ -1,101 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 4 Feb 2014 10:58:10 +0530
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CA+mB=1LyX0_VVXZQ-=m3gR2RBeumLrnPTUW3j+Zm1nj7a4exHg@mail.gmail.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
- <CA+mB=1Jwjn+KSO9yFr=LNVjk3khf0b-LLQamYf+nnSF4bODGPA@mail.gmail.com>
- <CA+mB=1LyX0_VVXZQ-=m3gR2RBeumLrnPTUW3j+Zm1nj7a4exHg@mail.gmail.com>
-Message-ID: <20140204052810.GO10628@intel.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon,  3 Feb 2014 21:54:28 -0800
+Subject: [PATCH] regulator: core: Make regulator object reflect configured
+ voltage
+Message-ID: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 12:22:52PM +0530, Srikanth Thokala wrote:
-> >>> >> [...]
-> >>> >>> +/**
-> >>> >>> + * xilinx_vdma_device_control - Configure DMA channel of the device
-> >>> >>> + * @dchan: DMA Channel pointer
-> >>> >>> + * @cmd: DMA control command
-> >>> >>> + * @arg: Channel configuration
-> >>> >>> + *
-> >>> >>> + * Return: '0' on success and failure value on error
-> >>> >>> + */
-> >>> >>> +static int xilinx_vdma_device_control(struct dma_chan *dchan,
-> >>> >>> +                                   enum dma_ctrl_cmd cmd, unsigned long arg)
-> >>> >>> +{
-> >>> >>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> >>> >>> +
-> >>> >>> +     switch (cmd) {
-> >>> >>> +     case DMA_TERMINATE_ALL:
-> >>> >>> +             xilinx_vdma_terminate_all(chan);
-> >>> >>> +             return 0;
-> >>> >>> +     case DMA_SLAVE_CONFIG:
-> >>> >>> +             return xilinx_vdma_slave_config(chan,
-> >>> >>> +                                     (struct xilinx_vdma_config *)arg);
-> >>> >>
-> >>> >> You really shouldn't be overloading the generic API with your own semantics.
-> >>> >> DMA_SLAVE_CONFIG should take a dma_slave_config and nothing else.
-> >>> >
-> >>> > Ok.  The driver needs few additional configuration from the slave
-> >>> > device like Vertical
-> >>> > Size, Horizontal Size,  Stride etc., for the DMA transfers, in that case do you
-> >>> > suggest me to define a separate dma_ctrl_cmd like the one FSLDMA_EXTERNAL_START
-> >>> > defined for Freescale drivers?
-> >>>
-> >>> In my opinion it is not a good idea to have driver implement a generic API,
-> >>> but at the same time let the driver have custom semantics for those API
-> >>> calls. It's a bit like having a gpio driver that expects 23 and 42 as the
-> >>> values passed to gpio_set_value instead of 0 and 1. It completely defeats
-> >>> the purpose of a generic API, namely that you are able to write generic code
-> >>> that makes use of the API without having to know about which implementation
-> >>> API it is talking to. The dmaengine framework provides the
-> >>> dmaengine_prep_interleaved_dma() function to setup two dimensional
-> >>> transfers, e.g. take a look at sirf-dma.c or imx-dma.c.
-> >>
-> >> The question here i think would be waht this device supports? Is the hardware
-> >> capable of doing interleaved transfers, then would make sense.
-> >>
-> >> While we do try to get users use dma_slave_config, but there will always be
-> >> someone who have specfic params. If we can generalize then we might want to add
-> >> to the dma_slave_config as well
-> >
-> > There are many configuration parameters which are specific to IP and I
-> > would like to
-> > give an overview of some of parameteres here:
-> >
-> > 1) Park Mode ('cfg->park'): In Park mode, engine will park on frame
-> > referenced by
-> >     'cfg->park_frm', so user will have control on each frame in this mode.
-> >
-> > 2) Interrupt Coalesce ('cfg->coalesce'):  Used for setting interrupt
-> > threshold. This value
-> >    determines the number of frame buffers to process. To use this feature,
-> >    'cfg->frm_cnt_en' should be set.
-> >
-> > 3) Frame Synchronization Source ('cfg->ext_fsync'):  Can be an
-> > external/internal frame
-> >     synchronization source. Used to synchronize one channel (MM2S/S2MM) with
-> >     another (S2MM/MM2S) channel.
-> >
-> > 4) Genlock Synchronization ('cfg->genlock'): Used to avoid mismatch rate between
-> >     master and slave.  In master mode (cfg->master), frames are not dropped and
-> >     slave can drop frames to adjust to master frame rate.
-> >
-> > And in future, this Engine being a soft IP, we could expect some more additional
-> > parameters.  Isn't a good idea to have a private member in dma_slave_config for
-> > sharing additional configuration between slave device and dma engine? Or a new
-> > dma_ctrl_cmd like FSLDMA_EXTERNAL_START?
+In the case when a regulator is initialized from DT with equal min and max
+voltages the voltage is applied on initialization and future calls to
+regulator_set_voltage fails. This behavious is different than if the regulator
+is configured to be a span and therefor requires logic to handle this
+difference in the consumer driver.
 
-The idea of a generic API is that we can use it for most of the controllers. Even
-if you are planning to support a family of controllers
+Eliminate this difference by populating the min_uV and max_uV of the newly
+created regulator from the constraints so that calles to regulator_set_voltage
+is considered no-ops and not a failure.
 
-ATM, lets not discuss the possiblity of private member and try to exhanust all
-possible options. Worst case you can embed the dma_slave_config in
-xilinx_dma_slave_config and retrieve it in dmac driver
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ drivers/regulator/core.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index d85f313..9c82d37 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1209,6 +1209,16 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
+ 	    _regulator_is_enabled(rdev))
+ 		regulator->always_on = true;
+ 
++	/*
++	 * Make the regulator reflect the configured voltage selected in
++	 * machine_constraints_voltage()
++	 */
++	if (rdev->constraints->apply_uV &&
++	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
++		regulator->min_uV = rdev->constraints->min_uV;
++		regulator->max_uV = rdev->constraints->min_uV;
++	}
++
+ 	mutex_unlock(&rdev->mutex);
+ 	return regulator;
+ overflow_err:
 -- 
-~Vinod
+1.7.9.5
