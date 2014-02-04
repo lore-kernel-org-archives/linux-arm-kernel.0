@@ -1,68 +1,118 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 4 Feb 2014 10:58:31 -0800
-Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
-In-Reply-To: <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
-References: <1391476403-26099-1-git-send-email-olof@lixom.net>
- <20140204052329.GN10628@intel.com>
- <20140204170019.GI8533@titan.lakedaemon.net>
- <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
- <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
-Message-ID: <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 4 Feb 2014 19:59:21 +0100
+Subject: [PATCH v3 2/5] ASoC: tda998x: add a codec driver for the TDA998x
+In-Reply-To: <20140204175410.GL22609@sirena.org.uk>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <ae68394f080f0ea5acaf3377cb1d18f29e42c646.1391274628.git.moinejf@free.fr>
+ <20140204133014.GA22609@sirena.org.uk>
+ <20140204181605.5b837a70@armhf>
+ <20140204175410.GL22609@sirena.org.uk>
+Message-ID: <20140204195921.5ace6163@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 10:57 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Feb 4, 2014 at 10:30 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->>> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
->>>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
->>>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
->>>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
->>>> > is enabled (thus making phys_addr_t 64-bit).
->>>> >
->>>> > Most changes are switching printk formats, but also a bit of changes to what
->>>> > used to be array-based pointer arithmetic that could just be done with the
->>>> > address types instead.
->>>> >
->>>> > The warnings were:
->>>> >
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
->>>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
->>>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
->>>> >     different size [-Wint-to-pointer-cast]
->>>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
->>>> >     different size [-Wpointer-to-int-cast]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
->>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
->>>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
->>>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
->>>> >
->>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
->>>> Acked-by: Vinod Koul <vinod.koul@intel.com>
->>>
->>> Olof, would you like me to queue it up?  Or do you want to take it
->>> directly?
->>>
->>> Acked-by: Jason Cooper <jason@lakedaemon.net>
->>
->> I'm confused. I sent the patch to the drivers/dma maintainers and they
->> just acked it without asking me to pick it up myself.
->>
->> Vinod, did you ack it for me to pick it up, or for some other reason?
->> If you don't want to take it through your tree I'll be happy to take
->> it through arm-soc, just looking to clarify.
->>
->> (Jason, I can apply it directly)
->
-> Vinod will correct me if I am wrong, but I take his acks to mean "yup,
-> take it through your tree".  For this specific problem I thought we
-> had a comprehensive fix pending from Joe Perches to add a new %pX
-> format specifier for dma addresses?
+On Tue, 4 Feb 2014 17:54:10 +0000
+Mark Brown <broonie@kernel.org> wrote:
 
-Never mind... that's what you are using.  Sorry for the noise.
+> On Tue, Feb 04, 2014 at 06:16:05PM +0100, Jean-Francois Moine wrote:
+> > Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > > +	/* load the optional CODEC */
+> > > > +	of_platform_populate(np, NULL, NULL, &client->dev);
+> 
+> > > Why is this using of_platform_populate()?  That's a very odd way of
+> > > doing things.
+> 
+> > The i2c does not populate the subnodes in the DT. I did not find why,
+> > but, what is sure is that if of_platform_populate() is not called, the
+> > tda CODEC module is not loaded.
+> 
+> You shouldn't be representing this as a separate node in the DT unless
+> there really is a distinct and reusable IP, otherwise you're putting
+> Linux implementation details in there.  Describe the hardware, not the
+> implemementation.
+
+If there is no 'compatible' node for the tda998x CODEC in the DT, the
+simple-card is not usable, simply because you want the CODEC DAIs to be
+defined by 'phandle + index' instead of by DAI name.
+
+> > You may find an other example in drivers/mfd/twl-core.c.
+> 
+> The TWL drivers aren't always a shining example of how to do things -
+> they were one of the earliest MFDs so there's warts in there.
+> 
+> > > > +config SND_SOC_TDA998X
+> > > > +	tristate
+> > > > +	depends on OF
+> > > > +	default y if DRM_I2C_NXP_TDA998X=y
+> > > > +	default m if DRM_I2C_NXP_TDA998X=m
+> 
+> > > Make this visible if it can be selected from DT so it can be used with
+> > > generic cards.
+> 
+> > I don't understand. The tda CODEC can only be used with the TDA998x I2C
+> > driver. It might have been included in the tda998x source as well.
+> 
+> You shouldn't have the default settings there at all, that's not the
+> normal idiom for MFDs.  I'd also not expect to have to build the CODEC
+> driver just because I built the DRM component.
+
+As the tda998x handles audio in HDMI, it would be a pity if you should
+connect an other cable to your screen.
+
+> > Now, the CODEC is declared inside the tda998x as a node child. But, in
+> > a bad DT, the tda CODEC could be declared anywhere, even inside a other
+> > DRM I2C slave encoder, in which case, bad things would happen...
+> 
+> So, part of the problem here is that this is being explicitly declared
+> in the DT leading to more sources for error.
+
+Simple-card constraint.
+
+> > > What does this actually do?  No information is being passed in to the
+> > > core function here, not even any information on if it's starting or
+> > > stopping.  Looking at the rest of the code I can't help thinking it
+> > > might be clearer to inline this possibly with a lookup helper, the code
+> > > is very small and the lack of parameters makes it hard to follow.
+> 
+> > I thought it was simple enough. The function tda_start_stop() is called
+> > from 2 places:
+> 
+> It's not at all obvious - _audio_update() isn't a terribly descriptive
+> name, just looking at that function by itself I had no idea what it was
+> supposed to be doing.
+
+The first purpose of the function is to set the audio input port in the
+tda998x. Streaming stop could have been omitted, but I thought it could
+be interesting to stop HDMI audio when there is a super HiFi device
+connected to the S/PDIF connector.
+
+> > - on audio start in tda_startup with the audio type (DAI id)
+> > 	priv->dai_id = dai->id;
+> 
+> > - on audio stop with a null audio type
+> > 	priv->dai_id = 0;		/* streaming stop */
+> 
+> > On stream start, the DAI id is never null, as explained in the patch 1:
+> 
+> > 	The audio format values in the encoder configuration interface  are
+> > 	changed to non null values so that the value 0 is used in the audio
+> > 	function to indicate that audio streaming is stopped.
+> 
+> > and on streaming stop the port is not meaningful.
+> 
+> > I will add a null item in the enum (AFMT_NO_AUDIO).
+> 
+> So we can't use both streams simultaneously then?  That's a bit sad.
+
+That's how the NXP tda998x family works (and surely many other HDMI
+transmitters).
+
+So, as I understand from your remarks, the CODEC should be included in
+the tda998x driver, and, then, as the simple-card cannot be used, there
+should be a Cubox specific audio card driver for the (kirkwood audio +
+tda998x HDMI + S/PDIF) set. Am I right?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
