@@ -1,46 +1,124 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 5 Feb 2014 00:35:59 +0200
-Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52F1668B.9040507@ti.com>
-References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
- <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
- <52F11B5C.40407@ti.com>
- <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
- <52F1668B.9040507@ti.com>
-Message-ID: <52F16B4F.2010801@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue,  4 Feb 2014 16:36:57 -0600
+Subject: [PATCH 1/5] ARM: msm: kill off hotplug.c
+In-Reply-To: <1391553421-26914-1-git-send-email-galak@codeaurora.org>
+References: <1391553421-26914-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1391553421-26914-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes. I'll send with __iowmb() instead of wmb().
+Right now hotplug.c only really implements msm_cpu_die as a wfi.  Just
+move that implementation into platsmp.c.  At the same time we use the
+existing wfi() instead of inline asm.
 
-On 02/05/2014 12:15 AM, Santosh Shilimkar wrote:
-> On Tuesday 04 February 2014 03:17 PM, Thomas Gleixner wrote:
->> On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
->>
->> Please do not top post.
->>
->>> It was so in v1. But it was decided to use explicit memory barriers,
->>> because we're always sure the memory barriers are there and that
->>> they're properly documented. Also in this case I don't need to add
->>> keystone readl/writel relaxed function variants and to use mixed calls of
->>> writel/writel_relaxed functions.
->>>
->>> See:
->>> http://www.spinics.net/lists/arm-kernel/msg294941.html
->> Fair enough, but we want a proper explanation for explicit barriers in
->> the code and not in some random discussion of patch version X on some
->> random mailing list.
->>
->> Aside of that it should be iowmb(), but I might miss something ...
->>
-> Agree. __iowmb() seems to be more appropriate.
->
-> Regards,
-> Santosh
->
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/mach-msm/Makefile  |  1 -
+ arch/arm/mach-msm/common.h  |  1 -
+ arch/arm/mach-msm/hotplug.c | 51 ---------------------------------------------
+ arch/arm/mach-msm/platsmp.c |  7 +++++++
+ 4 files changed, 7 insertions(+), 53 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/hotplug.c
 
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 721f27f..8327f60 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -18,7 +18,6 @@ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
+ 
+ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+ 
+-obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ obj-$(CONFIG_SMP) += platsmp.o
+ 
+ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index 33c7725..0a4899b 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -24,7 +24,6 @@ extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 					  unsigned int mtype, void *caller);
+ 
+ extern struct smp_operations msm_smp_ops;
+-extern void msm_cpu_die(unsigned int cpu);
+ 
+ struct msm_mmc_platform_data;
+ 
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+deleted file mode 100644
+index cea80fc..0000000
+--- a/arch/arm/mach-msm/hotplug.c
++++ /dev/null
+@@ -1,51 +0,0 @@
+-/*
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+-
+-#include <asm/smp_plat.h>
+-
+-#include "common.h"
+-
+-static inline void cpu_enter_lowpower(void)
+-{
+-}
+-
+-static inline void cpu_leave_lowpower(void)
+-{
+-}
+-
+-static inline void platform_do_lowpower(unsigned int cpu)
+-{
+-	asm("wfi"
+-	    :
+-	    :
+-	    : "memory", "cc");
+-}
+-
+-/*
+- * platform-specific code to shutdown a CPU
+- *
+- * Called with IRQs disabled
+- */
+-void __ref msm_cpu_die(unsigned int cpu)
+-{
+-	/*
+-	 * we're ready for shutdown now, so do it
+-	 */
+-	cpu_enter_lowpower();
+-	platform_do_lowpower(cpu);
+-
+-	/*
+-	 * bring this CPU back into the world of cache
+-	 * coherency, and then restore interrupts
+-	 */
+-	cpu_leave_lowpower();
+-}
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 3721b31..251a91e 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -29,6 +29,13 @@ extern void secondary_startup(void);
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static void __ref msm_cpu_die(unsigned int cpu)
++{
++	wfi();
++}
++#endif
++
+ static inline int get_core_count(void)
+ {
+ 	/* 1 + the PART[1:0] field of MIDR */
 -- 
-Regards,
-Ivan Khoronzhuk
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
