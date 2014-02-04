@@ -1,50 +1,16 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 4 Feb 2014 18:55:32 +0300
-Subject: [PATCH v2 2/2] ARM: shmobile: Koelsch: pass Ether PHY IRQ
-In-Reply-To: <201402041851.47198.sergei.shtylyov@cogentembedded.com>
-References: <201402041851.47198.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201402041855.32618.sergei.shtylyov@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Feb 2014 15:56:49 +0100
+Subject: [PATCH] ARM: pxa: fix various compilation problems
+In-Reply-To: <1391518387-5934-1-git-send-email-linus.walleij@linaro.org>
+References: <1391518387-5934-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4895932.cC8EyYOxb5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
-trigger type to be low-level as per the Micrel PHY driver's setup.
+On Tuesday 04 February 2014 13:53:07 Linus Walleij wrote:
+> Hi ARM SoC folks: please apply this patch directly to the ARM
+> SoC tree fixes branch if you are happy with it.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+It's also needed for 3.13-backports, right?
 
----
-Changes in version 2:
-- refreshed the patch.
-
- arch/arm/mach-shmobile/board-koelsch.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
-+++ renesas/arch/arm/mach-shmobile/board-koelsch.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
- #include <linux/phy.h>
-@@ -92,6 +93,7 @@ static void __init koelsch_add_du_device
- /* Ether */
- static const struct sh_eth_plat_data ether_pdata __initconst = {
- 	.phy			= 0x1,
-+	.phy_irq		= irq_pin(0),
- 	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
- 	.phy_interface		= PHY_INTERFACE_MODE_RMII,
- 	.ether_link_active_low	= 1,
-@@ -232,6 +234,8 @@ static void __init koelsch_init(void)
- {
- 	koelsch_add_standard_devices();
- 
-+	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
-+
- 	if (IS_ENABLED(CONFIG_PHYLIB))
- 		phy_register_fixup_for_id("r8a7791-ether-ff:01",
- 					  koelsch_ksz8041_fixup);
+	Arnd
