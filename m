@@ -1,69 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Feb 2014 13:56:55 -0800
-Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
-In-Reply-To: <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
-References: <1391476403-26099-1-git-send-email-olof@lixom.net>
- <20140204052329.GN10628@intel.com>
- <20140204170019.GI8533@titan.lakedaemon.net>
- <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
- <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
-Message-ID: <CAOesGMjvdTobOhT+zzfKFreSXLnbVFDDH=gLcpG3FUG48HUPcw@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 5 Feb 2014 00:35:59 +0200
+Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <52F1668B.9040507@ti.com>
+References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
+ <52F11B5C.40407@ti.com>
+ <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
+ <52F1668B.9040507@ti.com>
+Message-ID: <52F16B4F.2010801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 10:57 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Feb 4, 2014 at 10:30 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->>> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
->>>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
->>>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
->>>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
->>>> > is enabled (thus making phys_addr_t 64-bit).
->>>> >
->>>> > Most changes are switching printk formats, but also a bit of changes to what
->>>> > used to be array-based pointer arithmetic that could just be done with the
->>>> > address types instead.
->>>> >
->>>> > The warnings were:
->>>> >
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
->>>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
->>>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
->>>> >     different size [-Wint-to-pointer-cast]
->>>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
->>>> >     different size [-Wpointer-to-int-cast]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
->>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
->>>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
->>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
->>>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
->>>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
->>>> >
->>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
->>>> Acked-by: Vinod Koul <vinod.koul@intel.com>
+Yes. I'll send with __iowmb() instead of wmb().
+
+On 02/05/2014 12:15 AM, Santosh Shilimkar wrote:
+> On Tuesday 04 February 2014 03:17 PM, Thomas Gleixner wrote:
+>> On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
+>>
+>> Please do not top post.
+>>
+>>> It was so in v1. But it was decided to use explicit memory barriers,
+>>> because we're always sure the memory barriers are there and that
+>>> they're properly documented. Also in this case I don't need to add
+>>> keystone readl/writel relaxed function variants and to use mixed calls of
+>>> writel/writel_relaxed functions.
 >>>
->>> Olof, would you like me to queue it up?  Or do you want to take it
->>> directly?
->>>
->>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>> See:
+>>> http://www.spinics.net/lists/arm-kernel/msg294941.html
+>> Fair enough, but we want a proper explanation for explicit barriers in
+>> the code and not in some random discussion of patch version X on some
+>> random mailing list.
 >>
->> I'm confused. I sent the patch to the drivers/dma maintainers and they
->> just acked it without asking me to pick it up myself.
+>> Aside of that it should be iowmb(), but I might miss something ...
 >>
->> Vinod, did you ack it for me to pick it up, or for some other reason?
->> If you don't want to take it through your tree I'll be happy to take
->> it through arm-soc, just looking to clarify.
->>
->> (Jason, I can apply it directly)
+> Agree. __iowmb() seems to be more appropriate.
 >
-> Vinod will correct me if I am wrong, but I take his acks to mean "yup,
-> take it through your tree".
+> Regards,
+> Santosh
+>
 
-Ok, thanks, we'll do that then.
-
-
--Olof
+-- 
+Regards,
+Ivan Khoronzhuk
