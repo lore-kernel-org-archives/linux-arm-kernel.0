@@ -1,81 +1,136 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 04 Feb 2014 13:09:28 +0100
-Subject: [PATCH v2 0/5] reserved-memory regions/CMA in devicetree, again
-Message-ID: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 04 Feb 2014 13:09:30 +0100
+Subject: [PATCH v2 2/5] drivers: of: implement reserved-memory handling for dma
+In-Reply-To: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1391515773-6112-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
+From: Josh Cartwright <joshc@codeaurora.org>
 
-This is an updated version of the second attempt to add basic support
-for dynamic allocation of memory reserved regions defined in device
-tree.
+Add support for handling 'shared-dma-pool' reserved-memory nodes using
+dma exclusive driver (dma_alloc_coherent()).
 
-The initial code for this feature were posted here [1], merged as commit
-9d8eab7af79cb4ce2de5de39f82c455b1f796963 ("drivers: of: add
-initialization code for dma reserved memory") and later reverted by
-commit 1931ee143b0ab72924944bc06e363d837ba05063. For more information,
-see [2]. Finally a new bindings has been proposed [3] and Josh
-Cartwright a few days ago prepared some code which implements those
-bindings [4]. This finally pushed me again to find some time to finish
-this task and review the code. Josh agreed to give me the ownership of
-this series to continue preparing them for mainline inclusion.
-
-For more information please refer to the changlelog below.
-
-[1]: http://lkml.kernel.org/g/1377527959-5080-1-git-send-email-m.szyprowski at samsung.com
-[2]: http://lkml.kernel.org/g/1381476448-14548-1-git-send-email-m.szyprowski at samsung.com
-[3]: http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
-[4]: http://thread.gmane.org/gmane.linux.documentation/19579
-
-Changelog:
-
-v2:
-- removed copying of the node name
-- split shared-dma-pool handling into separate files (one for CMA and one
-  for dma_declare_coherent based implementations) for making the code easier
-  to understand
-- added support for AMBA devices, changed prototypes to use struct decice
-  instead of struct platform_device
-- renamed some functions to better match other names used in drivers/of/
-- restructured the rest of the code a bit for better readability
-- added 'reusable' property to exmaple linux,cma node in documentation
-- exclusive dma (dma_coherent) is used for only handling 'shared-dma-pool'
-  regions without 'reusable' property and CMA is used only for handling
-  'shared-dma-pool' regions with 'reusable' property.
-
-v1: http://thread.gmane.org/gmane.linux.documentation/19579
-- initial version prepared by Josh Cartwright
-
-Summary:
-
-Grant Likely (1):
-  of: document bindings for reserved-memory nodes
-
-Josh Cartwright (2):
-  drivers: of: implement reserved-memory handling for dma
-  drivers: of: implement reserved-memory handling for cma
-
-Marek Szyprowski (2):
-  drivers: of: add initialization code for reserved memory
-  ARM: init: add support for reserved memory defined by device tree
-
- .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++
- arch/arm/mm/init.c                                 |    3 +
- drivers/of/Kconfig                                 |   20 ++
- drivers/of/Makefile                                |    3 +
- drivers/of/of_reserved_mem.c                       |  219 ++++++++++++++++++++
- drivers/of/of_reserved_mem_cma.c                   |   75 +++++++
- drivers/of/of_reserved_mem_dma.c                   |   78 +++++++
- drivers/of/platform.c                              |    7 +
- include/asm-generic/vmlinux.lds.h                  |   11 +
- include/linux/of_reserved_mem.h                    |   62 ++++++
- 10 files changed, 616 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
- create mode 100644 drivers/of/of_reserved_mem.c
- create mode 100644 drivers/of/of_reserved_mem_cma.c
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/of/Kconfig               |    7 ++++
+ drivers/of/Makefile              |    1 +
+ drivers/of/of_reserved_mem_dma.c |   78 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 86 insertions(+)
  create mode 100644 drivers/of/of_reserved_mem_dma.c
- create mode 100644 include/linux/of_reserved_mem.h
 
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index aba13df56f3a..7ac330473ec9 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -81,4 +81,11 @@ config OF_RESERVED_MEM
+ 	help
+ 	  Helpers to allow for reservation of memory regions
+ 
++config OF_RESERVED_MEM_DMA
++	depends on OF_RESERVED_MEM
++	depends on HAVE_GENERIC_DMA_COHERENT
++	def_bool y
++	help
++	  Helpers for reserving memory regions for DMA use
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index ed9660adad77..6142227ca854 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
++obj-$(CONFIG_OF_RESERVED_MEM_DMA) += of_reserved_mem_dma.o
+diff --git a/drivers/of/of_reserved_mem_dma.c b/drivers/of/of_reserved_mem_dma.c
+new file mode 100644
+index 000000000000..53a4cac6084a
+--- /dev/null
++++ b/drivers/of/of_reserved_mem_dma.c
+@@ -0,0 +1,78 @@
++/*
++ * Device tree based initialization code for DMA reserved regions.
++ *
++ * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Author: Marek Szyprowski <m.szyprowski@samsung.com>
++ * Author: Josh Cartwright <joshc@codeaurora.org>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License or (at your optional) any later version of the license.
++ */
++#include <linux/memblock.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/of_platform.h>
++#include <linux/mm.h>
++#include <linux/sizes.h>
++#include <linux/mm_types.h>
++#include <linux/dma-mapping.h>
++#include <linux/of_reserved_mem.h>
++
++static void rmem_dma_device_init(struct reserved_mem *rmem,
++				 struct device *dev,
++				 struct of_phandle_args *args)
++{
++	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
++		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++}
++
++static void rmem_dma_device_release(struct reserved_mem *rmem,
++				    struct device *dev)
++{
++	dma_release_declared_memory(dev);
++}
++
++static const struct reserved_mem_ops rmem_dma_ops = {
++	.device_init	= rmem_dma_device_init,
++	.device_release	= rmem_dma_device_release,
++};
++
++static int __init rmem_dma_setup(struct reserved_mem *rmem,
++				 unsigned long node,
++				 const char *uname)
++{
++	int err;
++
++	if (of_get_flat_dt_prop(node, "reusable", NULL))
++		return -EINVAL;
++
++	err = of_parse_flat_dt_reg(node, uname, &rmem->base, &rmem->size);
++	if (!err)
++		goto out_done;
++
++	err = of_parse_flat_dt_size(node, uname, &rmem->size);
++	if (err)
++		goto out_err;
++
++	rmem->base = memblock_alloc_base(rmem->size, PAGE_SIZE,
++					 MEMBLOCK_ALLOC_ANYWHERE);
++	memblock_free(rmem->base, rmem->size);
++
++out_done:
++	rmem->ops = &rmem_dma_ops;
++	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
++		&rmem->base, (unsigned long)rmem->size / SZ_1M);
++
++	return memblock_remove(rmem->base, rmem->size);
++
++out_err:
++	pr_err("Reserved memory: unable to setup '%s' memory region for DMA.\n",
++	       uname);
++	return err;
++}
++RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
 -- 
 1.7.9.5
