@@ -1,41 +1,65 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Tue,  4 Feb 2014 07:19:06 -0500
-Subject: [PATCH 0/6] BCM59056 PMU regulator support
-Message-ID: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+Date: Tue,  4 Feb 2014 07:19:08 -0500
+Subject: [PATCH 2/6] regulator: add bcm59056 pmu DT binding
+In-Reply-To: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+Message-ID: <1391516352-32359-3-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM59056 is a multi-function power management unit used with the
-BCM281xx family of SoCs. This series adds an MFD and voltage regulator
-driver to support the BCM59056. The bcm28155-ap DT support is updated
-to enable use of regulators on the otg and sdhci peripherals.
+Add a DT binding for the BCM59056 PMU. The binding inherits from
+the generic regulator bindings.
 
-Matt Porter (6):
-  i2c: bcm-kona: register with subsys_initcall
-  regulator: add bcm59056 pmu DT binding
-  mfd: add bcm59056 pmu driver
-  regulator: add bcm59056 regulator driver
-  ARM: configs: bcm_defconfig: enable bcm59056 regulator support
-  ARM: dts: add bcm59056 pmu support and enable for bcm28155-ap
-
- .../devicetree/bindings/regulator/bcm59056.txt     |  37 ++
- arch/arm/boot/dts/bcm28155-ap.dts                  |  41 ++
- arch/arm/boot/dts/bcm59056.dtsi                    | 158 ++++++++
- arch/arm/configs/bcm_defconfig                     |   7 +
- drivers/i2c/busses/i2c-bcm-kona.c                  |  14 +-
- drivers/mfd/Kconfig                                |   8 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/bcm59056.c                             | 119 ++++++
- drivers/regulator/Kconfig                          |   8 +
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/bcm59056-regulator.c             | 445 +++++++++++++++++++++
- include/linux/mfd/bcm59056.h                       |  35 ++
- 12 files changed, 873 insertions(+), 1 deletion(-)
+Signed-off-by: Matt Porter <mporter@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ .../devicetree/bindings/regulator/bcm59056.txt     | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/regulator/bcm59056.txt
- create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
- create mode 100644 drivers/mfd/bcm59056.c
- create mode 100644 drivers/regulator/bcm59056-regulator.c
- create mode 100644 include/linux/mfd/bcm59056.h
 
+diff --git a/Documentation/devicetree/bindings/regulator/bcm59056.txt b/Documentation/devicetree/bindings/regulator/bcm59056.txt
+new file mode 100644
+index 0000000..bf6b633
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/bcm59056.txt
+@@ -0,0 +1,37 @@
++BCM59056 Power Management Unit
++
++Required properties:
++- compatible: "brcm,bcm59056"
++- reg: I2C slave address
++- interrupts: interrupt for the PMU. Generic interrupt client node bindings
++  are described in interrupt-controller/interrupts.txt
++- regulators: This is the list of child nodes that specify the regulator
++  initialization data for defined regulators.  Generic regulator bindings
++  are described in regulator/regulator.txt.
++
++  The valid regulator-compatible values are:
++  	rfldo, camldo1, camldo2, simldo1, simlso2, sdldo, sdxldo,
++	mmcldo1, mmcldo2, audldo, micldo, usbldo, vibldo,
++	csr, iosr1, iosr2, msr, sdsr1, sdsr2, vsr
++
++Example:
++	pmu: bcm59056 at 8 {
++		compatible = "brcm,bcm59056";
++		reg = <0x08>;
++		interrupts = <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
++		regulators {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			rfldo_reg: regulator at 0 {
++				reg = <0>;
++				regulator-compatible = "rfldo";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			...
++		};
++	};
 -- 
 1.8.4
