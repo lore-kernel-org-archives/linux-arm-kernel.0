@@ -1,231 +1,56 @@
-From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Tue, 04 Feb 2014 20:25:56 +0100
-Subject: [PATCH v2 6/6] ARM: dts: sun5i: Add support for mmc
-In-Reply-To: <20140204191648.29809.14611.stgit@dizzy-6.o2s.ch>
-References: <20140204191648.29809.14611.stgit@dizzy-6.o2s.ch>
-Message-ID: <20140204192554.29809.71885.stgit@dizzy-6.o2s.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Feb 2014 20:27:15 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <3121595.GbLMuGPlvA@wuerfel>
+ <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
+Message-ID: <201402042027.15898.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 03 February 2014, Michal Simek wrote:
+> On 02/03/2014 04:32 PM, Arnd Bergmann wrote:
+> > On Monday 03 February 2014 16:13:47 Michal Simek wrote:
+> >> Intention wasn't to fix binding but document current one
+> >> which is in mainline for a long time.
+> > 
+> > Ok, I see.
+> > 
+> >> Apart of this - yes, wdt-enable-once is nowayout and wdt-interval should be timeout
+> >> is seconds, and clock-frequency should go out and use CCF for getting clock.
+> > 
+> > Could we make a common binding then, and document that the xilinx
+> > watchdog can optionally provide either one?
+> 
+> Do you mean to have 2 DT bindings?
+> 
+> This binding is used from 2011-07.
+> It means it was generated for all hw designs at least from this time.
+> I would say from DT usage on Microblaze because it is not special case
+> in our dt generator.
 
----
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |   30 +++++++++++++++
- arch/arm/boot/dts/sun5i-a10s.dtsi                |   44 ++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |   15 ++++++++
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |   15 ++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi                 |   37 +++++++++++++++++++
- 5 files changed, 141 insertions(+)
+I certainly wasn't suggesting to break the binding, quite the contrary.
+What I tried to say is that the properties look like they should be
+useful for different kinds of watchdogs, not just xilinx, so it would
+be good to have a common definition using generic strings.
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 3c9f8b3..7189adf55 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -34,7 +34,37 @@
- 			};
- 		};
- 
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default", "default";
-+			pinctrl-0 = <&mmc0_pins_a>;
-+			pinctrl-1 = <&mmc0_cd_pin_olinuxino_micro>;
-+			cd-gpios = <&pio 6 1 0>; /* PG1 */
-+			status = "okay";
-+		};
-+
-+		mmc1: mmc at 01c10000 {
-+			pinctrl-names = "default", "default";
-+			pinctrl-0 = <&mmc1_pins_a>;
-+			pinctrl-1 = <&mmc1_cd_pin_olinuxino_micro>;
-+			cd-gpios = <&pio 6 13 0>; /* PG13 */
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxino_micro: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG1";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			mmc1_cd_pin_olinuxino_micro: mmc1_cd_pin at 0 {
-+				allwinner,pins = "PG13";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PE3";
- 				allwinner,function = "gpio_out";
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index ea16054..abff7f8 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -293,6 +293,36 @@
- 			#size-cells = <0>;
- 		};
- 
-+		mmc0: mmc at 01c0f000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <32>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		mmc1: mmc at 01c10000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ahb_gates 9>, <&mmc1_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <33>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 01c11000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <34>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
-@@ -363,6 +393,20 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			mmc0_pins_a: mmc0 at 0 {
-+				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			mmc1_pins_a: mmc1 at 0 {
-+				allwinner,pins = "PG3","PG4","PG5","PG6","PG7","PG8";
-+				allwinner,function = "mmc1";
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index fe2ce0a..6ae5867 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -20,7 +20,22 @@
- 	compatible = "olimex,a13-olinuxino-micro", "allwinner,sun5i-a13";
- 
- 	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default", "default";
-+			pinctrl-0 = <&mmc0_pins_a>;
-+			pinctrl-1 = <&mmc0_cd_pin_olinuxinom>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			led_pins_olinuxinom: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index a4ba5ff..b23237b 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -19,7 +19,22 @@
- 	compatible = "olimex,a13-olinuxino", "allwinner,sun5i-a13";
- 
- 	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default", "default";
-+			pinctrl-0 = <&mmc0_pins_a>;
-+			pinctrl-1 = <&mmc0_cd_pin_olinuxino>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 320335a..5d71c82 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -274,6 +274,36 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		mmc0: mmc at 01c0f000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <32>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		mmc1: mmc at 01c10000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ahb_gates 9>, <&mmc1_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <33>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 01c11000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <34>;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
-@@ -326,6 +356,13 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			mmc0_pins_a: mmc0 at 0 {
-+				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <3>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
+The xilinx driver would definitely have to keep supporting the traditional
+property names, but it could also support the generic names in the
+future.
+
+> xlnx,XXX are XXX parameters which you have to setup in tools
+> and get synthesized. This is valid for all xilinx IPs. We have full
+> IP description by generating xlnx,XXX parameters directly from tools
+> because we know all variants which can happen.
+>
+> Just back to your previous post:
+> "I'm not sure about the enable-once flag, which seems to just map to the
+> "nowayout" watchdog option that is not a hardware feature at all"
+> this is hw feature which you can select in tools because this is fpga. :-)
+
+Ah, so you mean the properties are not settings that the driver
+programs into the hardware, but they are hardware properties that the
+driver reports to user space?
+
+	Arnd
