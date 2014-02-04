@@ -1,36 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Feb 2014 20:21:38 +0100
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <20140204191055.GC25695@obsidianresearch.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <8676627.b6SYsazoah@wuerfel> <20140204191055.GC25695@obsidianresearch.com>
-Message-ID: <4118142.2mQ5BlBdTZ@wuerfel>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 04 Feb 2014 11:22:42 -0800
+Subject: [PATCH 05/17] mmc: mmci: Put the device into low power state at
+ system suspend
+In-Reply-To: <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Tue, 4 Feb 2014 16:58:46 +0100")
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <8738jyu1h9.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014 12:10:55 Jason Gunthorpe wrote:
-> 
-> For instance to support peer-to-peer IO you need to have a consisent,
-> non-overlapping set of bus/device/function/tag to uniquely route TLPs
-> within the chip. Cross domain TLP routing in HW is non-trivial.
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-Yes, that is a good reason.
+> Due to the available runtime PM callbacks, we are now able to put our
+> device into low power state at system suspend.
+>
+> Earlier we could not accomplish this without trusting a power domain
+> for the device to take care of it. Now we are able to cope with
+> scenarios both with and without a power domain.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/mmc/host/mmci.c |   45 +++++++++++++++++++++++++--------------------
+>  1 file changed, 25 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index c88da1c..074e0cb 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -1723,33 +1723,38 @@ static int mmci_remove(struct amba_device *dev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_SUSPEND
+> -static int mmci_suspend(struct device *dev)
+> +#ifdef CONFIG_PM_SLEEP
+> +static int mmci_suspend_late(struct device *dev)
+>  {
+> -	struct amba_device *adev = to_amba_device(dev);
+> -	struct mmc_host *mmc = amba_get_drvdata(adev);
+> +	int ret = 0;
+>  
+> -	if (mmc) {
+> -		struct mmci_host *host = mmc_priv(mmc);
+> -		pm_runtime_get_sync(dev);
+> -		writel(0, host->base + MMCIMASK0);
+> -	}
+> +	if (pm_runtime_status_suspended(dev))
+> +		return 0;
+>  
+> -	return 0;
+> +	if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
+> +		ret = dev->pm_domain->ops.runtime_suspend(dev);
+> +	else
+> +		ret = dev->bus->pm->runtime_suspend(dev);
+> +
+> +	if (!ret)
+> +		pm_runtime_set_suspended(dev);
 
-> IOMMUs (and SR-IOv) rely on the BDF to identify the originating device
-> for each TLP. Multiple domains means a much more complex IOMMU
-> environment.
+Isn't this basically open-coding pm_runtime_suspend()...
 
-I fear we already have to support complex IOMMU setups on ARM,
-whether there are multiple PCI domains or not. But it would be
-nice in theory not to require it.
+> +	return ret;
+>  }
+>  
+> -static int mmci_resume(struct device *dev)
+> +static int mmci_resume_early(struct device *dev)
+>  {
+> -	struct amba_device *adev = to_amba_device(dev);
+> -	struct mmc_host *mmc = amba_get_drvdata(adev);
+> +	int ret = 0;
+>  
+> -	if (mmc) {
+> -		struct mmci_host *host = mmc_priv(mmc);
+> -		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+> -		pm_runtime_put(dev);
+> -	}
+> +	if (pm_runtime_status_suspended(dev))
+> +		return 0;
+>  
+> -	return 0;
+> +	if (dev->pm_domain && dev->pm_domain->ops.runtime_resume)
+> +		ret = dev->pm_domain->ops.runtime_resume(dev);
+> +	else
+> +		ret = dev->bus->pm->runtime_resume(dev);
+> +
+> +	return ret;
 
-> Failure to integrate on-chip devices into the PCI world also means
-> thing like SR-IOv won't work sanely with on-chip devices.
+...and this is pm_runtime_resume()? (though both terribly simplified.)
 
-I'd consider this a feature ;)
+This is starting to show that building with PM_SLEEP but not PM_RUNTIME
+is going to force open-coding a lot of stuff that the runtime PM
+framework already provides.  So either we need some helper functions so
+we're not sprinkling manual calls to bus/pm_domain callbacks all over
+the place, or maybe where we need to go is have a way for platforms that
+really are "runtime PM centric" to declare that even PM_SLEEP depends on
+PM_RUNTIME.  
 
-But you are probably right: people will do SR-IOV whether we like
-it or not, and they will try to do it on non-PCI devices too,
-and great suffering will be involved.
+I'm trying to thing of a good reason to not make PM_SLEEP depend on
+PM_RUNTIME for platforms like this.
 
-	Arnd
+Kevin
