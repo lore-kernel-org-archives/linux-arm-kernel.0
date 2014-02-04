@@ -1,149 +1,153 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Tue, 4 Feb 2014 16:47:11 +0100
-Subject: 'unannotated irqs-on' lockdep warning
-In-Reply-To: <20140204125839.GC26766@pengutronix.de>
-References: <CAH9NwWcVrjV1=rFnHJhDH0yoEkTwUTcq-Tn=R0aaiTr70Fs3hA@mail.gmail.com>
- <20140130155741.GB15937@n2100.arm.linux.org.uk>
- <CAH9NwWdb0fGQTtss2JzXP16jfCJMG6fCkJQBiy6yiOQ5y30kHA@mail.gmail.com>
- <20140204125839.GC26766@pengutronix.de>
-Message-ID: <CAH9NwWfcmMWQv4AEW8CxCi=tSR4FeLAy1Jg4JzjxSOM9mmsbJA@mail.gmail.com>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Tue, 04 Feb 2014 10:45:35 -0500
+Subject: UBI leb_write_unlock NULL pointer Oops (continuation) on ARM926
+References: <D7B1B5F4F3F27A4CB073BF422331203F2A18997F1F@Exchange1.lawo.de>
+ <CAFLxGvya5WXoKcYmOgeM_SmVVEht1jEzeLG9vHhwFudFU+Ny8A@mail.gmail.com>
+ <D7B1B5F4F3F27A4CB073BF422331203F2A18997F8B@Exchange1.lawo.de>
+ <52EF772D.8080207@nod.at>
+ <D7B1B5F4F3F27A4CB073BF422331203F2A18DD7989@Exchange1.lawo.de>
+ <52EF9FFE.4020405@nod.at>
+ <1391498545.1795.29.camel@sauron.fi.intel.com>
+ <52F09AC9.6090604@nod.at>
+ <1391500492.1795.36.camel@sauron.fi.intel.com>
+Message-ID: <878utq51b4.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-04 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Tue, Feb 04, 2014 at 11:02:16AM +0100, Christian Gmeiner wrote:
->> Hi
->>
->> 2014-01-30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Thu, Jan 30, 2014 at 03:31:46PM +0100, Christian Gmeiner wrote:
->> >> [   19.859234] CPU: 0 PID: 1848 Comm: mkdir Not tainted 3.12.4 #44
->> >> [   19.865190] [<c0013900>] (unwind_backtrace+0x0/0xe0) from
->> >> [<c00113b8>] (show_stack+0x10/0x14)
->> >> [   19.873739] [<c00113b8>] (show_stack+0x10/0x14) from [<c044e040>]
->> >> (dump_stack+0x64/0xa4)
->> >> [   19.881851] [<c044e040>] (dump_stack+0x64/0xa4) from [<c0022718>]
->> >> (warn_slowpath_common+0x64/0x84)
->> >> [   19.890828] [<c0022718>] (warn_slowpath_common+0x64/0x84) from
->> >> [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c)
->> >> [   19.900413] [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c) from
->> >> [<c0076c84>] (check_flags.part.26+0xb4/0x1e4)
->> >> [   19.910001] [<c0076c84>] (check_flags.part.26+0xb4/0x1e4) from
->> >> [<c0079654>] (lock_release+0x3c/0x100)
->> >> [   19.919243] [<c0079654>] (lock_release+0x3c/0x100) from
->> >> [<c00485b4>] (lg_local_unlock+0x18/0x6c)
->> >> [   19.928055] [<c00485b4>] (lg_local_unlock+0x18/0x6c) from
->> >> [<c012a2cc>] (free_fs_struct+0x18/0x30)
->> >> [   19.936947] [<c012a2cc>] (free_fs_struct+0x18/0x30) from
->> >> [<c0024e24>] (do_exit+0x2ac/0x3f0)
->> >> [   19.945316] [<c0024e24>] (do_exit+0x2ac/0x3f0) from [<c002501c>]
->> >> (do_group_exit+0x88/0xb4)
->> >> [   19.953596] [<c002501c>] (do_group_exit+0x88/0xb4) from
->> >> [<c0025058>] (__wake_up_parent+0x0/0x18)
->> >> [   19.962391] ---[ end trace 98a70b5cdc7b49fe ]---
->> >> [   19.967017] possible reason: unannotated irqs-on.
->> >> [   19.971729] irq event stamp: 2910
->> >> [   19.975050] hardirqs last  enabled at (2909): [<c044a160>]
->> >> __slab_free+0x1c0/0x390
->> >> [   19.982661] hardirqs last disabled at (2910): [<c0456d14>]
->> >> __dabt_svc+0x34/0x60
->> >
->> > So, I wonder how we got from __dabt_svc to __wake_up_parent.  It looks
->> > like the unwinder has failed to do a proper job of unwinding, which
->> > makes this undebuggable.
->> >
->> > Can you rebuild in ARM mode with frame pointers enabled please?
->> >
->>
->> Maybe i am blind but I can not find that option via make menuconfig. hmmm
-> config FRAME_POINTER
->         bool
->         depends on !THUMB2_KERNEL
->         default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
->
-> so disable THUMB2_KERNEL and ARM_UNWIND.
->
 
-Thanks Uwe.
+>>>> Am 03.02.2014 13:51, schrieb Wiedemer, Thorsten (Lawo AG):
 
+>>>>> I can reproduce it fairly regularly, but not really "quickly". At
+>>>>> the moment, I can use a setup of about identical 70 devices.  A
+>>>>> test over the last weekend resultet In 6 devices showing the bug.
+>>>>> What we have are multiple processes which write in different
+>>>>> intervals some data on the device and sync it, because this data
+>>>>> should be available after a power cut.  Perhaps I can force the
+>>>>> error more often in writing test processes with shorter write/sync
+>>>>> intervals.
+>>>>>
+>>>>> If I have further access to the "big" setup for some days, I will
+>>>>> try to make a test without preemption.
 
-This is what I get:
+>>> On Mon, 2014-02-03 at 14:56 +0100, Richard Weinberger wrote:
 
+>>>> Hmm, ok.
+>>>> Please also apply this patch, just in case...
 
-    5.761766] udevd[360]: starting version 175
-[    6.436175] input: rotary.15 as /devices/rotary.15/input/input1
-[    9.689303] EXT4-fs (mmcblk0p2): re-mounted. Opts: (null)
-[    9.960301] [EXT4 FS bs=4096, gc=16, bpg=32768, ipg=8192,
-mo=8802c818, mo2=0002]
-[    9.960328] EXT4-fs (mmcblk0p2): re-mounted. Opts: debug
-[   14.212395] [EXT4 FS bs=4096, gc=13, bpg=32768, ipg=7888,
-mo=8802c818, mo2=0002]
-[   14.212729] EXT4-fs (mmcblk0p1): mounted filesystem with ordered
-data mode. Opts: debug
-[   15.063614] ------------[ cut here ]------------
-[   15.068272] WARNING: CPU: 1 PID: 1321 at kernel/lockdep.c:3539
-check_flags+0xe8/0x1ec()
-[   15.076287] DEBUG_LOCKS_WARN_ON(!current->hardirqs_enabled)
-[   15.081692] Modules linked in: rotary_encoder
-[   15.086296] CPU: 1 PID: 1321 Comm: mountall.sh Not tainted 3.12.9 #1
-[   15.092658] Backtrace:
-[   15.095153] [<c001213c>] (dump_backtrace+0x0/0x10c) from
-[<c00122dc>] (show_stack+0x18/0x1c)
-[   15.103601]  r6:ffffffff r5:c06e5660 r4:00000000 r3:00000000
-[   15.109365] [<c00122c4>] (show_stack+0x0/0x1c) from [<c04b83cc>]
-(dump_stack+0x6c/0xac)
-[   15.117394] [<c04b8360>] (dump_stack+0x0/0xac) from [<c0025094>]
-(warn_slowpath_common+0x70/0x90)
-[   15.126273]  r6:00000dd3 r5:00000009 r4:ec44fd50 r3:c2b62a00
-[   15.132028] [<c0025024>] (warn_slowpath_common+0x0/0x90) from
-[<c0025158>] (warn_slowpath_fmt+0x38/0x40)
-[   15.141515]  r8:ed6a2530 r7:c0128918 r6:c070fe54 r5:ec44e000 r4:c06e5738
-[   15.148331] [<c0025120>] (warn_slowpath_fmt+0x0/0x40) from
-[<c0083338>] (check_flags+0xe8/0x1ec)
-[   15.157123]  r3:c05ef538 r2:c05e6f2c
-[   15.160754] [<c0083250>] (check_flags+0x0/0x1ec) from [<c0087334>]
-(lock_release+0x48/0x290)
-[   15.169199]  r6:c06d16ec r5:00000040 r4:ec44e000 r3:00000000
-[   15.174959] [<c00872ec>] (lock_release+0x0/0x290) from [<c0128930>]
-(complete_walk+0x6c/0x12c)
-[   15.183586] [<c01288c4>] (complete_walk+0x0/0x12c) from
-[<c012b000>] (path_lookupat+0x74/0x7a8)
-[   15.192291]  r6:00000000 r5:00000040 r4:ec44fe68 r3:ed6a2530
-[   15.198042] [<c012af8c>] (path_lookupat+0x0/0x7a8) from
-[<c012b75c>] (filename_lookup+0x28/0x68)
-[   15.206842] [<c012b734>] (filename_lookup+0x0/0x68) from
-[<c012dd9c>] (user_path_at_empty+0x5c/0x84)
-[   15.215981]  r7:ffffff9c r6:ec44fe68 r5:00000000 r4:ec477000
-[   15.221732] [<c012dd40>] (user_path_at_empty+0x0/0x84) from
-[<c012dde0>] (user_path_at+0x1c/0x24)
-[   15.230610]  r8:ffffff9c r7:00eb3274 r6:ec44ff40 r5:00000000 r4:ec44ff00
-[   15.237425] [<c012ddc4>] (user_path_at+0x0/0x24) from [<c0123fd0>]
-(vfs_fstatat+0x54/0x98)
-[   15.245703] [<c0123f7c>] (vfs_fstatat+0x0/0x98) from [<c0124038>]
-(vfs_lstat+0x24/0x28)
-[   15.253722] [<c0124014>] (vfs_lstat+0x0/0x28) from [<c0124270>]
-(SyS_lstat64+0x1c/0x38)
-[   15.261742] [<c0124254>] (SyS_lstat64+0x0/0x38) from [<c000e5c0>]
-(ret_fast_syscall+0x0/0x48)
-[   15.270273]  r4:0000000b
-[   15.272833] ---[ end trace a6e000210e7fe9c9 ]---
-[   15.277457] possible reason: unannotated irqs-on.
-[   15.282169] irq event stamp: 37958
-[   15.285578] hardirqs last  enabled at (37957): [<c000e650>]
-no_work_pending+0x8/0x2c
-[   15.293352] hardirqs last disabled at (37958): [<c04beb54>]
-__dabt_svc+0x34/0x60
-[   15.300780] softirqs last  enabled at (32532): [<c0029b70>]
-__do_softirq+0x1bc/0x304
-[   15.308556] softirqs last disabled at (32521): [<c0029d80>]
-do_softirq+0x70/0x78
-[   16.977080] NET: Registered protocol family 10
-[   18.394642] fec 2188000.ethernet eth0: Freescale FEC PHY driver
-[Generic PHY] (mii_bus:phy_addr=fixed-0:00, irq=-1)
-[   18.409077] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+I don't think this patch will help.
+
+On  4 Feb 2014, dedekind1 at gmail.com wrote:
+
+> May be. Although sometimes corruptions are also deterministics - a
+> buffer over-run at the same place causes the same side effects etc.
+
+> But in any case, the only way I know to deal with this issues is start
+> putting various prints and assertions, and trying to come closer to the
+> root-cause. Sometimes bisecting helps, but this case would be difficult
+> to bisect because the reproducability is hard. Indeed, one may think
+> that there is no failure duding a day, so the commit as 'good' while it
+> may be actually 'bad', the bug just happen to not manifest itself
+> quickly enough.
+
+I have seen the same crash on a 2.6.36 system with all of the UbiFs/Ubi
+backported.  It is also an IMX25 based system.
+
+We have,
+
+ PC is at __up_write+0x3c/0x1a8  
+ LR is at __up_write+0x24/0x1a8  
+ pc : [<c0229400>]    lr : [<c02293e8>]    psr: a0000093  
+ sp : c7225cc8  ip : 00020000  fp : c79fba00  
+ r10: 00000523  r9 : 00000001  r8 : c7b33000  
+ r7 : c793a800  r6 : c7bd473c  r5 : c7bd4738  r4 : c7bd4720  
+ r3 : 00000000  r2 : 00000002  r1 : 00000001  r0 : 00000002  
+ Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user  
+
+ Code: e4863004 e5953004 e1560003 0a00002a (e593200c)
+
+I run this,
+
+   $ printf "\x04\x30\x86\xe4"
+            "\x04\x30\x95\xe5" 
+            "\x03\x00\x56\xe1"
+            "\x2a\x00\x00\x0a"
+            "\x0c\x20\x93\xe5" > crash.dump 
+   $ objdump --disassemble-all -b binary -m arm crash.dump 
+   crash.dump:     file format binary
 
 
-greets
---
-Christian Gmeiner, MSc
+   Disassembly of section .data:
 
-https://soundcloud.com/christian-gmeiner
+   00000000 <.data>:
+      0:   e4863004        str     r3, [r6], #4
+      4:   e5953004        ldr     r3, [r5, #4]
+      8:   e1560003        cmp     r6, r3
+      c:   0a00002a        beq     0xbc
+     10:   e593200c        ldr     r2, [r3, #12]
+
+The values 'r6' and 'r5' are pointers and they are far from non-NULL and
+look like good kernel data pointers.  Something in the list is 'NULL'.
+There is a load of 'r3' as NULL and then the use of '[r3, #12]' which
+gives the crash address of '0xc'.
+
+Here is the objdump with source interspersed for my build,
+
+        sem->activity = 0;
+ 350:   e3a0a000        mov     sl, #0
+ 354:   e1a05000        mov     r5, r0
+ 358:   e485a004        str     sl, [r5], #4
+ * list_empty - tests whether a list is empty
+ * @head: the list to test.
+ */
+static inline int list_empty(const struct list_head *head)
+{
+        return head->next == head;
+ 35c:   e5903004        ldr     r3, [r0, #4]
+        if (!list_empty(&sem->wait_list))
+ 360:   e1550003        cmp     r5, r3
+ 364:   0a00002b        beq     418 <__up_write+0xfc>
+        /* if we are allowed to wake writers try to grant a single write lock
+         * if there's a writer at the front of the queue
+         * - we leave the 'waiting count' incremented to signify potential
+         *   contention
+         */
+        if (waiter->flags & RWSEM_WAITING_FOR_WRITE) {
+ 368:   e593200c        ldr     r2, [r3, #12]
+ 36c:   e2124002        ands    r4, r2, #2
+ 370:   0a000006        beq     390 <__up_write+0x74>
+ 374:   ea000034        b       44c <__up_write+0x130>
+
+The compiler picks different registers,
+
+  r3/sl+r3, r5/r0, r6/r5 but the code is the same.
+
+The 'rw_semaphore' is 
+
+    struct rw_semaphore {
+            __s32		activity;
+            struct list_head	wait_list;
+    };
+
+So, the 'wait_list' is non-NULL, the rw_semaphore is non-NULL, but
+'wait_list->next' is NULL.  This seems to be very consistent with this
+'oops'.
+
+It seems that the "ltree_lock" doesn't protect the use of the
+ltree_lookup() versus insertions and deletions?  Ie, ltree_lookup() may
+return non-NULL, but an interrupt/pagefault before a 'le->users +/- =
+1;' may mean the node is released?  On a UP system, does 'spin_lock()'
+actually do anything?  The rw_semaphore uses spin_lock_irqsave().
+However, that doesn't make sense as I think this occurs mainly on a
+ARM926 system.
+
+The ARM926 systems do not have proper 'lock free' idioms like
+'ldrex/strex' and they try to do atomic operations by locking
+interrupts.  I think that UbiFs/UBI maybe called on a 'data fault' or
+'program fault' (in user space) when memory pressure is present.  I have
+seen this occur in some sound drivers where the data source is coming
+from disk (or maybe the driver uses vmalloc() or something).  So I think
+on occasion, the ltree_lookup() may not work or there is something weird
+with the atomic primatives and data/page faults.
+
+Fwiw,
+Bill Pringlemeir.
