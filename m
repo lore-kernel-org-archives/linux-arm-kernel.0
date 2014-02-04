@@ -1,46 +1,33 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Mon,  3 Feb 2014 21:54:28 -0800
-Subject: [PATCH] regulator: core: Make regulator object reflect configured
- voltage
-Message-ID: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Feb 2014 15:47:27 +0900
+Subject: [PATCH 0/8] ARM: shmobile: Conditionally select SMSC_PHY
+In-Reply-To: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+References: <1389084488-25984-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140204064727.GA25513@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case when a regulator is initialized from DT with equal min and max
-voltages the voltage is applied on initialization and future calls to
-regulator_set_voltage fails. This behavious is different than if the regulator
-is configured to be a span and therefor requires logic to handle this
-difference in the consumer driver.
+On Tue, Jan 07, 2014 at 05:48:00PM +0900, Simon Horman wrote:
+> Select the SMSC_PHY if ethernet is enabled on shmbile boards
+> that have an SMSC phy. This allows the SMSC-specific phy driver
+> to be used rather than relying on generic phy code.
+> 
+> Based on the renesas-devel-v3.13-rc7-20140107 tag
+> of my renesas tree.
+> 
+> Simon Horman (8):
+>   ARM: shmobile: ape6evm: Conditionally select SMSC_PHY
+>   ARM: shmobile: armadillo800eva: Conditionally select SMSC_PHY
+>   ARM: shmobile: bockw: Sort Kconfig node's selections
+>   ARM: shmobile: bockw: Conditionally select SMSC_PHY
+>   ARM: shmobile: kzm9d: Conditionally select SMSC_PHY
+>   ARM: shmobile: kzm9g: Conditionally select SMSC_PHY
+>   ARM: shmobile: mackerel: Conditionally select SMSC_PHY
+>   ARM: shmobile: marzen: Conditionally select SMSC_PHY
+> 
+>  arch/arm/mach-shmobile/Kconfig | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
 
-Eliminate this difference by populating the min_uV and max_uV of the newly
-created regulator from the constraints so that calles to regulator_set_voltage
-is considered no-ops and not a failure.
-
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- drivers/regulator/core.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index d85f313..9c82d37 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1209,6 +1209,16 @@ static struct regulator *create_regulator(struct regulator_dev *rdev,
- 	    _regulator_is_enabled(rdev))
- 		regulator->always_on = true;
- 
-+	/*
-+	 * Make the regulator reflect the configured voltage selected in
-+	 * machine_constraints_voltage()
-+	 */
-+	if (rdev->constraints->apply_uV &&
-+	    rdev->constraints->min_uV == rdev->constraints->max_uV) {
-+		regulator->min_uV = rdev->constraints->min_uV;
-+		regulator->max_uV = rdev->constraints->min_uV;
-+	}
-+
- 	mutex_unlock(&rdev->mutex);
- 	return regulator;
- overflow_err:
--- 
-1.7.9.5
+To my surprise I have discovered that the bockw and kzm9g boards
+do not boot using NFS root if SMSC_PHY enabled. I have dropped
+the SMSC_PHY patches for those boards pending investigation.
