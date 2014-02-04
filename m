@@ -1,116 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Feb 2014 20:13:49 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <1391532784-1953-3-git-send-email-will.deacon@arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-3-git-send-email-will.deacon@arm.com>
-Message-ID: <3460536.Sh23gjDa6X@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 4 Feb 2014 11:15:00 -0800
+Subject: [PATCH] ARM: footbridge: Switch to sched_clock_register()
+In-Reply-To: <1389922207-5154-1-git-send-email-sboyd@codeaurora.org>
+References: <1389922207-5154-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140204191500.GB20528@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014 16:53:03 Will Deacon wrote:
-> +
-> +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> +                   at least a definition of the Configuration Space plus
-> +                   one or both of IO and Memory Space.
-> +
+On 01/16, Stephen Boyd wrote:
+> The 32 bit sched_clock interface supports 64 bits since 3.13-rc1.
+> Upgrade to the 64 bit function to allow us to remove the 32 bit
+> registration interface.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I might need to reread the spec, but I think the config space is not
-actually supposed to be in the 'ranges' of the host bridge at all,
-and it should just be listed in the 'reg'.
+Russell,
 
-IIRC the reason why the config space is part of the three-cell address
-is so that you can have funky ways to say "memory space of the device
-with bus/dev/fn is actually translated to address X rather then Y".
+Can you please apply this for 3.14? This is the last user of the
+deprecated interface in linus' tree. Once this is merged I will
+remove setup_sched_clock(). It's 7945/1 in the patch tracker.
 
-It's too late to change that for the other drivers now, after the
-binding is established.
+> 
+> Based on rmk/for-next
+> 
+>  arch/arm/mach-footbridge/dc21285-timer.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
+> index 3971104d32d4..5d2725fd878c 100644
+> --- a/arch/arm/mach-footbridge/dc21285-timer.c > +++ b/arch/arm/mach-footbridge/dc21285-timer.c
+> @@ -125,7 +125,7 @@ void __init footbridge_timer_init(void)
+>  	clockevents_config_and_register(ce, rate, 0x4, 0xffffff);
+>  }
+>  
+> -static u32 notrace footbridge_read_sched_clock(void)
+> +static u64 notrace footbridge_read_sched_clock(void)
+>  {
+>  	return ~*CSR_TIMER3_VALUE;
+>  }
+> @@ -138,5 +138,5 @@ void __init footbridge_sched_clock(void)
+>  	*CSR_TIMER3_CLR = 0;
+>  	*CSR_TIMER3_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_DIV16;
+>  
+> -	setup_sched_clock(footbridge_read_sched_clock, 24, rate);
+> +	sched_clock_register(footbridge_read_sched_clock, 24, rate);
+>  }
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> +Configuration Space is assumed to be memory-mapped (as opposed to being
-> +accessed via an ioport) and laid out with a direct correspondence to the
-> +geography of a PCI bus address, by concatenating the various components
-> +to form a 24-bit offset:
-> +
-> +        cfg_offset(bus, device, function, register) =
-> +                bus << 16 | device << 11 | function << 8 | register
-
-This won't allow extended config space. Why not just do the
-regular mmconfig layout and make this:
-
-	cfg_offset(bus, device, function, register) =
-		bus << 20 | device << 15 | function << 12 | register;
-
-> +static int virt_pci_setup(int nr, struct pci_sys_data *sys)
-> +{
-> +	struct virt_pci *pci = sys->private_data;
-> +
-> +	if (resource_type(&pci->io)) {
-> +		pci_add_resource(&sys->resources, &pci->io);
-> +		pci_ioremap_io(nr * resource_size(&pci->io), pci->io.start);
-> +	}
-
-This should really compute an io_offset.
-
-> +	if (resource_type(&pci->mem))
-> +		pci_add_resource(&sys->resources, &pci->mem);
-
-and also a mem_offset, which is something different.
-
-> +	pci->cfg_base = devm_ioremap_resource(pci->dev, &pci->cfg);
-> +	return !IS_ERR(pci->cfg_base);
-> +}
-> +
-> +static const struct of_device_id virt_pci_of_match[] = {
-> +	{ .compatible = "linux,pci-virt" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, virt_pci_of_match);
-
-I don't think we even want "virt" in the compatible string. The
-binding should be generic enough that it can actually work with
-real hardware.
-
-> +	for_each_of_pci_range(&parser, &range) {
-> +		u32 restype = range.flags & IORESOURCE_TYPE_BITS;
-> +
-> +		switch (restype) {
-> +		case IORESOURCE_IO:
-> +			if (resource_type(&pci->io))
-> +				dev_warn(dev,
-> +					 "ignoring additional io resource\n");
-> +			else
-> +				of_pci_range_to_resource(&range, np, &pci->io);
-> +			break;
-> +		case IORESOURCE_MEM:
-> +			if (resource_type(&pci->mem))
-> +				dev_warn(dev,
-> +					 "ignoring additional mem resource\n");
-> +			else
-> +				of_pci_range_to_resource(&range, np, &pci->mem);
-> +			break;
-
-This shows once more that the range parser code is suboptimal. So far
-every single driver got the I/O space wrong here, because the obvious
-way to write this function is also completely wrong.
-
-What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
-is not the resource you want to pass into pci_add_resource()
-later.
-
-> +	memset(&hw, 0, sizeof(hw));
-> +	hw.nr_controllers	= 1;
-> +	hw.private_data		= (void **)&pci;
-> +	hw.setup		= virt_pci_setup;
-> +	hw.map_irq		= of_irq_parse_and_map_pci;
-> +	hw.ops			= &virt_pci_ops;
-> +	pci_common_init_dev(dev, &hw);
-
-Since most fields here are constant, I'd just write this as
-
-	struct hw_pci hw = {
-		.nr_controllers = 1,
-		.setup = virt_pci_setup,
-		...
-	};
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
