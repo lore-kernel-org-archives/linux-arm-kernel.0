@@ -1,64 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Feb 2014 17:15:54 +0100
-Subject: [RFC/RFT 1/2] ARM: mm: introduce arch hooks for dma address
- translation routines
-In-Reply-To: <1391470107-15927-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
- <1391470107-15927-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <201402041715.54538.arnd@arndb.de>
+Date: Tue, 4 Feb 2014 17:18:41 +0100
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <CAPcvp5HN4pBysOdS5_ep_3Lp7GDDKw4YrgmKjYzBet7PtaOLUg@mail.gmail.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140204122951.GC27975@e106497-lin.cambridge.arm.com>
+ <CAPcvp5HN4pBysOdS5_ep_3Lp7GDDKw4YrgmKjYzBet7PtaOLUg@mail.gmail.com>
+Message-ID: <201402041718.41931.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014, Santosh Shilimkar wrote:
-> Currently arch specific DMA address translation routines can be enabled
-> using only defines which makes impossible to use them in with
-> multi-platform builds.
+On Tuesday 04 February 2014, Andrew Murray wrote:
+> On 4 February 2014 12:29, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Mon, Feb 03, 2014 at 10:34:40PM +0000, Andrew Murray wrote:
+> >> On 3 February 2014 18:43, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> >> > index 4cc813e..ce5bad2 100644
+> >> > --- a/arch/arm64/include/asm/io.h
+> >> > +++ b/arch/arm64/include/asm/io.h
+> >> > @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+> >> >  /*
+> >> >   *  I/O port access primitives.
+> >> >   */
+> >> > +#define arch_has_dev_port()    (0)
+> >> >  #define IO_SPACE_LIMIT         0xffff
+> >> >  #define PCI_IOBASE             ((void __iomem *)(MODULES_VADDR - SZ_2M))
+> >> >
+> >> > +#define ioport_map(port, nr)   (PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
+> >> > +#define ioport_unmap(addr)
+> >>
+> >> I'm not sure that this will work. The in[bwl], out[bwl] macros in
+> >> arch/arm64/include/asm/io.h already add the PCI_IOBASE offset.
+> >>
+> >> Instead of these two #defines, why not just enforce that
+> >> GENERIC_PCI_IOMAP is enabled? Or at least wrap these defines with 'if
+> >> (!config_enabled(CONFIG_GENERIC_PCI_IOMAP))' or similar.
+> >
+> > GENERIC_PCI_IOMAP is enabled for AArch64. We have select GENERIC_IOMAP in
+> > arch/arm64/Kconfig which in turn selects GENERIC_PCI_IOMAP in lib/Kconfig.
 > 
-> Hence, introduce arch specific hooks for DMA address translations
-> routines to be compatible with multi-platform builds:
-> dma_addr_t (*arch_pfn_to_dma)(struct device *dev, unsigned long pfn);
-> unsigned long (*arch_dma_to_pfn)(struct device *dev, dma_addr_t addr);
-> void* (*arch_dma_to_virt)(struct device *dev, dma_addr_t addr);
-> dma_addr_t (*arch_virt_to_dma)(struct device *dev, void *addr);
-> 
-> In case if architecture won't use it - DMA address translation routines
-> will fall-back to existing implementation.
-> v
-> Also, modify machines omap1, ks8695, iop13xx to use new DMA hooks.
+> Sorry, it was intent to suggest using the ioport_[map|unmap] functions
+> in lib/iomap.c instead of defining something similar here. I guess you
+> will also need to also define CONFIG_HAS_IOPORT for this to happen.
 
-I think this is going into a wrong direction. DMA translation is not
-at all a platform-specific thing, but rather bus specific. The most
-common scenario is that you have some 64-bit capable buses and some
-buses that are limited to 32-bit DMA (or less if you are unfortunate).
-
-We also can't rely on {pfn,phys,virt}_to_{bus,dma} and the reverse
-to work anywhere outside of the dma_map_ops implementation, because
-of IOMMUs in-between.
-
-Of course we do need a proper solution for this problem, but we
-can't make it a per-platform decision, and whatever the solution is
-needs to take into account both nontrivial linear mappings (offset
-or cropped) and IOMMUs, and set the appropriate dma_map_ops for
-the device.
-
-I guess for the legacy cases (omap1, iop13xx, ks8695), we can
-hardcode dma_map_ops for all devices to get this right. For everything
-else, I'd suggest defaulting to the arm_dma_ops unless we get
-other information from DT. This means we have to create standardized
-properties to handle any combination of these:
-
-1. DMA is coherent
-2. DMA space is offset from phys space
-3. DMA space is smaller than 32-bit
-4. DMA space is larger than 32-bit
-5. DMA goes through an IOMMU
-
-The dma-ranges property can deal with 2-4. Highbank already introduced
-a "dma-coherent" flag for 1, and we can decide to generalize that.
-I don't know what the state of IOMMU support is, but we have to come
-up with something better than what we had on PowerPC, because we now
-have to deal with a combination of different IOMMUs in the same system,
-whereas the most complex case on PowerPC was some devices all going
-through one IOMMU and the other devices being linearly mapped.
+We do want CONFIG_HAS_IOPORT, but I would say that we should not use
+CONFIG_GENERIC_IOMAP. As I explained in another reply, enabling this
+was probably a simple mistake, and we only need this if we want I/O
+spaces that are /not/ memory mapped. IMHO any ARM64 system that doesn't
+map its PCI I/O space into MMIO space can live without I/O port
+access.
 
 	Arnd
