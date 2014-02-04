@@ -1,80 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 4 Feb 2014 09:16:29 -0600
-Subject: [PATCH] ARM: dts: omap3-ldp: fix mmc configuration
-In-Reply-To: <52F0E109.30801@ti.com>
-References: <1390260873-22354-1-git-send-email-nm@ti.com>
- <52F0E109.30801@ti.com>
-Message-ID: <52F1044D.2020004@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Feb 2014 15:20:56 +0000
+Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
+In-Reply-To: <20140204150156.GC4627@beef>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-4-git-send-email-mporter@linaro.org>
+ <20140204132951.GE13529@lee--X1> <20140204143119.GA4627@beef>
+ <20140204144731.GA3154@lee--X1> <20140204150156.GC4627@beef>
+Message-ID: <20140204152056.GB3154@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2014 06:46 AM, Balaji T K wrote:
-> On Tuesday 21 January 2014 05:04 AM, Nishanth Menon wrote:
->> MMC1 is the only MMC interface available on the platform. Further,
->> since the platform is based on older revision of SoC which is not
->> capable of doing multi-block writes, mark it so and add pinmux
+> > ... then you'll still need this.
 > 
-> s/writes/read
-arrgh.. yes.
+> Yes, I was far too vague..I'm going to stop explicitly populating the
+> data field.
+> 
+> static const struct of_device_id bcm59056_of_match[] = {
+> 	{ .compatible = "brcm,bcm59056"},
+> 	{ }
+> };
 
-> 
-> Thanks and Regards,
-> Balaji T K
-> 
->> to ensure that all relevant pins are configured for non-MMC boot
->> mode.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->> ti,erratum-2.1.1.128 introduced in https://patchwork.kernel.org/patch/3514851/
->> hence depends on the same.
->>   arch/arm/boot/dts/omap3-ldp.dts |   22 ++++++++++++++++++++++
->>   1 file changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
->> index ddce0d8..bc0cc66 100644
->> --- a/arch/arm/boot/dts/omap3-ldp.dts
->> +++ b/arch/arm/boot/dts/omap3-ldp.dts
->> @@ -176,6 +176,17 @@
->>   &mmc1 {
->>   	vmmc-supply = <&vmmc1>;
->>   	bus-width = <4>;
->> +	ti,erratum-2.1.1.128;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc1_pins>;
->> +};
->> +
->> +&mmc2 {
->> +	status="disabled";
->> +};
->> +
->> +&mmc3 {
->> +	status="disabled";
->>   };
->>
->>   &omap3_pmx_core {
->> @@ -209,6 +220,17 @@
->>   			0x174 (PIN_OUTPUT | MUX_MODE0)	/* hsusb0_stp.hsusb0_stp */
->>   		>;
->>   	};
->> +
->> +	mmc1_pins: pinmux_mmc1_pins {
->> +		pinctrl-single,pins = <
->> +			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.mmc1_clk */
->> +			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.mmc1_cmd */
->> +			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.mmc1_dat0 */
->> +			OMAP3_CORE1_IOPAD(0x214A, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.mmc1_dat1 */
->> +			OMAP3_CORE1_IOPAD(0x214C, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.mmc1_dat2 */
->> +			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.mmc1_dat3 */
->> +		>;
->> +	};
->>   };
->>
->>   &usb_otg_hs {
->>
-> 
++1
 
+> > And I don't think you can drop this, as the I2C subsystem still
+> > insists on it.
+> 
+> Agreed. I'm just dropping explicit population of the driver_data field
+> here.
+> 
+> static const struct i2c_device_id bcm59056_i2c_id[] = {
+> 	{ "bcm59056" },
+> 	{ }
+> };
+
++1
+
+> > I think you need to keep this to supply the silly I2C ID table.
+> > 
+> > I would just omit the '.data = (void *) VERSION' from the
+> > of_match_table until you require it. 
+> 
+> Well, it's not even necessary for I2C ID table. the I2C subsystem is
+> happy with just a matching entry on the i2c_device_id name field and
+> NULL driver_data. palmas is implemented in this manner.
+
+Guess what? +1 :)
 
 -- 
-Regards,
-Nishanth Menon
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
