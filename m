@@ -1,36 +1,240 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 4 Feb 2014 18:54:52 +0200
-Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
-References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
- <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
-Message-ID: <52F11B5C.40407@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 4 Feb 2014 10:51:49 -0600
+Subject: [PATCH 1/2] PM / OPP: Add support for 'boost' mode OPP
+In-Reply-To: <CAJuA9aimVcxwKEQnSNpsEhZ7Rf-74+r8FOz09EpAZcoVEdi6GA@mail.gmail.com>
+References: <1391506890-7335-1-git-send-email-thomas.ab@samsung.com>	<1391506890-7335-2-git-send-email-thomas.ab@samsung.com>	<52F10418.4040806@ti.com>
+ <CAJuA9aimVcxwKEQnSNpsEhZ7Rf-74+r8FOz09EpAZcoVEdi6GA@mail.gmail.com>
+Message-ID: <52F11AA5.6060200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was so in v1. But it was decided to use explicit memory barriers,
-because we're always sure the memory barriers are there and that
-they're properly documented. Also in this case I don't need to add
-keystone readl/writel relaxed function variants and to use mixed calls of
-writel/writel_relaxed functions.
+On 02/04/2014 09:59 AM, Thomas Abraham wrote:
+> On Tue, Feb 4, 2014 at 8:45 PM, Nishanth Menon <nm@ti.com> wrote:
+>> On 02/04/2014 03:41 AM, Thomas Abraham wrote:
+>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>
+>>> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+>>> support for CPU boost mode. This patch adds support for finding available
+>>> boost OPPs from device tree and marking them as usable in boost mode.
+>>>
+>>> Cc: Nishanth Menon <nm@ti.com>
+>>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>> ---
+>>
+>> Why is a cpufreq feature being pushed on to OPP library? you can very
+>> well have a property boot-frequencies = < a b c > and be done with the
+>> job.
+> 
+> The boost-opp was not limited to be a cpu/cpufreq only feature. Any
+> device (such as a bus) which has OPPs and if it can support optional
+> boost OPPs, can utilize this feature. The boost OPPs also require a
+> voltage to be associated with the frequency and hence the binding
+> boost-frequencies would not be suffice. The code changes in this patch
+> also do not have anything that is cpufreq specific.
+> 
+if we have
+operating-points = < Fa Va
+	Fb Vb
+	Fc Vc
+	Fd Vd
+	>;
+boost-frequencies = <Fc Fd>;
+you can easily pick up the voltages from the table.
 
-See:
-http://www.spinics.net/lists/arm-kernel/msg294941.html
+The point being - there does not seem to be a need to modify the
+existing definitions to introduce new OPP definitions.
 
-On 02/04/2014 06:24 PM, Thomas Gleixner wrote:
-> On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
->> +	keystone_timer_writel(off, TCR);
->> +	/* here we have to be sure the timer has been disabled */
->> +	wmb();
-> We have explicit writew_relaxed and writew. Why open coding the
-> barriers?
->
-> Thanks,
->
-> 	tglx
+a way to flip this over is to consider iMX6(see
+arch/arm/mach-imx/mach-imx6q.) where OPP tuple <Fd Vd> can only be
+enabled *iff* efuse register x has bit y set.
+
+Would we want to introduce efuse offsets into OPP definitions? into
+something like additional field definition 'efuse_controlled'?
+
+
+>>
+>> I agree with Rob's comment that this is something we have to discuss
+>> in wider "add features to an OPP" discussion[1].
+> 
+> Okay. I have read through the discussion in [1]. Thanks for the link.
+> Assuming that the current OPP tuple format will not change, I do not
+> feel the code changes in this patch will be hinder the outcome of the
+> discussion in [1].
+
+The context of that discussion is to consider what is the data form we
+consider OPP as? should we consider OPP as a data that is extensible
+(as in phandle with properties that we add on) OR should we consider
+key, value pair which provides a key (frequency) into another table
+for other data (like efuse bit map, boost set etc..).
+
+Both approaches I mentioned will work, and will take additional code
+to make it happen. But having custom properties like this limits
+extensibility - that is not scalable for other property definitions
+we'd like to make in the future.
+
+> 
+> Regards,
+> Thomas.
+> 
+>>
+>>
+>> [1] http://marc.info/?t=139108946400001&r=1&w=2
+>>
+>>>  drivers/base/power/opp.c |   69 +++++++++++++++++++++++++++++++++++++---------
+>>>  1 file changed, 56 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+>>> index 2553867..de4d52d 100644
+>>> --- a/drivers/base/power/opp.c
+>>> +++ b/drivers/base/power/opp.c
+>>> @@ -62,6 +62,7 @@ struct dev_pm_opp {
+>>>       struct list_head node;
+>>>
+>>>       bool available;
+>>> +     bool boost;
+>>>       unsigned long rate;
+>>>       unsigned long u_volt;
+>>>
+>>> @@ -380,10 +381,12 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+>>>  EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+>>>
+>>>  /**
+>>> - * dev_pm_opp_add()  - Add an OPP table from a table definitions
+>>> + * dev_pm_opp_add_flags()  - Add an OPP to device OPP list with flags
+>>>   * @dev:     device for which we do this operation
+>>>   * @freq:    Frequency in Hz for this OPP
+>>>   * @u_volt:  Voltage in uVolts for this OPP
+>>> + * @available:       initial availability of the OPP with adding it to the list.
+>>> + * @boost:   availability of this opp in controller's boost operating mode.
+>>>   *
+>>>   * This function adds an opp definition to the opp list and returns status.
+>>>   * The opp is made available by default and it can be controlled using
+>>> @@ -395,7 +398,8 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+>>>   * that this function is *NOT* called under RCU protection or in contexts where
+>>>   * mutex cannot be locked.
+>>>   */
+>>> -int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+>>> +static int dev_pm_opp_add_flags(struct device *dev, unsigned long freq,
+>>> +                     unsigned long u_volt, bool available, bool boost)
+>>>  {
+>>>       struct device_opp *dev_opp = NULL;
+>>>       struct dev_pm_opp *opp, *new_opp;
+>>> @@ -441,7 +445,8 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+>>>       new_opp->dev_opp = dev_opp;
+>>>       new_opp->rate = freq;
+>>>       new_opp->u_volt = u_volt;
+>>> -     new_opp->available = true;
+>>> +     new_opp->available = available;
+>>> +     new_opp->boost = boost;
+>>>
+>>>       /* Insert new OPP in order of increasing frequency */
+>>>       head = &dev_opp->opp_list;
+>>> @@ -462,6 +467,27 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+>>>       srcu_notifier_call_chain(&dev_opp->head, OPP_EVENT_ADD, new_opp);
+>>>       return 0;
+>>>  }
+>>> +
+>>> +/**
+>>> + * dev_pm_opp_add()  - Add an OPP table from a table definitions
+>>> + * @dev:     device for which we do this operation
+>>> + * @freq:    Frequency in Hz for this OPP
+>>> + * @u_volt:  Voltage in uVolts for this OPP
+>>> + *
+>>> + * This function adds an opp definition to the opp list and returns status.
+>>> + * The opp is made available by default and it can be controlled using
+>>> + * dev_pm_opp_enable/disable functions.
+>>> + *
+>>> + * Locking: The internal device_opp and opp structures are RCU protected.
+>>> + * Hence this function internally uses RCU updater strategy with mutex locks
+>>> + * to keep the integrity of the internal data structures. Callers should ensure
+>>> + * that this function is *NOT* called under RCU protection or in contexts where
+>>> + * mutex cannot be locked.
+>>> + */
+>>> +int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+>>> +{
+>>> +     return dev_pm_opp_add_flags(dev, freq, u_volt, true, false);
+>>> +}
+>>>  EXPORT_SYMBOL_GPL(dev_pm_opp_add);
+>>>
+>>>  /**
+>>> @@ -651,7 +677,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>>>
+>>>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
+>>>               if (opp->available) {
+>>> -                     freq_table[i].driver_data = i;
+>>> +                     freq_table[i].driver_data =
+>>> +                             opp->boost ? CPUFREQ_BOOST_FREQ : i;
+>>>                       freq_table[i].frequency = opp->rate / 1000;
+>>>                       i++;
+>>>               }
+>>> @@ -701,19 +728,14 @@ struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev)
+>>>  }
+>>>
+>>>  #ifdef CONFIG_OF
+>>> -/**
+>>> - * of_init_opp_table() - Initialize opp table from device tree
+>>> - * @dev:     device pointer used to lookup device OPPs.
+>>> - *
+>>> - * Register the initial OPP table with the OPP library for given device.
+>>> - */
+>>> -int of_init_opp_table(struct device *dev)
+>>> +static int of_parse_opp_table(struct device *dev, const char *prop_name,
+>>> +                                     bool boost)
+>>>  {
+>>>       const struct property *prop;
+>>>       const __be32 *val;
+>>>       int nr;
+>>>
+>>> -     prop = of_find_property(dev->of_node, "operating-points", NULL);
+>>> +     prop = of_find_property(dev->of_node, prop_name, NULL);
+>>>       if (!prop)
+>>>               return -ENODEV;
+>>>       if (!prop->value)
+>>> @@ -734,7 +756,7 @@ int of_init_opp_table(struct device *dev)
+>>>               unsigned long freq = be32_to_cpup(val++) * 1000;
+>>>               unsigned long volt = be32_to_cpup(val++);
+>>>
+>>> -             if (dev_pm_opp_add(dev, freq, volt)) {
+>>> +             if (dev_pm_opp_add_flags(dev, freq, volt, true, boost)) {
+>>>                       dev_warn(dev, "%s: Failed to add OPP %ld\n",
+>>>                                __func__, freq);
+>>>                       continue;
+>>> @@ -744,5 +766,26 @@ int of_init_opp_table(struct device *dev)
+>>>
+>>>       return 0;
+>>>  }
+>>> +
+>>> +/**
+>>> + * of_init_opp_table() - Initialize opp table from device tree
+>>> + * @dev:     device pointer used to lookup device OPPs.
+>>> + *
+>>> + * Register the initial OPP table with the OPP library for given device.
+>>> + * Additional "boost" operating points of the controller, if any, are
+>>> + * specified with "boost-opp" property.
+>>> + */
+>>> +int of_init_opp_table(struct device *dev)
+>>> +{
+>>> +     int ret;
+>>> +
+>>> +     ret = of_parse_opp_table(dev, "operating-points", false);
+>>> +     if (!ret) {
+>>> +             ret = of_parse_opp_table(dev, "boost-opp", true);
+>>> +             if (ret == -ENODEV)
+>>> +                     ret = 0;
+>>> +     }
+>>> +     return ret;
+>>> +}
+>>>  EXPORT_SYMBOL_GPL(of_init_opp_table);
+>>>  #endif
+>>>
+>>
+>>
+>> --
+>> Regards,
+>> Nishanth Menon
+
 
 -- 
 Regards,
-Ivan Khoronzhuk
+Nishanth Menon
