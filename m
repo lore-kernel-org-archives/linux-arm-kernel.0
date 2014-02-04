@@ -1,36 +1,63 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 04 Feb 2014 13:17:28 -0800
-Subject: [Patch v5 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1391546556-27702-2-git-send-email-agross@codeaurora.org>
-References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
- <1391546556-27702-2-git-send-email-agross@codeaurora.org>
-Message-ID: <1391548648.2538.32.camel@joe-AO722>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 4 Feb 2014 16:29:14 -0500
+Subject: [PATCH 4/6] regulator: add bcm59056 regulator driver
+In-Reply-To: <20140204172836.GH22609@sirena.org.uk>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-5-git-send-email-mporter@linaro.org>
+ <20140204172836.GH22609@sirena.org.uk>
+Message-ID: <20140204212914.GB16179@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-04 at 14:42 -0600, Andy Gross wrote:
-> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> found in the MSM 8x74 platforms.
+On Tue, Feb 04, 2014 at 05:28:36PM +0000, Mark Brown wrote:
+> On Tue, Feb 04, 2014 at 07:19:10AM -0500, Matt Porter wrote:
+> 
+> > +static unsigned int bcm59056_get_mode(struct regulator_dev *dev)
+> > +{
+> > +	return REGULATOR_MODE_NORMAL;
+> > +}
+> > +
+> > +static int bcm59056_set_mode(struct regulator_dev *dev, unsigned int mode)
+> > +{
+> > +	if (mode == REGULATOR_MODE_NORMAL)
+> > +		return 0;
+> > +	else
+> > +		return -EINVAL;
+> > +}
+> 
+> These do nothing, don't implement them.
 
-trivia: fixable later.
+Will remove. Maybe some day.
 
-> diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-[]
-> +	/* allocate enough room to accomodate the number of entries */
-> +	async_desc = kzalloc(sizeof(*async_desc) +
-> +			(sg_len * sizeof(struct bam_desc_hw)), GFP_NOWAIT);
-> +
-> +	if (!async_desc) {
-> +		dev_err(bdev->dev, "failed to allocate async descriptor\n");
+> > +	if (bcm59056->dev->of_node)
+> > +		pmu_data = bcm59056_parse_dt_reg_data(pdev,
+> > +						      &bcm59056_reg_matches);
+> 
+> It'd seem a bit neater to put the OF check into the parse function but
+> meh.
 
-Unnecessary OOM message as generic alloc has an
-OOM message with a dump_stack();
+On second look, I'd agree. Easy enough to clean up.
 
-> +static int bam_dma_probe(struct platform_device *pdev)
-> +{
-[]
-> +	ret = clk_prepare_enable(bdev->bamclk);
-> +	if (ret) {
-> +		dev_err(bdev->dev, "failed to prepare/enable clock");
+> > +	if (!pmu_data) {
+> > +		dev_err(&pdev->dev, "Platform data not found\n");
+> > +		return -EINVAL;
+> > +	}
+> 
+> Like I said when reviewing the binding this should not cause the driver
+> to fail to load.
 
-Missing terminating \n newline
+Will fix.
+
+> > +		/*
+> > +		 * Regulator API handles empty constraints but not NULL
+> > +		 * constraints
+> > +		 */
+> > +		if (!reg_data)
+> > +			continue;
+> 
+> It should do...  if not then make it so since that'd mean most drivers
+> are buggy.
+
+Ahh, I see there is a check for NULL in the core. Will drop.
+
+-Matt
