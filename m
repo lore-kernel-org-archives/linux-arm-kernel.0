@@ -1,80 +1,80 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 04 Feb 2014 08:36:36 -0800
-Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
-In-Reply-To: <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
-References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
- <1391483274-20331-2-git-send-email-sujith@msujith.org>
- <1391484878.2538.11.camel@joe-AO722>
- <21232.24855.201543.400943@gargle.gargle.HOWL>
- <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
-Message-ID: <1391531796.2538.21.camel@joe-AO722>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 4 Feb 2014 11:38:32 -0500
+Subject: [RFC/RFT 1/2] ARM: mm: introduce arch hooks for dma address
+ translation routines
+In-Reply-To: <201402041715.54538.arnd@arndb.de>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <1391470107-15927-2-git-send-email-santosh.shilimkar@ti.com>
+ <201402041715.54538.arnd@arndb.de>
+Message-ID: <52F11788.4030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-04 at 08:03 +0100, Holger Schurig wrote:
-> Joe, look in linux/arch/arm/include/asm/delay.h. The macro udelay
-> cannot handle large values because of lost-of-precision.
+On Tuesday 04 February 2014 11:15 AM, Arnd Bergmann wrote:
+> On Tuesday 04 February 2014, Santosh Shilimkar wrote:
+>> Currently arch specific DMA address translation routines can be enabled
+>> using only defines which makes impossible to use them in with
+>> multi-platform builds.
+>>
+>> Hence, introduce arch specific hooks for DMA address translations
+>> routines to be compatible with multi-platform builds:
+>> dma_addr_t (*arch_pfn_to_dma)(struct device *dev, unsigned long pfn);
+>> unsigned long (*arch_dma_to_pfn)(struct device *dev, dma_addr_t addr);
+>> void* (*arch_dma_to_virt)(struct device *dev, dma_addr_t addr);
+>> dma_addr_t (*arch_virt_to_dma)(struct device *dev, void *addr);
+>>
+>> In case if architecture won't use it - DMA address translation routines
+>> will fall-back to existing implementation.
+>> v
+>> Also, modify machines omap1, ks8695, iop13xx to use new DMA hooks.
 > 
-> IMHO udelay on ARM is broken, because it also cannot work with fast
-> ARM processors (where bogomips >= 3355, which is in sight now). It's
-> just not broken enought that someone did something against it ...   so
-> the current kludge is good enought.
+> I think this is going into a wrong direction. DMA translation is not
+> at all a platform-specific thing, but rather bus specific. The most
+> common scenario is that you have some 64-bit capable buses and some
+> buses that are limited to 32-bit DMA (or less if you are unfortunate).
+>
+I may be wrong but you could have 64 bit bus but 32 bit DMA controllers.
+That is one of the case I am dealing with.
+ 
+> We also can't rely on {pfn,phys,virt}_to_{bus,dma} and the reverse
+> to work anywhere outside of the dma_map_ops implementation, because
+> of IOMMUs in-between.
+> 
+> Of course we do need a proper solution for this problem, but we
+> can't make it a per-platform decision, and whatever the solution is
+> needs to take into account both nontrivial linear mappings (offset
+> or cropped) and IOMMUs, and set the appropriate dma_map_ops for
+> the device.
+> 
+> I guess for the legacy cases (omap1, iop13xx, ks8695), we can
+> hardcode dma_map_ops for all devices to get this right. For everything
+> else, I'd suggest defaulting to the arm_dma_ops unless we get
+> other information from DT. This means we have to create standardized
+> properties to handle any combination of these:
+> 
+Thats the case and the $subject series doesn't change that.
 
-Maybe something like this would be better?
+> 1. DMA is coherent
+> 2. DMA space is offset from phys space
+> 3. DMA space is smaller than 32-bit
+> 4. DMA space is larger than 32-bit
+> 5. DMA goes through an IOMMU
+> 
+> The dma-ranges property can deal with 2-4. Highbank already introduced
+> a "dma-coherent" flag for 1, and we can decide to generalize that.
+> I don't know what the state of IOMMU support is, but we have to come
+> up with something better than what we had on PowerPC, because we now
+> have to deal with a combination of different IOMMUs in the same system,
+> whereas the most complex case on PowerPC was some devices all going
+> through one IOMMU and the other devices being linearly mapped.
+> 
+Just to be clear, the patch set is not fiddling with dma_ops as such.
+The dma_ops needs few accessors to convert addresses and these accessors
+are different on few platforms. And hence needs to be patched.
 
----
- arch/arm/include/asm/delay.h | 33 +++++++++++++++++++++++++++++----
- 1 file changed, 29 insertions(+), 4 deletions(-)
+We will try to look at "dma-ranges" to see if it can address my case.
+Thanks for the pointer
 
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index dff714d..ac33c56 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -15,6 +15,8 @@
+Regards,
+Santosh
  
- #ifndef __ASSEMBLY__
- 
-+#include <linux/printk.h>
-+
- struct delay_timer {
- 	unsigned long (*read_current_timer)(void);
- 	unsigned long freq;
-@@ -51,11 +53,34 @@ extern void __bad_udelay(void);
- #define __udelay(n)		arm_delay_ops.udelay(n)
- #define __const_udelay(n)	arm_delay_ops.const_udelay(n)
- 
-+#ifdef DEBUG
-+#define __udelay_debug_max_delay(n)					\
-+do {									\
-+	if (n > MAX_UDELAY_MS * 1000) {					\
-+		pr_debug("udelay(%d) too large - Convert to mdelay\n", n); \
-+		dump_stack();						\
-+	}								\
-+} while (0)
-+#else
-+#define __udelay_debug_max_delay(n)					\
-+	do {} while (0)
-+#endif
-+
- #define udelay(n)							\
--	(__builtin_constant_p(n) ?					\
--	  ((n) > (MAX_UDELAY_MS * 1000) ? __bad_udelay() :		\
--			__const_udelay((n) * UDELAY_MULT)) :		\
--	  __udelay(n))
-+({									\
-+	if (__builtin_constant_p(n)) {					\
-+		typeof n _n = n;					\
-+		while (_n > MAX_UDELAY_MS * 1000) {			\
-+			__const_udelay(MAX_UDELAY_MS * 1000 * UDELAY_MULT); \
-+			_n -= MAX_UDELAY_MS * 1000;			\
-+		}							\
-+		if (_n)							\
-+			__const_udelay(_n * 1000 * UDELAY_MULT);	\
-+	} else {							\
-+		__udelay_debug_max_delay(n);				\
-+		__udelay(n);						\
-+	}								\
-+})
- 
- /* Loop-based definitions for assembly code. */
- extern void __loop_delay(unsigned long loops);
