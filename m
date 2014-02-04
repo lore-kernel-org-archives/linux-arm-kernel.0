@@ -1,35 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Feb 2014 21:17:28 +0100 (CET)
-Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52F11B5C.40407@ti.com>
-References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
- <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
- <52F11B5C.40407@ti.com>
-Message-ID: <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Feb 2014 21:18:22 +0100
+Subject: [PATCH] pinctrl: single: add low powr mode support
+In-Reply-To: <1390893644-3458-1-git-send-email-chao.xie@marvell.com>
+References: <1390893644-3458-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CACRpkdaMDRKXgMjtbnV8hhhuKYbNzSG1U7LYnD5WEDaUE4z8pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
+On Tue, Jan 28, 2014 at 8:20 AM, Chao Xie <chao.xie@marvell.com> wrote:
 
-Please do not top post.
+> From: Chao Xie <chao.xie@marvell.com>
+>
+> For some silicons, the pin configuration register can control
+> the output of the pin when the pad including the pin enter
+> low power mode.
+> For example, the pin can be "Drive 1", "Drive 0", "Float" when
+> the pad including the pin enter low power mode.
+> It is very useful when you want to control the power leakeage
+> when the SOC enter low power mode, and can save more power for
+> the low power mode.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-> It was so in v1. But it was decided to use explicit memory barriers,
-> because we're always sure the memory barriers are there and that
-> they're properly documented. Also in this case I don't need to add
-> keystone readl/writel relaxed function variants and to use mixed calls of
-> writel/writel_relaxed functions.
-> 
-> See:
-> http://www.spinics.net/lists/arm-kernel/msg294941.html
+Looks similar to the other pin config stuff, patch applied
+unless Tony protests.
 
-Fair enough, but we want a proper explanation for explicit barriers in
-the code and not in some random discussion of patch version X on some
-random mailing list.
-
-Aside of that it should be iowmb(), but I might miss something ...
-
-Thanks,
-
-	tglx
+Yours,
+Linus Walleij
