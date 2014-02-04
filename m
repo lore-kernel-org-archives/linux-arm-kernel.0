@@ -1,93 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Feb 2014 10:44:52 +0100
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <20140203233137.GH2519@obsidianresearch.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
- <20140203233137.GH2519@obsidianresearch.com>
-Message-ID: <13031998.NR888KZWhk@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Feb 2014 10:40:51 +0100
+Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
+In-Reply-To: <52E77FCD.5050701@redhat.com>
+References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
+ <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
+ <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
+ <20140128094427.GZ3867@lukather> <52E77FCD.5050701@redhat.com>
+Message-ID: <20140204094051.GL25625@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 February 2014 16:31:37 Jason Gunthorpe wrote:
-> Specifying 'use EHCI, AHCI, etc' - which are all PCI based standards
-> without clearly specifying exactly how PCI is suppose to work is
-> completely bonkers.
+Hi Hans,
+
+On Tue, Jan 28, 2014 at 11:00:45AM +0100, Hans de Goede wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
 > 
-> What is needed is a spec that says:
->  1) Here is how you generate config TLPs. A MMIO region that
->     conforms to the already specified x86 ECAM would
->     be perfect
->  2) Here is a dword by dword break down of the entire config space in
->     a SOC. Here is where a on-board AHCI controller must show up in
->     config space. Here is how an external PCI-E port must show
->     up. Etc. Most of this is already specified, but it clearly needs
->     to be layed out explicitly for ARM SOCs to actually follow it.
->  3) Here is how you specify the aperture(s) associated with PCI BAR's
->     and bridge windows in config space. And yes: The CONFIG SPACE
->     BARS MUST WORK.
->  4) Here is how MSI works, these are the values you put in the
->     address/data and here is how you collect the interrupt.
->  5) Here is how Legacy INTx must be mapped into the GIC.
+> Hi,
 > 
-> This is what x86 does, and they have been doing it well for 10
-> years. If you want to play in the server game you have to properly
-> implement PCI.
+> On 01/28/2014 10:44 AM, Maxime Ripard wrote:
+> > On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
+> >>>> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
+> >>> 
+> >>> Maybe we can just remove the gates from there? Even though they
+> >>> are gates, they are also (a bit) more than that.
+> >> 
+> >> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
+> > 
+> > Yep, exactly
+> > 
+> >>> I guess that means that we will have the OHCI0 gate declared
+> >>> with <&...-gates-clk 6>, while it's actually the first gate for
+> >>> this clock?
+> >> 
+> >> Correct.
+> >> 
+> >>> Maybe introducing an offset field in the gates_data would be a
+> >>> good idea, so that we always start from indexing the gates from
+> >>> 0 in the DT?
+> >> 
+> >> Well for the other "gates" type clks we also have holes in the
+> >> range, and we always refer to the clk with the bit number in the
+> >> reg as the clock-cell value.
+> > 
+> > Yes, we have holes, but I see two majors differences here: - the
+> > other gates are just gates, while the usb clocks are a bit more
+> > than that.
+> 
+> The usb-clk registers contain more then that, but the bits we are
+> talking about now are gates.
+> 
+> > - the other gates' gating bits thus all start at bit 0, while
+> > - here, since it's kind of a "mixed" clock, the gating bits start
+> > - at bit 6 (on the A20 at least)
+> 
+> Right, still I believe that the consistent thing to do is keeping
+> the bit-number for the bit in the register controlling the gate as
+> the specifier.  When adding new dts entries / reviewing existing
+> ones I'm used to matching the specifier to the bit-nr in the
+> data-sheet, I think making things different just for this one
+> register is counter productive.
 
-I'm pretty sure the authors of the SBSA actually thought that was
-what they wrote, by referring to external specifications (pci-3.0,
-ehci, ahci, ...).  However, it seems they were either foolish enough
-to believe that hardware designers would follow these specs, or
-they were intentionally misled and got talked into putting ambiguous
-terminology in because there were already hardware designs that
-are not exactly in line with the spirit of the SBSA but can be
-argued to be conforming to the text for a lax interpretation.
+And if you turn it the other way around, it would be inconsistent that
+all gates indices start at 0, and we would start at 6 here :)
 
-I think EHCI is a much better example than PCI here, because the
-spec has exactly one line to say about it, where it spends a whole
-chapter on PCI.
+Plus, this clock is already a special case, since it's the only gate
+that is more than just a gate so far.
 
-Here is how a sane person would read SBSA to create a compliant
-implementation:
+Maxime
 
-  I have to use EHCI version 1.1 to provide USB-2.0 support. EHCI
-  is a PCI device, so I'll put it behind a PCIe port that complies
-  to the PCIe section of the SBSA. Since EHCI by itself only provides
-  high-speed USB, and USB-2.0 mandates I provide low-speed and
-  full-speed as well, I have to add a USB hub device. It would have
-  been easier to just use OHCI for these, but SBSA says I can't.
-  Now I want to integrate the EHCI into my SoC and not waste one
-  of my precious PCIe root ports, so I have to create another PCI
-  domain with its own ECAM compliant config space to put it into.
-  Fortunately SBSA lets me add an arbitrary number of PCI domains,
-  as long as they are all strictly compliant. To software it will
-  look exactly as if it was on an external card, I just have to
-  ensure the boot loader correctly sets up the clocks and the phy
-  before an SBSA compliant OS gets loaded, all runtime power
-  management will get handled through the EHCI-1.1 energy-efficiency
-  extensions.
-
-Here is how a crazy person would read the same sentence in the SBSA:
-
-  I have an IP block that implements the EHCI register set, that
-  should be good enough. It's not a fast device, so I can put it
-  on a non-coherent bus. Since the SoC will be used for networking,
-  I'll put the registers into big-endian configuration to make it
-  easier for the OS to access. I'm not allowed to have USB-1.1
-  according to SBSA, so I can get away without a hub or an extra
-  OHCI. I can't support MSI because it's not a PCI device, and
-  the GIC is pretty full, so I'll just connect the IRQ line to
-  the GPIO controller. In order to do better power management,
-  I'll design a fancy PHY that the device driver will manage
-  for implementing autosuspend. I should also give the OS
-  fine-grained control over the clocks, but it will have to share
-  the clock domain with the other devices on the same edge of the
-  chip. The EHCI device is not part of PCI, which measn I don't
-  have to use the standard SMMU. However, my EHCI implementation
-  can only do 32-bit DMA, and I'll have to design my own IOMMU
-  to let it access the entire memory range. USB-OTG is a great
-  feature and we already paid for having this in our EHCI
-  implementation, better make sure it comes up in endpoint mode
-  after waking up from power saving.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/a602e9cd/attachment.sig>
