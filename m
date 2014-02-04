@@ -1,56 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Feb 2014 20:27:15 +0100
-Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
-In-Reply-To: <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <3121595.GbLMuGPlvA@wuerfel>
- <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
-Message-ID: <201402042027.15898.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 4 Feb 2014 13:28:20 -0600
+Subject: Extending OPP bindings
+In-Reply-To: <20140204182220.GQ22609@sirena.org.uk>
+References: <52EA570A.8040501@arm.com> <52EAF1CA.3040702@ti.com>
+ <20140131124620.GC2616@e102568-lin.cambridge.arm.com>
+ <CAL_Jsq+Kq9C39xr9tY8gSX+6QFkNDqwmTyC+dBhLNcxKMweCpw@mail.gmail.com>
+ <20140131180929.GH2616@e102568-lin.cambridge.arm.com> <52F12AE7.904@ti.com>
+ <20140204182220.GQ22609@sirena.org.uk>
+Message-ID: <52F13F54.5060000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 February 2014, Michal Simek wrote:
-> On 02/03/2014 04:32 PM, Arnd Bergmann wrote:
-> > On Monday 03 February 2014 16:13:47 Michal Simek wrote:
-> >> Intention wasn't to fix binding but document current one
-> >> which is in mainline for a long time.
-> > 
-> > Ok, I see.
-> > 
-> >> Apart of this - yes, wdt-enable-once is nowayout and wdt-interval should be timeout
-> >> is seconds, and clock-frequency should go out and use CCF for getting clock.
-> > 
-> > Could we make a common binding then, and document that the xilinx
-> > watchdog can optionally provide either one?
+On 02/04/2014 12:22 PM, Mark Brown wrote:
+> On Tue, Feb 04, 2014 at 12:01:11PM -0600, Nishanth Menon wrote:
 > 
-> Do you mean to have 2 DT bindings?
+>> As long as the key to the data sets are all the same (frequency),
+>> information in data set #0 is maintained. It would be in our common
+>> long term interest to maintain the split.
 > 
-> This binding is used from 2011-07.
-> It means it was generated for all hw designs at least from this time.
-> I would say from DT usage on Microblaze because it is not special case
-> in our dt generator.
+> You're assuming that the frequency is a unique key here.  That may not
+> be the case, for example two OPPs might have the same CPU clock
+> (assuming that's the frequency you're referring to) but different bus
+> clocking and of course the CPUs or CPU clusters might be individually
+> scalable (this is common in big.LITTLE designs I think).
+> 
+Which is why OPPs are maintained per device, bus OPPs belong to bus
+device (in TI terminology, we'd be talking of cross domain dependency
+here for maintaining asynchronous bridge timing closure constraints -
+but ofcourse, other SoCs may or maynot have such constraints). For
+scaling bus frequency, we already have infrastructure in place - clock
+notifiers - discussion of using that is much deeper topic of it's own.
 
-I certainly wasn't suggesting to break the binding, quite the contrary.
-What I tried to say is that the properties look like they should be
-useful for different kinds of watchdogs, not just xilinx, so it would
-be good to have a common definition using generic strings.
+for each processor that is uniquely transitioning, we'd have it's own
+sets of OPPs - the correct representation of the device node is the
+key there.
 
-The xilinx driver would definitely have to keep supporting the traditional
-property names, but it could also support the generic names in the
-future.
-
-> xlnx,XXX are XXX parameters which you have to setup in tools
-> and get synthesized. This is valid for all xilinx IPs. We have full
-> IP description by generating xlnx,XXX parameters directly from tools
-> because we know all variants which can happen.
->
-> Just back to your previous post:
-> "I'm not sure about the enable-once flag, which seems to just map to the
-> "nowayout" watchdog option that is not a hardware feature at all"
-> this is hw feature which you can select in tools because this is fpga. :-)
-
-Ah, so you mean the properties are not settings that the driver
-programs into the hardware, but they are hardware properties that the
-driver reports to user space?
-
-	Arnd
+-- 
+Regards,
+Nishanth Menon
