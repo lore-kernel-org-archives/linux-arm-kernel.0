@@ -1,34 +1,72 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 4 Feb 2014 02:30:39 +0100
-Subject: [GIT PULL] ARM: mvebu: stable fix for v3.13
-In-Reply-To: <20140114154141.GO19878@titan.lakedaemon.net>
-References: <20140114154141.GO19878@titan.lakedaemon.net>
-Message-ID: <20140204013039.GA25262@kroah.com>
+From: ashutosh.s@phytec.in (Ashutosh singh)
+Date: Tue, 4 Feb 2014 10:04:53 +0530
+Subject: [PATCH 1/3] Phytec phyFLEX-i.MX6 : Added USB_HOST Support
+Message-ID: <1391488493-30662-1-git-send-email-ashutosh.s@phytec.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 10:41:41AM -0500, Jason Cooper wrote:
-> arm-soc folks,
-> 
-> Sorry for the lateness in the window on this one.  I'd like to see it
-> get into v3.13 if possible, but if it doesn't get there till v3.13.1, I
-> understand.
-> 
-> This fixes a boot hang experienced on some Openblocks AX3-4 boards.
-> Once i2c transaction support was added, it was discovered that the A0
-> revision of the Armada XP had broken offload support which causes the
-> kernel to hang at boot.  The only way to detect this situation is to
-> read the PCI config register to get the SoC revision, then disable
-> offload if we are on an A0 SoC.
-> 
-> Unfortunately, this makes for a rather large patch series against
-> stable.  Doing the fix in a smaller patch would create a runtime
-> dependency between i2c and PCI which we prefer to avoid.
-> 
-> I'm Cc'ing Greg and linux-stable as a heads-up, and so they can comment
-> or ask questions.
+This patch adds support for USB_HOST on Phytec phyFLEX-i.MX6 Quad module.
 
-It's a big change for stable, but as it's self-contained, and only
-touches one platform/driver, I'll take it...
+Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
+---
+ arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |    4 ++++
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   15 +++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-greg k-h
+diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+index 87c3702..91aecba 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
++++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+@@ -25,6 +25,10 @@
+ 	status = "okay";
+ };
+ 
++&usbh1 {
++	status = "okay";
++};
++
+ &usbotg {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+index e682bf8..fb39dae 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+@@ -27,6 +27,15 @@
+ 		gpio = <&gpio4 15 0>;
+ 		enable-active-low;
+ 	};
++
++	reg_usb_h1_vbus: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 0 0>;
++		enable-active-low;
++	};
+ };
+ 
+ &ecspi3 {
+@@ -144,6 +153,7 @@
+ 				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
+ 				MX6QDL_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
+ 				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15   0x80000000 /* USB_OTG_PWR_EN */
++				MX6QDL_PAD_GPIO_0__USB_H1_PWR     0x80000000 /* USB_H1_PWR_EN */
+ 			>;
+ 		};
+ 	};
+@@ -172,6 +182,11 @@
+ 	status = "disabled";
+ };
+ 
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	status = "disabled";
++};
++
+ &usbotg {
+ 	vbus-supply = <&reg_usb_otg_vbus>;
+ 	pinctrl-names = "default";
+-- 
+1.7.9.5
