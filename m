@@ -1,67 +1,70 @@
 From: balajitk@ti.com (Balaji T K)
-Date: Tue, 4 Feb 2014 18:14:08 +0530
-Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
- device tree boot
-In-Reply-To: <1390260542-22213-1-git-send-email-nm@ti.com>
-References: <1390260542-22213-1-git-send-email-nm@ti.com>
-Message-ID: <52F0E098.3050404@ti.com>
+Date: Tue, 4 Feb 2014 18:16:01 +0530
+Subject: [PATCH] ARM: dts: omap3-ldp: fix mmc configuration
+In-Reply-To: <1390260873-22354-1-git-send-email-nm@ti.com>
+References: <1390260873-22354-1-git-send-email-nm@ti.com>
+Message-ID: <52F0E109.30801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 January 2014 04:59 AM, Nishanth Menon wrote:
-> When device is booted using devicetree, platforms impacted by
-> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
-> indicates that the module cannot do multi-block transfers.
->
-> Handle this by providing a boolean flag to indicate to driver that it is
-> working on a hardware with mentioned limitation.
+On Tuesday 21 January 2014 05:04 AM, Nishanth Menon wrote:
+> MMC1 is the only MMC interface available on the platform. Further,
+> since the platform is based on older revision of SoC which is not
+> capable of doing multi-block writes, mark it so and add pinmux
+
+s/writes/read
+
+Thanks and Regards,
+Balaji T K
+
+> to ensure that all relevant pins are configured for non-MMC boot
+> mode.
 >
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
+> ti,erratum-2.1.1.128 introduced in https://patchwork.kernel.org/patch/3514851/
+> hence depends on the same.
+>   arch/arm/boot/dts/omap3-ldp.dts |   22 ++++++++++++++++++++++
+>   1 file changed, 22 insertions(+)
 >
-> This explains the logs I see:
-> OMAP3430 LDP (ES2.2):
-> 	uImage only boot:  http://slexy.org/raw/s2YrbMAi7c
-> 	uImage+dtb concatenated boot: http://slexy.org/raw/s20qVg17T0
->
-> With the following flag set, device is now able to consistently boot with
-> device tree supported uImage+dtb concat boot.
->
->   .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
->   drivers/mmc/host/omap_hsmmc.c                      |    3 +++
->   2 files changed, 5 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index 8c8908a..ab36f8b 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -26,6 +26,8 @@ specifier is required.
->   dma-names: List of DMA request names. These strings correspond
->   1:1 with the DMA specifiers listed in dmas. The string naming is
->   to be "rx" and "tx" for RX and TX DMA requests, respectively.
-> +ti,erratum-2.1.1.128: boolean, for OMAP3430/OMAP35xx platforms with broken
-> +multiblock reads
-
-Rather than ti,errata.. specific property, something like
-caps no/disable multiblock read is more readable in my opinion, Otherwise
-
-Acked-by: Balaji T K <balajitk@ti.com>
-
->
->   Examples:
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 014bfe5..f2d5940 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1730,6 +1730,9 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
->   	if (of_find_property(np, "ti,dual-volt", NULL))
->   		pdata->controller_flags |= OMAP_HSMMC_SUPPORTS_DUAL_VOLT;
->
-> +	if (of_find_property(np, "ti,erratum-2.1.1.128", NULL))
-> +		pdata->controller_flags |= OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
+> diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+> index ddce0d8..bc0cc66 100644
+> --- a/arch/arm/boot/dts/omap3-ldp.dts
+> +++ b/arch/arm/boot/dts/omap3-ldp.dts
+> @@ -176,6 +176,17 @@
+>   &mmc1 {
+>   	vmmc-supply = <&vmmc1>;
+>   	bus-width = <4>;
+> +	ti,erratum-2.1.1.128;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins>;
+> +};
 > +
->   	/* This driver only supports 1 slot */
->   	pdata->nr_slots = 1;
->   	pdata->slots[0].switch_pin = cd_gpio;
+> +&mmc2 {
+> +	status="disabled";
+> +};
+> +
+> +&mmc3 {
+> +	status="disabled";
+>   };
+>
+>   &omap3_pmx_core {
+> @@ -209,6 +220,17 @@
+>   			0x174 (PIN_OUTPUT | MUX_MODE0)	/* hsusb0_stp.hsusb0_stp */
+>   		>;
+>   	};
+> +
+> +	mmc1_pins: pinmux_mmc1_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_clk.mmc1_clk */
+> +			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.mmc1_cmd */
+> +			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat0.mmc1_dat0 */
+> +			OMAP3_CORE1_IOPAD(0x214A, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat1.mmc1_dat1 */
+> +			OMAP3_CORE1_IOPAD(0x214C, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat2.mmc1_dat2 */
+> +			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_dat3.mmc1_dat3 */
+> +		>;
+> +	};
+>   };
+>
+>   &usb_otg_hs {
 >
