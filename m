@@ -1,43 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Feb 2014 20:11:22 +0000
-Subject: Extending OPP bindings
-In-Reply-To: <52F13F54.5060000@ti.com>
-References: <52EA570A.8040501@arm.com> <52EAF1CA.3040702@ti.com>
- <20140131124620.GC2616@e102568-lin.cambridge.arm.com>
- <CAL_Jsq+Kq9C39xr9tY8gSX+6QFkNDqwmTyC+dBhLNcxKMweCpw@mail.gmail.com>
- <20140131180929.GH2616@e102568-lin.cambridge.arm.com>
- <52F12AE7.904@ti.com> <20140204182220.GQ22609@sirena.org.uk>
- <52F13F54.5060000@ti.com>
-Message-ID: <20140204201122.GB22609@sirena.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Feb 2014 21:17:28 +0100 (CET)
+Subject: [PATCH v4 1/3] clocksource: timer-keystone: introduce clocksource
+ driver for Keystone
+In-Reply-To: <52F11B5C.40407@ti.com>
+References: <1391513453-21140-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391513453-21140-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <alpine.DEB.2.02.1402041715220.24986@ionos.tec.linutronix.de>
+ <52F11B5C.40407@ti.com>
+Message-ID: <alpine.DEB.2.02.1402042113270.24986@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 01:28:20PM -0600, Nishanth Menon wrote:
-> On 02/04/2014 12:22 PM, Mark Brown wrote:
+On Tue, 4 Feb 2014, Ivan Khoronzhuk wrote:
 
-> > You're assuming that the frequency is a unique key here.  That may not
-> > be the case, for example two OPPs might have the same CPU clock
-> > (assuming that's the frequency you're referring to) but different bus
-> > clocking and of course the CPUs or CPU clusters might be individually
-> > scalable (this is common in big.LITTLE designs I think).
+Please do not top post.
 
-> Which is why OPPs are maintained per device, bus OPPs belong to bus
-> device (in TI terminology, we'd be talking of cross domain dependency
-> here for maintaining asynchronous bridge timing closure constraints -
-> but ofcourse, other SoCs may or maynot have such constraints). For
-> scaling bus frequency, we already have infrastructure in place - clock
-> notifiers - discussion of using that is much deeper topic of it's own.
+> It was so in v1. But it was decided to use explicit memory barriers,
+> because we're always sure the memory barriers are there and that
+> they're properly documented. Also in this case I don't need to add
+> keystone readl/writel relaxed function variants and to use mixed calls of
+> writel/writel_relaxed functions.
+> 
+> See:
+> http://www.spinics.net/lists/arm-kernel/msg294941.html
 
-> for each processor that is uniquely transitioning, we'd have it's own
-> sets of OPPs - the correct representation of the device node is the
-> key there.
+Fair enough, but we want a proper explanation for explicit barriers in
+the code and not in some random discussion of patch version X on some
+random mailing list.
 
-I've seen some SoCs characterised over the whole device rather than with
-individual parts of the SoC done separately.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/90067f8e/attachment.sig>
+Aside of that it should be iowmb(), but I might miss something ...
+
+Thanks,
+
+	tglx
