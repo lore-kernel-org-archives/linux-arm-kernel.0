@@ -1,21 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Feb 2014 20:49:03 +0100
-Subject: [PATCH] ARM: pxa: fix various compilation problems
-In-Reply-To: <4895932.cC8EyYOxb5@wuerfel>
-References: <1391518387-5934-1-git-send-email-linus.walleij@linaro.org>
- <4895932.cC8EyYOxb5@wuerfel>
-Message-ID: <CACRpkdac3UW-ZzvgfsZt2cHaUsOeDcLS++ip=diYoLCUy7HFRA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Feb 2014 20:50:43 +0100
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <CAL_JsqLN4RjVzNCfZ50K44RcP61Z8zFOVnpY1+CfVFz_QnSBEg@mail.gmail.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <13031998.NR888KZWhk@wuerfel>
+ <CAL_JsqLN4RjVzNCfZ50K44RcP61Z8zFOVnpY1+CfVFz_QnSBEg@mail.gmail.com>
+Message-ID: <201402042050.43837.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 3:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 04 February 2014 13:53:07 Linus Walleij wrote:
->> Hi ARM SoC folks: please apply this patch directly to the ARM
->> SoC tree fixes branch if you are happy with it.
->
-> It's also needed for 3.13-backports, right?
+On Tuesday 04 February 2014, Rob Herring wrote:
+> > Here is how a sane person would read SBSA to create a compliant
+> > implementation:
+> 
+> s/sane/software/
 
-Yes. Tagging for stable # v3.13+ should do the trick.
+> > Here is how a crazy person would read the same sentence in the SBSA:
+> 
+> s/crazy/hardware/
 
-Yours,
-Linus Walleij
+Not much of a difference, apparently ...
+
+> My money is on the latter. I think non-PCI implementations of xHCI
+> interfaces will be common. This was certainly the case at Calxeda in
+> what was believed to be a SBSA compliant SOC.
+
+I just looked up the EHCI and xHCI specs and am shocked to see that
+the PCI config space access for both is an optional part of the
+spec, so that assertion may well have been correct.
+
+On the other hand, it does seem impossible to create a compliant
+AHCI implementation without making it show up as a PCI function,
+so any SBSA compliant SoC that contains AHCI already has to have
+all the bits for doing the same on USB.
+
+> However, I think PCI
+> device or not is the least of the issues and all the other examples
+> you list are the difficult ones to deal with.
+
+Agreed. But if they get the difficult problems right, it's
+trivial to also do the PCI config space either in the way
+that Jason described, or as a separate PCI domain. In the worst
+case, it could still be faked up by a secure-mode firmware
+catching all config space accesses.
+
+	Arnd
