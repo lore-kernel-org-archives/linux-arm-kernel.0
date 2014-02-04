@@ -1,54 +1,82 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 4 Feb 2014 21:57:42 +0800
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Support diagnostic LED
-Message-ID: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 04 Feb 2014 14:57:31 +0100
+Subject: [PATCH v2] at91: pmc: Fixed irq's name allocation for programmable
+ clocks
+In-Reply-To: <52F0A7F5.6070201@overkiz.com>
+References: <1391445961-20755-1-git-send-email-jjhiblot@traphandler.com>
+ <1391502105-24612-1-git-send-email-jjhiblot@traphandler.com>
+ <52F0A7F5.6070201@overkiz.com>
+Message-ID: <52F0F1CB.9000207@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The D25 LED controlled by gpio on the i.MX51 babbage
-board is a diagnostic LED according to the board design.
-This patch adds the relevant device tree nodes to the
-i.MX51 babbage device tree file to support this LED.
+Hello, Mike,
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- arch/arm/boot/dts/imx51-babbage.dts |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Please do not take this patch: the work of JJ to fix the prog clk 
+prepare bug
+will remove the irq handling from the prog clk driver, as a result, we won't
+have to request the irq anymore.
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index be1407c..8d6a74b 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -81,6 +81,17 @@
- 		};
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio2_6>;
-+
-+		led-diagnostic {
-+			label = "diagnostic";
-+			gpios = <&gpio2 6 0>;
-+		};
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx51-babbage-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
-@@ -280,6 +291,12 @@
- 				MX51_PAD_CSPI1_RDY__GPIO4_26 0x80000000
- 			>;
- 		};
-+
-+		led_pin_gpio2_6: led_gpio2_6 {
-+			fsl,pins = <
-+				MX51_PAD_EIM_D22__GPIO2_6 0x80000000
-+			>;
-+		};
- 	};
- };
- 
--- 
-1.7.9.5
+Sorry for the inconvenience.
+
+Best Regards,
+
+Boris
+
+On 04/02/2014 09:42, Boris BREZILLON wrote:
+> Hello JJ,
+>
+> Sorry for the noise (I added Mike in the CC list).
+>
+> BTW, thanks for fixing this bug.
+>
+> Mike, could you take this bug fix for the next 3.14 release ?
+>
+> Best Regards,
+>
+> Boris
+>
+> On 04/02/2014 09:21, Jean-Jacques Hiblot wrote:
+>> The name provided to request_irq() must be valid until the irq is 
+>> released.
+>> This patch stores the name in the internal data structure.
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   drivers/clk/at91/clk-programmable.c | 6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/at91/clk-programmable.c 
+>> b/drivers/clk/at91/clk-programmable.c
+>> index 8e242c7..799b75c 100644
+>> --- a/drivers/clk/at91/clk-programmable.c
+>> +++ b/drivers/clk/at91/clk-programmable.c
+>> @@ -44,6 +44,7 @@ struct clk_programmable {
+>>       u8 css;
+>>       u8 pres;
+>>       u8 slckmck;
+>> +    char irq_name[11];
+>>       const struct clk_programmable_layout *layout;
+>>   };
+>>   @@ -247,7 +248,6 @@ at91_clk_register_programmable(struct at91_pmc 
+>> *pmc, unsigned int irq,
+>>       struct clk_programmable *prog;
+>>       struct clk *clk = NULL;
+>>       struct clk_init_data init;
+>> -    char irq_name[11];
+>>         if (id > PROG_ID_MAX)
+>>           return ERR_PTR(-EINVAL);
+>> @@ -269,9 +269,9 @@ at91_clk_register_programmable(struct at91_pmc 
+>> *pmc, unsigned int irq,
+>>       prog->irq = irq;
+>>       init_waitqueue_head(&prog->wait);
+>>       irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
+>> -    snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
+>> +    snprintf(prog->irq_name, sizeof(prog->irq_name), "clk-prog%d", id);
+>>       ret = request_irq(prog->irq, clk_programmable_irq_handler,
+>> -              IRQF_TRIGGER_HIGH, irq_name, prog);
+>> +              IRQF_TRIGGER_HIGH, prog->irq_name, prog);
+>>       if (ret)
+>>           return ERR_PTR(ret);
+>
