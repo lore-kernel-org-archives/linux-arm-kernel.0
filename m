@@ -1,203 +1,60 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  4 Feb 2014 12:28:38 +0000
-Subject: [PATCH] ARM: mm: remove remaining domain support from ARMv6
-Message-ID: <1391516918-14455-1-git-send-email-will.deacon@arm.com>
+Date: Tue,  4 Feb 2014 12:28:46 +0000
+Subject: [PATCH] ARM: spinlock: ensure we have a compiler barrier before sev
+Message-ID: <1391516926-14493-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_32v6 currently selects CPU_USE_DOMAINS if CPU_V6 and MMU. This is
-because ARM 1136 r0pX CPUs lack the v6k extensions, and therefore do
-not have hardware thread registers. The lack of these registers requires
-the kernel to update the vectors page at each context switch in order to
-write a new TLS pointer. This write must be done via the userspace
-mapping, since aliasing caches can lead to expensive flushing when using
-kmap. Finally, this requires the vectors page to be mapped r/w for
-kernel and r/o for user, which has implications for things like put_user
-which must trigger CoW appropriately when targetting user pages.
+When unlocking a spinlock, we require the following, strictly ordered
+sequence of events:
 
-The upshot of all this is that a v6/v7 kernel makes use of domains to
-segregate kernel and user memory accesses. This has the nasty
-side-effect of making device mappings executable, which has been
-observed to cause subtle bugs on recent cores (e.g. Cortex-A15
-performing a speculative instruction fetch from the GIC and acking an
-interrupt in the process).
+	<barrier>	/* dmb */
+	<unlock>
+	<barrier>	/* dsb */
+	<sev>
 
-This patch solves this problem by removing the remaining domain support
-from ARMv6. A new memory type is added specifically for the vectors page
-which allows that page (and only that page) to be mapped as user r/o,
-kernel r/w. All other user r/o pages are mapped also as kernel r/o.
-Patch co-developed with Russell King.
+Whilst the code does indeed reflect this in terms of the architecture,
+the final <barrier> + <sev> have been contracted into a single inline
+asm without a "memory" clobber, therefore the compiler is at liberty to
+reorder the unlock to the end of the above sequence. In such a case,
+a waiting CPU may be woken up before the lock has been unlocked, leading
+to extremely poor performance.
+
+This patch reworks the dsb_sev() function to make use of the dsb()
+macro and ensure ordering against the unlock.
 
 Cc: <stable@vger.kernel.org>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/futex.h          |  6 ------
- arch/arm/include/asm/pgtable-2level.h |  1 +
- arch/arm/mm/Kconfig                   |  3 +--
- arch/arm/mm/mmu.c                     | 10 ++++++++++
- arch/arm/mm/proc-macros.S             | 19 ++++++-------------
- arch/arm/mm/proc-v7-2level.S          |  7 -------
- 6 files changed, 18 insertions(+), 28 deletions(-)
+ arch/arm/include/asm/spinlock.h | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
-index e42cf597f6e6..2aff798fbef4 100644
---- a/arch/arm/include/asm/futex.h
-+++ b/arch/arm/include/asm/futex.h
-@@ -3,11 +3,6 @@
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index ef3c6072aa45..ac4bfae26702 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -37,18 +37,9 @@
  
- #ifdef __KERNEL__
- 
--#if defined(CONFIG_CPU_USE_DOMAINS) && defined(CONFIG_SMP)
--/* ARM doesn't provide unprivileged exclusive memory accessors */
--#include <asm-generic/futex.h>
+ static inline void dsb_sev(void)
+ {
+-#if __LINUX_ARM_ARCH__ >= 7
+-	__asm__ __volatile__ (
+-		"dsb ishst\n"
+-		SEV
+-	);
 -#else
--
- #include <linux/futex.h>
- #include <linux/uaccess.h>
- #include <asm/errno.h>
-@@ -164,6 +159,5 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
- 	return ret;
+-	__asm__ __volatile__ (
+-		"mcr p15, 0, %0, c7, c10, 4\n"
+-		SEV
+-		: : "r" (0)
+-	);
+-#endif
++
++	dsb(ishst);
++	__asm__(SEV);
  }
  
--#endif /* !(CPU_USE_DOMAINS && SMP) */
- #endif /* __KERNEL__ */
- #endif /* _ASM_ARM_FUTEX_H */
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index dfff709fda3c..219ac88a9542 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -140,6 +140,7 @@
- #define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
- #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
- #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
-+#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x0f) << 2)	/* 1111 */
- #define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed94c2a4..ca8ecdee47d8 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -446,7 +446,6 @@ config CPU_32v5
- 
- config CPU_32v6
- 	bool
--	select CPU_USE_DOMAINS if CPU_V6 && MMU
- 	select TLS_REG_EMUL if !CPU_32v6K && !MMU
- 
- config CPU_32v6K
-@@ -671,7 +670,7 @@ config ARM_VIRT_EXT
- 
- config SWP_EMULATE
- 	bool "Emulate SWP/SWPB instructions"
--	depends on !CPU_USE_DOMAINS && CPU_V7
-+	depends on CPU_V7
- 	default y if SMP
- 	select HAVE_PROC_CPU if PROC_FS
- 	help
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4f08c133cc25..6ec07a84f759 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -511,6 +511,16 @@ static void __init build_mem_type_table(void)
- 	hyp_device_pgprot = s2_device_pgprot = mem_types[MT_DEVICE].prot_pte;
- 
- 	/*
-+	 * We don't use domains on ARMv6 (since this causes problems with
-+	 * v6/v7 kernels), so we must use a separate memory type for user
-+	 * r/o, kernel r/w to map the vectors page.
-+	 */
-+#ifndef CONFIG_ARM_LPAE
-+	if (cpu_arch == CPU_ARCH_ARMv6)
-+		vecs_pgprot |= L_PTE_MT_VECTORS;
-+#endif
-+
-+	/*
- 	 * ARMv6 and above have extended page tables.
- 	 */
- 	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index e3c48a3fe063..ee1d80593958 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -112,13 +112,9 @@
-  *  100x   1   0   1	r/o	no acc
-  *  10x0   1   0   1	r/o	no acc
-  *  1011   0   0   1	r/w	no acc
-- *  110x   0   1   0	r/w	r/o
-- *  11x0   0   1   0	r/w	r/o
-- *  1111   0   1   1	r/w	r/w
-- *
-- * If !CONFIG_CPU_USE_DOMAINS, the following permissions are changed:
-  *  110x   1   1   1	r/o	r/o
-  *  11x0   1   1   1	r/o	r/o
-+ *  1111   0   1   1	r/w	r/w
-  */
- 	.macro	armv6_mt_table pfx
- \pfx\()_mt_table:
-@@ -137,7 +133,7 @@
- 	.long	PTE_EXT_TEX(2)					@ L_PTE_MT_DEV_NONSHARED
- 	.long	0x00						@ unused
- 	.long	0x00						@ unused
--	.long	0x00						@ unused
-+	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
- 	.endm
- 
- 	.macro	armv6_set_pte_ext pfx
-@@ -158,24 +154,21 @@
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
--#ifdef CONFIG_CPU_USE_DOMAINS
--	@ allow kernel read/write access to read-only user pages
- 	tstne	r3, #PTE_EXT_APX
--	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
--#endif
-+
-+	@ user read-only -> kernel read-only
-+	bicne	r3, r3, #PTE_EXT_AP0
- 
- 	tst	r1, #L_PTE_XN
- 	orrne	r3, r3, #PTE_EXT_XN
- 
--	orr	r3, r3, r2
-+	eor	r3, r3, r2
- 
- 	tst	r1, #L_PTE_YOUNG
- 	tstne	r1, #L_PTE_PRESENT
- 	moveq	r3, #0
--#ifndef CONFIG_CPU_USE_DOMAINS
- 	tstne	r1, #L_PTE_NONE
- 	movne	r3, #0
--#endif
- 
- 	str	r3, [r0]
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index bdd3be4be77a..1f52915f2b28 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -90,21 +90,14 @@ ENTRY(cpu_v7_set_pte_ext)
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
--#ifdef CONFIG_CPU_USE_DOMAINS
--	@ allow kernel read/write access to read-only user pages
--	tstne	r3, #PTE_EXT_APX
--	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
--#endif
- 
- 	tst	r1, #L_PTE_XN
- 	orrne	r3, r3, #PTE_EXT_XN
- 
- 	tst	r1, #L_PTE_YOUNG
- 	tstne	r1, #L_PTE_VALID
--#ifndef CONFIG_CPU_USE_DOMAINS
- 	eorne	r1, r1, #L_PTE_NONE
- 	tstne	r1, #L_PTE_NONE
--#endif
- 	moveq	r3, #0
- 
-  ARM(	str	r3, [r0, #2048]! )
+ /*
 -- 
 1.8.2.2
