@@ -1,37 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Feb 2014 21:07:33 +0100
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <52F10024.4030201@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <52EA2875.5020807@free-electrons.com> <52EA2A04.2070109@gmail.com>
- <20140203231603.GA11613@1wt.eu> <52F02816.1050708@gmail.com>
- <52F10024.4030201@free-electrons.com>
-Message-ID: <20140204210733.36c2eab0@skate>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Feb 2014 21:10:45 +0100 (CET)
+Subject: [PATCH v5 4/6] spmi: pmic_arb: add support for interrupt handling
+In-Reply-To: <1391468739-20987-5-git-send-email-joshc@codeaurora.org>
+References: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
+ <1391468739-20987-5-git-send-email-joshc@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1402042107311.24986@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 3 Feb 2014, Josh Cartwright wrote:
+> +static void qpnpint_irq_ack(struct irq_data *d)
+> +{
+> +	struct spmi_pmic_arb_dev *pa = irq_data_get_irq_chip_data(d);
+> +	u8 irq  = d->hwirq >> 8;
+> +	u8 apid = d->hwirq;
+> +	unsigned long flags;
+> +	u8 data;
+> +
+> +	spin_lock_irqsave(&pa->lock, flags);
 
-On Tue, 04 Feb 2014 15:58:44 +0100, Gregory CLEMENT wrote:
+This wants to be a raw_spinlock - think about RT!
 
-> > @Jason, Andrew, Gregory, Thomas:
-> > Now that v3.14 is out, anything against taking this in as fixes for rc1?
-> 
-> I am not found of this solution I still think it should be done
-> at framework level. However we still have this very annoying issue,
-> and this fix is better than nothing. So I am not against taking this
-> for rc1 with the hope that it will be later revert with a better
-> solution.
+Looks sane otherwise.
 
-Same opinion here. I'm fine with this solution as a temporary measure,
-but it would be good to solve this problem in a nicer way. Also, making
-this change doesn't impact the DT in any way, there is no problem in
-having a temporary not perfect solution, and improve it later on.
+Thanks,
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	tglx
