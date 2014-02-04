@@ -1,109 +1,53 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue,  4 Feb 2014 16:38:52 -0600
-Subject: [PATCH v2 5/5] ARM: qcom: Rename various msm prefixed functions to
- qcom
-In-Reply-To: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
-References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1391553532-27001-6-git-send-email-galak@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Feb 2014 22:39:17 +0000
+Subject: arm64: kernel panic in paging_init()
+In-Reply-To: <1391540244.18760.5.camel@deneb.redhat.com>
+References: <1391460649.13327.51.camel@deneb.redhat.com>
+ <20140204121452.GI30676@arm.com> <1391540244.18760.5.camel@deneb.redhat.com>
+Message-ID: <34F26939-E85D-44DF-8E38-7B4AA4BF1A61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As mach-qcom will support a number of different Qualcomm SoC platforms
-we replace the msm prefix on function names with qcom to be a bit more
-generic.
+On 4 Feb 2014, at 18:57, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-02-04 at 12:14 +0000, Catalin Marinas wrote:
+>> On Mon, Feb 03, 2014 at 08:50:49PM +0000, Mark Salter wrote:
+>>> I'm seeing the following panic in paging init. This is on the foundation
+>>> model with a modified dtb memory node which has a non section-aligned
+>>> bank:
+>>> 	memory at 80000000 {
+>>> 		device_type = "memory";
+>>> 		reg = <0x00000000 0x80000000 0 0x20000000>,
+>>> 		      <0x00000000 0xa0300000 0 0x1fd00000>;
+>>> 	};
+>>> 
+>>> I only see this with 64k pagesize configured. What happens is the
+>>> non section-aligned bank causes alloc_init_pte() to allocate a page
+>>> for the new pte from the end of the first bank (the failing address
+>>> 0xfffffe001fff0000 [0x9fff0000 phys]). This should be a valid page
+>>> since it was mapped during the create_mapping() call for the first
+>>> memory bank. A flush_tlb_all() added to the end of create_mapping()
+>>> makes the panic go away so I think the problem is something stale
+>>> cached before the page with the failing address was mapped.
+>> 
+>> I think it goes like this:
+>> 
+>> head.S maps enough memory to get started but using 64K pages rather than
+>> 512M sections with a single pgd entry and several ptes. This never gets
+>> to the end of the first block (just up to KERNEL_END).
+>> 
+>> create_mapping() realises it can do a 512M section mapping, overriding
+>> the original table pgd entry with a block one. The memblock limit is set
+>> correctly PGDIR_SIZE but create_mapping, when it replaces the table pgd
+>> with a block one doesn't do any TLB invalidation.
+>> 
+>> So I wouldn't do a TLB invalidation all the time but only when the old
+>> pmd was set. Please give the patch below a try, I only compiled it (I'll
+>> add some text afterwards):
+> 
+> Yes, that works. Thanks.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/mach-qcom/board.c |  4 ++--
- arch/arm/mach-qcom/smp.c   | 22 +++++++++++-----------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+Can I add your tested-by?
 
-diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-index 4529f6b..830f69c 100644
---- a/arch/arm/mach-qcom/board.c
-+++ b/arch/arm/mach-qcom/board.c
-@@ -17,7 +17,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--extern struct smp_operations msm_smp_ops;
-+extern struct smp_operations qcom_smp_ops;
- 
- static const char * const qcom_dt_match[] __initconst = {
- 	"qcom,msm8660-surf",
-@@ -31,7 +31,7 @@ static const char * const apq8074_dt_match[] __initconst = {
- };
- 
- DT_MACHINE_START(QCOM_DT, "Qualcomm (Flattened Device Tree)")
--	.smp = smp_ops(msm_smp_ops),
-+	.smp = smp_ops(qcom_smp_ops),
- 	.dt_compat = qcom_dt_match,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-qcom/smp.c b/arch/arm/mach-qcom/smp.c
-index 67823a7..9c53ea7 100644
---- a/arch/arm/mach-qcom/smp.c
-+++ b/arch/arm/mach-qcom/smp.c
-@@ -30,7 +30,7 @@ extern void secondary_startup(void);
- static DEFINE_SPINLOCK(boot_lock);
- 
- #ifdef CONFIG_HOTPLUG_CPU
--static void __ref msm_cpu_die(unsigned int cpu)
-+static void __ref qcom_cpu_die(unsigned int cpu)
- {
- 	wfi();
- }
-@@ -42,7 +42,7 @@ static inline int get_core_count(void)
- 	return ((read_cpuid_id() >> 4) & 3) + 1;
- }
- 
--static void msm_secondary_init(unsigned int cpu)
-+static void qcom_secondary_init(unsigned int cpu)
- {
- 	/*
- 	 * Synchronise with the boot thread.
-@@ -70,7 +70,7 @@ static void prepare_cold_cpu(unsigned int cpu)
- 				  "address\n");
- }
- 
--static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int qcom_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	static int cold_boot_done;
- 
-@@ -108,7 +108,7 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-  * does not support the ARM SCU, so just set the possible cpu mask to
-  * NR_CPUS.
-  */
--static void __init msm_smp_init_cpus(void)
-+static void __init qcom_smp_init_cpus(void)
- {
- 	unsigned int i, ncores = get_core_count();
- 
-@@ -122,16 +122,16 @@ static void __init msm_smp_init_cpus(void)
- 		set_cpu_possible(i, true);
- }
- 
--static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init qcom_smp_prepare_cpus(unsigned int max_cpus)
- {
- }
- 
--struct smp_operations msm_smp_ops __initdata = {
--	.smp_init_cpus		= msm_smp_init_cpus,
--	.smp_prepare_cpus	= msm_smp_prepare_cpus,
--	.smp_secondary_init	= msm_secondary_init,
--	.smp_boot_secondary	= msm_boot_secondary,
-+struct smp_operations qcom_smp_ops __initdata = {
-+	.smp_init_cpus		= qcom_smp_init_cpus,
-+	.smp_prepare_cpus	= qcom_smp_prepare_cpus,
-+	.smp_secondary_init	= qcom_secondary_init,
-+	.smp_boot_secondary	= qcom_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_die		= msm_cpu_die,
-+	.cpu_die		= qcom_cpu_die,
- #endif
- };
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks.
+
+Catalin
