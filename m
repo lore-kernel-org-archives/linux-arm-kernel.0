@@ -1,60 +1,15 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 4 Feb 2014 11:15:14 -0700
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <13031998.NR888KZWhk@wuerfel>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqL+3S8w=_Fb-t0rVcq0sDiPSDM6nqn3mR2DHKw=VTffsg@mail.gmail.com>
- <20140203233137.GH2519@obsidianresearch.com>
- <13031998.NR888KZWhk@wuerfel>
-Message-ID: <20140204181514.GA25695@obsidianresearch.com>
+From: william.towle@codethink.co.uk (William Towle)
+Date: Tue,  4 Feb 2014 18:17:35 +0000
+Subject: Clock divisor/parent settings changes
+Message-ID: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 10:44:52AM +0100, Arnd Bergmann wrote:
+Patches (3x) to ensure we see:
+    sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 97 MHz
+    sh_mobile_sdhi ee140000.sd: mmc1 base at 0xee140000 clock rate 48 MHz
 
->   Now I want to integrate the EHCI into my SoC and not waste one
->   of my precious PCIe root ports, so I have to create another PCI
->   domain with its own ECAM compliant config space to put it into.
->   Fortunately SBSA lets me add an arbitrary number of PCI domains,
->   as long as they are all strictly compliant. To software it will
-
-Just to touch on this for others who might be reading..
-
-IMHO any simple SOC that requires multiple domains is *broken*. A
-single domain covers all reasonable needs until you get up to
-mega-scale NUMA systems, encouraging people to design with multiple
-domains only complicates the kernel :(
-
-SOC internal peripherals should all show up in the bus 0 config space
-of the only domain and SOC PCI-E physical ports should show up on bus
-0 as PCI-PCI bridges. This is all covered in the PCI-E specs regarding
-the root complex.
-
-Generally I would expect the internal peripherals to still be
-internally connected with AXI, but also connected through the ECAM
-space for configuration, control, power management and address
-assignment.
-
-> 2. all address windows are set up by the boot loader, we only
->   need to know the location (IMHO this should be the
->   preferred way to do things regardless of SBSA).
-
-Linux does a full address map re-assignment on boot, IIRC. You need
-more magics to inhibit that if your BAR's and bridge windows don't
-work.
-
-Hot plug is a whole other thing..
-
-> it's possible that the designware based ones get point 4 right.
-
-The designware one's also appear to be re-purposed end point cores, so
-their config handling is somewhat bonkers. Tegra got theirs sort of
-close because they re-used knowledge/IP from their x86 south bridges -
-but even then they didn't really implement ECAM properly for an ARM
-environment.
-
-Since config space is where everyone to date has fallen down, I think
-the SBSA would have been wise to list dword by dword what a typical
-ECAM config space should look like.
-
-Jason
+Attached:
+    [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+    [PATCH 2/3] ARM: shmobile: r8a7790: specify multiple parents for
+    [PATCH 3/3] clk: shmobile: handle multiple parent clocks for cpg
