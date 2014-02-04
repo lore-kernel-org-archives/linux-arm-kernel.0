@@ -1,92 +1,58 @@
-From: amit.grover@samsung.com (Amit Grover)
-Date: Tue, 04 Feb 2014 15:29:58 +0530
-Subject: [PATCH 1/2] [media] v4l2: Add settings for Horizontal and Vertical MV
- Search Range
-In-Reply-To: <1391507999-31437-1-git-send-email-amit.grover@samsung.com>
-References: <52E0ED10.2020901@samsung.com>
- <1391507999-31437-1-git-send-email-amit.grover@samsung.com>
-Message-ID: <1391507999-31437-2-git-send-email-amit.grover@samsung.com>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Tue, 4 Feb 2014 11:02:16 +0100
+Subject: 'unannotated irqs-on' lockdep warning
+In-Reply-To: <20140130155741.GB15937@n2100.arm.linux.org.uk>
+References: <CAH9NwWcVrjV1=rFnHJhDH0yoEkTwUTcq-Tn=R0aaiTr70Fs3hA@mail.gmail.com>
+ <20140130155741.GB15937@n2100.arm.linux.org.uk>
+Message-ID: <CAH9NwWdb0fGQTtss2JzXP16jfCJMG6fCkJQBiy6yiOQ5y30kHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding V4L2 controls for horizontal and vertical search range in pixels
-for motion estimation module in video encoder.
+Hi
 
-Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
-Signed-off-by: Amit Grover <amit.grover@samsung.com>
----
- Documentation/DocBook/media/v4l/controls.xml |   20 ++++++++++++++++++++
- drivers/media/v4l2-core/v4l2-ctrls.c         |    6 ++++++
- include/uapi/linux/v4l2-controls.h           |    2 ++
- 3 files changed, 28 insertions(+)
+2014-01-30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Jan 30, 2014 at 03:31:46PM +0100, Christian Gmeiner wrote:
+>> [   19.859234] CPU: 0 PID: 1848 Comm: mkdir Not tainted 3.12.4 #44
+>> [   19.865190] [<c0013900>] (unwind_backtrace+0x0/0xe0) from
+>> [<c00113b8>] (show_stack+0x10/0x14)
+>> [   19.873739] [<c00113b8>] (show_stack+0x10/0x14) from [<c044e040>]
+>> (dump_stack+0x64/0xa4)
+>> [   19.881851] [<c044e040>] (dump_stack+0x64/0xa4) from [<c0022718>]
+>> (warn_slowpath_common+0x64/0x84)
+>> [   19.890828] [<c0022718>] (warn_slowpath_common+0x64/0x84) from
+>> [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c)
+>> [   19.900413] [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c) from
+>> [<c0076c84>] (check_flags.part.26+0xb4/0x1e4)
+>> [   19.910001] [<c0076c84>] (check_flags.part.26+0xb4/0x1e4) from
+>> [<c0079654>] (lock_release+0x3c/0x100)
+>> [   19.919243] [<c0079654>] (lock_release+0x3c/0x100) from
+>> [<c00485b4>] (lg_local_unlock+0x18/0x6c)
+>> [   19.928055] [<c00485b4>] (lg_local_unlock+0x18/0x6c) from
+>> [<c012a2cc>] (free_fs_struct+0x18/0x30)
+>> [   19.936947] [<c012a2cc>] (free_fs_struct+0x18/0x30) from
+>> [<c0024e24>] (do_exit+0x2ac/0x3f0)
+>> [   19.945316] [<c0024e24>] (do_exit+0x2ac/0x3f0) from [<c002501c>]
+>> (do_group_exit+0x88/0xb4)
+>> [   19.953596] [<c002501c>] (do_group_exit+0x88/0xb4) from
+>> [<c0025058>] (__wake_up_parent+0x0/0x18)
+>> [   19.962391] ---[ end trace 98a70b5cdc7b49fe ]---
+>> [   19.967017] possible reason: unannotated irqs-on.
+>> [   19.971729] irq event stamp: 2910
+>> [   19.975050] hardirqs last  enabled at (2909): [<c044a160>]
+>> __slab_free+0x1c0/0x390
+>> [   19.982661] hardirqs last disabled at (2910): [<c0456d14>]
+>> __dabt_svc+0x34/0x60
+>
+> So, I wonder how we got from __dabt_svc to __wake_up_parent.  It looks
+> like the unwinder has failed to do a proper job of unwinding, which
+> makes this undebuggable.
+>
+> Can you rebuild in ARM mode with frame pointers enabled please?
+>
 
-diff --git a/Documentation/DocBook/media/v4l/controls.xml b/Documentation/DocBook/media/v4l/controls.xml
-index a5a3188..0e1770c 100644
---- a/Documentation/DocBook/media/v4l/controls.xml
-+++ b/Documentation/DocBook/media/v4l/controls.xml
-@@ -2258,6 +2258,26 @@ Applicable to the MPEG1, MPEG2, MPEG4 encoders.</entry>
- VBV buffer control.</entry>
- 	      </row>
- 
-+		  <row><entry></entry></row>
-+	      <row id=""v4l2-mpeg-video-hor-search-range">
-+		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE</constant>&nbsp;</entry>
-+		<entry>integer</entry>
-+	      </row>
-+		<row><entry spanname="descr">Horizontal search range defines maximum horizontal search area in pixels
-+to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
-+horizontal search range for motion estimation module in video encoder.</entry>
-+	      </row>
-+
-+		 <row><entry></entry></row>
-+	      <row id="v4l2-mpeg-video-vert-search-range">
-+		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE</constant>&nbsp;</entry>
-+		<entry>integer</entry>
-+	      </row>
-+		<row><entry spanname="descr">Vertical search range defines maximum vertical search area in pixels
-+to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
-+vertical search range for motion estimation module in video encoder.</entry>
-+	      </row>
-+
- 	      <row><entry></entry></row>
- 	      <row>
- 		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&nbsp;</entry>
-diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-index 6ff002b..e9e12c4 100644
---- a/drivers/media/v4l2-core/v4l2-ctrls.c
-+++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-@@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
- 	case V4L2_CID_MPEG_VIDEO_DEC_PTS:			return "Video Decoder PTS";
- 	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:			return "Video Decoder Frame Count";
- 	case V4L2_CID_MPEG_VIDEO_VBV_DELAY:			return "Initial Delay for VBV Control";
-+	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return "Horizontal MV Search Range";
-+	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
- 	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
- 
- 	/* VPX controls */
-@@ -910,6 +912,10 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
- 		*min = 0;
- 		*max = *step = 1;
- 		break;
-+	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
-+	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:
-+		*type = V4L2_CTRL_TYPE_INTEGER;
-+		break;
- 	case V4L2_CID_PAN_RESET:
- 	case V4L2_CID_TILT_RESET:
- 	case V4L2_CID_FLASH_STROBE:
-diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-index 2cbe605..cda6fa0 100644
---- a/include/uapi/linux/v4l2-controls.h
-+++ b/include/uapi/linux/v4l2-controls.h
-@@ -376,6 +376,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
- #define V4L2_CID_MPEG_VIDEO_DEC_FRAME			(V4L2_CID_MPEG_BASE+224)
- #define V4L2_CID_MPEG_VIDEO_VBV_DELAY			(V4L2_CID_MPEG_BASE+225)
- #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER		(V4L2_CID_MPEG_BASE+226)
-+#define V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+227)
-+#define V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+228)
- 
- #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP		(V4L2_CID_MPEG_BASE+300)
- #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP		(V4L2_CID_MPEG_BASE+301)
--- 
-1.7.9.5
+Maybe i am blind but I can not find that option via make menuconfig. hmmm
+
+--
+Christian Gmeiner, MSc
+
+https://soundcloud.com/christian-gmeiner
