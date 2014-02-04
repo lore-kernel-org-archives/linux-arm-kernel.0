@@ -1,91 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Feb 2014 19:34:50 +0100
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <20140204181514.GA25695@obsidianresearch.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <13031998.NR888KZWhk@wuerfel> <20140204181514.GA25695@obsidianresearch.com>
-Message-ID: <8676627.b6SYsazoah@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Feb 2014 18:36:41 +0000
+Subject: Weird sched_clock behaviour during boot with -rc1
+Message-ID: <20140204183641.GA25127@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014 11:15:14 Jason Gunthorpe wrote:
-> On Tue, Feb 04, 2014 at 10:44:52AM +0100, Arnd Bergmann wrote:
-> 
-> >   Now I want to integrate the EHCI into my SoC and not waste one
-> >   of my precious PCIe root ports, so I have to create another PCI
-> >   domain with its own ECAM compliant config space to put it into.
-> >   Fortunately SBSA lets me add an arbitrary number of PCI domains,
-> >   as long as they are all strictly compliant. To software it will
-> 
-> Just to touch on this for others who might be reading..
-> 
-> IMHO any simple SOC that requires multiple domains is *broken*. A
-> single domain covers all reasonable needs until you get up to
-> mega-scale NUMA systems, encouraging people to design with multiple
-> domains only complicates the kernel :(
+Hi guys,
 
-Well, the way I see it, we already have support for arbitrary
-PCI domains in the kernel, and that works fine, so we can just
-as well use it. That way we don't have to partition the available
-256 buses among the host bridges, and anything that needs a separate
-PCI config space can live in its own world. Quite often when you
-have multiple PCI hosts, they actually have different ways to
-get at the config space and don't even share the same driver.
+Booting -rc1 on my TC2 gives the following strange entries in the dmesg:
 
-On x86, any kind of HT/PCI/PCIe/PCI-x bridge is stuffed into a
-single domain so they can support OSs that only know the
-traditional config space access methods, but I don't see
-any real advantage to that for other architectures.
 
-> SOC internal peripherals should all show up in the bus 0 config space
-> of the only domain and SOC PCI-E physical ports should show up on bus
-> 0 as PCI-PCI bridges. This is all covered in the PCI-E specs regarding
-> the root complex.
-> 
-> Generally I would expect the internal peripherals to still be
-> internally connected with AXI, but also connected through the ECAM
-> space for configuration, control, power management and address
-> assignment.
+  Uncompressing Linux... done, booting the kernel.
+  [    0.000000] Booting Linux on physical CPU 0x0
 
-That would of course be very nice from a software perspective,
-but I think that is much less likely for any practical
-implementation.
+  [...]
 
-> > 2. all address windows are set up by the boot loader, we only
-> >   need to know the location (IMHO this should be the
-> >   preferred way to do things regardless of SBSA).
-> 
-> Linux does a full address map re-assignment on boot, IIRC. You need
-> more magics to inhibit that if your BAR's and bridge windows don't
-> work.
-> 
-> Hot plug is a whole other thing..
+  [    0.000000]   HighMem zone: 329728 pages, LIFO batch:31
+  [    7.789662] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
+  [    0.000129] PERCPU: Embedded 9 pages/cpu @ee7bd000 s12800 r8192 d15872 u36864
 
-I meant the I/O and memory space windows of the host bridge here,
-which typically don't get reassigned (except on mvebu). For the
-device resources, there is a per-host PCI_REASSIGN_ALL_RSRC
-flag and pcibios_assign_all_busses() function that we typically
-set on embedded systems where we don't trust the boot loader
-to set this up correctly, or at all.
+  [...]
 
-On server systems, I would expect to have the firmware assign
-all resources and the kernel to leave them alone. On sparc
-and powerpc servers, there is even a third method, which
-is to trust firmware to put the correct resources for each
-device into DT, overriding what is written in the BAR.
+  [    0.868297] NR_IRQS:16 nr_irqs:16 16
+  [    0.886350] Architected cp15 timer(s) running at 24.00MHz (phys).
+  [ 2915.164998] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
+  [    0.000002] Switching to timer-based delay loop
+  [    0.014249] Console: colour dummy device 80x30
 
-> > it's possible that the designware based ones get point 4 right.
-> 
-> The designware one's also appear to be re-purposed end point cores, so
-> their config handling is somewhat bonkers. Tegra got theirs sort of
-> close because they re-used knowledge/IP from their x86 south bridges -
-> but even then they didn't really implement ECAM properly for an ARM
-> environment.
-> 
-> Since config space is where everyone to date has fallen down, I think
-> the SBSA would have been wise to list dword by dword what a typical
-> ECAM config space should look like.
 
-I absolutely agree.
+so it looks like something whacky goes on during sched_clock registration.
+Sure enough, we're doing a pr_info in-between updating cs.* and calling
+update_sched_clock(), so moving the print sorts things out (diff below).
 
-	Arnd
+What I can't figure out is why this has suddenly started happening with
+3.14. Any ideas?
+
+Cheers,
+
+Will
+
+--->8
+
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 0abb36464281..f3de5d113afc 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -147,9 +147,6 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
+ 
+        /* calculate the ns resolution of this counter */
+        res = cyc_to_ns(1ULL, cd.mult, cd.shift);
+-       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
+-               bits, r, r_unit, res, wrap);
+-
+        update_sched_clock();
+ 
+        /*
+@@ -161,6 +158,9 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
+        if (irqtime > 0 || (irqtime == -1 && rate >= 1000000))
+                enable_sched_clock_irqtime();
+ 
++       pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lluns\n",
++               bits, r, r_unit, res, wrap);
++
+        pr_debug("Registered %pF as sched_clock source\n", read);
+ }
