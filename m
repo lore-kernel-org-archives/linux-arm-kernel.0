@@ -1,110 +1,241 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 4 Feb 2014 09:30:17 -0500
-Subject: [RFC/RFT 2/2] ARM: keystone: Install hooks for dma address
- translation routines
-In-Reply-To: <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
-References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
- <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
- <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
-Message-ID: <52F0F979.2090505@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 4 Feb 2014 09:31:19 -0500
+Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
+In-Reply-To: <20140204132951.GE13529@lee--X1>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-4-git-send-email-mporter@linaro.org>
+ <20140204132951.GE13529@lee--X1>
+Message-ID: <20140204143119.GA4627@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 February 2014 09:05 PM, Olof Johansson wrote:
-> Hi,
+On Tue, Feb 04, 2014 at 01:29:51PM +0000, Lee Jones wrote:
+> > Add a driver for the BCM59056 PMU multi-function device. The driver
+> > initially supports regmap initialization and instantiation of the
+> > voltage regulator device function of the PMU.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > ---
+> >  drivers/mfd/Kconfig          |   8 +++
+> >  drivers/mfd/Makefile         |   1 +
+> >  drivers/mfd/bcm59056.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/bcm59056.h |  35 +++++++++++++
+> >  4 files changed, 163 insertions(+)
+> >  create mode 100644 drivers/mfd/bcm59056.c
+> >  create mode 100644 include/linux/mfd/bcm59056.h
 > 
-> On Mon, Feb 3, 2014 at 3:28 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> Keystone platforms have their physical memory mapped at an address
->> outside the 32-bit physical range.  A Keystone machine with 16G of RAM
->> would find its memory at 0x0800000000 - 0x0bffffffff.
->> The system interconnect allows to perform DMA transfers from first 2G of
->> physical memory (0x08 0000 0000 to 08 7FFF FFFF) which aliased in
->> hardware to the 32-bit addressable space (0x80000000 - 0xffffffff),
->> because DMA HW supports only 32-bits addressing.
->>
->> Hence, add arch hooks for dma address translation routines.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof Johansson <olof@lixom.net>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/mach-keystone/keystone.c |   31 +++++++++++++++++++++++++++++++
->>  1 file changed, 31 insertions(+)
->>
->> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
->> index 1b43a27..54dae03 100644
->> --- a/arch/arm/mach-keystone/keystone.c
->> +++ b/arch/arm/mach-keystone/keystone.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/init.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/of_address.h>
->> +#include <linux/dma-mapping.h>
->>
->>  #include <asm/setup.h>
->>  #include <asm/mach/map.h>
->> @@ -53,6 +54,28 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
->>         return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
->>  }
->>
->> +static unsigned long keystone_dma_pfn_offset __read_mostly;
->> +
->> +static dma_addr_t keystone_pfn_to_dma(struct device *dev, unsigned long pfn)
->> +{
->> +       return PFN_PHYS(pfn - keystone_dma_pfn_offset);
->> +}
->> +
->> +static unsigned long keystone_dma_to_pfn(struct device *dev, dma_addr_t addr)
->> +{
->> +       return PFN_DOWN(addr) + keystone_dma_pfn_offset;
->> +}
->> +
->> +static void *keystone_dma_to_virt(struct device *dev, dma_addr_t addr)
->> +{
->> +       return phys_to_virt(addr + PFN_PHYS(keystone_dma_pfn_offset));
->> +}
->> +
->> +static dma_addr_t keystone_virt_to_dma(struct device *dev, void *addr)
->> +{
->> +       return virt_to_phys(addr) - PFN_PHYS(keystone_dma_pfn_offset);
->> +}
->> +
->>  static void __init keystone_init_meminfo(void)
->>  {
->>         bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
->> @@ -89,6 +112,14 @@ static void __init keystone_init_meminfo(void)
->>         /* Populate the arch idmap hook */
->>         arch_virt_to_idmap = keystone_virt_to_idmap;
->>
->> +       /* Populate the arch DMA hooks */
->> +       keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
->> +                                          KEYSTONE_LOW_PHYS_START);
->> +       __arch_pfn_to_dma = keystone_pfn_to_dma;
->> +       __arch_dma_to_pfn = keystone_dma_to_pfn;
->> +       __arch_dma_to_virt = keystone_dma_to_virt;
->> +       __arch_virt_to_dma = keystone_virt_to_dma;
+> <snip>
 > 
-> Is this truly a static window, or is it going through an IOMMU that
-> just happens to have an identity mapping setup per default?
+> > +static struct mfd_cell bcm59056s[] = {
+> > +	{
+> > +		.name = "bcm59056-pmu",
 > 
-Its true physical static window hardwired in Hardware. No IOMMU
-involvement.
+> If you plan to use *->of_node in the PMU driver, which it looks like
+> you do, you should set the compatible string here.
 
-> PPC servers use "ibm,dma-window" to describe the assigned dma address
-> space for busses/devices, but the window itself doesn't contain any
-> information about the physical address mapping (since it goes through
-> an iommu after that). It likely doesn't fit this particular use case,
-> but it's something we should look at as a base in case we need to
-> start looking at bindings for this instead of coding it per SoC. We'll
-> know more once we've seen what a few of the implementations out there
-> are.
-> 
-Understood.
+Ok. I missed that..I'll split bindings to reflect this as well. There's
+an error in that the regulator properties are all defined in the base
+compatible of brcm,bcm59056 atm and they'll need to be in
+brcm,bcm59056-pmu's binding.
 
-Regards,
-Santosh
+> > +	},
+> > +};
+> > +
+> > +static const struct regmap_config bcm59056_regmap_config = {
+> > +	.reg_bits	= 8,
+> > +	.val_bits	= 8,
+> > +	.max_register	= BCM59056_MAX_REGISTER - 1,
+> 
+> If you've just set this manually i.e. it's not part of an enum table,
+> can't you set it a value you don't need to do math on? It's not used
+> anywhere else is it?
+
+Yes, I'll update this. It's not used elsewhere.
+
+> 
+> > +	.cache_type	= REGCACHE_RBTREE,
+> > +};
+> > +
+> > +static int bcm59056_i2c_probe(struct i2c_client *i2c,
+> > +			      const struct i2c_device_id *id)
+> > +{
+> > +	struct bcm59056 *bcm59056;
+> > +	int chip_id = id->driver_data;
+> 
+> I thought this was a DT only driver? If so, you probably want to use
+> of_match_device() instead.
+
+Correct, I'll use of_match_device()
+
+> > +	int ret = 0;
+> > +
+> > +	bcm59056 = devm_kzalloc(&i2c->dev, sizeof(*bcm59056), GFP_KERNEL);
+> > +	if (!bcm59056)
+> > +		return -ENOMEM;
+> > +
+> > +	i2c_set_clientdata(i2c, bcm59056);
+> > +	bcm59056->dev = &i2c->dev;
+> > +	bcm59056->i2c_client = i2c;
+> > +	bcm59056->id = chip_id;
+> > +
+> > +	bcm59056->regmap = devm_regmap_init_i2c(i2c, &bcm59056_regmap_config);
+> > +	if (IS_ERR(bcm59056->regmap)) {
+> > +		ret = PTR_ERR(bcm59056->regmap);
+> > +		dev_err(&i2c->dev, "regmap initialization failed: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = mfd_add_devices(bcm59056->dev, -1,
+> > +			      bcm59056s, ARRAY_SIZE(bcm59056s),
+> > +			      NULL, 0, NULL);
+> 
+> Are you sure you need all of your #includes?
+> 
+> I notice that irqdomain is there, but you don't actually have one?
+
+Right, I'll do a sweep on them. In that particular case, I don't yet
+have a need to implement interrupt support so it needs to go.
+
+> 
+> > +	if (ret < 0)
+> > +		dev_err(&i2c->dev, "mfd_add_devices failed: %d\n", ret);
+> 
+> What if we change the name of the function? Probably better to say
+> something like "device registration failed" or thelike.
+
+Will do.
+
+> 
+> > +	return ret;
+> > +}
+> > +
+> > +static int bcm59056_i2c_remove(struct i2c_client *i2c)
+> > +{
+> > +	struct bcm59056 *bcm59056 = i2c_get_clientdata(i2c);
+> > +
+> > +	mfd_remove_devices(bcm59056->dev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id bcm59056_of_match[] = {
+> > +	{ .compatible = "brcm,bcm59056", .data = (void *)BCM59056 },
+> 
+> You've gone to the trouble of setting a device version here, but you
+> don't seem to use it?
+
+I'll drop the device version
+
+> > +	{ }
+> > +};
+> > +
+> > +static const struct i2c_device_id bcm59056_i2c_id[] = {
+> > +	{ "bcm59056", BCM59056 },
+> > +	{ }
+> > +};
+> 
+> Ah, I guess this is where id->driver comes from.
+> 
+> It's pretty silly that the I2C subsystem demands the presence of this
+> table, despite not using it if an of_device_id table is present.
+
+It does make it very difficult to follow DT enabled I2C client drivers
+:( I'll drop the BCM59056 too.
+
+> > +MODULE_DEVICE_TABLE(i2c, bcm59056_i2c_id);
+> > +
+> > +static struct i2c_driver bcm59056_i2c_driver = {
+> > +	.driver = {
+> > +		   .name = "bcm59056",
+> > +		   .owner = THIS_MODULE,
+> > +		   .of_match_table = of_match_ptr(bcm59056_of_match),
+> 
+> No need to use of_match_ptr() here.
+
+Will remove.
+
+> > +	},
+> > +	.probe = bcm59056_i2c_probe,
+> > +	.remove = bcm59056_i2c_remove,
+> > +	.id_table = bcm59056_i2c_id,
+> 
+> *grumble*
+
+:) Yes, unavoidable for now.
+
+> > +};
+> > +
+> > +static int __init bcm59056_init(void)
+> > +{
+> > +	return i2c_add_driver(&bcm59056_i2c_driver);
+> > +}
+> > +subsys_initcall(bcm59056_init);
+> 
+> Really? :(
+> 
+> Maybe you'll want to comment this, in case people do not know the back
+> ground and attempts to clean it up.
+
+I'll add a comment. This is the old problem of needing regulators really
+early. It's exasperated by the fact that the USB gadget framework
+drivers do not use driver probing. This means that they can not be
+deferred after i2c/mfd/regulator init...the problem is particularly
+noticeable when building in a gadget driver for nfsroot purposes.
+
+Because of this I have the regulator, MFD, and i2c drivers all using
+subsys_initcall() in this series. FWIW, there's some discussion about
+how to resolve the USB gadget driver case but it's going to take a
+while.
+
+> > +static void __exit bcm59056_exit(void)
+> > +{
+> > +	i2c_del_driver(&bcm59056_i2c_driver);
+> > +}
+> > +module_exit(bcm59056_exit);
+> 
+> <snip>
+> 
+> > +/* chip id */
+> > +#define BCM59056		0
+> 
+> Lonely, oh so lonely!
+
+Understood. Will remove.
+
+> > +/* max register address */
+> > +#define BCM59056_MAX_REGISTER	0xe8
+> 
+> Don't you have a table of registers which you care about?
+
+I placed the register defs that I actually use in the regulator driver
+itself since that is the only place they are used. I notice most MFD
+drivers centralize this in linux/mfd/*.h. However, generally chunk
+of register defs are only used in one subdriver and not shared. If
+it's preferred to move all register defs centrally I can do that.
+
+> > +/* bcm59056 chip access */
+> 
+> Superfluous comment? Don't we all know what these containers do?
+
+Indeed, will remove.
+
+Thanks for reviewing.
+
+-Matt
+
+> > +struct bcm59056 {
+> > +	struct device *dev;
+> > +	struct i2c_client *i2c_client;
+> > +	struct regmap *regmap;
+> > +	unsigned int id;
+> > +};
+> > +
+> > +#endif /*  __LINUX_MFD_BCM59056_H */
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
