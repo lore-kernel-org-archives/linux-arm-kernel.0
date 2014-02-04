@@ -1,24 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Feb 2014 19:20:41 +0000
-Subject: [PATCH 10/17] spi: pl022: Remove redundant pinctrl to default
- state in probe
-In-Reply-To: <1391529538-21685-11-git-send-email-ulf.hansson@linaro.org>
-References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
- <1391529538-21685-11-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140204192041.GW22609@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Feb 2014 20:21:38 +0100
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <20140204191055.GC25695@obsidianresearch.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <8676627.b6SYsazoah@wuerfel> <20140204191055.GC25695@obsidianresearch.com>
+Message-ID: <4118142.2mQ5BlBdTZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 04:58:51PM +0100, Ulf Hansson wrote:
-> The driver core is now taking care of putting our pins into default
-> state at probe. Thus we can remove the redundant call for it in probe.
+On Tuesday 04 February 2014 12:10:55 Jason Gunthorpe wrote:
+> 
+> For instance to support peer-to-peer IO you need to have a consisent,
+> non-overlapping set of bus/device/function/tag to uniquely route TLPs
+> within the chip. Cross domain TLP routing in HW is non-trivial.
 
-I applied this one too, as with the last patch it looks independant of
-the runtime PM stuff.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/a1237526/attachment.sig>
+Yes, that is a good reason.
+
+> IOMMUs (and SR-IOv) rely on the BDF to identify the originating device
+> for each TLP. Multiple domains means a much more complex IOMMU
+> environment.
+
+I fear we already have to support complex IOMMU setups on ARM,
+whether there are multiple PCI domains or not. But it would be
+nice in theory not to require it.
+
+> Failure to integrate on-chip devices into the PCI world also means
+> thing like SR-IOv won't work sanely with on-chip devices.
+
+I'd consider this a feature ;)
+
+But you are probably right: people will do SR-IOV whether we like
+it or not, and they will try to do it on non-PCI devices too,
+and great suffering will be involved.
+
+	Arnd
