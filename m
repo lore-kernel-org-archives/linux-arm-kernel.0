@@ -1,110 +1,103 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  3 Feb 2014 17:13:23 -0800
-Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
-Message-ID: <1391476403-26099-1-git-send-email-olof@lixom.net>
+Date: Mon, 3 Feb 2014 18:05:11 -0800
+Subject: [RFC/RFT 2/2] ARM: keystone: Install hooks for dma address
+ translation routines
+In-Reply-To: <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling some of the mvebu platforms in the multiplatform config for ARM
-enabled these drivers, which also triggered a bunch of warnings when LPAE
-is enabled (thus making phys_addr_t 64-bit).
+Hi,
 
-Most changes are switching printk formats, but also a bit of changes to what
-used to be array-based pointer arithmetic that could just be done with the
-address types instead.
+On Mon, Feb 3, 2014 at 3:28 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Keystone platforms have their physical memory mapped at an address
+> outside the 32-bit physical range.  A Keystone machine with 16G of RAM
+> would find its memory at 0x0800000000 - 0x0bffffffff.
+> The system interconnect allows to perform DMA transfers from first 2G of
+> physical memory (0x08 0000 0000 to 08 7FFF FFFF) which aliased in
+> hardware to the 32-bit addressable space (0x80000000 - 0xffffffff),
+> because DMA HW supports only 32-bits addressing.
+>
+> Hence, add arch hooks for dma address translation routines.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-keystone/keystone.c |   31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> index 1b43a27..54dae03 100644
+> --- a/arch/arm/mach-keystone/keystone.c
+> +++ b/arch/arm/mach-keystone/keystone.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/init.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/of_address.h>
+> +#include <linux/dma-mapping.h>
+>
+>  #include <asm/setup.h>
+>  #include <asm/mach/map.h>
+> @@ -53,6 +54,28 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
+>         return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+>  }
+>
+> +static unsigned long keystone_dma_pfn_offset __read_mostly;
+> +
+> +static dma_addr_t keystone_pfn_to_dma(struct device *dev, unsigned long pfn)
+> +{
+> +       return PFN_PHYS(pfn - keystone_dma_pfn_offset);
+> +}
+> +
+> +static unsigned long keystone_dma_to_pfn(struct device *dev, dma_addr_t addr)
+> +{
+> +       return PFN_DOWN(addr) + keystone_dma_pfn_offset;
+> +}
+> +
+> +static void *keystone_dma_to_virt(struct device *dev, dma_addr_t addr)
+> +{
+> +       return phys_to_virt(addr + PFN_PHYS(keystone_dma_pfn_offset));
+> +}
+> +
+> +static dma_addr_t keystone_virt_to_dma(struct device *dev, void *addr)
+> +{
+> +       return virt_to_phys(addr) - PFN_PHYS(keystone_dma_pfn_offset);
+> +}
+> +
+>  static void __init keystone_init_meminfo(void)
+>  {
+>         bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
+> @@ -89,6 +112,14 @@ static void __init keystone_init_meminfo(void)
+>         /* Populate the arch idmap hook */
+>         arch_virt_to_idmap = keystone_virt_to_idmap;
+>
+> +       /* Populate the arch DMA hooks */
+> +       keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
+> +                                          KEYSTONE_LOW_PHYS_START);
+> +       __arch_pfn_to_dma = keystone_pfn_to_dma;
+> +       __arch_dma_to_pfn = keystone_dma_to_pfn;
+> +       __arch_dma_to_virt = keystone_dma_to_virt;
+> +       __arch_virt_to_dma = keystone_virt_to_dma;
 
-The warnings were:
+Is this truly a static window, or is it going through an IOMMU that
+just happens to have an identity mapping setup per default?
 
-drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
-drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
-    'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
-drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
-drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
-    different size [-Wint-to-pointer-cast]
-drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
-    different size [-Wpointer-to-int-cast]
-drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
-drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
-    'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
-drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
-    'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
-drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
-drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
-    'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+PPC servers use "ibm,dma-window" to describe the assigned dma address
+space for busses/devices, but the window itself doesn't contain any
+information about the physical address mapping (since it goes through
+an iommu after that). It likely doesn't fit this particular use case,
+but it's something we should look at as a base in case we need to
+start looking at bindings for this instead of coding it per SoC. We'll
+know more once we've seen what a few of the implementations out there
+are.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- drivers/dma/mv_xor.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 53fb0c8365b0..766b68ed505c 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -497,8 +497,8 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
- 		if (!mv_can_chain(grp_start))
- 			goto submit_done;
- 
--		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
--			old_chain_tail->async_tx.phys);
-+		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %pa\n",
-+			&old_chain_tail->async_tx.phys);
- 
- 		/* fix up the hardware chain */
- 		mv_desc_set_next_desc(old_chain_tail, grp_start->async_tx.phys);
-@@ -527,7 +527,8 @@ submit_done:
- /* returns the number of allocated descriptors */
- static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- {
--	char *hw_desc;
-+	void *virt_desc;
-+	dma_addr_t dma_desc;
- 	int idx;
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	struct mv_xor_desc_slot *slot = NULL;
-@@ -542,17 +543,16 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 				" %d descriptor slots", idx);
- 			break;
- 		}
--		hw_desc = (char *) mv_chan->dma_desc_pool_virt;
--		slot->hw_desc = (void *) &hw_desc[idx * MV_XOR_SLOT_SIZE];
-+		virt_desc = mv_chan->dma_desc_pool_virt;
-+		slot->hw_desc = virt_desc + idx * MV_XOR_SLOT_SIZE;
- 
- 		dma_async_tx_descriptor_init(&slot->async_tx, chan);
- 		slot->async_tx.tx_submit = mv_xor_tx_submit;
- 		INIT_LIST_HEAD(&slot->chain_node);
- 		INIT_LIST_HEAD(&slot->slot_node);
- 		INIT_LIST_HEAD(&slot->tx_list);
--		hw_desc = (char *) mv_chan->dma_desc_pool;
--		slot->async_tx.phys =
--			(dma_addr_t) &hw_desc[idx * MV_XOR_SLOT_SIZE];
-+		dma_desc = mv_chan->dma_desc_pool;
-+		slot->async_tx.phys = dma_desc + idx * MV_XOR_SLOT_SIZE;
- 		slot->idx = idx++;
- 
- 		spin_lock_bh(&mv_chan->lock);
-@@ -582,8 +582,8 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	int slot_cnt;
- 
- 	dev_dbg(mv_chan_to_devp(mv_chan),
--		"%s dest: %x src %x len: %u flags: %ld\n",
--		__func__, dest, src, len, flags);
-+		"%s dest: %pad src %pad len: %u flags: %ld\n",
-+		__func__, &dest, &src, len, flags);
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
- 		return NULL;
- 
-@@ -626,8 +626,8 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
- 
- 	dev_dbg(mv_chan_to_devp(mv_chan),
--		"%s src_cnt: %d len: dest %x %u flags: %ld\n",
--		__func__, src_cnt, len, dest, flags);
-+		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
-+		__func__, src_cnt, len, &dest, flags);
- 
- 	spin_lock_bh(&mv_chan->lock);
- 	slot_cnt = mv_chan_xor_slot_count(len, src_cnt);
--- 
-1.8.4.1.601.g02b3b1d
+-Olof
