@@ -1,96 +1,54 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue,  4 Feb 2014 16:58:46 +0100
-Subject: [PATCH 05/17] mmc: mmci: Put the device into low power state at
- system suspend
+Date: Tue,  4 Feb 2014 16:58:47 +0100
+Subject: [PATCH 06/17] spi: pl022: Let runtime PM callbacks be available for
+ CONFIG_PM
 In-Reply-To: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
 References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1391529538-21685-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the available runtime PM callbacks, we are now able to put our
-device into low power state at system suspend.
+Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
+callbacks. This means the callbacks becomes available for both
+CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
+combinations of these scenarios.
 
-Earlier we could not accomplish this without trusting a power domain
-for the device to take care of it. Now we are able to cope with
-scenarios both with and without a power domain.
-
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   45 +++++++++++++++++++++++++--------------------
- 1 file changed, 25 insertions(+), 20 deletions(-)
+ drivers/spi/spi-pl022.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index c88da1c..074e0cb 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1723,33 +1723,38 @@ static int mmci_remove(struct amba_device *dev)
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 2789b45..70fa907 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2288,7 +2288,7 @@ pl022_remove(struct amba_device *adev)
  	return 0;
  }
  
--#ifdef CONFIG_SUSPEND
--static int mmci_suspend(struct device *dev)
-+#ifdef CONFIG_PM_SLEEP
-+static int mmci_suspend_late(struct device *dev)
- {
--	struct amba_device *adev = to_amba_device(dev);
--	struct mmc_host *mmc = amba_get_drvdata(adev);
-+	int ret = 0;
- 
--	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--		pm_runtime_get_sync(dev);
--		writel(0, host->base + MMCIMASK0);
--	}
-+	if (pm_runtime_status_suspended(dev))
-+		return 0;
- 
--	return 0;
-+	if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
-+		ret = dev->pm_domain->ops.runtime_suspend(dev);
-+	else
-+		ret = dev->bus->pm->runtime_suspend(dev);
-+
-+	if (!ret)
-+		pm_runtime_set_suspended(dev);
-+
-+	return ret;
+-#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
++#ifdef CONFIG_PM
+ /*
+  * These two functions are used from both suspend/resume and
+  * the runtime counterparts to handle external resources like
+@@ -2354,7 +2354,7 @@ static int pl022_resume(struct device *dev)
  }
+ #endif	/* CONFIG_PM */
  
--static int mmci_resume(struct device *dev)
-+static int mmci_resume_early(struct device *dev)
+-#ifdef CONFIG_PM_RUNTIME
++#ifdef CONFIG_PM
+ static int pl022_runtime_suspend(struct device *dev)
  {
--	struct amba_device *adev = to_amba_device(dev);
--	struct mmc_host *mmc = amba_get_drvdata(adev);
-+	int ret = 0;
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+@@ -2374,7 +2374,7 @@ static int pl022_runtime_resume(struct device *dev)
  
--	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
--		pm_runtime_put(dev);
--	}
-+	if (pm_runtime_status_suspended(dev))
-+		return 0;
- 
--	return 0;
-+	if (dev->pm_domain && dev->pm_domain->ops.runtime_resume)
-+		ret = dev->pm_domain->ops.runtime_resume(dev);
-+	else
-+		ret = dev->bus->pm->runtime_resume(dev);
-+
-+	return ret;
- }
- #endif
- 
-@@ -1820,7 +1825,7 @@ static int mmci_runtime_resume(struct device *dev)
- #endif
- 
- static const struct dev_pm_ops mmci_dev_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(mmci_suspend_late, mmci_resume_early)
- 	SET_PM_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
+ static const struct dev_pm_ops pl022_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+-	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
++	SET_PM_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
  };
  
+ static struct vendor_data vendor_arm = {
 -- 
 1.7.9.5
