@@ -1,52 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 4 Feb 2014 00:21:10 +0000
-Subject: [PATCH v3 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
-In-Reply-To: <20140131224704.GI2950@lukather>
-References: <1391165752-1819-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391165752-1819-4-git-send-email-maxime.ripard@free-electrons.com>
- <20140131124809.GE22609@sirena.org.uk>
- <20140131224704.GI2950@lukather>
-Message-ID: <20140204002110.GP22609@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Feb 2014 09:57:41 +0900
+Subject: [PATCH 1/3] mmc: tmio-mmc: add DMA SG synchronisation
+In-Reply-To: <Pine.LNX.4.64.1401311248320.3234@axis700.grange>
+References: <Pine.LNX.4.64.1401311237080.3234@axis700.grange>
+ <Pine.LNX.4.64.1401311248320.3234@axis700.grange>
+Message-ID: <20140204005741.GC24787@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 11:47:04PM +0100, Maxime Ripard wrote:
-> On Fri, Jan 31, 2014 at 12:48:09PM +0000, Mark Brown wrote:
-> > On Fri, Jan 31, 2014 at 11:55:50AM +0100, Maxime Ripard wrote:
+On Fri, Jan 31, 2014 at 12:54:19PM +0100, Guennadi Liakhovetski wrote:
+> According to the DMA API data has to be synchronised before starting
+> a DMA transfer to device and after completing a DMA transfer from device.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-> > > +	pm_runtime_enable(&pdev->dev);
-> > > +	if (!pm_runtime_enabled(&pdev->dev)) {
-> > > +		ret = sun6i_spi_runtime_resume(&pdev->dev);
-> > > +		if (ret) {
-> > > +			dev_err(&pdev->dev, "Couldn't resume the device\n");
-> > > +			return ret;
-> > > +		}
-> > > +	}
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-> > No, as discussed don't do this - notice how other drivers aren't written
-> > this way either.  Like I said leave the device powered on startup and
-> > then let it be idled by runtime PM.
-
-> Well, some SPI drivers are actually written like that (all the tegra
-
-It's not been done consistently, no - that should be fixed.
-
-> SPI drivers for example). It's not an excuse, but waking up the device
-> only to put it back in suspend right away seems kind of
-
-It isn't awesome, no.  Ideally the runtime PM code would do this but
-then you couldn't ifdef the operations which as far as I can tell is the
-main thing people want from disabling it and it gets complicated for
-devices that genuinely do power up on startup so here we are.
-
-> inefficient. Plus, the pm_runtime_idle callback you suggested are
-> actually calling runtime_idle, while we want to call runtime_suspend.
-
-Yeah, I didn't actually check if I was looking at the right call there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/f016f8c3/attachment.sig>
+> ---
+>  drivers/mmc/host/tmio_mmc_dma.c |   21 ++++++++++++---------
+>  1 files changed, 12 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
+> index 65edb4a..a997b94 100644
+> --- a/drivers/mmc/host/tmio_mmc_dma.c
+> +++ b/drivers/mmc/host/tmio_mmc_dma.c
+> @@ -168,9 +168,12 @@ static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
+>  	}
+>  
+>  	ret = dma_map_sg(chan->device->dev, sg, host->sg_len, DMA_TO_DEVICE);
+> -	if (ret > 0)
+> +	if (ret > 0) {
+> +		dma_sync_sg_for_device(chan->device->dev, sg, host->sg_len,
+> +				       DMA_TO_DEVICE);
+>  		desc = dmaengine_prep_slave_sg(chan, sg, ret,
+>  			DMA_MEM_TO_DEV, DMA_CTRL_ACK);
+> +	}
+>  
+>  	if (desc) {
+>  		cookie = dmaengine_submit(desc);
+> @@ -247,14 +250,14 @@ static void tmio_mmc_tasklet_fn(unsigned long arg)
+>  	if (!host->data)
+>  		goto out;
+>  
+> -	if (host->data->flags & MMC_DATA_READ)
+> -		dma_unmap_sg(host->chan_rx->device->dev,
+> -			     host->sg_ptr, host->sg_len,
+> -			     DMA_FROM_DEVICE);
+> -	else
+> -		dma_unmap_sg(host->chan_tx->device->dev,
+> -			     host->sg_ptr, host->sg_len,
+> -			     DMA_TO_DEVICE);
+> +	if (host->data->flags & MMC_DATA_READ) {
+> +		struct device *dev = host->chan_rx->device->dev;
+> +		dma_unmap_sg(dev, host->sg_ptr, host->sg_len, DMA_FROM_DEVICE);
+> +		dma_sync_sg_for_cpu(dev, host->sg_ptr, host->sg_len, DMA_FROM_DEVICE);
+> +	} else {
+> +		struct device *dev = host->chan_tx->device->dev;
+> +		dma_unmap_sg(dev, host->sg_ptr, host->sg_len, DMA_TO_DEVICE);
+> +	}
+>  
+>  	tmio_mmc_do_data_irq(host);
+>  out:
+> -- 
+> 1.7.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
