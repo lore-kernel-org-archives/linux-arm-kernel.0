@@ -1,59 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 04 Feb 2014 00:36:54 +0100
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <20140203231603.GA11613@1wt.eu>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <52EA2875.5020807@free-electrons.com> <52EA2A04.2070109@gmail.com>
- <20140203231603.GA11613@1wt.eu>
-Message-ID: <52F02816.1050708@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 00:21:10 +0000
+Subject: [PATCH v3 3/5] spi: sunxi: Add Allwinner A31 SPI controller driver
+In-Reply-To: <20140131224704.GI2950@lukather>
+References: <1391165752-1819-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1391165752-1819-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140131124809.GE22609@sirena.org.uk>
+ <20140131224704.GI2950@lukather>
+Message-ID: <20140204002110.GP22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2014 12:16 AM, Willy Tarreau wrote:
-> On Thu, Jan 30, 2014 at 11:31:32AM +0100, Sebastian Hesselbarth wrote:
->> On 01/30/14 11:24, Gregory CLEMENT wrote:
->>> On 25/01/2014 19:19, Sebastian Hesselbarth wrote:
->>>> This patch set fixes clk init order that went upside-down with
->>>> v3.14. I haven't really investigated what caused this, but I assume
->>>> it is related with DT node reordering by addresses.
->>>
->>> Can you explain what kind of issue do you observe?
->>
->> Sure. When probing CLK_OF_DECLAREed clock drivers, clock-gating driver
->> gets registered before core-clocks. It therefore cannot resolve it's
->> parent clock name for tclk and all clock gates will have no parent
->> clock.
->>
->> Usually, you'll see in some drivers (e.g. v643xx_eth) div_by_zero errors
->> poping up, when they calculate a frequency division factors based on
->> clock gate frequency, which should have been tclk but is 0 now.
->
-> Well, to be honnest, I have no idea whether your patch is the right way
-> to fix the problem or not, but what I can say is that it fixes such oopses
-> that appear in 3.14-rc1 when booting on mirabox :
->
-> Division by zero in kernel.
+On Fri, Jan 31, 2014 at 11:47:04PM +0100, Maxime Ripard wrote:
+> On Fri, Jan 31, 2014 at 12:48:09PM +0000, Mark Brown wrote:
+> > On Fri, Jan 31, 2014 at 11:55:50AM +0100, Maxime Ripard wrote:
 
-Willy,
+> > > +	pm_runtime_enable(&pdev->dev);
+> > > +	if (!pm_runtime_enabled(&pdev->dev)) {
+> > > +		ret = sun6i_spi_runtime_resume(&pdev->dev);
+> > > +		if (ret) {
+> > > +			dev_err(&pdev->dev, "Couldn't resume the device\n");
+> > > +			return ret;
+> > > +		}
+> > > +	}
 
-you have hit exactly the reason for this patch.
+> > No, as discussed don't do this - notice how other drivers aren't written
+> > this way either.  Like I said leave the device powered on startup and
+> > then let it be idled by runtime PM.
 
-[...]
-> By the way, seeing how often a trick related to the DT is nedeed to solve an
-> oops or a panic, I'm really scared that this whole DT mess is just becoming
-> the exact copy of the ACPI mess (but 15 years later) and we'll experience the
-> same horrible things :-( Sometimes I'm wondering whether there are not too
-> many structural things put in there...
+> Well, some SPI drivers are actually written like that (all the tegra
 
-To be precise, it is not a DT-related trick at all. You would have the
-same issues, if you'd register those "low-level" (i.e. early) drivers
-without DT. It is more about missing init ordering, here.
+It's not been done consistently, no - that should be fixed.
 
-There could be different ways to work this out, even elevating clock
-devices to "normal" probed devices could be possible. I am sure, in the
-long run, it will work out, but now this is a fix for v3.14-rc1.
+> SPI drivers for example). It's not an excuse, but waking up the device
+> only to put it back in suspend right away seems kind of
 
-@Jason, Andrew, Gregory, Thomas:
-Now that v3.14 is out, anything against taking this in as fixes for rc1?
+It isn't awesome, no.  Ideally the runtime PM code would do this but
+then you couldn't ifdef the operations which as far as I can tell is the
+main thing people want from disabling it and it gets complicated for
+devices that genuinely do power up on startup so here we are.
 
-Sebastian
+> inefficient. Plus, the pm_runtime_idle callback you suggested are
+> actually calling runtime_idle, while we want to call runtime_suspend.
+
+Yeah, I didn't actually check if I was looking at the right call there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/f016f8c3/attachment.sig>
