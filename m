@@ -1,46 +1,45 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue,  4 Feb 2014 16:58:41 +0100
-Subject: [PATCH 00/17] amba: PM fixups for amba bus and some amba drivers
-Message-ID: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+Date: Tue,  4 Feb 2014 16:58:42 +0100
+Subject: [PATCH 01/17] amba: Let runtime PM callbacks be available for
+ CONFIG_PM
+In-Reply-To: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1391529538-21685-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the PM problems you yet when combining CONFIG_PM_SLEEP and
-CONFIG_PM_RUNTIME. In principle these drivers did not manage to put it's devices
-into low power state at system suspend, which then this patchset intend to fix.
+Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
+callbacks. This means the callbacks becomes available for both
+CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed by drivers and
+power domains.
 
-Both the drivers and the amba bus converts to the new SET_PM_RUNTIME_PM_OPS
-macro while setting up the runtime PM callbacks, which is intended to be used
-for solving these kind of issues.
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/amba/bus.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The fixes for the amba bus needs to be merged prior to the other, thus I think
-it could make sense to merge this complete patchset through Russell's tree,
-if he and the other maintainers think this is okay.
-
-Ulf Hansson (17):
-  amba: Let runtime PM callbacks be available for CONFIG_PM
-  amba: Add late and early PM callbacks
-  mmc: mmci: Mask IRQs for all variants during runtime suspend
-  mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
-  mmc: mmci: Put the device into low power state at system suspend
-  spi: pl022: Let runtime PM callbacks be available for CONFIG_PM
-  spi: pl022: Don't ignore power domain and amba bus at system suspend
-  spi: pl022: Fully gate clocks at request inactivity
-  spi: pl022: Simplify clock handling
-  spi: pl022: Remove redundant pinctrl to default state in probe
-  i2c: nomadik: Convert to devm functions
-  i2c: nomadik: Remove redundant call to pm_runtime_disable
-  i2c: nomadik: Leave probe with the device in active state
-  i2c: nomadik: Fixup deployment of runtime PM
-  i2c: nomadik: Convert to late and early system PM callbacks
-  i2c: nomadik: Remove busy check for transfers at suspend late
-  i2c: nomadik: Fixup system suspend
-
- drivers/amba/bus.c               |   10 ++-
- drivers/i2c/busses/i2c-nomadik.c |  146 ++++++++++++++++++--------------------
- drivers/mmc/host/mmci.c          |   72 ++++++++++---------
- drivers/spi/spi-pl022.c          |   95 +++++++++++--------------
- 4 files changed, 159 insertions(+), 164 deletions(-)
-
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 9e60291..3cf61a1 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -83,7 +83,7 @@ static struct device_attribute amba_dev_attrs[] = {
+ 	__ATTR_NULL,
+ };
+ 
+-#ifdef CONFIG_PM_RUNTIME
++#ifdef CONFIG_PM
+ /*
+  * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
+  * enable/disable the bus clock at runtime PM suspend/resume as this
+@@ -123,7 +123,7 @@ static const struct dev_pm_ops amba_pm = {
+ 	.thaw		= pm_generic_thaw,
+ 	.poweroff	= pm_generic_poweroff,
+ 	.restore	= pm_generic_restore,
+-	SET_RUNTIME_PM_OPS(
++	SET_PM_RUNTIME_PM_OPS(
+ 		amba_pm_runtime_suspend,
+ 		amba_pm_runtime_resume,
+ 		NULL
 -- 
 1.7.9.5
