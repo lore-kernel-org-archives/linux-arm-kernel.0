@@ -1,95 +1,99 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 04 Feb 2014 11:14:44 +0100
-Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
-In-Reply-To: <20140204094051.GL25625@lukather>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
- <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
- <20140128094427.GZ3867@lukather> <52E77FCD.5050701@redhat.com>
- <20140204094051.GL25625@lukather>
-Message-ID: <52F0BD94.1060601@redhat.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 04 Feb 2014 11:13:31 +0100
+Subject: [PATCH 1/2] [media] v4l2: Add settings for Horizontal and Vertical
+ MV Search Range
+In-Reply-To: <1391507999-31437-2-git-send-email-amit.grover@samsung.com>
+References: <52E0ED10.2020901@samsung.com>
+ <1391507999-31437-1-git-send-email-amit.grover@samsung.com>
+ <1391507999-31437-2-git-send-email-amit.grover@samsung.com>
+Message-ID: <52F0BD4B.2020701@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-Hi,
-
-On 02/04/2014 10:40 AM, Maxime Ripard wrote:
-> Hi Hans,
-> 
-> On Tue, Jan 28, 2014 at 11:00:45AM +0100, Hans de Goede wrote:
->> -----BEGIN PGP SIGNED MESSAGE----- Hash: SHA1
->> 
->> Hi,
->> 
->> On 01/28/2014 10:44 AM, Maxime Ripard wrote:
->>> On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
->>>>>> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
->>>>> 
->>>>> Maybe we can just remove the gates from there? Even though they are gates, they are also (a bit) more than that.
->>>> 
->>>> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
->>> 
->>> Yep, exactly
->>> 
->>>>> I guess that means that we will have the OHCI0 gate declared with <&...-gates-clk 6>, while it's actually the first gate for this clock?
->>>> 
->>>> Correct.
->>>> 
->>>>> Maybe introducing an offset field in the gates_data would be a good idea, so that we always start from indexing the gates from 0 in the DT?
->>>> 
->>>> Well for the other "gates" type clks we also have holes in the range, and we always refer to the clk with the bit number in the reg as the clock-cell value.
->>> 
->>> Yes, we have holes, but I see two majors differences here: - the other gates are just gates, while the usb clocks are a bit more than that.
->> 
->> The usb-clk registers contain more then that, but the bits we are talking about now are gates.
->> 
->>> - the other gates' gating bits thus all start at bit 0, while - here, since it's kind of a "mixed" clock, the gating bits start - at bit 6 (on the A20 at least)
->> 
->> Right, still I believe that the consistent thing to do is keeping the bit-number for the bit in the register controlling the gate as the specifier.  When adding new dts entries / reviewing existing ones I'm used to matching the specifier to the bit-nr in the data-sheet, I think making things different just for this one register is counter productive.
-> 
-> And if you turn it the other way around, it would be inconsistent that all gates indices start at 0, and we would start at 6 here :)
-
-I think the problem here is that you see the specifier part of the clk
-phandle as an index, which it is not. All devicetree docs / code talks
-about specifiers or arguments not indexes. Once you stop seeing this as
-an index, you will hopefully also stop insisting this needs to
-start at 0 :)
-
-Also note that it already is not an index for existing sunxi clks which have
-cells != 0, as there are holes in the bits used in the gates registers and
-calling the specifier an index suggest we're dealing with an array, and
-arrays never have holes.
-
-The clk specifier as currently used in sunxi clks is a 1:1 mapping of the
-gate register bit numbers, as is clearly documented in ie:
-Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
-Where the datasheet is referenced as the source for (most) of the values
-to put in the specifier.
-
-My biggest objection is that this would loose 1:1 mapping we currently
-have between the specifier and bit-nr in the register, which really is
-convenient when writing new dts bindings.
-
-When we add an offset users will need to first lookup which clk they need in
-the datasheet and then look at both the dts bindings doc to find how this is
-mapped to the specifier. In my experience such an extra level of indirection
-in documentation is a PITA, and all that just so that some random number
-(it is not an index!) can start at 0 ?
-
-To me adding an offset here and making the clk gates different form all
-our other clock gates just feels wrong.
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
 Regards,
 
-Hans
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+	Hans
 
-iEYEARECAAYFAlLwvZMACgkQF3VEtJrzE/sz0gCfQNwhM/RpimtbhumvKKQ4a4V+
-Vo4AoLTNKRZXlPC84hi1JInPGYvZIxuR
-=dA68
------END PGP SIGNATURE-----
+On 02/04/14 10:59, Amit Grover wrote:
+> Adding V4L2 controls for horizontal and vertical search range in pixels
+> for motion estimation module in video encoder.
+> 
+> Signed-off-by: Swami Nathan <swaminath.p@samsung.com>
+> Signed-off-by: Amit Grover <amit.grover@samsung.com>
+> ---
+>  Documentation/DocBook/media/v4l/controls.xml |   20 ++++++++++++++++++++
+>  drivers/media/v4l2-core/v4l2-ctrls.c         |    6 ++++++
+>  include/uapi/linux/v4l2-controls.h           |    2 ++
+>  3 files changed, 28 insertions(+)
+> 
+> diff --git a/Documentation/DocBook/media/v4l/controls.xml b/Documentation/DocBook/media/v4l/controls.xml
+> index a5a3188..0e1770c 100644
+> --- a/Documentation/DocBook/media/v4l/controls.xml
+> +++ b/Documentation/DocBook/media/v4l/controls.xml
+> @@ -2258,6 +2258,26 @@ Applicable to the MPEG1, MPEG2, MPEG4 encoders.</entry>
+>  VBV buffer control.</entry>
+>  	      </row>
+>  
+> +		  <row><entry></entry></row>
+> +	      <row id=""v4l2-mpeg-video-hor-search-range">
+> +		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE</constant>&nbsp;</entry>
+> +		<entry>integer</entry>
+> +	      </row>
+> +		<row><entry spanname="descr">Horizontal search range defines maximum horizontal search area in pixels
+> +to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
+> +horizontal search range for motion estimation module in video encoder.</entry>
+> +	      </row>
+> +
+> +		 <row><entry></entry></row>
+> +	      <row id="v4l2-mpeg-video-vert-search-range">
+> +		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE</constant>&nbsp;</entry>
+> +		<entry>integer</entry>
+> +	      </row>
+> +		<row><entry spanname="descr">Vertical search range defines maximum vertical search area in pixels
+> +to search and match for the present Macroblock (MB) in the reference picture. This V4L2 control macro is used to set
+> +vertical search range for motion estimation module in video encoder.</entry>
+> +	      </row>
+> +
+>  	      <row><entry></entry></row>
+>  	      <row>
+>  		<entry spanname="id"><constant>V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE</constant>&nbsp;</entry>
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index 6ff002b..e9e12c4 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -735,6 +735,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_DEC_PTS:			return "Video Decoder PTS";
+>  	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:			return "Video Decoder Frame Count";
+>  	case V4L2_CID_MPEG_VIDEO_VBV_DELAY:			return "Initial Delay for VBV Control";
+> +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:		return "Horizontal MV Search Range";
+> +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
+>  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+>  
+>  	/* VPX controls */
+> @@ -910,6 +912,10 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  		*min = 0;
+>  		*max = *step = 1;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
+> +	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:
+> +		*type = V4L2_CTRL_TYPE_INTEGER;
+> +		break;
+>  	case V4L2_CID_PAN_RESET:
+>  	case V4L2_CID_TILT_RESET:
+>  	case V4L2_CID_FLASH_STROBE:
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 2cbe605..cda6fa0 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -376,6 +376,8 @@ enum v4l2_mpeg_video_multi_slice_mode {
+>  #define V4L2_CID_MPEG_VIDEO_DEC_FRAME			(V4L2_CID_MPEG_BASE+224)
+>  #define V4L2_CID_MPEG_VIDEO_VBV_DELAY			(V4L2_CID_MPEG_BASE+225)
+>  #define V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER		(V4L2_CID_MPEG_BASE+226)
+> +#define V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+227)
+> +#define V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE		(V4L2_CID_MPEG_BASE+228)
+>  
+>  #define V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP		(V4L2_CID_MPEG_BASE+300)
+>  #define V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP		(V4L2_CID_MPEG_BASE+301)
+> 
