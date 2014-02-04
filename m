@@ -1,49 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Feb 2014 13:40:43 +0000
-Subject: [PATCH 0/6] BCM59056 PMU regulator support
-In-Reply-To: <1391516352-32359-1-git-send-email-mporter@linaro.org>
-References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
-Message-ID: <20140204134043.GG13529@lee--X1>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 04 Feb 2014 14:51:41 +0100
+Subject: [PATCH 0/3] clk: at91: various fixes and improvements
+In-Reply-To: <1391426731-9392-1-git-send-email-b.brezillon@overkiz.com>
+References: <1391426731-9392-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52F0F06D.6000704@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The BCM59056 is a multi-function power management unit used with the
-> BCM281xx family of SoCs. This series adds an MFD and voltage regulator
-> driver to support the BCM59056. The bcm28155-ap DT support is updated
-> to enable use of regulators on the otg and sdhci peripherals.
-> 
-> Matt Porter (6):
->   i2c: bcm-kona: register with subsys_initcall
->   regulator: add bcm59056 pmu DT binding
->   mfd: add bcm59056 pmu driver
->   regulator: add bcm59056 regulator driver
->   ARM: configs: bcm_defconfig: enable bcm59056 regulator support
->   ARM: dts: add bcm59056 pmu support and enable for bcm28155-ap
-> 
->  .../devicetree/bindings/regulator/bcm59056.txt     |  37 ++
->  arch/arm/boot/dts/bcm28155-ap.dts                  |  41 ++
->  arch/arm/boot/dts/bcm59056.dtsi                    | 158 ++++++++
->  arch/arm/configs/bcm_defconfig                     |   7 +
->  drivers/i2c/busses/i2c-bcm-kona.c                  |  14 +-
->  drivers/mfd/Kconfig                                |   8 +
->  drivers/mfd/Makefile                               |   1 +
->  drivers/mfd/bcm59056.c                             | 119 ++++++
->  drivers/regulator/Kconfig                          |   8 +
->  drivers/regulator/Makefile                         |   1 +
->  drivers/regulator/bcm59056-regulator.c             | 445 +++++++++++++++++++++
->  include/linux/mfd/bcm59056.h                       |  35 ++
->  12 files changed, 873 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/regulator/bcm59056.txt
->  create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
->  create mode 100644 drivers/mfd/bcm59056.c
->  create mode 100644 drivers/regulator/bcm59056-regulator.c
->  create mode 100644 include/linux/mfd/bcm59056.h
+Hello, Mike,
 
-FYI: Mark's email address is not correct. Not sure where you pulled
-this one up from, but he doesn't have access to it anymore.
+Please do not take this series: the prog clk driver is still buggy (this was
+reported by Jean-Jacques Hiblot).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jean-Jacques is preparing a new series to fix these bugs, and I'll rebase
+patch 2 and 3 of this series on top of his work.
+
+Sorry for the inconvenience.
+
+Best Regards,
+
+Boris
+
+On 03/02/2014 12:25, Boris BREZILLON wrote:
+> Hello Mike,
+>
+> This series fixes a bug in the prog clk prepare function (the platform hangs
+> when preparing a prog clk).
+>
+> It also implements the determine_rate callback for these prog clks and allow
+> system clk to propagate the rate change to its parent.
+>
+> These modifications are needed to get the atmel_wm8904 driver working (this
+> driver make use of prog clks), and if possible, should be merged in the next
+> 3.14 release (at least the first patch of this series).
+>
+> Let me know if this is not possible.
+>
+> Thanks.
+>
+> Best Regards,
+>
+> Boris
+>
+> Boris BREZILLON (3):
+>    clk: at91: fix programmable clk irq handling
+>    clk: at91: replace prog clk round_rate with determine_rate
+>    clk: at91: propagate rate change on system clks
+>
+>   drivers/clk/at91/clk-programmable.c |   61 ++++++++++++++++++-----------------
+>   drivers/clk/at91/clk-system.c       |    3 +-
+>   2 files changed, 34 insertions(+), 30 deletions(-)
+>
