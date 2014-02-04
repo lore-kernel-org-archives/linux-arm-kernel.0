@@ -1,241 +1,114 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 4 Feb 2014 09:31:19 -0500
-Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
-In-Reply-To: <20140204132951.GE13529@lee--X1>
-References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
- <1391516352-32359-4-git-send-email-mporter@linaro.org>
- <20140204132951.GE13529@lee--X1>
-Message-ID: <20140204143119.GA4627@beef>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 4 Feb 2014 09:33:50 -0500
+Subject: [RFC/RFT 1/2] ARM: mm: introduce arch hooks for dma address
+ translation routines
+In-Reply-To: <CAOesGMgmTmAOy4SpZU8oxN=0AihcixX5aU1sM_LNe5TiScMaSw@mail.gmail.com>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <1391470107-15927-2-git-send-email-santosh.shilimkar@ti.com>
+ <CAOesGMgmTmAOy4SpZU8oxN=0AihcixX5aU1sM_LNe5TiScMaSw@mail.gmail.com>
+Message-ID: <52F0FA4E.3000202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 01:29:51PM +0000, Lee Jones wrote:
-> > Add a driver for the BCM59056 PMU multi-function device. The driver
-> > initially supports regmap initialization and instantiation of the
-> > voltage regulator device function of the PMU.
-> > 
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> > ---
-> >  drivers/mfd/Kconfig          |   8 +++
-> >  drivers/mfd/Makefile         |   1 +
-> >  drivers/mfd/bcm59056.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/bcm59056.h |  35 +++++++++++++
-> >  4 files changed, 163 insertions(+)
-> >  create mode 100644 drivers/mfd/bcm59056.c
-> >  create mode 100644 include/linux/mfd/bcm59056.h
+On Monday 03 February 2014 09:18 PM, Olof Johansson wrote:
+> Hi,
 > 
-> <snip>
 > 
-> > +static struct mfd_cell bcm59056s[] = {
-> > +	{
-> > +		.name = "bcm59056-pmu",
+> On Mon, Feb 3, 2014 at 3:28 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Currently arch specific DMA address translation routines can be enabled
+>> using only defines which makes impossible to use them in with
+>> multi-platform builds.
+>>
+>> Hence, introduce arch specific hooks for DMA address translations
+>> routines to be compatible with multi-platform builds:
+>> dma_addr_t (*arch_pfn_to_dma)(struct device *dev, unsigned long pfn);
+>> unsigned long (*arch_dma_to_pfn)(struct device *dev, dma_addr_t addr);
+>> void* (*arch_dma_to_virt)(struct device *dev, dma_addr_t addr);
+>> dma_addr_t (*arch_virt_to_dma)(struct device *dev, void *addr);
+>>
+>> In case if architecture won't use it - DMA address translation routines
+>> will fall-back to existing implementation.
+>>
+>> Also, modify machines omap1, ks8695, iop13xx to use new DMA hooks.
 > 
-> If you plan to use *->of_node in the PMU driver, which it looks like
-> you do, you should set the compatible string here.
-
-Ok. I missed that..I'll split bindings to reflect this as well. There's
-an error in that the regulator properties are all defined in the base
-compatible of brcm,bcm59056 atm and they'll need to be in
-brcm,bcm59056-pmu's binding.
-
-> > +	},
-> > +};
-> > +
-> > +static const struct regmap_config bcm59056_regmap_config = {
-> > +	.reg_bits	= 8,
-> > +	.val_bits	= 8,
-> > +	.max_register	= BCM59056_MAX_REGISTER - 1,
+> [...]
 > 
-> If you've just set this manually i.e. it's not part of an enum table,
-> can't you set it a value you don't need to do math on? It's not used
-> anywhere else is it?
-
-Yes, I'll update this. It's not used elsewhere.
-
+>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>> index e701a4d..84acc46 100644
+>> --- a/arch/arm/include/asm/dma-mapping.h
+>> +++ b/arch/arm/include/asm/dma-mapping.h
+>> @@ -55,28 +55,16 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>>   * functions used internally by the DMA-mapping API to provide DMA
+>>   * addresses. They must not be used by drivers.
+>>   */
+>> -#ifndef __arch_pfn_to_dma
+>> -static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>> -{
+>> -       return (dma_addr_t)__pfn_to_bus(pfn);
+>> -}
+>>
+>> -static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>> -{
+>> -       return __bus_to_pfn(addr);
+>> -}
+>> +extern dma_addr_t (*__arch_pfn_to_dma)(struct device *dev, unsigned long pfn);
+>> +extern unsigned long (*__arch_dma_to_pfn)(struct device *dev, dma_addr_t addr);
+>> +extern void* (*__arch_dma_to_virt)(struct device *dev, dma_addr_t addr);
+>> +extern dma_addr_t (*__arch_virt_to_dma)(struct device *dev, void *addr);
 > 
-> > +	.cache_type	= REGCACHE_RBTREE,
-> > +};
-> > +
-> > +static int bcm59056_i2c_probe(struct i2c_client *i2c,
-> > +			      const struct i2c_device_id *id)
-> > +{
-> > +	struct bcm59056 *bcm59056;
-> > +	int chip_id = id->driver_data;
+> I tend to prefer having these kind of function pointers grouped in a
+> struct instead of in the toplevel namespace like this. It allows you
+> to use a set_<foo>_ops() interface too instead and reduces
+> exposed/exported internals since only the global struct pointer has to
+> be exported.
 > 
-> I thought this was a DT only driver? If so, you probably want to use
-> of_match_device() instead.
+agree
 
-Correct, I'll use of_match_device()
-
-> > +	int ret = 0;
-> > +
-> > +	bcm59056 = devm_kzalloc(&i2c->dev, sizeof(*bcm59056), GFP_KERNEL);
-> > +	if (!bcm59056)
-> > +		return -ENOMEM;
-> > +
-> > +	i2c_set_clientdata(i2c, bcm59056);
-> > +	bcm59056->dev = &i2c->dev;
-> > +	bcm59056->i2c_client = i2c;
-> > +	bcm59056->id = chip_id;
-> > +
-> > +	bcm59056->regmap = devm_regmap_init_i2c(i2c, &bcm59056_regmap_config);
-> > +	if (IS_ERR(bcm59056->regmap)) {
-> > +		ret = PTR_ERR(bcm59056->regmap);
-> > +		dev_err(&i2c->dev, "regmap initialization failed: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = mfd_add_devices(bcm59056->dev, -1,
-> > +			      bcm59056s, ARRAY_SIZE(bcm59056s),
-> > +			      NULL, 0, NULL);
+[..]
+ 
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 5c43ca5..74111bf 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -39,6 +39,35 @@
+>>
+>>  #include "mm.h"
+>>
+>> +static inline dma_addr_t __pfn_to_dma(struct device *dev, unsigned long pfn)
+>> +{
+>> +       return (dma_addr_t)__pfn_to_bus(pfn);
+>> +}
+>> +
+>> +static inline unsigned long __dma_to_pfn(struct device *dev, dma_addr_t addr)
+>> +{
+>> +       return __bus_to_pfn(addr);
+>> +}
+>> +
+>> +static inline void *__dma_to_virt(struct device *dev, dma_addr_t addr)
+>> +{
+>> +       return (void *)__bus_to_virt((unsigned long)addr);
+>> +}
+>> +
+>> +static inline dma_addr_t __virt_to_dma(struct device *dev, void *addr)
+>> +{
+>> +       return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+>> +}
+>> +
+>> +dma_addr_t (*__arch_pfn_to_dma)(struct device *dev, unsigned long pfn) = __pfn_to_dma;
+>> +EXPORT_SYMBOL(__arch_pfn_to_dma);
+>> +unsigned long (*__arch_dma_to_pfn)(struct device *dev, dma_addr_t addr) = __dma_to_pfn;
+>> +EXPORT_SYMBOL(__arch_dma_to_pfn);
+>> +void* (*__arch_dma_to_virt)(struct device *dev, dma_addr_t addr) = __dma_to_virt;
+>> +EXPORT_SYMBOL(__arch_dma_to_virt);
+>> +dma_addr_t (*__arch_virt_to_dma)(struct device *dev, void *addr) = __virt_to_dma;
+>> +EXPORT_SYMBOL(__arch_virt_to_dma);
 > 
-> Are you sure you need all of your #includes?
+> Independent on whether someone objects to my preference of exporting a
+> struct, these (or that struct pointer) should probably be
+> EXPORT_SYMBOL_GPL().
 > 
-> I notice that irqdomain is there, but you don't actually have one?
+Sure.
 
-Right, I'll do a sweep on them. In that particular case, I don't yet
-have a need to implement interrupt support so it needs to go.
-
-> 
-> > +	if (ret < 0)
-> > +		dev_err(&i2c->dev, "mfd_add_devices failed: %d\n", ret);
-> 
-> What if we change the name of the function? Probably better to say
-> something like "device registration failed" or thelike.
-
-Will do.
-
-> 
-> > +	return ret;
-> > +}
-> > +
-> > +static int bcm59056_i2c_remove(struct i2c_client *i2c)
-> > +{
-> > +	struct bcm59056 *bcm59056 = i2c_get_clientdata(i2c);
-> > +
-> > +	mfd_remove_devices(bcm59056->dev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id bcm59056_of_match[] = {
-> > +	{ .compatible = "brcm,bcm59056", .data = (void *)BCM59056 },
-> 
-> You've gone to the trouble of setting a device version here, but you
-> don't seem to use it?
-
-I'll drop the device version
-
-> > +	{ }
-> > +};
-> > +
-> > +static const struct i2c_device_id bcm59056_i2c_id[] = {
-> > +	{ "bcm59056", BCM59056 },
-> > +	{ }
-> > +};
-> 
-> Ah, I guess this is where id->driver comes from.
-> 
-> It's pretty silly that the I2C subsystem demands the presence of this
-> table, despite not using it if an of_device_id table is present.
-
-It does make it very difficult to follow DT enabled I2C client drivers
-:( I'll drop the BCM59056 too.
-
-> > +MODULE_DEVICE_TABLE(i2c, bcm59056_i2c_id);
-> > +
-> > +static struct i2c_driver bcm59056_i2c_driver = {
-> > +	.driver = {
-> > +		   .name = "bcm59056",
-> > +		   .owner = THIS_MODULE,
-> > +		   .of_match_table = of_match_ptr(bcm59056_of_match),
-> 
-> No need to use of_match_ptr() here.
-
-Will remove.
-
-> > +	},
-> > +	.probe = bcm59056_i2c_probe,
-> > +	.remove = bcm59056_i2c_remove,
-> > +	.id_table = bcm59056_i2c_id,
-> 
-> *grumble*
-
-:) Yes, unavoidable for now.
-
-> > +};
-> > +
-> > +static int __init bcm59056_init(void)
-> > +{
-> > +	return i2c_add_driver(&bcm59056_i2c_driver);
-> > +}
-> > +subsys_initcall(bcm59056_init);
-> 
-> Really? :(
-> 
-> Maybe you'll want to comment this, in case people do not know the back
-> ground and attempts to clean it up.
-
-I'll add a comment. This is the old problem of needing regulators really
-early. It's exasperated by the fact that the USB gadget framework
-drivers do not use driver probing. This means that they can not be
-deferred after i2c/mfd/regulator init...the problem is particularly
-noticeable when building in a gadget driver for nfsroot purposes.
-
-Because of this I have the regulator, MFD, and i2c drivers all using
-subsys_initcall() in this series. FWIW, there's some discussion about
-how to resolve the USB gadget driver case but it's going to take a
-while.
-
-> > +static void __exit bcm59056_exit(void)
-> > +{
-> > +	i2c_del_driver(&bcm59056_i2c_driver);
-> > +}
-> > +module_exit(bcm59056_exit);
-> 
-> <snip>
-> 
-> > +/* chip id */
-> > +#define BCM59056		0
-> 
-> Lonely, oh so lonely!
-
-Understood. Will remove.
-
-> > +/* max register address */
-> > +#define BCM59056_MAX_REGISTER	0xe8
-> 
-> Don't you have a table of registers which you care about?
-
-I placed the register defs that I actually use in the regulator driver
-itself since that is the only place they are used. I notice most MFD
-drivers centralize this in linux/mfd/*.h. However, generally chunk
-of register defs are only used in one subdriver and not shared. If
-it's preferred to move all register defs centrally I can do that.
-
-> > +/* bcm59056 chip access */
-> 
-> Superfluous comment? Don't we all know what these containers do?
-
-Indeed, will remove.
-
-Thanks for reviewing.
-
--Matt
-
-> > +struct bcm59056 {
-> > +	struct device *dev;
-> > +	struct i2c_client *i2c_client;
-> > +	struct regmap *regmap;
-> > +	unsigned int id;
-> > +};
-> > +
-> > +#endif /*  __LINUX_MFD_BCM59056_H */
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Santosh
