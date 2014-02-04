@@ -1,103 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 3 Feb 2014 18:05:11 -0800
-Subject: [RFC/RFT 2/2] ARM: keystone: Install hooks for dma address
- translation routines
-In-Reply-To: <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
- <1391470107-15927-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 03 Feb 2014 21:06:16 -0500
+Subject: [PATCH v5 05/16] ARM: use a function table for determining
+ instruction interpreter action
+In-Reply-To: <1391437498.3509.11.camel@linaro1.home>
+References: <1390507559-4697-1-git-send-email-dave.long@linaro.org>
+ <1390507559-4697-6-git-send-email-dave.long@linaro.org>
+ <1391437498.3509.11.camel@linaro1.home>
+Message-ID: <52F04B18.4020905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/03/14 09:24, Jon Medhurst (Tixy) wrote:
+> On Thu, 2014-01-23 at 15:05 -0500, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Make the instruction interpreter call back to semantic action functions
+>> through a function pointer array provided by the invoker.  The interpreter
+>> decodes the instructions into groups and uses the group number to index
+>> into the supplied array.  kprobes and uprobes code will each supply their
+>> own array of functions.
+>>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> ---
+>
+> [...]
+>
+>> --- a/arch/arm/kernel/probes.c
+>> +++ b/arch/arm/kernel/probes.c
+>> @@ -378,10 +378,11 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
+>>    */
+>>   int __kprobes
+>>   kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+>> -		   const union decode_item *table, bool thumb)
+>> +		   const union decode_item *table, bool thumb,
+>> +		   const union decode_action *actions)
+>>   {
+>> -	const struct decode_header *h = (struct decode_header *)table;
+>> -	const struct decode_header *next;
+>> +	struct decode_header *h = (struct decode_header *)table;
+>> +	struct decode_header *next;
+>
+> The decode tables are fixed structures which nothing should want to
+> modify, so I think the const's above should be kept. I believe that
+> you've had to resort to changing them because the following typedef
+> lacks a 'const' on the final argument....
+>
 
-On Mon, Feb 3, 2014 at 3:28 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Keystone platforms have their physical memory mapped at an address
-> outside the 32-bit physical range.  A Keystone machine with 16G of RAM
-> would find its memory at 0x0800000000 - 0x0bffffffff.
-> The system interconnect allows to perform DMA transfers from first 2G of
-> physical memory (0x08 0000 0000 to 08 7FFF FFFF) which aliased in
-> hardware to the 32-bit addressable space (0x80000000 - 0xffffffff),
-> because DMA HW supports only 32-bits addressing.
->
-> Hence, add arch hooks for dma address translation routines.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-keystone/keystone.c |   31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-> index 1b43a27..54dae03 100644
-> --- a/arch/arm/mach-keystone/keystone.c
-> +++ b/arch/arm/mach-keystone/keystone.c
-> @@ -14,6 +14,7 @@
->  #include <linux/init.h>
->  #include <linux/of_platform.h>
->  #include <linux/of_address.h>
-> +#include <linux/dma-mapping.h>
->
->  #include <asm/setup.h>
->  #include <asm/mach/map.h>
-> @@ -53,6 +54,28 @@ static phys_addr_t keystone_virt_to_idmap(unsigned long x)
->         return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
->  }
->
-> +static unsigned long keystone_dma_pfn_offset __read_mostly;
-> +
-> +static dma_addr_t keystone_pfn_to_dma(struct device *dev, unsigned long pfn)
-> +{
-> +       return PFN_PHYS(pfn - keystone_dma_pfn_offset);
-> +}
-> +
-> +static unsigned long keystone_dma_to_pfn(struct device *dev, dma_addr_t addr)
-> +{
-> +       return PFN_DOWN(addr) + keystone_dma_pfn_offset;
-> +}
-> +
-> +static void *keystone_dma_to_virt(struct device *dev, dma_addr_t addr)
-> +{
-> +       return phys_to_virt(addr + PFN_PHYS(keystone_dma_pfn_offset));
-> +}
-> +
-> +static dma_addr_t keystone_virt_to_dma(struct device *dev, void *addr)
-> +{
-> +       return virt_to_phys(addr) - PFN_PHYS(keystone_dma_pfn_offset);
-> +}
-> +
->  static void __init keystone_init_meminfo(void)
->  {
->         bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
-> @@ -89,6 +112,14 @@ static void __init keystone_init_meminfo(void)
->         /* Populate the arch idmap hook */
->         arch_virt_to_idmap = keystone_virt_to_idmap;
->
-> +       /* Populate the arch DMA hooks */
-> +       keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
-> +                                          KEYSTONE_LOW_PHYS_START);
-> +       __arch_pfn_to_dma = keystone_pfn_to_dma;
-> +       __arch_dma_to_pfn = keystone_dma_to_pfn;
-> +       __arch_dma_to_virt = keystone_dma_to_virt;
-> +       __arch_virt_to_dma = keystone_virt_to_dma;
+I've made the change.
 
-Is this truly a static window, or is it going through an IOMMU that
-just happens to have an identity mapping setup per default?
+> [...]
+>> diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
+>> index c610fa9..81b6e61 100644
+> [...]
+>>
+>> +typedef enum kprobe_insn (probes_custom_decode_t)(kprobe_opcode_t,
+>> +						  struct arch_specific_insn *,
+>> +						  struct decode_header *);
+>> +
+>
+> Adding 'const' above will also have the knock on effect of requiring
+> const on all the 'custom decode' functions as well.
+>
 
-PPC servers use "ibm,dma-window" to describe the assigned dma address
-space for busses/devices, but the window itself doesn't contain any
-information about the physical address mapping (since it goes through
-an iommu after that). It likely doesn't fit this particular use case,
-but it's something we should look at as a base in case we need to
-start looking at bindings for this instead of coding it per SoC. We'll
-know more once we've seen what a few of the implementations out there
-are.
+I've made those numerous changes as well.
 
-
--Olof
+-dl
