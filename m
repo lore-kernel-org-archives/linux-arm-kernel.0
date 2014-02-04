@@ -1,42 +1,36 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 4 Feb 2014 10:02:14 -0800
-Subject: [PATCH] regulator: core: Make regulator object reflect configured
- voltage
-In-Reply-To: <20140204110531.GR22609@sirena.org.uk>
-References: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20140204110531.GR22609@sirena.org.uk>
-Message-ID: <CAJAp7OjCnJ=P9Gi20=D9gybREiSaqd1CaQ0K=9fGbCzU1gTFLw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Feb 2014 18:06:25 +0000
+Subject: [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw parameters
+ from EDID
+In-Reply-To: <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
+Message-ID: <20140204180625.GM22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 3:05 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Feb 03, 2014 at 09:54:28PM -0800, Bjorn Andersson wrote:
->
->> +     /*
->> +      * Make the regulator reflect the configured voltage selected in
->> +      * machine_constraints_voltage()
->> +      */
->> +     if (rdev->constraints->apply_uV &&
->> +         rdev->constraints->min_uV == rdev->constraints->max_uV) {
->> +             regulator->min_uV = rdev->constraints->min_uV;
->> +             regulator->max_uV = rdev->constraints->min_uV;
->> +     }
->> +
->
-> Why not do this at the time we apply the voltage?  That would seem to be
-> more robust, doing it in a separate place means that we might update one
-> bit of code and not the other or might change the execution path so that
-> one gets run and the other doesn't.
+On Mon, Jan 27, 2014 at 09:48:54AM +0100, Jean-Francois Moine wrote:
 
-I do share your concerns about having this logic mirrored here is
-risky, unfortunately the regulator object is created upon request from
-a consumer; so it is not available when regulator_register() calls
-set_machine_constraints().
+> +		/* change the snd_soc_pcm_stream values of the driver */
+> +		stream->rates = rate_mask;
+> +		stream->channels_max = max_channels;
+> +		stream->formats = formats;
 
-An alternative is to drop the conditional setting of
-REGULATOR_CHANGE_VOLTAGE from of_regulator.c and force the regulator
-drivers to set this flag explicitly; to avoid the difference in
-behavior depending on configuration.
+> +	/* copy the DAI driver to a writable area */
+> +	dai_drv = devm_kzalloc(&pdev->dev, sizeof(tda998x_dai), GFP_KERNEL);
+> +	if (!dai_drv)
+> +		return -ENOMEM;
+> +	memcpy(dai_drv, tda998x_dai, sizeof(tda998x_dai));
+> +
 
-Regards,
-Bjorn
+The code should be doing this by setting constraints based on the
+current setup rather than by editing the data structure - the expecation
+is very much that the data won't change so this prevents surprises with
+future work on the core.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140204/b5f17dd6/attachment.sig>
