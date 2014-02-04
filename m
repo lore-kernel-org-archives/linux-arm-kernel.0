@@ -1,105 +1,65 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue,  4 Feb 2014 16:23:56 +0100
-Subject: [PATCH v5 02/11] ARM: shmobile: genmai legacy: Add RSPI support
-In-Reply-To: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
-References: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1391527445-14881-3-git-send-email-geert@linux-m68k.org>
+Date: Tue,  4 Feb 2014 16:23:54 +0100
+Subject: [PATCH 00/11] ARM: shmobile: RSPI RZ and QSPI SoC and board
+ integration
+Message-ID: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+	Hi Simon, Magnus,
 
-Add RSPI platform device, resources, platform data, and SPI child.
+This patch series contains SoC and board integration for
+  1. RSPI in the r7s72100 aka RZ/A1H SoC on the Genmai reference board,
+  2. QSPI in the r8a7791 aka R-Car M2 SoC on the Koelsch reference board.
+It was rebased on top of renesas-devel-v3.14-rc1-20140204.
 
-On this board, only rspi4 is in use. Its bus contains a single device
-(a wm8978 audio codec).
+It was tested on the r7s72100-based Genmai reference board using loopback
+mode, and on the r8a7791-based Koelsch reference board using the Spansion
+s25fl512s SPI FLASH.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
-v5:
-  - Rebased on top of renesas-devel-v3.14-rc1-20140204
-v4:
-  - The platform device basename was changed from "rspi" to "rspi-rz",
-    dropping the platform data flags in the process
-  - Switch to named IRQs
-v3:
-  - Move platform devices from setup-r7s72100.c to board-genmai.c, as
-    genmai-reference will use devices instantiated from DT
-  - Merge with "ARM: shmobile: genmai: Add RSPI children", as this now
-    touches the same file
-  - Instantiate SPI children in C on genmai only, as genmai-reference will
-    instantiate them from DT
-v2:
-  - Correct platform device names ("rspi%u.0" -> "rspi.%u")
-  - Add missing platform data
-  - Correct summary (resources -> platform devices)
+  - [v5 01/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks
+  - [v5 02/11] ARM: shmobile: genmai legacy: Add RSPI support
+  - [v3 03/11] ARM: shmobile: genmai defconfig: Enable RSPI
+  - [v3 04/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
+  - [v5 05/11] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
+  - [v4 06/11] ARM: shmobile: r8a7791 clock: add QSPI clocks
+  - [v4 07/11] ARM: shmobile: koelsch legacy: Add QSPI support
+  - [v4 08/11] ARM: shmobile: koelsch defconfig: Enable RSPI and
+  - [v3 09/11] ARM: shmobile: r8a7791 dtsi: Add QSPI node
+  - [v3 10/11] ARM: shmobile: koelsch dts: Add QSPI nodes
+  - [v2 11/11] ARM: shmobile: lager legacy: Switch QSPI to named IRQs
 
- arch/arm/mach-shmobile/board-genmai.c |   44 +++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+All of these should be safe to apply, without compile-time or run-time
+dependencies on other parts.
+Actual functioning for some parts may depend on RSPI work queued up for
+3.15 in the spi tree.
 
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index 3e92e3c62d4c..c4064610e223 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -20,15 +20,59 @@
- 
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
-+#include <linux/spi/rspi.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r7s72100.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/* RSPI */
-+#define RSPI_RESOURCE(idx, baseaddr, irq)				\
-+static const struct resource rspi##idx##_resources[] __initconst = {	\
-+	DEFINE_RES_MEM(baseaddr, 0x24),					\
-+	DEFINE_RES_IRQ_NAMED(irq, "error"),				\
-+	DEFINE_RES_IRQ_NAMED(irq + 1, "rx"),				\
-+	DEFINE_RES_IRQ_NAMED(irq + 2, "tx"),				\
-+}
-+
-+RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
-+RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
-+RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
-+RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
-+RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
-+
-+static const struct rspi_plat_data rspi_pdata __initconst = {
-+	.num_chipselect	= 1,
-+};
-+
-+#define r7s72100_register_rspi(idx)					   \
-+	platform_device_register_resndata(&platform_bus, "rspi-rz", idx,   \
-+					rspi##idx##_resources,		   \
-+					ARRAY_SIZE(rspi##idx##_resources), \
-+					&rspi_pdata, sizeof(rspi_pdata))
-+
-+static const struct spi_board_info spi_info[] __initconst = {
-+	{
-+		.modalias               = "wm8978",
-+		.max_speed_hz           = 5000000,
-+		.bus_num                = 4,
-+		.chip_select            = 0,
-+	},
-+};
-+
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
- 	r7s72100_add_dt_devices();
-+
-+	r7s72100_register_rspi(0);
-+	r7s72100_register_rspi(1);
-+	r7s72100_register_rspi(2);
-+	r7s72100_register_rspi(3);
-+	r7s72100_register_rspi(4);
-+	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
- }
- 
- static const char * const genmai_boards_compat_dt[] __initconst = {
--- 
-1.7.9.5
+Compared to previous submission, the following have been postponed:
+  - [v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary RSPI
+               pinmux setup
+    This depends on the to-be-written non-DT pinmux configuration for
+    r7s72100.
+  - [v4 07/15] ARM: shmobile: genmai reference dts: Add RSPI nodes
+    This depends on Magnus' "ARM: shmobile: r7s72100 GPIO and PINCTRL device
+    nodes"
+  - [v1 14/15] ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for
+               the SPI FLASH
+  - [v1 15/15] ARM: shmobile: koelsch dts: Enable Quad SPI transfers
+    These two depend on the RSPI Dual/Quad work queued up in the spi tree.
+    After applying the r8a7791/Koelsch patches above, the mainline RSPI/QSPI
+    driver will work fine. But enabling Quad SPI transfers in board support
+    code or DT without the corresponding support in the RSPI driver would
+    cause a regression.
+
+Please apply this series, Thanks!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
