@@ -1,102 +1,138 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Feb 2014 16:41:14 +0000
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <3277167.UhkSU8Sf56@wuerfel>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <3808209.DeG1VobanZ@wuerfel>
- <20140203213658.GA24036@e106497-lin.cambridge.arm.com>
- <3277167.UhkSU8Sf56@wuerfel>
-Message-ID: <20140204164114.GJ30676@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 4 Feb 2014 12:00:19 -0500
+Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
+In-Reply-To: <20140204052329.GN10628@intel.com>
+References: <1391476403-26099-1-git-send-email-olof@lixom.net>
+ <20140204052329.GN10628@intel.com>
+Message-ID: <20140204170019.GI8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 08:44:36AM +0000, Arnd Bergmann wrote:
-> On Monday 03 February 2014 21:36:58 Liviu Dudau wrote:
-> > On Mon, Feb 03, 2014 at 08:05:56PM +0000, Arnd Bergmann wrote:
-> > > 2 MB was a compromise on arm32 to allow up to 32 PCI host bridges but not
-> > > take up too much virtual space. On arm64 it should be at least as big.
-> > > Could be more than that, although I don't see a reason why it should be,
-> > > unless we expect to see systems with tons of host bridges, or buses
-> > > that exceed 64KB of I/O space.
+On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
+> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
+> > Enabling some of the mvebu platforms in the multiplatform config for ARM
+> > enabled these drivers, which also triggered a bunch of warnings when LPAE
+> > is enabled (thus making phys_addr_t 64-bit).
 > > 
-> > I will increase the size to 2MB for v2.
+> > Most changes are switching printk formats, but also a bit of changes to what
+> > used to be array-based pointer arithmetic that could just be done with the
+> > address types instead.
+> > 
+> > The warnings were:
+> > 
+> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
+> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
+> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
+> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
+> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
+> >     different size [-Wint-to-pointer-cast]
+> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
+> >     different size [-Wpointer-to-int-cast]
+> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
+> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
+> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
+> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
+> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
+> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+> > 
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
+
+Olof, would you like me to queue it up?  Or do you want to take it
+directly?
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
+
+> > ---
+> >  drivers/dma/mv_xor.c | 24 ++++++++++++------------
+> >  1 file changed, 12 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> > index 53fb0c8365b0..766b68ed505c 100644
+> > --- a/drivers/dma/mv_xor.c
+> > +++ b/drivers/dma/mv_xor.c
+> > @@ -497,8 +497,8 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
+> >  		if (!mv_can_chain(grp_start))
+> >  			goto submit_done;
+> >  
+> > -		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
+> > -			old_chain_tail->async_tx.phys);
+> > +		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %pa\n",
+> > +			&old_chain_tail->async_tx.phys);
+> >  
+> >  		/* fix up the hardware chain */
+> >  		mv_desc_set_next_desc(old_chain_tail, grp_start->async_tx.phys);
+> > @@ -527,7 +527,8 @@ submit_done:
+> >  /* returns the number of allocated descriptors */
+> >  static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+> >  {
+> > -	char *hw_desc;
+> > +	void *virt_desc;
+> > +	dma_addr_t dma_desc;
+> >  	int idx;
+> >  	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+> >  	struct mv_xor_desc_slot *slot = NULL;
+> > @@ -542,17 +543,16 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+> >  				" %d descriptor slots", idx);
+> >  			break;
+> >  		}
+> > -		hw_desc = (char *) mv_chan->dma_desc_pool_virt;
+> > -		slot->hw_desc = (void *) &hw_desc[idx * MV_XOR_SLOT_SIZE];
+> > +		virt_desc = mv_chan->dma_desc_pool_virt;
+> > +		slot->hw_desc = virt_desc + idx * MV_XOR_SLOT_SIZE;
+> >  
+> >  		dma_async_tx_descriptor_init(&slot->async_tx, chan);
+> >  		slot->async_tx.tx_submit = mv_xor_tx_submit;
+> >  		INIT_LIST_HEAD(&slot->chain_node);
+> >  		INIT_LIST_HEAD(&slot->slot_node);
+> >  		INIT_LIST_HEAD(&slot->tx_list);
+> > -		hw_desc = (char *) mv_chan->dma_desc_pool;
+> > -		slot->async_tx.phys =
+> > -			(dma_addr_t) &hw_desc[idx * MV_XOR_SLOT_SIZE];
+> > +		dma_desc = mv_chan->dma_desc_pool;
+> > +		slot->async_tx.phys = dma_desc + idx * MV_XOR_SLOT_SIZE;
+> >  		slot->idx = idx++;
+> >  
+> >  		spin_lock_bh(&mv_chan->lock);
+> > @@ -582,8 +582,8 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+> >  	int slot_cnt;
+> >  
+> >  	dev_dbg(mv_chan_to_devp(mv_chan),
+> > -		"%s dest: %x src %x len: %u flags: %ld\n",
+> > -		__func__, dest, src, len, flags);
+> > +		"%s dest: %pad src %pad len: %u flags: %ld\n",
+> > +		__func__, &dest, &src, len, flags);
+> >  	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+> >  		return NULL;
+> >  
+> > @@ -626,8 +626,8 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+> >  	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+> >  
+> >  	dev_dbg(mv_chan_to_devp(mv_chan),
+> > -		"%s src_cnt: %d len: dest %x %u flags: %ld\n",
+> > -		__func__, src_cnt, len, dest, flags);
+> > +		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
+> > +		__func__, src_cnt, len, &dest, flags);
+> >  
+> >  	spin_lock_bh(&mv_chan->lock);
+> >  	slot_cnt = mv_chan_xor_slot_count(len, src_cnt);
+> > -- 
+> > 1.8.4.1.601.g02b3b1d
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Thinking about this some more, I'd go a little higher. In case of
-> pci_mv, we already register a 1MB region for one logical host
-> (which has multiple I/O spaces behind an emulated bridge), so
-> going to 16MB or more would let us handle multiple 1MB windows
-> for some amount of future proofing.
+> -- 
 > 
-> Maybe Catalin can assign us some virtual address space to use,
-> with the constraints that it should be 16MB or more in an
-> area that doesn't require additional kernel page table pages.
-
-See below, 16MB and could be extended further if needed.
-
------------->8--------------------
-
->From 00521f109ac8a2589c9089a5feaaaa1be7f26108 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Tue, 4 Feb 2014 16:37:59 +0000
-Subject: [PATCH] arm64: Extend the PCI I/O space to 16MB
-
-The patch moves the PCI I/O space (currently at 64K) before the
-earlyprintk mapping and extends it to 16MB.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- Documentation/arm64/memory.txt | 16 ++++++++++------
- arch/arm64/include/asm/io.h    |  2 +-
- 2 files changed, 11 insertions(+), 7 deletions(-)
-
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 5e054bfe4dde..85e24c4f215c 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -35,11 +35,13 @@ ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
- 
- ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
-+ffffffbffa000000	ffffffbffaffffff	  16MB		PCI I/O space
-+
-+ffffffbffb000000	ffffffbffbbfffff	  12MB		[guard]
- 
--ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
-+ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
- 
--ffffffbffbe10000	ffffffbcffffffff	  ~2MB		[guard]
-+ffffffbffbe00000	ffffffbffbffffff	   2MB		[guard]
- 
- ffffffbffc000000	ffffffbfffffffff	  64MB		modules
- 
-@@ -60,11 +62,13 @@ fffffdfc00000000	fffffdfdffffffff	   8GB		vmemmap
- 
- fffffdfe00000000	fffffdfffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
-+fffffdfffa000000	fffffdfffaffffff	  16MB		PCI I/O space
-+
-+fffffdfffb000000	fffffdfffbbfffff	  12MB		[guard]
- 
--fffffdfffbe00000	fffffdfffbe0ffff	  64KB		PCI I/O space
-+fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
- 
--fffffdfffbe10000	fffffdfffbffffff	  ~2MB		[guard]
-+fffffdfffbe00000	fffffdfffbffffff	   2MB		[guard]
- 
- fffffdfffc000000	fffffdffffffffff	  64MB		modules
- 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 4cc813eddacb..7846a6bb0833 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -121,7 +121,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-  *  I/O port access primitives.
-  */
- #define IO_SPACE_LIMIT		0xffff
--#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_2M))
-+#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
- {
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
