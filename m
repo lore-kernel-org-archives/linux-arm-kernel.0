@@ -1,37 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Feb 2014 16:12:19 -0500
-Subject: [GIT PULL] irqchip: dove: drivers for v3.14
-In-Reply-To: <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
-References: <20131201172914.GV2879@titan.lakedaemon.net>
- <20131211175037.GY10053@titan.lakedaemon.net>
- <20140110183430.GO19878@titan.lakedaemon.net>
- <20140128173531.GT29184@titan.lakedaemon.net>
- <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
-Message-ID: <20140204211219.GK8533@titan.lakedaemon.net>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 4 Feb 2014 16:16:38 -0500
+Subject: [PATCH 2/6] regulator: add bcm59056 pmu DT binding
+In-Reply-To: <20140204172309.GG22609@sirena.org.uk>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-3-git-send-email-mporter@linaro.org>
+ <20140204172309.GG22609@sirena.org.uk>
+Message-ID: <20140204211638.GA16179@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 07:59:58PM +0100, Thomas Gleixner wrote:
-> On Tue, 28 Jan 2014, Jason Cooper wrote:
-> > I see you pulled in mvebu/irqchip-fixes.  Thanks for that.  It's getting
-> > near to the end of the merge window and there's been no activity on this
-> > pull request.
-> > 
-> > Please let us know if there's anything we can do to assist.
+On Tue, Feb 04, 2014 at 05:23:09PM +0000, Mark Brown wrote:
+> On Tue, Feb 04, 2014 at 07:19:08AM -0500, Matt Porter wrote:
+> > Add a DT binding for the BCM59056 PMU. The binding inherits from
+> > the generic regulator bindings.
 > 
-> Nah. I simply forgot about it. About to send a pull request to Linus.
+> Is this really only a regulator - does the chip have no other functions?
 
-hmmm.  I see the pull request contains the patches from
-mvebu/irqchip-fixes (armada), but not the patches from mvebu/irqchip
-(dove):
+It's your average multi-function device with other functions as you are
+suspecting.  Buried in the the MFD driver comments is me admitting that
+I need to split this into two bindings. The base device, "bcm59056" and
+then "bcm59056-reg". So point noted, I'll updated with the appropriate
+binding for each.
 
-  40b367d95fb3 irqchip: irq-dove: Add PMU interrupt controller.
+> > +- regulators: This is the list of child nodes that specify the regulator
+> > +  initialization data for defined regulators.  Generic regulator bindings
+> > +  are described in regulator/regulator.txt.
+> 
+> The regulators property should always be optional, the driver should be
+> able to start up and read back the hardware state without any further
+> configuration.
 
-which is what this thread was originally a pull request for.
+Ahh, ok. I will make it so.
 
-
-Are you planning to send a second pull request to Linus?
-
-thx,
-
-Jason.
+Thanks,
+Matt
