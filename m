@@ -1,33 +1,39 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 04 Feb 2014 11:43:46 -0800
-Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
-In-Reply-To: <3469296.SINb5BZOG8@wuerfel>
-References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
- <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
- <1391531796.2538.21.camel@joe-AO722> <3469296.SINb5BZOG8@wuerfel>
-Message-ID: <1391543026.2538.28.camel@joe-AO722>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Feb 2014 11:38:23 -0800
+Subject: [PATCH v3 0/4] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+In-Reply-To: <1391507296-2099-1-git-send-email-anup.patel@linaro.org>
+References: <1391507296-2099-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140204193823.GM4167@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-04 at 19:40 +0100, Arnd Bergmann wrote:
-> On Tuesday 04 February 2014 08:36:36 Joe Perches wrote:
-> > On Tue, 2014-02-04 at 08:03 +0100, Holger Schurig wrote:
-> > > Joe, look in linux/arch/arm/include/asm/delay.h. The macro udelay
-> > > cannot handle large values because of lost-of-precision.
-> > > 
-> > > IMHO udelay on ARM is broken, because it also cannot work with fast
-> > > ARM processors (where bogomips >= 3355, which is in sight now). It's
-> > > just not broken enought that someone did something against it ...   so
-> > > the current kludge is good enought.
-> > 
-> > Maybe something like this would be better?
-> > 
+On Tue, Feb 04, 2014 at 03:18:12PM +0530, Anup Patel wrote:
+> Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+> and Coordination Interface (PSCI) v0.1.
 > 
-> I actually like the fact that we get link errors for insane 'udelay'
-> times.
+> This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+> such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
+> provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
+> CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
+> later.
+> 
+> The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+> KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+> PSCI v0.2 to VCPUs.
+> 
+> Changlog:
+> 
+> V3:
+>  - Make KVM_ARM_VCPU_PSCI_0_2 feature experiementatl for now so that
+>    it fails for user space till all mandatory PSCI v0.2 functions are
+>    emulated by KVM ARM/ARM64
+>  - Have separate patch for making KVM_ARM_VCPU_PSCI_0_2 feature available
+>    to user space. This patch can be defferred for now.
+> 
 
-For static values yes, for computed values no.
+I think we just want the feature bit when there's proper PSCI 0.2
+support as per Mark's comments, so I'll hold off with reviewing until we
+have a more complete patch set.
 
-This emits a warning/dump_stack on the non-static
-values.  It could also emit some similar #warning
-on static values > insane too.
+Thanks,
+-Christoffer
