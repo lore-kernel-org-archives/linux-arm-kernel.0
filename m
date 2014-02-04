@@ -1,61 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Feb 2014 09:41:15 +0000
-Subject: [PATCH] ARM64: KVM: Fix VGIC compile error for Linux-3.14-rc1
-In-Reply-To: <1391506640-1901-1-git-send-email-anup.patel@linaro.org>
-References: <1391506640-1901-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <52F0B5BB.3060901@arm.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Tue,  4 Feb 2014 15:11:28 +0530
+Subject: [PATCH 0/2] Add device tree based lookup of boost mode OPPs
+Message-ID: <1391506890-7335-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/14 09:37, Anup Patel wrote:
-> This patch fixes VGIC compilation for Linux-3.14-rc1 ARM64 kernel.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+support for CPU boost mode for CPUfreq drivers. To use the new boost
+mode, CPUfreq drivers have to specify the boost mode frequency and
+voltage within the CPUfreq driver, which is the case for Exynos4x12
+CPUfreq driver.
 
-Already posted by Christoffer, and hopefully on its way to mainline.
+But for CPUfreq drivers which obtain the OPPs from cpus node, this
+patch series adds support to specify boost mode OPPs in dt node. This
+requirement came up when Lukasz pointed out the regression caused by
+the Exynos CPUfreq driver consolidation patches.
 
-	M.
+Thomas Abraham (2):
+  PM / OPP: Add support for 'boost' mode OPP
+  Documentation: devicetree: Add boost-opp binding to list boost mode OPPs
 
-> ---
->  arch/arm64/include/uapi/asm/kvm.h |    9 +++++++++
->  virt/kvm/arm/vgic.c               |    1 +
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 31c2f54..cadc318 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -149,6 +149,15 @@ struct kvm_arch_memory_slot {
->  #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
->  #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
->  
-> +/* Device Control API: ARM VGIC */
-> +#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
-> +#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-> +#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
-> +#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
-> +#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-> +#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
-> +#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> +
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
->  #define KVM_ARM_IRQ_TYPE_MASK		0xff
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index be456ce..55b0609 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -21,6 +21,7 @@
->  #include <linux/kvm_host.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> +#include <linux/uaccess.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> 
-
+ Documentation/devicetree/bindings/power/opp.txt |    9 +++
+ drivers/base/power/opp.c                        |   69 ++++++++++++++++++-----
+ 2 files changed, 65 insertions(+), 13 deletions(-)
 
 -- 
-Jazz is not dead. It just smells funny...
+1.7.10.4
