@@ -1,63 +1,38 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 4 Feb 2014 16:29:14 -0500
-Subject: [PATCH 4/6] regulator: add bcm59056 regulator driver
-In-Reply-To: <20140204172836.GH22609@sirena.org.uk>
-References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
- <1391516352-32359-5-git-send-email-mporter@linaro.org>
- <20140204172836.GH22609@sirena.org.uk>
-Message-ID: <20140204212914.GB16179@beef>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Feb 2014 22:30:53 +0100 (CET)
+Subject: [GIT PULL] irqchip: dove: drivers for v3.14
+In-Reply-To: <20140204211219.GK8533@titan.lakedaemon.net>
+References: <20131201172914.GV2879@titan.lakedaemon.net>
+ <20131211175037.GY10053@titan.lakedaemon.net>
+ <20140110183430.GO19878@titan.lakedaemon.net>
+ <20140128173531.GT29184@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1402041959110.24986@ionos.tec.linutronix.de>
+ <20140204211219.GK8533@titan.lakedaemon.net>
+Message-ID: <alpine.DEB.2.02.1402042230230.24986@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 05:28:36PM +0000, Mark Brown wrote:
-> On Tue, Feb 04, 2014 at 07:19:10AM -0500, Matt Porter wrote:
+On Tue, 4 Feb 2014, Jason Cooper wrote:
+
+> On Tue, Feb 04, 2014 at 07:59:58PM +0100, Thomas Gleixner wrote:
+> > On Tue, 28 Jan 2014, Jason Cooper wrote:
+> > > I see you pulled in mvebu/irqchip-fixes.  Thanks for that.  It's getting
+> > > near to the end of the merge window and there's been no activity on this
+> > > pull request.
+> > > 
+> > > Please let us know if there's anything we can do to assist.
+> > 
+> > Nah. I simply forgot about it. About to send a pull request to Linus.
 > 
-> > +static unsigned int bcm59056_get_mode(struct regulator_dev *dev)
-> > +{
-> > +	return REGULATOR_MODE_NORMAL;
-> > +}
-> > +
-> > +static int bcm59056_set_mode(struct regulator_dev *dev, unsigned int mode)
-> > +{
-> > +	if (mode == REGULATOR_MODE_NORMAL)
-> > +		return 0;
-> > +	else
-> > +		return -EINVAL;
-> > +}
+> hmmm.  I see the pull request contains the patches from
+> mvebu/irqchip-fixes (armada), but not the patches from mvebu/irqchip
+> (dove):
 > 
-> These do nothing, don't implement them.
-
-Will remove. Maybe some day.
-
-> > +	if (bcm59056->dev->of_node)
-> > +		pmu_data = bcm59056_parse_dt_reg_data(pdev,
-> > +						      &bcm59056_reg_matches);
+>   40b367d95fb3 irqchip: irq-dove: Add PMU interrupt controller.
 > 
-> It'd seem a bit neater to put the OF check into the parse function but
-> meh.
-
-On second look, I'd agree. Easy enough to clean up.
-
-> > +	if (!pmu_data) {
-> > +		dev_err(&pdev->dev, "Platform data not found\n");
-> > +		return -EINVAL;
-> > +	}
+> which is what this thread was originally a pull request for.
 > 
-> Like I said when reviewing the binding this should not cause the driver
-> to fail to load.
-
-Will fix.
-
-> > +		/*
-> > +		 * Regulator API handles empty constraints but not NULL
-> > +		 * constraints
-> > +		 */
-> > +		if (!reg_data)
-> > +			continue;
 > 
-> It should do...  if not then make it so since that'd mean most drivers
-> are buggy.
+> Are you planning to send a second pull request to Linus?
 
-Ahh, I see there is a check for NULL in the core. Will drop.
-
--Matt
+Duh. I'll pick that up tomorrow
