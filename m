@@ -1,31 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Feb 2014 19:40:18 +0100
-Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
-In-Reply-To: <1391531796.2538.21.camel@joe-AO722>
-References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
- <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
- <1391531796.2538.21.camel@joe-AO722>
-Message-ID: <3469296.SINb5BZOG8@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 04 Feb 2014 19:48:17 +0100
+Subject: [PATCH v4] of: add functions to count number of elements in a
+ property
+In-Reply-To: <20140204173034.2D899C4050F@trevor.secretlab.ca>
+References: <27256277.YJ687suYy5@phil>
+ <CAL_JsqJord1OOjwcKk1jqF5o+XO3uw+Lc4ATtQacgwZWAoQq1g@mail.gmail.com>
+ <20140204173034.2D899C4050F@trevor.secretlab.ca>
+Message-ID: <13514940.URVnEJ4NF0@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014 08:36:36 Joe Perches wrote:
-> On Tue, 2014-02-04 at 08:03 +0100, Holger Schurig wrote:
-> > Joe, look in linux/arch/arm/include/asm/delay.h. The macro udelay
-> > cannot handle large values because of lost-of-precision.
+Hi Grant,
+
+On Tuesday, 4. February 2014 17:30:34 Grant Likely wrote:
+> On Sat, 18 Jan 2014 09:07:30 -0600, Rob Herring <robherring2@gmail.com> 
+wrote:
+> > On Sat, Jan 18, 2014 at 6:02 AM, Heiko St??bner <heiko@sntech.de> wrote:
+> > > The need to know the number of array elements in a property is
+> > > a common pattern. To prevent duplication of open-coded implementations
+> > > add a helper static function that also centralises strict sanity
+> > > checking and DTB format details, as well as a set of wrapper functions
+> > > for u8, u16, u32 and u64.
+> > > 
+> > > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
 > > 
-> > IMHO udelay on ARM is broken, because it also cannot work with fast
-> > ARM processors (where bogomips >= 3355, which is in sight now). It's
-> > just not broken enought that someone did something against it ...   so
-> > the current kludge is good enought.
+> > Looks good. Do you plan to convert some users to use this?
 > 
-> Maybe something like this would be better?
-> 
+> I'll take that as an acked-by. Merged, thanks.
 
-I actually like the fact that we get link errors for insane 'udelay'
-times. In most cases it's a driver bug because we shouldn't keep
-the CPU busy for an eternity in the kernel (and call msleep() instead).
-For the rare cases where mdelay makes sense, we also want to add
-a comment to the code explaining why msleep cannot be used.
+before you taking this patch, I was planning on simply sending this as part of 
+my rockchip-smp series - as I'm currently the only user of it :-) .
 
-	Arnd
+This going through your tree is most likely the better way, but now I need it 
+to somehow make its way into arm-soc too ... I guess some sort of stable 
+branch arm-soc could pull?
+
+
+Thanks
+Heiko
