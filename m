@@ -1,50 +1,80 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 4 Feb 2014 09:34:09 -0500
-Subject: [PATCH 0/6] BCM59056 PMU regulator support
-In-Reply-To: <20140204134043.GG13529@lee--X1>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Feb 2014 14:47:31 +0000
+Subject: [PATCH 3/6] mfd: add bcm59056 pmu driver
+In-Reply-To: <20140204143119.GA4627@beef>
 References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
- <20140204134043.GG13529@lee--X1>
-Message-ID: <20140204143409.GB4627@beef>
+ <1391516352-32359-4-git-send-email-mporter@linaro.org>
+ <20140204132951.GE13529@lee--X1> <20140204143119.GA4627@beef>
+Message-ID: <20140204144731.GA3154@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 01:40:43PM +0000, Lee Jones wrote:
-> > The BCM59056 is a multi-function power management unit used with the
-> > BCM281xx family of SoCs. This series adds an MFD and voltage regulator
-> > driver to support the BCM59056. The bcm28155-ap DT support is updated
-> > to enable use of regulators on the otg and sdhci peripherals.
-> > 
-> > Matt Porter (6):
-> >   i2c: bcm-kona: register with subsys_initcall
-> >   regulator: add bcm59056 pmu DT binding
-> >   mfd: add bcm59056 pmu driver
-> >   regulator: add bcm59056 regulator driver
-> >   ARM: configs: bcm_defconfig: enable bcm59056 regulator support
-> >   ARM: dts: add bcm59056 pmu support and enable for bcm28155-ap
-> > 
-> >  .../devicetree/bindings/regulator/bcm59056.txt     |  37 ++
-> >  arch/arm/boot/dts/bcm28155-ap.dts                  |  41 ++
-> >  arch/arm/boot/dts/bcm59056.dtsi                    | 158 ++++++++
-> >  arch/arm/configs/bcm_defconfig                     |   7 +
-> >  drivers/i2c/busses/i2c-bcm-kona.c                  |  14 +-
-> >  drivers/mfd/Kconfig                                |   8 +
-> >  drivers/mfd/Makefile                               |   1 +
-> >  drivers/mfd/bcm59056.c                             | 119 ++++++
-> >  drivers/regulator/Kconfig                          |   8 +
-> >  drivers/regulator/Makefile                         |   1 +
-> >  drivers/regulator/bcm59056-regulator.c             | 445 +++++++++++++++++++++
-> >  include/linux/mfd/bcm59056.h                       |  35 ++
-> >  12 files changed, 873 insertions(+), 1 deletion(-)
-> >  create mode 100644 Documentation/devicetree/bindings/regulator/bcm59056.txt
-> >  create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
-> >  create mode 100644 drivers/mfd/bcm59056.c
-> >  create mode 100644 drivers/regulator/bcm59056-regulator.c
-> >  create mode 100644 include/linux/mfd/bcm59056.h
+Hold your horses. :)
+
+> > > Add a driver for the BCM59056 PMU multi-function device. The driver
+> > > initially supports regmap initialization and instantiation of the
+> > > voltage regulator device function of the PMU.
+> > > 
+> > > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > > Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> > > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > > ---
+> > >  drivers/mfd/Kconfig          |   8 +++
+> > >  drivers/mfd/Makefile         |   1 +
+> > >  drivers/mfd/bcm59056.c       | 119 +++++++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/mfd/bcm59056.h |  35 +++++++++++++
+> > >  4 files changed, 163 insertions(+)
+> > >  create mode 100644 drivers/mfd/bcm59056.c
+> > >  create mode 100644 include/linux/mfd/bcm59056.h
+
+<snip>
+
+> > I thought this was a DT only driver? If so, you probably want to use
+> > of_match_device() instead.
 > 
-> FYI: Mark's email address is not correct. Not sure where you pulled
-> this one up from, but he doesn't have access to it anymore.
+> Correct, I'll use of_match_device()
 
-Thanks, I already updated (it was a stale .mutt/aliases entry here) it
-after the bounces.
+If you're going to use this ...
 
--Matt
+<snip>
+
+> > You've gone to the trouble of setting a device version here, but you
+> > don't seem to use it?
+> 
+> I'll drop the device version
+
+... then you'll still need this.
+
+> > > +static const struct i2c_device_id bcm59056_i2c_id[] = {
+> > > +	{ "bcm59056", BCM59056 },
+> > > +	{ }
+> > > +};
+> > 
+> > Ah, I guess this is where id->driver comes from.
+> > 
+> > It's pretty silly that the I2C subsystem demands the presence of this
+> > table, despite not using it if an of_device_id table is present.
+> 
+> It does make it very difficult to follow DT enabled I2C client drivers
+> :( I'll drop the BCM59056 too.
+
+And I don't think you can drop this, as the I2C subsystem still
+insists on it.
+
+> > > +/* chip id */
+> > > +#define BCM59056		0
+> > 
+> > Lonely, oh so lonely!
+> 
+> Understood. Will remove.
+
+I think you need to keep this to supply the silly I2C ID table.
+
+I would just omit the '.data = (void *) VERSION' from the
+of_match_table until you require it. 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
