@@ -1,93 +1,105 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue,  4 Feb 2014 16:24:00 +0100
-Subject: [PATCH v4 06/11] ARM: shmobile: r8a7791 clock: add QSPI clocks
+Date: Tue,  4 Feb 2014 16:23:56 +0100
+Subject: [PATCH v5 02/11] ARM: shmobile: genmai legacy: Add RSPI support
 In-Reply-To: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
 References: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1391527445-14881-7-git-send-email-geert@linux-m68k.org>
+Message-ID: <1391527445-14881-3-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-The QSPI clock divider value depends on the MD1, MD2, and MD3 mode
-switches.
+Add RSPI platform device, resources, platform data, and SPI child.
+
+On this board, only rspi4 is in use. Its bus contains a single device
+(a wm8978 audio codec).
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
-v4:
+v5:
   - Rebased on top of renesas-devel-v3.14-rc1-20140204
+v4:
+  - The platform device basename was changed from "rspi" to "rspi-rz",
+    dropping the platform data flags in the process
+  - Switch to named IRQs
 v3:
-  - No changes
+  - Move platform devices from setup-r7s72100.c to board-genmai.c, as
+    genmai-reference will use devices instantiated from DT
+  - Merge with "ARM: shmobile: genmai: Add RSPI children", as this now
+    touches the same file
+  - Instantiate SPI children in C on genmai only, as genmai-reference will
+    instantiate them from DT
 v2:
-  - No changes
+  - Correct platform device names ("rspi%u.0" -> "rspi.%u")
+  - Add missing platform data
+  - Correct summary (resources -> platform devices)
 
- arch/arm/mach-shmobile/clock-r8a7791.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-shmobile/board-genmai.c |   44 +++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index e4e4dfac85e9..c8227b334e61 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -101,6 +101,7 @@ static struct clk main_clk = {
-  */
- SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
- SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index 3e92e3c62d4c..c4064610e223 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -20,15 +20,59 @@
  
- /* fixed ratio clock */
- SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
-@@ -124,6 +125,7 @@ static struct clk *main_clks[] = {
- 	&pll3_clk,
- 	&hp_clk,
- 	&p_clk,
-+	&qspi_clk,
- 	&rclk_clk,
- 	&mp_clk,
- 	&cp_clk,
-@@ -135,6 +137,7 @@ static struct clk *main_clks[] = {
- /* MSTP */
- enum {
- 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
-+	MSTP917,
- 	MSTP815, MSTP814,
- 	MSTP813,
- 	MSTP811, MSTP810, MSTP809,
-@@ -154,6 +157,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
- 	[MSTP927] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 27, MSTPSR9, 0), /* I2C4 */
- 	[MSTP925] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 25, MSTPSR9, 0), /* I2C5 */
-+	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
- 	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
- 	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
- 	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
-@@ -195,6 +199,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("zs",		&zs_clk),
- 	CLKDEV_CON_ID("hp",		&hp_clk),
- 	CLKDEV_CON_ID("p",		&p_clk),
-+	CLKDEV_CON_ID("qspi",		&qspi_clk),
- 	CLKDEV_CON_ID("rclk",		&rclk_clk),
- 	CLKDEV_CON_ID("mp",		&mp_clk),
- 	CLKDEV_CON_ID("cp",		&cp_clk),
-@@ -220,6 +225,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
-+	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
-@@ -271,6 +277,11 @@ void __init r8a7791_clock_init(void)
- 		break;
- 	}
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
++#include <linux/spi/rspi.h>
++#include <linux/spi/spi.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
-+	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
-+	else
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
++/* RSPI */
++#define RSPI_RESOURCE(idx, baseaddr, irq)				\
++static const struct resource rspi##idx##_resources[] __initconst = {	\
++	DEFINE_RES_MEM(baseaddr, 0x24),					\
++	DEFINE_RES_IRQ_NAMED(irq, "error"),				\
++	DEFINE_RES_IRQ_NAMED(irq + 1, "rx"),				\
++	DEFINE_RES_IRQ_NAMED(irq + 2, "tx"),				\
++}
 +
- 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
- 		ret = clk_register(main_clks[k]);
++RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
++RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
++RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
++RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
++RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
++
++static const struct rspi_plat_data rspi_pdata __initconst = {
++	.num_chipselect	= 1,
++};
++
++#define r7s72100_register_rspi(idx)					   \
++	platform_device_register_resndata(&platform_bus, "rspi-rz", idx,   \
++					rspi##idx##_resources,		   \
++					ARRAY_SIZE(rspi##idx##_resources), \
++					&rspi_pdata, sizeof(rspi_pdata))
++
++static const struct spi_board_info spi_info[] __initconst = {
++	{
++		.modalias               = "wm8978",
++		.max_speed_hz           = 5000000,
++		.bus_num                = 4,
++		.chip_select            = 0,
++	},
++};
++
+ static void __init genmai_add_standard_devices(void)
+ {
+ 	r7s72100_clock_init();
+ 	r7s72100_add_dt_devices();
++
++	r7s72100_register_rspi(0);
++	r7s72100_register_rspi(1);
++	r7s72100_register_rspi(2);
++	r7s72100_register_rspi(3);
++	r7s72100_register_rspi(4);
++	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+ }
  
+ static const char * const genmai_boards_compat_dt[] __initconst = {
 -- 
 1.7.9.5
