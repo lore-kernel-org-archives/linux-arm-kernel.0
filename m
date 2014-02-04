@@ -1,64 +1,116 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 4 Feb 2014 12:10:55 -0700
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <8676627.b6SYsazoah@wuerfel>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <13031998.NR888KZWhk@wuerfel>
- <20140204181514.GA25695@obsidianresearch.com>
- <8676627.b6SYsazoah@wuerfel>
-Message-ID: <20140204191055.GC25695@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Feb 2014 20:13:49 +0100
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <1391532784-1953-3-git-send-email-will.deacon@arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <1391532784-1953-3-git-send-email-will.deacon@arm.com>
+Message-ID: <3460536.Sh23gjDa6X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 07:34:50PM +0100, Arnd Bergmann wrote:
+On Tuesday 04 February 2014 16:53:03 Will Deacon wrote:
+> +
+> +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> +                   at least a definition of the Configuration Space plus
+> +                   one or both of IO and Memory Space.
+> +
 
-> Well, the way I see it, we already have support for arbitrary
-> PCI domains in the kernel, and that works fine, so we can just
-> as well use it. That way we don't have to partition the available
-> 256 buses among the host bridges, and anything that needs a separate
-> PCI config space can live in its own world. Quite often when you
-> have multiple PCI hosts, they actually have different ways to
-> get at the config space and don't even share the same driver.
+I might need to reread the spec, but I think the config space is not
+actually supposed to be in the 'ranges' of the host bridge at all,
+and it should just be listed in the 'reg'.
 
-> On x86, any kind of HT/PCI/PCIe/PCI-x bridge is stuffed into a
-> single domain so they can support OSs that only know the
-> traditional config space access methods, but I don't see
-> any real advantage to that for other architectures.
+IIRC the reason why the config space is part of the three-cell address
+is so that you can have funky ways to say "memory space of the device
+with bus/dev/fn is actually translated to address X rather then Y".
 
-Supporting a standard configration interface is a solid reason, but
-there is alot more going on.
+It's too late to change that for the other drivers now, after the
+binding is established.
 
-For instance to support peer-to-peer IO you need to have a consisent,
-non-overlapping set of bus/device/function/tag to uniquely route TLPs
-within the chip. Cross domain TLP routing in HW is non-trivial.
+> +Configuration Space is assumed to be memory-mapped (as opposed to being
+> +accessed via an ioport) and laid out with a direct correspondence to the
+> +geography of a PCI bus address, by concatenating the various components
+> +to form a 24-bit offset:
+> +
+> +        cfg_offset(bus, device, function, register) =
+> +                bus << 16 | device << 11 | function << 8 | register
 
-IOMMUs (and SR-IOv) rely on the BDF to identify the originating device
-for each TLP. Multiple domains means a much more complex IOMMU
-environment.
+This won't allow extended config space. Why not just do the
+regular mmconfig layout and make this:
 
-Failure to integrate on-chip devices into the PCI world also means
-thing like SR-IOv won't work sanely with on-chip devices.
+	cfg_offset(bus, device, function, register) =
+		bus << 20 | device << 15 | function << 12 | register;
 
-The only reason we should see multi-domain on a SOC is because the HW
-design was lazy. Being lazy misses the Big Picture where PCI is the
-cornerstone of many important Server/Enterprise technologies.
+> +static int virt_pci_setup(int nr, struct pci_sys_data *sys)
+> +{
+> +	struct virt_pci *pci = sys->private_data;
+> +
+> +	if (resource_type(&pci->io)) {
+> +		pci_add_resource(&sys->resources, &pci->io);
+> +		pci_ioremap_io(nr * resource_size(&pci->io), pci->io.start);
+> +	}
 
-> > SOC internal peripherals should all show up in the bus 0 config space
-> > of the only domain and SOC PCI-E physical ports should show up on bus
-> > 0 as PCI-PCI bridges. This is all covered in the PCI-E specs regarding
-> > the root complex.
-> > 
-> > Generally I would expect the internal peripherals to still be
-> > internally connected with AXI, but also connected through the ECAM
-> > space for configuration, control, power management and address
-> > assignment.
-> 
-> That would of course be very nice from a software perspective,
-> but I think that is much less likely for any practical
-> implementation.
+This should really compute an io_offset.
 
-Well, all x86 implementations do this already.. It actually isn't that
-big a deal from a HW perspective, you just have to think about it
-fully, understand PCI, and position your registers accordingly.
+> +	if (resource_type(&pci->mem))
+> +		pci_add_resource(&sys->resources, &pci->mem);
 
-Jason
+and also a mem_offset, which is something different.
+
+> +	pci->cfg_base = devm_ioremap_resource(pci->dev, &pci->cfg);
+> +	return !IS_ERR(pci->cfg_base);
+> +}
+> +
+> +static const struct of_device_id virt_pci_of_match[] = {
+> +	{ .compatible = "linux,pci-virt" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, virt_pci_of_match);
+
+I don't think we even want "virt" in the compatible string. The
+binding should be generic enough that it can actually work with
+real hardware.
+
+> +	for_each_of_pci_range(&parser, &range) {
+> +		u32 restype = range.flags & IORESOURCE_TYPE_BITS;
+> +
+> +		switch (restype) {
+> +		case IORESOURCE_IO:
+> +			if (resource_type(&pci->io))
+> +				dev_warn(dev,
+> +					 "ignoring additional io resource\n");
+> +			else
+> +				of_pci_range_to_resource(&range, np, &pci->io);
+> +			break;
+> +		case IORESOURCE_MEM:
+> +			if (resource_type(&pci->mem))
+> +				dev_warn(dev,
+> +					 "ignoring additional mem resource\n");
+> +			else
+> +				of_pci_range_to_resource(&range, np, &pci->mem);
+> +			break;
+
+This shows once more that the range parser code is suboptimal. So far
+every single driver got the I/O space wrong here, because the obvious
+way to write this function is also completely wrong.
+
+What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
+is not the resource you want to pass into pci_add_resource()
+later.
+
+> +	memset(&hw, 0, sizeof(hw));
+> +	hw.nr_controllers	= 1;
+> +	hw.private_data		= (void **)&pci;
+> +	hw.setup		= virt_pci_setup;
+> +	hw.map_irq		= of_irq_parse_and_map_pci;
+> +	hw.ops			= &virt_pci_ops;
+> +	pci_common_init_dev(dev, &hw);
+
+Since most fields here are constant, I'd just write this as
+
+	struct hw_pci hw = {
+		.nr_controllers = 1,
+		.setup = virt_pci_setup,
+		...
+	};
+
+	Arnd
