@@ -1,39 +1,29 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Tue, 4 Feb 2014 15:27:40 -0800
-Subject: [PATCH v2] ARM: dts: Leave sdio1 as disabled on bcm28155-ap
-Message-ID: <1391556460-24218-1-git-send-email-tim.kryger@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 5 Feb 2014 00:45:08 +0100
+Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
+ implementation
+In-Reply-To: <201401100955.45885.jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <52CEA4AA.8050503@free-electrons.com> <201401100955.45885.jbe@pengutronix.de>
+Message-ID: <201402050045.08532.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdio1 interface pins are routed to an unpopulated daughter card
-connector on the bcm28155-ap board.  Thus there is no need to mark
-this interface as enabled.
+On Friday, January 10, 2014 at 09:55:45 AM, J?rgen Beisert wrote:
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
+[...]
 
-Changes since v1:
-  - Rebased on v3.14-rc1
+> > While this is not necessarily an issue with ts_calibrate (it is possible
+> > to click longer so it collects more samples), I don't see that working
+> > with xinput_calibrator.
+> > 
+> > While I don't have much experience with the TS part of the code but I
+> > can investigate if you don't have any idea.
+> 
+> You are right. I have seen the same behaviour here a few times. Currently
+> I'm short in time to dig deeper into this issue, but I will try to do so.
 
- arch/arm/boot/dts/bcm28155-ap.dts | 5 -----
- 1 file changed, 5 deletions(-)
+Hi guys, is this still broken?
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index 5ff2382..3604554 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -49,11 +49,6 @@
- 		clock-frequency = <400000>;
- 	};
- 
--	sdio1: sdio at 3f180000 {
--		max-frequency = <48000000>;
--		status = "okay";
--	};
--
- 	sdio2: sdio at 3f190000 {
- 		non-removable;
- 		max-frequency = <48000000>;
--- 
-1.8.0.1
+Best regards,
+Marek Vasut
