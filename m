@@ -1,49 +1,65 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  4 Feb 2014 18:59:31 +0400
-Subject: [PATCH 2/3] ARM: dts: imx27-phytec-phycard-s-som: Add NFC node
-In-Reply-To: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
-References: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1391525972-15810-2-git-send-email-shc_work@mail.ru>
+Date: Tue,  4 Feb 2014 18:59:30 +0400
+Subject: [PATCH 1/3] ARM: dts: imx27-phytec-phycard-s-som: Sort entries
+Message-ID: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the NFC devicetree node for Phytec PCA100 module.
-
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 36 ++++++++++++------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-index a28b6c7..1b62480 100644
+index e51e550..a28b6c7 100644
 --- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
 +++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-@@ -78,5 +78,26 @@
- 				MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
- 			>;
- 		};
-+
-+		pinctrl_nfc: nfcgrp {
-+			fsl,pins = <
-+				MX27_PAD_NFRB__NFRB 0x0
-+				MX27_PAD_NFCLE__NFCLE 0x0
-+				MX27_PAD_NFWP_B__NFWP_B 0x0
-+				MX27_PAD_NFCE_B__NFCE_B 0x0
-+				MX27_PAD_NFALE__NFALE 0x0
-+				MX27_PAD_NFRE_B__NFRE_B 0x0
-+				MX27_PAD_NFWE_B__NFWE_B 0x0
-+			>;
-+		};
- 	};
+@@ -29,6 +29,24 @@
+ 	status = "okay";
  };
-+
-+&nfc {
+ 
++&fec {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc>;
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
++	pinctrl-0 = <&pinctrl_fec1>;
 +	status = "okay";
 +};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	at24 at 52 {
++		compatible = "at,24c32";
++		pagesize = <32>;
++		reg = <0x52>;
++	};
++};
++
+ &iomuxc {
+ 	imx27-phycard-s-som {
+ 		pinctrl_fec1: fec1grp {
+@@ -62,21 +80,3 @@
+ 		};
+ 	};
+ };
+-
+-&fec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_fec1>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2>;
+-	status = "okay";
+-
+-	at24 at 52 {
+-		compatible = "at,24c32";
+-		pagesize = <32>;
+-		reg = <0x52>;
+-	};
+-};
 -- 
 1.8.3.2
