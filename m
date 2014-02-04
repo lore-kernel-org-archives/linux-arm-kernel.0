@@ -1,77 +1,68 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 04 Feb 2014 13:57:24 -0500
-Subject: arm64: kernel panic in paging_init()
-In-Reply-To: <20140204121452.GI30676@arm.com>
-References: <1391460649.13327.51.camel@deneb.redhat.com>
- <20140204121452.GI30676@arm.com>
-Message-ID: <1391540244.18760.5.camel@deneb.redhat.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 4 Feb 2014 10:58:31 -0800
+Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
+In-Reply-To: <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
+References: <1391476403-26099-1-git-send-email-olof@lixom.net>
+ <20140204052329.GN10628@intel.com>
+ <20140204170019.GI8533@titan.lakedaemon.net>
+ <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
+ <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
+Message-ID: <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-04 at 12:14 +0000, Catalin Marinas wrote:
-> On Mon, Feb 03, 2014 at 08:50:49PM +0000, Mark Salter wrote:
-> > I'm seeing the following panic in paging init. This is on the foundation
-> > model with a modified dtb memory node which has a non section-aligned
-> > bank:
-> > 	memory at 80000000 {
-> > 		device_type = "memory";
-> > 		reg = <0x00000000 0x80000000 0 0x20000000>,
-> > 		      <0x00000000 0xa0300000 0 0x1fd00000>;
-> > 	};
-> > 
-> > I only see this with 64k pagesize configured. What happens is the
-> > non section-aligned bank causes alloc_init_pte() to allocate a page
-> > for the new pte from the end of the first bank (the failing address
-> > 0xfffffe001fff0000 [0x9fff0000 phys]). This should be a valid page
-> > since it was mapped during the create_mapping() call for the first
-> > memory bank. A flush_tlb_all() added to the end of create_mapping()
-> > makes the panic go away so I think the problem is something stale
-> > cached before the page with the failing address was mapped.
-> 
-> I think it goes like this:
-> 
-> head.S maps enough memory to get started but using 64K pages rather than
-> 512M sections with a single pgd entry and several ptes. This never gets
-> to the end of the first block (just up to KERNEL_END).
-> 
-> create_mapping() realises it can do a 512M section mapping, overriding
-> the original table pgd entry with a block one. The memblock limit is set
-> correctly PGDIR_SIZE but create_mapping, when it replaces the table pgd
-> with a block one doesn't do any TLB invalidation.
-> 
-> So I wouldn't do a TLB invalidation all the time but only when the old
-> pmd was set. Please give the patch below a try, I only compiled it (I'll
-> add some text afterwards):
+On Tue, Feb 4, 2014 at 10:57 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Feb 4, 2014 at 10:30 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+>>> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
+>>>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
+>>>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
+>>>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
+>>>> > is enabled (thus making phys_addr_t 64-bit).
+>>>> >
+>>>> > Most changes are switching printk formats, but also a bit of changes to what
+>>>> > used to be array-based pointer arithmetic that could just be done with the
+>>>> > address types instead.
+>>>> >
+>>>> > The warnings were:
+>>>> >
+>>>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
+>>>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
+>>>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
+>>>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
+>>>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
+>>>> >     different size [-Wint-to-pointer-cast]
+>>>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
+>>>> >     different size [-Wpointer-to-int-cast]
+>>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
+>>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+>>>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
+>>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+>>>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
+>>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
+>>>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
+>>>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+>>>> >
+>>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+>>>> Acked-by: Vinod Koul <vinod.koul@intel.com>
+>>>
+>>> Olof, would you like me to queue it up?  Or do you want to take it
+>>> directly?
+>>>
+>>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>
+>> I'm confused. I sent the patch to the drivers/dma maintainers and they
+>> just acked it without asking me to pick it up myself.
+>>
+>> Vinod, did you ack it for me to pick it up, or for some other reason?
+>> If you don't want to take it through your tree I'll be happy to take
+>> it through arm-soc, just looking to clarify.
+>>
+>> (Jason, I can apply it directly)
+>
+> Vinod will correct me if I am wrong, but I take his acks to mean "yup,
+> take it through your tree".  For this specific problem I thought we
+> had a comprehensive fix pending from Joe Perches to add a new %pX
+> format specifier for dma addresses?
 
-Yes, that works. Thanks.
-
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index f557ebbe7013..f8dc7e8fce6f 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -203,10 +203,18 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
->  	do {
->  		next = pmd_addr_end(addr, end);
->  		/* try section mapping first */
-> -		if (((addr | next | phys) & ~SECTION_MASK) == 0)
-> +		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-> +			pmd_t old_pmd =*pmd;
->  			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
-> -		else
-> +			/*
-> +			 * Check for previous table entries created during
-> +			 * boot (__create_page_tables) and flush them.
-> +			 */
-> +			if (!pmd_none(old_pmd))
-> +				flush_tlb_all();
-> +		} else {
->  			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
-> +		}
->  		phys += next - addr;
->  	} while (pmd++, addr = next, addr != end);
->  }
-> 
-> 
-> Thanks.
-> 
+Never mind... that's what you are using.  Sorry for the noise.
