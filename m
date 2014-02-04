@@ -1,68 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 4 Feb 2014 13:58:39 +0100
-Subject: 'unannotated irqs-on' lockdep warning
-In-Reply-To: <CAH9NwWdb0fGQTtss2JzXP16jfCJMG6fCkJQBiy6yiOQ5y30kHA@mail.gmail.com>
-References: <CAH9NwWcVrjV1=rFnHJhDH0yoEkTwUTcq-Tn=R0aaiTr70Fs3hA@mail.gmail.com>
- <20140130155741.GB15937@n2100.arm.linux.org.uk>
- <CAH9NwWdb0fGQTtss2JzXP16jfCJMG6fCkJQBiy6yiOQ5y30kHA@mail.gmail.com>
-Message-ID: <20140204125839.GC26766@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 4 Feb 2014 15:19:40 +0200
+Subject: [PATCH v2 3/5] char: ti-usim: Add driver for USIM module on AM43xx
+In-Reply-To: <1390192434-19386-4-git-send-email-satish.patel@ti.com>
+References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
+ <1390192434-19386-4-git-send-email-satish.patel@ti.com>
+Message-ID: <52F0E8EC.8030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 11:02:16AM +0100, Christian Gmeiner wrote:
-> Hi
+Hi Satish,
+
+On 01/20/2014 06:33 AM, Satish Patel wrote:
+> TI-USIM driver is a platform driver that provides a character
+> driver interface to user applications.
 > 
-> 2014-01-30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Thu, Jan 30, 2014 at 03:31:46PM +0100, Christian Gmeiner wrote:
-> >> [   19.859234] CPU: 0 PID: 1848 Comm: mkdir Not tainted 3.12.4 #44
-> >> [   19.865190] [<c0013900>] (unwind_backtrace+0x0/0xe0) from
-> >> [<c00113b8>] (show_stack+0x10/0x14)
-> >> [   19.873739] [<c00113b8>] (show_stack+0x10/0x14) from [<c044e040>]
-> >> (dump_stack+0x64/0xa4)
-> >> [   19.881851] [<c044e040>] (dump_stack+0x64/0xa4) from [<c0022718>]
-> >> (warn_slowpath_common+0x64/0x84)
-> >> [   19.890828] [<c0022718>] (warn_slowpath_common+0x64/0x84) from
-> >> [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c)
-> >> [   19.900413] [<c00227b8>] (warn_slowpath_fmt+0x2c/0x3c) from
-> >> [<c0076c84>] (check_flags.part.26+0xb4/0x1e4)
-> >> [   19.910001] [<c0076c84>] (check_flags.part.26+0xb4/0x1e4) from
-> >> [<c0079654>] (lock_release+0x3c/0x100)
-> >> [   19.919243] [<c0079654>] (lock_release+0x3c/0x100) from
-> >> [<c00485b4>] (lg_local_unlock+0x18/0x6c)
-> >> [   19.928055] [<c00485b4>] (lg_local_unlock+0x18/0x6c) from
-> >> [<c012a2cc>] (free_fs_struct+0x18/0x30)
-> >> [   19.936947] [<c012a2cc>] (free_fs_struct+0x18/0x30) from
-> >> [<c0024e24>] (do_exit+0x2ac/0x3f0)
-> >> [   19.945316] [<c0024e24>] (do_exit+0x2ac/0x3f0) from [<c002501c>]
-> >> (do_group_exit+0x88/0xb4)
-> >> [   19.953596] [<c002501c>] (do_group_exit+0x88/0xb4) from
-> >> [<c0025058>] (__wake_up_parent+0x0/0x18)
-> >> [   19.962391] ---[ end trace 98a70b5cdc7b49fe ]---
-> >> [   19.967017] possible reason: unannotated irqs-on.
-> >> [   19.971729] irq event stamp: 2910
-> >> [   19.975050] hardirqs last  enabled at (2909): [<c044a160>]
-> >> __slab_free+0x1c0/0x390
-> >> [   19.982661] hardirqs last disabled at (2910): [<c0456d14>]
-> >> __dabt_svc+0x34/0x60
-> >
-> > So, I wonder how we got from __dabt_svc to __wake_up_parent.  It looks
-> > like the unwinder has failed to do a proper job of unwinding, which
-> > makes this undebuggable.
-> >
-> > Can you rebuild in ARM mode with frame pointers enabled please?
-> >
+> It allows user applications to call IOCTL's to
+> perform smart card operations.
 > 
-> Maybe i am blind but I can not find that option via make menuconfig. hmmm
-config FRAME_POINTER
-	bool
-	depends on !THUMB2_KERNEL
-	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
+> Driver currently supports
+> - ATR
+> - T=0 & T=1 protocol
+> - clock stop mode
+> - smart card clock configuration
+> - Tx/Rx application data units (APDU) to smart card
+> - Interface to PHY using DT & phy interface
+> 
+> Validation is done with ACOS3 smart cards
+> 
+> Signed-off-by: Satish Patel <satish.patel@ti.com>
+> ---
+>  .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
+>  drivers/char/Kconfig                               |    7 +
+>  drivers/char/Makefile                              |    1 +
+>  drivers/char/ti-usim-hw.h                          |  863 +++++++++
+>  drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
 
-so disable THUMB2_KERNEL and ARM_UNWIND.
+ti-usim.c is a very large driver that does everything but looks like limited to TI hardware.
+How about splitting it into generic stuff and hw specific glue logic so that most of the generic stuff
+could be used by different hardware types.
 
-Best regards
-Uwe
+>  include/linux/ti-usim.h                            |   98 +
+>  6 files changed, 2859 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
+>  create mode 100644 drivers/char/ti-usim-hw.h
+>  create mode 100644 drivers/char/ti-usim.c
+>  create mode 100644 include/linux/ti-usim.h
+> 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+cheers,
+-roger
