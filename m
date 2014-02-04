@@ -1,36 +1,41 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 04 Feb 2014 13:16:07 +0100
-Subject: [RFC] dt-bindings: configuration of parent clocks and clock
- frequency
-In-Reply-To: <20140201030614.9977.80501@quantum>
-References: <52DE6CAB.10008@samsung.com> <20140201030614.9977.80501@quantum>
-Message-ID: <52F0DA07.6050903@samsung.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue,  4 Feb 2014 07:19:06 -0500
+Subject: [PATCH 0/6] BCM59056 PMU regulator support
+Message-ID: <1391516352-32359-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The BCM59056 is a multi-function power management unit used with the
+BCM281xx family of SoCs. This series adds an MFD and voltage regulator
+driver to support the BCM59056. The bcm28155-ap DT support is updated
+to enable use of regulators on the otg and sdhci peripherals.
 
-On 2014-02-01 04:06, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-01-21 04:48:43)
-> > 5. Similarly to the regulator bindings the clock names could be appended
-> >   to name of a DT property:
-> >
-> >  [clk_name]-assigned-clock-parent = <...>;
-> >  [clk_name]-assigned-clock-rate = <...>;
->
-> I have always been partial to the way that the reg framework does its
-> [reg_name]-supply. We could shorten it to something like:
->
-> [clk-name]-asn-parent = ....
-> [clk-name]-asn-rate = ...
->
-> This is actually the format that was discussed at the ARM kernel summit
-> IIRC.
+Matt Porter (6):
+  i2c: bcm-kona: register with subsys_initcall
+  regulator: add bcm59056 pmu DT binding
+  mfd: add bcm59056 pmu driver
+  regulator: add bcm59056 regulator driver
+  ARM: configs: bcm_defconfig: enable bcm59056 regulator support
+  ARM: dts: add bcm59056 pmu support and enable for bcm28155-ap
 
-I think that "[clk-name]-clk-parent" and "[clk-name]-clk-rate" will be a bit
-more descriptive names instead of quite ambiguous "asn".
+ .../devicetree/bindings/regulator/bcm59056.txt     |  37 ++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |  41 ++
+ arch/arm/boot/dts/bcm59056.dtsi                    | 158 ++++++++
+ arch/arm/configs/bcm_defconfig                     |   7 +
+ drivers/i2c/busses/i2c-bcm-kona.c                  |  14 +-
+ drivers/mfd/Kconfig                                |   8 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/bcm59056.c                             | 119 ++++++
+ drivers/regulator/Kconfig                          |   8 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/bcm59056-regulator.c             | 445 +++++++++++++++++++++
+ include/linux/mfd/bcm59056.h                       |  35 ++
+ 12 files changed, 873 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/bcm59056.txt
+ create mode 100644 arch/arm/boot/dts/bcm59056.dtsi
+ create mode 100644 drivers/mfd/bcm59056.c
+ create mode 100644 drivers/regulator/bcm59056-regulator.c
+ create mode 100644 include/linux/mfd/bcm59056.h
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.8.4
