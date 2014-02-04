@@ -1,33 +1,42 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  4 Feb 2014 15:08:57 -0800
-Subject: [PATCHv2] arm64: Align CMA sizes to PAGE_SIZE
-Message-ID: <1391555337-25380-1-git-send-email-lauraa@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 4 Feb 2014 15:09:56 -0800
+Subject: [PATCH v2 2/5] clocksource: qcom: Move clocksource code out of
+ mach-msm
+In-Reply-To: <1391553532-27001-3-git-send-email-galak@codeaurora.org>
+References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
+ <1391553532-27001-3-git-send-email-galak@codeaurora.org>
+Message-ID: <20140204230956.GE20528@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_alloc_from_contiguous takes number of pages for a size.
-Align up the dma size passed in to page size to avoid truncation
-and allocation failures on sizes less than PAGE_SIZE.
+On 02/04, Kumar Gala wrote:
+> We intent to share the clocksource code for MSM platforms between legacy
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/mm/dma-mapping.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+s/intent/intend/
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 45b5ab5..fbd7678 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -45,6 +45,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
- 	if (IS_ENABLED(CONFIG_DMA_CMA)) {
- 		struct page *page;
- 
-+		size = PAGE_ALIGN(size);
- 		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
- 							get_order(size));
- 		if (!page)
+> and multiplatform supported qcom SoCs.
+> 
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index cd6950f..81caa16 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -140,3 +140,7 @@ config VF_PIT_TIMER
+>  	bool
+>  	help
+>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+> +
+> +config CLKSRC_QCOM
+> +	bool
+> +	depends on ARCH_MSM
+
+It would be a a little less noisy if  you left this as MSM_TIMER
+(msm is all over the code in that file anyway). Also, why do we
+care about depending on ARCH_MSM here? This is a hidden Kconfig
+option anyway.
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
