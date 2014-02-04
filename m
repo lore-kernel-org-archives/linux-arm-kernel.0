@@ -1,51 +1,49 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  4 Feb 2014 18:59:32 +0400
-Subject: [PATCH 3/3] ARM: dts: imx27-phytec-phycard-s-rdk: Add pinctrl
- definitions for SDHC2
+Date: Tue,  4 Feb 2014 18:59:31 +0400
+Subject: [PATCH 2/3] ARM: dts: imx27-phytec-phycard-s-som: Add NFC node
 In-Reply-To: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
 References: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1391525972-15810-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1391525972-15810-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl definitions for SDHC2 for Phytec PCA100 RDK board.
+This patch adds the NFC devicetree node for Phytec PCA100 module.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-index 04cadfc..1cd3a87 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-@@ -88,6 +88,18 @@
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+index a28b6c7..1b62480 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+@@ -78,5 +78,26 @@
+ 				MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
  			>;
  		};
- 
-+		pinctrl_sdhc2: sdhc2grp {
++
++		pinctrl_nfc: nfcgrp {
 +			fsl,pins = <
-+				MX27_PAD_SD2_CLK__SD2_CLK 0x0
-+				MX27_PAD_SD2_CMD__SD2_CMD 0x0
-+				MX27_PAD_SD2_D0__SD2_D0 0x0
-+				MX27_PAD_SD2_D1__SD2_D1 0x0
-+				MX27_PAD_SD2_D2__SD2_D2 0x0
-+				MX27_PAD_SD2_D3__SD2_D3 0x0
-+				MX27_PAD_SSI3_RXDAT__GPIO3_29 0x0 /* CD */
++				MX27_PAD_NFRB__NFRB 0x0
++				MX27_PAD_NFCLE__NFCLE 0x0
++				MX27_PAD_NFWP_B__NFWP_B 0x0
++				MX27_PAD_NFCE_B__NFCE_B 0x0
++				MX27_PAD_NFALE__NFALE 0x0
++				MX27_PAD_NFRE_B__NFRE_B 0x0
++				MX27_PAD_NFWE_B__NFWE_B 0x0
 +			>;
 +		};
+ 	};
+ };
 +
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-@@ -124,6 +136,8 @@
- };
- 
- &sdhci2 {
++&nfc {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhc2>;
- 	cd-gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
++	pinctrl-0 = <&pinctrl_nfc>;
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	nand-on-flash-bbt;
++	status = "okay";
++};
 -- 
 1.8.3.2
