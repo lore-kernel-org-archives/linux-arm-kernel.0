@@ -1,29 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Feb 2014 21:50:24 +0100
-Subject: [PATCH 2/2] ARM: dts: sirf: add pin group for USP0 with only RX
- or TX frame sync for atlas6
-In-Reply-To: <1391061293-2195-1-git-send-email-21cnbao@gmail.com>
-References: <1391061293-2195-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdboFk7TvJ6MqwYOWRJcAqqXx+jJVitUYq2grwnCHwS5hw@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 04 Feb 2014 12:46:03 -0800
+Subject: Weird sched_clock behaviour during boot with -rc1
+In-Reply-To: <20140204183641.GA25127@mudshark.cambridge.arm.com>
+References: <20140204183641.GA25127@mudshark.cambridge.arm.com>
+Message-ID: <52F1518B.9010109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 6:54 AM, Barry Song <21cnbao@gmail.com> wrote:
-
-> From: Rongjun Ying <rongjun.ying@csr.com>
+On 02/04/2014 10:36 AM, Will Deacon wrote:
+> Hi guys,
 >
-> add pin groups for USP0 only holding one of TX and RX frame sync. this patch
-> matches with the change in drivers/pinctrl/sirf.
+> Booting -rc1 on my TC2 gives the following strange entries in the dmesg:
 >
-> commit 73f68c01f46 did this for prima2, but missed prima2. this patch fixes
-> the problem.
 >
-> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>   Uncompressing Linux... done, booting the kernel.
+>   [    0.000000] Booting Linux on physical CPU 0x0
+>
+>   [...]
+>
+>   [    0.000000]   HighMem zone: 329728 pages, LIFO batch:31
+>   [    7.789662] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
+>   [    0.000129] PERCPU: Embedded 9 pages/cpu @ee7bd000 s12800 r8192 d15872 u36864
+>
+>   [...]
+>
+>   [    0.868297] NR_IRQS:16 nr_irqs:16 16
+>   [    0.886350] Architected cp15 timer(s) running at 24.00MHz (phys).
+>   [ 2915.164998] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
+>   [    0.000002] Switching to timer-based delay loop
+>   [    0.014249] Console: colour dummy device 80x30
+>
+>
+> so it looks like something whacky goes on during sched_clock registration.
+> Sure enough, we're doing a pr_info in-between updating cs.* and calling
+> update_sched_clock(), so moving the print sorts things out (diff below).
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yea... we have to be particularly careful with sched_clock to avoid
+locks since we don't want to deadlock, but in this case
+sched_clock_register is a little too relaxed here.
 
-Please take this patch through the ARM SoC tree.
+Stephen: Would it make sense to set cd.suspended = true at the top of
+the registration? That should block any sched_clock calls from getting
+half-updated data, but still allow the sched_clock_update function to work.
 
-Yours,
-Linus Walleij
+
+> What I can't figure out is why this has suddenly started happening with
+> 3.14. Any ideas?
+
+No clue. I'm guessing something like timing changes in the printk paths
+that call sched_clock?
+
+I suspect your patch to move the print down will also be a good idea
+along with the suspending sched_clock while we register new ones.
+
+thanks
+-john
