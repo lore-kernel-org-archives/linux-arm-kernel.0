@@ -1,66 +1,110 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Feb 2014 09:57:53 +0900
-Subject: [PATCH 2/3] mmc: sh-mmcif: add DMA SG synchronisation
-In-Reply-To: <Pine.LNX.4.64.1401311249070.3234@axis700.grange>
-References: <Pine.LNX.4.64.1401311237080.3234@axis700.grange>
- <Pine.LNX.4.64.1401311249070.3234@axis700.grange>
-Message-ID: <20140204005752.GD24787@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  3 Feb 2014 17:13:23 -0800
+Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
+Message-ID: <1391476403-26099-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 12:54:29PM +0100, Guennadi Liakhovetski wrote:
-> According to the DMA API data has to be synchronised before starting
-> a DMA transfer to device and after completing a DMA transfer from device.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Enabling some of the mvebu platforms in the multiplatform config for ARM
+enabled these drivers, which also triggered a bunch of warnings when LPAE
+is enabled (thus making phys_addr_t 64-bit).
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Most changes are switching printk formats, but also a bit of changes to what
+used to be array-based pointer arithmetic that could just be done with the
+address types instead.
 
-> ---
->  drivers/mmc/host/sh_mmcif.c |   18 ++++++++++--------
->  1 files changed, 10 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-> index d032b08..902780c 100644
-> --- a/drivers/mmc/host/sh_mmcif.c
-> +++ b/drivers/mmc/host/sh_mmcif.c
-> @@ -345,6 +345,8 @@ static void sh_mmcif_start_dma_tx(struct sh_mmcif_host *host)
->  			 DMA_TO_DEVICE);
->  	if (ret > 0) {
->  		host->dma_active = true;
-> +		dma_sync_sg_for_device(chan->device->dev, sg, data->sg_len,
-> +				       DMA_TO_DEVICE);
->  		desc = dmaengine_prep_slave_sg(chan, sg, ret,
->  			DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
->  	}
-> @@ -1118,14 +1120,14 @@ static bool sh_mmcif_end_cmd(struct sh_mmcif_host *host)
->  	time = wait_for_completion_interruptible_timeout(&host->dma_complete,
->  							 host->timeout);
->  
-> -	if (data->flags & MMC_DATA_READ)
-> -		dma_unmap_sg(host->chan_rx->device->dev,
-> -			     data->sg, data->sg_len,
-> -			     DMA_FROM_DEVICE);
-> -	else
-> -		dma_unmap_sg(host->chan_tx->device->dev,
-> -			     data->sg, data->sg_len,
-> -			     DMA_TO_DEVICE);
-> +	if (data->flags & MMC_DATA_READ) {
-> +		struct device *dev = host->chan_rx->device->dev;
-> +		dma_unmap_sg(dev, data->sg, data->sg_len, DMA_FROM_DEVICE);
-> +		dma_sync_sg_for_cpu(dev, data->sg, data->sg_len, DMA_FROM_DEVICE);
-> +	} else {
-> +		struct device *dev = host->chan_tx->device->dev;
-> +		dma_unmap_sg(dev, data->sg, data->sg_len, DMA_TO_DEVICE);
-> +	}
->  
->  	if (host->sd_error) {
->  		dev_err(host->mmc->parent,
-> -- 
-> 1.7.2.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+The warnings were:
+
+drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
+drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
+    'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
+drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
+drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
+    different size [-Wint-to-pointer-cast]
+drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
+    different size [-Wpointer-to-int-cast]
+drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
+drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+    'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
+drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+    'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
+drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
+drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
+    'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ drivers/dma/mv_xor.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 53fb0c8365b0..766b68ed505c 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -497,8 +497,8 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
+ 		if (!mv_can_chain(grp_start))
+ 			goto submit_done;
+ 
+-		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
+-			old_chain_tail->async_tx.phys);
++		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %pa\n",
++			&old_chain_tail->async_tx.phys);
+ 
+ 		/* fix up the hardware chain */
+ 		mv_desc_set_next_desc(old_chain_tail, grp_start->async_tx.phys);
+@@ -527,7 +527,8 @@ submit_done:
+ /* returns the number of allocated descriptors */
+ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ {
+-	char *hw_desc;
++	void *virt_desc;
++	dma_addr_t dma_desc;
+ 	int idx;
+ 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+ 	struct mv_xor_desc_slot *slot = NULL;
+@@ -542,17 +543,16 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 				" %d descriptor slots", idx);
+ 			break;
+ 		}
+-		hw_desc = (char *) mv_chan->dma_desc_pool_virt;
+-		slot->hw_desc = (void *) &hw_desc[idx * MV_XOR_SLOT_SIZE];
++		virt_desc = mv_chan->dma_desc_pool_virt;
++		slot->hw_desc = virt_desc + idx * MV_XOR_SLOT_SIZE;
+ 
+ 		dma_async_tx_descriptor_init(&slot->async_tx, chan);
+ 		slot->async_tx.tx_submit = mv_xor_tx_submit;
+ 		INIT_LIST_HEAD(&slot->chain_node);
+ 		INIT_LIST_HEAD(&slot->slot_node);
+ 		INIT_LIST_HEAD(&slot->tx_list);
+-		hw_desc = (char *) mv_chan->dma_desc_pool;
+-		slot->async_tx.phys =
+-			(dma_addr_t) &hw_desc[idx * MV_XOR_SLOT_SIZE];
++		dma_desc = mv_chan->dma_desc_pool;
++		slot->async_tx.phys = dma_desc + idx * MV_XOR_SLOT_SIZE;
+ 		slot->idx = idx++;
+ 
+ 		spin_lock_bh(&mv_chan->lock);
+@@ -582,8 +582,8 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	int slot_cnt;
+ 
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+-		"%s dest: %x src %x len: %u flags: %ld\n",
+-		__func__, dest, src, len, flags);
++		"%s dest: %pad src %pad len: %u flags: %ld\n",
++		__func__, &dest, &src, len, flags);
+ 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+ 		return NULL;
+ 
+@@ -626,8 +626,8 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+ 
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+-		"%s src_cnt: %d len: dest %x %u flags: %ld\n",
+-		__func__, src_cnt, len, dest, flags);
++		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
++		__func__, src_cnt, len, &dest, flags);
+ 
+ 	spin_lock_bh(&mv_chan->lock);
+ 	slot_cnt = mv_chan_xor_slot_count(len, src_cnt);
+-- 
+1.8.4.1.601.g02b3b1d
