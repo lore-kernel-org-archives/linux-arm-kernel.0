@@ -1,101 +1,83 @@
-From: konrad@darnok.org (Konrad Rzeszutek Wilk)
-Date: Tue, 4 Feb 2014 11:07:27 -0400
-Subject: [Xen-devel] [PATCH v9 0/5] xen/arm/arm64: CONFIG_PARAVIRT and
- stolen ticks accounting
-In-Reply-To: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
-Message-ID: <20140204150727.GA1529@andromeda.dapyr.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 4 Feb 2014 09:18:15 -0600
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
+ device tree boot
+In-Reply-To: <52F0E098.3050404@ti.com>
+References: <1390260542-22213-1-git-send-email-nm@ti.com>
+ <52F0E098.3050404@ti.com>
+Message-ID: <52F104B7.6040606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 09, 2014 at 06:15:07PM +0000, Stefano Stabellini wrote:
-> Hi all,
-> this patch series introduces stolen ticks accounting for Xen on ARM and
-> ARM64.
-> Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
-> typically because Linux is running in a virtual machine and the vcpu has
-> been descheduled.
-> To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
-> so that we can make use of:
+On 02/04/2014 06:44 AM, Balaji T K wrote:
+> On Tuesday 21 January 2014 04:59 AM, Nishanth Menon wrote:
+>> When device is booted using devicetree, platforms impacted by
+>> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
+>> indicates that the module cannot do multi-block transfers.
+>>
+>> Handle this by providing a boolean flag to indicate to driver that it is
+>> working on a hardware with mentioned limitation.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>
+>> This explains the logs I see:
+>> OMAP3430 LDP (ES2.2):
+>> 	uImage only boot:  http://slexy.org/raw/s2YrbMAi7c
+>> 	uImage+dtb concatenated boot: http://slexy.org/raw/s20qVg17T0
+>>
+>> With the following flag set, device is now able to consistently boot with
+>> device tree supported uImage+dtb concat boot.
+>>
+>>   .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
+>>   drivers/mmc/host/omap_hsmmc.c                      |    3 +++
+>>   2 files changed, 5 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>> index 8c8908a..ab36f8b 100644
+>> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>> @@ -26,6 +26,8 @@ specifier is required.
+>>   dma-names: List of DMA request names. These strings correspond
+>>   1:1 with the DMA specifiers listed in dmas. The string naming is
+>>   to be "rx" and "tx" for RX and TX DMA requests, respectively.
+>> +ti,erratum-2.1.1.128: boolean, for OMAP3430/OMAP35xx platforms with broken
+>> +multiblock reads
 > 
-> kernel/sched/cputime.c:steal_account_process_tick
-> 
-> 
-> Changes in v9:
-> - added back missing new files from patches;
-> - fix compilation on avr32 (remove patch #5, revert to previous version
->   of patch #2).
-> 
-> 
-> 
-> Stefano Stabellini (5):
->       xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
->       kernel: missing include in cputime.c
->       arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
->       arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
->       xen/arm: account for stolen ticks
-> 
->  arch/arm/Kconfig                  |   20 ++++++++
->  arch/arm/include/asm/paravirt.h   |   20 ++++++++
->  arch/arm/kernel/Makefile          |    2 +
->  arch/arm/kernel/paravirt.c        |   25 ++++++++++
->  arch/arm/xen/enlighten.c          |   21 +++++++++
->  arch/arm64/Kconfig                |   20 ++++++++
->  arch/arm64/include/asm/paravirt.h |   20 ++++++++
->  arch/arm64/kernel/Makefile        |    1 +
->  arch/arm64/kernel/paravirt.c      |   25 ++++++++++
->  arch/ia64/xen/time.c              |   48 +++----------------
->  arch/x86/xen/time.c               |   76 +------------------------------
->  drivers/xen/Makefile              |    2 +-
->  drivers/xen/time.c                |   91 +++++++++++++++++++++++++++++++++++++
->  include/xen/xen-ops.h             |    5 ++
->  kernel/sched/cputime.c            |    3 ++
->  15 files changed, 261 insertions(+), 118 deletions(-)
->  create mode 100644 arch/arm/include/asm/paravirt.h
->  create mode 100644 arch/arm/kernel/paravirt.c
->  create mode 100644 arch/arm64/include/asm/paravirt.h
->  create mode 100644 arch/arm64/kernel/paravirt.c
->  create mode 100644 drivers/xen/time.c
-> 
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_9
+> Rather than ti,errata.. specific property, something like
+> caps no/disable multiblock read is more readable in my opinion, Otherwise
 
-I tried to merge it on top of 3.14-rc1 + stable/for-linus-3.14 (which
-has the revert of " xen/grant-table: Avoid m2p_override during mapping"
-
-
-And I get:
-konrad at phenom:~/linux$ git merge stefano/lost_ticks_9
-Auto-merging drivers/xen/Makefile
-CONFLICT (content): Merge conflict in drivers/xen/Makefile
-Auto-merging arch/x86/xen/time.c
-CONFLICT (modify/delete): arch/ia64/xen/time.c deleted in HEAD and
-modified in stefano/lost_ticks_9. Version stefano/lost_ticks_9 of
-arch/ia64/xen/time.c left in tree.
-Auto-merging arch/arm64/kernel/Makefile
-CONFLICT (content): Merge conflict in arch/arm64/kernel/Makefile
-Auto-merging arch/arm64/Kconfig
-Auto-merging arch/arm/xen/enlighten.c
-CONFLICT (content): Merge conflict in arch/arm/xen/enlighten.c
-Auto-merging arch/arm/Kconfig
-CONFLICT (content): Merge conflict in arch/arm/Kconfig
-Automatic merge failed; fix conflicts and then commit the result.
-
-
-I presume that is mostly due to David's FIFO queue patches.
-
-Could you kindly rebase it on top 3.14-rc1 and also tack on
-Catalin Marinas Ack on the patches?
-
-Thank you!
+Is'nt the better definition to state i have quirk X and allow the
+driver to do the necessary thing/things needed to handle quirk X? in
+this case, there is just one thing to do: broken multi_block_read, in
+the case of other quirks, there might be more than 1 thing to do.. let
+driver figure that out, dts just states the h/w capabilty or in this
+case, the quirk capability.
 
 > 
+> Acked-by: Balaji T K <balajitk@ti.com>
 > 
-> Cheers,
+>>
+>>   Examples:
+>>
+>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> index 014bfe5..f2d5940 100644
+>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> @@ -1730,6 +1730,9 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
+>>   	if (of_find_property(np, "ti,dual-volt", NULL))
+>>   		pdata->controller_flags |= OMAP_HSMMC_SUPPORTS_DUAL_VOLT;
+>>
+>> +	if (of_find_property(np, "ti,erratum-2.1.1.128", NULL))
+>> +		pdata->controller_flags |= OMAP_HSMMC_BROKEN_MULTIBLOCK_READ;
+>> +
+>>   	/* This driver only supports 1 slot */
+>>   	pdata->nr_slots = 1;
+>>   	pdata->slots[0].switch_pin = cd_gpio;
+>>
 > 
-> Stefano
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
+
+
+-- 
+Regards,
+Nishanth Menon
