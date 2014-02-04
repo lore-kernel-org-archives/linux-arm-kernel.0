@@ -1,38 +1,75 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue,  4 Feb 2014 16:58:43 +0100
-Subject: [PATCH 02/17] amba: Add late and early PM callbacks
+Date: Tue,  4 Feb 2014 16:58:44 +0100
+Subject: [PATCH 03/17] mmc: mmci: Mask IRQs for all variants during runtime
+ suspend
 In-Reply-To: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
 References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1391529538-21685-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1391529538-21685-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To give provision for amba drivers to make use of the late|early PM
-callbacks, we point the amba bus PM callbacks to the generic versions
-of these.
+In runtime suspended state, we are not expecting IRQs and thus we can
+safely mask them, not only for pwrreg_nopower variants but for all.
+
+Obviously we then also need to make sure we restore the IRQ mask while
+becoming runtime resumed.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/amba/bus.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mmc/host/mmci.c |   23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index 3cf61a1..c255d62 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -123,6 +123,12 @@ static const struct dev_pm_ops amba_pm = {
- 	.thaw		= pm_generic_thaw,
- 	.poweroff	= pm_generic_poweroff,
- 	.restore	= pm_generic_restore,
-+	.suspend_late	= pm_generic_suspend_late,
-+	.resume_early	= pm_generic_resume_early,
-+	.freeze_late	= pm_generic_freeze_late,
-+	.thaw_early	= pm_generic_thaw_early,
-+	.poweroff_late	= pm_generic_poweroff_late,
-+	.restore_early	= pm_generic_restore_early,
- 	SET_PM_RUNTIME_PM_OPS(
- 		amba_pm_runtime_suspend,
- 		amba_pm_runtime_resume,
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index b931226..178868a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1758,35 +1758,34 @@ static void mmci_save(struct mmci_host *host)
+ {
+ 	unsigned long flags;
+ 
+-	if (host->variant->pwrreg_nopower) {
+-		spin_lock_irqsave(&host->lock, flags);
++	spin_lock_irqsave(&host->lock, flags);
+ 
+-		writel(0, host->base + MMCIMASK0);
++	writel(0, host->base + MMCIMASK0);
++	if (host->variant->pwrreg_nopower) {
+ 		writel(0, host->base + MMCIDATACTRL);
+ 		writel(0, host->base + MMCIPOWER);
+ 		writel(0, host->base + MMCICLOCK);
+-		mmci_reg_delay(host);
+-
+-		spin_unlock_irqrestore(&host->lock, flags);
+ 	}
++	mmci_reg_delay(host);
+ 
++	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+ static void mmci_restore(struct mmci_host *host)
+ {
+ 	unsigned long flags;
+ 
+-	if (host->variant->pwrreg_nopower) {
+-		spin_lock_irqsave(&host->lock, flags);
++	spin_lock_irqsave(&host->lock, flags);
+ 
++	if (host->variant->pwrreg_nopower) {
+ 		writel(host->clk_reg, host->base + MMCICLOCK);
+ 		writel(host->datactrl_reg, host->base + MMCIDATACTRL);
+ 		writel(host->pwr_reg, host->base + MMCIPOWER);
+-		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+-		mmci_reg_delay(host);
+-
+-		spin_unlock_irqrestore(&host->lock, flags);
+ 	}
++	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++	mmci_reg_delay(host);
++
++	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
+ static int mmci_runtime_suspend(struct device *dev)
 -- 
 1.7.9.5
