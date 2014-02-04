@@ -1,52 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Feb 2014 17:18:41 +0100
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <CAPcvp5HN4pBysOdS5_ep_3Lp7GDDKw4YrgmKjYzBet7PtaOLUg@mail.gmail.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <20140204122951.GC27975@e106497-lin.cambridge.arm.com>
- <CAPcvp5HN4pBysOdS5_ep_3Lp7GDDKw4YrgmKjYzBet7PtaOLUg@mail.gmail.com>
-Message-ID: <201402041718.41931.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 4 Feb 2014 08:22:32 -0800
+Subject: [RFC/RFT 2/2] ARM: keystone: Install hooks for dma address
+ translation routines
+In-Reply-To: <201402041702.00039.arnd@arndb.de>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAOesGMgzsx3gE6cT-nMTJfnO1T5pvfTr8HA6tVGv8svF_kCYjg@mail.gmail.com>
+ <52F0F979.2090505@ti.com> <201402041702.00039.arnd@arndb.de>
+Message-ID: <CAOesGMg7tuyF-NhS93ji2vOdrg0B04Oeihnz0ctrQXc+9ZFdkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014, Andrew Murray wrote:
-> On 4 February 2014 12:29, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Mon, Feb 03, 2014 at 10:34:40PM +0000, Andrew Murray wrote:
-> >> On 3 February 2014 18:43, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> >> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> >> > index 4cc813e..ce5bad2 100644
-> >> > --- a/arch/arm64/include/asm/io.h
-> >> > +++ b/arch/arm64/include/asm/io.h
-> >> > @@ -120,9 +120,13 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-> >> >  /*
-> >> >   *  I/O port access primitives.
-> >> >   */
-> >> > +#define arch_has_dev_port()    (0)
-> >> >  #define IO_SPACE_LIMIT         0xffff
-> >> >  #define PCI_IOBASE             ((void __iomem *)(MODULES_VADDR - SZ_2M))
-> >> >
-> >> > +#define ioport_map(port, nr)   (PCI_IOBASE + ((port) & IO_SPACE_LIMIT))
-> >> > +#define ioport_unmap(addr)
-> >>
-> >> I'm not sure that this will work. The in[bwl], out[bwl] macros in
-> >> arch/arm64/include/asm/io.h already add the PCI_IOBASE offset.
-> >>
-> >> Instead of these two #defines, why not just enforce that
-> >> GENERIC_PCI_IOMAP is enabled? Or at least wrap these defines with 'if
-> >> (!config_enabled(CONFIG_GENERIC_PCI_IOMAP))' or similar.
-> >
-> > GENERIC_PCI_IOMAP is enabled for AArch64. We have select GENERIC_IOMAP in
-> > arch/arm64/Kconfig which in turn selects GENERIC_PCI_IOMAP in lib/Kconfig.
-> 
-> Sorry, it was intent to suggest using the ioport_[map|unmap] functions
-> in lib/iomap.c instead of defining something similar here. I guess you
-> will also need to also define CONFIG_HAS_IOPORT for this to happen.
+On Tue, Feb 4, 2014 at 8:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 04 February 2014, Santosh Shilimkar wrote:
+>> > PPC servers use "ibm,dma-window" to describe the assigned dma address
+>> > space for busses/devices, but the window itself doesn't contain any
+>> > information about the physical address mapping (since it goes through
+>> > an iommu after that). It likely doesn't fit this particular use case,
+>> > but it's something we should look at as a base in case we need to
+>> > start looking at bindings for this instead of coding it per SoC. We'll
+>> > know more once we've seen what a few of the implementations out there
+>> > are.
+>> >
+>> Understood.
+>
+> I think you are looking for the "dma-ranges" property, which describes
+> how a device DMA address space maps into the parent bus address space
+> for inbound translations. It's not used much in Linux, but it is clearly
+> specified. The "ibm,dma-window" property OTOH is for the corner case
+> that you have a small per-partition DMA address space section, which is
+> not how things are done on most systems these days.
 
-We do want CONFIG_HAS_IOPORT, but I would say that we should not use
-CONFIG_GENERIC_IOMAP. As I explained in another reply, enabling this
-was probably a simple mistake, and we only need this if we want I/O
-spaces that are /not/ memory mapped. IMHO any ARM64 system that doesn't
-map its PCI I/O space into MMIO space can live without I/O port
-access.
+Ah, that might very well be the case. And it looks like dma-ranges
+handles this case already. At least based on the first draft proposal
+for dma-ranges that I came across. :)
 
-	Arnd
+
+-Olof
