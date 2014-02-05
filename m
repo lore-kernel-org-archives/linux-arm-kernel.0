@@ -1,69 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 19:55:47 +0000
-Subject: [PATCH v3 07/11] ARM: KVM: fix handling of trapped 64bit coprocessor
- accesses
+Date: Wed,  5 Feb 2014 19:55:45 +0000
+Subject: [PATCH v3 05/11] ARM: LPAE: provide an IPA capable pmd_addr_end
 In-Reply-To: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
 References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391630151-7875-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391630151-7875-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 240e99cbd00a (ARM: KVM: Fix 64-bit coprocessor handling)
-changed the way we match the 64bit coprocessor access from
-user space, but didn't update the trap handler for the same
-set of registers.
+The default pmd_addr_end macro uses an unsigned long to represent
+the VA. When used with KVM and stage-2 translation, the VA is
+actually an IPA, which is up to 40 bits. This also affect the
+SMMU driver, which also deals with stage-2 translation.
 
-The effect is that a trapped 64bit access is never matched, leading
-to a fault being injected into the guest. This went unnoticed as we
-didn't really trap any 64bit register so far.
-
-Placing the CRm field of the access into the CRn field of the matching
-structure fixes the problem. Also update the debug feature to emit the
-expected string in case of failing match.
+Instead, provide an implementation that can cope with larger VAs
+by using a u64 instead. This version will overload the default
+one provided in include/asm-generic/pgtable.h.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc.c | 4 ++--
- arch/arm/kvm/coproc.h | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/pgtable-3level.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 78c0885..126c90d 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -443,7 +443,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	struct coproc_params params;
- 
--	params.CRm = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
-+	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
- 	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
- 	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
- 	params.is_64bit = true;
-@@ -451,7 +451,7 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 16) & 0xf;
- 	params.Op2 = 0;
- 	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
--	params.CRn = 0;
-+	params.CRm = 0;
- 
- 	return emulate_cp15(vcpu, &params);
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 03243f7..594867b 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -262,6 +262,11 @@ static inline int has_transparent_hugepage(void)
+ 	return 1;
  }
-diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-index 0461d5c..c5ad7ff 100644
---- a/arch/arm/kvm/coproc.h
-+++ b/arch/arm/kvm/coproc.h
-@@ -58,8 +58,8 @@ static inline void print_cp_instr(const struct coproc_params *p)
- {
- 	/* Look, we even formatted it for you to paste into the table! */
- 	if (p->is_64bit) {
--		kvm_pr_unimpl(" { CRm(%2lu), Op1(%2lu), is64, func_%s },\n",
--			      p->CRm, p->Op1, p->is_write ? "write" : "read");
-+		kvm_pr_unimpl(" { CRm64(%2lu), Op1(%2lu), is64, func_%s },\n",
-+			      p->CRn, p->Op1, p->is_write ? "write" : "read");
- 	} else {
- 		kvm_pr_unimpl(" { CRn(%2lu), CRm(%2lu), Op1(%2lu), Op2(%2lu), is32,"
- 			      " func_%s },\n",
+ 
++#define pmd_addr_end(addr, end)						\
++({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
++	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
++})
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* _ASM_PGTABLE_3LEVEL_H */
 -- 
 1.8.3.4
