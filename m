@@ -1,96 +1,41 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 5 Feb 2014 21:55:02 +0530
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <CA+mB=1K8Cqe_c6_ce-fLyphvqcr90mhCjFdZ_d4BV-VkUk-gXw@mail.gmail.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
- <52E54849.2000208@metafoo.de>
- <CA+mB=1JvnTcyRnuvdnW1BCeiMLSTMrrAbKwVKgwFUmWrVuXzSw@mail.gmail.com>
- <20140128031324.GH10628@intel.com>
- <CA+mB=1K8Cqe_c6_ce-fLyphvqcr90mhCjFdZ_d4BV-VkUk-gXw@mail.gmail.com>
-Message-ID: <CA+mB=1L9XFC8h_qW_-K-cv5sYondL_0NiLr=9XCFxwWRjDHn1Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Feb 2014 09:28:18 -0700
+Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
+In-Reply-To: <CAAVeFuKLtC62+bujY4724hMV_6M8Ow0s=6zRn_M87VX4PHQgxA@mail.gmail.com>
+References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
+ <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
+ <52E02DCC.1000404@wwwdotorg.org>
+ <CAAVeFuKLtC62+bujY4724hMV_6M8Ow0s=6zRn_M87VX4PHQgxA@mail.gmail.com>
+Message-ID: <52F266A2.1030503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 12:21 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> Hi Vinod,
->
-> On Tue, Jan 28, 2014 at 8:43 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->> On Mon, Jan 27, 2014 at 06:42:36PM +0530, Srikanth Thokala wrote:
->>> Hi Lars/Vinod,
->>> >> The question here i think would be waht this device supports? Is the hardware
->>> >> capable of doing interleaved transfers, then would make sense.
->>> >
->>> > The hardware does 2D transfers. The parameters for a transfer are height,
->>> > width and stride. That's only a subset of what interleaved transfers can be
->>> > (xt->num_frames must be one for 2d transfers). But if I remember correctly
->>> > there has been some discussion on this in the past and the result of that
->>> > discussion was that using interleaved transfers for 2D transfers is
->>> > preferred over adding a custom API for 2D transfers.
+On 01/23/2014 12:39 AM, Alexandre Courbot wrote:
+> On Thu, Jan 23, 2014 at 5:45 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/21/2014 03:10 AM, Alexandre Courbot wrote:
+>>> Invoke the do_idle() firmware call before suspending a CPU so that the
+>>> underlying firmware (if any) can take necessary action.
+>>
+>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+>>
+>>> @@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
 >>>
->>> I went through the prep_interleaved_dma API and I see only one descriptor
->>> is prepared per API call (i.e. per frame).  As our IP supports upto 16 frame
->>> buffers (can be more in future), isn't it less efficient compared to the
->>> prep_slave_sg where we get a single sg list and can prepare all the descriptors
->>> (of non-contiguous buffers) in one go?  Correct me, if am wrong and let me
->>> know your opinions.
->> Well the descriptor maybe one, but that can represent multiple frames, for
->> example 16 as in your case. Can you read up the documentation of how multiple
->> frames are passed. Pls see include/linux/dmaengine.h
+>>>       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+>>>
+>>> +     call_firmware_op(do_idle);
+>>> +
+>>>       cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>>>
+>>>       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 >>
->> /**
->>  * Interleaved Transfer Request
->>  * ----------------------------
->>  * A chunk is collection of contiguous bytes to be transfered.
->>  * The gap(in bytes) between two chunks is called inter-chunk-gap(ICG).
->>  * ICGs may or maynot change between chunks.
->>  * A FRAME is the smallest series of contiguous {chunk,icg} pairs,
->>  *  that when repeated an integral number of times, specifies the transfer.
->>  * A transfer template is specification of a Frame, the number of times
->>  *  it is to be repeated and other per-transfer attributes.
->>  *
->>  * Practically, a client driver would have ready a template for each
->>  *  type of transfer it is going to need during its lifetime and
->>  *  set only 'src_start' and 'dst_start' before submitting the requests.
->>  *
->>  *
->>  *  |      Frame-1        |       Frame-2       | ~ |       Frame-'numf'  |
->>  *  |====....==.===...=...|====....==.===...=...| ~ |====....==.===...=...|
->>  *
->>  *    ==  Chunk size
->>  *    ... ICG
->>  */
->
-> Yes, it can handle multiple frames specified by 'numf' each of size
-> 'frame_size * sgl[0].size'.
-> But, I see it only works if all the frames' memory is contiguous and
-> in this case we
-> can just increment 'src_start' by the total frame size 'numf' number
-> of times to fill in
-> for each HW descriptor (each frame is one HW descriptor).  So, there
-> is no issue when the
-> memory is contiguous.  If the frames are non contiguous, we have to
-> call this API for each
-> frame (hence for each descriptor), as the src_start for each frame is
-> different.  Is it correct?
->
-> FYI: This hardware has an inbuilt Scatter-Gather engine.
->
+>> Don't you need to have the kernel also *not* do something when entering
+>> idle; doesn't the FW op replace some of the register writes that the
+>> kernel would otherwise be doing?
+> 
+> It seems like the operation is actually to inform the firmware that we
+> are going to suspend the CPU. Downstream kernel also uses it that way.
+> But you are right in that we should expect do_idle() to actually
+> perform the suspend operation. Maybe a prepare_idle() operation should
+> be added to the firmware interface for this purpose?
 
-Ping?
-
-
-> Srikanth
->
->>
->> --
->> ~Vinod
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+That sounds like a reasonable change. Is it easy to plumb in?
