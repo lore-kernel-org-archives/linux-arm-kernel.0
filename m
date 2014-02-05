@@ -1,58 +1,49 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 05 Feb 2014 10:15:10 +0000
-Subject: [PATCH v2 4/5] ARM: init: add support for reserved memory defined
- by device tree
-In-Reply-To: <1391515773-6112-5-git-send-email-m.szyprowski@samsung.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
- 1391515773-6112-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140205101510.59A95C40A89@trevor.secretlab.ca>
+From: jilin@nvidia.com (Jim Lin)
+Date: Wed, 5 Feb 2014 18:26:35 +0800
+Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <20140203141529.GF19389@tbergstrom-lnx.Nvidia.com>
+References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
+ <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
+ <1390962378.2398.11.camel@jilin-desktop>
+ <20140203141529.GF19389@tbergstrom-lnx.Nvidia.com>
+Message-ID: <4B9C9637D5087840A465BDCB251780E9E334916736@HKMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Feb 2014 13:09:32 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Enable reserved memory initialization from device tree.
-> 
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mm/init.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 804d61566a53..ebafdb479410 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -17,6 +17,7 @@
->  #include <linux/nodemask.h>
->  #include <linux/initrd.h>
->  #include <linux/of_fdt.h>
-> +#include <linux/of_reserved_mem.h>
->  #include <linux/highmem.h>
->  #include <linux/gfp.h>
->  #include <linux/memblock.h>
-> @@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
->  	if (mdesc->reserve)
->  		mdesc->reserve();
->  
-> +	early_init_dt_scan_reserved_mem();
-> +
+Please ignore my comment.
+I will try to use exported tegra_fuse_readl().
 
-The new binding is being made fundamental. If the reserved-memory node
-is present, then it needs to be honored, even if the kernel doesn't know
-how to use the regions. Therefore, This needs to be unconditional for
-all architectures. The hook should be called in early_init_dt_scan()
-(drivers/of/fdt.c) immediately after the early_init_dt_scan_memory()
-hook.
+-----Original Message-----
+From: Peter De Schrijver [mailto:pdeschrijver at nvidia.com] 
+Sent: Monday, February 03, 2014 10:15 PM
+To: Jim Lin
+Cc: linux-arm-kernel at lists.infradead.org; linux-tegra at vger.kernel.org; linux-kernel at vger.kernel.org; Rob Landley; Stephen Warren; Thierry Reding; Grant Likely; Rob Herring; Danny Huang; linux-doc at vger.kernel.org; devicetree at vger.kernel.org
+Subject: Re: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
 
->  	/*
->  	 * reserve memory for DMA contigouos allocations,
->  	 * must come from DMA area inside low memory
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+On Wed, Jan 29, 2014 at 03:26:18AM +0100, Jim Lin wrote:
+> On Wed, 2014-01-29 at 07:36 +0800, Peter De Schrijver wrote:
+> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > ---
+> >  Documentation/ABI/testing/sysfs-driver-tegra-fuse |    8 +
+> >  drivers/misc/fuse/Makefile                        |    1 +
+> >  drivers/misc/fuse/tegra/Makefile                  |    7 +
+> >  drivers/misc/fuse/tegra/fuse-tegra.c              |  228 ++++++++++++++++
+> >  drivers/misc/fuse/tegra/fuse-tegra20.c            |  136 ++++++++++
+> >  drivers/misc/fuse/tegra/fuse-tegra30.c            |  178 +++++++++++++
+> >  drivers/misc/fuse/tegra/fuse.h                    |   82 ++++++
+> Could we move this fuse.h to other folder under /include/linux (like 
+> /include/linux/platform_data) for other driver to include?
+
+I don't think we should expose everything in fuse.h to the world.
+
+> So other driver can invoke function to read fuse data if needed.
+
+Which functionality do you want? Just reading the fuse data exposed in the sysfs file from a driver? exporting tegra_fuse_readl() should do that I think?
+
+Cheers,
+
+Peter.
+
+--nvpublic
