@@ -1,68 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 5 Feb 2014 08:12:28 -0600
-Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
- device tree boot
-In-Reply-To: <52F2465A.6060804@ti.com>
-References: <1390260542-22213-1-git-send-email-nm@ti.com>
- <52F0E098.3050404@ti.com> <52F104B7.6040606@ti.com> <52F2465A.6060804@ti.com>
-Message-ID: <52F246CC.6070600@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Feb 2014 14:13:58 +0000
+Subject: [PATCH 05/17] mmc: mmci: Put the device into low power state at
+ system suspend
+In-Reply-To: <CACRpkdZt5+t7b0_a__2kJP4V9PS2cyXmguWrST+fzbKCnosi7g@mail.gmail.com>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org>
+ <8738jyu1h9.fsf@paris.lan>
+ <CACRpkdZt5+t7b0_a__2kJP4V9PS2cyXmguWrST+fzbKCnosi7g@mail.gmail.com>
+Message-ID: <20140205141358.GJ22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 05 Feb 2014 08:10:34 AM CST, Balaji T K wrote:
-> On Tuesday 04 February 2014 08:48 PM, Nishanth Menon wrote:
->> On 02/04/2014 06:44 AM, Balaji T K wrote:
->>> On Tuesday 21 January 2014 04:59 AM, Nishanth Menon wrote:
->>>> When device is booted using devicetree, platforms impacted by
->>>> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
->>>> indicates that the module cannot do multi-block transfers.
->>>>
->>>> Handle this by providing a boolean flag to indicate to driver that it is
->>>> working on a hardware with mentioned limitation.
->>>>
->>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>> ---
->>>>
->>>> This explains the logs I see:
->>>> OMAP3430 LDP (ES2.2):
->>>> 	uImage only boot:  http://slexy.org/raw/s2YrbMAi7c
->>>> 	uImage+dtb concatenated boot: http://slexy.org/raw/s20qVg17T0
->>>>
->>>> With the following flag set, device is now able to consistently boot with
->>>> device tree supported uImage+dtb concat boot.
->>>>
->>>>    .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
->>>>    drivers/mmc/host/omap_hsmmc.c                      |    3 +++
->>>>    2 files changed, 5 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->>>> index 8c8908a..ab36f8b 100644
->>>> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->>>> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->>>> @@ -26,6 +26,8 @@ specifier is required.
->>>>    dma-names: List of DMA request names. These strings correspond
->>>>    1:1 with the DMA specifiers listed in dmas. The string naming is
->>>>    to be "rx" and "tx" for RX and TX DMA requests, respectively.
->>>> +ti,erratum-2.1.1.128: boolean, for OMAP3430/OMAP35xx platforms with broken
->>>> +multiblock reads
->>>
->>> Rather than ti,errata.. specific property, something like
->>> caps no/disable multiblock read is more readable in my opinion, Otherwise
->>
->> Is'nt the better definition to state i have quirk X and allow the
->> driver to do the necessary thing/things needed to handle quirk X? in
->> this case, there is just one thing to do: broken multi_block_read, in
->> the case of other quirks, there might be more than 1 thing to do.. let
->> driver figure that out, dts just states the h/w capabilty or in this
->> case, the quirk capability.
->>
->
-> But in this case there is only one. disable multi block read is more readable
-> than the errata reference, No strong feelings though.
+On Wed, Feb 05, 2014 at 01:49:49PM +0100, Linus Walleij wrote:
+> On Tue, Feb 4, 2014 at 8:22 PM, Kevin Hilman <khilman@linaro.org> wrote:
 
-Considering this might set an precedence for other quirk description, 
-I'd like to leave it as it stands.
+> > I'm trying to thing of a good reason to not make PM_SLEEP depend on
+> > PM_RUNTIME for platforms like this.
 
---
-Regards,
-Nishanth Menon
+> Isn't the typical Android platform using PM_SLEEP without using
+> PM_RUNTIME?
+
+No, not at all.  Android does make aggressive use of sleep but it's also
+highly desirable to use runtime PM - for example you don't want to have
+to power up the entire SoC simply because the system is getting a new
+e-mail pushed to it or location updates, most of the hardware is doing
+nothing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/9d95bf3e/attachment.sig>
