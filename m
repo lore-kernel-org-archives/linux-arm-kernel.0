@@ -1,9 +1,10 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 06 Feb 2014 03:36:14 +0530
-Subject: [PATCH 09/51] arm, kvm: Fix CPU hotplug callback registration
+Date: Thu, 06 Feb 2014 03:39:45 +0530
+Subject: [PATCH 28/51] arm64,
+ hw_breakpoint.c: Fix CPU hotplug callback registration
 In-Reply-To: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
 References: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140205220613.19080.58823.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20140205220944.19080.26519.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,50 +39,41 @@ registration is:
 	cpu_maps_update_done();
 
 
-Fix the kvm code in arm by using this latter form of callback registration.
+Fix the hw-breakpoint code in arm64 by using this latter form of callback
+registration.
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Gleb Natapov <gleb@kernel.org>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: kvmarm at lists.cs.columbia.edu
-Cc: kvm at vger.kernel.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- arch/arm/kvm/arm.c |    7 ++++++-
+ arch/arm64/kernel/hw_breakpoint.c |    7 ++++++-
  1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1d8248e..e2ef4c4 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1050,21 +1050,26 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index f17f581..24e88d0 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -913,6 +913,8 @@ static int __init arch_hw_breakpoint_init(void)
+ 	pr_info("found %d breakpoint and %d watchpoint registers.\n",
+ 		core_num_brps, core_num_wrps);
  
 +	cpu_maps_update_begin();
 +
- 	err = init_hyp_mode();
- 	if (err)
- 		goto out_err;
+ 	/*
+ 	 * Reset the breakpoint resources. We assume that a halting
+ 	 * debugger will leave the world in a nice state for us.
+@@ -927,7 +929,10 @@ static int __init arch_hw_breakpoint_init(void)
+ 			      TRAP_HWBKPT, "hw-watchpoint handler");
  
--	err = register_cpu_notifier(&hyp_init_cpu_nb);
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
- 		goto out_err;
- 	}
- 
+ 	/* Register hotplug notifier. */
+-	register_cpu_notifier(&hw_breakpoint_reset_nb);
++	__register_cpu_notifier(&hw_breakpoint_reset_nb);
++
 +	cpu_maps_update_done();
 +
- 	hyp_cpu_pm_init();
- 
- 	kvm_coproc_table_init();
- 	return 0;
- out_err:
-+	cpu_maps_update_done();
- 	return err;
- }
+ 	/* Register cpu_suspend hw breakpoint restore hook */
+ 	cpu_suspend_set_dbg_restorer(hw_breakpoint_reset);
  
