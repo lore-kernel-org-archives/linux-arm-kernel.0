@@ -1,57 +1,64 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  5 Feb 2014 15:56:37 +0100
-Subject: [PATCH] ARM: zynq: Move of_clk_init from clock driver
-Message-ID: <572af6e4eaaaa1c74ea62364f8fa7ac5834cc754.1391612175.git.michal.simek@xilinx.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 5 Feb 2014 08:56:34 -0600
+Subject: [PATCH RESEND] ARM: dts: add BeagleBone Audio Cape (Rev A) dtsi
+In-Reply-To: <20140205143800.GB22153@beef>
+References: <1391608084-12665-1-git-send-email-ml@embed.me.uk>
+ <52F2460C.3080908@ti.com> <20140205143800.GB22153@beef>
+Message-ID: <52F25122.50400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move of_clk_init() from clock driver to enable
-options not to use zynq clock driver.
-Use for example fixed clock setting.
+On 02/05/2014 08:38 AM, Matt Porter wrote:
+> On Wed, Feb 05, 2014 at 08:09:16AM -0600, Nishanth Menon wrote:
+>> On 02/05/2014 07:48 AM, Jack Mitchell wrote:
+[...]
+>>> + * --- a/arch/arm/boot/dts/am335x-boneblack.dts
+>>> + * +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+>>> + * @@ -73,6 +74,6 @@
+>>> + *  		pinctrl-names = "default", "off";
+>>> + *  		pinctrl-0 = <&nxp_hdmi_bonelt_pins>;
+>>> + *  		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
+>>> + * -		status = "okay";
+>>> + * +		status = "disabled";
+>>> + *  	};
+>>> + *  };
+>>> + */
+>>> +
+>> how about making the audio-cape-reva.dts which includes and overrides
+>> parameters of boneblack.dts?
+> 
+> Yeah, that might be a little cleaner. Black makes things unfortunately
+> messy for these capes that were really intended for BBW :(
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+yes indeed - we might have to live with more dts in such a case.
+> 
+>> Further, I see a bunch of capes in
+>> http://elinux.org/Beagleboard:BeagleBone_Capes
+>>
+>> Assuming that we dont want to discuss capebus all over again, is this
+>> the approach we'd like to consider in the interim?
+> 
+> I think that's a fair assumption...I'll note that there is work slowly
+> in progress on a very minimal implementation DT overlays upstream. But
+> that doesn't exist. We are simply interested in a sane way to use the
+> hardware we own in mainline and this approach makes it possible to build
+> a kernel+dtb from mainline that works for this configuration. If
+> there's a better way to support this hardware *today* let's discuss it.
+> One of the big benefits to having this upstream is that it's no longer
+> out of sight out of mind. It should be managed alongside all the other
+> am335x dts data.
+> 
+> Incidentally, I'm hoping to contribute a similar patch for the DVI cape
+> I have here.
 
-Based on http://www.spinics.net/lists/arm-kernel/msg298287.html
-series
+If I am not mistaken, the capes are stackable (within reason), and are
+not exactly hotpluggable.. question pops up as to how do we handle
+multiple cape descriptions on the same board without having the user
+to create custom dts which includes each relevant cape dts he has on
+his/her bone? I wonder(without proper research, just thinking aloud)
+if u-boot can do some sort of merge of dtbs - assuming ofcourse eeprom
+data is used to detect the capes plugged on board?
 
----
- arch/arm/mach-zynq/common.c | 1 +
- drivers/clk/zynq/clkc.c     | 2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 93ea19b..8df35f3 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -68,6 +68,7 @@ static void __init zynq_timer_init(void)
- 	zynq_early_slcr_init();
-
- 	zynq_clock_init();
-+	of_clk_init(NULL);
- 	clocksource_of_init();
- }
-
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index 03052d6..c812b93 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -602,8 +602,6 @@ void __init zynq_clock_init(void)
- 	of_node_put(slcr);
- 	of_node_put(np);
-
--	of_clk_init(NULL);
--
- 	return;
-
- np_err:
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/55aa2bd7/attachment.sig>
+-- 
+Regards,
+Nishanth Menon
