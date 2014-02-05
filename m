@@ -1,36 +1,39 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 5 Feb 2014 10:18:26 -0500
-Subject: [PATCH 1/6] i2c: bcm-kona: register with subsys_initcall
-In-Reply-To: <20140205090818.GA2614@katana>
-References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
- <1391516352-32359-2-git-send-email-mporter@linaro.org>
- <20140205090818.GA2614@katana>
-Message-ID: <20140205151826.GC22153@beef>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 5 Feb 2014 09:27:57 -0600
+Subject: [PATCH v2 0/5] Split mach-msm into legacy and mach-qcom
+ (multiplatform)
+In-Reply-To: <20140205004732.GB12815@codeaurora.org>
+References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
+ <20140205004732.GB12815@codeaurora.org>
+Message-ID: <86DB2204-BB01-4B64-AF0C-5A0045DA8ABD@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 10:08:18AM +0100, Wolfram Sang wrote:
-> On Tue, Feb 04, 2014 at 07:19:07AM -0500, Matt Porter wrote:
+
+On Feb 4, 2014, at 6:47 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 02/04, Kumar Gala wrote:
+>> This is the splits the Qualcomm MSM platform into legacy support that we will
+>> not try and convert to multiplatform and multiplatform support.
+>> 
+>> - k
+>> 
+>> Changes from v1:
+>> * Added patch to remove hotplug.c
+>> * Added patch to rename msm_ to qcom_
+>> * Changes the Kconfig to drop CPU_V7
+>> * used wfi() in cpu_die function
+>> * Added git tree to MAINTAINERS file
 > 
-> > Voltage regulators are needed very early due to deferred probe
-> > being incompatible with built-in USB gadget drivers.
-> 
-> What does it need to fix those instead?
+> What's the plan for this series combined with my SMP series? It
+> looks like this isn't based on those patches, so we'll have some
+> conflicts with the msm to qcom rename but it should be fairly
+> minor.
 
-[added Alan/Felipe for more insight]
+I?ve rebased the smp patch series on top of this set, so will post the new version short (hopefully once we close on these).
 
-Discussion on that topic came about from this submission:
-http://www.spinics.net/lists/linux-usb/msg94217.html
+- k
 
-End of it is:
-http://www.spinics.net/lists/linux-usb/msg94731.html
-
-We can either add to the many drivers that already do subsys_initcall()
-for similar reasons...or I can drop this from the series and add gadget
-probe ordering to my TODO list.
-
-In short, it can't be a late_initcall() hack like the original post and
-really could be solved by converting to a real bus (and letting
-deferred probe do its job)..but Alan voiced concerns about that.
-
--Matt
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
