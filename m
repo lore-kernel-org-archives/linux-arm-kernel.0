@@ -1,74 +1,116 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 05 Feb 2014 07:05:15 -0800
-Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
-In-Reply-To: <20140205142126.GR26684@n2100.arm.linux.org.uk>
-References: <1391484878.2538.11.camel@joe-AO722>
- <21232.24855.201543.400943@gargle.gargle.HOWL>
- <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
- <1391531796.2538.21.camel@joe-AO722>
- <20140205115035.GO26684@n2100.arm.linux.org.uk>
- <1391603566.2538.63.camel@joe-AO722>
- <20140205124127.GP26684@n2100.arm.linux.org.uk>
- <1391605494.2538.68.camel@joe-AO722>
- <20140205133956.GQ26684@n2100.arm.linux.org.uk>
- <1391608993.2538.74.camel@joe-AO722>
- <20140205142126.GR26684@n2100.arm.linux.org.uk>
-Message-ID: <1391612715.2538.84.camel@joe-AO722>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 05 Feb 2014 16:05:08 +0100
+Subject: [PATCH] clk: add strict of_clk_init dependency check
+In-Reply-To: <52F24F4F.8000901@free-electrons.com>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+ <1391593680-9388-1-git-send-email-b.brezillon@overkiz.com>
+ <52F24F4F.8000901@free-electrons.com>
+Message-ID: <52F25324.90108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-05 at 14:21 +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 05, 2014 at 06:03:13AM -0800, Joe Perches wrote:
-> > On Wed, 2014-02-05 at 13:39 +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Feb 05, 2014 at 05:04:54AM -0800, Joe Perches wrote:
-> > > > On Wed, 2014-02-05 at 12:41 +0000, Russell King - ARM Linux wrote:
-> > > > > On Wed, Feb 05, 2014 at 04:32:46AM -0800, Joe Perches wrote:
-> > > > > > Apparently, people just convert stupidly large udelay()s
-> > > > > > to mdelay and not be bothered.
-> > > > > 
-> > > > > And that's the correct answer.  Having udelay(10000) rather than mdelay(10)
-> > > > > is a sign that they weren't paying that much attention when writing the
-> > > > > code.
-> > > > 
-> > > > Not really.
-> > []
-> > > > It's not so much not paying attention as not
-> > > > knowing ARM is broken for large udelay().
-> > > 
-> > > And now read my suggestion about how to avoid the "not knowing" problem. :)
-> > 
-> > I'd read it already.  I didn't and don't disagree.
+On 05/02/2014 15:48, Gregory CLEMENT wrote:
+> Hi Boris,
 > 
-> Please explain /why/ you don't agree.
-
-Please reread what I wrote.
-
-We agree a lot more than you seem to think.
-
-> > I still think adding a #warning on large static udelay()s
-> > would be sensible.  Maybe adding another option like
-> > #define UDELAY_TOO_BIG_I_KNOW_ALREADY_DONT_BOTHER_ME
-> > guard to avoid seeing the #warning when there's no other
-> > option.
+> On 05/02/2014 10:48, Boris BREZILLON wrote:
+>> The parent dependency check is only available on the first parent of a given
+>> clk.
+>>
+>> Add support for strict dependency check: all parents of a given clk must be
+>> initialized.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>
+>> Hello Gregory,
+>>
+>> This patch adds support for strict check on clk dependencies (check if all
+>> parents specified by an DT clk node are initialized).
+>>
+>> I'm not sure this is what you were expecting (maybe testing the first parent
+>> is what you really want), so please feel free to tell me if I'm wrong.
+>>
+>> Best Regards,
+>>
+>> Boris
+>>
+>>  drivers/clk/clk.c |   27 +++++++++++++++++++++------
+>>  1 file changed, 21 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index beb0f8b..6849769 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -2543,22 +2543,37 @@ static int parent_ready(struct device_node *np)
+>>  {
+>>  	struct of_phandle_args clkspec;
+>>  	struct of_clk_provider *provider;
+>> +	int num_parents;
+>> +	bool found;
+>> +	int i;
+>>  
+>>  	/*
+>>  	 * If there is no clock parent, no need to wait for them, then
+>>  	 * we can consider their absence as being ready
+>>  	 */
+>> -	if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
+>> -					&clkspec))
+>> +	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+>> +	if (num_parents <= 0)
+>>  		return 1;
+>>  
+>> -	/* Check if we have such a provider in our array */
+>> -	list_for_each_entry(provider, &of_clk_providers, link) {
+>> -		if (provider->node == clkspec.np)
+>> +	for (i = 0; i < num_parents; i++) {
+>> +		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
+>> +					       &clkspec))
+>>  			return 1;
+>> +
+>> +		/* Check if we have such a provider in our array */
+>> +		found = false;
+>> +		list_for_each_entry(provider, &of_clk_providers, link) {
+>> +			if (provider->node == clkspec.np) {
+>> +				found = true;
+>> +				break;
 > 
-> How does that help?  It's /not/ a warning situation - if you ask for
-> udelay(10000) on ARM, you will /not/ get a 10ms delay.  You'll instead
-> get something much shorter because the arithmetic will overflow.
+> Hum this means that as soon as you have one parent then you consider it
+> as ready. It is better of what I have done because I only test the 1st
+> parent. However I wondered if we should go further by ensuring all the
+> parents are ready.
 
-> Now, you could argue that maybe ARM's udelay() implementation should
-> know about this and implement a loop around the underlying udelay()
-> implementation to achieve it,
+My bad, I read the code too fast. Your code already checks that all the
+parents are ready.
 
-I suggested something like that was possible.
+So if you agree I will merge your code with mine and send a new patch.
 
-> and I might agree with you - but I
-> don't for one very simple reason: we /already/ have such an
-> implementation.  It's called mdelay():
+> 
+> If I am right, there is more than one parent only for the muxer. In this
+> case is it really expected that all the parent are ready?
+> 
+> Thanks,
+> 
+> Gregory
+> 
+>> +			}
+>> +		}
+>> +
+>> +		if (!found)
+>> +			return 0;
+>>  	}
+>>  
+>> -	return 0;
+>> +	return 1;
+>>  }
+>>  
+>>  /**
+>>
+> 
+> 
 
-I think mdelay should be for the case where the range
-is too big for a udelay.  I think arm's 11 bit range
-is unfortunately small.
 
-I think we agree be nice to get a generic compiler
-#warning when a __builtin_constant_p value is too large
-and a ratelimited dmesg/warning for the runtime case.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
