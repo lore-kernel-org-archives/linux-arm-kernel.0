@@ -1,67 +1,66 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 05 Feb 2014 16:52:02 +0100
-Subject: [PATCH] ARM: zynq: Move of_clk_init from clock driver
-In-Reply-To: <4e03e3ec-2fc7-40fc-a2cc-4a6c64379559@CO1EHSMHS025.ehs.local>
-References: <572af6e4eaaaa1c74ea62364f8fa7ac5834cc754.1391612175.git.michal.simek@xilinx.com>
- <4e03e3ec-2fc7-40fc-a2cc-4a6c64379559@CO1EHSMHS025.ehs.local>
-Message-ID: <52F25E22.6010801@monstr.eu>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 05 Feb 2014 08:01:31 -0800
+Subject: [GIT PULLv3] clk: socfpga: Clean-ups for 3.14
+In-Reply-To: <1389788321-11260-1-git-send-email-dinguyen@altera.com>
+References: <1389788321-11260-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140205160131.22158.85285@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 04:41 PM, S?ren Brinkmann wrote:
-> On Wed, Feb 05, 2014 at 03:56:37PM +0100, Michal Simek wrote:
->> Move of_clk_init() from clock driver to enable
->> options not to use zynq clock driver.
->> Use for example fixed clock setting.
-> What is the use-case? Zynq w/o this driver makes no sense, IMHO. And
-> even if you wanna fake clocks, why would this driver prevent it? Just
-> replace all the input clocks with different ones and don't care about
-> what this driver does?
+Quoting dinguyen at altera.com (2014-01-15 04:18:41)
+> Hi Mike,
+> 
+> Please pull in these patches that cleans up the SOCFPGA clock driver. This is
+> v3 of the pull request that includes 3 patches from Steffen Trumtrar. I have
+> squashed the compiler error fix patch into the patch that introduced the error.
+> Bisectability should now be fix.
 
-One case is supervisor for example.
+Thanks for the rework. Can you rebase this onto 3.14-rc1 and send it
+again?
+
+Regards,
+Mike
 
 > 
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Based on http://www.spinics.net/lists/arm-kernel/msg298287.html
->> series
->>
->> ---
->>  arch/arm/mach-zynq/common.c | 1 +
->>  drivers/clk/zynq/clkc.c     | 2 --
->>  2 files changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->> index 93ea19b..8df35f3 100644
->> --- a/arch/arm/mach-zynq/common.c
->> +++ b/arch/arm/mach-zynq/common.c
->> @@ -68,6 +68,7 @@ static void __init zynq_timer_init(void)
->>  	zynq_early_slcr_init();
->>
->>  	zynq_clock_init();
->> +	of_clk_init(NULL);
-> Now you have two clock init functions...
-
-If I have two clock init functions now, what I had before?
-You were calling of_clk_init from zynq_clock_init.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/a4179396/attachment.sig>
+> Thanks,
+> Dinh
+> 
+> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
+> 
+>   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.14_v3
+> 
+> for you to fetch changes up to 5710d11ab5230dce43e5edc09d9d5506d3d49663:
+> 
+>   clk: socfpga: split clk code (2014-01-15 05:56:07 -0600)
+> 
+> ----------------------------------------------------------------
+> v3: SOCFPGA clk cleanups for 3.14
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (3):
+>       clk: socfpga: Map the clk manager base address in the clock driver
+>       clk: socfpga: Look for the GPIO_DB_CLK by its offset
+>       clk: socfpga: Remove socfpga_init_clocks
+> 
+> Steffen Trumtrar (3):
+>       clk: socfpga: remove unused field
+>       clk: socfpga: fix define typo
+>       clk: socfpga: split clk code
+> 
+>  arch/arm/mach-socfpga/socfpga.c  |    5 -
+>  drivers/clk/socfpga/Makefile     |    3 +
+>  drivers/clk/socfpga/clk-gate.c   |  195 ++++++++++++++++++++++
+>  drivers/clk/socfpga/clk-periph.c |   94 +++++++++++
+>  drivers/clk/socfpga/clk-pll.c    |  111 +++++++++++++
+>  drivers/clk/socfpga/clk.c        |  328 ++------------------------------------
+>  drivers/clk/socfpga/clk.h        |   57 +++++++
+>  7 files changed, 472 insertions(+), 321 deletions(-)
+>  create mode 100644 drivers/clk/socfpga/clk-gate.c
+>  create mode 100644 drivers/clk/socfpga/clk-periph.c
+>  create mode 100644 drivers/clk/socfpga/clk-pll.c
+>  create mode 100644 drivers/clk/socfpga/clk.h
+> 
