@@ -1,9 +1,7 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 5 Feb 2014 11:10:10 -0200
-Subject: [PATCH 2/2] ARM: dts: imx28-tx28: Remove 'enable-active-low' property
-In-Reply-To: <1391605810-3285-1-git-send-email-fabio.estevam@freescale.com>
-References: <1391605810-3285-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1391605810-3285-2-git-send-email-fabio.estevam@freescale.com>
+Date: Wed, 5 Feb 2014 11:10:09 -0200
+Subject: [PATCH 1/2] ARM: dts: mx53: Remove 'enable-active-low' property
+Message-ID: <1391605810-3285-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,20 +18,46 @@ simply not pass 'enable-active-high'.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx28-tx28.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/imx53-m53evk.dts | 1 -
+ arch/arm/boot/dts/imx53-mba53.dts  | 1 -
+ arch/arm/boot/dts/imx53-tx53.dtsi  | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 3c54e8d..e14bd86 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -91,7 +91,6 @@
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
- 			gpio = <&gpio1 0 0>;
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index 7100d08..e8d11e2 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -103,7 +103,6 @@
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio1 2 0>;
 -			enable-active-low;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&tx28_flexcan_xcvr_pins>;
  		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+index 0358366..55af110 100644
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@ -46,7 +46,6 @@
+ 			regulator-name = "lcd-supply";
+ 			gpio = <&gpio2 5 0>;
+ 			startup-delay-us = <5000>;
+-			enable-active-low;
+ 		};
+ 
+ 		reg_3p2v: regulator at 1 {
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index a44403a..e348796 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -96,7 +96,6 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_can_xcvr>;
+ 			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+-			enable-active-low;
+ 		};
+ 
+ 		reg_usbh1_vbus: regulator at 3 {
 -- 
 1.8.1.2
