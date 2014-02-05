@@ -1,56 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 5 Feb 2014 12:43:18 +0800
-Subject: [PATCH v3 8/8] ARM: dts: sun7i: Add ethernet alias for GMAC
-In-Reply-To: <20140203193802.GE25625@lukather>
-References: <1391398346-5094-1-git-send-email-wens@csie.org>
- <1391398346-5094-9-git-send-email-wens@csie.org>
- <20140203193802.GE25625@lukather>
-Message-ID: <CAGb2v659T_QTLChB0NRS0seQvwDBCmTAH6UBEghZng9Ac6uL4g@mail.gmail.com>
+From: r.sh.open@gmail.com (Rahul Sharma)
+Date: Wed, 5 Feb 2014 10:15:11 +0530
+Subject: [PATCH 0/9] Samsung clock PM consolidation part 1
+In-Reply-To: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
+References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAPdUM4OHCEgy4Y8An9j8t3sQ6RjzMdSEdOnqrZNuAwrWGZN7Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 4, 2014 at 3:38 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Feb 03, 2014 at 11:32:26AM +0800, Chen-Yu Tsai wrote:
->> U-Boot will insert MAC address into the device tree image.
->> It looks up ethernet[0-5] aliases to find the ethernet nodes.
->> Alias GMAC as ethernet0, as it is the only ethernet controller used.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
->> index 65fb8d0..c48fb11 100644
->> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->> @@ -17,7 +17,7 @@
->>       interrupt-parent = <&gic>;
->>
->>       aliases {
->> -             ethernet0 = &emac;
->> +             ethernet0 = &gmac;
->>       };
+Hi Tomasz,
+
+Are you planning to respin this series? It is not applying on mike's for-next.
+
+Regards,
+Rahul Sharma.
+
+
+On 16 October 2013 16:38, Tomasz Figa <t.figa@samsung.com> wrote:
+> This series reworks suspend/resume handling of Samsung clock drivers
+> to cover more SoC specific aspects that are beyond simple register
+> save and restore. The goal is to have all the suspend/resume code
+> that touches the clock controller in single place, which is the
+> clock driver.
 >
-> I'm not very fond of this patch.
+> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+> Arndale boards (except suspend/resume, which is broken because of
+> unrelated reasons):
 >
-> People might rely on the fact that ethernet0 is actually the emac, and
-> are expecting u-boot to fill the ethaddr variable to the emac, and not
-> the gmac.
+> Tested-by: Tomasz Figa <t.figa@samsung.com>
 >
-> Since u-boot is totally able to deal with several ethernet addresses,
-> please add it as ethernet1.
-
-Actually I think we should override this in the board dts.
-The boards we currently support can only use emac or gmac,
-and in our u-boot tree, they have been converted to using
-gmac. If any future boards support both emac and gmac, we
-can address the ordering then. And the ordering should
-match u-boot.
-
-What do you think?
-
-
-Cheers
-ChenYu
+> Tomasz Figa (9):
+>   clk: exynos4: Remove remnants of non-DT support
+>   clk: samsung: Provide common helpers for register save/restore
+>   clk: samsung: exynos4: Move suspend/resume handling to SoC driver
+>   clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
+>   clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
+>   clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
+>   clk: samsung: Drop old suspend/resume code
+>   clk: samsung: exynos4: Add remaining suspend/resume handling
+>   ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
+>
+>  arch/arm/mach-exynos/pm.c            | 125 +-------------------------
+>  drivers/clk/samsung/clk-exynos4.c    | 170 ++++++++++++++++++++++++++++++-----
+>  drivers/clk/samsung/clk-exynos5250.c |  49 ++++++++--
+>  drivers/clk/samsung/clk-exynos5420.c |  49 ++++++++--
+>  drivers/clk/samsung/clk-exynos5440.c |   2 +-
+>  drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
+>  drivers/clk/samsung/clk.c            |  71 ++++++---------
+>  drivers/clk/samsung/clk.h            |  14 ++-
+>  8 files changed, 346 insertions(+), 213 deletions(-)
+>
+> --
+> 1.8.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
