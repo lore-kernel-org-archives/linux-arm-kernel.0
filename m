@@ -1,92 +1,36 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 05 Feb 2014 17:30:14 +0100
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <CA+mB=1L9XFC8h_qW_-K-cv5sYondL_0NiLr=9XCFxwWRjDHn1Q@mail.gmail.com>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
- <52E54849.2000208@metafoo.de>
- <CA+mB=1JvnTcyRnuvdnW1BCeiMLSTMrrAbKwVKgwFUmWrVuXzSw@mail.gmail.com>
- <20140128031324.GH10628@intel.com>
- <CA+mB=1K8Cqe_c6_ce-fLyphvqcr90mhCjFdZ_d4BV-VkUk-gXw@mail.gmail.com>
- <CA+mB=1L9XFC8h_qW_-K-cv5sYondL_0NiLr=9XCFxwWRjDHn1Q@mail.gmail.com>
-Message-ID: <52F26716.3010203@metafoo.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Wed, 5 Feb 2014 10:39:48 -0600
+Subject: [PATCHv9 1/4] clk: socfpga: Add a clk-phase property to the
+ "altr, socfpga-gate-clk"
+In-Reply-To: <20140205160350.22158.37384@quantum>
+References: <1389303079-19808-1-git-send-email-dinguyen@altera.com>
+ <1389303079-19808-2-git-send-email-dinguyen@altera.com>
+ <52CF6D67.1000803@samsung.com> <52D680E4.6090608@gmail.com>
+ <20140205160350.22158.37384@quantum>
+Message-ID: <1391618388.4037.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 05:25 PM, Srikanth Thokala wrote:
-> On Fri, Jan 31, 2014 at 12:21 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->> Hi Vinod,
->>
->> On Tue, Jan 28, 2014 at 8:43 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->>> On Mon, Jan 27, 2014 at 06:42:36PM +0530, Srikanth Thokala wrote:
->>>> Hi Lars/Vinod,
->>>>>> The question here i think would be waht this device supports? Is the hardware
->>>>>> capable of doing interleaved transfers, then would make sense.
->>>>>
->>>>> The hardware does 2D transfers. The parameters for a transfer are height,
->>>>> width and stride. That's only a subset of what interleaved transfers can be
->>>>> (xt->num_frames must be one for 2d transfers). But if I remember correctly
->>>>> there has been some discussion on this in the past and the result of that
->>>>> discussion was that using interleaved transfers for 2D transfers is
->>>>> preferred over adding a custom API for 2D transfers.
->>>>
->>>> I went through the prep_interleaved_dma API and I see only one descriptor
->>>> is prepared per API call (i.e. per frame).  As our IP supports upto 16 frame
->>>> buffers (can be more in future), isn't it less efficient compared to the
->>>> prep_slave_sg where we get a single sg list and can prepare all the descriptors
->>>> (of non-contiguous buffers) in one go?  Correct me, if am wrong and let me
->>>> know your opinions.
->>> Well the descriptor maybe one, but that can represent multiple frames, for
->>> example 16 as in your case. Can you read up the documentation of how multiple
->>> frames are passed. Pls see include/linux/dmaengine.h
->>>
->>> /**
->>>   * Interleaved Transfer Request
->>>   * ----------------------------
->>>   * A chunk is collection of contiguous bytes to be transfered.
->>>   * The gap(in bytes) between two chunks is called inter-chunk-gap(ICG).
->>>   * ICGs may or maynot change between chunks.
->>>   * A FRAME is the smallest series of contiguous {chunk,icg} pairs,
->>>   *  that when repeated an integral number of times, specifies the transfer.
->>>   * A transfer template is specification of a Frame, the number of times
->>>   *  it is to be repeated and other per-transfer attributes.
->>>   *
->>>   * Practically, a client driver would have ready a template for each
->>>   *  type of transfer it is going to need during its lifetime and
->>>   *  set only 'src_start' and 'dst_start' before submitting the requests.
->>>   *
->>>   *
->>>   *  |      Frame-1        |       Frame-2       | ~ |       Frame-'numf'  |
->>>   *  |====....==.===...=...|====....==.===...=...| ~ |====....==.===...=...|
->>>   *
->>>   *    ==  Chunk size
->>>   *    ... ICG
->>>   */
->>
->> Yes, it can handle multiple frames specified by 'numf' each of size
->> 'frame_size * sgl[0].size'.
->> But, I see it only works if all the frames' memory is contiguous and
->> in this case we
->> can just increment 'src_start' by the total frame size 'numf' number
->> of times to fill in
->> for each HW descriptor (each frame is one HW descriptor).  So, there
->> is no issue when the
->> memory is contiguous.  If the frames are non contiguous, we have to
->> call this API for each
->> frame (hence for each descriptor), as the src_start for each frame is
->> different.  Is it correct?
->>
->> FYI: This hardware has an inbuilt Scatter-Gather engine.
->>
->
-> Ping?
+On Wed, 2014-02-05 at 08:03 -0800, Mike Turquette wrote:
+> Quoting Dinh Nguyen (2014-01-15 04:36:52)
+> > Hi Mike,
+> > 
+> > Can you apply this to your clk tree?
+> 
+> The patch looks good to me, but I think it depends on your pending pull
+> request. Can you add this to that pull request and rebase it to
+> 3.14-rc1?
 
-If you want to submit multiple frames at once I think you should look at how 
-the current dmaengine API can be extended to allow that. And also provide an 
-explanation on how this is superior over submitting them one by one.
+Yes, I will send an updated pull request shortly.
 
-- Lars
+Thanks,
+Dinh
+> 
+> Thanks,
+> Mike
+> 
+> > 
+> > Thanks,
+> > Dinh
+> > 
+> 
