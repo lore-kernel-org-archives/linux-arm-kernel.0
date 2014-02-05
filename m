@@ -1,37 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Feb 2014 11:50:35 +0000
-Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
-In-Reply-To: <1391531796.2538.21.camel@joe-AO722>
-References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
- <1391483274-20331-2-git-send-email-sujith@msujith.org>
- <1391484878.2538.11.camel@joe-AO722>
- <21232.24855.201543.400943@gargle.gargle.HOWL>
- <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
- <1391531796.2538.21.camel@joe-AO722>
-Message-ID: <20140205115035.GO26684@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 05 Feb 2014 11:55:12 +0000
+Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+In-Reply-To: <2083213.7oCTVAqWbC@avalon>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <1391537858-28593-2-git-send-email-william.towle@codethink.co.uk>
+ <2083213.7oCTVAqWbC@avalon>
+Message-ID: <52F226A0.5070301@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 08:36:36AM -0800, Joe Perches wrote:
-> On Tue, 2014-02-04 at 08:03 +0100, Holger Schurig wrote:
-> > Joe, look in linux/arch/arm/include/asm/delay.h. The macro udelay
-> > cannot handle large values because of lost-of-precision.
-> > 
-> > IMHO udelay on ARM is broken, because it also cannot work with fast
-> > ARM processors (where bogomips >= 3355, which is in sight now). It's
-> > just not broken enought that someone did something against it ...   so
-> > the current kludge is good enought.
-> 
-> Maybe something like this would be better?
+On 05/02/14 10:56, Laurent Pinchart wrote:
+> Hi William,
+>
+> Thank you for the patch.
+>
+> On Tuesday 04 February 2014 18:17:36 William Towle wrote:
+>> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
+>> but not with values found in the device itself (which are also the
+>> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
+>>
+>> Update the clk-rcar-gen2.c driver to have the same table as the one
+>> used by the mach-shmobile driver which work once further issues are
+>> fixed in the clk-rcar-gen2.c driver.
+>>
+>> Part of the fix for the following error where the driver reports the
+>> output as 1MHz but is really 97.5MHz:
+>>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
+>>
+>> [ben.dooks at codethink.co.uk: updated patch description]
+>> Signed-off-by: William Towle <william.towle@codethink.co.uk>
+>> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>> ---
+>>   drivers/clk/shmobile/clk-rcar-gen2.c |    2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c
+>> b/drivers/clk/shmobile/clk-rcar-gen2.c index a59ec21..df4a1e6 100644
+>> --- a/drivers/clk/shmobile/clk-rcar-gen2.c
+>> +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
+>> @@ -170,6 +170,8 @@ static const struct clk_div_table cpg_sdh_div_table[] =
+>> { };
+>>
+>>   static const struct clk_div_table cpg_sd01_div_table[] = {
+>> +	{  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
+>> +	{  4,  8 },
+>>   	{  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
+>>   	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
+>
+> With this applied the only difference between the sdh and sd0/1 dividers
+> tables would be the { 12, 10 } entry, available for sd0/1 only. Given that the
+> hardware does not match the documentation, could you check whether that entry
+> is supported by sdh as well ? If so we could merge the two tables. Otherwise
+> this patch looks good, could you please just reformat the table to avoid the
+> mostly empty line in the middle ?
 
-No, the point of __bad_udelay() is that people doing stupidly large
-udelay()s result in build errors, rather than having to run the kernel
-and trip over a non-existent debugging message beacuse they haven't
-built the kernel with DEBUG defined.
+I would like feedback from Renesas on this issue if possible. I can
+have a quick try at setting the clock value to 10 in u-boot and scope
+it out and see what happens.
 
-NAK.
+Magnus or Morimoto-san, is there a chance this could be reviewed by
+someone in Renesas who has knowledge of the hardware block?
+
+[PS, added Kuninori Morimoto to this[
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
