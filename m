@@ -1,44 +1,33 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 05 Feb 2014 12:06:52 +0000
-Subject: [PATCH v4] of: add functions to count number of elements in a
- property
-In-Reply-To: <13514940.URVnEJ4NF0@phil>
-References: <27256277.YJ687suYy5@phil> <
- CAL_JsqJord1OOjwcKk1jqF5o+XO3uw+Lc4ATtQacgwZWAoQq1g@mail.gmail.com> <
- 20140204173034.2D899C4050F@trevor.secretlab.ca> <13514940.URVnEJ4NF0@phil>
-Message-ID: <20140205120652.9B1A7C40A89@trevor.secretlab.ca>
+From: sr@denx.de (Stefan Roese)
+Date: Wed,  5 Feb 2014 13:12:39 +0100
+Subject: [PATCH 1/3] arm: dts: am33xx.dtsi: Add node name to rtc device node
+Message-ID: <1391602361-2666-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Feb 2014 19:48:17 +0100, Heiko St??bner <heiko@sntech.de> wrote:
-> Hi Grant,
-> 
-> On Tuesday, 4. February 2014 17:30:34 Grant Likely wrote:
-> > On Sat, 18 Jan 2014 09:07:30 -0600, Rob Herring <robherring2@gmail.com> 
-> wrote:
-> > > On Sat, Jan 18, 2014 at 6:02 AM, Heiko St????bner <heiko@sntech.de> wrote:
-> > > > The need to know the number of array elements in a property is
-> > > > a common pattern. To prevent duplication of open-coded implementations
-> > > > add a helper static function that also centralises strict sanity
-> > > > checking and DTB format details, as well as a set of wrapper functions
-> > > > for u8, u16, u32 and u64.
-> > > > 
-> > > > Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > ---
-> > > 
-> > > Looks good. Do you plan to convert some users to use this?
-> > 
-> > I'll take that as an acked-by. Merged, thanks.
-> 
-> before you taking this patch, I was planning on simply sending this as part of 
-> my rockchip-smp series - as I'm currently the only user of it :-) .
-> 
-> This going through your tree is most likely the better way, but now I need it 
-> to somehow make its way into arm-soc too ... I guess some sort of stable 
-> branch arm-soc could pull?
+Making it possible to reference and therefor change (disable) this
+device node from other dts file which import this dtsi file.
 
-Nah, I'll drop it from my tree. Add my acked-by and merge it via
-arm-soc.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Lukas Stockmann <lukas.stockmann@siemens.com>
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-g.
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 6d95d3d..b8daf8c 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -399,7 +399,7 @@
+ 			ti,timer-pwm;
+ 		};
+ 
+-		rtc at 44e3e000 {
++		rtc: rtc at 44e3e000 {
+ 			compatible = "ti,da830-rtc";
+ 			reg = <0x44e3e000 0x1000>;
+ 			interrupts = <75
+-- 
+1.8.5.3
