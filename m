@@ -1,43 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Feb 2014 11:50:29 +0100
-Subject: [PATCH 1/3] reset: Add of_reset_control_get
-In-Reply-To: <1389179494.4297.9.camel@pizza.hi.pengutronix.de>
-References: <1387575669-21253-1-git-send-email-maxime.ripard@free-electrons.com>
- <1387575669-21253-2-git-send-email-maxime.ripard@free-electrons.com>
- <20131221094213.03658852@skate>
- <1389030171.5590.31.camel@pizza.hi.pengutronix.de>
- <20140108103843.GA2941@lukather>
- <1389179494.4297.9.camel@pizza.hi.pengutronix.de>
-Message-ID: <20140205105029.GD3192@lukather>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Feb 2014 11:56:25 +0100
+Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+In-Reply-To: <1391537858-28593-2-git-send-email-william.towle@codethink.co.uk>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <1391537858-28593-2-git-send-email-william.towle@codethink.co.uk>
+Message-ID: <2083213.7oCTVAqWbC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi William,
 
-On Wed, Jan 08, 2014 at 12:11:34PM +0100, Philipp Zabel wrote:
-> > How do you want to get this merged? You'll probably want to take this
-> > patch, and patches 2/3 and 3/3 depend on some patches merged by Daniel
-> > Lezcano (that I forgot to CC on this, I'll resend).
-> > 
-> > Maybe the best way would be simply to merge this one for 3.14 through
-> > your branch, and merge the two other patches in 3.15.
+Thank you for the patch.
+
+On Tuesday 04 February 2014 18:17:36 William Towle wrote:
+> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
+> but not with values found in the device itself (which are also the
+> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
 > 
-> Alright, this is applied to my branch. I'll wait a bit for feedback on
-> the GPIO reset patches and then send a pull request.
+> Update the clk-rcar-gen2.c driver to have the same table as the one
+> used by the mach-shmobile driver which work once further issues are
+> fixed in the clk-rcar-gen2.c driver.
+> 
+> Part of the fix for the following error where the driver reports the
+> output as 1MHz but is really 97.5MHz:
+>     sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
+> 
+> [ben.dooks at codethink.co.uk: updated patch description]
+> Signed-off-by: William Towle <william.towle@codethink.co.uk>
+> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  drivers/clk/shmobile/clk-rcar-gen2.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c
+> b/drivers/clk/shmobile/clk-rcar-gen2.c index a59ec21..df4a1e6 100644
+> --- a/drivers/clk/shmobile/clk-rcar-gen2.c
+> +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
+> @@ -170,6 +170,8 @@ static const struct clk_div_table cpg_sdh_div_table[] =
+> { };
+> 
+>  static const struct clk_div_table cpg_sd01_div_table[] = {
+> +	{  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
+> +	{  4,  8 },
+>  	{  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
+>  	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
 
-It doesn't seem to be in 3.14. Did I miss something?
+With this applied the only difference between the sdh and sd0/1 dividers 
+tables would be the { 12, 10 } entry, available for sd0/1 only. Given that the 
+hardware does not match the documentation, could you check whether that entry 
+is supported by sdh as well ? If so we could merge the two tables. Otherwise 
+this patch looks good, could you please just reformat the table to avoid the 
+mostly empty line in the middle ?
 
-Thanks,
-Maxime
+>  };
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/611bab2f/attachment.sig>
+Regards,
+
+Laurent Pinchart
