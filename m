@@ -1,41 +1,45 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 5 Feb 2014 20:52:37 +0200
-Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
- timer
-In-Reply-To: <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>	<1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>	<CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>	<52F26444.5090707@ti.com>
- <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
-Message-ID: <52F28875.9000200@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed,  5 Feb 2014 14:01:36 -0500
+Subject: [PATCH v3 1/6] iio: add support for pulse width capture devices
+In-Reply-To: <1391626901-31684-1-git-send-email-mporter@linaro.org>
+References: <1391626901-31684-1-git-send-email-mporter@linaro.org>
+Message-ID: <1391626901-31684-2-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a channel type to support pulse width capture devices.
+These devices capture the timing of a PWM signal based on a
+configurable trigger
 
-On 02/05/2014 07:41 PM, Rob Herring wrote:
-> On Wed, Feb 5, 2014 at 10:18 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->> On 02/05/2014 04:39 PM, Rob Herring wrote:
->>> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> wrote:
->>>> This patch provides bindings for the 64-bit timer in the KeyStone
->>>> architecture devices. The timer can be configured as a general-purpose
->>>> 64-bit
->>>> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
->>>> timers, each half can operate in conjunction (chain mode) or
->>>> independently
->>>> (unchained mode) of each other.
->>> This is software configurable or h/w design time configurations?
->>>
->>> Rob
->>>
->> This is h/w design time configurations
-> Then it seems like the binding should provide for describing those
-> differences either with a property or different compatible strings.
->
-> Rob
-Oh..sorry, seems I didn't catch, this is configurable by software.
-These configurations are like modes in which timer can work
-and they are not different hardware IPs. It depends on driver in
-which mode it should work.
+Signed-off-by: Matt Porter <mporter@linaro.org>
+---
+ drivers/iio/industrialio-core.c | 1 +
+ include/linux/iio/types.h       | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/drivers/iio/industrialio-core.c b/drivers/iio/industrialio-core.c
+index acc911a..6ea0cf8 100644
+--- a/drivers/iio/industrialio-core.c
++++ b/drivers/iio/industrialio-core.c
+@@ -70,6 +70,7 @@ static const char * const iio_chan_type_name_spec[] = {
+ 	[IIO_CCT] = "cct",
+ 	[IIO_PRESSURE] = "pressure",
+ 	[IIO_HUMIDITYRELATIVE] = "humidityrelative",
++	[IIO_PULSE] = "pulse",
+ };
+ 
+ static const char * const iio_modifier_names[] = {
+diff --git a/include/linux/iio/types.h b/include/linux/iio/types.h
+index 084d882..4fa8840 100644
+--- a/include/linux/iio/types.h
++++ b/include/linux/iio/types.h
+@@ -30,6 +30,7 @@ enum iio_chan_type {
+ 	IIO_CCT,
+ 	IIO_PRESSURE,
+ 	IIO_HUMIDITYRELATIVE,
++	IIO_PULSE,
+ };
+ 
+ enum iio_modifier {
 -- 
-Regards,
-Ivan Khoronzhuk
+1.8.4
