@@ -1,69 +1,44 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Wed, 5 Feb 2014 11:48:24 +0000
-Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
-In-Reply-To: <201401312115.33731.arnd@arndb.de>
-References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
- <201401301939.08302.arnd@arndb.de> <52EB96BB.6070800@st.com>
- <201401312115.33731.arnd@arndb.de>
-Message-ID: <52F22508.7080706@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Feb 2014 11:54:57 +0000
+Subject: [PATCH v2 1/2] arm64: vdso: fix coarse clock handling
+In-Reply-To: <20140205100945.GA28623@mudshark.cambridge.arm.com>
+References: <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
+ <1391579584-412-1-git-send-email-nathan_lynch@mentor.com>
+ <20140205100945.GA28623@mudshark.cambridge.arm.com>
+Message-ID: <20140205115457.GC7550@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-On 31/01/14 20:15, Arnd Bergmann wrote:
-> On Friday 31 January 2014, srinivas kandagatla wrote:
+On Wed, Feb 05, 2014 at 10:09:45AM +0000, Will Deacon wrote:
+> On Wed, Feb 05, 2014 at 05:53:04AM +0000, Nathan Lynch wrote:
+> > When __kernel_clock_gettime is called with a CLOCK_MONOTONIC_COARSE or
+> > CLOCK_REALTIME_COARSE clock id, it returns incorrectly to whatever the
+> > caller has placed in x2 ("ret x2" to return from the fast path).  Fix
+> > this by saving x30/LR to x2 only in code that will call
+> > __do_get_tspec, restoring x30 afterward, and using a plain "ret" to
+> > return from the routine.
+> > 
+> > Also: while the resulting tv_nsec value for CLOCK_REALTIME and
+> > CLOCK_MONOTONIC must be computed using intermediate values that are
+> > left-shifted by cs_shift (x12, set by __do_get_tspec), the results for
+> > coarse clocks should be calculated using unshifted values
+> > (xtime_coarse_nsec is in units of actual nanoseconds).  The current
+> > code shifts intermediate values by x12 unconditionally, but x12 is
+> > uninitialized when servicing a coarse clock.  Fix this by setting x12
+> > to 0 once we know we are dealing with a coarse clock id.
+> > 
+> > Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> > ---
 > 
->>> Sorry if I missed the initial review, but can you explain
->>> why this is needed to start with?
->>
->> On ST SoCs the default value for L2 AUX_CTRL register is 0x0, so we  set
->> the way-size explicit here.
+> Thanks for the quick update Nathan!
 > 
-> Unfortunately, we keep going back and forth on the L2 cache controller
-> setup between "it should work automatically" and "we don't want to
-> have configuration data in DT", where my personal opinion is that
-> the first one is more important here.
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Now, there are a couple of properties that are defined in
-> Documentation/devicetree/bindings/arm/l2cc.txt to let some of the
-> things get set up automatically already. Can you check which bits
-> are missing there, if any? Are they better described as "configuration"
-> or "hardware" settings?
+> Catalin: both of these are candidates for stable.
 
-Currently l2cc bindings has few optional properties like.
+And by this you mean Cc: stable...
 
-- arm,data-latency
-- arm,tag-latency
-- arm,dirty-latency
-- arm,filter-ranges
-- interrupts :
-- cache-id-part:
-- wt-override:
+Applied, thanks.
 
-These does not include properties to set "way-size", "associativity",
-"enabling prefetching", "Prefetch drop enable", "prefetch offset",
-"Double linefill" and few more in prefect control register and
-aux-control register.
-
-This is not just a issue with STi SOCs, having a quick look, I can see
-that few more SOCs have similar requirements to set these properties.
-
-We could do two things to get l2 setup automatically on STi SOCS.
-
-1> Either define these properties case-by-case basic, which might be
-useful for other SOCs too.
-
-2> Or Add new compatible string for STi SoCs so that they can
-automatically setup these values in cache-l2x0.c
-
-Am Ok with either approaches.
-
-
-Thanks,
-srini
-
-
-> 
-> 	Arnd
-> 
-> 
+-- 
+Catalin
