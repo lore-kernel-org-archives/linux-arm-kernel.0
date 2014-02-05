@@ -1,10 +1,10 @@
 From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 06 Feb 2014 03:39:45 +0530
-Subject: [PATCH 28/51] arm64,
- hw_breakpoint.c: Fix CPU hotplug callback registration
+Date: Thu, 06 Feb 2014 03:39:58 +0530
+Subject: [PATCH 29/51] arm64,
+ debug-monitors: Fix CPU hotplug callback registration
 In-Reply-To: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
 References: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140205220944.19080.26519.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <20140205220957.19080.79200.stgit@srivatsabhat.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,41 +39,38 @@ registration is:
 	cpu_maps_update_done();
 
 
-Fix the hw-breakpoint code in arm64 by using this latter form of callback
+Fix the debug-monitors code in arm64 by using this latter form of callback
 registration.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 ---
 
- arch/arm64/kernel/hw_breakpoint.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/debug-monitors.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index f17f581..24e88d0 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -913,6 +913,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	pr_info("found %d breakpoint and %d watchpoint registers.\n",
- 		core_num_brps, core_num_wrps);
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 636ba8b..959a16b 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -155,12 +155,16 @@ static struct notifier_block os_lock_nb = {
  
+ static int debug_monitors_init(void)
+ {
 +	cpu_maps_update_begin();
 +
- 	/*
- 	 * Reset the breakpoint resources. We assume that a halting
- 	 * debugger will leave the world in a nice state for us.
-@@ -927,7 +929,10 @@ static int __init arch_hw_breakpoint_init(void)
- 			      TRAP_HWBKPT, "hw-watchpoint handler");
+ 	/* Clear the OS lock. */
+ 	smp_call_function(clear_os_lock, NULL, 1);
+ 	clear_os_lock(NULL);
  
- 	/* Register hotplug notifier. */
--	register_cpu_notifier(&hw_breakpoint_reset_nb);
-+	__register_cpu_notifier(&hw_breakpoint_reset_nb);
+ 	/* Register hotplug handler. */
+-	register_cpu_notifier(&os_lock_nb);
++	__register_cpu_notifier(&os_lock_nb);
 +
 +	cpu_maps_update_done();
-+
- 	/* Register cpu_suspend hw breakpoint restore hook */
- 	cpu_suspend_set_dbg_restorer(hw_breakpoint_reset);
- 
+ 	return 0;
+ }
+ postcore_initcall(debug_monitors_init);
