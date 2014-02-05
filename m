@@ -1,31 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  5 Feb 2014 22:05:08 +0100
-Subject: [PATCH 3/4] DT: i2c: Trivial: Add sii,s35390a
+Date: Wed,  5 Feb 2014 22:05:07 +0100
+Subject: [PATCH 2/4] DT: Vendor prefixes: Add ricoh, ssi and synology
 In-Reply-To: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
 References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1391634309-3123-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1391634309-3123-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Seiko Instruments Inc S35390a to the list of trivial i2c
-devices.
+The following patches make use of vendor names ricoh, ssi and
+synology.  Add them to the vendor prefix list.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- Documentation/devicetree/bindings/i2c/trivial-devices.txt |    1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 1a1ac2e560e9..e11ed0fe770c 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -58,6 +58,7 @@ plx,pex8648		48-Lane, 12-Port PCI Express Gen 2 (5.0 GT/s) Switch
- ramtron,24c64		i2c serial eeprom  (24cxx)
- ricoh,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
- samsung,24ad0xd1	S524AD0XF1 (128K/256K-bit Serial EEPROM for Low Power)
-+sii,s35390a		2-wire CMOS real-time clock
- st-micro,24c256		i2c serial eeprom  (24cxx)
- stm,m41t00		Serial Access TIMEKEEPER
- stm,m41t62		Serial real-time clock (RTC) with alarm
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 3f900cd51bf0..1629e8f33578 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -69,6 +69,7 @@ ralink	Mediatek/Ralink Technology Corp.
+ ramtron	Ramtron International
+ realtek Realtek Semiconductor Corp.
+ renesas	Renesas Electronics Corporation
++ricoh	Richoh Co. Ltd.
+ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ samsung	Samsung Semiconductor
+ sbs	Smart Battery System
+@@ -76,11 +77,13 @@ schindler	Schindler
+ sil	Silicon Image
+ silabs	Silicon Laboratories
+ simtek
++sii	Seiko Instruments, Inc.
+ sirf	SiRF Technology, Inc.
+ snps 	Synopsys, Inc.
+ st	STMicroelectronics
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
++synology	Synology, Inc.
+ ti	Texas Instruments
+ tlm	Trusted Logic Mobility
+ toshiba	Toshiba Corporation
 -- 
 1.7.10.4
