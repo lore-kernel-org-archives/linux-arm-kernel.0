@@ -1,60 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 19:55:46 +0000
-Subject: [PATCH v3 06/11] ARM: KVM: force cache clean on page fault when
- caches are off
+Date: Wed,  5 Feb 2014 19:55:49 +0000
+Subject: [PATCH v3 09/11] ARM: KVM: introduce per-vcpu HYP Configuration
+ Register
 In-Reply-To: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
 References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391630151-7875-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391630151-7875-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for a guest with caches disabled to observe data written
-contained in a given page, we need to make sure that page is
-committed to memory, and not just hanging in the cache (as guest
-accesses are completely bypassing the cache until it decides to
-enable it).
+So far, KVM/ARM used a fixed HCR configuration per guest, except for
+the VI/VF/VA bits to control the interrupt in absence of VGIC.
 
-For this purpose, hook into the coherent_cache_guest_page
-function and flush the region if the guest SCTLR
-register doesn't show the MMU and caches as being enabled.
+With the upcoming need to dynamically reconfigure trapping, it becomes
+necessary to allow the HCR to be changed on a per-vcpu basis.
+
+The fix here is to mimic what KVM/arm64 already does: a per vcpu HCR
+field, initialized at setup time.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_arm.h  | 1 -
+ arch/arm/include/asm/kvm_host.h | 9 ++++++---
+ arch/arm/kernel/asm-offsets.c   | 1 +
+ arch/arm/kvm/guest.c            | 1 +
+ arch/arm/kvm/interrupts_head.S  | 9 +++------
+ 5 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 0931cda..b62ca91 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -122,9 +122,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 1d3153c..a843e74 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -69,7 +69,6 @@
+ #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+ 			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
+ 			HCR_TWE | HCR_SWIO | HCR_TIDCP)
+-#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
  
- struct kvm;
+ /* System Control Register (SCTLR) bits */
+ #define SCTLR_TE	(1 << 30)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 228ae1c..86be18c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -101,6 +101,12 @@ struct kvm_vcpu_arch {
+ 	/* The CPU type we expose to the VM */
+ 	u32 midr;
  
-+#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
++	/* HYP trapping configuration */
++	u32 hcr;
 +
-+static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
-+{
-+	return (vcpu->arch.cp15[c1_SCTLR] & 0b101) == 0b101;
-+}
++	/* Interrupt related fields */
++	u32 irq_lines;		/* IRQ and FIQ levels */
 +
- static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
- 					     unsigned long size)
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+@@ -128,9 +134,6 @@ struct kvm_vcpu_arch {
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
+-	/* Interrupt related fields */
+-	u32 irq_lines;		/* IRQ and FIQ levels */
+-
+ 	/* Cache some mmu pages needed inside spinlock regions */
+ 	struct kvm_mmu_memory_cache mmu_page_cache;
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index dbe0476..713e807 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -174,6 +174,7 @@ int main(void)
+   DEFINE(VCPU_FIQ_REGS,		offsetof(struct kvm_vcpu, arch.regs.fiq_regs));
+   DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_pc));
+   DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
++  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+   DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 2786eae..b23a59c 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -38,6 +38,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+ 
+ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
  {
-+	if (!vcpu_has_cache_enabled(vcpu))
-+		kvm_flush_dcache_to_poc((void *)hva, size);
-+	
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
- 	 * either VIPT or PIPT, there is a potential problem where the host
-@@ -145,7 +155,6 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
- 	}
++	vcpu->arch.hcr = HCR_GUEST_MASK;
+ 	return 0;
  }
  
--#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
- #define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 4a2a97a..7cb41e1 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -597,17 +597,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
  
- void stage2_flush_vm(struct kvm *kvm);
+ /* Enable/Disable: stage-2 trans., trap interrupts, trap wfi, trap smc */
+ .macro configure_hyp_role operation
+-	mrc	p15, 4, r2, c1, c1, 0	@ HCR
+-	bic	r2, r2, #HCR_VIRT_EXCP_MASK
+-	ldr	r3, =HCR_GUEST_MASK
+ 	.if \operation == vmentry
+-	orr	r2, r2, r3
++	ldr	r2, [vcpu, #VCPU_HCR]
+ 	ldr	r3, [vcpu, #VCPU_IRQ_LINES]
+ 	orr	r2, r2, r3
+ 	.else
+-	bic	r2, r2, r3
++	mov	r2, #0
+ 	.endif
+-	mcr	p15, 4, r2, c1, c1, 0
++	mcr	p15, 4, r2, c1, c1, 0	@ HCR
+ .endm
+ 
+ .macro load_vcpu
 -- 
 1.8.3.4
