@@ -1,50 +1,98 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Feb 2014 11:39:49 +0100
-Subject: [PATCH v2 0/6] ARM: sunxi: Add driver for SD/MMC hosts found on
- allwinner sunxi SOCs
-In-Reply-To: <20140204191648.29809.14611.stgit@dizzy-6.o2s.ch>
-References: <20140204191648.29809.14611.stgit@dizzy-6.o2s.ch>
-Message-ID: <20140205103949.GC3192@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 05 Feb 2014 11:40:10 +0100
+Subject: [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
+In-Reply-To: <52F18A08.6070409@samsung.com>
+References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
+ <1390911522-28209-12-git-send-email-k.kozlowski@samsung.com>
+ <52F18A08.6070409@samsung.com>
+Message-ID: <1391596810.3726.5.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Wed, 2014-02-05 at 09:47 +0900, Chanwoo Choi wrote:
+> Hi Krzysztof,
+> 
+> Following patch has conflict on extcon-next branch(Linus 3.14-rc1)
+> when apply patchset by using git am.
+> 
+> [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
+> [PATCH 12/18] extcon: max14577: Choose muic_irqs according to device type
+> [PATCH 14/18] extcon: max14577: Add support for max77836
+> 
+> The base commit of this patchset isn't mainline. You need to rebase this patchset 
+> on extcon-next branch and please resend this patchset.
+> 
+> Thanks,
+> Chanwoo Choi
 
-On Tue, Feb 04, 2014 at 08:24:13PM +0100, David Lanzend?rfer wrote:
-> Hello
-> The following patchset adds support for the SD/MMC host found in the Allwinner SoCs.
-> It contains all the necessary modifications for clock environment and also the device
-> tree script modification which add it to all the boards using it.
-> The clock environment function needed for phase offset configuration has
-> been proposed and implemented by Emilio.
-> This patchset is the second attempt to send this driver upstream.
-> I'm looking forward to the acceptance of this patchset into mainline.
+Hi,
 
-I have four comments here:
-  - Read Documentation/SubmittingPatches, especially Section 5 and 12
-    (hints, you forgot the clock maintainers for your clock patches
-    and you didn't put any signed-off-by tags)
-  - You ignored pretty much all the comments that were made during the
-    review of the first version. Go through
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/219339.html
-    and address the comments that were made.
-  - Each of your patches should compile. Fix the order of your
-    patches.
-  - Submit a v3, with the changes you made. Otherwise we have no way
-    of knowing what have been fixed and what didn't
+This patch patch (along with other) depends on previous rename patches
+from this patchset:
+[PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols to prepare
+for max77836
+http://article.gmane.org/gmane.linux.kernel/1636674
 
-Looking forward for the next iteration!
-Thanks,
-Maxime
+I can resolve the conflict but then they will return on applying patch
+7/18.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/739e5515/attachment.sig>
+I think this patch may wait for a little until the rename-like patches
+will be accepted.
+
+Can you ACK other patches touch extcon?
+ - [PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols...
+ - [PATCH 08/18] mfd: max14577: Rename state container to maxim_core
+ - [PATCH 09/18] mfd: max14577: Add "muic" suffix to regmap and irq_chip
+
+Best regards,
+Krzysztof
+
+> On 01/28/2014 09:18 PM, Krzysztof Kozlowski wrote:
+> > Add max14577 prefix to muic_irqs array. This prepares for max77836
+> > support in this extcon driver.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  drivers/extcon/extcon-max14577.c |   12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/extcon/extcon-max14577.c b/drivers/extcon/extcon-max14577.c
+> > index fd48b4909470..fb343f4042d2 100644
+> > --- a/drivers/extcon/extcon-max14577.c
+> > +++ b/drivers/extcon/extcon-max14577.c
+> > @@ -85,7 +85,7 @@ struct max14577_muic_irq {
+> >  	unsigned int virq;
+> >  };
+> >  
+> > -static struct max14577_muic_irq muic_irqs[] = {
+> > +static struct max14577_muic_irq max14577_muic_irqs[] = {
+> >  	{ MAXIM_IRQ_INT1_ADC,		"muic-ADC" },
+> >  	{ MAXIM_IRQ_INT1_ADCLOW,	"muic-ADCLOW" },
+> >  	{ MAXIM_IRQ_INT1_ADCERR,	"muic-ADCError" },
+> > @@ -541,9 +541,9 @@ static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
+> >  	 * However we only need to know whether it was ADC, charger
+> >  	 * or both interrupts so decode IRQ and turn on proper flags.
+> >  	 */
+> > -	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++)
+> > -		if (irq == muic_irqs[i].virq)
+> > -			irq_type = muic_irqs[i].irq;
+> > +	for (i = 0; i < ARRAY_SIZE(max14577_muic_irqs); i++)
+> > +		if (irq == max14577_muic_irqs[i].virq)
+> > +			irq_type = max14577_muic_irqs[i].irq;
+> >  
+> >  	switch (irq_type) {
+> >  	case MAXIM_IRQ_INT1_ADC:
+> > @@ -647,8 +647,8 @@ static int max14577_muic_probe(struct platform_device *pdev)
+> >  	INIT_WORK(&info->irq_work, max14577_muic_irq_work);
+> >  
+> >  	/* Support irq domain for max14577 MUIC device */
+> > -	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++) {
+> > -		struct max14577_muic_irq *muic_irq = &muic_irqs[i];
+> > +	for (i = 0; i < ARRAY_SIZE(max14577_muic_irqs); i++) {
+> > +		struct max14577_muic_irq *muic_irq = &max14577_muic_irqs[i];
+> >  		unsigned int virq = 0;
+> >  
+> >  		virq = regmap_irq_get_virq(maxim_core->irq_data_muic,
+> > 
