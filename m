@@ -1,76 +1,78 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 05 Feb 2014 10:34:49 +0000
-Subject: [PATCH 1/2] clk: shmobile: rcar-gen2: Fix clock parent all non-PLL
- clocks
-In-Reply-To: <1389113273-10364-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1389113273-10364-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <52F213C9.2020501@codethink.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Feb 2014 11:32:18 +0100
+Subject: [PATCH v3 8/8] ARM: dts: sun7i: Add ethernet alias for GMAC
+In-Reply-To: <CAGb2v659T_QTLChB0NRS0seQvwDBCmTAH6UBEghZng9Ac6uL4g@mail.gmail.com>
+References: <1391398346-5094-1-git-send-email-wens@csie.org>
+ <1391398346-5094-9-git-send-email-wens@csie.org>
+ <20140203193802.GE25625@lukather>
+ <CAGb2v659T_QTLChB0NRS0seQvwDBCmTAH6UBEghZng9Ac6uL4g@mail.gmail.com>
+Message-ID: <20140205103218.GB3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 16:47, Laurent Pinchart wrote:
-> The lb, qspi, sdh, sd0 and sd1 clocks have the PLL1 (divided by 2) as
-> their parent, not the main clock. Fix it.
+On Wed, Feb 05, 2014 at 12:43:18PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Feb 4, 2014 at 3:38 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Feb 03, 2014 at 11:32:26AM +0800, Chen-Yu Tsai wrote:
+> >> U-Boot will insert MAC address into the device tree image.
+> >> It looks up ethernet[0-5] aliases to find the ethernet nodes.
+> >> Alias GMAC as ethernet0, as it is the only ethernet controller used.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> index 65fb8d0..c48fb11 100644
+> >> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >> @@ -17,7 +17,7 @@
+> >>       interrupt-parent = <&gic>;
+> >>
+> >>       aliases {
+> >> -             ethernet0 = &emac;
+> >> +             ethernet0 = &gmac;
+> >>       };
+> >
+> > I'm not very fond of this patch.
+> >
+> > People might rely on the fact that ethernet0 is actually the emac, and
+> > are expecting u-boot to fill the ethaddr variable to the emac, and not
+> > the gmac.
+> >
+> > Since u-boot is totally able to deal with several ethernet addresses,
+> > please add it as ethernet1.
+> 
+> Actually I think we should override this in the board dts.
+> The boards we currently support can only use emac or gmac,
+> and in our u-boot tree, they have been converted to using
+> gmac. If any future boards support both emac and gmac, we
+> can address the ordering then. And the ordering should
+> match u-boot.
+> 
+> What do you think?
 
-William Towle has already sent a patch to move this to device tree
-which I think is a better solution for this. Any chance of commenting
-on which to take please.
+That what u-boot does is not a good argument (especially when it's not
+even mainline u-boot we're talking about). Otherwise, I can just cook
+up a bootloader of my own, do crazy stuff in it, and use that as an
+argument to get crazy things in the kernel.
 
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->   drivers/clk/shmobile/clk-rcar-gen2.c | 10 +++++++++-
->   1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c b/drivers/clk/shmobile/clk-rcar-gen2.c
-> index a59ec21..8c7bcbd 100644
-> --- a/drivers/clk/shmobile/clk-rcar-gen2.c
-> +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
-> @@ -186,7 +186,7 @@ rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
->   			     const char *name)
->   {
->   	const struct clk_div_table *table = NULL;
-> -	const char *parent_name = "main";
-> +	const char *parent_name;
->   	unsigned int shift;
->   	unsigned int mult = 1;
->   	unsigned int div = 1;
-> @@ -201,23 +201,31 @@ rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
->   		 * the multiplier value.
->   		 */
->   		u32 value = clk_readl(cpg->reg + CPG_PLL0CR);
-> +		parent_name = "main";
->   		mult = ((value >> 24) & ((1 << 7) - 1)) + 1;
->   	} else if (!strcmp(name, "pll1")) {
-> +		parent_name = "main";
->   		mult = config->pll1_mult / 2;
->   	} else if (!strcmp(name, "pll3")) {
-> +		parent_name = "main";
->   		mult = config->pll3_mult;
->   	} else if (!strcmp(name, "lb")) {
-> +		parent_name = "pll1_div2";
->   		div = cpg_mode & BIT(18) ? 36 : 24;
->   	} else if (!strcmp(name, "qspi")) {
-> +		parent_name = "pll1_div2";
->   		div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
->   		    ? 16 : 20;
->   	} else if (!strcmp(name, "sdh")) {
-> +		parent_name = "pll1_div2";
->   		table = cpg_sdh_div_table;
->   		shift = 8;
->   	} else if (!strcmp(name, "sd0")) {
-> +		parent_name = "pll1_div2";
->   		table = cpg_sd01_div_table;
->   		shift = 4;
->   	} else if (!strcmp(name, "sd1")) {
-> +		parent_name = "pll1_div2";
->   		table = cpg_sd01_div_table;
->   		shift = 0;
->   	} else if (!strcmp(name, "z")) {
->
+And you can set eth1addr just fine in u-boot.
 
+But thinking a bit more about your patch, I guess that this patch
+makes some kind of sense anyway..
+
+Maxime
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/c90dca1e/attachment-0001.sig>
