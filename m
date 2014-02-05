@@ -1,86 +1,122 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Feb 2014 09:56:31 +0900
-Subject: [PATCH 00/11] ARM: shmobile: RSPI RZ and QSPI SoC and board
- integration
-In-Reply-To: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
-References: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140205005631.GA7664@verge.net.au>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 05 Feb 2014 10:54:27 +0900
+Subject: [PATCH v3 3/3] arm64: audit: Add audit hook in
+ ptrace/syscall_trace
+In-Reply-To: <20140204173133.GG664@mudshark.cambridge.arm.com>
+References: <1389946399-4525-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391410590-4884-4-git-send-email-takahiro.akashi@linaro.org>
+ <20140204173133.GG664@mudshark.cambridge.arm.com>
+Message-ID: <52F199D3.2060409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Magnus, could you Ack these or otherwise?
+On 02/05/2014 02:31 AM, Will Deacon wrote:
+> On Mon, Feb 03, 2014 at 06:56:30AM +0000, AKASHI Takahiro wrote:
+>> This patch adds auditing functions on entry to or exit from
+>> every system call invocation.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/thread_info.h |    1 +
+>>   arch/arm64/kernel/entry.S            |    3 +++
+>>   arch/arm64/kernel/ptrace.c           |   10 ++++++++++
+>>   3 files changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+>> index 720e70b..7468388 100644
+>> --- a/arch/arm64/include/asm/thread_info.h
+>> +++ b/arch/arm64/include/asm/thread_info.h
+>> @@ -101,6 +101,7 @@ static inline struct thread_info *current_thread_info(void)
+>>   #define TIF_NEED_RESCHED	1
+>>   #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+>>   #define TIF_SYSCALL_TRACE	8
+>> +#define TIF_SYSCALL_AUDIT	9
+>>   #define TIF_POLLING_NRFLAG	16
+>>   #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+>>   #define TIF_FREEZE		19
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 827cbad..83c4b29 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -630,6 +630,9 @@ el0_svc_naked:					// compat entry point
+>>   	get_thread_info tsk
+>>   	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+>>   	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
+>> +#ifdef CONFIG_AUDITSYSCALL
+>> +	tbnz	x16, #TIF_SYSCALL_AUDIT, __sys_trace // auditing syscalls?
+>> +#endif
+>
+> Could we avoid the back-to-back tbnz instructions with a single mask? It's
+> not obvious that it will end up any better, but it would be good to know.
 
-On Tue, Feb 04, 2014 at 04:23:54PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This patch series contains SoC and board integration for
->   1. RSPI in the r7s72100 aka RZ/A1H SoC on the Genmai reference board,
->   2. QSPI in the r8a7791 aka R-Car M2 SoC on the Koelsch reference board.
-> It was rebased on top of renesas-devel-v3.14-rc1-20140204.
-> 
-> It was tested on the r7s72100-based Genmai reference board using loopback
-> mode, and on the r8a7791-based Koelsch reference board using the Spansion
-> s25fl512s SPI FLASH.
-> 
->   - [v5 01/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks
->   - [v5 02/11] ARM: shmobile: genmai legacy: Add RSPI support
->   - [v3 03/11] ARM: shmobile: genmai defconfig: Enable RSPI
->   - [v3 04/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
->   - [v5 05/11] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
->   - [v4 06/11] ARM: shmobile: r8a7791 clock: add QSPI clocks
->   - [v4 07/11] ARM: shmobile: koelsch legacy: Add QSPI support
->   - [v4 08/11] ARM: shmobile: koelsch defconfig: Enable RSPI and
->   - [v3 09/11] ARM: shmobile: r8a7791 dtsi: Add QSPI node
->   - [v3 10/11] ARM: shmobile: koelsch dts: Add QSPI nodes
->   - [v2 11/11] ARM: shmobile: lager legacy: Switch QSPI to named IRQs
+When first implementing ftrace support, TIF_SYSCALL_TRACEPOINT is defined as 10
+and 'tst' instruction doesn't allow the following code:
+     tst x16, #(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_TRACEPOINT)
 
-Above I see v2, v3, v4 and v5 patches.
+That is why I've used "back-to-back" tbnz since then, but now that I'm going to
+submit ftrace, audit and later seccomp, I will replace it with:
+     #define TIF_SYSCALL_WORK (_TIF_SYSCALL_TRACE|TRACEPOINT|AUDIT|SECCOMP)
 
-While I can make sense of this it makes it cumbersome to refer to the
-series as a whole.
+     tst x16, #TIF_SYSCALL_WORK
+     b.ne __syscall_trace
 
-Bob, can you take a look at '"[PATCH 00/11] ARM: shmobile: RSPI RZ and
-QSPI SoC and board", posted on Tuesday the 2nd, which includes v2, v3,
-v4 and v5 patches'?
 
-What would make my life easier would be if the entire series was v5 and
-all the patches contained in it were v5. Then I could just ask Bob to look
-at "[PATCH v5 00/11] ARM: shmobile: RSPI RZ and QSPI SoC and board"
+>>   	adr	lr, ret_fast_syscall		// return address
+>>   	cmp     scno, sc_nr                     // check upper syscall limit
+>>   	b.hs	ni_sys
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 6777a21..75a3f23 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -19,6 +19,7 @@
+>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>    */
+>>
+>> +#include <linux/audit.h>
+>>   #include <linux/kernel.h>
+>>   #include <linux/sched.h>
+>>   #include <linux/mm.h>
+>> @@ -38,6 +39,7 @@
+>>   #include <asm/compat.h>
+>>   #include <asm/debug-monitors.h>
+>>   #include <asm/pgtable.h>
+>> +#include <asm/syscall.h>
+>>   #include <asm/traps.h>
+>>   #include <asm/system_misc.h>
+>>
+>> @@ -1064,6 +1066,14 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>>   {
+>>   	unsigned long saved_reg;
+>>
+>> +	if (dir)
+>> +		audit_syscall_exit(regs);
+>> +	else
+>> +		audit_syscall_entry(syscall_get_arch(current, regs),
+>> +			(int)regs->syscallno,
+>> +			regs->orig_x0, regs->regs[1],
+>> +			regs->regs[2], regs->regs[3]);
+>> +
+>
+> Do we really want to perform the audit checks before the tracehook calls?
+> Remember that the latter can rewrite all of the registers.
 
-There is no Bob but I do ask people these kind of questions :)
+OK. I will change the code to make calls in the following order:
+On entry,
+    *secure_computing
+    *tracehook_report_syscall(ENTER)
+    *trace_sys_enter
+    *audit_syscall_entry
+On exit,
+    *audit_syscall_exit
+    *trace_sys_exit
+    *tracehook_report_syscall(EXIT)
 
-> All of these should be safe to apply, without compile-time or run-time
-> dependencies on other parts.
-> Actual functioning for some parts may depend on RSPI work queued up for
-> 3.15 in the spi tree.
-> 
-> Compared to previous submission, the following have been postponed:
->   - [v4 03/15] [WIP] ARM: shmobile: genmai legacy: Add preliminary RSPI
->                pinmux setup
->     This depends on the to-be-written non-DT pinmux configuration for
->     r7s72100.
->   - [v4 07/15] ARM: shmobile: genmai reference dts: Add RSPI nodes
->     This depends on Magnus' "ARM: shmobile: r7s72100 GPIO and PINCTRL device
->     nodes"
->   - [v1 14/15] ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for
->                the SPI FLASH
->   - [v1 15/15] ARM: shmobile: koelsch dts: Enable Quad SPI transfers
->     These two depend on the RSPI Dual/Quad work queued up in the spi tree.
->     After applying the r8a7791/Koelsch patches above, the mainline RSPI/QSPI
->     driver will work fine. But enabling Quad SPI transfers in board support
->     code or DT without the corresponding support in the RSPI driver would
->     cause a regression.
-> 
-> Please apply this series, Thanks!
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+The order here is the exact same as on x86, but such change might
+decrease the readability in syscall_trace().
+
+Thanks,
+-Takahiro AKASHI
+
+> Will
+>
