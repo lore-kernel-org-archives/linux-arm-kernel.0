@@ -1,36 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 5 Feb 2014 14:08:08 +0000
-Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <52F23D1D.7040804@metafoo.de>
-References: <cover.1391274627.git.moinejf@free.fr>
- <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
- <20140204180625.GM22609@sirena.org.uk>
- <20140205101134.4591e5c3@armhf> <52F2021A.9020804@metafoo.de>
- <20140205111814.GF22609@sirena.org.uk>
- <52F23D1D.7040804@metafoo.de>
-Message-ID: <20140205140808.GI22609@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 5 Feb 2014 15:08:32 +0100
+Subject: [PATCH v2 2/5] binfmt_elf: add ELF_HWCAP2 to compat auxv entries
+In-Reply-To: <1387807592-26375-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1387807592-26375-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1387807592-26375-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_QYp0emHdGtkN7FMep1iQTOTGHXVD6Nj9ntO=mbA8SiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 02:31:09PM +0100, Lars-Peter Clausen wrote:
-> On 02/05/2014 12:18 PM, Mark Brown wrote:
+Hello Al,
 
-> >...as previously requested.  I know there was some discusion of broader
-> >moves to factor this stuff out but it'd still be good to keep it
-> >separated out even prior to a final non-EDID based solution so it's
-> >easier to refactor.
+May we please have your Ack on this patch so it can go through one of
+the ARM trees?
 
-> I think it will always be EDID (or ELD) based. As I understood it
-> the re-factoring Takashi was talking about is related to how this
-> data is passed from the graphics driver to the audio driver. The way
+Thank you,
+Ard.
 
-Right, the data of course has to come from there originally, it's about
-how we pass the data and updates to it around.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/5244a05d/attachment.sig>
+
+On 23 December 2013 15:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Add ELF_HWCAP2 to the set of auxv entries that is passed to
+> a 32-bit ELF program running in 32-bit compat mode under a
+> 64-bit kernel.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  fs/compat_binfmt_elf.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/fs/compat_binfmt_elf.c b/fs/compat_binfmt_elf.c
+> index a81147e..4d24d17 100644
+> --- a/fs/compat_binfmt_elf.c
+> +++ b/fs/compat_binfmt_elf.c
+> @@ -88,6 +88,11 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+>  #define        ELF_HWCAP               COMPAT_ELF_HWCAP
+>  #endif
+>
+> +#ifdef COMPAT_ELF_HWCAP2
+> +#undef ELF_HWCAP2
+> +#define        ELF_HWCAP2              COMPAT_ELF_HWCAP2
+> +#endif
+> +
+>  #ifdef COMPAT_ARCH_DLINFO
+>  #undef ARCH_DLINFO
+>  #define        ARCH_DLINFO             COMPAT_ARCH_DLINFO
+> --
+> 1.8.3.2
+>
