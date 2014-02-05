@@ -1,88 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 13:30:46 +0000
-Subject: [PATCH 14/18] arm64: KVM: remove __kvm_hyp_code_{start,
- end} from hyp.S
+Date: Wed,  5 Feb 2014 13:30:48 +0000
+Subject: [PATCH 16/18] arm64: KVM: move hcr_el2 setting into vgic-v2-switch.S
 In-Reply-To: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
 References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391607050-540-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391607050-540-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have __hyp_text_{start,end} to express the boundaries
-of the HYP text section, and __kvm_hyp_code_{start,end} are getting
-in the way of a more modular world switch code.
+GICv3 requires the hcr_el2 switch to be tightly coupled with some
+of the interrupt controller's register switch.
 
-Just turn __kvm_hyp_code_{start,end} into #defines mapping the
-linker-emited symbols.
+In order to have similar code paths, start moving the hcr_el2
+manipulation code to the GICv2 switch code.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 6 ++++--
- arch/arm64/include/asm/virt.h    | 4 ++++
- arch/arm64/kvm/hyp.S             | 6 ------
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm64/kvm/hyp.S            | 7 -------
+ arch/arm64/kvm/vgic-v2-switch.S | 8 ++++++++
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index b25763b..dddb345 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -18,6 +18,8 @@
- #ifndef __ARM_KVM_ASM_H__
- #define __ARM_KVM_ASM_H__
- 
-+#include <asm/virt.h>
-+
- /*
-  * 0 is reserved as an invalid value.
-  * Order *must* be kept in sync with the hyp switch code.
-@@ -95,8 +97,8 @@ extern char __kvm_hyp_init_end[];
- 
- extern char __kvm_hyp_vector[];
- 
--extern char __kvm_hyp_code_start[];
--extern char __kvm_hyp_code_end[];
-+#define	__kvm_hyp_code_start	__hyp_text_start
-+#define	__kvm_hyp_code_end	__hyp_text_end
- 
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 130e2be..290fb66 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -63,6 +63,10 @@ static inline bool is_hyp_mode_mismatched(void)
- 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
- }
- 
-+/* The section containing the hypervisor text */
-+extern char __hyp_text_start[];
-+extern char __hyp_text_end[];
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! __ASM__VIRT_H */
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index c4c3a18..b57f286 100644
+index 5a868c0..20a58fe 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -36,9 +36,6 @@
- 	.pushsection	.hyp.text, "ax"
- 	.align	PAGE_SHIFT
+@@ -335,11 +335,6 @@
+ .endm
  
--__kvm_hyp_code_start:
--	.globl __kvm_hyp_code_start
+ .macro activate_traps
+-	ldr	x2, [x0, #VCPU_IRQ_LINES]
+-	ldr	x1, [x0, #VCPU_HCR_EL2]
+-	orr	x2, x2, x1
+-	msr	hcr_el2, x2
 -
- .macro save_common_regs
- 	// x2: base address for cpu context
- 	// x3: tmp register
-@@ -851,7 +848,4 @@ ENTRY(__kvm_hyp_vector)
- 	ventry	el1_error_invalid		// Error 32-bit EL1
- ENDPROC(__kvm_hyp_vector)
+ 	ldr	x2, =(CPTR_EL2_TTA)
+ 	msr	cptr_el2, x2
  
--__kvm_hyp_code_end:
--	.globl	__kvm_hyp_code_end
--
- 	.popsection
+@@ -353,8 +348,6 @@
+ .endm
+ 
+ .macro deactivate_traps
+-	mov	x2, #HCR_RW
+-	msr	hcr_el2, x2
+ 	msr	cptr_el2, xzr
+ 	msr	hstr_el2, xzr
+ 
+diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+index c5dc777..d36cd7a 100644
+--- a/arch/arm64/kvm/vgic-v2-switch.S
++++ b/arch/arm64/kvm/vgic-v2-switch.S
+@@ -85,6 +85,9 @@ CPU_BE(	rev	w5, w5 )
+ 	sub	w4, w4, #1
+ 	cbnz	w4, 1b
+ 2:
++	mov	x2, #HCR_RW
++	msr	hcr_el2, x2
++	isb
+ .endm
+ 
+ /*
+@@ -92,6 +95,11 @@ CPU_BE(	rev	w5, w5 )
+  * x0: Register pointing to VCPU struct
+  */
+ .macro restore_vgic_v2_state
++	ldr	x2, [x0, #VCPU_IRQ_LINES]
++	ldr	x1, [x0, #VCPU_HCR_EL2]
++	orr	x2, x2, x1
++	msr	hcr_el2, x2
++
+ 	/* Get VGIC VCTRL base into x2 */
+ 	ldr	x2, [x0, #VCPU_KVM]
+ 	kern_hyp_va	x2
 -- 
 1.8.3.4
