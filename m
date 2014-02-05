@@ -1,72 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 5 Feb 2014 12:43:16 -0500
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <20140205140802.9977.19747@quantum>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205140802.9977.19747@quantum>
-Message-ID: <20140205174316.GV8533@titan.lakedaemon.net>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 5 Feb 2014 10:00:15 -0800
+Subject: [PATCH] regulator: core: Make regulator object reflect configured
+ voltage
+In-Reply-To: <20140204200018.GZ22609@sirena.org.uk>
+References: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140204110531.GR22609@sirena.org.uk>
+ <CAJAp7OjCnJ=P9Gi20=D9gybREiSaqd1CaQ0K=9fGbCzU1gTFLw@mail.gmail.com>
+ <20140204181831.GP22609@sirena.org.uk>
+ <CAJAp7Ohn3ch2nK_S8j9ieRBzNeyt6OJmumEhRXXykB9RgMJsQg@mail.gmail.com>
+ <20140204200018.GZ22609@sirena.org.uk>
+Message-ID: <CAJAp7OjB-cJbLpdWo0RFJZefCKcCiKc8KgrjkBobJnddv4MSWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 06:08:02AM -0800, Mike Turquette wrote:
-> Quoting Sebastian Hesselbarth (2014-01-25 10:19:06)
-> > This patch set fixes clk init order that went upside-down with
-> > v3.14. I haven't really investigated what caused this, but I assume
-> > it is related with DT node reordering by addresses.
-> > 
-> > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> > registered before core clocks driver. Unfortunately, we cannot
-> > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> > init order for our drivers is always core clocks before clock gating,
-> > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> > init function that will register core clocks before clock gating
-> > driver.
-> > 
-> > This patch is based on pre-v3.14-rc1 mainline and should go in as
-> > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> > I suggest Jason picks it up as a topic branch.
-> 
-> Sebastian,
-> 
-> These patches look OK to me. I'd rather take Gregory Clement's "respect
-> the clock dependencies in of_clk_init" patch towards 3.15, so this fix
-> will still be necessary for the current -rc's.
-> 
-> Jason, will you be sending a PR?
+On Tue, Feb 4, 2014 at 12:00 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Feb 04, 2014 at 11:09:03AM -0800, Bjorn Andersson wrote:
+>
+>> I have a regulator that's being configured from DT as:
+>> regulator-min-microvolt = <2950000>;
+>> regulator-max-microvolt = <2950000>;
+>
+>> In the consumer I do regulator_set_voltage(2.95V).
+>
+>> As min == max the voltage is applied by the regulator framework on registration
+>> of the regulator; and the regulator_set_voltage() fails as
+>> REGULATOR_CHANGE_VOLTAGE is not set for this regulator.
+>
+> So we should be changing the code to allow a set_voltage() that sets the
+> voltage to the existing voltage regardless of constraints allowing a
+> change then - that's what the underlying issue is.  Your change wouldn't
+> cover the case where the hardware defualt is being used for example.
 
-Ahh, just saw this now.  ignore my previous comments about using
-Gregory's series as the fix.
+Makes sense, but the only thing we could check for would be if min_uV
+== max_uV == current-voltage. That would work out fine for this use
+case, but do you think it would be good enough?
 
-Sure, I'll put this together for a pr to the clk tree.
+The best thing I've come up with then is to add the following check in
+regulator_set_voltage().
 
-thx,
+if (min_uV == max_uV && _regulator_get_voltage(rdev) == min_uV)
+    goto out;
 
-Jason.
+Would this be acceptable? It's achieving the same thing as my patch,
+is more robust and covers the case of setting the voltage to the hw
+default value.
 
-> > The patches have been boot tested on Dove and compile-tested only
-> > for Kirkwood, Armada 370 and XP.
-> > 
-> > Sebastian Hesselbarth (4):
-> >   clk: mvebu: armada-370: maintain clock init order
-> >   clk: mvebu: armada-xp: maintain clock init order
-> >   clk: mvebu: dove: maintain clock init order
-> >   clk: mvebu: kirkwood: maintain clock init order
-> > 
-> >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
-> >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
-> >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
-> >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
-> >  4 files changed, 44 insertions(+), 50 deletions(-)
-> > 
-> > ---
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > -- 
-> > 1.8.5.2
-> > 
+Regards,
+Bjorn
