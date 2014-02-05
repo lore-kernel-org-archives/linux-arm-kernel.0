@@ -1,40 +1,257 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 05 Feb 2014 14:31:09 +0100
-Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <20140205111814.GF22609@sirena.org.uk>
-References: <cover.1391274627.git.moinejf@free.fr>
- <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
- <20140204180625.GM22609@sirena.org.uk> <20140205101134.4591e5c3@armhf>
- <52F2021A.9020804@metafoo.de> <20140205111814.GF22609@sirena.org.uk>
-Message-ID: <52F23D1D.7040804@metafoo.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  5 Feb 2014 13:30:44 +0000
+Subject: [PATCH 12/18] KVM: ARM: introduce vgic_params structure
+In-Reply-To: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391607050-540-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 12:18 PM, Mark Brown wrote:
-> On Wed, Feb 05, 2014 at 10:19:22AM +0100, Lars-Peter Clausen wrote:
-[..]
->> Bonus points for making this a generic helper function that takes a
->> runtime and a EDID and then applies the EDID constraints on the
->> runtime.
->
-> ...as previously requested.  I know there was some discusion of broader
-> moves to factor this stuff out but it'd still be good to keep it
-> separated out even prior to a final non-EDID based solution so it's
-> easier to refactor.
+Move all the data specific to a given GIC implementation into its own
+little structure.
 
-I think it will always be EDID (or ELD) based. As I understood it the 
-re-factoring Takashi was talking about is related to how this data is passed 
-from the graphics driver to the audio driver. The way things work right now 
-in HDA land is that the graphics driver reads the EDID from the monitor, 
-converts it to ELD and writes it to a special memory region in the graphics 
-controller. This generates an interrupt in the audio driver and the audio 
-driver reads the ELD from the hardware and sets up the constraints based on 
-that. And I think that the plan is to change this to pass the EDID directly 
-from the graphics driver to the audio driver without taking the detour 
-through the hardware. This is what we'll need for embedded systems anyway. A 
-system that allows to associate a sound driver with a specific HDMI port and 
-status updates for that port, e.g. new EDID or cable connected/disconnected 
-are passed from the graphics driver handling that port to the audio driver.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h | 11 +++++++++
+ virt/kvm/arm/vgic.c    | 66 +++++++++++++++++++++-----------------------------
+ 2 files changed, 39 insertions(+), 38 deletions(-)
 
-- Lars
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 46a42b1..48dbca1 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -101,6 +101,17 @@ struct vgic_ops {
+ 	void	(*enable)(struct kvm_vcpu *vcpu);
+ };
+ 
++struct vgic_params {
++	/* Physical address of vgic virtual cpu interface */
++	phys_addr_t	vcpu_base;
++	/* Number of list registers */
++	u32		nr_lr;
++	/* Interrupt number */
++	unsigned int	maint_irq;
++	/* Virtual control interface base address */
++	void __iomem	*vctrl_base;
++};
++
+ struct vgic_dist {
+ #ifdef CONFIG_KVM_ARM_VGIC
+ 	spinlock_t		lock;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index a6d70fc..c22afce 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -76,14 +76,6 @@
+ #define IMPLEMENTER_ARM		0x43b
+ #define GICC_ARCH_VERSION_V2	0x2
+ 
+-/* Physical address of vgic virtual cpu interface */
+-static phys_addr_t vgic_vcpu_base;
+-
+-/* Virtual control interface base address */
+-static void __iomem *vgic_vctrl_base;
+-
+-static struct device_node *vgic_node;
+-
+ #define ACCESS_READ_VALUE	(1 << 0)
+ #define ACCESS_READ_RAZ		(0 << 0)
+ #define ACCESS_READ_MASK(x)	((x) & (1 << 0))
+@@ -103,8 +95,7 @@ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+ static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 
+-static u32 vgic_nr_lr;
+-static unsigned int vgic_maint_irq;
++static struct vgic_params vgic;
+ 
+ static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+ 				int cpuid, u32 offset)
+@@ -1183,7 +1174,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	int lr;
+ 
+-	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
++	for_each_set_bit(lr, vgic_cpu->lr_used, vgic.nr_lr) {
+ 		struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
+ 
+ 		if (!vgic_irq_is_enabled(vcpu, vlr.irq)) {
+@@ -1227,8 +1218,8 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 
+ 	/* Try to use another LR for this interrupt */
+ 	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
+-			       vgic_cpu->nr_lr);
+-	if (lr >= vgic_cpu->nr_lr)
++			       vgic.nr_lr);
++	if (lr >= vgic.nr_lr)
+ 		return false;
+ 
+ 	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
+@@ -1354,7 +1345,6 @@ epilog:
+ 
+ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	u32 status = vgic_get_interrupt_status(vcpu);
+ 	bool level_pending = false;
+ 
+@@ -1369,8 +1359,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		unsigned long *eisr_ptr = (unsigned long *)&eisr;
+ 		int lr;
+ 
+-		for_each_set_bit(lr, eisr_ptr, vgic_cpu->nr_lr) {
+-				 vgic_cpu->nr_lr) {
++		for_each_set_bit(lr, eisr_ptr, vgic.nr_lr) {
+ 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
+ 
+ 			vgic_irq_clear_active(vcpu, vlr.irq);
+@@ -1409,7 +1398,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	level_pending = vgic_process_maintenance(vcpu);
+ 
+ 	/* Clear mappings for empty LRs */
+-	for_each_set_bit(lr, elrsr_ptr, vgic_cpu->nr_lr) {
++	for_each_set_bit(lr, elrsr_ptr, vgic.nr_lr) {
+ 		struct vgic_lr vlr;
+ 
+ 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
+@@ -1422,8 +1411,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* Check if we still have something up our sleeve... */
+-	pending = find_first_zero_bit(elrsr_ptr, vgic_cpu->nr_lr);
+-	if (level_pending || pending < vgic_cpu->nr_lr)
++	pending = find_first_zero_bit(elrsr_ptr, vgic.nr_lr);
++	if (level_pending || pending < vgic.nr_lr)
+ 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+ }
+ 
+@@ -1612,7 +1601,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
+ 	}
+ 
+-	vgic_cpu->nr_lr = vgic_nr_lr;
++	vgic_cpu->nr_lr = vgic.nr_lr;
+ 
+ 	vgic_enable(vcpu);
+ 
+@@ -1621,7 +1610,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 
+ static void vgic_init_maintenance_interrupt(void *info)
+ {
+-	enable_percpu_irq(vgic_maint_irq, 0);
++	enable_percpu_irq(vgic.maint_irq, 0);
+ }
+ 
+ static int vgic_cpu_notify(struct notifier_block *self,
+@@ -1634,7 +1623,7 @@ static int vgic_cpu_notify(struct notifier_block *self,
+ 		break;
+ 	case CPU_DYING:
+ 	case CPU_DYING_FROZEN:
+-		disable_percpu_irq(vgic_maint_irq);
++		disable_percpu_irq(vgic.maint_irq);
+ 		break;
+ 	}
+ 
+@@ -1650,6 +1639,7 @@ int kvm_vgic_hyp_init(void)
+ 	int ret;
+ 	struct resource vctrl_res;
+ 	struct resource vcpu_res;
++	struct device_node *vgic_node;
+ 
+ 	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
+ 	if (!vgic_node) {
+@@ -1657,17 +1647,17 @@ int kvm_vgic_hyp_init(void)
+ 		return -ENODEV;
+ 	}
+ 
+-	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
+-	if (!vgic_maint_irq) {
++	vgic.maint_irq = irq_of_parse_and_map(vgic_node, 0);
++	if (!vgic.maint_irq) {
+ 		kvm_err("error getting vgic maintenance irq from DT\n");
+ 		ret = -ENXIO;
+ 		goto out;
+ 	}
+ 
+-	ret = request_percpu_irq(vgic_maint_irq, vgic_maintenance_handler,
++	ret = request_percpu_irq(vgic.maint_irq, vgic_maintenance_handler,
+ 				 "vgic", kvm_get_running_vcpus());
+ 	if (ret) {
+-		kvm_err("Cannot register interrupt %d\n", vgic_maint_irq);
++		kvm_err("Cannot register interrupt %d\n", vgic.maint_irq);
+ 		goto out;
+ 	}
+ 
+@@ -1683,18 +1673,18 @@ int kvm_vgic_hyp_init(void)
+ 		goto out_free_irq;
+ 	}
+ 
+-	vgic_vctrl_base = of_iomap(vgic_node, 2);
+-	if (!vgic_vctrl_base) {
++	vgic.vctrl_base = of_iomap(vgic_node, 2);
++	if (!vgic.vctrl_base) {
+ 		kvm_err("Cannot ioremap VCTRL\n");
+ 		ret = -ENOMEM;
+ 		goto out_free_irq;
+ 	}
+ 
+-	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
+-	vgic_nr_lr = (vgic_nr_lr & 0x3f) + 1;
++	vgic.nr_lr = readl_relaxed(vgic.vctrl_base + GICH_VTR);
++	vgic.nr_lr = (vgic.nr_lr & 0x3f) + 1;
+ 
+-	ret = create_hyp_io_mappings(vgic_vctrl_base,
+-				     vgic_vctrl_base + resource_size(&vctrl_res),
++	ret = create_hyp_io_mappings(vgic.vctrl_base,
++				     vgic.vctrl_base + resource_size(&vctrl_res),
+ 				     vctrl_res.start);
+ 	if (ret) {
+ 		kvm_err("Cannot map VCTRL into hyp\n");
+@@ -1702,7 +1692,7 @@ int kvm_vgic_hyp_init(void)
+ 	}
+ 
+ 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+-		 vctrl_res.start, vgic_maint_irq);
++		 vctrl_res.start, vgic.maint_irq);
+ 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+ 
+ 	if (of_address_to_resource(vgic_node, 3, &vcpu_res)) {
+@@ -1710,14 +1700,14 @@ int kvm_vgic_hyp_init(void)
+ 		ret = -ENXIO;
+ 		goto out_unmap;
+ 	}
+-	vgic_vcpu_base = vcpu_res.start;
++	vgic.vcpu_base = vcpu_res.start;
+ 
+ 	goto out;
+ 
+ out_unmap:
+-	iounmap(vgic_vctrl_base);
++	iounmap(vgic.vctrl_base);
+ out_free_irq:
+-	free_percpu_irq(vgic_maint_irq, kvm_get_running_vcpus());
++	free_percpu_irq(vgic.maint_irq, kvm_get_running_vcpus());
+ out:
+ 	of_node_put(vgic_node);
+ 	return ret;
+@@ -1752,7 +1742,7 @@ int kvm_vgic_init(struct kvm *kvm)
+ 	}
+ 
+ 	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+-				    vgic_vcpu_base, KVM_VGIC_V2_CPU_SIZE);
++				    vgic.vcpu_base, KVM_VGIC_V2_CPU_SIZE);
+ 	if (ret) {
+ 		kvm_err("Unable to remap VGIC CPU to VCPU\n");
+ 		goto out;
+@@ -1798,7 +1788,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	}
+ 
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+-	kvm->arch.vgic.vctrl_base = vgic_vctrl_base;
++	kvm->arch.vgic.vctrl_base = vgic.vctrl_base;
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 
+-- 
+1.8.3.4
