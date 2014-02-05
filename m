@@ -1,43 +1,74 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed,  5 Feb 2014 17:03:53 +0000
-Subject: [PATCH 02/22] arm: add new asm macro update_sctlr
+Date: Wed,  5 Feb 2014 17:03:55 +0000
+Subject: [PATCH 04/22] efi-stub.txt updates for ARM
 In-Reply-To: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
 References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1391619853-10601-3-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1391619853-10601-5-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new macro for setting/clearing bits in the SCTLR.
+From: Roy Franz <roy.franz@linaro.org>
 
+Update efi-stub.txt documentation to be more general
+and not x86 specific.  Add ARM only "dtb=" command
+line option description.
+
+Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- arch/arm/include/asm/assembler.h |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ Documentation/efi-stub.txt |   27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 5c22851..e8ca24b 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -383,4 +383,18 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
+diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+index c628788..26be7b0 100644
+--- a/Documentation/efi-stub.txt
++++ b/Documentation/efi-stub.txt
+@@ -1,13 +1,16 @@
+ 			  The EFI Boot Stub
+ 		     ---------------------------
  
-+#ifdef CONFIG_CPU_CP15
-+/* Macro for setting/clearing bits in sctlr */
-+	.macro	update_sctlr, tmp:req, set=, clear=
-+	mrc	p15, 0, \tmp, c1, c0, 0
-+	.ifnc	\set,
-+	orr	\tmp, \set
-+	.endif
-+	.ifnc	\clear,
-+	bic	\tmp, \tmp, \clear
-+	.endif
-+	mcr	p15, 0, \tmp, c1, c0, 0
-+	.endm
-+#endif
+-On the x86 platform, a bzImage can masquerade as a PE/COFF image,
+-thereby convincing EFI firmware loaders to load it as an EFI
+-executable. The code that modifies the bzImage header, along with the
+-EFI-specific entry point that the firmware loader jumps to are
+-collectively known as the "EFI boot stub", and live in
++On the x86 and ARM platforms, a kernel zImage/bzImage can masquerade
++as a PE/COFF image, thereby convincing EFI firmware loaders to load
++it as an EFI executable. The code that modifies the bzImage header,
++along with the EFI-specific entry point that the firmware loader
++jumps to are collectively known as the "EFI boot stub", and live in
+ arch/x86/boot/header.S and arch/x86/boot/compressed/eboot.c,
+-respectively.
++respectively. For ARM the EFI stub is implemented in
++arch/arm/boot/compressed/efi-header.S and
++arch/arm/boot/compressed/efi-stub.c. EFI stub code that is shared
++between architectures is in drivers/firmware/efi/efi-stub-helper.c.
+ 
+ By using the EFI boot stub it's possible to boot a Linux kernel
+ without the use of a conventional EFI boot loader, such as grub or
+@@ -23,7 +26,9 @@ The bzImage located in arch/x86/boot/bzImage must be copied to the EFI
+ System Partition (ESP) and renamed with the extension ".efi". Without
+ the extension the EFI firmware loader will refuse to execute it. It's
+ not possible to execute bzImage.efi from the usual Linux file systems
+-because EFI firmware doesn't have support for them.
++because EFI firmware doesn't have support for them. For ARM the
++arch/arm/boot/zImage should be copied to the system partition, and it
++may not need to be renamed.
+ 
+ 
+ **** Passing kernel parameters from the EFI shell
+@@ -63,3 +68,11 @@ Notice how bzImage.efi can be specified with a relative path. That's
+ because the image we're executing is interpreted by the EFI shell,
+ which understands relative paths, whereas the rest of the command line
+ is passed to bzImage.efi.
 +
- #endif /* __ASM_ASSEMBLER_H__ */
++
++**** The "dtb=" option
++
++For the ARM architecture, we also need to be able to provide a device
++tree to the kernel. This is done with the "dtb=" command line option,
++and is processed in the same manner as the "initrd=" option that is
++described above.
 -- 
 1.7.10.4
