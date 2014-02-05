@@ -1,34 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Feb 2014 14:55:19 +0000
-Subject: [PATCH] arm64: fix early_io_map for 64K pages
-In-Reply-To: <20140205145250.GC28140@mudshark.cambridge.arm.com>
-References: <1391611829-7824-1-git-send-email-robherring2@gmail.com>
- <20140205145250.GC28140@mudshark.cambridge.arm.com>
-Message-ID: <20140205145519.GJ7550@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed,  5 Feb 2014 15:56:37 +0100
+Subject: [PATCH] ARM: zynq: Move of_clk_init from clock driver
+Message-ID: <572af6e4eaaaa1c74ea62364f8fa7ac5834cc754.1391612175.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 02:52:51PM +0000, Will Deacon wrote:
-> On Wed, Feb 05, 2014 at 02:50:29PM +0000, Rob Herring wrote:
-> > From: Rob Herring <robh@kernel.org>
-> > 
-> > earlyprintk is broken with 64KB pages. The problem is pgprot_default
-> > is not yet initialized when early_io_map is called, so the pte does not
-> > get marked as valid. Set the necessary page and access permission bits.
-> > 
-> > Cc: Mark Salter <msalter@redhat.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> 
-> I thought we fixed this in 4ce00dfcf19c by reverting the use of
-> pgprot_default?
+Move of_clk_init() from clock driver to enable
+options not to use zynq clock driver.
+Use for example fixed clock setting.
 
-Indeed. We still need to fix the ioremap_cache() case where the
-shareability isn't set but I haven't yet decided what we do for
-SMP-on-UP in arm64 (if we always assume SMP, I would just get rid of
-pgprot_default entirely).
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
--- 
-Catalin
+Based on http://www.spinics.net/lists/arm-kernel/msg298287.html
+series
+
+---
+ arch/arm/mach-zynq/common.c | 1 +
+ drivers/clk/zynq/clkc.c     | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 93ea19b..8df35f3 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -68,6 +68,7 @@ static void __init zynq_timer_init(void)
+ 	zynq_early_slcr_init();
+
+ 	zynq_clock_init();
++	of_clk_init(NULL);
+ 	clocksource_of_init();
+ }
+
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 03052d6..c812b93 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -602,8 +602,6 @@ void __init zynq_clock_init(void)
+ 	of_node_put(slcr);
+ 	of_node_put(np);
+
+-	of_clk_init(NULL);
+-
+ 	return;
+
+ np_err:
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/55aa2bd7/attachment.sig>
