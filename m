@@ -1,65 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 05 Feb 2014 06:08:02 -0800
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140205140802.9977.19747@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Feb 2014 14:08:08 +0000
+Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
+ parameters from EDID
+In-Reply-To: <52F23D1D.7040804@metafoo.de>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
+ <20140204180625.GM22609@sirena.org.uk>
+ <20140205101134.4591e5c3@armhf> <52F2021A.9020804@metafoo.de>
+ <20140205111814.GF22609@sirena.org.uk>
+ <52F23D1D.7040804@metafoo.de>
+Message-ID: <20140205140808.GI22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2014-01-25 10:19:06)
-> This patch set fixes clk init order that went upside-down with
-> v3.14. I haven't really investigated what caused this, but I assume
-> it is related with DT node reordering by addresses.
-> 
-> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> registered before core clocks driver. Unfortunately, we cannot
-> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> init order for our drivers is always core clocks before clock gating,
-> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> init function that will register core clocks before clock gating
-> driver.
-> 
-> This patch is based on pre-v3.14-rc1 mainline and should go in as
-> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> I suggest Jason picks it up as a topic branch.
+On Wed, Feb 05, 2014 at 02:31:09PM +0100, Lars-Peter Clausen wrote:
+> On 02/05/2014 12:18 PM, Mark Brown wrote:
 
-Sebastian,
+> >...as previously requested.  I know there was some discusion of broader
+> >moves to factor this stuff out but it'd still be good to keep it
+> >separated out even prior to a final non-EDID based solution so it's
+> >easier to refactor.
 
-These patches look OK to me. I'd rather take Gregory Clement's "respect
-the clock dependencies in of_clk_init" patch towards 3.15, so this fix
-will still be necessary for the current -rc's.
+> I think it will always be EDID (or ELD) based. As I understood it
+> the re-factoring Takashi was talking about is related to how this
+> data is passed from the graphics driver to the audio driver. The way
 
-Jason, will you be sending a PR?
-
-Thanks,
-Mike
-
-> 
-> The patches have been boot tested on Dove and compile-tested only
-> for Kirkwood, Armada 370 and XP.
-> 
-> Sebastian Hesselbarth (4):
->   clk: mvebu: armada-370: maintain clock init order
->   clk: mvebu: armada-xp: maintain clock init order
->   clk: mvebu: dove: maintain clock init order
->   clk: mvebu: kirkwood: maintain clock init order
-> 
->  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
->  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
->  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
->  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
->  4 files changed, 44 insertions(+), 50 deletions(-)
-> 
-> ---
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> -- 
-> 1.8.5.2
-> 
+Right, the data of course has to come from there originally, it's about
+how we pass the data and updates to it around.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/5244a05d/attachment.sig>
