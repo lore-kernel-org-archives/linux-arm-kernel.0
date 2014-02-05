@@ -1,17 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Feb 2014 10:17:14 -0700
-Subject: [PATCH] ARM: tegra: document which Dalmore revisions are supported
-In-Reply-To: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
-References: <1389035749-15261-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <52F2721A.3020100@wwwdotorg.org>
+Date: Wed, 05 Feb 2014 10:17:52 -0700
+Subject: [PATCH] ARM: tegra: add system-power-controller property for
+ PMIC node
+In-Reply-To: <1389265308-26405-1-git-send-email-ldewangan@nvidia.com>
+References: <1389265308-26405-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <52F27240.7000201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2014 12:15 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> There are a number of revisions of the Dalmore board, each with a variety
-> of incompatible SW-visible HW changes. The Dalmore DT file in the kernel
-> only supports HW revision A04. Document this in the DT file.
+On 01/09/2014 04:01 AM, Laxman Dewangan wrote:
+> Add system-power-controller property to system PMIC, ams AS3722,
+> node to enable power off functionality through PMIC.
 
 Applied to Tegra's for-3.15/dt branch.
