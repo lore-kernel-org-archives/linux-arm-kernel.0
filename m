@@ -1,44 +1,68 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 5 Feb 2014 19:41:15 +0530
-Subject: [PATCH V5 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <52F23887.9060209@ti.com>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
- <52D7B2CA.8080902@ti.com> <52EF7D85.5070705@ti.com>
- <alpine.DEB.2.02.1402041713470.24986@ionos.tec.linutronix.de>
- <52F23887.9060209@ti.com>
-Message-ID: <52F24683.9060200@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 5 Feb 2014 08:12:28 -0600
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
+ device tree boot
+In-Reply-To: <52F2465A.6060804@ti.com>
+References: <1390260542-22213-1-git-send-email-nm@ti.com>
+ <52F0E098.3050404@ti.com> <52F104B7.6040606@ti.com> <52F2465A.6060804@ti.com>
+Message-ID: <52F246CC.6070600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On Wednesday 05 February 2014 06:41 PM, Sricharan R wrote:
-> On Tuesday 04 February 2014 09:44 PM, Thomas Gleixner wrote:
->> On Mon, 3 Feb 2014, Sricharan R wrote:
->>>> I already have your reviewed-by tag for the first patch in this series.
+On Wed 05 Feb 2014 08:10:34 AM CST, Balaji T K wrote:
+> On Tuesday 04 February 2014 08:48 PM, Nishanth Menon wrote:
+>> On 02/04/2014 06:44 AM, Balaji T K wrote:
+>>> On Tuesday 21 January 2014 04:59 AM, Nishanth Menon wrote:
+>>>> When device is booted using devicetree, platforms impacted by
+>>>> Erratum 2.1.1.128 is not detected easily in the mmc driver. This erratum
+>>>> indicates that the module cannot do multi-block transfers.
 >>>>
->>>> Kevin was pointing out that irqchip maintainer tag is needed for this patch as well
->>>> to be merged. We are planning to take this series through arm-soc tree.
+>>>> Handle this by providing a boolean flag to indicate to driver that it is
+>>>> working on a hardware with mentioned limitation.
 >>>>
->>>> Can i please have your tag for this patch as well ?
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> ---
+>>>>
+>>>> This explains the logs I see:
+>>>> OMAP3430 LDP (ES2.2):
+>>>> 	uImage only boot:  http://slexy.org/raw/s2YrbMAi7c
+>>>> 	uImage+dtb concatenated boot: http://slexy.org/raw/s20qVg17T0
+>>>>
+>>>> With the following flag set, device is now able to consistently boot with
+>>>> device tree supported uImage+dtb concat boot.
+>>>>
+>>>>    .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
+>>>>    drivers/mmc/host/omap_hsmmc.c                      |    3 +++
+>>>>    2 files changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>>> index 8c8908a..ab36f8b 100644
+>>>> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>>> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>>> @@ -26,6 +26,8 @@ specifier is required.
+>>>>    dma-names: List of DMA request names. These strings correspond
+>>>>    1:1 with the DMA specifiers listed in dmas. The string naming is
+>>>>    to be "rx" and "tx" for RX and TX DMA requests, respectively.
+>>>> +ti,erratum-2.1.1.128: boolean, for OMAP3430/OMAP35xx platforms with broken
+>>>> +multiblock reads
+>>>
+>>> Rather than ti,errata.. specific property, something like
+>>> caps no/disable multiblock read is more readable in my opinion, Otherwise
 >>
->> Acked-by-me
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> Thanks Thomas.
-> 
-> Kevin,
->     I will re-send a branch based on rc1 for this.
-> 
+>> Is'nt the better definition to state i have quirk X and allow the
+>> driver to do the necessary thing/things needed to handle quirk X? in
+>> this case, there is just one thing to do: broken multi_block_read, in
+>> the case of other quirks, there might be more than 1 thing to do.. let
+>> driver figure that out, dts just states the h/w capabilty or in this
+>> case, the quirk capability.
+>>
+>
+> But in this case there is only one. disable multi block read is more readable
+> than the errata reference, No strong feelings though.
 
-I have pushed a branch based on mainline,
-   git://github.com/Sricharanti/sricharan.git
-   branch: crossbar_3.14_rc1
+Considering this might set an precedence for other quirk description, 
+I'd like to leave it as it stands.
 
+--
 Regards,
- Sricharan
+Nishanth Menon
