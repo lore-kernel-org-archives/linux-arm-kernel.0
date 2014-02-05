@@ -1,85 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 05 Feb 2014 14:38:44 +0100
-Subject: [PATCH 10/18] mfd: max14577: Add detection of device type
-In-Reply-To: <20140203095541.GK13529@lee--X1>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-11-git-send-email-k.kozlowski@samsung.com>
- <20140203095541.GK13529@lee--X1>
-Message-ID: <1391607524.3726.23.camel@AMDC1943>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Feb 2014 13:39:56 +0000
+Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
+In-Reply-To: <1391605494.2538.68.camel@joe-AO722>
+References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
+ <1391483274-20331-2-git-send-email-sujith@msujith.org>
+ <1391484878.2538.11.camel@joe-AO722>
+ <21232.24855.201543.400943@gargle.gargle.HOWL>
+ <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
+ <1391531796.2538.21.camel@joe-AO722>
+ <20140205115035.GO26684@n2100.arm.linux.org.uk>
+ <1391603566.2538.63.camel@joe-AO722>
+ <20140205124127.GP26684@n2100.arm.linux.org.uk>
+ <1391605494.2538.68.camel@joe-AO722>
+Message-ID: <20140205133956.GQ26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-03 at 09:55 +0000, Lee Jones wrote:
-> > This patch continues the preparation for adding support for max77836
-> > device to existing max14577 driver.
+On Wed, Feb 05, 2014 at 05:04:54AM -0800, Joe Perches wrote:
+> On Wed, 2014-02-05 at 12:41 +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 05, 2014 at 04:32:46AM -0800, Joe Perches wrote:
+> > > Apparently, people just convert stupidly large udelay()s
+> > > to mdelay and not be bothered.
 > > 
-> > Add enum for types of devices supported by this driver. The device type
-> > will be detected by matching of_device_id, or i2c_device_id as a
-> > fallback.
+> > And that's the correct answer.  Having udelay(10000) rather than mdelay(10)
+> > is a sign that they weren't paying that much attention when writing the
+> > code.
+> 
+> Not really.
+> 
+> Look at the code that brought this up in the first place.
+> 
+> On Tue, 2014-02-04 at 08:37 +0530, Sujith Manoharan wrote:
+> > From: Sujith Manoharan <c_manoha@qca.qualcomm.com>
 > > 
-> > The patch also moves to separate function the code related to displaying
-> > DeviceID register values.
+> > Use mdelay instead of udelay to fix this error:
 > > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  drivers/mfd/max14577.c               |   61 +++++++++++++++++++++++-----------
-> >  include/linux/mfd/max14577-private.h |   12 ++++---
-> >  2 files changed, 50 insertions(+), 23 deletions(-)
+> > ERROR: "__bad_udelay" [drivers/net/wireless/ath/ath9k/ath9k_hw.ko] undefined!
+> []
+> diff --git a/drivers/net/wireless/ath/ath9k/hw.c b/drivers/net/wireless/ath/ath9k/hw.c
+> []
+> > @@ -1316,7 +1316,7 @@ static bool ath9k_hw_set_reset(struct ath_hw *ah, int type)
+> >  	if (AR_SREV_9300_20_OR_LATER(ah))
+> >  		udelay(50);
+> >  	else if (AR_SREV_9100(ah))
+> > -		udelay(10000);
+> > +		mdelay(10);
+> >  	else
+> >  		udelay(100);
+> >  
 > > 
-> > diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
-> > index 1d8104213b3e..224aba8c5b3f 100644
-> > --- a/drivers/mfd/max14577.c
-> > +++ b/drivers/mfd/max14577.c
-> > @@ -20,6 +20,7 @@
+> > >     if (AR_SREV_9300_20_OR_LATER(ah))
+> > >             udelay(50);
+> > >     else if (AR_SREV_9100(ah))
+> > > -           udelay(10000);
+> > > +           mdelay(10);
+> > >     else
+> > >             udelay(100);
 > 
-> <snip>
+> One chip needs a larger delay than the others.
 > 
-> > +static void max14577_print_dev_type(struct maxim_core *maxim_core)
-> > +{
-> > +	u8 reg_data, vendor_id, device_id;
-> > +	int ret = max14577_read_reg(maxim_core->regmap_muic,
-> > +			MAXIM_MUIC_REG_DEVICEID, &reg_data);
-> 
-> I'm not a big fan of declaring variables whilst feeding them with
-> function return values. Can you separate the two please?
+> It's not so much not paying attention as not
+> knowing ARM is broken for large udelay().
 
-Sure.
+And now read my suggestion about how to avoid the "not knowing" problem. :)
 
-> 
-> > +	if (ret) {
-> > +		dev_err(maxim_core->dev, "Failed to read DEVICEID
-> > register: %d\n",
-> 
-> I think this is too many chars.
-
-OK.
-
-> 
-> > +				ret);
-> > +		return;
-> > +	}
-> > +
-> 
-> <snip>
-> 
-> > -	ret = max14577_read_reg(maxim_core->regmap_muic,
-> > -			MAXIM_MUIC_REG_DEVICEID, &reg_data);
-> > -	if (ret) {
-> > -		dev_err(maxim_core->dev, "Device not found on this channel: %d\n",
-> > -				ret);
-> > -		return ret;
-> > +	if (np) {
-> > +		const struct of_device_id *of_id =
-> > +			of_match_device(max14577_dt_match, &i2c->dev);
-> 
-> Again this is a bit messy. Bring it down onto a separate line.
-
-OK.
-
-I'll send fixed version after grabbing more ACK-s for previous
-rename-patches (this patch depends on them).
-
-Best regards,
-Krzysztof
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
