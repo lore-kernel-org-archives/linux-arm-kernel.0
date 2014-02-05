@@ -1,18 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Feb 2014 11:49:02 -0700
-Subject: [PATCH v3 0/6] efuse driver for Tegra
-In-Reply-To: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <52F2879E.3040700@wwwdotorg.org>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 5 Feb 2014 20:52:37 +0200
+Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
+ timer
+In-Reply-To: <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
+References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>	<1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>	<CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>	<52F26444.5090707@ti.com>
+ <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
+Message-ID: <52F28875.9000200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2014 04:36 PM, Peter De Schrijver wrote:
-> This driver allows userspace to read the raw efuse data. Its userspace
-> interface is modelled after the sunxi_sid driver which provides similar
-> functionality for some Allwinner SoCs. It has been tested on
-> Tegra20 (ventana), Tegra30 (beaverboard) and Tegra114 (dalmore).
 
-I think this series should have been CC'd to Greg and Arnd, since
-they're listed in MAINTAINERS for drivers/misc/. I'll need their ack to
-apply these patches to the Tegra tree.
+On 02/05/2014 07:41 PM, Rob Herring wrote:
+> On Wed, Feb 5, 2014 at 10:18 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+>> On 02/05/2014 04:39 PM, Rob Herring wrote:
+>>> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> wrote:
+>>>> This patch provides bindings for the 64-bit timer in the KeyStone
+>>>> architecture devices. The timer can be configured as a general-purpose
+>>>> 64-bit
+>>>> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
+>>>> timers, each half can operate in conjunction (chain mode) or
+>>>> independently
+>>>> (unchained mode) of each other.
+>>> This is software configurable or h/w design time configurations?
+>>>
+>>> Rob
+>>>
+>> This is h/w design time configurations
+> Then it seems like the binding should provide for describing those
+> differences either with a property or different compatible strings.
+>
+> Rob
+Oh..sorry, seems I didn't catch, this is configurable by software.
+These configurations are like modes in which timer can work
+and they are not different hardware IPs. It depends on driver in
+which mode it should work.
+
+-- 
+Regards,
+Ivan Khoronzhuk
