@@ -1,86 +1,85 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Feb 2014 14:07:36 +0100
-Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
-In-Reply-To: <52F23166.1030609@codethink.co.uk>
-References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
- <52F226A0.5070301@codethink.co.uk> <52F23166.1030609@codethink.co.uk>
-Message-ID: <2298259.CqC51XrMZM@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  5 Feb 2014 14:05:04 +0100
+Subject: [PATCH v4 2/5] ARM: sun6i: dt: Add PLL6 and SPI module clocks
+In-Reply-To: <1391605507-30981-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391605507-30981-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391605507-30981-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+The module clocks in the A31 are still compatible with the A10 one. Add the SPI
+module clocks and the PLL6 in the device tree to allow their use by the SPI
+controllers.
 
-On Wednesday 05 February 2014 12:41:10 Ben Dooks wrote:
-> On 05/02/14 11:55, Ben Dooks wrote:
-> > On 05/02/14 10:56, Laurent Pinchart wrote:
-> >> On Tuesday 04 February 2014 18:17:36 William Towle wrote:
-> >>> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
-> >>> but not with values found in the device itself (which are also the
-> >>> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
-> >>> 
-> >>> Update the clk-rcar-gen2.c driver to have the same table as the one
-> >>> used by the mach-shmobile driver which work once further issues are
-> >>> fixed in the clk-rcar-gen2.c driver.
-> >>> 
-> >>> Part of the fix for the following error where the driver reports the
-> >>> 
-> >>> output as 1MHz but is really 97.5MHz:
-> >>>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1
-> >>> MHz
-> >>> 
-> >>> [ben.dooks at codethink.co.uk: updated patch description]
-> >>> Signed-off-by: William Towle <william.towle@codethink.co.uk>
-> >>> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> >>> ---
-> >>> 
-> >>>   drivers/clk/shmobile/clk-rcar-gen2.c |    2 ++
-> >>>   1 file changed, 2 insertions(+)
-> >>> 
-> >>> diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c
-> >>> b/drivers/clk/shmobile/clk-rcar-gen2.c index a59ec21..df4a1e6 100644
-> >>> --- a/drivers/clk/shmobile/clk-rcar-gen2.c
-> >>> +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
-> >>> @@ -170,6 +170,8 @@ static const struct clk_div_table
-> >>> cpg_sdh_div_table[] =
-> >>> { };
-> >>> 
-> >>>   static const struct clk_div_table cpg_sd01_div_table[] = {
-> >>> 
-> >>> +    {  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
-> >>> +    {  4,  8 },
-> >>> 
-> >>>       {  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
-> >>>       { 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
-> >> 
-> >> With this applied the only difference between the sdh and sd0/1 dividers
-> >> tables would be the { 12, 10 } entry, available for sd0/1 only. Given
-> >> that the hardware does not match the documentation, could you check
-> >> whether that entry is supported by sdh as well ? If so we could merge the
-> >> two tables. Otherwise this patch looks good, could you please just
-> >> reformat the table to avoid the mostly empty line in the middle ?
-> > 
-> > I would like feedback from Renesas on this issue if possible. I can
-> > have a quick try at setting the clock value to 10 in u-boot and scope
-> > it out and see what happens.
-> > 
-> > Magnus or Morimoto-san, is there a chance this could be reviewed by
-> > someone in Renesas who has knowledge of the hardware block?
-> > 
-> > [PS, added Kuninori Morimoto to this[
-> 
-> I got William to do a quick test with the following u-boot command
-> 	mw.l 0xE6150074 0xCCC
-> 
-> sdhi0 showed 156MHz output, and it seemed to work. So there is a
-> distinct possibility that the sdh clock also supports setting 12
-> for a /10
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 46 ++++++++++++++++++++++++++++++++--------
+ 1 file changed, 37 insertions(+), 9 deletions(-)
 
-Thank you for trying it out. I'd like feedback from Renesas as well, assuming 
-we don't get a "don't do that or it will cause the universe to collapse - 
-woops, too late" nack, let's respin this patch and merge the two tables 
-instead.
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 092bf97..93d7bb6 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -83,16 +83,12 @@
+ 			clocks = <&osc24M>;
+ 		};
+ 
+-		/*
+-		 * This is a dummy clock, to be used as placeholder on
+-		 * other mux clocks when a specific parent clock is not
+-		 * yet implemented. It should be dropped when the driver
+-		 * is complete.
+-		 */
+-		pll6: pll6 {
++		pll6: clk at 01c20028 {
+ 			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <0>;
++			compatible = "allwinner,sun6i-a31-pll6-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll6";
+ 		};
+ 
+ 		cpu: cpu at 01c20050 {
+@@ -192,6 +188,38 @@
+ 					"apb2_uart1", "apb2_uart2", "apb2_uart3",
+ 					"apb2_uart4", "apb2_uart5";
+ 		};
++
++		spi0_clk: clk at 01c200a0 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a0 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "spi0";
++		};
++
++		spi1_clk: clk at 01c200a4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a4 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "spi1";
++		};
++
++		spi2_clk: clk at 01c200a8 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200a8 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "spi2";
++		};
++
++		spi3_clk: clk at 01c200ac {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-mod0-clk";
++			reg = <0x01c200ac 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "spi3";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.4.2
