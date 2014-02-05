@@ -1,48 +1,53 @@
-From: eparis@parisplace.org (Eric Paris)
-Date: Wed, 5 Feb 2014 04:27:17 -0500
-Subject: [PATCH] security: select correct default LSM_MMAP_MIN_ADDR on arm
- on arm64
-In-Reply-To: <20140204093843.GB16708@mudshark.cambridge.arm.com>
-References: <1391480133-27149-1-git-send-email-ccross@android.com>
- <20140204093843.GB16708@mudshark.cambridge.arm.com>
-Message-ID: <CACLa4pt+4pw4xfkA8mrRF5_KE2sPDrVASPMRPtw4P_JYzDiHiw@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 05 Feb 2014 10:28:06 +0100
+Subject: [PATCH v2 0/6] ARM: STi reset controller support
+In-Reply-To: <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1391592486.11239.4.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Eric Paris <eparis@redhat.com>
+Hi Srinivas,
 
-On Tue, Feb 4, 2014 at 4:38 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Feb 04, 2014 at 02:15:32AM +0000, Colin Cross wrote:
->> Binaries compiled for arm may run on arm64 if CONFIG_COMPAT is
->> selected.  Set LSM_MMAP_MIN_ADDR to 32768 if ARM64 && COMPAT to
->> prevent selinux failures launching 32-bit static executables that
->> are mapped at 0x8000.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> ---
->>  security/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/security/Kconfig b/security/Kconfig
->> index e9c6ac724fef..beb86b500adf 100644
->> --- a/security/Kconfig
->> +++ b/security/Kconfig
->> @@ -103,7 +103,7 @@ config INTEL_TXT
->>  config LSM_MMAP_MIN_ADDR
->>       int "Low address space for LSM to protect from user allocation"
->>       depends on SECURITY && SECURITY_SELINUX
->> -     default 32768 if ARM
->> +     default 32768 if ARM || (ARM64 && COMPAT)
->>       default 65536
->>       help
->>         This is the portion of low virtual memory which should be protected
->
-> Since ARM64 && COMPAT implies 4k pages, this change looks ok to me.
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-security-module" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Am Montag, den 03.02.2014, 14:27 +0000 schrieb
+srinivas.kandagatla at st.com:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> 
+> Hi All,
+> 
+> This patch series adds reset controller support for STi SOC series STiH415 and
+> STiH416. It adds support for both power down reset and soft reset controllers.
+> On STi series SOCs reset lines are wired up to system configuration registers.
+> Most of the IPs on STi SOCs are left in reset state, so this driver is very
+> important for other drivers to use the IPs.
+> 
+> Patch 01: Adds reset controller based on system configuration registers via
+> regmap.
+> 
+> Patch 02, 03: adds STiH415 and STiH416 reset controller drivers.
+> 
+> Patch 04, 05: adds STiH415 and STiH416 soft reset controllers.
+> 
+> The final patch 06 selects reset controller in mach-sti Kconfig.
+> 
+> I would like get this driver in to 3.15, so that its possible to add dt
+> support for other IPs with reset lines. Without this patchset its impossible
+> to add DT support to IPs with reset lines as reset line definition is in
+> common header file in include/dt-bindings/.
+> 
+> This reset controller will be used by gmac, i2c and st-ir drivers.
+> 
+> 
+> Comments?
+
+the patchset looks good to me for the soft resets. But for the powerdown
+bits I am wondering whether the reset controller API is the right
+abstraction. Depending on whether those bits really just put the IPs
+into reset or there is some power gating / sequencing involved,
+shouldn't this rather be handled as a set of pm domains?
+I see that for example on STiH415 there are both soft resets and
+powerdown bits for USB[012].
+
+regards
+Philipp
