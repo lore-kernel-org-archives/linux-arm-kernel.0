@@ -1,111 +1,208 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 19:55:41 +0000
-Subject: [PATCH v3 01/11] arm64: KVM: force cache clean on page fault when
- caches are off
+Date: Wed,  5 Feb 2014 19:55:44 +0000
+Subject: [PATCH v3 04/11] arm64: KVM: flush VM pages before letting the guest
+ enable caches
 In-Reply-To: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
 References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391630151-7875-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391630151-7875-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the guest with caches off to observe data written
-contained in a given page, we need to make sure that page is
-committed to memory, and not just hanging in the cache (as
-guest accesses are completely bypassing the cache until it
-decides to enable it).
+When the guest runs with caches disabled (like in an early boot
+sequence, for example), all the writes are diectly going to RAM,
+bypassing the caches altogether.
 
-For this purpose, hook into the coherent_icache_guest_page
-function and flush the region if the guest SCTLR_EL1
-register doesn't show the MMU  and caches as being enabled.
-The function also get renamed to coherent_cache_guest_page.
+Once the MMU and caches are enabled, whatever sits in the cache
+becomes suddenly visible, which isn't what the guest expects.
+
+A way to avoid this potential disaster is to invalidate the cache
+when the MMU is being turned on. For this, we hook into the SCTLR_EL1
+trapping code, and scan the stage-2 page tables, invalidating the
+pages/sections that have already been mapped in.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  4 ++--
- arch/arm/kvm/mmu.c               |  4 ++--
- arch/arm64/include/asm/kvm_mmu.h | 16 ++++++++++++----
- 3 files changed, 16 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  8 ++++
+ arch/arm/kvm/mmu.c               | 93 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  4 ++
+ arch/arm64/kvm/sys_regs.c        |  5 ++-
+ 4 files changed, 109 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 2d122ad..6d0f3d3 100644
+index 6d0f3d3..0931cda 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+@@ -114,6 +114,12 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
+ }
  
++/* Open coded pgd_addr_end that can deal with 64bit addresses */
++#define kvm_pgd_addr_end(addr, end)					\
++({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
++	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
++})
++
  struct kvm;
  
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
- {
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
+ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+@@ -142,6 +148,8 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+ #define kvm_virt_to_phys(x)		virt_to_idmap((unsigned long)(x))
+ 
++void stage2_flush_vm(struct kvm *kvm);
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7789857..fc71a8d 100644
+index fc71a8d..ea21b6a 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -715,7 +715,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pmd_writable(&new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
-+		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-@@ -723,7 +723,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
-+		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+@@ -187,6 +187,99 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
  	}
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7f1f940..6eaf69b 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- 	return true;
  }
  
--static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
-@@ -124,9 +123,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 
- struct kvm;
- 
--static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
--					      unsigned long size)
-+#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
++			      phys_addr_t addr, phys_addr_t end)
++{
++	pte_t *pte;
 +
-+static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- {
-+	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
++	pte = pte_offset_kernel(pmd, addr);
++	do {
++		if (!pte_none(*pte)) {
++			hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++			kvm_flush_dcache_to_poc((void*)hva, PAGE_SIZE);
++		}
++	} while (pte++, addr += PAGE_SIZE, addr != end);
 +}
 +
-+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
-+					     unsigned long size)
++static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
++			      phys_addr_t addr, phys_addr_t end)
 +{
-+	if (!vcpu_has_cache_enabled(vcpu))
-+		kvm_flush_dcache_to_poc((void *)hva, size);
++	pmd_t *pmd;
++	phys_addr_t next;
 +
- 	if (!icache_is_aliasing()) {		/* PIPT */
- 		flush_icache_range(hva, hva + size);
- 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
-@@ -135,7 +144,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
- 	}
++	pmd = pmd_offset(pud, addr);
++	do {
++		next = pmd_addr_end(addr, end);
++		if (!pmd_none(*pmd)) {
++			if (kvm_pmd_huge(*pmd)) {
++				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++				kvm_flush_dcache_to_poc((void*)hva, PMD_SIZE);
++			} else {
++				stage2_flush_ptes(kvm, pmd, addr, next);
++			}
++		}
++	} while (pmd++, addr = next, addr != end);
++}
++
++static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
++			      phys_addr_t addr, phys_addr_t end)
++{
++	pud_t *pud;
++	phys_addr_t next;
++
++	pud = pud_offset(pgd, addr);
++	do {
++		next = pud_addr_end(addr, end);
++		if (!pud_none(*pud)) {
++			if (pud_huge(*pud)) {
++				hva_t hva = gfn_to_hva(kvm, addr >> PAGE_SHIFT);
++				kvm_flush_dcache_to_poc((void*)hva, PUD_SIZE);
++			} else {
++				stage2_flush_pmds(kvm, pud, addr, next);
++			}
++		}
++	} while(pud++, addr = next, addr != end);
++}
++
++static void stage2_flush_memslot(struct kvm *kvm,
++				 struct kvm_memory_slot *memslot)
++{
++	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
++	phys_addr_t end = addr + PAGE_SIZE * memslot->npages;
++	phys_addr_t next;
++	pgd_t *pgd;
++
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	do {
++		next = kvm_pgd_addr_end(addr, end);
++		stage2_flush_puds(kvm, pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++}
++
++/**
++ * stage2_flush_vm - Invalidate cache for pages mapped in stage 2
++ * @kvm: The struct kvm pointer
++ *
++ * Go through the stage 2 page tables and invalidate any cache lines
++ * backing memory already mapped to the VM.
++ */
++void stage2_flush_vm(struct kvm *kvm)
++{
++	struct kvm_memslots *slots;
++	struct kvm_memory_slot *memslot;
++	int idx;
++
++	idx = srcu_read_lock(&kvm->srcu);
++	spin_lock(&kvm->mmu_lock);
++
++	slots = kvm_memslots(kvm);
++	kvm_for_each_memslot(memslot, slots)
++		stage2_flush_memslot(kvm, memslot);
++
++	spin_unlock(&kvm->mmu_lock);
++	srcu_read_unlock(&kvm->srcu, idx);
++}
++
+ /**
+  * free_boot_hyp_pgd - free HYP boot page tables
+  *
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 6eaf69b..e78d050 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -121,6 +121,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= PMD_S2_RDWR;
  }
  
--#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++#define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+@@ -146,5 +148,7 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ 
  #define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
  
++void stage2_flush_vm(struct kvm *kvm);
++
  #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 2097e5e..0324458 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -27,6 +27,7 @@
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <trace/events/kvm.h>
+@@ -154,8 +155,10 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ {
+ 	access_vm_reg(vcpu, p, r);
+ 
+-	if (vcpu_has_cache_enabled(vcpu))	/* MMU+Caches enabled? */
++	if (vcpu_has_cache_enabled(vcpu)) {	/* MMU+Caches enabled? */
+ 		vcpu->arch.hcr_el2 &= ~HCR_TVM;
++		stage2_flush_vm(vcpu->kvm);
++	}
+ 
+ 	return true;
+ }
 -- 
 1.8.3.4
