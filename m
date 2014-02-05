@@ -1,32 +1,24 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 5 Feb 2014 03:04:08 -0600
-Subject: [PATCH] ARM: OMAP3+: DPLL: stop reparenting to same parent if already
- done
-Message-ID: <1391591048-19433-1-git-send-email-nm@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 5 Feb 2014 10:08:18 +0100
+Subject: [PATCH 1/6] i2c: bcm-kona: register with subsys_initcall
+In-Reply-To: <1391516352-32359-2-git-send-email-mporter@linaro.org>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-2-git-send-email-mporter@linaro.org>
+Message-ID: <20140205090818.GA2614@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap3_noncore_dpll_set_rate forces a reparent to the same clk_ref
-for every call that takes place. This is an can be done only if a change
-is detected.
+On Tue, Feb 04, 2014 at 07:19:07AM -0500, Matt Porter wrote:
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/dpll3xxx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Voltage regulators are needed very early due to deferred probe
+> being incompatible with built-in USB gadget drivers.
 
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 3185ced..d9bcbf7 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -525,7 +525,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	* stuff is inherited for free
- 	*/
- 
--	if (!ret)
-+	if (!ret && clk_get_parent(hw->clk) != new_parent)
- 		__clk_reparent(hw->clk, new_parent);
- 
- 	return 0;
--- 
-1.7.9.5
+What does it need to fix those instead?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/9c9b7759/attachment.sig>
