@@ -1,34 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 05 Feb 2014 06:49:11 -0800
-Subject: [PATCH] clk: Fix notifier documentation
-In-Reply-To: <7c0808b4-aac3-4add-a5dd-1a69ee815f4b@CO9EHSMHS003.ehs.local>
-References: <1390420117-25930-1-git-send-email-soren.brinkmann@xilinx.com>
- <57c43634-23a6-4dcf-8aff-f49961d7f4d6@TX2EHSMHS005.ehs.local>
- <CAPtuhTj7QmB-xFU40x_MCvbvo07M2_2sDfiOQNkf4oEGFPKiOg@mail.gmail.com>
- <7c0808b4-aac3-4add-a5dd-1a69ee815f4b@CO9EHSMHS003.ehs.local>
-Message-ID: <20140205144911.22158.48540@quantum>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  5 Feb 2014 08:50:29 -0600
+Subject: [PATCH] arm64: fix early_io_map for 64K pages
+Message-ID: <1391611829-7824-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting S?ren Brinkmann (2014-02-03 08:36:57)
-> On Fri, Jan 31, 2014 at 10:01:27PM -0800, Mike Turquette wrote:
-> > On Fri, Jan 31, 2014 at 5:49 PM, S?ren Brinkmann
-> > <soren.brinkmann@xilinx.com> wrote:
-> > > ping?
-> > 
-> > Hi Soren,
-> > 
-> > I'm a bit slow to review patches during the merge window. Thanks for
-> > the doc update. I'll take it in after -rc1 drops.
-> 
-> Sorry for my impatience. Thank you!
+From: Rob Herring <robh@kernel.org>
 
-Taken into clk-next.
+earlyprintk is broken with 64KB pages. The problem is pgprot_default
+is not yet initialized when early_io_map is called, so the pte does not
+get marked as valid. Set the necessary page and access permission bits.
 
-Regards,
-Mike
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
 
-> 
->         S?ren
-> 
-> 
+I'm not sure this is really the best fix. Perhaps pgprot_default can be
+statically initialized to something useful instead? 
+
+Rob
+
+ arch/arm64/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f557ebb..c41daa6 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -284,7 +284,7 @@ void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
+ 		if (pmd_none(*pmd))
+ 			return NULL;
+ 		pte = pte_offset_kernel(pmd, virt);
+-		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRE));
++		set_pte(pte, __pte((phys & mask) | PTE_TYPE_PAGE | PTE_AF | PROT_DEVICE_nGnRE));
+ 	} else {
+ 		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRE));
+ 	}
+-- 
+1.8.3.2
