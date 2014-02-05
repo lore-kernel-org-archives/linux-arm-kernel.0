@@ -1,178 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 13:30:42 +0000
-Subject: [PATCH 10/18] KVM: ARM: vgic: abstract VMCR access
+Date: Wed,  5 Feb 2014 13:30:41 +0000
+Subject: [PATCH 09/18] KVM: ARM: vgic: move underflow handling to vgic_ops
 In-Reply-To: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
 References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391607050-540-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391607050-540-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly messing with with the GICH_VMCR bits for the CPU
-interface save/restore code, add accessors that encode/decode the
-entire set of registers exposed by VMCR.
+Move the code dealing with LR underflow handling to its own functions,
+and make them accessible through vgic_ops.
 
-Not the most efficient thing, but given that this code is only used
-by the save/restore code, performance is far from being critical.
-
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  9 +++++++
- virt/kvm/arm/vgic.c    | 69 ++++++++++++++++++++++++++++++++++++++------------
- 2 files changed, 62 insertions(+), 16 deletions(-)
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 407e104..ee6fa93 100644
+index 95085a6..407e104 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -81,6 +81,13 @@ struct vgic_lr {
- 	u8	state;
- };
- 
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
-+
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
-@@ -89,6 +96,8 @@ struct vgic_ops {
+@@ -87,6 +87,8 @@ struct vgic_ops {
+ 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+ 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
  	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
- 	void	(*set_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++	void	(*set_underflow)(struct kvm_vcpu *vcpu);
++	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index fe85740..574ca47 100644
+index 22423dd..fe85740 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -100,8 +100,10 @@ static void vgic_kick_vcpus(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
- static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
--static u32 vgic_nr_lr;
-+static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 
-+static u32 vgic_nr_lr;
- static unsigned int vgic_maint_irq;
- 
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
-@@ -1057,6 +1059,28 @@ static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
+@@ -1047,12 +1047,24 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
+ 	return ret;
  }
  
-+static void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++static void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
 +{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >> GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >> GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >> GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >> GICH_VMCR_PRIMASK_SHIFT;
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
 +}
 +
-+static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
 +{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) & GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) & GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) & GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
-@@ -1065,6 +1089,8 @@ static const struct vgic_ops vgic_ops = {
+ 	.get_elrsr		= vgic_v2_get_elrsr,
+ 	.get_eisr		= vgic_v2_get_eisr,
  	.get_interrupt_status	= vgic_v2_get_interrupt_status,
- 	.set_underflow		= vgic_v2_set_underflow,
- 	.clear_underflow	= vgic_v2_clear_underflow,
-+	.get_vmcr		= vgic_v2_get_vmcr,
-+	.set_vmcr		= vgic_v2_set_vmcr,
++	.set_underflow		= vgic_v2_set_underflow,
++	.clear_underflow	= vgic_v2_clear_underflow,
  };
  
  static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1103,6 +1129,16 @@ static inline void vgic_clear_underflow(struct kvm_vcpu *vcpu)
- 	vgic_ops.clear_underflow(vcpu);
+@@ -1081,6 +1093,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
+ 	return vgic_ops.get_interrupt_status(vcpu);
  }
  
-+static inline void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.get_vmcr(vcpu, vmcr);
++	vgic_ops.set_underflow(vcpu);
 +}
 +
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++static inline void vgic_clear_underflow(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.set_vmcr(vcpu, vmcr);
++	vgic_ops.clear_underflow(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1847,39 +1883,40 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
- 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
--	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u32 reg, mask = 0, shift = 0;
- 	bool updated = false;
-+	struct vgic_vmcr vmcr;
-+	u32 *vmcr_field;
-+	u32 reg;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
+@@ -1262,9 +1284,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
  
- 	switch (offset & ~0x3) {
- 	case GIC_CPU_CTRL:
--		mask = GICH_VMCR_CTRL_MASK;
--		shift = GICH_VMCR_CTRL_SHIFT;
-+		vmcr_field = &vmcr.ctlr;
- 		break;
- 	case GIC_CPU_PRIMASK:
--		mask = GICH_VMCR_PRIMASK_MASK;
--		shift = GICH_VMCR_PRIMASK_SHIFT;
-+		vmcr_field = &vmcr.pmr;
- 		break;
- 	case GIC_CPU_BINPOINT:
--		mask = GICH_VMCR_BINPOINT_MASK;
--		shift = GICH_VMCR_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.bpr;
- 		break;
- 	case GIC_CPU_ALIAS_BINPOINT:
--		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
--		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.abpr;
- 		break;
-+	default:
-+		BUG();
- 	}
- 
- 	if (!mmio->is_write) {
--		reg = (vgic_cpu->vgic_v2.vgic_vmcr & mask) >> shift;
-+		reg = *vmcr_field;
- 		mmio_data_write(mmio, ~0, reg);
+ epilog:
+ 	if (overflow) {
+-		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
++		vgic_set_underflow(vcpu);
  	} else {
- 		reg = mmio_data_read(mmio, ~0);
--		reg = (reg << shift) & mask;
--		if (reg != (vgic_cpu->vgic_vmcr & mask))
-+		if (reg != *vmcr_field) {
-+			*vmcr_field = reg;
-+			vgic_set_vmcr(vcpu, &vmcr);
- 			updated = true;
--		vgic_cpu->vgic_v2.vgic_vmcr &= ~mask;
--		vgic_cpu->vgic_v2.vgic_vmcr |= reg;
-+		}
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_clear_underflow(vcpu);
+ 		/*
+ 		 * We're about to run this VCPU, and we've consumed
+ 		 * everything the distributor had in store for
+@@ -1311,7 +1333,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
  	}
- 	return updated;
+ 
+ 	if (status & INT_STATUS_UNDERFLOW)
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_clear_underflow(vcpu);
+ 
+ 	return level_pending;
  }
 -- 
 1.8.3.4
