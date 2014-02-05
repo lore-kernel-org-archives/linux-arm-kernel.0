@@ -1,184 +1,398 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 05 Feb 2014 09:45:16 +0100
-Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52F1FA1C.1090209@overkiz.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed,  5 Feb 2014 09:37:37 +0100
+Subject: [PATCH v2 3/4] clk: at91: fix programmable clk irq handling
+In-Reply-To: <1391589458-28018-1-git-send-email-jjhiblot@traphandler.com>
+References: <1391589458-28018-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1391589458-28018-4-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+The PCKRDY bit is not set until the system clock is enabled.
+This patch moves the management of the ready status in the system clock
+driver.
 
-On 04/02/2014 23:59, Gregory CLEMENT wrote:
-> Until now the clock providers were initialized in the order found in
-> the device tree. This led to have the dependencies between the clocks
-> not respected: children clocks could be initialized before their
-> parent clocks.
->
-> Instead of forcing each platform to manage its own initialization order,
-> this patch adds this work inside the framework itself.
->
-> Using the data of the device tree the of_clk_init function now delayed
-> the initialization of a clock provider if its parent provider was not
-> ready yet.
->
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ drivers/clk/at91/clk-programmable.c | 108 +++++++++---------------------------
+ drivers/clk/at91/clk-system.c       |  74 ++++++++++++++++++++----
+ 2 files changed, 89 insertions(+), 93 deletions(-)
 
-Great! I remember having some trouble with this "parent is not 
-registered yet" issue (but I don't recall how I solved it, maybe in 
-reordering clk nodes).
-Anyway, this will help other platforms too (at least the at91 one).
-
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> Mike,
->
-> this patch could solve the issues we get on severals mvebu platform
-> since 3.14-rc1. This is an alternate solution of the patch set sent by
-> Sebastian. However as it modifies the clock framework itself, it is
-> more sensible.
->
-> I find this solution more elegant than changing the order of the
-> initialization of the clock at the platform level. However as it
-> should be tested on more platforms that only the mvebu ones, it would
-> take some time, and I don't want to still have "broken" platform
-> during more release candidate. So at the end this patch should be part
-> of the 3.15 kernel.
->
-> Thanks,
->
-> Gregory
->
->   drivers/clk/clk.c | 94 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 91 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 5517944495d8..beb0f8b0c2a0 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2526,24 +2526,112 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
->   }
->   EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
->
-> +struct clock_provider {
-> +	of_clk_init_cb_t clk_init_cb;
-> +	struct device_node *np;
-> +	struct list_head node;
-> +};
-> +
-> +static LIST_HEAD(clk_provider_list);
-> +
-> +/*
-> + * This function looks for a parent clock. If there is one, then it
-> + * checks that the provider for this parent clock was initialized, in
-> + * this case the parent clock will be ready.
-> + */
-> +static int parent_ready(struct device_node *np)
-> +{
-> +	struct of_phandle_args clkspec;
-> +	struct of_clk_provider *provider;
-> +
-> +	/*
-> +	 * If there is no clock parent, no need to wait for them, then
-> +	 * we can consider their absence as being ready
-> +	 */
-> +	if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
-> +					&clkspec))
-> +		return 1;
-> +
-> +	/* Check if we have such a provider in our array */
-> +	list_for_each_entry(provider, &of_clk_providers, link) {
-> +		if (provider->node == clkspec.np)
-> +			return 1;
-> +	}
-
-Shouldn't we wait for all parents to be ready (If I'm right, you're only 
-waiting for the first parent...) ?
-And if you only request for one clk to be ready, why the first one (you 
-could loop over parent clks and stop when one of its parent is ready) ?
-
-Best Regards,
-
-Boris
-
-> +
-> +	return 0;
-> +}
-> +
->   /**
->    * of_clk_init() - Scan and init clock providers from the DT
->    * @matches: array of compatible values and init functions for providers.
->    *
-> - * This function scans the device tree for matching clock providers and
-> - * calls their initialization functions
-> + * This function scans the device tree for matching clock providers
-> + * and calls their initialization functions. It also do it by trying
-> + * to follow the dependencies.
->    */
->   void __init of_clk_init(const struct of_device_id *matches)
->   {
->   	const struct of_device_id *match;
->   	struct device_node *np;
-> +	struct clock_provider *clk_provider, *next;
-> +	bool is_init_done;
->
->   	if (!matches)
->   		matches = &__clk_of_table;
->
->   	for_each_matching_node_and_match(np, matches, &match) {
->   		of_clk_init_cb_t clk_init_cb = match->data;
-> -		clk_init_cb(np);
-> +
-> +
-> +		if (parent_ready(np)) {
-> +			/*
-> +			 * The parent clock is ready or there is no
-> +			 * clock parent at all, in this case the
-> +			 * provider can be initialize immediately.
-> +			 */
-> +			clk_init_cb(np);
-> +		} else {
-> +			/*
-> +			 * The parent clock is not ready, this
-> +			 * provider is moved to a list to be
-> +			 * initialized later
-> +			 */
-> +			struct clock_provider *parent = kzalloc(sizeof(struct clock_provider),
-> +							GFP_KERNEL);
-> +
-> +			parent->clk_init_cb = match->data;
-> +			parent->np = np;
-> +			list_add(&parent->node, &clk_provider_list);
-> +		}
-> +	}
-> +
-> +	while (!list_empty(&clk_provider_list)) {
-> +		is_init_done = false;
-> +		list_for_each_entry_safe(clk_provider, next,
-> +					&clk_provider_list, node) {
-> +			if (parent_ready(clk_provider->np)) {
-> +				clk_provider->clk_init_cb(clk_provider->np);
-> +				list_del(&clk_provider->node);
-> +				kfree(clk_provider);
-> +				is_init_done = true;
-> +			}
-> +		}
-> +
-> +		if (!is_init_done) {
-> +			/*
-> +			 * We didn't managed to initialize any of the
-> +			 * remaining providers during the last loop,
-> +			 * so now we initialize all the remaining ones
-> +			 * unconditionally in case the clock parent
-> +			 * was not mandatory
-> +			 */
-> +			list_for_each_entry_safe(clk_provider, next,
-> +						&clk_provider_list, node) {
-> +				clk_provider->clk_init_cb(clk_provider->np);
-> +				list_del(&clk_provider->node);
-> +				kfree(clk_provider);
-> +			}
-> +		}
->   	}
->   }
->   #endif
->
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index eff7016..7bcc725 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -13,12 +13,9 @@
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/of_irq.h>
+ #include <linux/io.h>
+ #include <linux/wait.h>
+ #include <linux/sched.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ 
+ #include "pmc.h"
+ 
+@@ -38,68 +35,23 @@ struct clk_programmable_layout {
+ struct clk_programmable {
+ 	struct clk_hw hw;
+ 	struct at91_pmc *pmc;
+-	unsigned int irq;
+-	wait_queue_head_t wait;
+ 	u8 id;
+-	u8 css;
+-	u8 pres;
+-	u8 slckmck;
+ 	const struct clk_programmable_layout *layout;
+ };
+ 
+ #define to_clk_programmable(hw) container_of(hw, struct clk_programmable, hw)
+ 
+-
+-static irqreturn_t clk_programmable_irq_handler(int irq, void *dev_id)
+-{
+-	struct clk_programmable *prog = (struct clk_programmable *)dev_id;
+-
+-	wake_up(&prog->wait);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static int clk_programmable_prepare(struct clk_hw *hw)
+-{
+-	u32 tmp;
+-	struct clk_programmable *prog = to_clk_programmable(hw);
+-	struct at91_pmc *pmc = prog->pmc;
+-	const struct clk_programmable_layout *layout = prog->layout;
+-	u8 id = prog->id;
+-	u32 mask = PROG_STATUS_MASK(id);
+-
+-	tmp = prog->css | (prog->pres << layout->pres_shift);
+-	if (layout->have_slck_mck && prog->slckmck)
+-		tmp |= AT91_PMC_CSSMCK_MCK;
+-
+-	pmc_write(pmc, AT91_PMC_PCKR(id), tmp);
+-
+-	while (!(pmc_read(pmc, AT91_PMC_SR) & mask))
+-		wait_event(prog->wait, pmc_read(pmc, AT91_PMC_SR) & mask);
+-
+-	return 0;
+-}
+-
+-static int clk_programmable_is_ready(struct clk_hw *hw)
+-{
+-	struct clk_programmable *prog = to_clk_programmable(hw);
+-	struct at91_pmc *pmc = prog->pmc;
+-
+-	return !!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_PCKR(prog->id));
+-}
+-
+ static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
+ 						  unsigned long parent_rate)
+ {
+-	u32 tmp;
++	u32 pres;
+ 	struct clk_programmable *prog = to_clk_programmable(hw);
+ 	struct at91_pmc *pmc = prog->pmc;
+ 	const struct clk_programmable_layout *layout = prog->layout;
+ 
+-	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
+-	prog->pres = (tmp >> layout->pres_shift) & PROG_PRES_MASK;
+-
+-	return parent_rate >> prog->pres;
++	pres = (pmc_read(pmc, AT91_PMC_PCKR(prog->id)) >> layout->pres_shift) &
++	       PROG_PRES_MASK;
++	return parent_rate >> pres;
+ }
+ 
+ static long clk_programmable_determine_rate(struct clk_hw *hw,
+@@ -146,17 +98,22 @@ static int clk_programmable_set_parent(struct clk_hw *hw, u8 index)
+ {
+ 	struct clk_programmable *prog = to_clk_programmable(hw);
+ 	const struct clk_programmable_layout *layout = prog->layout;
++	struct at91_pmc *pmc = prog->pmc;
++	u32 tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id)) & ~layout->css_mask;
++
++	if (layout->have_slck_mck)
++		tmp &= AT91_PMC_CSSMCK_MCK;
++
+ 	if (index > layout->css_mask) {
+ 		if (index > PROG_MAX_RM9200_CSS && layout->have_slck_mck) {
+-			prog->css = 0;
+-			prog->slckmck = 1;
++			tmp |= AT91_PMC_CSSMCK_MCK;
+ 			return 0;
+ 		} else {
+ 			return -EINVAL;
+ 		}
+ 	}
+ 
+-	prog->css = index;
++	pmc_write(pmc, AT91_PMC_PCKR(prog->id), tmp | index);
+ 	return 0;
+ }
+ 
+@@ -169,13 +126,9 @@ static u8 clk_programmable_get_parent(struct clk_hw *hw)
+ 	const struct clk_programmable_layout *layout = prog->layout;
+ 
+ 	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
+-	prog->css = tmp & layout->css_mask;
+-	ret = prog->css;
+-	if (layout->have_slck_mck) {
+-		prog->slckmck = !!(tmp & AT91_PMC_CSSMCK_MCK);
+-		if (prog->slckmck && !ret)
+-			ret = PROG_MAX_RM9200_CSS + 1;
+-	}
++	ret = tmp & layout->css_mask;
++	if (layout->have_slck_mck && (tmp & AT91_PMC_CSSMCK_MCK) && !ret)
++		ret = PROG_MAX_RM9200_CSS + 1;
+ 
+ 	return ret;
+ }
+@@ -184,11 +137,15 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				     unsigned long parent_rate)
+ {
+ 	struct clk_programmable *prog = to_clk_programmable(hw);
++	struct at91_pmc *pmc = prog->pmc;
++	const struct clk_programmable_layout *layout = prog->layout;
+ 	unsigned long best_rate = parent_rate;
+ 	unsigned long best_diff;
+ 	unsigned long new_diff;
+ 	unsigned long cur_rate;
+ 	int shift = 0;
++	u32 tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id)) &
++		  ~(PROG_PRES_MASK << layout->pres_shift);
+ 
+ 	if (rate > parent_rate)
+ 		return parent_rate;
+@@ -196,7 +153,7 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
+ 		best_diff = parent_rate - rate;
+ 
+ 	if (!best_diff) {
+-		prog->pres = shift;
++		pmc_write(pmc, AT91_PMC_PCKR(prog->id), tmp | shift);
+ 		return 0;
+ 	}
+ 
+@@ -220,13 +177,13 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			break;
+ 	}
+ 
+-	prog->pres = shift;
++	pmc_write(pmc, AT91_PMC_PCKR(prog->id),
++		  tmp | (shift << layout->pres_shift));
++
+ 	return 0;
+ }
+ 
+ static const struct clk_ops programmable_ops = {
+-	.prepare = clk_programmable_prepare,
+-	.is_prepared = clk_programmable_is_ready,
+ 	.recalc_rate = clk_programmable_recalc_rate,
+ 	.determine_rate = clk_programmable_determine_rate,
+ 	.get_parent = clk_programmable_get_parent,
+@@ -235,16 +192,14 @@ static const struct clk_ops programmable_ops = {
+ };
+ 
+ static struct clk * __init
+-at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
++at91_clk_register_programmable(struct at91_pmc *pmc,
+ 			       const char *name, const char **parent_names,
+ 			       u8 num_parents, u8 id,
+ 			       const struct clk_programmable_layout *layout)
+ {
+-	int ret;
+ 	struct clk_programmable *prog;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
+-	char irq_name[11];
+ 
+ 	if (id > PROG_ID_MAX)
+ 		return ERR_PTR(-EINVAL);
+@@ -263,14 +218,6 @@ at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
+ 	prog->layout = layout;
+ 	prog->hw.init = &init;
+ 	prog->pmc = pmc;
+-	prog->irq = irq;
+-	init_waitqueue_head(&prog->wait);
+-	irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
+-	snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
+-	ret = request_irq(prog->irq, clk_programmable_irq_handler,
+-			  IRQF_TRIGGER_HIGH, irq_name, prog);
+-	if (ret)
+-		return ERR_PTR(ret);
+ 
+ 	clk = clk_register(NULL, &prog->hw);
+ 	if (IS_ERR(clk))
+@@ -304,7 +251,6 @@ of_at91_clk_prog_setup(struct device_node *np, struct at91_pmc *pmc,
+ 	int num;
+ 	u32 id;
+ 	int i;
+-	unsigned int irq;
+ 	struct clk *clk;
+ 	int num_parents;
+ 	const char *parent_names[PROG_SOURCE_MAX];
+@@ -332,11 +278,7 @@ of_at91_clk_prog_setup(struct device_node *np, struct at91_pmc *pmc,
+ 		if (of_property_read_string(np, "clock-output-names", &name))
+ 			name = progclknp->name;
+ 
+-		irq = irq_of_parse_and_map(progclknp, 0);
+-		if (!irq)
+-			continue;
+-
+-		clk = at91_clk_register_programmable(pmc, irq, name,
++		clk = at91_clk_register_programmable(pmc, name,
+ 						     parent_names, num_parents,
+ 						     id, layout);
+ 		if (IS_ERR(clk))
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index a98557b..82c5f44 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -14,6 +14,11 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/of_irq.h>
++#include <linux/interrupt.h>
++#include <linux/wait.h>
++#include <linux/sched.h>
+ 
+ #include "pmc.h"
+ 
+@@ -25,19 +30,48 @@
+ struct clk_system {
+ 	struct clk_hw hw;
+ 	struct at91_pmc *pmc;
++	unsigned int irq;
++	wait_queue_head_t wait;
+ 	u8 id;
+ };
+ 
+-static int clk_system_enable(struct clk_hw *hw)
++static inline int is_pck(int id)
++{
++	return (id >= 8) && (id <= 15);
++}
++static irqreturn_t clk_system_irq_handler(int irq, void *dev_id)
++{
++	struct clk_system *sys = (struct clk_system *)dev_id;
++
++	wake_up(&sys->wait);
++	disable_irq_nosync(sys->irq);
++
++	return IRQ_HANDLED;
++}
++
++static int clk_system_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_system *sys = to_clk_system(hw);
+ 	struct at91_pmc *pmc = sys->pmc;
++	u32 mask = 1 << sys->id;
+ 
+-	pmc_write(pmc, AT91_PMC_SCER, 1 << sys->id);
++	pmc_write(pmc, AT91_PMC_SCER, mask);
++
++	if (!is_pck(sys->id))
++		return 0;
++
++	while (!(pmc_read(pmc, AT91_PMC_SR) & mask)) {
++		if (sys->irq) {
++			enable_irq(sys->irq);
++			wait_event(sys->wait,
++				   pmc_read(pmc, AT91_PMC_SR) & mask);
++		} else
++			cpu_relax();
++	}
+ 	return 0;
+ }
+ 
+-static void clk_system_disable(struct clk_hw *hw)
++static void clk_system_unprepare(struct clk_hw *hw)
+ {
+ 	struct clk_system *sys = to_clk_system(hw);
+ 	struct at91_pmc *pmc = sys->pmc;
+@@ -45,27 +79,34 @@ static void clk_system_disable(struct clk_hw *hw)
+ 	pmc_write(pmc, AT91_PMC_SCDR, 1 << sys->id);
+ }
+ 
+-static int clk_system_is_enabled(struct clk_hw *hw)
++static int clk_system_is_prepared(struct clk_hw *hw)
+ {
+ 	struct clk_system *sys = to_clk_system(hw);
+ 	struct at91_pmc *pmc = sys->pmc;
+ 
+-	return !!(pmc_read(pmc, AT91_PMC_SCSR) & (1 << sys->id));
++	if (!(pmc_read(pmc, AT91_PMC_SCSR) & (1 << sys->id)))
++		return 0;
++
++	if (!is_pck(sys->id))
++		return 1;
++
++	return !!(pmc_read(pmc, AT91_PMC_SR) & (1 << sys->id));
+ }
+ 
+ static const struct clk_ops system_ops = {
+-	.enable = clk_system_enable,
+-	.disable = clk_system_disable,
+-	.is_enabled = clk_system_is_enabled,
++	.prepare = clk_system_prepare,
++	.unprepare = clk_system_unprepare,
++	.is_prepared = clk_system_is_prepared,
+ };
+ 
+ static struct clk * __init
+ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+-			 const char *parent_name, u8 id)
++			 const char *parent_name, u8 id, int irq)
+ {
+ 	struct clk_system *sys;
+ 	struct clk *clk = NULL;
+ 	struct clk_init_data init;
++	int ret;
+ 
+ 	if (!parent_name || id > SYSTEM_MAX_ID)
+ 		return ERR_PTR(-EINVAL);
+@@ -90,6 +131,15 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+ 	sys->id = id;
+ 	sys->hw.init = &init;
+ 	sys->pmc = pmc;
++	sys->irq = irq;
++	if (irq) {
++		init_waitqueue_head(&sys->wait);
++		irq_set_status_flags(sys->irq, IRQ_NOAUTOEN);
++		ret = request_irq(sys->irq, clk_system_irq_handler,
++				IRQF_TRIGGER_HIGH, name, sys);
++		if (ret)
++			return ERR_PTR(ret);
++	}
+ 
+ 	clk = clk_register(NULL, &sys->hw);
+ 	if (IS_ERR(clk))
+@@ -102,6 +152,7 @@ static void __init
+ of_at91_clk_sys_setup(struct device_node *np, struct at91_pmc *pmc)
+ {
+ 	int num;
++	int irq = 0;
+ 	u32 id;
+ 	struct clk *clk;
+ 	const char *name;
+@@ -119,9 +170,12 @@ of_at91_clk_sys_setup(struct device_node *np, struct at91_pmc *pmc)
+ 		if (of_property_read_string(np, "clock-output-names", &name))
+ 			name = sysclknp->name;
+ 
++		if (is_pck(id))
++			irq = irq_of_parse_and_map(sysclknp, 0);
++
+ 		parent_name = of_clk_get_parent_name(sysclknp, 0);
+ 
+-		clk = at91_clk_register_system(pmc, name, parent_name, id);
++		clk = at91_clk_register_system(pmc, name, parent_name, id, irq);
+ 		if (IS_ERR(clk))
+ 			continue;
+ 
+-- 
+1.8.5.2
