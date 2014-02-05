@@ -1,68 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 05 Feb 2014 11:55:12 +0000
-Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
-In-Reply-To: <2083213.7oCTVAqWbC@avalon>
-References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
- <1391537858-28593-2-git-send-email-william.towle@codethink.co.uk>
- <2083213.7oCTVAqWbC@avalon>
-Message-ID: <52F226A0.5070301@codethink.co.uk>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Wed, 5 Feb 2014 11:48:24 +0000
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <201401312115.33731.arnd@arndb.de>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+ <201401301939.08302.arnd@arndb.de> <52EB96BB.6070800@st.com>
+ <201401312115.33731.arnd@arndb.de>
+Message-ID: <52F22508.7080706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/14 10:56, Laurent Pinchart wrote:
-> Hi William,
->
-> Thank you for the patch.
->
-> On Tuesday 04 February 2014 18:17:36 William Towle wrote:
->> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
->> but not with values found in the device itself (which are also the
->> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
+Hi Arnd,
+On 31/01/14 20:15, Arnd Bergmann wrote:
+> On Friday 31 January 2014, srinivas kandagatla wrote:
+> 
+>>> Sorry if I missed the initial review, but can you explain
+>>> why this is needed to start with?
 >>
->> Update the clk-rcar-gen2.c driver to have the same table as the one
->> used by the mach-shmobile driver which work once further issues are
->> fixed in the clk-rcar-gen2.c driver.
->>
->> Part of the fix for the following error where the driver reports the
->> output as 1MHz but is really 97.5MHz:
->>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
->>
->> [ben.dooks at codethink.co.uk: updated patch description]
->> Signed-off-by: William Towle <william.towle@codethink.co.uk>
->> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> ---
->>   drivers/clk/shmobile/clk-rcar-gen2.c |    2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c
->> b/drivers/clk/shmobile/clk-rcar-gen2.c index a59ec21..df4a1e6 100644
->> --- a/drivers/clk/shmobile/clk-rcar-gen2.c
->> +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
->> @@ -170,6 +170,8 @@ static const struct clk_div_table cpg_sdh_div_table[] =
->> { };
->>
->>   static const struct clk_div_table cpg_sd01_div_table[] = {
->> +	{  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
->> +	{  4,  8 },
->>   	{  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
->>   	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
->
-> With this applied the only difference between the sdh and sd0/1 dividers
-> tables would be the { 12, 10 } entry, available for sd0/1 only. Given that the
-> hardware does not match the documentation, could you check whether that entry
-> is supported by sdh as well ? If so we could merge the two tables. Otherwise
-> this patch looks good, could you please just reformat the table to avoid the
-> mostly empty line in the middle ?
+>> On ST SoCs the default value for L2 AUX_CTRL register is 0x0, so we  set
+>> the way-size explicit here.
+> 
+> Unfortunately, we keep going back and forth on the L2 cache controller
+> setup between "it should work automatically" and "we don't want to
+> have configuration data in DT", where my personal opinion is that
+> the first one is more important here.
+> 
+> Now, there are a couple of properties that are defined in
+> Documentation/devicetree/bindings/arm/l2cc.txt to let some of the
+> things get set up automatically already. Can you check which bits
+> are missing there, if any? Are they better described as "configuration"
+> or "hardware" settings?
 
-I would like feedback from Renesas on this issue if possible. I can
-have a quick try at setting the clock value to 10 in u-boot and scope
-it out and see what happens.
+Currently l2cc bindings has few optional properties like.
 
-Magnus or Morimoto-san, is there a chance this could be reviewed by
-someone in Renesas who has knowledge of the hardware block?
+- arm,data-latency
+- arm,tag-latency
+- arm,dirty-latency
+- arm,filter-ranges
+- interrupts :
+- cache-id-part:
+- wt-override:
 
-[PS, added Kuninori Morimoto to this[
+These does not include properties to set "way-size", "associativity",
+"enabling prefetching", "Prefetch drop enable", "prefetch offset",
+"Double linefill" and few more in prefect control register and
+aux-control register.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+This is not just a issue with STi SOCs, having a quick look, I can see
+that few more SOCs have similar requirements to set these properties.
+
+We could do two things to get l2 setup automatically on STi SOCS.
+
+1> Either define these properties case-by-case basic, which might be
+useful for other SOCs too.
+
+2> Or Add new compatible string for STi SoCs so that they can
+automatically setup these values in cache-l2x0.c
+
+Am Ok with either approaches.
+
+
+Thanks,
+srini
+
+
+> 
+> 	Arnd
+> 
+> 
