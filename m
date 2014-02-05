@@ -1,22 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Feb 2014 10:28:50 +0000
-Subject: [PATCHv2] arm64: Align CMA sizes to PAGE_SIZE
-In-Reply-To: <1391555337-25380-1-git-send-email-lauraa@codeaurora.org>
-References: <1391555337-25380-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140205102850.GB4854@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Feb 2014 11:31:41 +0100
+Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
+In-Reply-To: <1591253.8BzYfubhGS@avalon>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
+ <1591253.8BzYfubhGS@avalon>
+Message-ID: <15127900.Wy8QsPfEr8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 11:08:57PM +0000, Laura Abbott wrote:
-> dma_alloc_from_contiguous takes number of pages for a size.
-> Align up the dma size passed in to page size to avoid truncation
-> and allocation failures on sizes less than PAGE_SIZE.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Mike,
 
-Thanks. Applied.
+Ping ?
+
+v3.14-rc1 is out, and those are bug fixes.
+
+On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
+> On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
+> > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
+> > > Geert, could you please verify that the series fixes your QSPI clock
+> > > issues with the Koelsch board ?
+> > > 
+> > > Laurent Pinchart (2):
+> > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
+> > >   clk: shmobile: rcar-gen2: Fix qspi divisor
+> > 
+> > Thanks, both:
+> > 
+> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> 
+> Thank you.
+> 
+> Mike, could you please pick those patches up for v3.14 ?
 
 -- 
-Catalin
+Regards,
+
+Laurent Pinchart
