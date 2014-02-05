@@ -1,51 +1,88 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 05 Feb 2014 10:19:22 +0100
-Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <20140205101134.4591e5c3@armhf>
-References: <cover.1391274627.git.moinejf@free.fr>
- <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
- <20140204180625.GM22609@sirena.org.uk> <20140205101134.4591e5c3@armhf>
-Message-ID: <52F2021A.9020804@metafoo.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 05 Feb 2014 10:25:27 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <201402042027.15898.arnd@arndb.de>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <3121595.GbLMuGPlvA@wuerfel>
+ <4c4539fe-e810-4c0a-9a01-c1e4c67ea661@AM1EHSMHS007.ehs.local>
+ <201402042027.15898.arnd@arndb.de>
+Message-ID: <52F20387.3090709@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 10:11 AM, Jean-Francois Moine wrote:
-> On Tue, 4 Feb 2014 18:06:25 +0000
-> Mark Brown <broonie@kernel.org> wrote:
->
->> On Mon, Jan 27, 2014 at 09:48:54AM +0100, Jean-Francois Moine wrote:
+On 02/04/2014 08:27 PM, Arnd Bergmann wrote:
+> On Monday 03 February 2014, Michal Simek wrote:
+>> On 02/03/2014 04:32 PM, Arnd Bergmann wrote:
+>>> On Monday 03 February 2014 16:13:47 Michal Simek wrote:
+>>>> Intention wasn't to fix binding but document current one
+>>>> which is in mainline for a long time.
+>>>
+>>> Ok, I see.
+>>>
+>>>> Apart of this - yes, wdt-enable-once is nowayout and wdt-interval should be timeout
+>>>> is seconds, and clock-frequency should go out and use CCF for getting clock.
+>>>
+>>> Could we make a common binding then, and document that the xilinx
+>>> watchdog can optionally provide either one?
 >>
->>> +		/* change the snd_soc_pcm_stream values of the driver */
->>> +		stream->rates = rate_mask;
->>> +		stream->channels_max = max_channels;
->>> +		stream->formats = formats;
+>> Do you mean to have 2 DT bindings?
 >>
->>> +	/* copy the DAI driver to a writable area */
->>> +	dai_drv = devm_kzalloc(&pdev->dev, sizeof(tda998x_dai), GFP_KERNEL);
->>> +	if (!dai_drv)
->>> +		return -ENOMEM;
->>> +	memcpy(dai_drv, tda998x_dai, sizeof(tda998x_dai));
->>> +
+>> This binding is used from 2011-07.
+>> It means it was generated for all hw designs at least from this time.
+>> I would say from DT usage on Microblaze because it is not special case
+>> in our dt generator.
+> 
+> I certainly wasn't suggesting to break the binding, quite the contrary.
+> What I tried to say is that the properties look like they should be
+> useful for different kinds of watchdogs, not just xilinx, so it would
+> be good to have a common definition using generic strings.
+> 
+> The xilinx driver would definitely have to keep supporting the traditional
+> property names, but it could also support the generic names in the
+> future.
+
+No problem with to do in future.
+
+>> xlnx,XXX are XXX parameters which you have to setup in tools
+>> and get synthesized. This is valid for all xilinx IPs. We have full
+>> IP description by generating xlnx,XXX parameters directly from tools
+>> because we know all variants which can happen.
 >>
->> The code should be doing this by setting constraints based on the
->> current setup rather than by editing the data structure - the expecation
->> is very much that the data won't change so this prevents surprises with
->> future work on the core.
->
-> As it is done in the soc core, in soc_pcm_open(), the runtime hw_params
-> are initialized after the call to the CODEC startup, and the next CODEC
-> event is hw_params() when the user has already chosen all the parameters.
->
-> So, in the CODEC, I don't see how I could update the parameters
-> dictated by the EDID otherwise in changing the DAI driver parameters.
->
+>> Just back to your previous post:
+>> "I'm not sure about the enable-once flag, which seems to just map to the
+>> "nowayout" watchdog option that is not a hardware feature at all"
+>> this is hw feature which you can select in tools because this is fpga. :-)
+> 
+> Ah, so you mean the properties are not settings that the driver
+> programs into the hardware, but they are hardware properties that the
+> driver reports to user space?
 
-The startup function is the right place. But instead of modifying the DAI 
-use snd_pcm_hw_constraint_mask64(), snd_pcm_hw_constraint_list(), etc. to 
-setup the additional constraints that come from the EDID.
+yes, they are hardware properties which you can choose based on your
+configuration. Every user just decides if this watchdog can be started just
+once and how long it takes in synthesis time. There is no option to program
+this by software.
 
-Bonus points for making this a generic helper function that takes a runtime 
-and a EDID and then applies the EDID constraints on the runtime.
+I am not quite sure what you mean by reports to user space.
+If you mean to get timeout through ioctl for example - then yes it is working
+through standard watchdog ioctl interface and timeout is calculated
+from hardware setup.
 
-- Lars
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/99e851c4/attachment-0001.sig>
