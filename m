@@ -1,107 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 13:30:34 +0000
-Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
+Date: Wed,  5 Feb 2014 13:30:35 +0000
+Subject: [PATCH 03/18] arm64: boot protocol documentation update for GICv3
 In-Reply-To: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
 References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391607050-540-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary documentation to support GICv3.
+Linux has some requirements that must be satisfied in order to boot
+on a system built with a GICv3.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/gic-v3.txt | 81 ++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
+ Documentation/arm64/booting.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
-new file mode 100644
-index 0000000..93852f6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
-@@ -0,0 +1,81 @@
-+* ARM Generic Interrupt Controller, version 3
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index a9691cc..4a02ebd 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -131,6 +131,13 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
+ 
++  For systems with a GICv3 interrupt controller, it is expected that:
++  - ID_AA64PFR0_EL1.GIC (bits [27:24]) must have the value 0b0001
++  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
++    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
++  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
++    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
 +
-+AArch64 SMP cores are often associated with a GICv3, providing private
-+peripheral interrupts (PPI), shared peripheral interrupts (SPI),
-+software generated interrupts (SGI), and locality-specific peripheral
-+Interrupts (LPI).
-+
-+Main node required properties:
-+
-+- compatible : should at least contain  "arm,gic-v3".
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. Must be a single cell with a value of at least 3.
-+
-+  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
-+  interrupts. Other values are reserved for future use.
-+
-+  The 2nd cell contains the interrupt number for the interrupt type.
-+  SPI interrupts are in the range [0-987]. PPI interrupts are in the
-+  range [0-15].
-+
-+  The 3rd cell is the flags, encoded as follows:
-+	bits[3:0] trigger type and level flags.
-+		1 = edge triggered
-+		2 = edge triggered (deprecated, for compatibility with GICv2)
-+		4 = level triggered
-+		8 = level triggered (deprecated, for compatibility with GICv2)
-+
-+  Cells 4 and beyond are reserved for future use. Where the 1st cell
-+  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
-+  ignored. It is recommended that padding cells have a value of 0.
-+
-+- reg : Specifies base physical address(s) and size of the GIC
-+  registers, in the following order:
-+  - GIC Distributor interface (GICD)
-+  - GIC Redistributors (GICR), one range per redistributor region
-+  - GIC CPU interface (GICC)
-+  - GIC Hypervisor interface (GICH)
-+  - GIC Virtual CPU interface (GICV)
-+
-+  GICC, GICH and GICV are optional.
-+
-+- interrupts : Interrupt source of the VGIC maintenance interrupt.
-+
-+Optional
-+
-+- redistributor-stride : If using padding pages, specifies the stride
-+  of consecutive redistributors. Must be a multiple of 64kB.
-+
-+- #redistributor-regions: The number of independent contiguous regions
-+  occupied by the redistributors. Required if more than one such
-+  region is present.
-+
-+Examples:
-+
-+	gic: interrupt-controller at 2cf00000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
-+		      <0x0 0x2f100000 0 0x200000>,	// GICR
-+		      <0x0 0x2c000000 0 0x2000>,	// GICC
-+		      <0x0 0x2c010000 0 0x2000>,	// GICH
-+		      <0x0 0x2c020000 0 0x2000>;	// GICV
-+		interrupts = <1 9 4>;
-+	};
-+
-+	gic: interrupt-controller at 2c010000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		redistributor-stride = 0x40000;		// 256kB stride
-+		#redistributor-regions = <2>;
-+		reg = <0x0 0x2c010000 0 0x10000>,	// GICD
-+		      <0x0 0x2d000000 0 0x800000>,	// GICR 1: CPUs 0-31
-+		      <0x0 0x2e000000 0 0x800000>;	// GICR 2: CPUs 32-63
-+		      <0x0 0x2c040000 0 0x2000>,	// GICC
-+		      <0x0 0x2c060000 0 0x2000>,	// GICH
-+		      <0x0 0x2c080000 0 0x2000>;	// GICV
-+		interrupts = <1 9 4>;
-+	};
+ The requirements described above for CPU mode, caches, MMUs, architected
+ timers, coherency and system registers apply to all CPUs.  All CPUs must
+ enter the kernel in the same exception level.
 -- 
 1.8.3.4
