@@ -1,45 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 4 Feb 2014 15:59:55 -0800
-Subject: [PATCH v2 2/5] clocksource: qcom: Move clocksource code out of
- mach-msm
-In-Reply-To: <EE8EC898-CFE4-4953-968A-ECCEEB09DE76@codeaurora.org>
-References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
- <1391553532-27001-3-git-send-email-galak@codeaurora.org>
- <20140204230956.GE20528@codeaurora.org>
- <EE8EC898-CFE4-4953-968A-ECCEEB09DE76@codeaurora.org>
-Message-ID: <20140204235955.GF20528@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue,  4 Feb 2014 16:02:29 -0800
+Subject: [PATCHv2 0/2] Remove ARM meminfo
+Message-ID: <1391558551-31395-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, Kumar Gala wrote:
-> 
-> On Feb 4, 2014, at 5:09 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > On 02/04, Kumar Gala wrote:
-> >> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> >> index cd6950f..81caa16 100644
-> >> --- a/drivers/clocksource/Kconfig
-> >> +++ b/drivers/clocksource/Kconfig
-> >> @@ -140,3 +140,7 @@ config VF_PIT_TIMER
-> >> 	bool
-> >> 	help
-> >> 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-> >> +
-> >> +config CLKSRC_QCOM
-> >> +	bool
-> >> +	depends on ARCH_MSM
-> > 
-> > It would be a a little less noisy if  you left this as MSM_TIMER
-> > (msm is all over the code in that file anyway). Also, why do we
-> > care about depending on ARCH_MSM here? This is a hidden Kconfig
-> > option anyway.
-> 
-> I will drop the depends, but not sure what point in leaving this as MSM_TIMER.
-> 
+Hi,
 
-Less changes to the Kconfig files if you do that. It's a minor
-thing.
+This is v2 of the patch to get rid of meminfo. This should cover all the
+bases. Testing would be appreciated.
+
+Thanks,
+Laura
+
+Laura Abbott (2):
+  mm/memblock: add memblock_get_current_limit
+  arm: Get rid of meminfo
+
+ arch/arm/include/asm/mach/arch.h         |    4 +-
+ arch/arm/include/asm/memblock.h          |    3 +-
+ arch/arm/include/asm/setup.h             |   23 ------
+ arch/arm/kernel/atags_parse.c            |    5 +-
+ arch/arm/kernel/setup.c                  |   30 ++------
+ arch/arm/mach-clps711x/board-clep7312.c  |    7 +-
+ arch/arm/mach-clps711x/board-edb7211.c   |   10 +--
+ arch/arm/mach-clps711x/board-p720t.c     |    2 +-
+ arch/arm/mach-footbridge/cats-hw.c       |    2 +-
+ arch/arm/mach-footbridge/netwinder-hw.c  |    2 +-
+ arch/arm/mach-msm/board-halibut.c        |    6 --
+ arch/arm/mach-msm/board-mahimahi.c       |   13 +---
+ arch/arm/mach-msm/board-msm7x30.c        |    3 +-
+ arch/arm/mach-msm/board-sapphire.c       |   13 ++--
+ arch/arm/mach-msm/board-trout.c          |    8 +--
+ arch/arm/mach-orion5x/common.c           |    3 +-
+ arch/arm/mach-orion5x/common.h           |    3 +-
+ arch/arm/mach-pxa/cm-x300.c              |    3 +-
+ arch/arm/mach-pxa/corgi.c                |   10 +--
+ arch/arm/mach-pxa/eseries.c              |    9 +--
+ arch/arm/mach-pxa/poodle.c               |    8 +--
+ arch/arm/mach-pxa/spitz.c                |    9 +--
+ arch/arm/mach-pxa/tosa.c                 |    8 +--
+ arch/arm/mach-realview/core.c            |   11 +--
+ arch/arm/mach-realview/core.h            |    3 +-
+ arch/arm/mach-realview/realview_pb1176.c |    8 +--
+ arch/arm/mach-realview/realview_pbx.c    |   17 ++---
+ arch/arm/mach-s3c24xx/mach-smdk2413.c    |    8 +--
+ arch/arm/mach-s3c24xx/mach-vstms.c       |    8 +--
+ arch/arm/mach-sa1100/assabet.c           |    2 +-
+ arch/arm/mm/init.c                       |   61 ++++++----------
+ arch/arm/mm/mmu.c                        |  115 +++++++++---------------------
+ include/linux/memblock.h                 |    2 +
+ mm/memblock.c                            |    5 ++
+ 34 files changed, 140 insertions(+), 284 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
