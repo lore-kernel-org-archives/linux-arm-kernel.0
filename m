@@ -1,109 +1,36 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 05 Feb 2014 16:07:19 +0100
-Subject: [PATCH] clk: add strict of_clk_init dependency check
-In-Reply-To: <52F25324.90108@free-electrons.com>
-References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
- <1391593680-9388-1-git-send-email-b.brezillon@overkiz.com>
- <52F24F4F.8000901@free-electrons.com> <52F25324.90108@free-electrons.com>
-Message-ID: <52F253A7.9030805@overkiz.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 5 Feb 2014 10:18:26 -0500
+Subject: [PATCH 1/6] i2c: bcm-kona: register with subsys_initcall
+In-Reply-To: <20140205090818.GA2614@katana>
+References: <1391516352-32359-1-git-send-email-mporter@linaro.org>
+ <1391516352-32359-2-git-send-email-mporter@linaro.org>
+ <20140205090818.GA2614@katana>
+Message-ID: <20140205151826.GC22153@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2014 16:05, Gregory CLEMENT wrote:
-> On 05/02/2014 15:48, Gregory CLEMENT wrote:
->> Hi Boris,
->>
->> On 05/02/2014 10:48, Boris BREZILLON wrote:
->>> The parent dependency check is only available on the first parent of a given
->>> clk.
->>>
->>> Add support for strict dependency check: all parents of a given clk must be
->>> initialized.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>> ---
->>>
->>> Hello Gregory,
->>>
->>> This patch adds support for strict check on clk dependencies (check if all
->>> parents specified by an DT clk node are initialized).
->>>
->>> I'm not sure this is what you were expecting (maybe testing the first parent
->>> is what you really want), so please feel free to tell me if I'm wrong.
->>>
->>> Best Regards,
->>>
->>> Boris
->>>
->>>   drivers/clk/clk.c |   27 +++++++++++++++++++++------
->>>   1 file changed, 21 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>> index beb0f8b..6849769 100644
->>> --- a/drivers/clk/clk.c
->>> +++ b/drivers/clk/clk.c
->>> @@ -2543,22 +2543,37 @@ static int parent_ready(struct device_node *np)
->>>   {
->>>   	struct of_phandle_args clkspec;
->>>   	struct of_clk_provider *provider;
->>> +	int num_parents;
->>> +	bool found;
->>> +	int i;
->>>   
->>>   	/*
->>>   	 * If there is no clock parent, no need to wait for them, then
->>>   	 * we can consider their absence as being ready
->>>   	 */
->>> -	if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
->>> -					&clkspec))
->>> +	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
->>> +	if (num_parents <= 0)
->>>   		return 1;
->>>   
->>> -	/* Check if we have such a provider in our array */
->>> -	list_for_each_entry(provider, &of_clk_providers, link) {
->>> -		if (provider->node == clkspec.np)
->>> +	for (i = 0; i < num_parents; i++) {
->>> +		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
->>> +					       &clkspec))
->>>   			return 1;
->>> +
->>> +		/* Check if we have such a provider in our array */
->>> +		found = false;
->>> +		list_for_each_entry(provider, &of_clk_providers, link) {
->>> +			if (provider->node == clkspec.np) {
->>> +				found = true;
->>> +				break;
->> Hum this means that as soon as you have one parent then you consider it
->> as ready. It is better of what I have done because I only test the 1st
->> parent. However I wondered if we should go further by ensuring all the
->> parents are ready.
-> My bad, I read the code too fast. Your code already checks that all the
-> parents are ready.
->
-> So if you agree I will merge your code with mine and send a new patch.
+On Wed, Feb 05, 2014 at 10:08:18AM +0100, Wolfram Sang wrote:
+> On Tue, Feb 04, 2014 at 07:19:07AM -0500, Matt Porter wrote:
+> 
+> > Voltage regulators are needed very early due to deferred probe
+> > being incompatible with built-in USB gadget drivers.
+> 
+> What does it need to fix those instead?
 
-That's fine by me.
->
->> If I am right, there is more than one parent only for the muxer. In this
->> case is it really expected that all the parent are ready?
->>
->> Thanks,
->>
->> Gregory
->>
->>> +			}
->>> +		}
->>> +
->>> +		if (!found)
->>> +			return 0;
->>>   	}
->>>   
->>> -	return 0;
->>> +	return 1;
->>>   }
->>>   
->>>   /**
->>>
->>
->
+[added Alan/Felipe for more insight]
+
+Discussion on that topic came about from this submission:
+http://www.spinics.net/lists/linux-usb/msg94217.html
+
+End of it is:
+http://www.spinics.net/lists/linux-usb/msg94731.html
+
+We can either add to the many drivers that already do subsys_initcall()
+for similar reasons...or I can drop this from the series and add gadget
+probe ordering to my TODO list.
+
+In short, it can't be a late_initcall() hack like the original post and
+really could be solved by converting to a real bus (and letting
+deferred probe do its job)..but Alan voiced concerns about that.
+
+-Matt
