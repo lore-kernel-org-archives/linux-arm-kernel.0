@@ -1,235 +1,213 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  5 Feb 2014 18:13:35 +0100
-Subject: [PATCH v2 1/4] arm64: add abstractions for FPSIMD state manipulation
+Date: Wed,  5 Feb 2014 18:13:38 +0100
+Subject: [PATCH v2 4/4] arm64: add Crypto Extensions based synchronous core
+ AES cipher
 In-Reply-To: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1391620418-3999-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1391620418-3999-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a preparatory patch that replaces code that saves or restores the
-on-CPU or preserved FPSIMD state directly with wrapper functions, resulting
-in all direct manipulation of the FPSIMD state to be concentrated in fpsimd.c
+This implements the core AES cipher using the Crypto Extensions,
+using only NEON registers q0 - q3.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h |  9 ++++++---
- arch/arm64/kernel/fpsimd.c      | 31 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c     |  2 +-
- arch/arm64/kernel/ptrace.c      | 22 +++++++++++++---------
- arch/arm64/kernel/signal.c      |  6 +++---
- arch/arm64/kernel/signal32.c    |  6 +++---
- 6 files changed, 57 insertions(+), 19 deletions(-)
+ arch/arm64/Makefile               |   1 +
+ arch/arm64/crypto/Makefile        |  13 ++++
+ arch/arm64/crypto/aes-ce-cipher.c | 134 ++++++++++++++++++++++++++++++++++++++
+ crypto/Kconfig                    |   6 ++
+ 4 files changed, 154 insertions(+)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index c43b4ac13008..7807974b49ee 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -52,12 +52,15 @@ struct fpsimd_state {
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 2fceb71ac3b7..8185a913c5ed 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -45,6 +45,7 @@ export	TEXT_OFFSET GZFLAGS
+ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
++core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
  
- struct task_struct;
- 
--extern void fpsimd_save_state(struct fpsimd_state *state);
--extern void fpsimd_load_state(struct fpsimd_state *state);
--
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
- 
-+struct fpsimd_state *fpsimd_get_task_state(void);
-+void fpsimd_set_task_state(struct fpsimd_state *state);
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+new file mode 100644
+index 000000000000..ac58945c50b3
+--- /dev/null
++++ b/arch/arm64/crypto/Makefile
+@@ -0,0 +1,13 @@
++#
++# linux/arch/arm64/crypto/Makefile
++#
++# Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License version 2 as
++# published by the Free Software Foundation.
++#
 +
-+struct user_fpsimd_state *fpsimd_get_user_state(struct task_struct *t);
-+void fpsimd_set_user_state(struct task_struct *t, struct user_fpsimd_state *st);
++obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
 +
- #endif
- 
- #endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 4aef42a04bdc..eeb003f54ad0 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -34,6 +34,10 @@
- #define FPEXC_IXF	(1 << 4)
- #define FPEXC_IDF	(1 << 7)
- 
-+/* defined in entry-fpsimd.S but only used in this unit */
-+void fpsimd_save_state(struct fpsimd_state *state);
-+void fpsimd_load_state(struct fpsimd_state *state);
-+
- /*
-  * Trapped FP/ASIMD access.
-  */
-@@ -87,6 +91,33 @@ void fpsimd_flush_thread(void)
- 	preempt_enable();
- }
- 
++CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
+new file mode 100644
+index 000000000000..6dd64106923f
+--- /dev/null
++++ b/arch/arm64/crypto/aes-ce-cipher.c
+@@ -0,0 +1,134 @@
 +/*
-+ * Sync the saved FPSIMD context with the FPSIMD register file
++ * linux/arch/arm64/crypto/aes-ce-cipher.c
++ *
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+struct fpsimd_state *fpsimd_get_task_state(void)
-+{
-+	fpsimd_save_state(&current->thread.fpsimd_state);
-+	return &current->thread.fpsimd_state;
-+}
 +
-+/*
-+ * Load a new FPSIMD state into the FPSIMD register file.
-+ */
-+void fpsimd_set_task_state(struct fpsimd_state *state)
-+{
-+	fpsimd_load_state(state);
-+}
++#include <asm/hwcap.h>
++#include <asm/neon.h>
++#include <crypto/aes.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++#include <linux/mod_devicetable.h>
 +
-+struct user_fpsimd_state *fpsimd_get_user_state(struct task_struct *t)
-+{
-+	return &t->thread.fpsimd_state.user_fpsimd;
-+}
++MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL");
 +
-+void fpsimd_set_user_state(struct task_struct *t, struct user_fpsimd_state *st)
++static int num_rounds(struct crypto_aes_ctx *ctx)
 +{
-+	t->thread.fpsimd_state.user_fpsimd = *st;
-+}
-+
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
- /*
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 1c0a9be2ffa8..bfa8214f92d1 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -199,7 +199,7 @@ void release_thread(struct task_struct *dead_task)
- 
- int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
- {
--	fpsimd_save_state(&current->thread.fpsimd_state);
-+	fpsimd_get_task_state();
- 	*dst = *src;
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6a8928bba03c..d0b35af14539 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -500,8 +500,7 @@ static int fpr_get(struct task_struct *target, const struct user_regset *regset,
- 		   unsigned int pos, unsigned int count,
- 		   void *kbuf, void __user *ubuf)
- {
--	struct user_fpsimd_state *uregs;
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+	struct user_fpsimd_state *uregs = fpsimd_get_user_state(target);
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs, 0, -1);
- }
- 
-@@ -516,7 +515,7 @@ static int fpr_set(struct task_struct *target, const struct user_regset *regset,
- 	if (ret)
- 		return ret;
- 
--	target->thread.fpsimd_state.user_fpsimd = newstate;
-+	fpsimd_set_user_state(target, &newstate);
- 	return ret;
- }
- 
-@@ -723,7 +722,7 @@ static int compat_vfp_get(struct task_struct *target,
- 	compat_ulong_t fpscr;
- 	int ret;
- 
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+	uregs = fpsimd_get_user_state(target);
- 
- 	/*
- 	 * The VFP registers are packed into the fpsimd_state, so they all sit
-@@ -746,24 +745,29 @@ static int compat_vfp_set(struct task_struct *target,
- 			  unsigned int pos, unsigned int count,
- 			  const void *kbuf, const void __user *ubuf)
- {
--	struct user_fpsimd_state *uregs;
-+	struct user_fpsimd_state newstate;
- 	compat_ulong_t fpscr;
- 	int ret;
- 
- 	if (pos + count > VFP_STATE_SIZE)
- 		return -EIO;
- 
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
 +	/*
-+	 * We will not overwrite the entire FPSIMD state, so we need to
-+	 * initialize 'newstate' with sane values.
++	 * # of rounds specified by AES:
++	 * 128 bit key		10 rounds
++	 * 192 bit key		12 rounds
++	 * 256 bit key		14 rounds
++	 * => n byte key	=> 6 + (n/4) rounds
 +	 */
-+	newstate = *fpsimd_get_user_state(target);
++	return 6 + ctx->key_length / 4;
++}
++
++static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++
++	kernel_neon_begin_partial(4);
++
++	__asm__("	ld1		{v0.16b}, [%[in]]		;"
++		"	cmp		%[rounds], #10			;"
++		"	bmi		0f				;"
++		"	bne		3f				;"
++		"	ld1		{v3.2d}, [%[key]], #16		;"
++		"	b		2f				;"
++		"0:	ld1		{v2.2d-v3.2d}, [%[key]], #32	;"
++		"1:	aese		v0.16b, v2.16b			;"
++		"	aesmc		v0.16b, v0.16b			;"
++		"2:	aese		v0.16b, v3.16b			;"
++		"	aesmc		v0.16b, v0.16b			;"
++		"3:	ld1		{v1.2d-v3.2d}, [%[key]], #48	;"
++		"	subs		%[rounds], %[rounds], #3	;"
++		"	aese		v0.16b, v1.16b			;"
++		"	aesmc		v0.16b, v0.16b			;"
++		"	bpl		1b				;"
++		"	aese		v0.16b, v2.16b			;"
++		"	eor		v0.16b, v0.16b, v3.16b		;"
++		"	st1		{v0.16b}, [%[out]]		;"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(num_rounds(ctx) - 2),
++		[key]		"r"(ctx->key_enc)
++	:			"cc", "memory");
++
++	kernel_neon_end();
++}
++
++static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++
++	kernel_neon_begin_partial(4);
++
++	__asm__("	ld1		{v0.16b}, [%[in]]		;"
++		"	cmp		%[rounds], #10			;"
++		"	bmi		0f				;"
++		"	bne		3f				;"
++		"	ld1		{v3.2d}, [%[key]], #16		;"
++		"	b		2f				;"
++		"0:	ld1		{v2.2d-v3.2d}, [%[key]], #32	;"
++		"1:	aesd		v0.16b, v2.16b			;"
++		"	aesimc		v0.16b, v0.16b			;"
++		"2:	aesd		v0.16b, v3.16b			;"
++		"	aesimc		v0.16b, v0.16b			;"
++		"3:	ld1		{v1.2d-v3.2d}, [%[key]], #48	;"
++		"	subs		%[rounds], %[rounds], #3	;"
++		"	aesd		v0.16b, v1.16b			;"
++		"	aesimc		v0.16b, v0.16b			;"
++		"	bpl		1b				;"
++		"	aesd		v0.16b, v2.16b			;"
++		"	eor		v0.16b, v0.16b, v3.16b		;"
++		"	st1		{v0.16b}, [%[out]]		;"
++	: :
++		[out]		"r"(dst),
++		[in]		"r"(src),
++		[rounds]	"r"(num_rounds(ctx) - 2),
++		[key]		"r"(ctx->key_dec)
++	:			"cc", "memory");
++
++	kernel_neon_end();
++}
++
++static struct crypto_alg aes_alg = {
++	.cra_name		= "aes",
++	.cra_driver_name	= "aes-ce",
++	.cra_priority		= 300,
++	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize		= AES_BLOCK_SIZE,
++	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
++	.cra_module		= THIS_MODULE,
++	.cra_cipher = {
++		.cia_min_keysize	= AES_MIN_KEY_SIZE,
++		.cia_max_keysize	= AES_MAX_KEY_SIZE,
++		.cia_setkey		= crypto_aes_set_key,
++		.cia_encrypt		= aes_cipher_encrypt,
++		.cia_decrypt		= aes_cipher_decrypt
++	}
++};
++
++static int __init aes_mod_init(void)
++{
++	if (!(elf_hwcap & HWCAP_AES))
++		return -ENODEV;
++	return crypto_register_alg(&aes_alg);
++}
++
++static void __exit aes_mod_exit(void)
++{
++	crypto_unregister_alg(&aes_alg);
++}
++
++module_init(aes_mod_init);
++module_exit(aes_mod_exit);
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 7bcb70d216e1..f1d98bc346b6 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -791,6 +791,12 @@ config CRYPTO_AES_ARM_BS
+ 	  This implementation does not rely on any lookup tables so it is
+ 	  believed to be invulnerable to cache timing attacks.
  
--	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, uregs, 0,
-+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate, 0,
- 				 VFP_STATE_SIZE - sizeof(compat_ulong_t));
- 
- 	if (count && !ret) {
- 		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
--		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
--		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
-+		newstate.fpsr = fpscr & VFP_FPSCR_STAT_MASK;
-+		newstate.fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
- 	}
- 
-+	fpsimd_set_user_state(target, &newstate);
- 	return ret;
- }
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 890a591f75dd..54e1092c5b4c 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -47,11 +47,11 @@ struct rt_sigframe {
- 
- static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
--	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
-+	struct fpsimd_state *fpsimd;
- 	int err;
- 
- 	/* dump the hardware registers to the fpsimd_state structure */
--	fpsimd_save_state(fpsimd);
-+	fpsimd = fpsimd_get_task_state();
- 
- 	/* copy the FP and status/control registers */
- 	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
-@@ -88,7 +88,7 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	/* load the hardware registers from the fpsimd_state structure */
- 	if (!err) {
- 		preempt_disable();
--		fpsimd_load_state(&fpsimd);
-+		fpsimd_set_task_state(&fpsimd);
- 		preempt_enable();
- 	}
- 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index b3fc9f5ec6d3..88e4535c3a45 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -208,7 +208,7 @@ int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
-  */
- static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- {
--	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
-+	struct fpsimd_state *fpsimd;
- 	compat_ulong_t magic = VFP_MAGIC;
- 	compat_ulong_t size = VFP_STORAGE_SIZE;
- 	compat_ulong_t fpscr, fpexc;
-@@ -219,7 +219,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	 * Note that this also saves V16-31, which aren't visible
- 	 * in AArch32.
- 	 */
--	fpsimd_save_state(fpsimd);
-+	fpsimd = fpsimd_get_task_state();
- 
- 	/* Place structure header on the stack */
- 	__put_user_error(magic, &frame->magic, err);
-@@ -284,7 +284,7 @@ static int compat_restore_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	 */
- 	if (!err) {
- 		preempt_disable();
--		fpsimd_load_state(&fpsimd);
-+		fpsimd_set_task_state(&fpsimd);
- 		preempt_enable();
- 	}
- 
++config CRYPTO_AES_ARM64_CE
++	tristate "Synchronous AES cipher using ARMv8 Crypto Extensions"
++	depends on ARM64 && KERNEL_MODE_NEON
++	select CRYPTO_ALGAPI
++	select CRYPTO_AES
++
+ config CRYPTO_ANUBIS
+ 	tristate "Anubis cipher algorithm"
+ 	select CRYPTO_ALGAPI
 -- 
 1.8.3.2
