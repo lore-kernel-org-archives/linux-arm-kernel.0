@@ -1,173 +1,59 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed,  5 Feb 2014 17:03:54 +0000
-Subject: [PATCH 03/22] efi: add helper function to get UEFI params from FDT
-In-Reply-To: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
-References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1391619853-10601-4-git-send-email-leif.lindholm@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  5 Feb 2014 18:13:34 +0100
+Subject: [PATCH v2 0/4] kernel mode NEON optimizations
+Message-ID: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+The main purpose of this series is to allow Crypto Extensions instructions to be
+used in interrupt context. For instance, the WPA2 CCMP handling (i.e., AES-128
+in CCM mode) in the mac80211 layer runs entirely in softirq context.
 
-ARM and ARM64 architectures use the device tree to pass UEFI parameters
-from stub to kernel. These parameters are things known to the stub but
-not discoverable by the kernel after the stub calls ExitBootSerives().
-There is a helper function in:
+Patch #1 does some preparatory work so all code external to kernel/fpsimd.c uses
+accessor functions to manipulate both the on-CPU and preserved FPSIMD states
+rather than poking them directly.
 
-   drivers/firmware/efi/fdt.c
+Patch #2 implements an optimization that reduces the number of times the
+userland FPSIMD state is needlessly preserved and restored.
 
-which the stub uses to add the UEFI parameters to the device tree.
-This patch adds a complimentary helper function which UEFI runtime
-support may use to retrieve the parameters from the device tree.
-If an architecture wants to use this helper, it should select
-CONFIG_UEFI_PARAMS_FROM_FDT.
+Patch #3 modifies kernel_neon_begin() and kernel_neon_end() so they may be
+called from interrupt context.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/firmware/efi/Kconfig |    7 ++++
- drivers/firmware/efi/efi.c   |   79 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/efi.h          |    9 +++++
- 3 files changed, 95 insertions(+)
+Patch #4 contains the actual AES implementation, updated to reflect some recent
+feedback I received when I posted it separately from this series.
 
-diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-index 1e75f48..d3fe28d 100644
---- a/drivers/firmware/efi/Kconfig
-+++ b/drivers/firmware/efi/Kconfig
-@@ -47,6 +47,13 @@ config EFI_RUNTIME_MAP
- 
- 	  See also Documentation/ABI/testing/sysfs-firmware-efi-runtime-map.
- 
-+config UEFI_PARAMS_FROM_FDT
-+	bool
-+	help
-+	  Select this config option from the architecture Kconfig if
-+	  the EFI runtime support gets system table address, memory
-+          map address, and other parameters from the device tree.
-+
- endmenu
- 
- config UEFI_CPER
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index b25b36b..7f6e977 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -20,6 +20,8 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/efi.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/io.h>
- 
- struct efi __read_mostly efi = {
-@@ -318,3 +320,80 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
- 
- 	return 0;
- }
-+
-+#ifdef CONFIG_UEFI_PARAMS_FROM_FDT
-+
-+#define UEFI_PARAM(name, prop, field)			   \
-+	{						   \
-+		{ name },				   \
-+		{ prop },				   \
-+		offsetof(struct efi_fdt_params, field),    \
-+		FIELD_SIZEOF(struct efi_fdt_params, field) \
-+	}
-+
-+static __initdata struct {
-+	const char name[32];
-+	const char propname[32];
-+	int offset;
-+	int size;
-+} dt_params[] = {
-+	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
-+};
-+
-+struct param_info {
-+	int verbose;
-+	void *params;
-+};
-+
-+static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
-+				       int depth, void *data)
-+{
-+	struct param_info *info = data;
-+	void *prop, *dest;
-+	unsigned long len;
-+	u64 val;
-+	int i;
-+
-+	if (depth != 1 ||
-+	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen at 0") != 0))
-+		return 0;
-+
-+	pr_info("Getting parameters from FDT:\n");
-+
-+	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
-+		if (!prop) {
-+			pr_err("Can't find %s in device tree!\n",
-+			       dt_params[i].name);
-+			return 0;
-+		}
-+		dest = info->params + dt_params[i].offset;
-+
-+		val = of_read_number(prop, len / sizeof(u32));
-+
-+		if (dt_params[i].size == sizeof(u32))
-+			*(u32 *)dest = val;
-+		else
-+			*(u64 *)dest = val;
-+
-+		if (info->verbose)
-+			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
-+				dt_params[i].size * 2, val);
-+	}
-+	return 1;
-+}
-+
-+int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
-+{
-+	struct param_info info;
-+
-+	info.verbose = verbose;
-+	info.params = params;
-+
-+	return of_scan_flat_dt(fdt_find_uefi_params, &info);
-+}
-+#endif /* CONFIG_UEFI_PARAMS_FROM_FDT */
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index a3276da..d450673 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -483,6 +483,14 @@ struct efi_memory_map {
- 	unsigned long desc_size;
- };
- 
-+struct efi_fdt_params {
-+	u64 system_table;
-+	u64 mmap;
-+	u32 mmap_size;
-+	u32 desc_size;
-+	u32 desc_ver;
-+};
-+
- typedef struct {
- 	u32 revision;
- 	void *parent_handle;
-@@ -620,6 +628,7 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
- extern void efi_get_time(struct timespec *now);
- extern int efi_set_rtc_mmss(const struct timespec *now);
- extern void efi_reserve_boot_services(void);
-+extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
- extern struct efi_memory_map memmap;
- 
- /* Iterate through an efi_memory_map */
+Changes since previous version:
+- added preparatory patch #1
+- based on feedback from Will Deacon, make sure ptrace() and return from signal
+  handler cases are covered.
+
+Mildly but not yet thoroughly tested.
+All feedback highly appreciated.
+
+Ard Biesheuvel (4):
+  arm64: add abstractions for FPSIMD state manipulation
+  arm64: defer reloading a task's FPSIMD state to userland resume
+  arm64: add support for kernel mode NEON in interrupt context
+  arm64: add Crypto Extensions based synchronous core AES cipher
+
+ arch/arm64/Makefile                   |   1 +
+ arch/arm64/crypto/Makefile            |  13 +++
+ arch/arm64/crypto/aes-ce-cipher.c     | 134 +++++++++++++++++++++++++++++
+ arch/arm64/include/asm/fpsimd.h       |  30 ++++++-
+ arch/arm64/include/asm/fpsimdmacros.h |  37 ++++++++
+ arch/arm64/include/asm/neon.h         |   6 +-
+ arch/arm64/include/asm/thread_info.h  |   4 +-
+ arch/arm64/kernel/entry-fpsimd.S      |  24 ++++++
+ arch/arm64/kernel/entry.S             |   2 +-
+ arch/arm64/kernel/fpsimd.c            | 156 +++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/process.c           |   2 +-
+ arch/arm64/kernel/ptrace.c            |  22 +++--
+ arch/arm64/kernel/signal.c            |  10 ++-
+ arch/arm64/kernel/signal32.c          |   6 +-
+ crypto/Kconfig                        |   6 ++
+ 15 files changed, 411 insertions(+), 42 deletions(-)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
+
 -- 
-1.7.10.4
+1.8.3.2
