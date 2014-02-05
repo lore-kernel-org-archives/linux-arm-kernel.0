@@ -1,63 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 05 Feb 2014 19:21:23 +0100
-Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
- parameters from EDID
-In-Reply-To: <20140205190732.5617f200@armhf>
-References: <cover.1391274627.git.moinejf@free.fr>
- <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
- <20140204180625.GM22609@sirena.org.uk> <20140205101134.4591e5c3@armhf>
- <52F2021A.9020804@metafoo.de> <20140205190732.5617f200@armhf>
-Message-ID: <52F28123.1080102@metafoo.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 5 Feb 2014 13:34:57 -0500
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140205183457.GW8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 07:07 PM, Jean-Francois Moine wrote:
-> On Wed, 05 Feb 2014 10:19:22 +0100
-> Lars-Peter Clausen <lars@metafoo.de> wrote:
->
->>> So, in the CODEC, I don't see how I could update the parameters
->>> dictated by the EDID otherwise in changing the DAI driver parameters.
->>>
->>
->> The startup function is the right place. But instead of modifying the DAI
->> use snd_pcm_hw_constraint_mask64(), snd_pcm_hw_constraint_list(), etc. to
->> setup the additional constraints that come from the EDID.
->
-> It is more complicated, but it works. Nevertheless, I have 2 problems:
->
-> - snd_pcm_hw_constraint_list() keeps a pointer to the list, so, it
->    cannot be in the stack. It fix this with static struct and rate array.
->
+On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
+> This patch set fixes clk init order that went upside-down with
+> v3.14. I haven't really investigated what caused this, but I assume
+> it is related with DT node reordering by addresses.
+> 
+> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> registered before core clocks driver. Unfortunately, we cannot
+> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> init order for our drivers is always core clocks before clock gating,
+> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> init function that will register core clocks before clock gating
+> driver.
+> 
+> This patch is based on pre-v3.14-rc1 mainline and should go in as
+> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> I suggest Jason picks it up as a topic branch.
+> 
+> The patches have been boot tested on Dove and compile-tested only
+> for Kirkwood, Armada 370 and XP.
+> 
+> Sebastian Hesselbarth (4):
+>   clk: mvebu: armada-370: maintain clock init order
+>   clk: mvebu: armada-xp: maintain clock init order
+>   clk: mvebu: dove: maintain clock init order
+>   clk: mvebu: kirkwood: maintain clock init order
+> 
+>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+>  4 files changed, 44 insertions(+), 50 deletions(-)
 
-Right. If the struct is modified though it should be per device and not 
-global. I think the best way to implement this is to make the array static 
-and specify a mask for the constraint based on the EDID. E.g.
+Whole series applied to mvebu/clk-fixes.
 
-static unsigned int hdmi_rates[] = {
-	32000,
-	44100,
-	48000,
-	88200,
-	96000,
-	176400,
-	192000,
-};
+thx,
 
-rate_mask = 0;
-
-while (...) {
-	...
-	rate_mask |= 1 << sad[1];
-}
-
-rate_constraints->list = hdmi_rates;
-rate_constraints->count = ARRAY_SIZE(hdmi_rates);
-rate_constraints->mask = rate_mask;
-
-> - snd_pcm_hw_constraint_mask64() is not exported.
->    Is there an other way to set constraints on the formats/sample widths?
-
-I think that's a bug. Both snd_pcm_hw_constraint_mask() and 
-snd_pcm_hw_constraint_mask64() should be exported. Can you send a patch?
-
-- Lars
+Jason.
