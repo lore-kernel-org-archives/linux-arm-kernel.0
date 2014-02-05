@@ -1,91 +1,70 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 4 Feb 2014 23:52:48 -0600
-Subject: [PATCH 1/2] arm64: vdso: fix coarse clock handling
-In-Reply-To: <20140204182631.GI664@mudshark.cambridge.arm.com>
-References: <1391456932-17815-1-git-send-email-nathan_lynch@mentor.com>
- <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
- <20140204182631.GI664@mudshark.cambridge.arm.com>
-Message-ID: <52F1D1B0.6080401@mentor.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Tue,  4 Feb 2014 23:53:04 -0600
+Subject: [PATCH v2 1/2] arm64: vdso: fix coarse clock handling
+In-Reply-To: <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
+References: <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1391579584-412-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+When __kernel_clock_gettime is called with a CLOCK_MONOTONIC_COARSE or
+CLOCK_REALTIME_COARSE clock id, it returns incorrectly to whatever the
+caller has placed in x2 ("ret x2" to return from the fast path).  Fix
+this by saving x30/LR to x2 only in code that will call
+__do_get_tspec, restoring x30 afterward, and using a plain "ret" to
+return from the routine.
 
-On 02/04/2014 12:26 PM, Will Deacon wrote:
-> 
-> On Mon, Feb 03, 2014 at 07:48:51PM +0000, Nathan Lynch wrote:
->> When __kernel_clock_gettime is called with a CLOCK_MONOTONIC_COARSE or
->> CLOCK_REALTIME_COARSE clock id, it returns incorrectly to whatever the
->> caller has placed in x2.  Fix this by saving x30/LR to x2
->> unconditionally.
->>
->> Also: the tv_nsec field in the result is shifted by the value in x12.
->> In the high-precision case x12 is cs_shift from the data page, but
->> for coarse clocks x12 is uninitialized.  Fix this by setting x12 to 0
->> once we know we are dealing with a coarse clock.
-> 
-> How are you managing to see these failures? It's clear that our LTP testing
-> isn't hitting this path...
+Also: while the resulting tv_nsec value for CLOCK_REALTIME and
+CLOCK_MONOTONIC must be computed using intermediate values that are
+left-shifted by cs_shift (x12, set by __do_get_tspec), the results for
+coarse clocks should be calculated using unshifted values
+(xtime_coarse_nsec is in units of actual nanoseconds).  The current
+code shifts intermediate values by x12 unconditionally, but x12 is
+uninitialized when servicing a coarse clock.  Fix this by setting x12
+to 0 once we know we are dealing with a coarse clock id.
 
-I'm using a custom test program that I wrote to check the vdso
-implementation I've been working on for 32-bit ARM.  Briefly looking
-through LTP sources it's not apparent to me that it tests
-clock_gettime() with the coarse ids.
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
 
+Changes from v1:
+- Save x30/lr only when branching to __do_get_tspec, and restore it
+  afterward.  Use plain "ret" to return instead of "ret x2".
+- Better explanation for setting x12 (shift) to zero.
 
-> 
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> ---
->>  arch/arm64/kernel/vdso/gettimeofday.S | 9 ++++++---
->>  1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
->> index f0a6d10b5211..6c37ae4a70c0 100644
->> --- a/arch/arm64/kernel/vdso/gettimeofday.S
->> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
->> @@ -88,13 +88,13 @@ ENDPROC(__kernel_gettimeofday)
->>  /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
->>  ENTRY(__kernel_clock_gettime)
->>  	.cfi_startproc
->> +	mov	x2, x30
->> +	.cfi_register x30, x2
->> +
->>  	cmp	w0, #CLOCK_REALTIME
->>  	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
->>  	b.ne	2f
->>  
->> -	mov	x2, x30
->> -	.cfi_register x30, x2
->> -
-> 
-> Could we avoid the redundant moves by instead doing this around the bl
-> __do_get_tspec?
+ arch/arm64/kernel/vdso/gettimeofday.S | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-In v2 I've restored x30 upon returning from __do_get_tspec and adjusted
-the return from __kernel_clock_gettime accordingly.  Let me know if you
-were suggesting something different here.
-
-
-> 
->>  	/* Get kernel timespec. */
->>  	adr	vdso_data, _vdso_data
->>  1:	seqcnt_acquire
->> @@ -118,6 +118,9 @@ ENTRY(__kernel_clock_gettime)
->>  	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
->>  	b.ne	8f
->>  
->> +	/* Set shift to 0 for coarse clocks */
->> +	mov	x12, #0
-> 
-> Worth mentioning that xtime_coarse_nsec is pre-shifted for us, rather than
-> shifting not actually being required.
-
-Agreed.
-
-
-> Also, rather than shift by #0, can we move the lsl instruction immediately
-> before the b 4f earlier on?
-
-There are two more shift operations later in the routine which would
-also need accounting for, so it's not quite that simple.  Okay to leave
-this alone for the purpose of this patch?
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+index f0a6d10b5211..fe652ffd34c2 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.S
++++ b/arch/arm64/kernel/vdso/gettimeofday.S
+@@ -103,6 +103,8 @@ ENTRY(__kernel_clock_gettime)
+ 	bl	__do_get_tspec
+ 	seqcnt_check w9, 1b
+ 
++	mov	x30, x2
++
+ 	cmp	w0, #CLOCK_MONOTONIC
+ 	b.ne	6f
+ 
+@@ -118,6 +120,9 @@ ENTRY(__kernel_clock_gettime)
+ 	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
+ 	b.ne	8f
+ 
++	/* xtime_coarse_nsec is already right-shifted */
++	mov	x12, #0
++
+ 	/* Get coarse timespec. */
+ 	adr	vdso_data, _vdso_data
+ 3:	seqcnt_acquire
+@@ -156,7 +161,7 @@ ENTRY(__kernel_clock_gettime)
+ 	lsr	x11, x11, x12
+ 	stp	x10, x11, [x1, #TSPEC_TV_SEC]
+ 	mov	x0, xzr
+-	ret	x2
++	ret
+ 7:
+ 	mov	x30, x2
+ 8:	/* Syscall fallback. */
+-- 
+1.8.3.1
