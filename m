@@ -1,38 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 5 Feb 2014 11:41:31 -0600
-Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
-In-Reply-To: <52F26F53.20408@ti.com>
-References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
- <52F26F53.20408@ti.com>
-Message-ID: <CAGo_u6qt2qqsxRSdJM26g6_UHObTQQTyPin0fU_1fOViAqW8Lg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 5 Feb 2014 11:41:34 -0600
+Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
+ timer
+In-Reply-To: <52F26444.5090707@ti.com>
+References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>
+ <52F26444.5090707@ti.com>
+Message-ID: <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-05 Grygorii Strashko <grygorii.strashko@ti.com>:
-> Hi All,
-> On 02/05/2014 05:06 PM, Illia Smyrnov wrote:
->> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
->> softreset bit cleaning right after set one. It is caused L3 error for
->> OMAP4 ISS because ISS register write occurs when ISS reset process is in
->> progress. Avoid this situation by cleaning softreset bit later, when reset
->> process is successfully finished.
+On Wed, Feb 5, 2014 at 10:18 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
 >
-> I'd like to mention that this issue has been caught while upgrading
-> custom Linux Kernel 3.4 to the last Stable Kernel linux-3.4.y.
-> So, the same OMAP4+ functionality can be broken in all Stable trees
-> where commit "ARM: OMAP2+: hwmod: Fix SOFTRESET logic" was merged to.
+> On 02/05/2014 04:39 PM, Rob Herring wrote:
+>>
+>> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> wrote:
+>>>
+>>> This patch provides bindings for the 64-bit timer in the KeyStone
+>>> architecture devices. The timer can be configured as a general-purpose
+>>> 64-bit
+>>> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
+>>> timers, each half can operate in conjunction (chain mode) or
+>>> independently
+>>> (unchained mode) of each other.
+>>
+>> This is software configurable or h/w design time configurations?
+>>
+>> Rob
+>>
 >
-> On OMAP4+ we should always try to wait until IP reset is finished before proceed.
->
-> Reviewed-by: "Grygorii Strashko <grygorii.strashko@ti.com>"
->
-> Error log example (k3.4):
->
+> This is h/w design time configurations
 
-Thanks - I for a moment thought it was on newer kernels :).
+Then it seems like the binding should provide for describing those
+differences either with a property or different compatible strings.
 
-Looping in Dan who is currently looking at reset driver replacement
-for existing hwmod based reset solution.
-
-Regards,
-Nishanth Menon
+Rob
