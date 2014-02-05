@@ -1,41 +1,38 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 5 Feb 2014 11:31:57 -0600
-Subject: [GIT PULL] SOCFPGA DT updates for 3.15
-Message-ID: <1391621517-17219-1-git-send-email-dinguyen@altera.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 5 Feb 2014 11:41:31 -0600
+Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+In-Reply-To: <52F26F53.20408@ti.com>
+References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+ <52F26F53.20408@ti.com>
+Message-ID: <CAGo_u6qt2qqsxRSdJM26g6_UHObTQQTyPin0fU_1fOViAqW8Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof,
+2014-02-05 Grygorii Strashko <grygorii.strashko@ti.com>:
+> Hi All,
+> On 02/05/2014 05:06 PM, Illia Smyrnov wrote:
+>> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
+>> softreset bit cleaning right after set one. It is caused L3 error for
+>> OMAP4 ISS because ISS register write occurs when ISS reset process is in
+>> progress. Avoid this situation by cleaning softreset bit later, when reset
+>> process is successfully finished.
+>
+> I'd like to mention that this issue has been caught while upgrading
+> custom Linux Kernel 3.4 to the last Stable Kernel linux-3.4.y.
+> So, the same OMAP4+ functionality can be broken in all Stable trees
+> where commit "ARM: OMAP2+: hwmod: Fix SOFTRESET logic" was merged to.
+>
+> On OMAP4+ we should always try to wait until IP reset is finished before proceed.
+>
+> Reviewed-by: "Grygorii Strashko <grygorii.strashko@ti.com>"
+>
+> Error log example (k3.4):
+>
 
-Please consider pulling in these 2 patches for the enabling SD/MMC on the SOCFPGA
-platform.
+Thanks - I for a moment thought it was on newer kernels :).
 
-Thanks,
-Dinh
+Looping in Dan who is currently looking at reset driver replacement
+for existing hwmod based reset solution.
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-for-3.15
-
-for you to fetch changes up to e422c12bc07192289c3fec4edd457e6ffaa03b2b:
-
-  ARM: socfpga_defconfig: enable SD/MMC support (2014-02-05 11:19:34 -0600)
-
-----------------------------------------------------------------
-SOCFPGA dts updates for v3.15
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      dts: socfpga: Add support for SD/MMC on the SOCFPGA platform
-      ARM: socfpga_defconfig: enable SD/MMC support
-
- arch/arm/boot/dts/socfpga.dtsi          |   13 ++++++++++++-
- arch/arm/boot/dts/socfpga_arria5.dtsi   |   11 +++++++++++
- arch/arm/boot/dts/socfpga_cyclone5.dtsi |   11 +++++++++++
- arch/arm/boot/dts/socfpga_vt.dts        |   11 +++++++++++
- arch/arm/configs/socfpga_defconfig      |    2 ++
- 5 files changed, 47 insertions(+), 1 deletion(-)
+Regards,
+Nishanth Menon
