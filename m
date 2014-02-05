@@ -1,44 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 19:58:25 +0000
-Subject: [PATCH] ARM: KVM: fix warning in mmu.c
-Message-ID: <1391630305-8056-1-git-send-email-marc.zyngier@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 05 Feb 2014 12:08:38 -0800
+Subject: [PATCH 05/17] mmc: mmci: Put the device into low power state at
+ system suspend
+In-Reply-To: <CACRpkdZt5+t7b0_a__2kJP4V9PS2cyXmguWrST+fzbKCnosi7g@mail.gmail.com>
+ (Linus Walleij's message of "Wed, 5 Feb 2014 13:49:49 +0100")
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org>
+ <8738jyu1h9.fsf@paris.lan>
+ <CACRpkdZt5+t7b0_a__2kJP4V9PS2cyXmguWrST+fzbKCnosi7g@mail.gmail.com>
+Message-ID: <87ob2ls4op.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling with THP enabled leads to the following warning:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-arch/arm/kvm/mmu.c: In function ?unmap_range?:
-arch/arm/kvm/mmu.c:177:39: warning: ?pte? may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
-                                        ^
-Code inspection reveals that these two cases are mutually exclusive,
-so GCC is a bit overzealous here. But silence it anyway by setting
-pte to NULL if kvm_pmd_huge(*pmd) is true.
+> On Tue, Feb 4, 2014 at 8:22 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>>
+>>> Due to the available runtime PM callbacks, we are now able to put our
+>>> device into low power state at system suspend.
+> (...)
+>> I'm trying to thing of a good reason to not make PM_SLEEP depend on
+>> PM_RUNTIME for platforms like this.
+>
+> Isn't the typical Android platform using PM_SLEEP without using
+> PM_RUNTIME?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/mmu.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+No, most Android platforms that I'm aware of use both extensively.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index ea21b6a..3020221 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -169,12 +169,14 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 			pte = pte_offset_kernel(pmd, addr);
- 			clear_pte_entry(kvm, pte, addr);
- 			next = addr + PAGE_SIZE;
-+		} else {
-+			pte = NULL;
- 		}
- 
- 		/*
- 		 * If the pmd entry is to be cleared, walk back up the ladder
- 		 */
--		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
-+		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
- 			clear_pmd_entry(kvm, pmd, addr);
- 			next = pmd_addr_end(addr, end);
- 			if (page_empty(pmd) && !page_empty(pud)) {
--- 
-1.8.3.4
+Kevin
