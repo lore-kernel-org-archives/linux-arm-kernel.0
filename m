@@ -1,45 +1,43 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 06 Feb 2014 00:11:39 +0100
-Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <52F2C52B.60001@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 5 Feb 2014 20:19:04 -0300
+Subject: [PATCH v5 02/20] clocksource: orion: Use atomic access for
+ shared registers
+In-Reply-To: <20140205191035.GZ8533@titan.lakedaemon.net>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390836440-12744-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140205191035.GZ8533@titan.lakedaemon.net>
+Message-ID: <20140205231903.GA30244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2014 11:59 PM, Gregory CLEMENT wrote:
-> Until now the clock providers were initialized in the order found in
-> the device tree. This led to have the dependencies between the clocks
-> not respected: children clocks could be initialized before their
-> parent clocks.
->
-> Instead of forcing each platform to manage its own initialization order,
-> this patch adds this work inside the framework itself.
->
-> Using the data of the device tree the of_clk_init function now delayed
-> the initialization of a clock provider if its parent provider was not
-> ready yet.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> [...]
-> this patch could solve the issues we get on severals mvebu platform
-> since 3.14-rc1. This is an alternate solution of the patch set sent by
-> Sebastian. However as it modifies the clock framework itself, it is
-> more sensible.
->
-> I find this solution more elegant than changing the order of the
-> initialization of the clock at the platform level. However as it
-> should be tested on more platforms that only the mvebu ones, it would
-> take some time, and I don't want to still have "broken" platform
-> during more release candidate. So at the end this patch should be part
-> of the 3.15 kernel.
+On Wed, Feb 05, 2014 at 02:10:35PM -0500, Jason Cooper wrote:
+> On Mon, Jan 27, 2014 at 12:27:02PM -0300, Ezequiel Garcia wrote:
+> > Replace the driver-specific thread-safe shared register API
+> > by the recently introduced atomic_io_clear_set().
+> > 
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/clocksource/time-orion.c | 28 ++++++++++------------------
+> >  1 file changed, 10 insertions(+), 18 deletions(-)
+> 
+> The MMIO patch this depends on:
+> 
+>   c5ca95b507c8 ARM: 7930/1: Introduce atomic MMIO modify
+> 
+> made it in to v3.14-rc1.  It looks like this change is independent of
+> the rest of the watchdog series, so:
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
 
-Gregory,
+Thanks, Jason.
 
-I admit, your patch is more general and I am looking forward to revert
-the reorder fix as soon as this is ready :)
+Daniel: If you can pick this I'll drop it from the next watchdog patchset
+submission.
 
-BTW, what happened to the early device discussion? Couldn't this be
-picked up here to allow -EPROBE_DEFER also for those early drivers?
-
-Sebastian
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
