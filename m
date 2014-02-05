@@ -1,35 +1,28 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 5 Feb 2014 18:41:35 +0530
-Subject: [PATCH V5 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <alpine.DEB.2.02.1402041713470.24986@ionos.tec.linutronix.de>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
- <52D7B2CA.8080902@ti.com> <52EF7D85.5070705@ti.com>
- <alpine.DEB.2.02.1402041713470.24986@ionos.tec.linutronix.de>
-Message-ID: <52F23887.9060209@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 5 Feb 2014 11:14:00 -0200
+Subject: [PATCH 1/3] Phytec phyFLEX-i.MX6 : Added USB_HOST Support
+In-Reply-To: <1391488493-30662-1-git-send-email-ashutosh.s@phytec.in>
+References: <1391488493-30662-1-git-send-email-ashutosh.s@phytec.in>
+Message-ID: <CAOMZO5DKx1uWT568t9TAy48Uf6ufpa1sSznaifDG_=+hLh8mqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 February 2014 09:44 PM, Thomas Gleixner wrote:
-> On Mon, 3 Feb 2014, Sricharan R wrote:
->>> I already have your reviewed-by tag for the first patch in this series.
->>>
->>> Kevin was pointing out that irqchip maintainer tag is needed for this patch as well
->>> to be merged. We are planning to take this series through arm-soc tree.
->>>
->>> Can i please have your tag for this patch as well ?
-> 
-> Acked-by-me
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Tue, Feb 4, 2014 at 2:34 AM, Ashutosh singh <ashutosh.s@phytec.in> wrote:
 
-Thanks Thomas.
+> +
+> +       reg_usb_h1_vbus: regulator at 1 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "usb_h1_vbus";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpio1 0 0>;
+> +               enable-active-low;
 
-Kevin,
-    I will re-send a branch based on rc1 for this.
+You should remove this 'enable-active-low' as this is not a valid property.
+
+By default the gpio is active low according to
+Documentation/devicetree/bindings/regulator/gpio-regulator.txt
 
 Regards,
- Sricharan
+
+Fabio Estevam
