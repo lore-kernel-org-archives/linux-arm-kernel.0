@@ -1,119 +1,179 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Feb 2014 14:01:00 +0900
-Subject: [PATCH] backlight: add PWM dependencies
-In-Reply-To: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
-References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <000401cf222f$43263b20$c972b160$%han@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 5 Feb 2014 00:09:16 -0500
+Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140205050916.GO8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 04, 2014 9:57 PM, Linus Walleij wrote:
+Mike,
+
+On Tue, Feb 04, 2014 at 11:59:26PM +0100, Gregory CLEMENT wrote:
+> Until now the clock providers were initialized in the order found in
+> the device tree. This led to have the dependencies between the clocks
+> not respected: children clocks could be initialized before their
+> parent clocks.
 > 
-> In some compilations the LM3630A and LP855X backlight drivers
-> fail like this:
+> Instead of forcing each platform to manage its own initialization order,
+> this patch adds this work inside the framework itself.
 > 
-> drivers/built-in.o: In function `lm3630a_pwm_ctrl':
-> drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
-> drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
-> drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
-> drivers/built-in.o: In function `lp855x_pwm_ctrl':
-> drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
-> drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
-> drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
+> Using the data of the device tree the of_clk_init function now delayed
+> the initialization of a clock provider if its parent provider was not
+> ready yet.
 > 
-> This is because both drivers depend on the PWM framework, so
-> add this dependency to their Kconfig entries.
-
-However, even though, when CONFIG_PWM is not enabled, the problem
-should not happen. pwm_config(),pwm_disable(), and pwm_enable()
-are already defined for CONFIG_PWM=n case as below.
-
-./include/linux/pwm.h
-#if IS_ENABLED(CONFIG_PWM) || IS_ENABLED(CONFIG_HAVE_PWM)
-	.....
-#else
-static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
-{
-        return ERR_PTR(-ENODEV);
-}
-
-static inline void pwm_free(struct pwm_device *pwm)
-{
-}
-
-static inline int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-{
-        return -EINVAL;
-}
-
-static inline int pwm_enable(struct pwm_device *pwm)
-{
-        return -EINVAL;
-}
-
-static inline void pwm_disable(struct pwm_device *pwm)
-{
-}
-#endif
-
-Is there 'drivers/pwm/core.o'?
-I reproduced this problem by commenting core.o with CONFIG_PWM=y.
-
-.config
-CONFIG_PWM=y
-
-./drivers/pwm/Makefile
-@@ -1,4 +1,4 @@
--obj-$(CONFIG_PWM)              += core.o
-+#obj-$(CONFIG_PWM)             += core.o
-
-In this case, the following build errors happen.
-Even though, CONFIG_PWM is enabled, the same errors happen.
-Would you give me the more detailed information?
-Ex. how to reproduce the problem.
-
-drivers/built-in.o: In function `lm3630a_pwm_ctrl':
-drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
-drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
-drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
-drivers/built-in.o: In function `lm3630a_probe':
-drivers/video/backlight/lm3630a_bl.c:422: undefined reference to `devm_pwm_get'
-drivers/built-in.o: In function `lp855x_pwm_ctrl':
-drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
-drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
-drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
-drivers/video/backlight/lp855x_bl.c:242: undefined reference to `devm_pwm_get'
-
-Thank you.
-
-Best regards,
-Jingoo Han
-
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  drivers/video/backlight/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> Mike,
 > 
-> diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-> index 5a3eb2ecb525..0604c3348761 100644
-> --- a/drivers/video/backlight/Kconfig
-> +++ b/drivers/video/backlight/Kconfig
-> @@ -371,6 +371,7 @@ config BACKLIGHT_AAT2870
->  config BACKLIGHT_LM3630A
->  	tristate "Backlight Driver for LM3630A"
->  	depends on BACKLIGHT_CLASS_DEVICE && I2C
-> +	depends on PWM
->  	select REGMAP_I2C
->  	help
->  	  This supports TI LM3630A Backlight Driver
-> @@ -387,6 +388,7 @@ config BACKLIGHT_LM3639
->  config BACKLIGHT_LP855X
->  	tristate "Backlight driver for TI LP855X"
->  	depends on BACKLIGHT_CLASS_DEVICE && I2C
-> +	depends on PWM
->  	help
->  	  This supports TI LP8550, LP8551, LP8552, LP8553, LP8555, LP8556 and
->  	  LP8557 backlight driver.
-> --
-> 1.8.5.3
+> this patch could solve the issues we get on severals mvebu platform
+> since 3.14-rc1. This is an alternate solution of the patch set sent by
+> Sebastian. However as it modifies the clock framework itself, it is
+> more sensible.
+> 
+> I find this solution more elegant than changing the order of the
+> initialization of the clock at the platform level. However as it
+> should be tested on more platforms that only the mvebu ones, it would
+> take some time, and I don't want to still have "broken" platform
+> during more release candidate. So at the end this patch should be part
+> of the 3.15 kernel.
+
+If we can get a response from Mike, I'd prefer to go with this approach
+and let it bake in -next for a while.  Hopefully, we could get it in
+before -rc4...
+
+thx,
+
+Jason.
+
+>  drivers/clk/clk.c | 94 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 91 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 5517944495d8..beb0f8b0c2a0 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2526,24 +2526,112 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+>  
+> +struct clock_provider {
+> +	of_clk_init_cb_t clk_init_cb;
+> +	struct device_node *np;
+> +	struct list_head node;
+> +};
+> +
+> +static LIST_HEAD(clk_provider_list);
+> +
+> +/*
+> + * This function looks for a parent clock. If there is one, then it
+> + * checks that the provider for this parent clock was initialized, in
+> + * this case the parent clock will be ready.
+> + */
+> +static int parent_ready(struct device_node *np)
+> +{
+> +	struct of_phandle_args clkspec;
+> +	struct of_clk_provider *provider;
+> +
+> +	/*
+> +	 * If there is no clock parent, no need to wait for them, then
+> +	 * we can consider their absence as being ready
+> +	 */
+> +	if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
+> +					&clkspec))
+> +		return 1;
+> +
+> +	/* Check if we have such a provider in our array */
+> +	list_for_each_entry(provider, &of_clk_providers, link) {
+> +		if (provider->node == clkspec.np)
+> +			return 1;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * of_clk_init() - Scan and init clock providers from the DT
+>   * @matches: array of compatible values and init functions for providers.
+>   *
+> - * This function scans the device tree for matching clock providers and
+> - * calls their initialization functions
+> + * This function scans the device tree for matching clock providers
+> + * and calls their initialization functions. It also do it by trying
+> + * to follow the dependencies.
+>   */
+>  void __init of_clk_init(const struct of_device_id *matches)
+>  {
+>  	const struct of_device_id *match;
+>  	struct device_node *np;
+> +	struct clock_provider *clk_provider, *next;
+> +	bool is_init_done;
+>  
+>  	if (!matches)
+>  		matches = &__clk_of_table;
+>  
+>  	for_each_matching_node_and_match(np, matches, &match) {
+>  		of_clk_init_cb_t clk_init_cb = match->data;
+> -		clk_init_cb(np);
+> +
+> +
+> +		if (parent_ready(np)) {
+> +			/*
+> +			 * The parent clock is ready or there is no
+> +			 * clock parent at all, in this case the
+> +			 * provider can be initialize immediately.
+> +			 */
+> +			clk_init_cb(np);
+> +		} else {
+> +			/*
+> +			 * The parent clock is not ready, this
+> +			 * provider is moved to a list to be
+> +			 * initialized later
+> +			 */
+> +			struct clock_provider *parent = kzalloc(sizeof(struct clock_provider),
+> +							GFP_KERNEL);
+> +
+> +			parent->clk_init_cb = match->data;
+> +			parent->np = np;
+> +			list_add(&parent->node, &clk_provider_list);
+> +		}
+> +	}
+> +
+> +	while (!list_empty(&clk_provider_list)) {
+> +		is_init_done = false;
+> +		list_for_each_entry_safe(clk_provider, next,
+> +					&clk_provider_list, node) {
+> +			if (parent_ready(clk_provider->np)) {
+> +				clk_provider->clk_init_cb(clk_provider->np);
+> +				list_del(&clk_provider->node);
+> +				kfree(clk_provider);
+> +				is_init_done = true;
+> +			}
+> +		}
+> +
+> +		if (!is_init_done) {
+> +			/*
+> +			 * We didn't managed to initialize any of the
+> +			 * remaining providers during the last loop,
+> +			 * so now we initialize all the remaining ones
+> +			 * unconditionally in case the clock parent
+> +			 * was not mandatory
+> +			 */
+> +			list_for_each_entry_safe(clk_provider, next,
+> +						&clk_provider_list, node) {
+> +				clk_provider->clk_init_cb(clk_provider->np);
+> +				list_del(&clk_provider->node);
+> +				kfree(clk_provider);
+> +			}
+> +		}
+>  	}
+>  }
+>  #endif
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
