@@ -1,50 +1,80 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 5 Feb 2014 11:19:28 -0500
-Subject: [PATCH 1/6] i2c: bcm-kona: register with subsys_initcall
-In-Reply-To: <Pine.LNX.4.44L0.1402051028350.1312-100000@iolanthe.rowland.org>
-References: <20140205151826.GC22153@beef>
- <Pine.LNX.4.44L0.1402051028350.1312-100000@iolanthe.rowland.org>
-Message-ID: <20140205161928.GF22153@beef>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 5 Feb 2014 17:21:10 +0100
+Subject: [PATCH] PCI: MVEBU: Use Device ID and revision from underlying
+ endpoint
+In-Reply-To: <1391597749-29807-1-git-send-email-andrew@lunn.ch>
+References: <1391597749-29807-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140205172110.22507687@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 10:30:29AM -0500, Alan Stern wrote:
-> On Wed, 5 Feb 2014, Matt Porter wrote:
+Dear Andrew Lunn,
+
+On Wed,  5 Feb 2014 11:55:49 +0100, Andrew Lunn wrote:
+> Marvell SoCs place the SoC number into the PCIe endpoint device ID.
+> The SoC stepping is placed into the PCIe revision. The old plat-orion
+> PCIe driver allowed this information to be seen in user space with a
+> simple lspci command.
 > 
-> > On Wed, Feb 05, 2014 at 10:08:18AM +0100, Wolfram Sang wrote:
-> > > On Tue, Feb 04, 2014 at 07:19:07AM -0500, Matt Porter wrote:
-> > > 
-> > > > Voltage regulators are needed very early due to deferred probe
-> > > > being incompatible with built-in USB gadget drivers.
-> > > 
-> > > What does it need to fix those instead?
-> > 
-> > [added Alan/Felipe for more insight]
-> > 
-> > Discussion on that topic came about from this submission:
-> > http://www.spinics.net/lists/linux-usb/msg94217.html
-> > 
-> > End of it is:
-> > http://www.spinics.net/lists/linux-usb/msg94731.html
-> > 
-> > We can either add to the many drivers that already do subsys_initcall()
-> > for similar reasons...or I can drop this from the series and add gadget
-> > probe ordering to my TODO list.
-> > 
-> > In short, it can't be a late_initcall() hack like the original post and
-> > really could be solved by converting to a real bus (and letting
-> > deferred probe do its job)..but Alan voiced concerns about that.
+> The new driver places a virtual PCI-PCI bridge on top of these
+> endpoints. It has its own hard coded PCI device ID. Thus it is no
+> longer possible to see what the SoC is using lspci.
 > 
-> Don't worry too much about what I said.  If adding a "gadget" bus will 
-> solve the problem in an appropriate way, and if nobody else objects 
-> (particularly Felipe, who is on vacation now), then go for it.
+> When initializing the PCI-PCI bridge, set its device ID and revision
+> from the underlying endpoint, thus restoring this functionality.
+> Debian would like to use this in order to aid installing the correct
+> DTB file.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/pci/host/pci-mvebu.c | 11 ++---------
+>  1 file changed, 2 insertions(+), 9 deletions(-)
 
-Ok, I'll take a look at what can be done and restart the conversation
-when Felipe returns.
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Wolfram: given this, as I mentioned, I'll simply drop this patch from
-the series and work around it for now. This will probably make Lee and
-Mark happy to not see subsys_initcall() in the MFD/regulator drivers as
-well.
+I have two comments below, though.
 
--Matt
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 13478ecd4113..0e79665afd44 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -60,14 +60,6 @@
+>  #define PCIE_DEBUG_CTRL         0x1a60
+>  #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
+>  
+> -/*
+> - * This product ID is registered by Marvell, and used when the Marvell
+> - * SoC is not the root complex, but an endpoint on the PCIe bus. It is
+> - * therefore safe to re-use this PCI ID for our emulated PCI-to-PCI
+> - * bridge.
+> - */
+> -#define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 0x7846
+> -
+>  /* PCI configuration space of a PCI-to-PCI bridge */
+>  struct mvebu_sw_pci_bridge {
+>  	u16 vendor;
+> @@ -388,7 +380,8 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+>  
+>  	bridge->class = PCI_CLASS_BRIDGE_PCI;
+>  	bridge->vendor = PCI_VENDOR_ID_MARVELL;
+
+This could also have been replaced by:
+
+	bridge->vendor = mvebu_readl(port, PCIE_DEV_ID_OFF) & 0xff;
+
+> -	bridge->device = MARVELL_EMULATED_PCI_PCI_BRIDGE_ID;
+> +	bridge->device = mvebu_readl(port, PCIE_DEV_ID_OFF) >> 16;
+> +	bridge->revision = mvebu_readl(port, PCIE_DEV_REV_OFF) & 0xff;
+
+On Armada 370 and XP, this field is apparently always 0x0, so not very
+useful. But if it's useful on other mvebu SoCs, that's fine, it's just
+an informative field anyway.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
