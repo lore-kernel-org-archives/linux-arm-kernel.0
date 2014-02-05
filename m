@@ -1,110 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  5 Feb 2014 13:30:40 +0000
-Subject: [PATCH 08/18] KVM: ARM: vgic: abstract MISR decoding
+Date: Wed,  5 Feb 2014 13:30:43 +0000
+Subject: [PATCH 11/18] KVM: ARM: vgic: introduce vgic_enable
 In-Reply-To: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
 References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1391607050-540-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391607050-540-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly dealing with the GICH_MISR bits, move the code to
-its own function and use a couple of public flags to represent the
-actual state.
+Move the code dealing with kicking the VGIC on to vgic_ops.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  4 ++++
- virt/kvm/arm/vgic.c    | 26 +++++++++++++++++++++++---
- 2 files changed, 27 insertions(+), 3 deletions(-)
+ include/kvm/arm_vgic.h |  1 +
+ virt/kvm/arm/vgic.c    | 29 +++++++++++++++++++++--------
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7928909..95085a6 100644
+index ee6fa93..46a42b1 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -86,6 +86,7 @@ struct vgic_ops {
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
-+	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
+@@ -98,6 +98,7 @@ struct vgic_ops {
+ 	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
+ 	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++	void	(*enable)(struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
-@@ -164,6 +165,9 @@ struct vgic_cpu {
- 
- #define LR_EMPTY	0xff
- 
-+#define INT_STATUS_EOI		(1 << 0)
-+#define INT_STATUS_UNDERFLOW	(1 << 1)
-+
- struct kvm;
- struct kvm_vcpu;
- struct kvm_run;
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8cb5f22..22423dd 100644
+index 574ca47..a6d70fc 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1034,11 +1034,25 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
- 	return *(u64 *)eisr;
+@@ -1081,6 +1081,19 @@ static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
  }
  
-+static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
++static void vgic_v2_enable(struct kvm_vcpu *vcpu)
 +{
-+	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
-+	u32 ret = 0;
++	/*
++	 * By forcing VMCR to zero, the GIC will restore the binary
++	 * points to their reset values. Anything else resets to zero
++	 * anyway.
++	 */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
 +
-+	if (misr & GICH_MISR_EOI)
-+		ret |= INT_STATUS_EOI;
-+	if (misr & GICH_MISR_U)
-+		ret |= INT_STATUS_UNDERFLOW;
-+
-+	return ret;
++	/* Get the show on the road... */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
-+	.get_interrupt_status	= vgic_v2_get_interrupt_status,
+@@ -1091,6 +1104,7 @@ static const struct vgic_ops vgic_ops = {
+ 	.clear_underflow	= vgic_v2_clear_underflow,
+ 	.get_vmcr		= vgic_v2_get_vmcr,
+ 	.set_vmcr		= vgic_v2_set_vmcr,
++	.enable			= vgic_v2_enable,
  };
  
  static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1062,6 +1076,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
- 	return vgic_ops.get_eisr(vcpu);
+@@ -1139,6 +1153,11 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+ 	vgic_ops.set_vmcr(vcpu, vmcr);
  }
  
-+static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
++static inline void vgic_enable(struct kvm_vcpu *vcpu)
 +{
-+	return vgic_ops.get_interrupt_status(vcpu);
++	vgic_ops.enable(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1259,11 +1278,12 @@ epilog:
- static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	u32 status = vgic_get_interrupt_status(vcpu);
- 	bool level_pending = false;
- 
--	kvm_debug("MISR = %08x\n", vgic_cpu->vgic_v2.vgic_misr);
-+	kvm_debug("STATUS = %08x\n", status);
- 
--	if (vgic_cpu->vgic_v2.vgic_misr & GICH_MISR_EOI) {
-+	if (status & INT_STATUS_EOI) {
- 		/*
- 		 * Some level interrupts have been EOIed. Clear their
- 		 * active bit.
-@@ -1290,7 +1310,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 		}
+@@ -1593,15 +1612,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
  	}
  
--	if (vgic_cpu->vgic_v2.vgic_misr & GICH_MISR_U)
-+	if (status & INT_STATUS_UNDERFLOW)
- 		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
+-	/*
+-	 * By forcing VMCR to zero, the GIC will restore the binary
+-	 * points to their reset values. Anything else resets to zero
+-	 * anyway.
+-	 */
+-	vgic_cpu->vgic_v2.vgic_vmcr = 0;
+-
+ 	vgic_cpu->nr_lr = vgic_nr_lr;
+-	vgic_cpu->vgic_v2.vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
++
++	vgic_enable(vcpu);
  
- 	return level_pending;
+ 	return 0;
+ }
 -- 
 1.8.3.4
