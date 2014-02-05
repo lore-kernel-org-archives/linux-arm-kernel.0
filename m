@@ -1,42 +1,119 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  5 Feb 2014 08:50:29 -0600
-Subject: [PATCH] arm64: fix early_io_map for 64K pages
-Message-ID: <1391611829-7824-1-git-send-email-robherring2@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 05 Feb 2014 06:51:49 -0800
+Subject: [PATCH v4 1/5] clk: sunxi: Add support for PLL6 on the A31
+In-Reply-To: <1391605507-30981-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391605507-30981-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1391605507-30981-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140205145149.22158.72564@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+Quoting Maxime Ripard (2014-02-05 05:05:03)
+> The A31 has a slightly different PLL6 clock. Add support for this new clock in
+> our driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-earlyprintk is broken with 64KB pages. The problem is pgprot_default
-is not yet initialized when early_io_map is called, so the pte does not
-get marked as valid. Set the necessary page and access permission bits.
+Looks good to me.
 
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
+Regards,
+Mike
 
-I'm not sure this is really the best fix. Perhaps pgprot_default can be
-statically initialized to something useful instead? 
-
-Rob
-
- arch/arm64/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f557ebb..c41daa6 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -284,7 +284,7 @@ void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
- 		if (pmd_none(*pmd))
- 			return NULL;
- 		pte = pte_offset_kernel(pmd, virt);
--		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRE));
-+		set_pte(pte, __pte((phys & mask) | PTE_TYPE_PAGE | PTE_AF | PROT_DEVICE_nGnRE));
- 	} else {
- 		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRE));
- 	}
--- 
-1.8.3.2
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 45 +++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index c2cb762..954845c 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -11,6 +11,7 @@ Required properties:
+>         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+>         "allwinner,sun4i-pll5-clk" - for the PLL5 clock
+>         "allwinner,sun4i-pll6-clk" - for the PLL6 clock
+> +       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+>         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+>         "allwinner,sun4i-axi-clk" - for the AXI clock
+>         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index abb6c5a..0c05c2d 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -249,7 +249,38 @@ static void sun4i_get_pll5_factors(u32 *freq, u32 parent_rate,
+>         *n = DIV_ROUND_UP(div, (*k+1));
+>  }
+>  
+> +/**
+> + * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6
+> + * PLL6 rate is calculated as follows
+> + * rate = parent_rate * n * (k + 1) / 2
+> + * parent_rate is always 24Mhz
+> + */
+> +
+> +static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
+> +                                      u8 *n, u8 *k, u8 *m, u8 *p)
+> +{
+> +       u8 div;
+> +
+> +       /*
+> +        * We always have 24MHz / 2, so we can just say that our
+> +        * parent clock is 12MHz.
+> +        */
+> +       parent_rate = parent_rate / 2;
+> +
+> +       /* Normalize value to a parent_rate multiple (24M / 2) */
+> +       div = *freq / parent_rate;
+> +       *freq = parent_rate * div;
+> +
+> +       /* we were called to round the frequency, we can now return */
+> +       if (n == NULL)
+> +               return;
+> +
+> +       *k = div / 32;
+> +       if (*k > 3)
+> +               *k = 3;
+>  
+> +       *n = DIV_ROUND_UP(div, (*k+1));
+> +}
+>  
+>  /**
+>   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+> @@ -416,6 +447,13 @@ static struct clk_factors_config sun4i_pll5_config = {
+>         .kwidth = 2,
+>  };
+>  
+> +static struct clk_factors_config sun6i_a31_pll6_config = {
+> +       .nshift = 8,
+> +       .nwidth = 5,
+> +       .kshift = 4,
+> +       .kwidth = 2,
+> +};
+> +
+>  static struct clk_factors_config sun4i_apb1_config = {
+>         .mshift = 0,
+>         .mwidth = 5,
+> @@ -457,6 +495,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+>         .getter = sun4i_get_pll5_factors,
+>  };
+>  
+> +static const struct factors_data sun6i_a31_pll6_data __initconst = {
+> +       .enable = 31,
+> +       .table = &sun6i_a31_pll6_config,
+> +       .getter = sun6i_a31_get_pll6_factors,
+> +};
+> +
+>  static const struct factors_data sun4i_apb1_data __initconst = {
+>         .table = &sun4i_apb1_config,
+>         .getter = sun4i_get_apb1_factors,
+> @@ -972,6 +1016,7 @@ free_clkdata:
+>  static const struct of_device_id clk_factors_match[] __initconst = {
+>         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
+>         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
+> +       {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
+>         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
+>         {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
+>         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+> -- 
+> 1.8.4.2
+> 
