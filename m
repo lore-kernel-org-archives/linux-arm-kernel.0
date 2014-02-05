@@ -1,127 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  5 Feb 2014 11:20:09 -0700
-Subject: [PATCH V2 1/2] ARM: tegra: enable LCD panel on Seaboard
-Message-ID: <1391624410-28632-1-git-send-email-swarren@wwwdotorg.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 05 Feb 2014 19:21:23 +0100
+Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
+ parameters from EDID
+In-Reply-To: <20140205190732.5617f200@armhf>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
+ <20140204180625.GM22609@sirena.org.uk> <20140205101134.4591e5c3@armhf>
+ <52F2021A.9020804@metafoo.de> <20140205190732.5617f200@armhf>
+Message-ID: <52F28123.1080102@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 02/05/2014 07:07 PM, Jean-Francois Moine wrote:
+> On Wed, 05 Feb 2014 10:19:22 +0100
+> Lars-Peter Clausen <lars@metafoo.de> wrote:
+>
+>>> So, in the CODEC, I don't see how I could update the parameters
+>>> dictated by the EDID otherwise in changing the DAI driver parameters.
+>>>
+>>
+>> The startup function is the right place. But instead of modifying the DAI
+>> use snd_pcm_hw_constraint_mask64(), snd_pcm_hw_constraint_list(), etc. to
+>> setup the additional constraints that come from the EDID.
+>
+> It is more complicated, but it works. Nevertheless, I have 2 problems:
+>
+> - snd_pcm_hw_constraint_list() keeps a pointer to the list, so, it
+>    cannot be in the stack. It fix this with static struct and rate array.
+>
 
-Seaboard uses a CLAA101WA01A LCD panel. Enable the relevant display
-controller, backlight, and regulators.
+Right. If the struct is modified though it should be per device and not 
+global. I think the best way to implement this is to make the array static 
+and specify a mask for the constraint based on the EDID. E.g.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Reviewed-by: Thierry Reding <treding@nvidia.com>
----
-v2:
-* s/chungwa/chunghwa/
-* Use the correct PWM instance
+static unsigned int hdmi_rates[] = {
+	32000,
+	44100,
+	48000,
+	88200,
+	96000,
+	176400,
+	192000,
+};
 
-(I intend to apply these immediately)
----
- arch/arm/boot/dts/tegra20-seaboard.dts | 55 +++++++++++++++++++++++++++++++++-
- 1 file changed, 54 insertions(+), 1 deletion(-)
+rate_mask = 0;
 
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a11b6e7b4759..a1d4bf9895d7 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -17,6 +17,14 @@
- 	};
- 
- 	host1x at 50000000 {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+
-+				nvidia,panel = <&panel>;
-+			};
-+		};
-+
- 		hdmi at 54280000 {
- 			status = "okay";
- 
-@@ -312,6 +320,10 @@
- 		status = "okay";
- 	};
- 
-+	pwm: pwm at 7000a000 {
-+		status = "okay";
-+	};
-+
- 	i2c at 7000c000 {
- 		status = "okay";
- 		clock-frequency = <400000>;
-@@ -369,7 +381,7 @@
- 			#size-cells = <0>;
- 		};
- 
--		i2c at 1 {
-+		lvds_ddc: i2c at 1 {
- 			reg = <1>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -762,6 +774,17 @@
- 		non-removable;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+
-+		enable-gpios = <&gpio TEGRA_GPIO(D, 4) GPIO_ACTIVE_HIGH>;
-+		power-supply = <&vdd_bl_reg>;
-+		pwms = <&pwm 2 5000000>;
-+
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
- 	clocks {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -795,6 +818,16 @@
- 		};
- 	};
- 
-+	panel: panel {
-+		compatible = "chunghwa,claa101wa01a", "simple-panel";
-+
-+		power-supply = <&vdd_pnl_reg>;
-+		enable-gpios = <&gpio TEGRA_GPIO(B, 2) GPIO_ACTIVE_HIGH>;
-+
-+		backlight = <&backlight>;
-+		ddc-i2c-bus = <&lvds_ddc>;
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -839,6 +872,26 @@
- 			regulator-always-on;
- 			regulator-boot-on;
- 		};
-+
-+		vdd_pnl_reg: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "vdd_pnl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio TEGRA_GPIO(C, 6) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		vdd_bl_reg: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			regulator-name = "vdd_bl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio TEGRA_GPIO(W, 0) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	sound {
--- 
-1.8.1.5
+while (...) {
+	...
+	rate_mask |= 1 << sad[1];
+}
+
+rate_constraints->list = hdmi_rates;
+rate_constraints->count = ARRAY_SIZE(hdmi_rates);
+rate_constraints->mask = rate_mask;
+
+> - snd_pcm_hw_constraint_mask64() is not exported.
+>    Is there an other way to set constraints on the formats/sample widths?
+
+I think that's a bug. Both snd_pcm_hw_constraint_mask() and 
+snd_pcm_hw_constraint_mask64() should be exported. Can you send a patch?
+
+- Lars
