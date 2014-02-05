@@ -1,44 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Feb 2014 11:54:57 +0000
-Subject: [PATCH v2 1/2] arm64: vdso: fix coarse clock handling
-In-Reply-To: <20140205100945.GA28623@mudshark.cambridge.arm.com>
-References: <1391456932-17815-2-git-send-email-nathan_lynch@mentor.com>
- <1391579584-412-1-git-send-email-nathan_lynch@mentor.com>
- <20140205100945.GA28623@mudshark.cambridge.arm.com>
-Message-ID: <20140205115457.GC7550@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 05 Feb 2014 12:05:15 +0000
+Subject: [PATCH 1/2] clk: shmobile: rcar-gen2: Fix clock parent all non-PLL
+ clocks
+In-Reply-To: <4232876.LkjsLLbJbc@avalon>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1389113273-10364-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52F213C9.2020501@codethink.co.uk> <4232876.LkjsLLbJbc@avalon>
+Message-ID: <52F228FB.5090900@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 10:09:45AM +0000, Will Deacon wrote:
-> On Wed, Feb 05, 2014 at 05:53:04AM +0000, Nathan Lynch wrote:
-> > When __kernel_clock_gettime is called with a CLOCK_MONOTONIC_COARSE or
-> > CLOCK_REALTIME_COARSE clock id, it returns incorrectly to whatever the
-> > caller has placed in x2 ("ret x2" to return from the fast path).  Fix
-> > this by saving x30/LR to x2 only in code that will call
-> > __do_get_tspec, restoring x30 afterward, and using a plain "ret" to
-> > return from the routine.
-> > 
-> > Also: while the resulting tv_nsec value for CLOCK_REALTIME and
-> > CLOCK_MONOTONIC must be computed using intermediate values that are
-> > left-shifted by cs_shift (x12, set by __do_get_tspec), the results for
-> > coarse clocks should be calculated using unshifted values
-> > (xtime_coarse_nsec is in units of actual nanoseconds).  The current
-> > code shifts intermediate values by x12 unconditionally, but x12 is
-> > uninitialized when servicing a coarse clock.  Fix this by setting x12
-> > to 0 once we know we are dealing with a coarse clock id.
-> > 
-> > Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> > ---
-> 
-> Thanks for the quick update Nathan!
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Catalin: both of these are candidates for stable.
+On 05/02/14 10:51, Laurent Pinchart wrote:
+> Hi Ben,
+>
+> On Wednesday 05 February 2014 10:34:49 Ben Dooks wrote:
+>> On 07/01/14 16:47, Laurent Pinchart wrote:
+>>> The lb, qspi, sdh, sd0 and sd1 clocks have the PLL1 (divided by 2) as
+>>> their parent, not the main clock. Fix it.
+>>
+>> William Towle has already sent a patch to move this to device tree
+>> which I think is a better solution for this.
+>
+> I actually disagree. The CPG is an IP core that generates a bunch of clocks
+> from a single external parent. The fact that clocks are not flat but organized
+> as a tree internally is an internal property of the CPG, and I prefer keeping
+> it that way instead of exposing it in the device tree.
 
-And by this you mean Cc: stable...
-
-Applied, thanks.
+If you feel that the block is unlikely to change if it gets
+re-used then that'll be fine. We can always revisit the changes
+if needed.
 
 -- 
-Catalin
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
