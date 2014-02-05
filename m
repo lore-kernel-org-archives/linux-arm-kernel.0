@@ -1,47 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 05 Feb 2014 06:39:16 -0800
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <15127900.Wy8QsPfEr8@avalon>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
- <1591253.8BzYfubhGS@avalon> <15127900.Wy8QsPfEr8@avalon>
-Message-ID: <20140205143916.22158.48165@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Feb 2014 15:34:24 +0100
+Subject: [PATCH 14/17] i2c: nomadik: Fixup deployment of runtime PM
+In-Reply-To: <1391529538-21685-15-git-send-email-ulf.hansson@linaro.org>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-15-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdZwoXf5ovmQEAN6Ugvz91+_i5uGqStR3MGXQeJGHitj3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Laurent Pinchart (2014-02-05 02:31:41)
-> Mike,
-> 
-> Ping ?
-> 
-> v3.14-rc1 is out, and those are bug fixes.
-> 
-> On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
-> > On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
-> > > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
-> > > > Geert, could you please verify that the series fixes your QSPI clock
-> > > > issues with the Koelsch board ?
-> > > > 
-> > > > Laurent Pinchart (2):
-> > > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
-> > > >   clk: shmobile: rcar-gen2: Fix qspi divisor
-> > > 
-> > > Thanks, both:
-> > > 
-> > > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > 
-> > Thank you.
-> > 
-> > Mike, could you please pick those patches up for v3.14 ?
+On Tue, Feb 4, 2014 at 4:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Taken into clk-fixes.
+> Since the device is active while a successful probe has been completed,
+> the reference counting for the clock will be screwed up and never reach
+> zero.
+>
+> The issue is resolved by implementing runtime PM callbacks and let them
+> handle the resources accordingly, including the clock.
+>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Thanks!
-Mike
+Hm do I read it right as patch 13 breaks runtime PM by leaving
+the device active after probe() and this patch
+14 fixes it again? Maybe these two patches should be squashed
+then.
 
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+Yours,
+Linus Walleij
