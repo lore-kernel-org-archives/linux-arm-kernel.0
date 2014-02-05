@@ -1,49 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Feb 2014 16:47:10 +0100
-Subject: [PATCH] mvebu : pcie: dt: potential issue in range parsing
-In-Reply-To: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
-References: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140205164710.082f689e@skate>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 05 Feb 2014 16:47:35 +0100
+Subject: [PATCH v2 0/6] ARM: sunxi: Add driver for SD/MMC hosts found
+ on allwinner sunxi SOCs
+In-Reply-To: <1676482.sbjAhaSLaV@dizzy-6.o2s.ch>
+References: <20140204191648.29809.14611.stgit@dizzy-6.o2s.ch>
+ <20140205103949.GC3192@lukather> <1676482.sbjAhaSLaV@dizzy-6.o2s.ch>
+Message-ID: <52F25D17.9080309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jean-Jacques Hiblot,
+Hi David,
 
-On Fri, 10 Jan 2014 11:23:51 +0100, Jean-Jacques Hiblot wrote:
-> The second parameter of of_read_number is not the index, but a size.
-> As it happens, in this case it may work just fine because of the the conversion
-> to u32 and the favorable endianness on this architecture.
-> 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index c269e43..877e8ce 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -768,7 +768,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
->  
->  	for (i = 0; i < nranges; i++) {
->  		u32 flags = of_read_number(range, 1);
-> -		u32 slot = of_read_number(range, 2);
-> +		u32 slot = of_read_number(range + 1, 1);
->  		u64 cpuaddr = of_read_number(range + na, pna);
->  		unsigned long rtype;
->  
+On 02/05/2014 02:01 PM, David Lanzend?rfer wrote:
+> Hi Maxime
+>> I have four comments here:
+>>    - Read Documentation/SubmittingPatches, especially Section 5 and 12
+>>      (hints, you forgot the clock maintainers for your clock patches
+>>      and you didn't put any signed-off-by tags)
+> Oops. I added signed-offs now
+>>    - You ignored pretty much all the comments that were made during the
+>>      review of the first version. Go through
+> Uh? I just fixed the commits and squashed them together for easier handling.
+> I'm even using mmc_of_parse now...
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/219339.
+>> html and address the comments that were made.
+>>    - Each of your patches should compile. Fix the order of your
+>>      patches.
+> Done.
+>>    - Submit a v3, with the changes you made. Otherwise we have no way
+>>      of knowing what have been fixed and what didn't
+> Too many patches would be bloaty.
+> That's why I've squashed them into small and corrected patches.
 
-Sorry for the long delay, and thanks for the fix!
+The squashing is fine, what Maxime means is that normally you would include
+a changelog in the coverletter (the [patch 0/x] mail) documenting changes
+done since the previous posting of the patchset, so for v3 that would have been
+something like:
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Changes since v1:
+-use mmc_of_parse instead of diy dt parsing
+-add nodes for all mmc controller to the dtsi files, including sofar unused
+  controllers
 
-(on Armada 370, with PCIe cards plugged in)
+Changes since v2:
+-Add missing Signed-off-by tags
+-stop using __raw_readl / __raw_writel so that barriers are properly used
 
-Thanks!
+I've probably forgotten a few things, it would be good if you could send
+a reply to the:
+"[PATCH v3 0/7] ARM: sunxi: Add driver for SD/MMC hosts found on allwinner sunxi SOCs"
+mail with the above changelog, amended with whatever I've forgotten to add
+to the above changelog
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks & Regards,
+
+Hans
