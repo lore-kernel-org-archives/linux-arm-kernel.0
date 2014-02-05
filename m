@@ -1,44 +1,65 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 5 Feb 2014 10:11:34 +0100
-Subject: [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw parameters
- from EDID
-In-Reply-To: <20140204180625.GM22609@sirena.org.uk>
-References: <cover.1391274627.git.moinejf@free.fr>
- <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
- <20140204180625.GM22609@sirena.org.uk>
-Message-ID: <20140205101134.4591e5c3@armhf>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 05 Feb 2014 09:15:31 +0000
+Subject: [Linux-kernel] [PATCH 2/3] ARM: shmobile: r8a7790: specify
+ multiple parents for cpg_clks
+In-Reply-To: <1391537858-28593-3-git-send-email-william.towle@codethink.co.uk>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <1391537858-28593-3-git-send-email-william.towle@codethink.co.uk>
+Message-ID: <52F20133.6080107@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Feb 2014 18:06:25 +0000
-Mark Brown <broonie@kernel.org> wrote:
+On 04/02/14 18:17, William Towle wrote:
+> The current drivers/clk/shmobile/clk-rcar-gen2.c uses the
+> extal_clk reference for the parent of all the clocks that
+> it registers. However the lb, qspi, sdh, sd0 and sd1 clocks
+> are all parented to either pll1 or pll1_div2 which means
+> that the clock rates are incorrect.
+>
+> This is part of the fix that corrects the SDHI0 clock
+> rate error where it reports 1MHz instead of 97.5:
+>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
+>
+> Notes:
+> - May require cross-merge with clk-rcar-gen2.c fix
+> - Also not clear which clock "z" is to fix it.
 
-> On Mon, Jan 27, 2014 at 09:48:54AM +0100, Jean-Francois Moine wrote:
-> 
-> > +		/* change the snd_soc_pcm_stream values of the driver */
-> > +		stream->rates = rate_mask;
-> > +		stream->channels_max = max_channels;
-> > +		stream->formats = formats;
-> 
-> > +	/* copy the DAI driver to a writable area */
-> > +	dai_drv = devm_kzalloc(&pdev->dev, sizeof(tda998x_dai), GFP_KERNEL);
-> > +	if (!dai_drv)
-> > +		return -ENOMEM;
-> > +	memcpy(dai_drv, tda998x_dai, sizeof(tda998x_dai));
-> > +
-> 
-> The code should be doing this by setting constraints based on the
-> current setup rather than by editing the data structure - the expecation
-> is very much that the data won't change so this prevents surprises with
-> future work on the core.
+Laurent, if you could give us an idea of how to fix this then
+it would be helpful to get this patch fully fixed.
 
-As it is done in the soc core, in soc_pcm_open(), the runtime hw_params
-are initialized after the call to the CODEC startup, and the next CODEC
-event is hw_params() when the user has already chosen all the parameters.
+>
+> [ben.dooks at codethink.co.uk: updated patch description]
+> Signed-off-by: William Towle <william.towle@codethink.co.uk>
+> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>   arch/arm/boot/dts/r8a7790.dtsi |    8 +++++++-
+>   1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index ff55c6e..242e6e2 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -446,7 +446,13 @@
+>   			compatible = "renesas,r8a7790-cpg-clocks",
+>   				     "renesas,rcar-gen2-cpg-clocks";
+>   			reg = <0 0xe6150000 0 0x1000>;
+> -			clocks = <&extal_clk>;
+> +			clocks = <&extal_clk>, <&extal_clk>, <&extal_clk>, <&extal_clk>,
+> +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> +				<&pll1_div2_clk>,
+> +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> +				<&cpg_clocks R8A7790_CLK_PLL1>
 
-So, in the CODEC, I don't see how I could update the parameters
-dictated by the EDID otherwise in changing the DAI driver parameters.
+Should we add a pll1_clk node, or leave this as is?
+
+> +				/* not known for "z" ...,<> */;
+>   			#clock-cells = <1>;
+>   			clock-output-names = "main", "pll0", "pll1", "pll3",
+>   					     "lb", "qspi", "sdh", "sd0", "sd1",
+>
+
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
