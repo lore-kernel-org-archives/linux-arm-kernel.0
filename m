@@ -1,59 +1,45 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Wed, 5 Feb 2014 10:15:11 +0530
-Subject: [PATCH 0/9] Samsung clock PM consolidation part 1
-In-Reply-To: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
-References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAPdUM4OHCEgy4Y8An9j8t3sQ6RjzMdSEdOnqrZNuAwrWGZN7Nw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 4 Feb 2014 23:54:15 -0500
+Subject: [PATCH 0/3] irqchip: orion: bridge irq fixes for v3.14-rc1
+In-Reply-To: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140205045415.GN8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu, Jan 23, 2014 at 11:38:03PM +0100, Sebastian Hesselbarth wrote:
+> This is a small patch set to fix some shortcomings how Orion bridge
+> irqs are handled. The patches are based on v3.13-rc8 and should go
+> into v3.14. They can possibly also marked for -stable down to v3.10.
+> 
+> This patches are the result of a discussion about a stale watchdog irq,
+> that can accidentially trigger the watchdog's irq handler and cause a
+> reset [1].
+> 
+> The first patch will add a write to clear already pending interrupts
+> on init. The second patch replaces handle_level_irq with handle_edge_irq
+> which is more appropriate for bridge irqs which are edge-triggered.
+> The last patch finally, fixes stale interrupts by installing an
+> .irq_enable callback, that will clear a possible pending interrupt
+> before unmasking it.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg302106.html
+> 
+> Sebastian Hesselbarth (3):
+>   irqchip: orion: clear bridge cause register on init
+>   irqchip: orion: use handle_edge_irq on bridge irqs
+>   irqchip: orion: clear stale interrupts in irq_enable
+> 
+>  drivers/irqchip/irq-orion.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
 
-Are you planning to respin this series? It is not applying on mike's for-next.
+Whole series applied to mvebu-next/irqchip-fixes (v2 for 3/3).  Once I
+see that the outstanding pull requests for mvebu/irqchip have been
+merged into mainline, I'll be changing the name of this branch to
+mvebu/irqchip-fixes.  I just don't want to upset the applecart atm.
 
-Regards,
-Rahul Sharma.
+Oh yeah, Cc'd for stable back to v3.10.
 
+thx,
 
-On 16 October 2013 16:38, Tomasz Figa <t.figa@samsung.com> wrote:
-> This series reworks suspend/resume handling of Samsung clock drivers
-> to cover more SoC specific aspects that are beyond simple register
-> save and restore. The goal is to have all the suspend/resume code
-> that touches the clock controller in single place, which is the
-> clock driver.
->
-> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
-> Arndale boards (except suspend/resume, which is broken because of
-> unrelated reasons):
->
-> Tested-by: Tomasz Figa <t.figa@samsung.com>
->
-> Tomasz Figa (9):
->   clk: exynos4: Remove remnants of non-DT support
->   clk: samsung: Provide common helpers for register save/restore
->   clk: samsung: exynos4: Move suspend/resume handling to SoC driver
->   clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
->   clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
->   clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
->   clk: samsung: Drop old suspend/resume code
->   clk: samsung: exynos4: Add remaining suspend/resume handling
->   ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
->
->  arch/arm/mach-exynos/pm.c            | 125 +-------------------------
->  drivers/clk/samsung/clk-exynos4.c    | 170 ++++++++++++++++++++++++++++++-----
->  drivers/clk/samsung/clk-exynos5250.c |  49 ++++++++--
->  drivers/clk/samsung/clk-exynos5420.c |  49 ++++++++--
->  drivers/clk/samsung/clk-exynos5440.c |   2 +-
->  drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
->  drivers/clk/samsung/clk.c            |  71 ++++++---------
->  drivers/clk/samsung/clk.h            |  14 ++-
->  8 files changed, 346 insertions(+), 213 deletions(-)
->
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jason.
