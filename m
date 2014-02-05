@@ -1,31 +1,80 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 05 Feb 2014 23:23:25 +0300
-Subject: [PATCH v3 0/6] IIO pulse capture support for TI ECAP
-In-Reply-To: <1391626901-31684-1-git-send-email-mporter@linaro.org>
-References: <1391626901-31684-1-git-send-email-mporter@linaro.org>
-Message-ID: <52F29DBD.9050305@cogentembedded.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 5 Feb 2014 12:27:33 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140205190947.GA22297@mudshark.cambridge.arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <1391532784-1953-3-git-send-email-will.deacon@arm.com>
+ <3460536.Sh23gjDa6X@wuerfel>
+ <20140205190947.GA22297@mudshark.cambridge.arm.com>
+Message-ID: <20140205192733.GG25695@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Feb 05, 2014 at 07:09:47PM +0000, Will Deacon wrote:
+> Hi Arnd,
+> 
+> Thanks for having a look.
+> 
+> On Tue, Feb 04, 2014 at 07:13:49PM +0000, Arnd Bergmann wrote:
+> > On Tuesday 04 February 2014 16:53:03 Will Deacon wrote:
+> > > +
+> > > +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> > > +                   at least a definition of the Configuration Space plus
+> > > +                   one or both of IO and Memory Space.
+> > > +
+> > 
+> > I might need to reread the spec, but I think the config space is not
+> > actually supposed to be in the 'ranges' of the host bridge at all,
+> > and it should just be listed in the 'reg'.
+> 
+> This wasn't at all clear to me (I listed it in the cover-letter as being
+> something to sort out).
 
-On 02/05/2014 10:01 PM, Matt Porter wrote:
+When we talked about this earlier on the DT bindings list the
+consensus seemed to be that configuration MMIO ranges should only be
+used if the underlying memory was exactly ECAM, and was not to be used
+for random configuration related register blocks.
 
-[...]
+The rational being that generic code, upon seeing that ranges entry,
+could just go ahead and assume ECAM mapping.
 
-> This series adds support for PWM capture devices within IIO and
-> adds a TI ECAP IIO driver.
+> Now, if "reg" is definitely the correct thing to do, is it simply a matter
+> of putting the Configuration Space base address in there, or do we also need
+> to do the rest of what ePAPR says (expansion ROM details, ...)? I don't like
+> the idea of enumerating the entire bus in the DT when we don't need to.
 
-> PWM capture devices are supported using a new IIO "pulse" channel type.
+If you use 'reg' then it is a private base address to your driver and
+you can do whatever you want with it.
 
-> The IIO ECAP driver implements interrupt driven triggered buffer capture
-> only as raw sample reads are not applicable to this hardware.
-> Initially, the driver supports a single pulse width measurement with
-> configurable polarity. The ECAP hardware can support measurement of a
-> complete period and duty cycle but this is not yet implemented.
+Most of the ePAPR things are only needed if the FW is going to
+communicate detailed information to the OS, for an environment that
+relies on Linux resource assignment and discovery you can just ignore
+all that.
 
-    How about pulse counting? I have the hardware that can also count pulses 
-in addition to measuring the periods, so I'm interested in this work 
-(initially I supported it in driver/misc/ but it got turned down for iio).
+> > This won't allow extended config space. Why not just do the
+> > regular mmconfig layout and make this:
+> > 
+> > 	cfg_offset(bus, device, function, register) =
+> > 		bus << 20 | device << 15 | function << 12 | register;
+> 
+> Is it worth adding a DT property to support both, or is ECAM the only thing
+> to care about? I'm happy either way, although I'll need to hack kvmtool to
+> use the new scheme.
 
-WBR, Sergei
+If you use ECAM then I wonder if your driver might be a generic SBSA
+driver too?
+
+I can't think of a reason to support alternate MMIO layouts if
+kvmtool is the only user and can be changed.
+
+> > I don't think we even want "virt" in the compatible string. The
+> > binding should be generic enough that it can actually work with
+> > real hardware.
+> 
+> Sure. How about "arm,pci-generic" ? Alternatives are
+> "arm,pcie-generic" or "linux,pci-generic".
+
+arm,pci-ecam-generic ?
+
+Regards,
+Jason
