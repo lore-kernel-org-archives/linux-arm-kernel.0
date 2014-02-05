@@ -1,119 +1,145 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 05 Feb 2014 06:51:49 -0800
-Subject: [PATCH v4 1/5] clk: sunxi: Add support for PLL6 on the A31
-In-Reply-To: <1391605507-30981-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391605507-30981-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391605507-30981-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140205145149.22158.72564@quantum>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 5 Feb 2014 17:47:24 +0200
+Subject: [PATCH v4] gpio: davinci: reuse for keystone soc
+Message-ID: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-02-05 05:05:03)
-> The A31 has a slightly different PLL6 clock. Add support for this new clock in
-> our driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The similar GPIO HW block is used by keystone SoCs as
+in Davinci SoCs.
+Hence, reuse Davinci GPIO driver for Keystone taking into
+account that Keystone contains ARM GIC IRQ controller which
+is implemented using IRQ Chip.
 
-Looks good to me.
+Documentation:
+	http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
 
-Regards,
-Mike
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+Changes in v4:
+- rebased on top of v3.14 +
+  [patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/clk-sunxi.c                     | 45 +++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index c2cb762..954845c 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -11,6 +11,7 @@ Required properties:
->         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->         "allwinner,sun4i-pll5-clk" - for the PLL5 clock
->         "allwinner,sun4i-pll6-clk" - for the PLL6 clock
-> +       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
->         "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
->         "allwinner,sun4i-axi-clk" - for the AXI clock
->         "allwinner,sun4i-axi-gates-clk" - for the AXI gates
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index abb6c5a..0c05c2d 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -249,7 +249,38 @@ static void sun4i_get_pll5_factors(u32 *freq, u32 parent_rate,
->         *n = DIV_ROUND_UP(div, (*k+1));
->  }
->  
-> +/**
-> + * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6
-> + * PLL6 rate is calculated as follows
-> + * rate = parent_rate * n * (k + 1) / 2
-> + * parent_rate is always 24Mhz
-> + */
-> +
-> +static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
-> +                                      u8 *n, u8 *k, u8 *m, u8 *p)
-> +{
-> +       u8 div;
-> +
-> +       /*
-> +        * We always have 24MHz / 2, so we can just say that our
-> +        * parent clock is 12MHz.
-> +        */
-> +       parent_rate = parent_rate / 2;
-> +
-> +       /* Normalize value to a parent_rate multiple (24M / 2) */
-> +       div = *freq / parent_rate;
-> +       *freq = parent_rate * div;
-> +
-> +       /* we were called to round the frequency, we can now return */
-> +       if (n == NULL)
-> +               return;
-> +
-> +       *k = div / 32;
-> +       if (*k > 3)
-> +               *k = 3;
->  
-> +       *n = DIV_ROUND_UP(div, (*k+1));
-> +}
->  
->  /**
->   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-> @@ -416,6 +447,13 @@ static struct clk_factors_config sun4i_pll5_config = {
->         .kwidth = 2,
->  };
->  
-> +static struct clk_factors_config sun6i_a31_pll6_config = {
-> +       .nshift = 8,
-> +       .nwidth = 5,
-> +       .kshift = 4,
-> +       .kwidth = 2,
-> +};
-> +
->  static struct clk_factors_config sun4i_apb1_config = {
->         .mshift = 0,
->         .mwidth = 5,
-> @@ -457,6 +495,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
->         .getter = sun4i_get_pll5_factors,
->  };
->  
-> +static const struct factors_data sun6i_a31_pll6_data __initconst = {
-> +       .enable = 31,
-> +       .table = &sun6i_a31_pll6_config,
-> +       .getter = sun6i_a31_get_pll6_factors,
-> +};
-> +
->  static const struct factors_data sun4i_apb1_data __initconst = {
->         .table = &sun4i_apb1_config,
->         .getter = sun4i_get_apb1_factors,
-> @@ -972,6 +1016,7 @@ free_clkdata:
->  static const struct of_device_id clk_factors_match[] __initconst = {
->         {.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
->         {.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
-> +       {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
->         {.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
->         {.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
->         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
-> -- 
-> 1.8.4.2
-> 
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
+ drivers/gpio/gpio-davinci.c                        |   48 ++++++++++++++++----
+ 2 files changed, 42 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+index a2e839d..4ce9862 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+@@ -1,7 +1,7 @@
+-Davinci GPIO controller bindings
++Davinci/Keystone GPIO controller bindings
+ 
+ Required Properties:
+-- compatible: should be "ti,dm6441-gpio"
++- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
+ 
+ - reg: Physical base address of the controller and the size of memory mapped
+        registers.
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index b0e98d3..5c97f61 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -37,6 +37,8 @@ struct davinci_gpio_regs {
+ 	u32	intstat;
+ };
+ 
++typedef struct irq_chip *(*gpio_get_irq_chip_cb_t)(unsigned int irq);
++
+ #define BINTEN	0x8 /* GPIO Interrupt Per-Bank Enable Register */
+ 
+ #define chip2controller(chip)	\
+@@ -413,6 +415,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
+ 	.xlate = irq_domain_xlate_onetwocell,
+ };
+ 
++static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
++{
++	static struct irq_chip_type gpio_unbanked;
++
++	gpio_unbanked = *container_of(irq_get_chip(irq),
++				      struct irq_chip_type, chip);
++
++	return &gpio_unbanked.chip;
++};
++
++static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
++{
++	static struct irq_chip gpio_unbanked;
++
++	gpio_unbanked = *irq_get_chip(irq);
++	return &gpio_unbanked;
++};
++
++static const struct of_device_id davinci_gpio_ids[];
++
+ /*
+  * NOTE:  for suspend/resume, probably best to make a platform_device with
+  * suspend_late/resume_resume calls hooking into results of the set_wake()
+@@ -434,6 +456,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 	struct davinci_gpio_regs __iomem *g;
+ 	struct irq_domain	*irq_domain = NULL;
+ 	int		irq;
++	const struct of_device_id *match;
++	struct irq_chip *irq_chip;
++	gpio_get_irq_chip_cb_t gpio_get_irq_chip;
++
++	/*
++	 * Use davinci_gpio_get_irq_chip by default to handle non DT cases
++	 */
++	gpio_get_irq_chip = davinci_gpio_get_irq_chip;
++	match = of_match_device(of_match_ptr(davinci_gpio_ids),
++				dev);
++	if (match)
++		gpio_get_irq_chip = (gpio_get_irq_chip_cb_t)match->data;
+ 
+ 	ngpio = pdata->ngpio;
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+@@ -490,8 +524,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 	 * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
+ 	 */
+ 	if (pdata->gpio_unbanked) {
+-		static struct irq_chip_type gpio_unbanked;
+-
+ 		/* pass "bank 0" GPIO IRQs to AINTC */
+ 		chips[0].chip.to_irq = gpio_to_irq_unbanked;
+ 		chips[0].gpio_irq = bank_irq;
+@@ -500,10 +532,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 
+ 		/* AINTC handles mask/unmask; GPIO handles triggering */
+ 		irq = bank_irq;
+-		gpio_unbanked = *container_of(irq_get_chip(irq),
+-					      struct irq_chip_type, chip);
+-		gpio_unbanked.chip.name = "GPIO-AINTC";
+-		gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
++		irq_chip = gpio_get_irq_chip(irq);
++		irq_chip->name = "GPIO-AINTC";
++		irq_chip->irq_set_type = gpio_irq_type_unbanked;
+ 
+ 		/* default trigger: both edges */
+ 		g = gpio2regs(0);
+@@ -512,7 +543,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+ 
+ 		/* set the direct IRQs up to use that irqchip */
+ 		for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
+-			irq_set_chip(irq, &gpio_unbanked.chip);
++			irq_set_chip(irq, irq_chip);
+ 			irq_set_handler_data(irq, &chips[gpio / 32]);
+ 			irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
+ 		}
+@@ -555,7 +586,8 @@ done:
+ 
+ #if IS_ENABLED(CONFIG_OF)
+ static const struct of_device_id davinci_gpio_ids[] = {
+-	{ .compatible = "ti,dm6441-gpio", },
++	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
++	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
+-- 
+1.7.9.5
