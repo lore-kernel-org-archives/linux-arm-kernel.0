@@ -1,31 +1,28 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed,  5 Feb 2014 15:04:36 +0530
-Subject: [PATCH] arm64: add DSB after icache flush in __flush_icache_all()
-Message-ID: <1391592876-18627-1-git-send-email-vkale@apm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 5 Feb 2014 10:36:19 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <52F20387.3090709@monstr.eu>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <201402042027.15898.arnd@arndb.de> <52F20387.3090709@monstr.eu>
+Message-ID: <201402051036.19428.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DSB after icache flush to complete the cache maintenance operation.
-The function __flush_icache_all() is used only for user space mappings
-and an ISB is not required because of an exception return before executing
-user instructions. An exception return would behave like an ISB.
+On Wednesday 05 February 2014, Michal Simek wrote:
+> I am not quite sure what you mean by reports to user space.
+> If you mean to get timeout through ioctl for example - then yes it is working
+> through standard watchdog ioctl interface and timeout is calculated
+> from hardware setup.
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
----
- arch/arm64/include/asm/cacheflush.h |    1 +
- 1 file changed, 1 insertion(+)
+Yes, that is what I meant. I believe most other watchdogs let
+you program the timeout, but I don't see anything wrong with
+having that fixed in the FPGA in your case.
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index fea9ee3..88932498 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -116,6 +116,7 @@ extern void flush_dcache_page(struct page *);
- static inline void __flush_icache_all(void)
- {
- 	asm("ic	ialluis");
-+	dsb();
- }
- 
- #define flush_dcache_mmap_lock(mapping) \
--- 
-1.7.9.5
+Still, the choice of putting the timeout into DT in terms of
+cycles rather than miliseconds wasn't ideal from an interface
+perspective and we should change that if/when we do a generic
+binding. I can definitely see where it's coming from for your
+case, as the cycle count totally makes sense from an FPGA
+tool perspective...
+
+	Arnd
