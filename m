@@ -1,39 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 05 Feb 2014 21:29:37 +0300
-Subject: [PATCH 1/3] arm: dts: am33xx.dtsi: Add node name to rtc device
- node
-In-Reply-To: <1391602361-2666-1-git-send-email-sr@denx.de>
-References: <1391602361-2666-1-git-send-email-sr@denx.de>
-Message-ID: <52F28311.20905@cogentembedded.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 05 Feb 2014 09:34:13 -0800
+Subject: [PATCH 05/22] Add shared printk wrapper for consistent prefixing
+In-Reply-To: <1391619853-10601-6-git-send-email-leif.lindholm@linaro.org>
+References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
+ <1391619853-10601-6-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1391621653.30094.11.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, 2014-02-05 at 17:03 +0000, Leif Lindholm wrote:
+> From: Roy Franz <roy.franz@linaro.org>
+> 
+> Add a wrapper for printk to standardize the prefix for informational and
+> error messages from the EFI stub.
 
-On 02/05/2014 03:12 PM, Stefan Roese wrote:
+trivia:
 
-> Making it possible to reference and therefor change (disable) this
-> device node from other dts file which import this dtsi file.
+> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
+[]
+> @@ -45,6 +45,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
+>  	}
+>  }
+>  
+> +#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
+> +#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Lukas Stockmann <lukas.stockmann@siemens.com>
-> Cc: Benoit Cousson <bcousson@baylibre.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/boot/dts/am33xx.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+Perhaps it'd be better to use a space after the second "
 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 6d95d3d..b8daf8c 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -399,7 +399,7 @@
->   			ti,timer-pwm;
->   		};
->
-> -		rtc at 44e3e000 {
-> +		rtc: rtc at 44e3e000 {
-
-    Node name is "rtc at 44e3e000" -- what you are adding is a label.
-
-WBR, Sergei
+Also, maybe pr_efi should be pr_efi_info.
+That would quiet any checkpatch noise around long msg uses.
