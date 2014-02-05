@@ -1,167 +1,191 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 05 Feb 2014 10:53:40 +0100
-Subject: [PATCH v2 1/7] cpufreq: cpufreq-cpu0: allow optional safe voltage
- during frequency transitions
-In-Reply-To: <20140201041051.9977.46568@quantum>
-References: <1390047057-2239-1-git-send-email-thomas.ab@samsung.com>
- <2009408.gnUEcoqA3p@phil> <20140201041051.9977.46568@quantum>
-Message-ID: <13010531.fmC0N07svH@phil>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 05 Feb 2014 10:07:50 +0000
+Subject: [PATCH v2 5/5] of: document bindings for reserved-memory nodes
+In-Reply-To: <1391515773-6112-6-git-send-email-m.szyprowski@samsung.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
+ 1391515773-6112-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140205100750.58EFAC40A89@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 31. Januar 2014, 20:10:51 schrieb Mike Turquette:
-> Quoting Heiko St?bner (2014-01-30 07:09:04)
+On Tue, 04 Feb 2014 13:09:33 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> From: Grant Likely <grant.likely@linaro.org>
 > 
-> > On Thursday, 30. January 2014 18:23:44 Thomas Abraham wrote:
-> > > Hi Mike,
-> > > 
-> > > On Wed, Jan 29, 2014 at 12:17 AM, Mike Turquette <mturquette@linaro.org>
-> > 
-> > wrote:
-> > > > On Mon, Jan 27, 2014 at 9:30 PM, Thomas Abraham <ta.omasab@gmail.com>
-> > 
-> > wrote:
-> > > >> Hi Mike,
-> > > >> 
-> > > >> On Tue, Jan 28, 2014 at 1:55 AM, Mike Turquette
-> > > >> <mturquette@linaro.org>
-> > 
-> > wrote:
-> > > >>> Quoting Thomas Abraham (2014-01-18 04:10:51)
-> > > > 
-> > > > As far as I can tell
-> > > > the remux does not happen because it is necessary to generate the
-> > > > required clock rate, but because we don't want to run the ARM core out
-> > > > of spec for a short time while the PLL relocks. Assuming I have that
-> > > > part of it right, I prefer for the parent mux operation to be a part
-> > > > of the CPUfreq driver's .target callback instead of hidden away in the
-> > > > clock driver.
-> > > 
-> > > The re-parenting is mostly done to keep the ARM CPU clocked while the
-> > > PLL is stopped, reprogrammed and restarted. One of the side effects of
-> > > that is, the clock speed of the temporary parent could be higher then
-> > > what is allowed due to the ARM voltage at the time of re-parenting.
-> > > That is the reason to use the safe voltage.
-> > 
-> > The Rockchip-SoCs use something similar, so I'm following quite closely
-> > what Thomas is trying to do here, as similar solution would also solve
-> > this issue for me.
-> > 
-> > On some Rockchip-SoCs even stuff like pclk and hclk seems to be sourced
-> > from the divided armclk, creating additional constraints.
-> > 
-> > But on the RKs (at least in the upstream sources) the armclk is simply
-> > equal to the pll output. A divider exists, but is only used to make sure
-> > that the armclk stays below the original rate when sourced from the
-> > temp-parent, like> 
-> >         if (clk_get_rate(temp_parent) > clk_get_rate(main_parent)
-> >         
-> >                 set_divider(something so that rate(temp) <= rate(main)
-> >         
-> >         clk_set_parent(...)
-> > 
-> > Isn't there a similar possiblity on your platform, as it would remove the
-> > need for the safe-voltage?
-> > 
-> > 
-> > In general I also like the approach of hiding the rate-change logic inside
-> > this composite clock, as the depending clocks can be easily kept in sync.
-> > As with the Rockchips the depending clocks are different for each of the
-> > three Cortex-A9 SoCs I looked at, it would be "interesting" if all of
-> > this would need to be done in a cpufreq driver.
+> Reserved memory nodes allow for the reservation of static (fixed
+> address) regions, or dynamically allocated regions for a specific
+> purpose.
 > 
-> I wonder if hiding these details inside of the composite clock
-> implementation indicates the lack of some needed feature in the clk
-> core? I've discussed the idea of "coordinated rate changes" before. E.g:
+> [joshc: Based on binding document proposed (in non-patch form) here:
+>  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+>  adapted to support #memory-region-cells]
 > 
-> _________________________________________________________
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
+>  1 file changed, 138 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 > 
-> |  clk	|  opp-low	|  opp-mid	|  opp-fast	|
-> |
-> |pll	| 300000	|  600000	|  600000	|
-> |
-> |div	| 150000	|  300000	|  600000	|
-> |
-> |mpu_clk| 150000	|  300000       |  600000	|
-> |
-> |periph	| 150000	|  150000	|  300000	|
-> 
-> ---------------------------------------------------------
-> 
-> A call to clk_set_rate() against any of those clocks will result in all
-> of their dividers being updated. At the implementation level this might
-> look something like this extremely simplified pseudocode:
-> 
-> int clk_set_rate(struct clk* clk, unsigned long rate)
-> {
-> 	/* trap clks that support coordinated rate changes */
-> 	if (clk->ops->coordinate_rate)
-> 		return clk->ops->coordinate_rate(clk->hw, rate);
-> 	...
-> }
-> 
-> and,
-> 
-> struct coord_rates {
-> 	struct clk_hw *hw;
-> 	struct clk *parent;
-> 	struct clk *rate;
-> };
-> 
-> and in the clock driver,
-> 
-> #define PLL 0
-> #define DIV 1
-> #define MPU 2
-> #define PER 3
-> 
-> #define NR_OPP 4
-> #define NR_CLK 4
-> 
-> struct coord_rates my_opps[NR_OPP][NR_CLK]; // populated from DT data
-> 
-> int my_coordinate_rate_callback(struct clk_hw *hw, unsigned long rate)
-> {
-> 	struct coord_rate **selected_opp;
-> 
-> 	for(i = 0; i < NR_OPP; i++) {
-> 		for(j = 0; j < NR_CLK; j++) {
-> 			if (my_opps[i][j]->hw == hw &&
-> 				my_opps[i][j]->rate == rate)
-> 				selected_opp = my_opps[i];
-> 				break;
-> 		}
-> 	}
-> 
-> 	/*
-> 	 * order of operations is specific to my hardware and should be
-> 	 * managed by my clock driver, not generic code
-> 	 */
-> 
-> 	__clk_set_parent(selected_opp[DIV]->hw, temp_parent);
-> 	__clk_set_rate(selected_opp[PLL]->hw, selected_opp[PLL]->rate);
-> 	__clk_set_parent(selected_opp[DIV]->hw,
-> 				selected_opp[PLL]->hw->clk);
-> 	...
-> 
-> 	/*
-> 	 * note that the above could be handled by a switch-case or
-> 	 * something else
-> 	 */
-> }
-> 
-> Thoughts? Please forgive any gaps in my logic or abuse of C.
-> 
-> I have long thought that something like the above would someday go into
-> a generic dvfs layer instead of the clock framework, but maybe starting
-> with the clk framework makes more sense?
+> diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> new file mode 100644
+> index 000000000000..a606ce90c9c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> @@ -0,0 +1,138 @@
+> +*** Reserved memory regions ***
+> +
+> +Reserved memory is specified as a node under the /reserved-memory node.
+> +The operating system shall exclude reserved memory from normal usage
+> +one can create child nodes describing particular reserved (excluded from
+> +normal use) memory regions. Such memory regions are usually designed for
+> +the special usage by various device drivers.
+> +
+> +Parameters for each memory region can be encoded into the device tree
+> +with the following nodes:
+> +
+> +/reserved-memory node
+> +---------------------
+> +#address-cells, #size-cells (required) - standard definition
+> +    - Should use the same values as the root node
+> +#memory-region-cells (required) - dictates number of cells used in the child
+> +                                  nodes memory-region specifier
 
-Similar to Thomas, this looks like the thing I'd need for my core clocks.
+I don't think this isn't defined well enough. These reserved regions may
+not have a driver attached to them, so there is no central agent to
+decide what the specifier means. That leaves the interpretation of
+the memory region in the hands of the client drivers. How do you see the
+specifier getting parsed and used?
 
-Also to me this really looks like something belonging to the clock framework, 
-as we at this point really only have some clocks that in all cases need to be 
-set together, independent of it beeing embedded in some scaling context or 
-something else.
+Otherwise the binding looks good to me. Also, please add my s-o-b line
+to the patch (instead of a-b because I authored part of the text)
 
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
 
-Heiko
+g.
+
+> +ranges (required) - standard definition
+> +    - Should be empty
+> +
+> +/reserved-memory/ child nodes
+> +-----------------------------
+> +Each child of the reserved-memory node specifies one or more regions of
+> +reserved memory. Each child node may either use a 'reg' property to
+> +specify a specific range of reserved memory, or a 'size' property with
+> +optional constraints to request a dynamically allocated block of memory.
+> +
+> +Following the generic-names recommended practice, node names should
+> +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
+> +address (@<address>) should be appended to the name if the node is a
+> +static allocation.
+> +
+> +Properties:
+> +Requires either a) or b) below.
+> +a) static allocation
+> +   reg (required) - standard definition
+> +b) dynamic allocation
+> +   size (required) - length based on parent's #size-cells
+> +                   - Size in bytes of memory to reserve.
+> +   alignment (optional) - length based on parent's #size-cells
+> +                        - Address boundary for alignment of allocation.
+> +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
+> +                           - Specifies regions of memory that are
+> +                             acceptable to allocate from.
+> +
+> +If both reg and size are present, then the reg property takes precedence
+> +and size is ignored.
+> +
+> +Additional properties:
+> +compatible (optional) - standard definition
+> +    - may contain the following strings:
+> +        - shared-dma-pool: This indicates a region of memory meant to be
+> +          used as a shared pool of DMA buffers for a set of devices. It can
+> +          be used by an operating system to instanciate the necessary pool
+> +          management subsystem if necessary.
+> +        - vendor specific string in the form <vendor>,[<device>-]<usage>
+> +no-map (optional) - empty property
+> +    - Indicates the operating system must not create a virtual mapping
+> +      of the region as part of its standard mapping of system memory,
+> +      nor permit speculative access to it under any circumstances other
+> +      than under the control of the device driver using the region.
+> +reusable (optional) - empty property
+> +    - The operating system can use the memory in this region with the
+> +      limitation that the device driver(s) owning the region need to be
+> +      able to reclaim it back. Typically that means that the operating
+> +      system can use that region to store volatile or cached data that
+> +      can be otherwise regenerated or migrated elsewhere.
+> +
+> +Linux implementation note:
+> +- If a "linux,cma-default" property is present, then Linux will use the
+> +  region for the default pool of the contiguous memory allocator.
+> +
+> +Device node references to reserved memory
+> +-----------------------------------------
+> +Regions in the /reserved-memory node may be referenced by other device
+> +nodes by adding a memory-region property to the device node.
+> +
+> +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
+> +
+> +Example
+> +-------
+> +This example defines 3 contiguous regions are defined for Linux kernel:
+> +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
+> +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
+> +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
+> +
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		/* global autoconfigured region for contiguous allocations */
+> +		linux,cma {
+> +			compatible = "shared-dma-pool";
+> +			reusable;
+> +			#memory-region-cells = <0>;
+> +			size = <0x4000000>;
+> +			alignment = <0x2000>;
+> +			linux,cma-default;
+> +		};
+> +
+> +		display_reserved: framebuffer at 78000000 {
+> +			#memory-region-cells = <0>;
+> +			reg = <0x78000000 0x800000>;
+> +		};
+> +
+> +		multimedia_reserved: multimedia at 77000000 {
+> +			compatible = "acme,multimedia-memory";
+> +			#memory-region-cells = <1>;
+> +			reg = <0x77000000 0x4000000>;
+> +		};
+> +	};
+> +
+> +	/* ... */
+> +
+> +	fb0: video at 12300000 {
+> +		memory-region = <&display_reserved>;
+> +		/* ... */
+> +	};
+> +
+> +	scaler: scaler at 12500000 {
+> +		memory-region = <&multimedia_reserved 0xdeadbeef>;
+> +		/* ... */
+> +	};
+> +
+> +	codec: codec at 12600000 {
+> +		memory-region = <&multimedia_reserved 0xfeebdaed>;
+> +		/* ... */
+> +	};
+> +};
+> -- 
+> 1.7.9.5
+> 
