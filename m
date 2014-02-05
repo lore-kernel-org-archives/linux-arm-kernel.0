@@ -1,54 +1,41 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 05 Feb 2014 11:15:00 +0000
-Subject: [RFC PATCH v2 03/14] of: mtd: add documentation for
- nand-ecc-level property
-In-Reply-To: <20140129175331.GA27143@localhost>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com> <
- 1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com> <
- 20140129175331.GA27143@localhost>
-Message-ID: <20140205111500.B19FDC40A89@trevor.secretlab.ca>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Feb 2014 11:18:14 +0000
+Subject: [alsa-devel] [PATCH v3 4/5] ASoC: tda998x: adjust the audio hw
+ parameters from EDID
+In-Reply-To: <52F2021A.9020804@metafoo.de>
+References: <cover.1391274627.git.moinejf@free.fr>
+ <1b15025671d9099863a3091346536e45891e4a26.1391274628.git.moinejf@free.fr>
+ <20140204180625.GM22609@sirena.org.uk>
+ <20140205101134.4591e5c3@armhf> <52F2021A.9020804@metafoo.de>
+Message-ID: <20140205111814.GF22609@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Jan 2014 14:53:32 -0300, Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
-> On Wed, Jan 29, 2014 at 03:34:13PM +0100, Boris BREZILLON wrote:
-> > nand-ecc-level property statically defines NAND chip's ECC requirements.
-> > 
-> > Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> > ---
-> >  Documentation/devicetree/bindings/mtd/nand.txt |    3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-> > index 03855c8..0c962296 100644
-> > --- a/Documentation/devicetree/bindings/mtd/nand.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/nand.txt
-> > @@ -3,5 +3,8 @@
-> >  - nand-ecc-mode : String, operation mode of the NAND ecc mode.
-> >    Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
-> >    "soft_bch".
-> > +- nand-ecc-level : Two cells property defining the ECC level requirements.
-> > +  The first cell represent the strength and the second cell the ECC block size.
-> > +  E.g. : nand-ecc-level = <4 512>; /* 4 bits / 512 bytes */
-> >  - nand-bus-width : 8 or 16 bus width if not present 8
-> >  - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-> 
-> Hm.. when was this proposal agreed? It seems I've missed the
-> discussion...
-> 
-> FWIW, we've already proposed an equivalent one, but it received no
-> feedback from the devicetree maintainers:
+On Wed, Feb 05, 2014 at 10:19:22AM +0100, Lars-Peter Clausen wrote:
+> On 02/05/2014 10:11 AM, Jean-Francois Moine wrote:
 
-Sorry, binding review has become a huge undertaking.
+> >So, in the CODEC, I don't see how I could update the parameters
+> >dictated by the EDID otherwise in changing the DAI driver parameters.
 
-> 
-> http://comments.gmane.org/gmane.linux.drivers.devicetree/58764
-> 
-> Maybe we can discuss about it now?
-> 
->   nand-ecc-strength : integer ECC required strength.
->   nand-ecc-size : integer step size associated to the ECC strength.
+> The startup function is the right place. But instead of modifying
+> the DAI use snd_pcm_hw_constraint_mask64(),
+> snd_pcm_hw_constraint_list(), etc. to setup the additional
+> constraints that come from the EDID.
 
-I'm okay with either, but the above binding is indeed more readable.
+Right.
 
-g.
+> Bonus points for making this a generic helper function that takes a
+> runtime and a EDID and then applies the EDID constraints on the
+> runtime.
+
+...as previously requested.  I know there was some discusion of broader
+moves to factor this stuff out but it'd still be good to keep it
+separated out even prior to a final non-EDID based solution so it's
+easier to refactor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/f91a9e51/attachment.sig>
