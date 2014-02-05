@@ -1,35 +1,81 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 05 Feb 2014 12:05:15 +0000
-Subject: [PATCH 1/2] clk: shmobile: rcar-gen2: Fix clock parent all non-PLL
- clocks
-In-Reply-To: <4232876.LkjsLLbJbc@avalon>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1389113273-10364-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <52F213C9.2020501@codethink.co.uk> <4232876.LkjsLLbJbc@avalon>
-Message-ID: <52F228FB.5090900@codethink.co.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 05 Feb 2014 13:05:14 +0100
+Subject: [PATCH v7 2/7] dt-bindings: sram: describe option to reserve
+ parts of the memory
+In-Reply-To: <20140205111247.476B7C40A89@trevor.secretlab.ca>
+References: <4970034.fqvMoHdOyd@phil> <1782709.QdZpsrsctf@phil>
+ <20140205111247.476B7C40A89@trevor.secretlab.ca>
+Message-ID: <1816961.2dvm7Iumeh@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/14 10:51, Laurent Pinchart wrote:
-> Hi Ben,
->
-> On Wednesday 05 February 2014 10:34:49 Ben Dooks wrote:
->> On 07/01/14 16:47, Laurent Pinchart wrote:
->>> The lb, qspi, sdh, sd0 and sd1 clocks have the PLL1 (divided by 2) as
->>> their parent, not the main clock. Fix it.
->>
->> William Towle has already sent a patch to move this to device tree
->> which I think is a better solution for this.
->
-> I actually disagree. The CPG is an IP core that generates a bunch of clocks
-> from a single external parent. The fact that clocks are not flat but organized
-> as a tree internally is an internal property of the CPG, and I prefer keeping
-> it that way instead of exposing it in the device tree.
+Am Mittwoch, 5. Februar 2014, 11:12:47 schrieb Grant Likely:
+> On Mon, 20 Jan 2014 16:42:58 +0100, Heiko St??bner <heiko@sntech.de> wrote:
+> > Some SoCs need parts of their sram for special purposes. So while being
+> > part of the peripheral, it should not be part of the genpool controlling
+> > the sram.
+> > 
+> > Therefore add an option mmio-sram-reserved to keep arbitrary portions of
+> > the sram from general usage.
+> > 
+> > Suggested-by: Rob Herring <robherring2@gmail.com>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> > 
+> >  Documentation/devicetree/bindings/misc/sram.txt |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/misc/sram.txt
+> > b/Documentation/devicetree/bindings/misc/sram.txt index 4d0a00e..09ee7a3
+> > 100644
+> > --- a/Documentation/devicetree/bindings/misc/sram.txt
+> > +++ b/Documentation/devicetree/bindings/misc/sram.txt
+> > 
+> > @@ -8,9 +8,17 @@ Required properties:
+> >  - reg : SRAM iomem address range
+> > 
+> > +Optional properties:
+> > +
+> > +- mmio-sram-reserved: ordered list of reserved chunks inside the sram
+> > that
+> > +  should not be used by the operating system.
+> > +  Format is <base size>, <base size>, ...; with base being relative to
+> > the
+> > +  reg property base.
+> > +
+> 
+> We've now got a draft binding for reserved memory. Can you use the format
+> here? Basically each reserved region is a sub node with either a reg
+> property or a size property.
+> 
+> This is specifically for sram, so I won't make a big deal about it, but
+> it would be good to have some commonality.
 
-If you feel that the block is unlikely to change if it gets
-re-used then that'll be fine. We can always revisit the changes
-if needed.
+I guess you're talking about "[PATCH v2 0/5] reserved-memory regions/CMA in 
+devicetree, again", right?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+In general I'm all for commonality :-). So I guess you mean it to look 
+something like the following:
+
+	sram: sram at 10080000 {
+		compatible = "rockchip,rk3066-sram", "mmio-sram";
+		reg = <0x10080000 0x8000>;
+
+		reserved-memory {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			smp at 200 {
+				/* hmm, relative or absolute, aka 0x200 or 0x10080200? */
+				reg = <0x200 0x50>;
+			};
+		};
+	};
+
+As it looks like only a slight modification of my "parsing" code this should be 
+doable. Do you suggest more changes to the example above?
+
+
+Heiko
