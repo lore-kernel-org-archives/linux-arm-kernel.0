@@ -1,49 +1,83 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 05 Feb 2014 10:41:06 +0100
-Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
-In-Reply-To: <201402051036.19428.arnd@arndb.de>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <201402042027.15898.arnd@arndb.de> <52F20387.3090709@monstr.eu>
- <201402051036.19428.arnd@arndb.de>
-Message-ID: <52F20732.6070209@monstr.eu>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed,  5 Feb 2014 10:48:00 +0100
+Subject: [PATCH] clk: add strict of_clk_init dependency check
+In-Reply-To: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1391593680-9388-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 10:36 AM, Arnd Bergmann wrote:
-> On Wednesday 05 February 2014, Michal Simek wrote:
->> I am not quite sure what you mean by reports to user space.
->> If you mean to get timeout through ioctl for example - then yes it is working
->> through standard watchdog ioctl interface and timeout is calculated
->> from hardware setup.
-> 
-> Yes, that is what I meant. I believe most other watchdogs let
-> you program the timeout, but I don't see anything wrong with
-> having that fixed in the FPGA in your case.
-> 
-> Still, the choice of putting the timeout into DT in terms of
-> cycles rather than miliseconds wasn't ideal from an interface
-> perspective and we should change that if/when we do a generic
-> binding. I can definitely see where it's coming from for your
-> case, as the cycle count totally makes sense from an FPGA
-> tool perspective...
+The parent dependency check is only available on the first parent of a given
+clk.
 
-Thanks. I take this like ACK for this current binding description.
+Add support for strict dependency check: all parents of a given clk must be
+initialized.
 
-Thanks,
-Michal
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
 
+Hello Gregory,
+
+This patch adds support for strict check on clk dependencies (check if all
+parents specified by an DT clk node are initialized).
+
+I'm not sure this is what you were expecting (maybe testing the first parent
+is what you really want), so please feel free to tell me if I'm wrong.
+
+Best Regards,
+
+Boris
+
+ drivers/clk/clk.c |   27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index beb0f8b..6849769 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2543,22 +2543,37 @@ static int parent_ready(struct device_node *np)
+ {
+ 	struct of_phandle_args clkspec;
+ 	struct of_clk_provider *provider;
++	int num_parents;
++	bool found;
++	int i;
+ 
+ 	/*
+ 	 * If there is no clock parent, no need to wait for them, then
+ 	 * we can consider their absence as being ready
+ 	 */
+-	if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
+-					&clkspec))
++	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	if (num_parents <= 0)
+ 		return 1;
+ 
+-	/* Check if we have such a provider in our array */
+-	list_for_each_entry(provider, &of_clk_providers, link) {
+-		if (provider->node == clkspec.np)
++	for (i = 0; i < num_parents; i++) {
++		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
++					       &clkspec))
+ 			return 1;
++
++		/* Check if we have such a provider in our array */
++		found = false;
++		list_for_each_entry(provider, &of_clk_providers, link) {
++			if (provider->node == clkspec.np) {
++				found = true;
++				break;
++			}
++		}
++
++		if (!found)
++			return 0;
+ 	}
+ 
+-	return 0;
++	return 1;
+ }
+ 
+ /**
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/a5adb1d4/attachment-0001.sig>
+1.7.9.5
