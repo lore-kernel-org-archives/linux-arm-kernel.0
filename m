@@ -1,98 +1,37 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 05 Feb 2014 11:40:10 +0100
-Subject: [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
-In-Reply-To: <52F18A08.6070409@samsung.com>
+Date: Wed, 05 Feb 2014 11:41:03 +0100
+Subject: [PATCH 05/18] mfd: max14577: Use of_match_ptr() in i2c_driver
+In-Reply-To: <20140203093013.GG13529@lee--X1>
 References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-12-git-send-email-k.kozlowski@samsung.com>
- <52F18A08.6070409@samsung.com>
-Message-ID: <1391596810.3726.5.camel@AMDC1943>
+ <1390911522-28209-6-git-send-email-k.kozlowski@samsung.com>
+ <20140203093013.GG13529@lee--X1>
+Message-ID: <1391596863.3726.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-05 at 09:47 +0900, Chanwoo Choi wrote:
-> Hi Krzysztof,
-> 
-> Following patch has conflict on extcon-next branch(Linus 3.14-rc1)
-> when apply patchset by using git am.
-> 
-> [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
-> [PATCH 12/18] extcon: max14577: Choose muic_irqs according to device type
-> [PATCH 14/18] extcon: max14577: Add support for max77836
-> 
-> The base commit of this patchset isn't mainline. You need to rebase this patchset 
-> on extcon-next branch and please resend this patchset.
-> 
-> Thanks,
-> Chanwoo Choi
-
-Hi,
-
-This patch patch (along with other) depends on previous rename patches
-from this patchset:
-[PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols to prepare
-for max77836
-http://article.gmane.org/gmane.linux.kernel/1636674
-
-I can resolve the conflict but then they will return on applying patch
-7/18.
-
-I think this patch may wait for a little until the rename-like patches
-will be accepted.
-
-Can you ACK other patches touch extcon?
- - [PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols...
- - [PATCH 08/18] mfd: max14577: Rename state container to maxim_core
- - [PATCH 09/18] mfd: max14577: Add "muic" suffix to regmap and irq_chip
-
-Best regards,
-Krzysztof
-
-> On 01/28/2014 09:18 PM, Krzysztof Kozlowski wrote:
-> > Add max14577 prefix to muic_irqs array. This prepares for max77836
-> > support in this extcon driver.
+On Mon, 2014-02-03 at 09:30 +0000, Lee Jones wrote:
+> > Use of_match_ptr() in assignment of i2c_driver.of_match_table.
 > > 
 > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > > Cc: Kyungmin Park <kyungmin.park@samsung.com>
 > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 > > ---
-> >  drivers/extcon/extcon-max14577.c |   12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> >  drivers/mfd/max14577.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > diff --git a/drivers/extcon/extcon-max14577.c b/drivers/extcon/extcon-max14577.c
-> > index fd48b4909470..fb343f4042d2 100644
-> > --- a/drivers/extcon/extcon-max14577.c
-> > +++ b/drivers/extcon/extcon-max14577.c
-> > @@ -85,7 +85,7 @@ struct max14577_muic_irq {
-> >  	unsigned int virq;
-> >  };
-> >  
-> > -static struct max14577_muic_irq muic_irqs[] = {
-> > +static struct max14577_muic_irq max14577_muic_irqs[] = {
-> >  	{ MAXIM_IRQ_INT1_ADC,		"muic-ADC" },
-> >  	{ MAXIM_IRQ_INT1_ADCLOW,	"muic-ADCLOW" },
-> >  	{ MAXIM_IRQ_INT1_ADCERR,	"muic-ADCError" },
-> > @@ -541,9 +541,9 @@ static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
-> >  	 * However we only need to know whether it was ADC, charger
-> >  	 * or both interrupts so decode IRQ and turn on proper flags.
-> >  	 */
-> > -	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++)
-> > -		if (irq == muic_irqs[i].virq)
-> > -			irq_type = muic_irqs[i].irq;
-> > +	for (i = 0; i < ARRAY_SIZE(max14577_muic_irqs); i++)
-> > +		if (irq == max14577_muic_irqs[i].virq)
-> > +			irq_type = max14577_muic_irqs[i].irq;
-> >  
-> >  	switch (irq_type) {
-> >  	case MAXIM_IRQ_INT1_ADC:
-> > @@ -647,8 +647,8 @@ static int max14577_muic_probe(struct platform_device *pdev)
-> >  	INIT_WORK(&info->irq_work, max14577_muic_irq_work);
-> >  
-> >  	/* Support irq domain for max14577 MUIC device */
-> > -	for (i = 0; i < ARRAY_SIZE(muic_irqs); i++) {
-> > -		struct max14577_muic_irq *muic_irq = &muic_irqs[i];
-> > +	for (i = 0; i < ARRAY_SIZE(max14577_muic_irqs); i++) {
-> > +		struct max14577_muic_irq *muic_irq = &max14577_muic_irqs[i];
-> >  		unsigned int virq = 0;
-> >  
-> >  		virq = regmap_irq_get_virq(maxim_core->irq_data_muic,
-> > 
+> > diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
+> > index 2ac2f2d7cea6..75b37082a3fe 100644
+> > --- a/drivers/mfd/max14577.c
+> > +++ b/drivers/mfd/max14577.c
+> > @@ -224,7 +224,7 @@ static struct i2c_driver max14577_i2c_driver = {
+> >  		.name = "max14577",
+> >  		.owner = THIS_MODULE,
+> >  		.pm = &max14577_pm,
+> > -		.of_match_table = max14577_dt_match,
+> > +		.of_match_table = of_match_ptr(max14577_dt_match),
+> 
+> Are you sure this is required?
+
+No, it was my mistake. Please ignore this patch.
+
+Krzysztof
