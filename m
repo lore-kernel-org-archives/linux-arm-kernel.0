@@ -1,26 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Feb 2014 15:00:02 +0100
-Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
-In-Reply-To: <52F20732.6070209@monstr.eu>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <201402051036.19428.arnd@arndb.de> <52F20732.6070209@monstr.eu>
-Message-ID: <201402051500.02408.arnd@arndb.de>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 05 Feb 2014 06:03:13 -0800
+Subject: [ath9k-devel] [PATCH 1/3] ath9k: Fix build error on ARM
+In-Reply-To: <20140205133956.GQ26684@n2100.arm.linux.org.uk>
+References: <1391483274-20331-1-git-send-email-sujith@msujith.org>
+ <1391483274-20331-2-git-send-email-sujith@msujith.org>
+ <1391484878.2538.11.camel@joe-AO722>
+ <21232.24855.201543.400943@gargle.gargle.HOWL>
+ <CAOpc7mFQZ3efZda0cC28BLATqRDJ99BRNu=ezQq8wa+dyFyOvA@mail.gmail.com>
+ <1391531796.2538.21.camel@joe-AO722>
+ <20140205115035.GO26684@n2100.arm.linux.org.uk>
+ <1391603566.2538.63.camel@joe-AO722>
+ <20140205124127.GP26684@n2100.arm.linux.org.uk>
+ <1391605494.2538.68.camel@joe-AO722>
+ <20140205133956.GQ26684@n2100.arm.linux.org.uk>
+Message-ID: <1391608993.2538.74.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 February 2014, Michal Simek wrote:
-> On 02/05/2014 10:36 AM, Arnd Bergmann wrote:
-> > On Wednesday 05 February 2014, Michal Simek wrote:
-> > Still, the choice of putting the timeout into DT in terms of
-> > cycles rather than miliseconds wasn't ideal from an interface
-> > perspective and we should change that if/when we do a generic
-> > binding. I can definitely see where it's coming from for your
-> > case, as the cycle count totally makes sense from an FPGA
-> > tool perspective...
+On Wed, 2014-02-05 at 13:39 +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 05, 2014 at 05:04:54AM -0800, Joe Perches wrote:
+> > On Wed, 2014-02-05 at 12:41 +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Feb 05, 2014 at 04:32:46AM -0800, Joe Perches wrote:
+> > > > Apparently, people just convert stupidly large udelay()s
+> > > > to mdelay and not be bothered.
+> > > 
+> > > And that's the correct answer.  Having udelay(10000) rather than mdelay(10)
+> > > is a sign that they weren't paying that much attention when writing the
+> > > code.
+> > 
+> > Not really.
+[]
+> > It's not so much not paying attention as not
+> > knowing ARM is broken for large udelay().
 > 
-> Thanks. I take this like ACK for this current binding description.
-> 
+> And now read my suggestion about how to avoid the "not knowing" problem. :)
 
-Yes, please add my 'Acked-by'.
+I'd read it already.  I didn't and don't disagree.
 
-	Arnd
+I still think adding a #warning on large static udelay()s
+would be sensible.  Maybe adding another option like
+#define UDELAY_TOO_BIG_I_KNOW_ALREADY_DONT_BOTHER_ME
+guard to avoid seeing the #warning when there's no other
+option.
