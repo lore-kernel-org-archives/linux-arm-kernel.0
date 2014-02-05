@@ -1,84 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 5 Feb 2014 19:09:11 +0100
-Subject: [PATCH 21/22] arm: efistub: ignore dtb= when UEFI SecureBoot is
- enabled
-In-Reply-To: <1391619853-10601-22-git-send-email-leif.lindholm@linaro.org>
-References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
- <1391619853-10601-22-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <CAKv+Gu-yD+MjN70cVRCwdBB=LLmJX9X7RVv13gTEuZcko+2E8A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Feb 2014 18:18:17 +0000
+Subject: [PATCH] regulator: core: Make regulator object reflect
+ configured voltage
+In-Reply-To: <CAJAp7OjB-cJbLpdWo0RFJZefCKcCiKc8KgrjkBobJnddv4MSWA@mail.gmail.com>
+References: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140204110531.GR22609@sirena.org.uk>
+ <CAJAp7OjCnJ=P9Gi20=D9gybREiSaqd1CaQ0K=9fGbCzU1gTFLw@mail.gmail.com>
+ <20140204181831.GP22609@sirena.org.uk>
+ <CAJAp7Ohn3ch2nK_S8j9ieRBzNeyt6OJmumEhRXXykB9RgMJsQg@mail.gmail.com>
+ <20140204200018.GZ22609@sirena.org.uk>
+ <CAJAp7OjB-cJbLpdWo0RFJZefCKcCiKc8KgrjkBobJnddv4MSWA@mail.gmail.com>
+Message-ID: <20140205181817.GG32298@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2014 18:04, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Loading unauthenticated FDT blobs directly from storage is a security hazard,
-> so this should only be allowed when running with UEFI Secure Boot disabled.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  drivers/firmware/efi/arm-stub.c        |    4 +++-
->  drivers/firmware/efi/efi-stub-helper.c |   24 ++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/firmware/efi/arm-stub.c b/drivers/firmware/efi/arm-stub.c
-> index b505fde..c651082 100644
-> --- a/drivers/firmware/efi/arm-stub.c
-> +++ b/drivers/firmware/efi/arm-stub.c
-> @@ -95,7 +95,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->
->         /* Load a device tree from the configuration table, if present. */
->         fdt_addr = (uintptr_t)get_fdt(sys_table);
-> -       if (!fdt_addr) {
-> +       if (efi_secureboot_enabled(sys_table))
-> +               pr_efi(sys_table, "UEFI Secure Boot is enabled, ignoring dtb= commandline option.\n");
+On Wed, Feb 05, 2014 at 10:00:15AM -0800, Bjorn Andersson wrote:
+> On Tue, Feb 4, 2014 at 12:00 PM, Mark Brown <broonie@kernel.org> wrote:
 
-I am pretty sure my original patch had braces on both branches of the if () :-)
+> > So we should be changing the code to allow a set_voltage() that sets the
+> > voltage to the existing voltage regardless of constraints allowing a
+> > change then - that's what the underlying issue is.  Your change wouldn't
+> > cover the case where the hardware defualt is being used for example.
 
-Also, I think the precedence is backward here: dtb= should trump
-config table, not the other way around.
+> Makes sense, but the only thing we could check for would be if min_uV
+> == max_uV == current-voltage. That would work out fine for this use
+> case, but do you think it would be good enough?
 
--- 
-Ard.
+It should be fine to check for min_uV <= current-voltage <= max_uV
+instead if CHANGE_VOLTAGE isn't available, so long as the existing
+setting is in the range it's fine.
 
+> The best thing I've come up with then is to add the following check in
+> regulator_set_voltage().
 
-> +       else if (!fdt_addr) {
->                 status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->                                               "dtb=",
->                                               ~0UL, (unsigned long *)&fdt_addr,
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-> index 2ee69ea..6221be7 100644
-> --- a/drivers/firmware/efi/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/efi-stub-helper.c
-> @@ -721,3 +721,27 @@ static char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
->         *cmd_line_len = options_bytes;
->         return (char *)cmdline_addr;
->  }
-> +
-> +static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
-> +{
-> +       static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
-> +       static efi_char16_t const var_name[] __initconst = {
-> +               'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
-> +
-> +       efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
-> +       unsigned long size = sizeof(u8);
-> +       efi_status_t status;
-> +       u8 val;
-> +
-> +       status = efi_call_phys5(f_getvar, (efi_char16_t *)var_name,
-> +                               (efi_guid_t *)&var_guid, NULL, &size, &val);
-> +
-> +       switch (status) {
-> +       case EFI_SUCCESS:
-> +               return val;
-> +       case EFI_NOT_FOUND:
-> +               return 0;
-> +       default:
-> +               return 1;
-> +       }
-> +}
-> --
-> 1.7.10.4
->
+> if (min_uV == max_uV && _regulator_get_voltage(rdev) == min_uV)
+>     goto out;
+
+> Would this be acceptable? It's achieving the same thing as my patch,
+> is more robust and covers the case of setting the voltage to the hw
+> default value.
+
+That sort of thing yes, just short circuit out the main logic in this
+case.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140205/fda85355/attachment.sig>
