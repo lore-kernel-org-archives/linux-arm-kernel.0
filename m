@@ -1,31 +1,26 @@
-From: jmorris@namei.org (James Morris)
-Date: Thu, 6 Feb 2014 01:02:22 +1100 (EST)
-Subject: [PATCH] security: select correct default LSM_MMAP_MIN_ADDR on
- arm on arm64
-In-Reply-To: <20140205114832.GB7550@arm.com>
-References: <1391480133-27149-1-git-send-email-ccross@android.com>
- <20140205114832.GB7550@arm.com>
-Message-ID: <alpine.LRH.2.02.1402060100590.24936@tundra.namei.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 5 Feb 2014 15:00:02 +0100
+Subject: [PATCH 09/10] watchdog: xilinx: Add missing binding
+In-Reply-To: <52F20732.6070209@monstr.eu>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <201402051036.19428.arnd@arndb.de> <52F20732.6070209@monstr.eu>
+Message-ID: <201402051500.02408.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Feb 2014, Catalin Marinas wrote:
-
-> On Tue, Feb 04, 2014 at 02:15:32AM +0000, Colin Cross wrote:
-> > Binaries compiled for arm may run on arm64 if CONFIG_COMPAT is
-> > selected.  Set LSM_MMAP_MIN_ADDR to 32768 if ARM64 && COMPAT to
-> > prevent selinux failures launching 32-bit static executables that
-> > are mapped at 0x8000.
-> > 
-> > Signed-off-by: Colin Cross <ccross@android.com>
+On Wednesday 05 February 2014, Michal Simek wrote:
+> On 02/05/2014 10:36 AM, Arnd Bergmann wrote:
+> > On Wednesday 05 February 2014, Michal Simek wrote:
+> > Still, the choice of putting the timeout into DT in terms of
+> > cycles rather than miliseconds wasn't ideal from an interface
+> > perspective and we should change that if/when we do a generic
+> > binding. I can definitely see where it's coming from for your
+> > case, as the cycle count totally makes sense from an FPGA
+> > tool perspective...
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Thanks. I take this like ACK for this current binding description.
+> 
 
-Acked-by: James Morris <james.l.morris@oracle.com>
+Yes, please add my 'Acked-by'.
 
-Probably makes sense to push this through the arm tree.
-
-
--- 
-James Morris
-<jmorris@namei.org>
+	Arnd
