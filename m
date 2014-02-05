@@ -1,14 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Feb 2014 10:15:48 -0700
-Subject: [PATCH 2/2] ARM: tegra: paz00: Add LVDS support to device tree
-In-Reply-To: <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
-References: <f03a644deb858f10affb7b039f9982bac81b02c9.1387656959.git.marvin24@gmx.de>
- <bcf12ecec69ef4e38e74a9be9c45e8bd2bd9ffcc.1387656959.git.marvin24@gmx.de>
-Message-ID: <52F271C4.2040602@wwwdotorg.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 05 Feb 2014 21:29:37 +0300
+Subject: [PATCH 1/3] arm: dts: am33xx.dtsi: Add node name to rtc device
+ node
+In-Reply-To: <1391602361-2666-1-git-send-email-sr@denx.de>
+References: <1391602361-2666-1-git-send-email-sr@denx.de>
+Message-ID: <52F28311.20905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/21/2013 01:38 PM, Marc Dietrich wrote:
-> Add backlight and panel nodes for the PAZ00 TFT LCD panel.
+Hello.
 
-Applied to Tegra's for-3.15/dt branch.
+On 02/05/2014 03:12 PM, Stefan Roese wrote:
+
+> Making it possible to reference and therefor change (disable) this
+> device node from other dts file which import this dtsi file.
+
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Lukas Stockmann <lukas.stockmann@siemens.com>
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>   arch/arm/boot/dts/am33xx.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 6d95d3d..b8daf8c 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -399,7 +399,7 @@
+>   			ti,timer-pwm;
+>   		};
+>
+> -		rtc at 44e3e000 {
+> +		rtc: rtc at 44e3e000 {
+
+    Node name is "rtc at 44e3e000" -- what you are adding is a label.
+
+WBR, Sergei
