@@ -1,151 +1,71 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 05 Feb 2014 11:09:22 +0000
-Subject: [PATCH v2 3/5] drivers: of: implement reserved-memory handling
- for cma
-In-Reply-To: <1391515773-6112-4-git-send-email-m.szyprowski@samsung.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
- 1391515773-6112-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140205110922.44DAAC40A89@trevor.secretlab.ca>
+From: skrishnakar@gmail.com (srikanth krishnakar)
+Date: Wed, 5 Feb 2014 16:43:40 +0530
+Subject: Linux-3.10 LTSI: Missing R-Car Sound Support on Marzen (R8A7779)
+Message-ID: <CALDxG5hw1cmVB=PYxvjLv+At1rnsyUJNpn0NEwSRMB=ctR_=5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Feb 2014 13:09:31 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> From: Josh Cartwright <joshc@codeaurora.org>
-> 
-> Add support for handling 'shared-dma-pool' reserved-memory nodes using
-> Contiguous Memory Allocator driver.
-> 
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/of/Kconfig               |    7 ++++
->  drivers/of/Makefile              |    1 +
->  drivers/of/of_reserved_mem_cma.c |   75 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 83 insertions(+)
->  create mode 100644 drivers/of/of_reserved_mem_cma.c
-> 
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index 7ac330473ec9..5dd3a80910d2 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -81,6 +81,13 @@ config OF_RESERVED_MEM
->  	help
->  	  Helpers to allow for reservation of memory regions
->  
-> +config OF_RESERVED_MEM_CMA
-> +	depends on OF_RESERVED_MEM
-> +	depends on DMA_CMA
-> +	def_bool y
-> +	help
-> +	  Helpers for reserving memory regions for DMA use
-> +
->  config OF_RESERVED_MEM_DMA
->  	depends on OF_RESERVED_MEM
->  	depends on HAVE_GENERIC_DMA_COHERENT
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index 6142227ca854..49b9078637b8 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -10,4 +10,5 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
->  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> +obj-$(CONFIG_OF_RESERVED_MEM_CMA) += of_reserved_mem_cma.o
->  obj-$(CONFIG_OF_RESERVED_MEM_DMA) += of_reserved_mem_dma.o
-> diff --git a/drivers/of/of_reserved_mem_cma.c b/drivers/of/of_reserved_mem_cma.c
-> new file mode 100644
-> index 000000000000..601d80655102
-> --- /dev/null
-> +++ b/drivers/of/of_reserved_mem_cma.c
-> @@ -0,0 +1,75 @@
-> +/*
-> + * Device tree based initialization code for DMA reserved regions.
-> + *
-> + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> + * Author: Josh Cartwright <joshc@codeaurora.org>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of the
-> + * License or (at your optional) any later version of the license.
-> + */
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/mm.h>
-> +#include <linux/sizes.h>
-> +#include <linux/mm_types.h>
-> +#include <linux/dma-contiguous.h>
-> +#include <linux/of_reserved_mem.h>
-> +
-> +static void rmem_cma_device_init(struct reserved_mem *rmem,
-> +				 struct device *dev,
-> +				 struct of_phandle_args *args)
-> +{
-> +	struct cma *cma = rmem->priv;
-> +	dev_set_cma_area(dev, cma);
-> +}
-> +
-> +static const struct reserved_mem_ops rmem_cma_ops = {
-> +	.device_init	= rmem_cma_device_init,
-> +};
-> +
-> +static int __init rmem_cma_setup(struct reserved_mem *rmem,
-> +				 unsigned long node,
-> +				 const char *uname)
-> +{
-> +	struct cma *cma;
-> +	int err;
-> +
-> +	if (!of_get_flat_dt_prop(node, "reusable", NULL))
-> +		return -EINVAL;
-> +
-> +	err = of_parse_flat_dt_reg(node, uname, &rmem->base, &rmem->size);
-> +	if (!err)
-> +		goto out_done;
-> +
-> +	rmem->base = 0;
-> +	err = of_parse_flat_dt_size(node, uname, &rmem->size);
-> +	if (err)
-> +		goto out_err;
-> +
-> +out_done:
+I am trying to boot the Renesas R-Car H1 (Marzen) board with 3.10 LTSi
+kernel which is present at :
 
-Please restrict gotos for error handling. Why not the following:
+https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/
 
-	err = of_parse_flat_dt_reg(node, uname, &rmem->base, &rmem->size);
-	if (err) {
-		rmem->base = 0;
-		err = of_parse_flat_dt_size(node, uname, &rmem->size);
-		if (err)
-			goto out_err;
-	}
+Branch: backport/v3.10.28-ltsi-rc1/snapshot
 
-> +	err = dma_contiguous_reserve_area(rmem->size, rmem->base, 0,
-> +					  &cma);
-> +	if (err) {
-> +		pr_err("Reserved memory: unable to setup CMA region\n");
-> +		return err;
-> +	}
-> +
-> +	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
-> +		dma_contiguous_set_default(cma);
-> +
-> +	rmem->ops = &rmem_cma_ops;
-> +	rmem->priv = cma;
-> +
-> +	return 0;
-> +out_err:
-> +	pr_err("Reseved memory: malformed node '%s'.\n", uname);
-> +	return err;
-> +}
-> +RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
-> -- 
-> 1.7.9.5
-> 
+There are no sound cards detected on booting this kernel, although
+graphics is found to be working. Are there any updates which adds the
+RCAR_SOUND support to Marzen on v3.10 LTSi kernel ?
+
+--------------------------
+
+root at marzenh1:~# cat /proc/interrupts
+            CPU0       CPU1       CPU2       CPU3
+  29:       5840      17228       5026      14491       GIC  twd
+  59:          0          0          0          0       GIC  renesas_intc_irqpin
+  60:       8094          0          0          0       GIC  renesas_intc_irqpin
+  61:          0          0          0          0       GIC  renesas_intc_irqpin
+  62:          0          0          0          0       GIC  renesas_intc_irqpin
+  63:          0          0          0          0       GIC
+rcar-du-r8a7779, rcar-du-r8a7779
+  64:         13          0          0          0       GIC  sh_tmu.0
+  76:         60          0          0          0       GIC
+ehci_hcd:usb1, ohci_hcd:usb3
+  77:          1          0          0          0       GIC
+ehci_hcd:usb2, ohci_hcd:usb4
+  96:          0          0          0          0       GIC  r8a7779-vin.1
+  98:          0          0          0          0       GIC  r8a7779-vin.3
+ 111:         82          0          0          0       GIC  i2c-rcar.0
+ 112:          0          0          0          0       GIC  i2c-rcar.2
+ 113:          0          0          0          0       GIC  i2c-rcar.3
+ 114:          0          0          0          0       GIC  i2c-rcar.1
+ 122:        982          0          0          0       GIC  sh-sci.2:mux
+ 132:          0          0          0          0       GIC  sata_rcar
+ 136:         52          0          0          0       GIC  sh_mobile_sdhi.0
+ 173:          0          0          0          0       GIC  gpio_rcar.0
+ 174:          0          0          0          0       GIC  gpio_rcar.1
+ 175:          0          0          0          0       GIC  gpio_rcar.2
+ 176:          0          0          0          0       GIC  gpio_rcar.3
+ 177:          0          0          0          0       GIC  gpio_rcar.4
+ 178:          0          0          0          0       GIC  gpio_rcar.5
+ 179:          0          0          0          0       GIC  gpio_rcar.6
+2001:       8094          0          0          0  renesas_intc_irqpin  eth0
+IPI0:          0          0          0          0  CPU wakeup interrupts
+IPI1:          0          0          0          0  Timer broadcast interrupts
+IPI2:        476       1715       1732       1236  Rescheduling interrupts
+IPI3:         50         62        112        112  Function call interrupts
+IPI4:          0          0          0          0  Single function
+call interrupts
+IPI5:          0          0          0          0  CPU stop interrupts
+ Err:          0
+...
+....
+.....
+root at marzenh1:~# aplay -l
+aplay: device_list:268: no soundcards found...
+
+---------------------------
+When will be the Audio support available for R-Car Marzen (R8A7779) on
+v3.10 LTSi kernel ?
+
+Thanks,
+Srikanth
