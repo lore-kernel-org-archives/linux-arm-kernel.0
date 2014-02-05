@@ -1,31 +1,76 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 5 Feb 2014 19:41:47 +0000
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140205192733.GG25695@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-3-git-send-email-will.deacon@arm.com>
- <3460536.Sh23gjDa6X@wuerfel>
- <20140205190947.GA22297@mudshark.cambridge.arm.com>
- <20140205192733.GG25695@obsidianresearch.com>
-Message-ID: <CAFEAcA9bhWK+pSy8wVLtNPyHtBCnudLi7pMhNny=ZfgNLty87Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  5 Feb 2014 19:55:42 +0000
+Subject: [PATCH v3 02/11] arm64: KVM: allows discrimination of AArch32 sysreg
+ access
+In-Reply-To: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
+References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1391630151-7875-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 February 2014 19:27, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> I can't think of a reason to support alternate MMIO layouts if
-> kvmtool is the only user and can be changed.
+The current handling of AArch32 trapping is slightly less than
+perfect, as it is not possible (from a handler point of view)
+to distinguish it from an AArch64 access, nor to tell a 32bit
+from a 64bit access either.
 
-I expect we'll get a QEMU implementation too at some point,
-but we should be able to just make that match whatever you
-decide is the correct layout and behaviour.
+Fix this by introducing two additional flags:
+- is_aarch32: true if the access was made in AArch32 mode
+- is_32bit: true if is_aarch32 == true and a MCR/MRC instruction
+  was used to perform the access (as opposed to MCRR/MRRC).
 
-The only constraint QEMU has which kvmtool doesn't is that
-we care about not randomly shuffling things around between
-QEMU versions, so whatever we pick we're more or less
-stuck with. So a layout which leaves scope for "supports
-PCI now, may do PCI-e later, MSI after that" would be good.
-(My PCI knowledge is very piecemeal, I hope that makes sense...)
+This allows a handler to cover all the possible conditions in which
+a system register gets trapped.
 
-thanks
--- PMM
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 6 ++++++
+ arch/arm64/kvm/sys_regs.h | 2 ++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 02e9d09..bf03e0f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -437,6 +437,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 	int Rt2 = (hsr >> 10) & 0xf;
+ 
++	params.is_aarch32 = true;
++	params.is_32bit = false;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -480,6 +482,8 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = true;
++	params.is_32bit = true;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt  = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -549,6 +553,8 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = false;
++	params.is_32bit = false;
+ 	params.Op0 = (esr >> 20) & 3;
+ 	params.Op1 = (esr >> 14) & 0x7;
+ 	params.CRn = (esr >> 10) & 0xf;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index d50d372..d411e25 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -30,6 +30,8 @@ struct sys_reg_params {
+ 	u8	Op2;
+ 	u8	Rt;
+ 	bool	is_write;
++	bool	is_aarch32;
++	bool	is_32bit;	/* Only valid if is_aarch32 is true */
+ };
+ 
+ struct sys_reg_desc {
+-- 
+1.8.3.4
