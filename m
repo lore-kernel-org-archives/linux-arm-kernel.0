@@ -1,42 +1,49 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 5 Feb 2014 07:41:28 -0800
-Subject: [PATCH] ARM: zynq: Move of_clk_init from clock driver
-In-Reply-To: <572af6e4eaaaa1c74ea62364f8fa7ac5834cc754.1391612175.git.michal.simek@xilinx.com>
-References: <572af6e4eaaaa1c74ea62364f8fa7ac5834cc754.1391612175.git.michal.simek@xilinx.com>
-Message-ID: <4e03e3ec-2fc7-40fc-a2cc-4a6c64379559@CO1EHSMHS025.ehs.local>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 5 Feb 2014 16:47:10 +0100
+Subject: [PATCH] mvebu : pcie: dt: potential issue in range parsing
+In-Reply-To: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
+References: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140205164710.082f689e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 03:56:37PM +0100, Michal Simek wrote:
-> Move of_clk_init() from clock driver to enable
-> options not to use zynq clock driver.
-> Use for example fixed clock setting.
-What is the use-case? Zynq w/o this driver makes no sense, IMHO. And
-even if you wanna fake clocks, why would this driver prevent it? Just
-replace all the input clocks with different ones and don't care about
-what this driver does?
+Dear Jean-Jacques Hiblot,
 
+On Fri, 10 Jan 2014 11:23:51 +0100, Jean-Jacques Hiblot wrote:
+> The second parameter of of_read_number is not the index, but a size.
+> As it happens, in this case it may work just fine because of the the conversion
+> to u32 and the favorable endianness on this architecture.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 > ---
+>  drivers/pci/host/pci-mvebu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Based on http://www.spinics.net/lists/arm-kernel/msg298287.html
-> series
-> 
-> ---
->  arch/arm/mach-zynq/common.c | 1 +
->  drivers/clk/zynq/clkc.c     | 2 --
->  2 files changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 93ea19b..8df35f3 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -68,6 +68,7 @@ static void __init zynq_timer_init(void)
->  	zynq_early_slcr_init();
-> 
->  	zynq_clock_init();
-> +	of_clk_init(NULL);
-Now you have two clock init functions...
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index c269e43..877e8ce 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -768,7 +768,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+>  
+>  	for (i = 0; i < nranges; i++) {
+>  		u32 flags = of_read_number(range, 1);
+> -		u32 slot = of_read_number(range, 2);
+> +		u32 slot = of_read_number(range + 1, 1);
+>  		u64 cpuaddr = of_read_number(range + na, pna);
+>  		unsigned long rtype;
+>  
 
-	S?ren
+Sorry for the long delay, and thanks for the fix!
+
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+(on Armada 370, with PCIe cards plugged in)
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
