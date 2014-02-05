@@ -1,80 +1,82 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 5 Feb 2014 12:27:33 -0700
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140205190947.GA22297@mudshark.cambridge.arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-3-git-send-email-will.deacon@arm.com>
- <3460536.Sh23gjDa6X@wuerfel>
- <20140205190947.GA22297@mudshark.cambridge.arm.com>
-Message-ID: <20140205192733.GG25695@obsidianresearch.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 5 Feb 2014 13:25:02 -0600
+Subject: [PATCH v2 5/5] of: document bindings for reserved-memory nodes
+In-Reply-To: <20140205100750.58EFAC40A89@trevor.secretlab.ca>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+ <1391515773-6112-6-git-send-email-m.szyprowski@samsung.com>
+ <20140205100750.58EFAC40A89@trevor.secretlab.ca>
+Message-ID: <20140205192502.GO20228@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 07:09:47PM +0000, Will Deacon wrote:
-> Hi Arnd,
-> 
-> Thanks for having a look.
-> 
-> On Tue, Feb 04, 2014 at 07:13:49PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 04 February 2014 16:53:03 Will Deacon wrote:
-> > > +
-> > > +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> > > +                   at least a definition of the Configuration Space plus
-> > > +                   one or both of IO and Memory Space.
-> > > +
-> > 
-> > I might need to reread the spec, but I think the config space is not
-> > actually supposed to be in the 'ranges' of the host bridge at all,
-> > and it should just be listed in the 'reg'.
-> 
-> This wasn't at all clear to me (I listed it in the cover-letter as being
-> something to sort out).
+On Wed, Feb 05, 2014 at 10:07:50AM +0000, Grant Likely wrote:
+> On Tue, 04 Feb 2014 13:09:33 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > From: Grant Likely <grant.likely@linaro.org>
+> > +/reserved-memory node
+> > +---------------------
+> > +#address-cells, #size-cells (required) - standard definition
+> > +    - Should use the same values as the root node
+> > +#memory-region-cells (required) - dictates number of cells used in the child
+> > +                                  nodes memory-region specifier
+>
+> I don't think this isn't defined well enough. These reserved regions may
+> not have a driver attached to them, so there is no central agent to
+> decide what the specifier means. That leaves the interpretation of
+> the memory region in the hands of the client drivers. How do you see the
+> specifier getting parsed and used?
 
-When we talked about this earlier on the DT bindings list the
-consensus seemed to be that configuration MMIO ranges should only be
-used if the underlying memory was exactly ECAM, and was not to be used
-for random configuration related register blocks.
+I had a specific usecase in mind when I added it, although admittedly I
+haven't yet worked through all of the details.
 
-The rational being that generic code, upon seeing that ranges entry,
-could just go ahead and assume ECAM mapping.
+On MSM chips, there is a region of memory accessible from the various
+processors on the SoC.  This region is used for (among other things)
+inter-processor communication.  Inside this region, a heap allocation
+protocol is implemented by software on all interested processors.
 
-> Now, if "reg" is definitely the correct thing to do, is it simply a matter
-> of putting the Configuration Space base address in there, or do we also need
-> to do the rest of what ePAPR says (expansion ROM details, ...)? I don't like
-> the idea of enumerating the entire bus in the DT when we don't need to.
+Consumers of this shared memory heap specify a 32-bit identifier and a
+size, and are either given a matching preexisting chunk (for example,
+another processor has already allocated a chunk with the corresponding
+identifier), or are allocated a new chunk for that identifier out of the
+region.
 
-If you use 'reg' then it is a private base address to your driver and
-you can do whatever you want with it.
+Given it's shared nature, this region has some specific requirements
+about how it may be accessed by the kernel (specifically regarding
+cacheability/how it's mapped), which means it at least needs _some_
+representation in a reserved-memory node.
 
-Most of the ePAPR things are only needed if the FW is going to
-communicate detailed information to the OS, for an environment that
-relies on Linux resource assignment and discovery you can just ignore
-all that.
+I had envisioned expressing the shared memory/consumer relationship in
+the device tree:
 
-> > This won't allow extended config space. Why not just do the
-> > regular mmconfig layout and make this:
-> > 
-> > 	cfg_offset(bus, device, function, register) =
-> > 		bus << 20 | device << 15 | function << 12 | register;
-> 
-> Is it worth adding a DT property to support both, or is ECAM the only thing
-> to care about? I'm happy either way, although I'll need to hack kvmtool to
-> use the new scheme.
+	reserved-memory {
+		smem : smem {
+			compatible = "qcom,shared-memory";
+			reg = <...>;
+			#memory-region-cells = <2>;
+			no-map;
+		};
+	};
 
-If you use ECAM then I wonder if your driver might be a generic SBSA
-driver too?
+	consumer {
+		/* ... */;
+		memory-region = <&smem 0xDEADBEEF 0x1000>;
+	};
 
-I can't think of a reason to support alternate MMIO layouts if
-kvmtool is the only user and can be changed.
+That is, the heap protocol implementation exists as a "driver" for the
+smem reserved-memory node, and the consumer's 2-cell specifier is a
+32-bit identifier and a size.
 
-> > I don't think we even want "virt" in the compatible string. The
-> > binding should be generic enough that it can actually work with
-> > real hardware.
-> 
-> Sure. How about "arm,pci-generic" ? Alternatives are
-> "arm,pcie-generic" or "linux,pci-generic".
+If your concern is for the case where a "qcom,shared-memory" node is
+specified in a device tree, but the "driver" hasn't been built into the
+kernel, then the appropriate behavior would be the same as the DMA/CMA
+case: fallback to a default case of memblock_reserve/memblock_remove'ing
+the region.
 
-arm,pci-ecam-generic ?
+Would using reserved-memory in this way be outside the scope of what was
+originally intended?
 
-Regards,
-Jason
+Thanks,
+  Josh
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
