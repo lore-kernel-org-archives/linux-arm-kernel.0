@@ -1,51 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Feb 2014 23:05:02 -0500
-Subject: [PATCH] mvebu : pcie: dt: potential issue in range parsing
-In-Reply-To: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
-References: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140205040502.GM8533@titan.lakedaemon.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 5 Feb 2014 12:43:18 +0800
+Subject: [PATCH v3 8/8] ARM: dts: sun7i: Add ethernet alias for GMAC
+In-Reply-To: <20140203193802.GE25625@lukather>
+References: <1391398346-5094-1-git-send-email-wens@csie.org>
+ <1391398346-5094-9-git-send-email-wens@csie.org>
+ <20140203193802.GE25625@lukather>
+Message-ID: <CAGb2v659T_QTLChB0NRS0seQvwDBCmTAH6UBEghZng9Ac6uL4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Jacques,
+On Tue, Feb 4, 2014 at 3:38 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Feb 03, 2014 at 11:32:26AM +0800, Chen-Yu Tsai wrote:
+>> U-Boot will insert MAC address into the device tree image.
+>> It looks up ethernet[0-5] aliases to find the ethernet nodes.
+>> Alias GMAC as ethernet0, as it is the only ethernet controller used.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index 65fb8d0..c48fb11 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -17,7 +17,7 @@
+>>       interrupt-parent = <&gic>;
+>>
+>>       aliases {
+>> -             ethernet0 = &emac;
+>> +             ethernet0 = &gmac;
+>>       };
+>
+> I'm not very fond of this patch.
+>
+> People might rely on the fact that ethernet0 is actually the emac, and
+> are expecting u-boot to fill the ethaddr variable to the emac, and not
+> the gmac.
+>
+> Since u-boot is totally able to deal with several ethernet addresses,
+> please add it as ethernet1.
 
-On Fri, Jan 10, 2014 at 11:23:51AM +0100, Jean-Jacques Hiblot wrote:
-> The second parameter of of_read_number is not the index, but a size.
-> As it happens, in this case it may work just fine because of the the conversion
-> to u32 and the favorable endianness on this architecture.
-> 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Actually I think we should override this in the board dts.
+The boards we currently support can only use emac or gmac,
+and in our u-boot tree, they have been converted to using
+gmac. If any future boards support both emac and gmac, we
+can address the ordering then. And the ordering should
+match u-boot.
 
-Sorry for the unusually long delay.  I was waiting for Thomas to get
-back from vacation since he is intimately familiar with this driver.
+What do you think?
 
-Thomas?
 
-thx,
-
-Jason.
-
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index c269e43..877e8ce 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -768,7 +768,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
->  
->  	for (i = 0; i < nranges; i++) {
->  		u32 flags = of_read_number(range, 1);
-> -		u32 slot = of_read_number(range, 2);
-> +		u32 slot = of_read_number(range + 1, 1);
->  		u64 cpuaddr = of_read_number(range + na, pna);
->  		unsigned long rtype;
->  
-> -- 
-> 1.8.5.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cheers
+ChenYu
