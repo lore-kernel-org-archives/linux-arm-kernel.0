@@ -1,39 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 5 Feb 2014 11:41:34 -0600
-Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
- timer
-In-Reply-To: <52F26444.5090707@ti.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>
- <CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>
- <52F26444.5090707@ti.com>
-Message-ID: <CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 5 Feb 2014 12:43:16 -0500
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140205140802.9977.19747@quantum>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205140802.9977.19747@quantum>
+Message-ID: <20140205174316.GV8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 5, 2014 at 10:18 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->
-> On 02/05/2014 04:39 PM, Rob Herring wrote:
->>
->> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> wrote:
->>>
->>> This patch provides bindings for the 64-bit timer in the KeyStone
->>> architecture devices. The timer can be configured as a general-purpose
->>> 64-bit
->>> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
->>> timers, each half can operate in conjunction (chain mode) or
->>> independently
->>> (unchained mode) of each other.
->>
->> This is software configurable or h/w design time configurations?
->>
->> Rob
->>
->
-> This is h/w design time configurations
+On Wed, Feb 05, 2014 at 06:08:02AM -0800, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2014-01-25 10:19:06)
+> > This patch set fixes clk init order that went upside-down with
+> > v3.14. I haven't really investigated what caused this, but I assume
+> > it is related with DT node reordering by addresses.
+> > 
+> > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> > registered before core clocks driver. Unfortunately, we cannot
+> > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> > init order for our drivers is always core clocks before clock gating,
+> > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> > init function that will register core clocks before clock gating
+> > driver.
+> > 
+> > This patch is based on pre-v3.14-rc1 mainline and should go in as
+> > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> > I suggest Jason picks it up as a topic branch.
+> 
+> Sebastian,
+> 
+> These patches look OK to me. I'd rather take Gregory Clement's "respect
+> the clock dependencies in of_clk_init" patch towards 3.15, so this fix
+> will still be necessary for the current -rc's.
+> 
+> Jason, will you be sending a PR?
 
-Then it seems like the binding should provide for describing those
-differences either with a property or different compatible strings.
+Ahh, just saw this now.  ignore my previous comments about using
+Gregory's series as the fix.
 
-Rob
+Sure, I'll put this together for a pr to the clk tree.
+
+thx,
+
+Jason.
+
+> > The patches have been boot tested on Dove and compile-tested only
+> > for Kirkwood, Armada 370 and XP.
+> > 
+> > Sebastian Hesselbarth (4):
+> >   clk: mvebu: armada-370: maintain clock init order
+> >   clk: mvebu: armada-xp: maintain clock init order
+> >   clk: mvebu: dove: maintain clock init order
+> >   clk: mvebu: kirkwood: maintain clock init order
+> > 
+> >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+> >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+> >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+> >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+> >  4 files changed, 44 insertions(+), 50 deletions(-)
+> > 
+> > ---
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > -- 
+> > 1.8.5.2
+> > 
