@@ -1,31 +1,41 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 05 Feb 2014 09:34:13 -0800
-Subject: [PATCH 05/22] Add shared printk wrapper for consistent prefixing
-In-Reply-To: <1391619853-10601-6-git-send-email-leif.lindholm@linaro.org>
-References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
- <1391619853-10601-6-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1391621653.30094.11.camel@joe-AO722>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 5 Feb 2014 11:31:57 -0600
+Subject: [GIT PULL] SOCFPGA DT updates for 3.15
+Message-ID: <1391621517-17219-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-05 at 17:03 +0000, Leif Lindholm wrote:
-> From: Roy Franz <roy.franz@linaro.org>
-> 
-> Add a wrapper for printk to standardize the prefix for informational and
-> error messages from the EFI stub.
+Hi Arnd, Kevin, and Olof,
 
-trivia:
+Please consider pulling in these 2 patches for the enabling SD/MMC on the SOCFPGA
+platform.
 
-> diff --git a/drivers/firmware/efi/efi-stub-helper.c b/drivers/firmware/efi/efi-stub-helper.c
-[]
-> @@ -45,6 +45,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
->  	}
->  }
->  
-> +#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
-> +#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
+Thanks,
+Dinh
 
-Perhaps it'd be better to use a space after the second "
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-Also, maybe pr_efi should be pr_efi_info.
-That would quiet any checkpatch noise around long msg uses.
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-for-3.15
+
+for you to fetch changes up to e422c12bc07192289c3fec4edd457e6ffaa03b2b:
+
+  ARM: socfpga_defconfig: enable SD/MMC support (2014-02-05 11:19:34 -0600)
+
+----------------------------------------------------------------
+SOCFPGA dts updates for v3.15
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      dts: socfpga: Add support for SD/MMC on the SOCFPGA platform
+      ARM: socfpga_defconfig: enable SD/MMC support
+
+ arch/arm/boot/dts/socfpga.dtsi          |   13 ++++++++++++-
+ arch/arm/boot/dts/socfpga_arria5.dtsi   |   11 +++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts        |   11 +++++++++++
+ arch/arm/configs/socfpga_defconfig      |    2 ++
+ 5 files changed, 47 insertions(+), 1 deletion(-)
