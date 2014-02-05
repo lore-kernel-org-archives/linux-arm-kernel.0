@@ -1,50 +1,89 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 05 Feb 2014 11:48:16 +0100
-Subject: [PATCH 08/18] mfd: max14577: Rename state container to maxim_core
-In-Reply-To: <20140203094258.GI13529@lee--X1>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-9-git-send-email-k.kozlowski@samsung.com>
- <20140203094258.GI13529@lee--X1>
-Message-ID: <1391597296.3726.13.camel@AMDC1943>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Feb 2014 11:51:41 +0100
+Subject: [PATCH 1/2] clk: shmobile: rcar-gen2: Fix clock parent all
+ non-PLL clocks
+In-Reply-To: <52F213C9.2020501@codethink.co.uk>
+References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1389113273-10364-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52F213C9.2020501@codethink.co.uk>
+Message-ID: <4232876.LkjsLLbJbc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Cc: Chanwoo, Mark and Dmitry for ACK-s on their subsystems.
+Hi Ben,
 
-Krzysztof Kozlowski
+On Wednesday 05 February 2014 10:34:49 Ben Dooks wrote:
+> On 07/01/14 16:47, Laurent Pinchart wrote:
+> > The lb, qspi, sdh, sd0 and sd1 clocks have the PLL1 (divided by 2) as
+> > their parent, not the main clock. Fix it.
+> 
+> William Towle has already sent a patch to move this to device tree
+> which I think is a better solution for this.
 
-On Mon, 2014-02-03 at 09:42 +0000, Lee Jones wrote:
-> > This patch continues the preparation for adding support for max77836
-> > device to existing max14577 driver.
-> > 
-> > The patch renames the struct "max14577" state container to "maxim_core".
-> > This is only a rename-like patch, new code is not added.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+I actually disagree. The CPG is an IP core that generates a bunch of clocks 
+from a single external parent. The fact that clocks are not flat but organized 
+as a tree internally is an internal property of the CPG, and I prefer keeping 
+it that way instead of exposing it in the device tree.
+
+> Any chance of commenting on which to take please.
+> 
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
 > > ---
-> >  drivers/extcon/extcon-max14577.c     |   22 +++++------
-> >  drivers/mfd/max14577.c               |   68 +++++++++++++++++-----------------
-> >  drivers/power/max14577_charger.c     |   16 ++++----
-> >  drivers/regulator/max14577.c         |    6 +--
-> >  include/linux/mfd/max14577-private.h |    5 ++-
-> >  5 files changed, 60 insertions(+), 57 deletions(-)
-> 
-> Need some more maintainer Acks here.
-> 
-> > -struct max14577 {
-> > +/*
-> > + * State container for max14577-like drivers.
-> > + */
-> 
-> I don't think this comment is required.
-> 
-> Besides that, the code looks fine:
->   Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> > +struct maxim_core {
-> >  	struct device *dev;
-> >  	struct i2c_client *i2c; /* Slave addr = 0x4A */
-> >  
-> 
+> > 
+> >   drivers/clk/shmobile/clk-rcar-gen2.c | 10 +++++++++-
+> >   1 file changed, 9 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c
+> > b/drivers/clk/shmobile/clk-rcar-gen2.c index a59ec21..8c7bcbd 100644
+> > --- a/drivers/clk/shmobile/clk-rcar-gen2.c
+> > +++ b/drivers/clk/shmobile/clk-rcar-gen2.c
+> > @@ -186,7 +186,7 @@ rcar_gen2_cpg_register_clock(struct device_node *np,
+> > struct rcar_gen2_cpg *cpg,> 
+> >   			     const char *name)
+> >   {
+> >   	const struct clk_div_table *table = NULL;
+> > -	const char *parent_name = "main";
+> > +	const char *parent_name;
+> >   	unsigned int shift;
+> >   	unsigned int mult = 1;
+> >   	unsigned int div = 1;
+> > @@ -201,23 +201,31 @@ rcar_gen2_cpg_register_clock(struct device_node *np,
+> > struct rcar_gen2_cpg *cpg,> 
+> >   		 * the multiplier value.
+> >   		 */
+> >   		u32 value = clk_readl(cpg->reg + CPG_PLL0CR);
+> > +		parent_name = "main";
+> >   		mult = ((value >> 24) & ((1 << 7) - 1)) + 1;
+> >   	} else if (!strcmp(name, "pll1")) {
+> > +		parent_name = "main";
+> >   		mult = config->pll1_mult / 2;
+> >   	} else if (!strcmp(name, "pll3")) {
+> > +		parent_name = "main";
+> >   		mult = config->pll3_mult;
+> >   	} else if (!strcmp(name, "lb")) {
+> > +		parent_name = "pll1_div2";
+> >   		div = cpg_mode & BIT(18) ? 36 : 24;
+> >   	} else if (!strcmp(name, "qspi")) {
+> > +		parent_name = "pll1_div2";
+> >   		div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
+> >   		    ? 16 : 20;
+> >   	} else if (!strcmp(name, "sdh")) {
+> > +		parent_name = "pll1_div2";
+> >   		table = cpg_sdh_div_table;
+> >   		shift = 8;
+> >   	} else if (!strcmp(name, "sd0")) {
+> > +		parent_name = "pll1_div2";
+> >   		table = cpg_sd01_div_table;
+> >   		shift = 4;
+> >   	} else if (!strcmp(name, "sd1")) {
+> > +		parent_name = "pll1_div2";
+> >   		table = cpg_sd01_div_table;
+> >   		shift = 0;
+> >   	} else if (!strcmp(name, "z")) {
+
+-- 
+Regards,
+
+Laurent Pinchart
