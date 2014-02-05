@@ -1,43 +1,54 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Wed,  5 Feb 2014 14:01:38 -0500
-Subject: [PATCH v3 3/6] iio: enable selection and build of pulse drivers
-In-Reply-To: <1391626901-31684-1-git-send-email-mporter@linaro.org>
-References: <1391626901-31684-1-git-send-email-mporter@linaro.org>
-Message-ID: <1391626901-31684-4-git-send-email-mporter@linaro.org>
+Date: Wed,  5 Feb 2014 14:01:35 -0500
+Subject: [PATCH v3 0/6] IIO pulse capture support for TI ECAP
+Message-ID: <1391626901-31684-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pulse driver subdirectory when configuring and building
-IIO.
+Changes since v2:
+	- Remove various unneeded field initialization
+	- Call iio_triggered_buffer_cleanup() on remove
 
-Signed-off-by: Matt Porter <mporter@linaro.org>
----
- drivers/iio/Kconfig  | 1 +
- drivers/iio/Makefile | 1 +
- 2 files changed, 2 insertions(+)
+Changes since v1:
+	- Rebased to 3.14-rc1
+	- Renamed in_pulse_polarity to pulse_polarity
+	- Added ABI entries for pulse devices and TI ECAP
 
-diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-index 5dd0e12..286acc3 100644
---- a/drivers/iio/Kconfig
-+++ b/drivers/iio/Kconfig
-@@ -74,6 +74,7 @@ if IIO_TRIGGER
-    source "drivers/iio/trigger/Kconfig"
- endif #IIO_TRIGGER
- source "drivers/iio/pressure/Kconfig"
-+source "drivers/iio/pulse/Kconfig"
- source "drivers/iio/temperature/Kconfig"
- 
- endif # IIO
-diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
-index 887d390..9a953c9 100644
---- a/drivers/iio/Makefile
-+++ b/drivers/iio/Makefile
-@@ -24,5 +24,6 @@ obj-y += light/
- obj-y += magnetometer/
- obj-y += orientation/
- obj-y += pressure/
-+obj-y += pulse/
- obj-y += temperature/
- obj-y += trigger/
+This series adds support for PWM capture devices within IIO and
+adds a TI ECAP IIO driver.
+
+PWM capture devices are supported using a new IIO "pulse" channel type.
+
+The IIO ECAP driver implements interrupt driven triggered buffer capture
+only as raw sample reads are not applicable to this hardware.
+Initially, the driver supports a single pulse width measurement with
+configurable polarity. The ECAP hardware can support measurement of a
+complete period and duty cycle but this is not yet implemented.
+
+Matt Porter (6):
+  iio: add support for pulse width capture devices
+  iio: pulse: add TI ECAP driver
+  iio: enable selection and build of pulse drivers
+  iio: Add ABI docs for pulse capture devices
+  pwm: enable TI PWMSS if the IIO tiecap driver is selected
+  ARM: dts: AM33XX: Add ecap interrupt properties
+
+ Documentation/ABI/testing/sysfs-bus-iio            |  18 +
+ .../ABI/testing/sysfs-bus-iio-pulse-tiecap         |   9 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   6 +
+ drivers/iio/Kconfig                                |   1 +
+ drivers/iio/Makefile                               |   1 +
+ drivers/iio/industrialio-core.c                    |   1 +
+ drivers/iio/pulse/Kconfig                          |  20 +
+ drivers/iio/pulse/Makefile                         |   6 +
+ drivers/iio/pulse/tiecap.c                         | 491 +++++++++++++++++++++
+ drivers/pwm/Kconfig                                |   2 +-
+ include/linux/iio/types.h                          |   1 +
+ 11 files changed, 555 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-pulse-tiecap
+ create mode 100644 drivers/iio/pulse/Kconfig
+ create mode 100644 drivers/iio/pulse/Makefile
+ create mode 100644 drivers/iio/pulse/tiecap.c
+
 -- 
 1.8.4
