@@ -1,37 +1,82 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Feb 2014 11:31:41 +0100
-Subject: [PATCH 0/2] clk: shmobile rcar-gen2 fixes
-In-Reply-To: <1591253.8BzYfubhGS@avalon>
-References: <1389113273-10364-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAMuHMdUVGAL_h8iezPHZsmfC+77xXE9+irNywk4LYcqAMk9JGg@mail.gmail.com>
- <1591253.8BzYfubhGS@avalon>
-Message-ID: <15127900.Wy8QsPfEr8@avalon>
+Date: Wed, 05 Feb 2014 11:32:45 +0100
+Subject: [Linux-kernel] [PATCH 2/3] ARM: shmobile: r8a7790: specify
+ multiple parents for cpg_clks
+In-Reply-To: <52F20133.6080107@codethink.co.uk>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <1391537858-28593-3-git-send-email-william.towle@codethink.co.uk>
+ <52F20133.6080107@codethink.co.uk>
+Message-ID: <1565445.R9bPDKl3Py@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Hi Ben,
 
-Ping ?
-
-v3.14-rc1 is out, and those are bug fixes.
-
-On Wednesday 08 January 2014 00:06:39 Laurent Pinchart wrote:
-> On Tuesday 07 January 2014 17:59:01 Geert Uytterhoeven wrote:
-> > On Tue, Jan 7, 2014 at 5:47 PM, Laurent Pinchart wrote:
-> > > Geert, could you please verify that the series fixes your QSPI clock
-> > > issues with the Koelsch board ?
-> > > 
-> > > Laurent Pinchart (2):
-> > >   clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks
-> > >   clk: shmobile: rcar-gen2: Fix qspi divisor
+On Wednesday 05 February 2014 09:15:31 Ben Dooks wrote:
+> On 04/02/14 18:17, William Towle wrote:
+> > The current drivers/clk/shmobile/clk-rcar-gen2.c uses the
+> > extal_clk reference for the parent of all the clocks that
+> > it registers. However the lb, qspi, sdh, sd0 and sd1 clocks
+> > are all parented to either pll1 or pll1_div2 which means
+> > that the clock rates are incorrect.
 > > 
-> > Thanks, both:
+> > This is part of the fix that corrects the SDHI0 clock
 > > 
-> > Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > rate error where it reports 1MHz instead of 97.5:
+> >      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1 MHz
+> > 
+> > Notes:
+> > - May require cross-merge with clk-rcar-gen2.c fix
+> > - Also not clear which clock "z" is to fix it.
 > 
-> Thank you.
+> Laurent, if you could give us an idea of how to fix this then
+> it would be helpful to get this patch fully fixed.
+
+I've already sent a patch that fixes this issue.
+
+"clk: shmobile: rcar-gen2: Fix clock parent all non-PLL clocks"
+
+(http://www.spinics.net/lists/linux-sh/msg27275.html)
+
+I've just pinged Mike to ask him to pick it up for v3.14.
+
+> > [ben.dooks at codethink.co.uk: updated patch description]
+> > Signed-off-by: William Towle <william.towle@codethink.co.uk>
+> > Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> > ---
+> > 
+> >   arch/arm/boot/dts/r8a7790.dtsi |    8 +++++++-
+> >   1 file changed, 7 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi
+> > b/arch/arm/boot/dts/r8a7790.dtsi index ff55c6e..242e6e2 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> > @@ -446,7 +446,13 @@
+> > 
+> >   			compatible = "renesas,r8a7790-cpg-clocks",
+> >   			
+> >   				     "renesas,rcar-gen2-cpg-clocks";
+> >   			
+> >   			reg = <0 0xe6150000 0 0x1000>;
+> > 
+> > -			clocks = <&extal_clk>;
+> > +			clocks = <&extal_clk>, <&extal_clk>, <&extal_clk>, 
+<&extal_clk>,
+> > +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> > +				<&pll1_div2_clk>,
+> > +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> > +				<&cpg_clocks R8A7790_CLK_PLL1>,
+> > +				<&cpg_clocks R8A7790_CLK_PLL1>
 > 
-> Mike, could you please pick those patches up for v3.14 ?
+> Should we add a pll1_clk node, or leave this as is?
+> 
+> > +				/* not known for "z" ...,<> */;
+> > 
+> >   			#clock-cells = <1>;
+> >   			clock-output-names = "main", "pll0", "pll1", "pll3",
+> >   			
+> >   					     "lb", "qspi", "sdh", "sd0", "sd1",
 
 -- 
 Regards,
