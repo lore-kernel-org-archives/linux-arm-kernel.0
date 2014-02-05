@@ -1,44 +1,66 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 5 Feb 2014 21:40:53 +0100 (CET)
-Subject: [PATCH 2/2] clocksource: Make clocksource register functions void
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D46489C@AcuExch.aculab.com>
-References: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
- <52E0C889.6000106@prisktech.co.nz>
- <063D6719AE5E284EB5DD2968C1650D6D46489C@AcuExch.aculab.com>
-Message-ID: <alpine.DEB.2.02.1402052139560.24986@ionos.tec.linutronix.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 5 Feb 2014 13:53:19 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <3724624.kd9jZNUiTF@wuerfel>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <3460536.Sh23gjDa6X@wuerfel>
+ <20140205190947.GA22297@mudshark.cambridge.arm.com>
+ <3724624.kd9jZNUiTF@wuerfel>
+Message-ID: <20140205205319.GH25695@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yijing,
+On Wed, Feb 05, 2014 at 09:26:17PM +0100, Arnd Bergmann wrote:
+> > > What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
+> > > is not the resource you want to pass into pci_add_resource()
+> > > later.
 
-On Thu, 23 Jan 2014, David Laight wrote:
+Right, of_pci_range_to_resource returns the CPU MMIO address. A big
+problem here is that struct resource is being re-used for bus
+physical, CPU MMIO, and Linux Driver addressing domains without any
+helpful tagging.
 
-> From: Linuxppc-dev Tony Prisk
-> > On 23/01/14 20:12, Yijing Wang wrote:
-> > > Currently, clocksource_register() and __clocksource_register_scale()
-> > > functions always return 0, it's pointless, make functions void.
-> > > And remove the dead code that check the clocksource_register_hz()
-> > > return value.
-> > ......
-> > > -static inline int clocksource_register_hz(struct clocksource *cs, u32 hz)
-> > > +static inline void clocksource_register_hz(struct clocksource *cs, u32 hz)
-> > >   {
-> > >   	return __clocksource_register_scale(cs, 1, hz);
-> > >   }
-> > 
-> > This doesn't make sense - you are still returning a value on a function
-> > declared void, and the return is now from a function that doesn't return
-> > anything either ?!?!
-> > Doesn't this throw a compile-time warning??
+typedef struct resource resource_bus;
+typedef struct resource resource_cpu;
+
+?
+
+> > Do I need to open-code the resource translation from phys -> logical?
 > 
-> It depends on the compiler.
-> Recent gcc allow it.
-> I don't know if it is actually valid C though.
-> 
-> There is no excuse for it on lines like the above though.
+> I think we should have some common infrastructure that lets you
+> get this right more easily.
 
-Can you please resend with that fixed against 3.14-rc1 ?
+The offset stuff seems to be very confusing to people, removing it
+from the APIs and forcing drivers to talk about bus addresess, CPU
+addresses and internal Linux addresses seems a bit more plain?
 
-Thanks,
+What do you think about something like this:
 
-	tglx
+int of_pci_alloc_io(.. resources,
+                    struct of_pci_range *range,
+                    struct device_node *np)
+{
+  struct resource bus_address, mmio_window, res;
+
+  bus_address.start = range->pci_addr;
+  bus_address.end = range->pci_addr + range->size - 1;
+
+  mmio_window.start = range->cpu_addr;
+  mmio_window.end = range->cpu_addr + range->size - 1;
+
+  /* Input bus_address - addresses seen on the bus
+           mmio_window - physical CPU address to create the bus
+	   	         addreses
+     Output res - Address suitable for use in drivers
+     This does the pci_ioremap_io too */
+  pci_alloc_virtual_io_window(&bus_address, &mmio_window, &res);
+
+  /* bus_address - addresses seen on the bus
+     res - matching driver view for the bus addresses */
+  pci_add_resource_bus(&resources, &bus_address, &res);
+}
+
+And a similar function for MMIO that just omits
+pci_alloc_virtual_io_window.
+
+Jason
