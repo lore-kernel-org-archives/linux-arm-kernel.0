@@ -1,93 +1,65 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 05 Feb 2014 13:53:18 +0000
-Subject: [PATCH v7 2/7] dt-bindings: sram: describe option to reserve
- parts of the memory
-In-Reply-To: <1816961.2dvm7Iumeh@phil>
-References: <4970034.fqvMoHdOyd@phil> <1782709.QdZpsrsctf@phil> <
- 20140205111247.476B7C40A89@trevor.secretlab.ca> <1816961.2dvm7Iumeh@phil>
-Message-ID: <20140205135318.5BEF0C40A89@trevor.secretlab.ca>
+From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
+Date: Wed, 05 Feb 2014 14:53:31 +0100
+Subject: [PATCH v3 0/7] ARM: sunxi: Add driver for SD/MMC hosts found on
+ allwinner sunxi SOCs
+Message-ID: <20140205134741.3027.50207.stgit@dizzy-6.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Feb 2014 13:05:14 +0100, Heiko St??bner <heiko@sntech.de> wrote:
-> Am Mittwoch, 5. Februar 2014, 11:12:47 schrieb Grant Likely:
-> > On Mon, 20 Jan 2014 16:42:58 +0100, Heiko St????bner <heiko@sntech.de> wrote:
-> > > Some SoCs need parts of their sram for special purposes. So while being
-> > > part of the peripheral, it should not be part of the genpool controlling
-> > > the sram.
-> > > 
-> > > Therefore add an option mmio-sram-reserved to keep arbitrary portions of
-> > > the sram from general usage.
-> > > 
-> > > Suggested-by: Rob Herring <robherring2@gmail.com>
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > > 
-> > >  Documentation/devicetree/bindings/misc/sram.txt |    8 ++++++++
-> > >  1 file changed, 8 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/misc/sram.txt
-> > > b/Documentation/devicetree/bindings/misc/sram.txt index 4d0a00e..09ee7a3
-> > > 100644
-> > > --- a/Documentation/devicetree/bindings/misc/sram.txt
-> > > +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> > > 
-> > > @@ -8,9 +8,17 @@ Required properties:
-> > >  - reg : SRAM iomem address range
-> > > 
-> > > +Optional properties:
-> > > +
-> > > +- mmio-sram-reserved: ordered list of reserved chunks inside the sram
-> > > that
-> > > +  should not be used by the operating system.
-> > > +  Format is <base size>, <base size>, ...; with base being relative to
-> > > the
-> > > +  reg property base.
-> > > +
-> > 
-> > We've now got a draft binding for reserved memory. Can you use the format
-> > here? Basically each reserved region is a sub node with either a reg
-> > property or a size property.
-> > 
-> > This is specifically for sram, so I won't make a big deal about it, but
-> > it would be good to have some commonality.
-> 
-> I guess you're talking about "[PATCH v2 0/5] reserved-memory regions/CMA in 
-> devicetree, again", right?
-> 
-> In general I'm all for commonality :-). So I guess you mean it to look 
-> something like the following:
-> 
-> 	sram: sram at 10080000 {
-> 		compatible = "rockchip,rk3066-sram", "mmio-sram";
-> 		reg = <0x10080000 0x8000>;
-> 
-> 		reserved-memory {
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			smp at 200 {
-> 				/* hmm, relative or absolute, aka 0x200 or 0x10080200? */
-> 				reg = <0x200 0x50>;
-> 			};
-> 		};
-> 	};
-> 
-> As it looks like only a slight modification of my "parsing" code this should be 
-> doable. Do you suggest more changes to the example above?
+Hello
+The following patchset adds support for the SD/MMC host found in the Allwinner SoCs.
+It contains all the necessary modifications for clock environment and also the device
+tree script modification which add it to all the boards using it.
+The clock environment function needed for phase offset configuration has
+been proposed and implemented by Emilio.
+A lot of work and cleanup has been done by Hans de Goede. Special thanks to him!
+This patchset is the third attempt to send this driver upstream.
+It addresses special remarks about coding style and API usage and incorporates proposed
+corrections into the previous commits.
+It also includes the patch of Emilios, I forgot to include last time.
 
-I think the reserved-memory node can actually be dropped in this case.
-The only reason we had it for main memory is to deal with regions that
-traverse multiple memory nodes. You don't have that case so you can make
-the smp at 200 node a direct child of SRAM. All the semantics would be the
-same otherwise.
+best regards
+David
 
-It would be useful to allow compatible values or phandle references to
-the reserved regions, and the SRAM driver would be responsible to avoid
-any region defined unless told explicitly that the region can be used.
-Not using a child region is a sensible default for any SRAM driver when
-it doesn't have any information otherwise.
+---
 
-g.
+David Lanzend?rfer (4):
+      ARM: sunxi: Add driver for SD/MMC hosts found on Allwinner sunxi SoCs
+      ARM: dts: sun7i: Add support for mmc
+      ARM: dts: sun4i: Add support for mmc
+      ARM: dts: sun5i: Add support for mmc
+
+Emilio L?pez (2):
+      clk: sunxi: factors: automatic reparenting support
+      clk: sunxi: Implement MMC phase control
+
+Hans de Goede (1):
+      ARM: sunxi: clk: export clk_sunxi_mmc_phase_control
+
+
+ arch/arm/boot/dts/sun4i-a10-a1000.dts            |    8 
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |    8 
+ arch/arm/boot/dts/sun4i-a10.dtsi                 |   54 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |   30 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |   44 +
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |   15 
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |   15 
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |   37 +
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      |    8 
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |    8 
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |   23 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |   61 ++
+ drivers/clk/sunxi/clk-factors.c                  |   36 +
+ drivers/clk/sunxi/clk-sunxi.c                    |   35 +
+ drivers/mmc/host/Kconfig                         |    7 
+ drivers/mmc/host/Makefile                        |    2 
+ drivers/mmc/host/sunxi-mci.c                     |  859 ++++++++++++++++++++++
+ drivers/mmc/host/sunxi-mci.h                     |  239 ++++++
+ include/linux/clk/sunxi.h                        |   22 +
+ 19 files changed, 1511 insertions(+)
+ create mode 100644 drivers/mmc/host/sunxi-mci.c
+ create mode 100644 drivers/mmc/host/sunxi-mci.h
+ create mode 100644 include/linux/clk/sunxi.h
+
+-- 
+Signature
