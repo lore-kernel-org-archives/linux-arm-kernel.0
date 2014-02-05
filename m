@@ -1,29 +1,50 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 5 Feb 2014 18:18:12 +0200
-Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
- timer
-In-Reply-To: <CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>	<1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>
- <CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>
-Message-ID: <52F26444.5090707@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 5 Feb 2014 11:19:28 -0500
+Subject: [PATCH 1/6] i2c: bcm-kona: register with subsys_initcall
+In-Reply-To: <Pine.LNX.4.44L0.1402051028350.1312-100000@iolanthe.rowland.org>
+References: <20140205151826.GC22153@beef>
+ <Pine.LNX.4.44L0.1402051028350.1312-100000@iolanthe.rowland.org>
+Message-ID: <20140205161928.GF22153@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 05, 2014 at 10:30:29AM -0500, Alan Stern wrote:
+> On Wed, 5 Feb 2014, Matt Porter wrote:
+> 
+> > On Wed, Feb 05, 2014 at 10:08:18AM +0100, Wolfram Sang wrote:
+> > > On Tue, Feb 04, 2014 at 07:19:07AM -0500, Matt Porter wrote:
+> > > 
+> > > > Voltage regulators are needed very early due to deferred probe
+> > > > being incompatible with built-in USB gadget drivers.
+> > > 
+> > > What does it need to fix those instead?
+> > 
+> > [added Alan/Felipe for more insight]
+> > 
+> > Discussion on that topic came about from this submission:
+> > http://www.spinics.net/lists/linux-usb/msg94217.html
+> > 
+> > End of it is:
+> > http://www.spinics.net/lists/linux-usb/msg94731.html
+> > 
+> > We can either add to the many drivers that already do subsys_initcall()
+> > for similar reasons...or I can drop this from the series and add gadget
+> > probe ordering to my TODO list.
+> > 
+> > In short, it can't be a late_initcall() hack like the original post and
+> > really could be solved by converting to a real bus (and letting
+> > deferred probe do its job)..but Alan voiced concerns about that.
+> 
+> Don't worry too much about what I said.  If adding a "gadget" bus will 
+> solve the problem in an appropriate way, and if nobody else objects 
+> (particularly Felipe, who is on vacation now), then go for it.
 
-On 02/05/2014 04:39 PM, Rob Herring wrote:
-> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->> This patch provides bindings for the 64-bit timer in the KeyStone
->> architecture devices. The timer can be configured as a general-purpose 64-bit
->> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
->> timers, each half can operate in conjunction (chain mode) or independently
->> (unchained mode) of each other.
-> This is software configurable or h/w design time configurations?
->
-> Rob
->
+Ok, I'll take a look at what can be done and restart the conversation
+when Felipe returns.
 
-This is h/w design time configurations
+Wolfram: given this, as I mentioned, I'll simply drop this patch from
+the series and work around it for now. This will probably make Lee and
+Mark happy to not see subsys_initcall() in the MFD/regulator drivers as
+well.
 
--- 
-Regards,
-Ivan Khoronzhuk
+-Matt
