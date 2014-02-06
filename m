@@ -1,63 +1,61 @@
-From: x-linux@infra-silbe.de (Sascha Silbe)
-Date: Thu,  6 Feb 2014 23:24:13 +0100
-Subject: [PATCH resend] ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC
- interrupt
-Message-ID: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu,  6 Feb 2014 16:24:39 -0600
+Subject: [PATCH v3 0/5] Split mach-msm into legacy and mach-qcom
+ (multiplatform)
+Message-ID: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apply the same work-around for i.MX 6D/Q erratum 006687 as used for
-Sabre Lite for the Wandboard Dual / Quad.
+This is the splits the Qualcomm MSM platform into legacy support that we will
+not try and convert to multiplatform and multiplatform support.
 
-Like on the Sabre Lite, GPIO6 is used as a power down output for
-camera expansion boards. However, these expansion boards do not work
-with mainline yet anyway.
+- k
 
-Tested on a Wandboard Quad. Before the patch:
+Changes from v2:
+* Dropped ARCH_MSM depends from CLKSRC_QCOM, since we select it
+* Fixed some grammar/typo's in commit messages
+* kept smp ops code in platsmp.c to match what other mach's do
+* Kept mach-qcom/Kconfig sorted alphabetically
 
-root at arm:~# ping -q -f -c 10000 192.168.2.1
-PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
+Changes from v1:
+* Added patch to remove hotplug.c
+* Added patch to rename msm_ to qcom_
+* Changes the Kconfig to drop CPU_V7
+* used wfi() in cpu_die function
+* Added git tree to MAINTAINERS file
 
---- 192.168.2.1 ping statistics ---
-10000 packets transmitted, 10000 received, 0% packet loss, time 97363ms
-rtt min/avg/max/mdev = 0.290/9.586/10.198/1.432 ms, pipe 2, ipg/ewma 9.737/9.672 ms
+Kumar Gala (5):
+      ARM: msm: kill off hotplug.c
+      clocksource: qcom: Move clocksource code out of mach-msm
+      ARM: qcom: Split Qualcomm support into legacy and multiplatform
+      clocksource: qcom: split building of legacy vs multiplatform support
+      ARM: qcom: Rename various msm prefixed functions to qcom
 
-After the patch:
-
-root at arm:~# ping -q -f -c 10000 192.168.2.1
-PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
-
---- 192.168.2.1 ping statistics ---
-10000 packets transmitted, 10000 received, 0% packet loss, time 4810ms
-rtt min/avg/max/mdev = 0.246/0.355/0.863/0.044 ms, ipg/ewma 0.481/0.319 ms
-
-Signed-off-by: Sascha Silbe <x-linux@infra-silbe.de>
----
- Resend after fixing up sendemail.envelopesender.
-
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index d050888..4d82878 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -123,6 +123,7 @@
- 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
- 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
- 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-+				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
- 			>;
- 		};
- 
-@@ -201,6 +202,8 @@
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
- 	phy-reset-gpios = <&gpio3 29 0>;
-+	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
- 	status = "okay";
- };
- 
--- 
-1.8.4.3
+ arch/arm/mach-msm/board-dt.c       |   41 ----
+ arch/arm/mach-msm/hotplug.c        |   51 -----
+ arch/arm/mach-msm/platsmp.c        |  130 --------------
+ arch/arm/mach-msm/scm-boot.c       |   39 ----
+ arch/arm/mach-msm/scm-boot.h       |   22 --
+ arch/arm/mach-msm/scm.c            |  299 ---------------------------------
+ arch/arm/mach-msm/scm.h            |   25 --
+ arch/arm/mach-msm/timer.c          |  333 -------------------------------------
+ b/MAINTAINERS                      |    8 
+ b/arch/arm/Kconfig                 |    7 
+ b/arch/arm/Kconfig.debug           |    2 
+ b/arch/arm/Makefile                |    1 
+ b/arch/arm/boot/dts/Makefile       |    6 
+ b/arch/arm/mach-msm/Kconfig        |   54 ------
+ b/arch/arm/mach-msm/Makefile       |    8 
+ b/arch/arm/mach-msm/common.h       |    1 
+ b/arch/arm/mach-qcom/Kconfig       |   33 +++
+ b/arch/arm/mach-qcom/Makefile      |    5 
+ b/arch/arm/mach-qcom/board.c       |   40 ++++
+ b/arch/arm/mach-qcom/platsmp.c     |  137 +++++++++++++++
+ b/arch/arm/mach-qcom/scm-boot.c    |   39 ++++
+ b/arch/arm/mach-qcom/scm-boot.h    |   22 ++
+ b/arch/arm/mach-qcom/scm.c         |  299 +++++++++++++++++++++++++++++++++
+ b/arch/arm/mach-qcom/scm.h         |   25 ++
+ b/drivers/clocksource/Kconfig      |    3 
+ b/drivers/clocksource/Makefile     |    1 
+ b/drivers/clocksource/qcom-timer.c |  330 ++++++++++++++++++++++++++++++++++++
+ 27 files changed, 956 insertions(+), 1005 deletions(-)
