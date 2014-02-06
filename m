@@ -1,155 +1,46 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 06 Feb 2014 18:00:39 +0900
-Subject: [PATCH] ARM: pxa: don't select HAVE_PWM
-Message-ID: <000e01cf2319$e8837e80$b98a7b80$%han@samsung.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu,  6 Feb 2014 10:10:15 +0100
+Subject: [PATCH 0/3] ARM: dts: Fixes for Overo/Tobi against 3.14-rc1
+Message-ID: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HAVE_PWM symbol is only for legacy platforms that provide
-the PWM API without using the generic framework. PXA platforms
-use the generic PWM framework, after the commit "17b2b47 pwm:
-Move PXA PWM driver to PWM framework".
+OMAP36xx-based Overo (Storm and alike) are now failing to boot with 3.14-rc1 [1].
+This series fixes this, by moving model-agnostic DT into a common dtsi file,
+and creating model-specific DT files:
 
-In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", PXA platforms
-make the build errors as below. Thus, selecting HAVE_PWM should
-be removed from PXA platforms.
+- omap3-overo-tobi.dts -> older OMAP35xx Overo
+- omap3-overo-storm-tobi.dts -> newer OMAP36xx/AM37xx/DM37xx Overo
 
-drivers/built-in.o: In function `lm3630a_pwm_ctrl':
-drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
-drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
-drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
-drivers/built-in.o: In function `lp855x_pwm_ctrl':
-drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
-drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
-drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
+People will have to use the right Overo / expansion board combination.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/mach-pxa/Kconfig |   15 ---------------
- 1 file changed, 15 deletions(-)
+(Patch 2 in an unrelated fix that was waiting in my queue.)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 96100db..b96244c 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
- config MACH_PXA3XX_DT
- 	bool "Support PXA3xx platforms from device tree"
- 	select CPU_PXA300
--	select HAVE_PWM
- 	select POWER_SUPPLY
- 	select PXA3xx
- 	select USE_OF
-@@ -23,12 +22,10 @@ config ARCH_LUBBOCK
- 
- config MACH_MAINSTONE
- 	bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_ZYLONITE
- 	bool
--	select HAVE_PWM
- 	select PXA3xx
- 
- config MACH_ZYLONITE300
-@@ -69,7 +66,6 @@ config ARCH_PXA_IDP
- config ARCH_VIPER
- 	bool "Arcom/Eurotech VIPER SBC"
- 	select ARCOM_PCMCIA
--	select HAVE_PWM
- 	select I2C_GPIO
- 	select ISA
- 	select PXA25x
-@@ -120,7 +116,6 @@ config MACH_CM_X300
- 	bool "CompuLab CM-X300 modules"
- 	select CPU_PXA300
- 	select CPU_PXA310
--	select HAVE_PWM
- 	select PXA3xx
- 
- config MACH_CAPC7117
-@@ -211,7 +206,6 @@ config TRIZEPS_PCMCIA
- 
- config MACH_LOGICPD_PXA270
- 	bool "LogicPD PXA270 Card Engine Development Platform"
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_PCM027
-@@ -222,7 +216,6 @@ config MACH_PCM027
- config MACH_PCM990_BASEBOARD
- 	bool "PHYTEC PCM-990 development board"
- 	depends on MACH_PCM027
--	select HAVE_PWM
- 
- choice
- 	prompt "display on pcm990"
-@@ -246,7 +239,6 @@ config MACH_COLIBRI
- config MACH_COLIBRI_PXA270_INCOME
- 	bool "Income s.r.o. PXA270 SBC"
- 	depends on MACH_COLIBRI
--	select HAVE_PWM
- 	select PXA27x
- 
- config MACH_COLIBRI300
-@@ -275,7 +267,6 @@ comment "End-user Products (sorted by vendor name)"
- 
- config MACH_H4700
- 	bool "HP iPAQ hx4700"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
-@@ -289,14 +280,12 @@ config MACH_HIMALAYA
- 
- config MACH_MAGICIAN
- 	bool "Enable HTC Magician Support"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
- config MACH_MIOA701
- 	bool "Mitac Mio A701 Support"
- 	select GPIO_SYSFS
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 	help
-@@ -306,7 +295,6 @@ config MACH_MIOA701
- 
- config PXA_EZX
- 	bool "Motorola EZX Platform"
--	select HAVE_PWM
- 	select IWMMXT
- 	select PXA27x
- 
-@@ -346,7 +334,6 @@ config MACH_MP900C
- 
- config ARCH_PXA_PALM
- 	bool "PXA based Palm PDAs"
--	select HAVE_PWM
- 
- config MACH_PALM27X
- 	bool
-@@ -444,7 +431,6 @@ config MACH_TREO680
- config MACH_RAUMFELD_RC
- 	bool "Raumfeld Controller"
- 	select CPU_PXA300
--	select HAVE_PWM
- 	select POWER_SUPPLY
- 	select PXA3xx
- 
-@@ -608,7 +594,6 @@ config MACH_E800
- 
- config MACH_ZIPIT2
- 	bool "Zipit Z2 Handheld"
--	select HAVE_PWM
- 	select PXA27x
- endmenu
- 
+omap3-overo-tobi.dts tested with Overo Sand (OMAP3503) and omap3-overo-storm-tobi.dts
+tested with Overo EarthStorm (AM3703). Both boot. With the Overo Sand, I cannot
+mount the ext3 rootfs, but this seems unrelated to the current topic, maybe
+a missing errata.
+
+Regards,
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110006
+
+
+Florian Vaussard (3):
+  ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based Overo
+  ARM: dts: omap3-tobi: Use the correct vendor prefix
+  ARM: dts: Add support for both OMAP35xx and OMAP36xx Overo/Tobi
+
+ arch/arm/boot/dts/Makefile                         |  3 ++-
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
+ ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  3 ---
+ arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo.dtsi                 |  3 ---
+ 5 files changed, 46 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+ rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (94%)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
+
 -- 
-1.7.10.4
+1.8.1.2
