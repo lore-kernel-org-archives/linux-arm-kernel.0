@@ -1,62 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:21:00 +0900
-Subject: [PATCH 03/13] ARM: shmobile: r8a7791: Add I2C clocks
+Date: Thu,  6 Feb 2014 15:21:01 +0900
+Subject: [PATCH 04/13] ARM: shmobile: r8a7791: Add VIN clocks
 In-Reply-To: <cover.1391666228.git.horms+renesas@verge.net.au>
 References: <cover.1391666228.git.horms+renesas@verge.net.au>
-Message-ID: <106c0e8fa3a2f7a40d25583e193e34af3861564d.1391666228.git.horms+renesas@verge.net.au>
+Message-ID: <5f3fbe63b39923294cfd4bce84ab16948467d30f.1391666228.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-This adds I2C[0-5] clock support to R8A7791 SoC.
+This adds VIN[0-2] clock support to R8A7791 SoC.
 
 Changes in V2:
-* Capitalized ARM in the subject.
+* none.
+
+Changes in V3:
+* capitalized ARM in the subject.
 
 Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7791.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7791.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index f546126..fe4a774 100644
+index fe4a774..191ad60 100644
 --- a/arch/arm/mach-shmobile/clock-r8a7791.c
 +++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -122,6 +122,7 @@ static struct clk *main_clks[] = {
+@@ -103,6 +103,7 @@ SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
+ SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
+ SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
+ SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
++SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
+ SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
  
- /* MSTP */
+ static struct clk *main_clks[] = {
+@@ -117,6 +118,7 @@ static struct clk *main_clks[] = {
+ 	&rclk_clk,
+ 	&mp_clk,
+ 	&cp_clk,
++	&zg_clk,
+ 	&zx_clk,
+ };
+ 
+@@ -124,6 +126,7 @@ static struct clk *main_clks[] = {
  enum {
-+	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
+ 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
  	MSTP813,
++	MSTP811, MSTP810, MSTP809,
  	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
  	MSTP719, MSTP718, MSTP715, MSTP714,
-@@ -133,6 +134,12 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP931] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 31, 0), /* I2C0 */
-+	[MSTP930] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 30, 0), /* I2C1 */
-+	[MSTP929] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 29, 0), /* I2C2 */
-+	[MSTP928] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 28, 0), /* I2C3 */
-+	[MSTP927] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 27, 0), /* I2C4 */
-+	[MSTP925] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 25, 0), /* I2C5 */
+ 	MSTP522,
+@@ -141,6 +144,9 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP927] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 27, 0), /* I2C4 */
+ 	[MSTP925] = SH_CLK_MSTP32(&p_clk, SMSTPCR9, 25, 0), /* I2C5 */
  	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
++	[MSTP811] = SH_CLK_MSTP32(&zg_clk, SMSTPCR8, 11, 0), /* VIN0 */
++	[MSTP810] = SH_CLK_MSTP32(&zg_clk, SMSTPCR8, 10, 0), /* VIN1 */
++	[MSTP809] = SH_CLK_MSTP32(&zg_clk, SMSTPCR8,  9, 0), /* VIN2 */
  	[MSTP726] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 26, 0), /* LVDS0 */
  	[MSTP724] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 24, 0), /* DU0 */
-@@ -194,6 +201,12 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.4", &mstp_clks[MSTP927]),
-+	CLKDEV_DEV_ID("i2c-rcar_gen2.5", &mstp_clks[MSTP925]),
+ 	[MSTP723] = SH_CLK_MSTP32(&zx_clk, SMSTPCR7, 23, 0), /* DU1 */
+@@ -172,6 +178,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll1",		&pll1_clk),
+ 	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
+ 	CLKDEV_CON_ID("pll3",		&pll3_clk),
++	CLKDEV_CON_ID("zg",		&zg_clk),
+ 	CLKDEV_CON_ID("hp",		&hp_clk),
+ 	CLKDEV_CON_ID("p",		&p_clk),
+ 	CLKDEV_CON_ID("rclk",		&rclk_clk),
+@@ -208,6 +215,9 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.4", &mstp_clks[MSTP927]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.5", &mstp_clks[MSTP925]),
  	CLKDEV_DEV_ID("r8a7791-ether", &mstp_clks[MSTP813]), /* Ether */
++	CLKDEV_DEV_ID("r8a7791-vin.0", &mstp_clks[MSTP811]),
++	CLKDEV_DEV_ID("r8a7791-vin.1", &mstp_clks[MSTP810]),
++	CLKDEV_DEV_ID("r8a7791-vin.2", &mstp_clks[MSTP809]),
  };
  
+ #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
 -- 
 1.8.5.2
