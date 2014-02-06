@@ -1,65 +1,53 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 6 Feb 2014 19:36:17 +0900
-Subject: [PATCH 00/11] ARM: shmobile: RSPI RZ and QSPI SoC and board
- integration
-In-Reply-To: <20140205005631.GA7664@verge.net.au>
-References: <1391527445-14881-1-git-send-email-geert@linux-m68k.org>
- <20140205005631.GA7664@verge.net.au>
-Message-ID: <CANqRtoSrLV3PiUdbUQv9gTsM-p8tiqRvSza-=D9hG5fVn-CR0A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Feb 2014 10:43:28 +0000
+Subject: [PATCH v3 05/11] ARM: LPAE: provide an IPA capable pmd_addr_end
+In-Reply-To: <1391630151-7875-6-git-send-email-marc.zyngier@arm.com>
+References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
+ <1391630151-7875-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140206104328.GB29446@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 5, 2014 at 9:56 AM, Simon Horman <horms@verge.net.au> wrote:
-> Magnus, could you Ack these or otherwise?
->
-> On Tue, Feb 04, 2014 at 04:23:54PM +0100, Geert Uytterhoeven wrote:
->>       Hi Simon, Magnus,
->>
->> This patch series contains SoC and board integration for
->>   1. RSPI in the r7s72100 aka RZ/A1H SoC on the Genmai reference board,
->>   2. QSPI in the r8a7791 aka R-Car M2 SoC on the Koelsch reference board.
->> It was rebased on top of renesas-devel-v3.14-rc1-20140204.
->>
->> It was tested on the r7s72100-based Genmai reference board using loopback
->> mode, and on the r8a7791-based Koelsch reference board using the Spansion
->> s25fl512s SPI FLASH.
->>
->>   - [v5 01/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks
->>   - [v5 02/11] ARM: shmobile: genmai legacy: Add RSPI support
->>   - [v3 03/11] ARM: shmobile: genmai defconfig: Enable RSPI
->>   - [v3 04/11] ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
->>   - [v5 05/11] ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
->>   - [v4 06/11] ARM: shmobile: r8a7791 clock: add QSPI clocks
->>   - [v4 07/11] ARM: shmobile: koelsch legacy: Add QSPI support
->>   - [v4 08/11] ARM: shmobile: koelsch defconfig: Enable RSPI and
->>   - [v3 09/11] ARM: shmobile: r8a7791 dtsi: Add QSPI node
->>   - [v3 10/11] ARM: shmobile: koelsch dts: Add QSPI nodes
->>   - [v2 11/11] ARM: shmobile: lager legacy: Switch QSPI to named IRQs
->
-> Above I see v2, v3, v4 and v5 patches.
->
-> While I can make sense of this it makes it cumbersome to refer to the
-> series as a whole.
->
-> Bob, can you take a look at '"[PATCH 00/11] ARM: shmobile: RSPI RZ and
-> QSPI SoC and board", posted on Tuesday the 2nd, which includes v2, v3,
-> v4 and v5 patches'?
->
-> What would make my life easier would be if the entire series was v5 and
-> all the patches contained in it were v5. Then I could just ask Bob to look
-> at "[PATCH v5 00/11] ARM: shmobile: RSPI RZ and QSPI SoC and board"
->
-> There is no Bob but I do ask people these kind of questions :)
+On Wed, Feb 05, 2014 at 07:55:45PM +0000, Marc Zyngier wrote:
+> The default pmd_addr_end macro uses an unsigned long to represent
+> the VA. When used with KVM and stage-2 translation, the VA is
+> actually an IPA, which is up to 40 bits. This also affect the
+> SMMU driver, which also deals with stage-2 translation.
+> 
+> Instead, provide an implementation that can cope with larger VAs
+> by using a u64 instead. This version will overload the default
+> one provided in include/asm-generic/pgtable.h.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/pgtable-3level.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 03243f7..594867b 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -262,6 +262,11 @@ static inline int has_transparent_hugepage(void)
+>  	return 1;
+>  }
+>  
+> +#define pmd_addr_end(addr, end)						\
+> +({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
+> +	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+> +})
 
-Simon, Geert, Bob,
+I see why you need this but it affects all the other uses of
+pmd_addr_end() with 32-bit VA. It would be slight performance, I don't
+think it's noticeable.
 
-I've now gone through these patches and I think they look great. My
-apologies for slow handling.
+A different approach could be something like (untested):
 
-Acked-by: Magnus Damm <damm@opensource.se>
+#define pmd_addr_end(addr, end)					\
+({	__typeof__(addr) __boundary = ...
+	...
+})
 
-Thanks for your help.
+What about the pgd_addr_end(), do we need this or it's not used by KVM?
 
-Cheers,
-
-/ magnus
+-- 
+Catalin
