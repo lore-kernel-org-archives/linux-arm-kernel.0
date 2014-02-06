@@ -1,89 +1,134 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu,  6 Feb 2014 16:18:47 +0000
-Subject: [RFC PATCH V2 0/4] get_user_pages_fast for ARM and ARM64
-Message-ID: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+Date: Thu,  6 Feb 2014 16:18:48 +0000
+Subject: [RFC PATCH V2 1/4] arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+References: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1391703531-12845-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-This RFC series implements get_user_pages_fast and __get_user_pages_fast.
-These are required for Transparent HugePages to function correctly, as
-a futex on a THP tail will otherwise result in an infinite loop (due to
-the core implementation of __get_user_pages_fast always returning 0).
-This series may also be beneficial for direct-IO heavy workloads and
-certain KVM workloads.
+In order to implement fast_get_user_pages we need to ensure that the
+page table walker is protected from page table pages being freed from
+under it.
+
+One way to achieve this is to have the walker disable interrupts, and
+rely on IPIs from the TLB flushing code blocking before the page table
+pages are freed.
+
+On some ARM platforms we have hardware TLB invalidation, thus the TLB
+flushing code won't necessarily broadcast IPIs. Also spuriously
+broadcasting IPIs can hurt system performance if done too often.
+
+This problem has already been solved on PowerPC and Sparc by batching
+up page table pages belonging to more than one mm_user, then scheduling
+an rcu_sched callback to free the pages. If one were to disable
+interrupts, that would block the page table pages being freed. This
+logic has also been promoted to core code and is activated when one
+enables HAVE_RCU_TABLE_FREE.
+
+This patch enables HAVE_RCU_TABLE_FREE and incorporates it into the
+existing ARM TLB logic.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/Kconfig           |  1 +
+ arch/arm/include/asm/tlb.h | 38 ++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c1f1a7e..e4a0e59 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -55,6 +55,7 @@ config ARM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
++	select HAVE_RCU_TABLE_FREE if SMP
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index 0baf7f0..8cb5552 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -35,12 +35,39 @@
  
-Previous RFCs for fast_gup on arm have included one from Chanho Park:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162115.html
-
-one from Zi Shen Lim:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202133.html
-
-and my RFC V1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205951.html
-
-The main issues with previous RFCs have been in the mechanisms used to
-prevent page table pages from being freed from under the fast_gup
-walker. Some other architectures disable interrupts in the fast_gup
-walker, and then rely on the fact that TLB invalidations require IPIs;
-thus the page table freeing code is blocked by the walker. Some ARM
-platforms, however, have hardware broadcasts for TLB invalidation, so
-do not always require IPIs to flush TLBs. Some extra logic is therefore
-required to protect the fast_gup walker on ARM.
-
-My previous RFC attempted to protect the fast_gup walker with atomics,
-but this led to performance degradation.
-
-This RFC V2 instead uses the RCU scheduler logic from PowerPC to protect
-the fast_gup walker. All page table pages belonging to an address space
-with more than one user are batched together and freed from a delayed
-call_rcu_sched routine. Disabling interrupts will block the RCU delayed
-scheduler and prevent the page table pages from being freed from under
-the fast_gup walker. If there is not enough memory to batch the page
-tables together (which is very rare), then IPIs are raised individually
-instead.
-
-The RCU logic is activated by enabling HAVE_RCU_TABLE_FREE, and some
-modifications are made to the mmu_gather code in ARM and ARM64 to plumb
-it in. On ARM64, we could probably go one step further and switch to
-the generic mmu_gather code too.
-
-THP splitting is made to broadcast an IPI as we need to block these
-completely when the fast_gup walker is active. As THP splits are
-relatively rare (on my machine with 22 days uptime I count 27678), I do
-not expect these IPIs to cause any performance issues.
-
-I have tested the series using the Fast Model for ARM64 and an Arndale
-Board. A series of hackbench runs on the Arndale did not turn up any
-performance degradation with this patch set applied.
-
-This series applies to 3.13, but has also been tested on 3.14-rc1.
-
-I would really appreciate any comments and/or testers!
-
-Cheers,
--- 
-Steve
-
-Steve Capper (4):
-  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm: mm: implement get_user_pages_fast
-  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm64: mm: implement get_user_pages_fast
-
- arch/arm/Kconfig                      |   1 +
- arch/arm/include/asm/pgtable-3level.h |   6 +
- arch/arm/include/asm/tlb.h            |  38 ++++-
- arch/arm/mm/Makefile                  |   2 +-
- arch/arm/mm/gup.c                     | 251 ++++++++++++++++++++++++++++
- arch/arm64/Kconfig                    |   1 +
- arch/arm64/include/asm/pgtable.h      |   4 +
- arch/arm64/include/asm/tlb.h          |  27 +++-
- arch/arm64/mm/Makefile                |   2 +-
- arch/arm64/mm/gup.c                   | 297 ++++++++++++++++++++++++++++++++++
- 10 files changed, 623 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mm/gup.c
- create mode 100644 arch/arm64/mm/gup.c
-
+ #define MMU_GATHER_BUNDLE	8
+ 
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++static inline void __tlb_remove_table(void *_table)
++{
++	free_page_and_swap_cache((struct page *)_table);
++}
++
++struct mmu_table_batch {
++	struct rcu_head		rcu;
++	unsigned int		nr;
++	void			*tables[0];
++};
++
++#define MAX_TABLE_BATCH		\
++	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
++
++extern void tlb_table_flush(struct mmu_gather *tlb);
++extern void tlb_remove_table(struct mmu_gather *tlb, void *table);
++
++#define tlb_remove_entry(tlb,entry)	tlb_remove_table(tlb,entry)
++#else
++#define tlb_remove_entry(tlb,entry)	tlb_remove_page(tlb,entry)
++#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
++
+ /*
+  * TLB handling.  This allows us to remove pages from the page
+  * tables, and efficiently handle the TLB issues.
+  */
+ struct mmu_gather {
+ 	struct mm_struct	*mm;
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	struct mmu_table_batch	*batch;
++	unsigned int		need_flush;
++#endif
+ 	unsigned int		fullmm;
+ 	struct vm_area_struct	*vma;
+ 	unsigned long		start, end;
+@@ -101,6 +128,9 @@ static inline void __tlb_alloc_page(struct mmu_gather *tlb)
+ static inline void tlb_flush_mmu(struct mmu_gather *tlb)
+ {
+ 	tlb_flush(tlb);
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	tlb_table_flush(tlb);
++#endif
+ 	free_pages_and_swap_cache(tlb->pages, tlb->nr);
+ 	tlb->nr = 0;
+ 	if (tlb->pages == tlb->local)
+@@ -119,6 +149,10 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
+ 	tlb->pages = tlb->local;
+ 	tlb->nr = 0;
+ 	__tlb_alloc_page(tlb);
++
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	tlb->batch = NULL;
++#endif
+ }
+ 
+ static inline void
+@@ -195,7 +229,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 	tlb_add_flush(tlb, addr + SZ_1M);
+ #endif
+ 
+-	tlb_remove_page(tlb, pte);
++	tlb_remove_entry(tlb, pte);
+ }
+ 
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+@@ -203,7 +237,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ {
+ #ifdef CONFIG_ARM_LPAE
+ 	tlb_add_flush(tlb, addr);
+-	tlb_remove_page(tlb, virt_to_page(pmdp));
++	tlb_remove_entry(tlb, virt_to_page(pmdp));
+ #endif
+ }
+ 
 -- 
 1.8.1.4
