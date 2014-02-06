@@ -1,49 +1,36 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 6 Feb 2014 16:09:05 +0200
-Subject: [PATCH v5 2/3] clocksource: keystone: add bindings for keystone
- timer
-In-Reply-To: <CAL_JsqLSNrTvH2SFfA5KB8RsDqcj9zks1QaVmvYya6WQ--W7jg@mail.gmail.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>	<1391608060-10760-3-git-send-email-ivan.khoronzhuk@ti.com>	<CAL_JsqKVc2fdg1Q+TH6ro9kpJmUYyHw8FCwhORfm2_oj6GYM2Q@mail.gmail.com>	<52F26444.5090707@ti.com>	<CAL_JsqL6YDcZJa5xziR7dP-bEt1CO4BtL1vsO8Qm+hFwgCiQ1w@mail.gmail.com>	<52F28875.9000200@ti.com>
- <CAL_JsqLSNrTvH2SFfA5KB8RsDqcj9zks1QaVmvYya6WQ--W7jg@mail.gmail.com>
-Message-ID: <52F39781.3060405@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 6 Feb 2014 14:09:59 +0000 (GMT)
+Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
+In-Reply-To: <20140130162753.GF5002@laptop.programming.kicks-ass.net>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
+ <20140130152500.GB5002@laptop.programming.kicks-ass.net>
+ <alpine.LFD.2.11.1401301102210.1652@knanqh.ubzr>
+ <20140130162753.GF5002@laptop.programming.kicks-ass.net>
+Message-ID: <alpine.LFD.2.11.1402061152550.1906@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 01:36 AM, Rob Herring wrote:
-> On Wed, Feb 5, 2014 at 12:52 PM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->> On 02/05/2014 07:41 PM, Rob Herring wrote:
->>> On Wed, Feb 5, 2014 at 10:18 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> wrote:
->>>> On 02/05/2014 04:39 PM, Rob Herring wrote:
->>>>> On Wed, Feb 5, 2014 at 7:47 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>> wrote:
->>>>>> This patch provides bindings for the 64-bit timer in the KeyStone
->>>>>> architecture devices. The timer can be configured as a general-purpose
->>>>>> 64-bit
->>>>>> timer, dual general-purpose 32-bit timers. When configured as dual
->>>>>> 32-bit
->>>>>> timers, each half can operate in conjunction (chain mode) or
->>>>>> independently
->>>>>> (unchained mode) of each other.
->>>>> This is software configurable or h/w design time configurations?
->>>>>
->>>>> Rob
->>>>>
->>>> This is h/w design time configurations
->>> Then it seems like the binding should provide for describing those
->>> differences either with a property or different compatible strings.
->>>
->>> Rob
->> Oh..sorry, seems I didn't catch, this is configurable by software.
->> These configurations are like modes in which timer can work
->> and they are not different hardware IPs. It depends on driver in
->> which mode it should work.
-> In that case,
->
-> Acked-by: Rob Herring <robh@kernel.org>
+On Thu, 30 Jan 2014, Peter Zijlstra wrote:
 
-Thanks
+> On Thu, Jan 30, 2014 at 11:03:31AM -0500, Nicolas Pitre wrote:
+> > > This is not a valid patch for PATCH(1). Please try again.
+> > 
+> > Don't you use git?  ;-)
+> 
+> Nah, git and me don't get along well.
+> 
+> > Here's a plain patch:
+> 
+> Thanks!
 
--- 
-Regards,
-Ivan Khoronzhuk
+Hi Peter,
+
+Did you merge those patches in your tree?  If so, is it published 
+somewhere?  That would be a good idea if that could appear in linux-next 
+so to prevent people from adding more calls to cpuidle_idle_call() from 
+architecture code.  I'm sending you 2 additional patches right away to 
+remove those that appeared in v3.14-rc1.
+
+
+Nicolas
