@@ -1,83 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Feb 2014 09:28:52 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140205205319.GH25695@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <3724624.kd9jZNUiTF@wuerfel> <20140205205319.GH25695@obsidianresearch.com>
-Message-ID: <201402060928.53310.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Feb 2014 09:32:59 +0100
+Subject: [PATCH] backlight: add PWM dependencies
+In-Reply-To: <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
+References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
+ <000401cf222f$43263b20$c972b160$%han@samsung.com>
+ <CACRpkdbB8LFM0Vu8VRo4niqxwxUdS-c5gmmWaxbUTbnLCLZbMA@mail.gmail.com>
+ <000101cf2307$97a3c770$c6eb5650$%han@samsung.com>
+ <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
+Message-ID: <CACRpkda6SFeDKftn7he++dbkuqHwMF5M5ZbucmiWfASfJq0GbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 February 2014, Jason Gunthorpe wrote:
-> On Wed, Feb 05, 2014 at 09:26:17PM +0100, Arnd Bergmann wrote:
-> > > > What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
-> > > > is not the resource you want to pass into pci_add_resource()
-> > > > later.
-> 
-> Right, of_pci_range_to_resource returns the CPU MMIO address. A big
-> problem here is that struct resource is being re-used for bus
-> physical, CPU MMIO, and Linux Driver addressing domains without any
-> helpful tagging.
-> 
-> typedef struct resource resource_bus;
-> typedef struct resource resource_cpu;
-> 
-> ?
+On Thu, Feb 6, 2014 at 8:23 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 
-I fear the resource management needs a bigger overhaul than than.
-Most importantly, 'struct resource' is not connected to 'struct device'
-at the moment, and it only deals with resource types that were around
-15 years ago.
+> In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", it makes
+> the problem.
+>
+> The HAVE_PWM symbol is only for legacy platforms that provide
+> the PWM API without using the generic framework. PXA looks to
+> use the generic PWM framework. Then, how about removing
+> "select HAVE_PWM" from PXA as below?
+>
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+>  config MACH_PXA3XX_DT
+>         bool "Support PXA3xx platforms from device tree"
+>         select CPU_PXA300
+> -       select HAVE_PWM
+>         select POWER_SUPPLY
+>         select PXA3xx
+>         select USE_OF
+> @@ -23,12 +22,10 @@ config ARCH_LUBBOCK
+>
+>  config MACH_MAINSTONE
+>         bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
+> -       select HAVE_PWM
+>         select PXA27x
+>
+>  config MACH_ZYLONITE
+>         bool
+> -       select HAVE_PWM
+>         select PXA3xx
 
-> > > Do I need to open-code the resource translation from phys -> logical?
-> > 
-> > I think we should have some common infrastructure that lets you
-> > get this right more easily.
-> 
-> The offset stuff seems to be very confusing to people, removing it
-> from the APIs and forcing drivers to talk about bus addresess, CPU
-> addresses and internal Linux addresses seems a bit more plain?
+Looks like the right solution to me.
 
-Interesting idea. I'm not sure how Bjorn will like that
-after he just did an overhaul of all users of the offset
-API some time ago, but let's see what he thinks.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> What do you think about something like this:
-> 
-> int of_pci_alloc_io(.. resources,
->                     struct of_pci_range *range,
->                     struct device_node *np)
-> {
->   struct resource bus_address, mmio_window, res;
-> 
->   bus_address.start = range->pci_addr;
->   bus_address.end = range->pci_addr + range->size - 1;
-> 
->   mmio_window.start = range->cpu_addr;
->   mmio_window.end = range->cpu_addr + range->size - 1;
-> 
->   /* Input bus_address - addresses seen on the bus
->            mmio_window - physical CPU address to create the bus
-> 	   	         addreses
->      Output res - Address suitable for use in drivers
->      This does the pci_ioremap_io too */
->   pci_alloc_virtual_io_window(&bus_address, &mmio_window, &res);
-> 
->   /* bus_address - addresses seen on the bus
->      res - matching driver view for the bus addresses */
->   pci_add_resource_bus(&resources, &bus_address, &res);
-> }
-> 
-> And a similar function for MMIO that just omits
-> pci_alloc_virtual_io_window.
-
-It certainly seems workable. OTOH if we just manage to do a
-helper that scans the OF ranges, allocates the I/O window,
-remaps it and calls the existing pci_add_resource_offset()
-helper, PCI host drivers don't need to worry about the
-io_offsets computation either and just need to pull out the
-correct window locations if they need to set up the hardware
-translation windows (which I'd hope we can often let the boot
-loader take care of).
-
-	Arnd
+Yours,
+Linus Walleij
