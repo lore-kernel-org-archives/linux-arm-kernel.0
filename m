@@ -1,66 +1,38 @@
-From: satish.patel@ti.com (Satish Patel)
-Date: Thu, 6 Feb 2014 09:16:24 +0530
-Subject: [PATCH v2 3/5] char: ti-usim: Add driver for USIM module on AM43xx
-In-Reply-To: <52F0E8EC.8030900@ti.com>
-References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
- <1390192434-19386-4-git-send-email-satish.patel@ti.com>
- <52F0E8EC.8030900@ti.com>
-Message-ID: <52F30590.1020802@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Feb 2014 12:14:05 +0800
+Subject: [PATCH] ARM: imx6q: remove unneeded clk lookups
+Message-ID: <1391660045-10572-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since commit (a94f8ec ARM: imx6q: remove board specific CLKO setup),
+a number of clk lookups in imx6q clock driver is no longer needed.
+Let's remove them.
 
+The cpu0 lookup is also removed since we are now running imx6 cpufreq
+driver and looking up clocks from device tree.
 
-On 2/4/2014 6:49 PM, Roger Quadros wrote:
-> Hi Satish,
-> 
-> On 01/20/2014 06:33 AM, Satish Patel wrote:
->> TI-USIM driver is a platform driver that provides a character
->> driver interface to user applications.
->>
->> It allows user applications to call IOCTL's to
->> perform smart card operations.
->>
->> Driver currently supports
->> - ATR
->> - T=0 & T=1 protocol
->> - clock stop mode
->> - smart card clock configuration
->> - Tx/Rx application data units (APDU) to smart card
->> - Interface to PHY using DT & phy interface
->>
->> Validation is done with ACOS3 smart cards
->>
->> Signed-off-by: Satish Patel <satish.patel@ti.com>
->> ---
->>  .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
->>  drivers/char/Kconfig                               |    7 +
->>  drivers/char/Makefile                              |    1 +
->>  drivers/char/ti-usim-hw.h                          |  863 +++++++++
->>  drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
-> 
-> ti-usim.c is a very large driver that does everything but looks like limited to TI hardware.
-> How about splitting it into generic stuff and hw specific glue logic so that most of the generic stuff
-> could be used by different hardware types.
-> 
-Two things over here
-- First interface between user application and smartcard controller
-driver. There is already an open source f/w in user space called "pcsc"
-exists for this.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    6 ------
+ 1 file changed, 6 deletions(-)
 
-- Second communication between smartcard controller and smartcard phy. I
-have introduce lite interface called sc_phy which covers generic stuff
-between controller and phy.
-
-
->>  include/linux/ti-usim.h                            |   98 +
->>  6 files changed, 2859 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
->>  create mode 100644 drivers/char/ti-usim-hw.h
->>  create mode 100644 drivers/char/ti-usim.c
->>  create mode 100644 include/linux/ti-usim.h
->>
-> 
-> cheers,
-> -roger
-> 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index af2e582..dd4f1e3 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -437,12 +437,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk_register_clkdev(clk[gpt_ipg], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+-	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+-	clk_register_clkdev(clk[ahb], "ahb", NULL);
+-	clk_register_clkdev(clk[cko1], "cko1", NULL);
+-	clk_register_clkdev(clk[arm], NULL, "cpu0");
+-	clk_register_clkdev(clk[pll4_post_div], "pll4_post_div", NULL);
+-	clk_register_clkdev(clk[pll4_audio], "pll4_audio", NULL);
+ 
+ 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+ 	    cpu_is_imx6dl()) {
+-- 
+1.7.9.5
