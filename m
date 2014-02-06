@@ -1,149 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu,  6 Feb 2014 08:57:51 -0200
-Subject: [PATCH v3 2/2] ARM: dts: imx6sl-evk: Add audio support
-In-Reply-To: <1391684271-6621-1-git-send-email-festevam@gmail.com>
-References: <1391684271-6621-1-git-send-email-festevam@gmail.com>
-Message-ID: <1391684271-6621-2-git-send-email-festevam@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 11:00:16 +0000
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140206105442.GB4993@e106497-lin.cambridge.arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <1391532784-1953-3-git-send-email-will.deacon@arm.com>
+ <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
+ <20140206105442.GB4993@e106497-lin.cambridge.arm.com>
+Message-ID: <20140206110016.GI26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Feb 06, 2014 at 10:54:42AM +0000, Liviu Dudau wrote:
+> On Thu, Feb 06, 2014 at 08:54:03AM +0000, Anup Patel wrote:
+> > On Tue, Feb 4, 2014 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > This patch adds support for an extremely simple virtual PCI host
+> > > controller. The controller itself has no configuration registers, and
+> > > has its address spaces described entirely by the device-tree (using the
+> > > bindings described by ePAPR). This allows emulations, such as kvmtool,
+> > > to provide a simple means for a guest Linux instance to make use of
+> > > PCI devices.
+> > >
+> > > Corresponding documentation is added for the DT binding.
+> > >
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  .../devicetree/bindings/pci/linux,pci-virt.txt     |  38 ++++
+> > >  drivers/pci/host/Kconfig                           |   7 +
+> > >  drivers/pci/host/Makefile                          |   1 +
+> > >  drivers/pci/host/pci-virt.c                        | 200 +++++++++++++++++++++
+> > >  4 files changed, 246 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/pci/linux,pci-virt.txt
+> > >  create mode 100644 drivers/pci/host/pci-virt.c
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/pci/linux,pci-virt.txt b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
+> > > new file mode 100644
+> > > index 000000000000..54668a283498
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
+> > > @@ -0,0 +1,38 @@
+> > > +* ARM Basic Virtual PCI controller
+> > > +
+> > > +PCI emulations, such as the virtio-pci implementations found in kvmtool
+> > > +and other para-virtualised systems, do not require driver support for
+> > > +complexities such as regulator and clock management. In fact, the
+> > > +controller may not even have a control interface visible to the
+> > > +operating system, instead presenting a set of fixed windows describing a
+> > > +subset of IO, Memory and Configuration spaces.
+> > > +
+> > > +Such a controller can be described purely in terms of the standardized
+> > > +device tree bindings communicated in pci.txt:
+> > > +
+> > > +- compatible     : Must be "linux,pci-virt"
+> > > +
+> > > +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> > > +                   at least a definition of the Configuration Space plus
+> > > +                   one or both of IO and Memory Space.
+> > > +
+> > > +- #address-cells : Must be 3
+> > > +
+> > > +- #size-cells    : Must be 2
+> > > +
+> > > +Configuration Space is assumed to be memory-mapped (as opposed to being
+> > 
+> > It would be great to have a flag to specify whether Configuration Space is over
+> > ioports or memory mapped.
+> 
+> This is another reason why I prefer the reg property for specifying the configuration
+> space address range. I don't see a straight way of making the distinction you
+> need using the ranges property.
 
-imx6sl-evk has a wm8962 codec. Add support for it.
+Well if we need to distinguish cam vs ecam, then adding ioport to the mix
+should be (conceptually) easy and I don't think it would involve the "reg"
+property.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Chages since v2:
-- Keep it sorted 
+However, I'm not planning to add ioport support myself.
 
- arch/arm/boot/dts/imx6sl-evk.dts | 84 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 1899f85..3216ede 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -43,9 +43,49 @@
- 			gpio = <&gpio4 2 0>;
- 			enable-active-high;
- 		};
-+
-+		reg_aud3v: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "wm8962-supply-3v15";
-+			regulator-min-microvolt = <3150000>;
-+			regulator-max-microvolt = <3150000>;
-+			regulator-boot-on;
-+		};
-+
-+		reg_aud4v: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "wm8962-supply-4v2";
-+			regulator-min-microvolt = <4325000>;
-+			regulator-max-microvolt = <4325000>;
-+			regulator-boot-on;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx6sl-evk-wm8962", "fsl,imx-audio-wm8962";
-+		model = "wm8962-audio";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"Ext Spk", "SPKOUTL",
-+			"Ext Spk", "SPKOUTR",
-+			"AMIC", "MICBIAS",
-+			"IN3R", "AMIC";
-+		mux-int-port = <2>;
-+		mux-ext-port = <3>;
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux3>;
-+	status = "okay";
-+};
-+
- &ecspi1 {
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 11 0>;
-@@ -175,6 +215,27 @@
- 	};
- };
- 
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	codec: wm8962 at 1a {
-+		compatible = "wlf,wm8962";
-+		reg = <0x1a>;
-+		clocks = <&clks IMX6SL_CLK_EXTERN_AUDIO>;
-+		DCVDD-supply = <&vgen3_reg>;
-+		DBVDD-supply = <&reg_aud3v>;
-+		AVDD-supply = <&vgen3_reg>;
-+		CPVDD-supply = <&vgen3_reg>;
-+		MICVDD-supply = <&reg_aud3v>;
-+		PLLVDD-supply = <&vgen3_reg>;
-+		SPKVDD1-supply = <&reg_aud4v>;
-+		SPKVDD2-supply = <&reg_aud4v>;
-+	};
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -189,6 +250,16 @@
- 				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
- 				MX6SL_PAD_KEY_COL4__GPIO4_IO00	0x80000000
- 				MX6SL_PAD_KEY_COL5__GPIO4_IO02	0x80000000
-+				MX6SL_PAD_AUD_MCLK__AUDIO_CLK_OUT 0x4130b0
-+			>;
-+		};
-+
-+		pinctrl_audmux3: audmux3grp {
-+			fsl,pins = <
-+				MX6SL_PAD_AUD_RXD__AUD3_RXD	  0x4130b0
-+				MX6SL_PAD_AUD_TXC__AUD3_TXC	  0x4130b0
-+				MX6SL_PAD_AUD_TXD__AUD3_TXD	  0x4110b0
-+				MX6SL_PAD_AUD_TXFS__AUD3_TXFS	  0x4130b0
- 			>;
- 		};
- 
-@@ -221,6 +292,14 @@
- 			>;
- 		};
- 
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6SL_PAD_I2C2_SCL__I2C2_SCL	0x4001b8b1
-+				MX6SL_PAD_I2C2_SDA__I2C2_SDA	0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_kpp: kppgrp {
- 			fsl,pins = <
- 				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-@@ -374,6 +453,11 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
--- 
-1.8.1.2
+Will
