@@ -1,124 +1,60 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  7 Feb 2014 00:42:05 +0100
-Subject: [PATCH 09/21] ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
+Date: Fri,  7 Feb 2014 00:42:08 +0100
+Subject: [PATCH 12/21] ARM: Fix MULTI_TLB for feroceon
 In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1391730137-14814-10-git-send-email-andrew@lunn.ch>
+Message-ID: <1391730137-14814-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the gradual move to DT, kirkwood has become a lot less dependent
-on plat-orion. cache-feroceon-l2.h is the last dependency. Move it out
-so we can drop plat-orion when building DT only kirkwood boards.
+Feroceon has the same flush operations as v4wbi, but has an additional
+flag, TLB_L2CLEAN_FR. When building with MULTI_TLB this flag is placed
+into cpu_tlb.tlb_flags, so there needs to be a cpu_tlb specifically
+for feroceon, rather than sharing the v4wbi.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/include/asm/hardware/cache-feroceon-l2.h    | 11 +++++++++++
- arch/arm/mach-kirkwood/board-dt.c                    |  2 +-
- arch/arm/mach-kirkwood/common.c                      |  2 +-
- arch/arm/mach-mv78xx0/common.c                       |  2 +-
- arch/arm/mm/cache-feroceon-l2.c                      |  2 +-
- arch/arm/plat-orion/include/plat/cache-feroceon-l2.h | 11 -----------
- 6 files changed, 15 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
- delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
+ arch/arm/mm/proc-feroceon.S | 2 +-
+ arch/arm/mm/tlb-v4wbi.S     | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
-new file mode 100644
-index 000000000000..8edd330aabf6
---- /dev/null
-+++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
-@@ -0,0 +1,11 @@
-+/*
-+ * arch/arm/include/asm/hardware/cache-feroceon-l2.h
-+ *
-+ * Copyright (C) 2008 Marvell Semiconductor
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+extern void __init feroceon_l2_init(int l2_wt_override);
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 91b61a971af2..34c35510fd17 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -20,11 +20,11 @@
- #include <linux/dma-mapping.h>
- #include <linux/irqchip.h>
- #include <linux/kexec.h>
-+#include <asm/hardware/cache-feroceon-l2.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
- #include <plat/common.h>
--#include <plat/cache-feroceon-l2.h>
- #include <plat/pcie.h>
- #include "pm.h"
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index db79b62c92fb..b76c2706cb02 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -607,7 +607,7 @@ __\name\()_proc_info:
+ 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+ 	.long	\cpu_name
+ 	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
++	.long	fr_tlb_fns
+ 	.long	feroceon_user_fns
+ 	.long	\cache
+ 	 .size	__\name\()_proc_info, . - __\name\()_proc_info
+diff --git a/arch/arm/mm/tlb-v4wbi.S b/arch/arm/mm/tlb-v4wbi.S
+index 1f6062b6c1c1..4e053fef3487 100644
+--- a/arch/arm/mm/tlb-v4wbi.S
++++ b/arch/arm/mm/tlb-v4wbi.S
+@@ -28,6 +28,7 @@
+  *	- mm    - mm_struct describing address space
+  */
+ 	.align	5
++ENTRY(fr_flush_user_tlb_range)
+ ENTRY(v4wbi_flush_user_tlb_range)
+ 	vma_vm_mm ip, r2
+ 	act_mm	r3				@ get current->active_mm
+@@ -46,6 +47,7 @@ ENTRY(v4wbi_flush_user_tlb_range)
+ 	blo	1b
+ 	mov	pc, lr
  
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 52aca25432a7..255f33a3903c 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -25,10 +25,10 @@
- #include <asm/page.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-+#include <asm/hardware/cache-feroceon-l2.h>
- #include <mach/kirkwood.h>
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/asoc-kirkwood.h>
--#include <plat/cache-feroceon-l2.h>
- #include <linux/platform_data/mmc-mvsdio.h>
- #include <linux/platform_data/mtd-orion_nand.h>
- #include <linux/platform_data/usb-ehci-orion.h>
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 75062eff2494..e6ac679bece9 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -15,11 +15,11 @@
- #include <linux/ata_platform.h>
- #include <linux/clk-provider.h>
- #include <linux/ethtool.h>
-+#include <asm/hardware/cache-feroceon-l2.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <mach/mv78xx0.h>
- #include <mach/bridge-regs.h>
--#include <plat/cache-feroceon-l2.h>
- #include <linux/platform_data/usb-ehci-orion.h>
- #include <linux/platform_data/mtd-orion_nand.h>
- #include <plat/time.h>
-diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
-index 48bc3c0a87ce..898362e7972b 100644
---- a/arch/arm/mm/cache-feroceon-l2.c
-+++ b/arch/arm/mm/cache-feroceon-l2.c
-@@ -16,7 +16,7 @@
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
--#include <plat/cache-feroceon-l2.h>
-+#include <asm/hardware/cache-feroceon-l2.h>
++ENTRY(fr_flush_kern_tlb_range)
+ ENTRY(v4wbi_flush_kern_tlb_range)
+ 	mov	r3, #0
+ 	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
+@@ -62,3 +64,4 @@ ENTRY(v4wbi_flush_kern_tlb_range)
  
- /*
-  * Low-level cache maintenance operations.
-diff --git a/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h b/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
-deleted file mode 100644
-index 06f982d55697..000000000000
---- a/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
-+++ /dev/null
-@@ -1,11 +0,0 @@
--/*
-- * arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
-- *
-- * Copyright (C) 2008 Marvell Semiconductor
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--extern void __init feroceon_l2_init(int l2_wt_override);
+ 	/* define struct cpu_tlb_fns (see <asm/tlbflush.h> and proc-macros.S) */
+ 	define_tlb_functions v4wbi, v4wbi_tlb_flags
++	define_tlb_functions fr, fr_tlb_flags
 -- 
 1.8.5.3
