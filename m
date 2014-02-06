@@ -1,37 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:09 +0900
-Subject: [PATCH 3/3] ARM: shmobile: emev2: Use __initconst for const init
- definition
-In-Reply-To: <cover.1391650702.git.horms+renesas@verge.net.au>
-References: <cover.1391650702.git.horms+renesas@verge.net.au>
-Message-ID: <d24d1780c340777942061ef3445edcf228e8d35b.1391650702.git.horms+renesas@verge.net.au>
+Date: Thu,  6 Feb 2014 15:20:27 +0900
+Subject: [GIT PULL 00/13] Renesas ARM based SoC Defconfig Updates for v3.15
+Message-ID: <cover.1391651074.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__initconst must be used instead of __initdata for
-const init definitions.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This problem was introduced by 3d5de27174955702 ("mach-shmobile: Emma
-Mobile EV2 DT support V3") in v3.4-rc7.
+please consider these Renesas ARM based SoC defconfig updates for v3.15.
 
-Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-emev2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index c8f2a1a..c71d667 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -58,7 +58,7 @@ static void __init emev2_add_standard_devices_dt(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char *emev2_boards_compat_dt[] __initdata = {
-+static const char *emev2_boards_compat_dt[] __initconst = {
- 	"renesas,emev2",
- 	NULL,
- };
--- 
-1.8.5.2
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.15
+
+for you to fetch changes up to 0771ddff31186836f62a20c42e7958bd37f7b4ed:
+
+  ARM: shmobile: ape6evm: enable CONFIG_DEVTMPFS in defconfig (2014-02-04 10:26:04 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC Defconfig Updates for v3.15
+
+* Renesas ARM based SoC boards (Global)
+  enable CONFIG_DEVTMPFS in defconfig
+
+* r8a7791 SoC (R-Car M2) based Koelsch board
+  - Enable SATA
+
+* r8a7790 SoC (R-Car H2) based Lager board
+  - Enable SATA, VIN and ADV7180 decoder in defconfig
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: koelsch: Enable DEVTMPFS_MOUNT in defconfig
+
+Kuninori Morimoto (9):
+      ARM: shmobile: marzen: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: mackerel: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: lager: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: kzm9g: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: kzm9d: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: genmai: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: bockw: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: armadillo: enable CONFIG_DEVTMPFS in defconfig
+      ARM: shmobile: ape6evm: enable CONFIG_DEVTMPFS in defconfig
+
+Valentine Barshak (3):
+      ARM: shmobile: lager: Enable VIN along with ADV7180 decoder in defconfig
+      ARM: shmobile: koelsch: Enable SATA in defconfig
+      ARM: shmobile: lager: Enable SATA in defconfig
+
+ arch/arm/configs/ape6evm_defconfig         |  2 ++
+ arch/arm/configs/armadillo800eva_defconfig |  2 ++
+ arch/arm/configs/bockw_defconfig           |  2 ++
+ arch/arm/configs/genmai_defconfig          |  2 ++
+ arch/arm/configs/koelsch_defconfig         |  6 +++++-
+ arch/arm/configs/kzm9d_defconfig           |  2 ++
+ arch/arm/configs/kzm9g_defconfig           |  2 ++
+ arch/arm/configs/lager_defconfig           | 13 +++++++++++++
+ arch/arm/configs/mackerel_defconfig        |  2 ++
+ arch/arm/configs/marzen_defconfig          |  2 ++
+ 10 files changed, 34 insertions(+), 1 deletion(-)
