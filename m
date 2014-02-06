@@ -1,31 +1,69 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  7 Feb 2014 00:42:13 +0100
-Subject: [PATCH 17/21] ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
+Date: Fri,  7 Feb 2014 00:42:02 +0100
+Subject: [PATCH 06/21] ARM: Kirkwood: ioremap the cpu_config register before
+ using it.
 In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1391730137-14814-18-git-send-email-andrew@lunn.ch>
+Message-ID: <1391730137-14814-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kirkwood PCIe compatibility string to mvebu-soc-id, so that it
-can get the SoC ID and revision from the PCIe endpoints.
+With the move to mach-mvebu and MULTI_V5, the global iomap for all
+registers will be going away. So explicitly map the CPU configuration
+register before using it.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-mvebu/mvebu-soc-id.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-kirkwood/board-dt.c                 | 22 +++++++++++++++-------
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  1 +
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index f3b325f6cbd4..f3d4cf53f746 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -38,6 +38,7 @@ static bool is_id_valid;
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie" },
- 	{},
- };
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 64151a4a378f..91b61a971af2 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -191,15 +191,23 @@ eth_fixup_skip:
+ 	}
+ }
  
++/*
++ * Disable propagation of mbus errors to the CPU local bus, as this
++ * causes mbus errors (which can occur for example for PCI aborts) to
++ * throw CPU aborts, which we're not set up to deal with.
++ */
++void kirkwood_disable_mbus_error_propagation(void)
++{
++	void __iomem *cpu_config;
++
++	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
++	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
++}
++
++
+ static void __init kirkwood_dt_init(void)
+ {
+-	/*
+-	 * Disable propagation of mbus errors to the CPU local bus,
+-	 * as this causes mbus errors (which can occur for example
+-	 * for PCI aborts) to throw CPU aborts, which we're not set
+-	 * up to deal with.
+-	 */
+-	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
++	kirkwood_disable_mbus_error_propagation();
+ 
+ 	BUG_ON(mvebu_mbus_dt_init());
+ 
+diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+index 8b9d1c9ff199..2bd12fde1781 100644
+--- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
++++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+@@ -14,6 +14,7 @@
+ #include <mach/kirkwood.h>
+ 
+ #define CPU_CONFIG		(BRIDGE_VIRT_BASE + 0x0100)
++#define CPU_CONFIG_PHYS		(BRIDGE_PHYS_BASE + 0x0100)
+ #define CPU_CONFIG_ERROR_PROP	0x00000004
+ 
+ #define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
 -- 
 1.8.5.3
