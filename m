@@ -1,70 +1,62 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 6 Feb 2014 17:03:17 +0200
-Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
-In-Reply-To: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
-References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
-Message-ID: <52F3A435.3020209@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 6 Feb 2014 13:08:08 -0200
+Subject: [PATCH] ARM: dts: imx6sl-evk: Add debug LED support
+Message-ID: <1391699288-7101-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 05:06 PM, Illia Smyrnov wrote:
-> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
-> softreset bit cleaning right after set one. It is caused L3 error for
-> OMAP4 ISS because ISS register write occurs when ISS reset process is in
-> progress. Avoid this situation by cleaning softreset bit later, when reset
-> process is successfully finished.
-> 
-> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
+GPIO3_20 is connected to a debug LED. 
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Add support for it.
 
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c | 20 +++++++++++---------
->  1 file changed, 11 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 42d8188..1f33f5d 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1947,29 +1947,31 @@ static int _ocp_softreset(struct omap_hwmod *oh)
->  		goto dis_opt_clks;
->  
->  	_write_sysconfig(v, oh);
-> -	ret = _clear_softreset(oh, &v);
-> -	if (ret)
-> -		goto dis_opt_clks;
-> -
-> -	_write_sysconfig(v, oh);
->  
->  	if (oh->class->sysc->srst_udelay)
->  		udelay(oh->class->sysc->srst_udelay);
->  
->  	c = _wait_softreset_complete(oh);
-> -	if (c == MAX_MODULE_SOFTRESET_WAIT)
-> +	if (c == MAX_MODULE_SOFTRESET_WAIT) {
->  		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
->  			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
-> -	else
-> +		ret = -ETIMEDOUT;
-> +		goto dis_opt_clks;
-> +	} else {
->  		pr_debug("omap_hwmod: %s: softreset in %d usec\n", oh->name, c);
-> +	}
-> +
-> +	ret = _clear_softreset(oh, &v);
-> +	if (ret)
-> +		goto dis_opt_clks;
-> +
-> +	_write_sysconfig(v, oh);
->  
->  	/*
->  	 * XXX add _HWMOD_STATE_WEDGED for modules that don't come back from
->  	 * _wait_target_ready() or _reset()
->  	 */
->  
-> -	ret = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
-> -
->  dis_opt_clks:
->  	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
->  		_disable_optional_clocks(oh);
-> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 0001804..4d23e28 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -8,6 +8,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include "imx6sl.dtsi"
+ 
+@@ -19,6 +20,18 @@
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led>;
++
++		user {
++			label = "debug";
++			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -108,6 +121,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_led: ledgrp {
++			fsl,pins = <
++				MX6SL_PAD_HSIC_STROBE__GPIO3_IO20 0x17059
++			>;
++		};
++
+ 		pinctrl_kpp: kppgrp {
+ 			fsl,pins = <
+ 				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
+-- 
+1.8.1.2
