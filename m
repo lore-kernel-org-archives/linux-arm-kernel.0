@@ -1,51 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:21:03 +0900
-Subject: [PATCH 06/13] ARM: shmobile: r8a7790: add Audio DMAC clock
+Date: Thu,  6 Feb 2014 15:21:08 +0900
+Subject: [PATCH 11/13] ARM: shmobile: r8a7791: Add SATA clocks
 In-Reply-To: <cover.1391666228.git.horms+renesas@verge.net.au>
 References: <cover.1391666228.git.horms+renesas@verge.net.au>
-Message-ID: <f5b2947e4a6589f07d485ca149d606283294979f.1391666228.git.horms+renesas@verge.net.au>
+Message-ID: <373ababd4896d6012871f03a3f6d96083dc50610.1391666228.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-Audio DMAC can be controlled via sh-dma-engine
+This adds SATA[01] clock support to R8A7791 SoC.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 5 +++++
+ arch/arm/mach-shmobile/clock-r8a7791.c | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index a028f96..58f3dcf 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -201,6 +201,7 @@ enum {
- 	MSTP717, MSTP716,
- 	MSTP704,
- 	MSTP522,
-+	MSTP502, MSTP501,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
- 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
- 	MSTP124,
-@@ -236,6 +237,8 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP716] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR7, 16, MSTPSR7, 0), /* HSCIF1 */
- 	[MSTP704] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR7, 4, MSTPSR7, 0), /* HSUSB */
- 	[MSTP522] = SH_CLK_MSTP32_STS(&extal_clk, SMSTPCR5, 22, MSTPSR5, 0), /* Thermal */
-+	[MSTP502] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR5, 2, MSTPSR5, 0), /* Audio-DMAC low */
-+	[MSTP501] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR5, 1, MSTPSR5, 0), /* Audio-DMAC hi */
- 	[MSTP315] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_MMC0], SMSTPCR3, 15, MSTPSR3, 0), /* MMC0 */
- 	[MSTP314] = SH_CLK_MSTP32_STS(&div4_clks[DIV4_SD0], SMSTPCR3, 14, MSTPSR3, 0), /* SDHI0 */
- 	[MSTP313] = SH_CLK_MSTP32_STS(&div4_clks[DIV4_SD1], SMSTPCR3, 13, MSTPSR3, 0), /* SDHI1 */
-@@ -311,6 +314,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-+	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP502]),
-+	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP501]),
- 	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("ee100000.sd", &mstp_clks[MSTP314]),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index 52d7d13..e4e4dfa 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -135,6 +135,7 @@ static struct clk *main_clks[] = {
+ /* MSTP */
+ enum {
+ 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
++	MSTP815, MSTP814,
+ 	MSTP813,
+ 	MSTP811, MSTP810, MSTP809,
+ 	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
+@@ -153,6 +154,8 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
+ 	[MSTP927] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 27, MSTPSR9, 0), /* I2C4 */
+ 	[MSTP925] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 25, MSTPSR9, 0), /* I2C5 */
++	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
++	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
+ 	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
+ 	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
+ 	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
+@@ -229,6 +232,8 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("r8a7791-vin.0", &mstp_clks[MSTP811]),
+ 	CLKDEV_DEV_ID("r8a7791-vin.1", &mstp_clks[MSTP810]),
+ 	CLKDEV_DEV_ID("r8a7791-vin.2", &mstp_clks[MSTP809]),
++	CLKDEV_DEV_ID("sata-r8a7791.0", &mstp_clks[MSTP815]),
++	CLKDEV_DEV_ID("sata-r8a7791.1", &mstp_clks[MSTP814]),
+ };
+ 
+ #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
 -- 
 1.8.5.2
