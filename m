@@ -1,34 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:19:06 +0900
-Subject: [PATCH 14/21] ARM: shmobile: bockw: Sort Kconfig node's selections
+Date: Thu,  6 Feb 2014 15:19:08 +0900
+Subject: [PATCH 16/21] ARM: shmobile: mackerel: Conditionally select SMSC_PHY
 In-Reply-To: <cover.1391665225.git.horms+renesas@verge.net.au>
 References: <cover.1391665225.git.horms+renesas@verge.net.au>
-Message-ID: <2b2fd2755182d43e149259330c7b1fe0aa3243d6.1391665225.git.horms+renesas@verge.net.au>
+Message-ID: <c5c2a294a4b24778cd3cab880bf05becee471edb.1391665225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The mackerel board uses has an SMSC911X ethernet controller which uses an
+SMSC phy. Select SMSC_PHY for mackerel if SMSC911X is enabled to make use of the
+SMSC-specific phy driver rather than relying on the generic phy driver.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index b624b5a..6f16983 100644
+index b735ea8..f8005ef 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -207,11 +207,11 @@ config MACH_BOCKW
- 	bool "BOCK-W platform"
- 	depends on ARCH_R8A7778
+@@ -177,6 +177,7 @@ config MACH_MACKEREL
+ 	depends on ARCH_SH7372
  	select ARCH_REQUIRE_GPIOLIB
--	select RENESAS_INTC_IRQPIN
  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select USE_OF
-+	select RENESAS_INTC_IRQPIN
- 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
++	select SMSC_PHY if SMSC911X
  	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-+	select USE_OF
+ 	select USE_OF
  
- config MACH_BOCKW_REFERENCE
- 	bool "BOCK-W  - Reference Device Tree Implementation"
 -- 
 1.8.5.2
