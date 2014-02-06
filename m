@@ -1,47 +1,70 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 6 Feb 2014 23:01:35 +0800
-Subject: [GIT PULL] ARM: imx: device tree changes for 3.15, take 1
-In-Reply-To: <201402061445.06234.arnd@arndb.de>
-References: <20140205122258.GA13821@S2101-09.ap.freescale.net>
- <201402061445.06234.arnd@arndb.de>
-Message-ID: <20140206150131.GC6610@S2101-09.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 6 Feb 2014 17:03:17 +0200
+Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+In-Reply-To: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+Message-ID: <52F3A435.3020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 02:45:05PM +0100, Arnd Bergmann wrote:
-> On Wednesday 05 February 2014, Shawn Guo wrote:
-> > Hi arm-soc folks,
-> > 
-> > This is basically imx-dt-3.14 pull request that missed the 3.14 merge
-> > window with the pingrp removal series applied on top of.  It also
-> > includes a few additional board support I collected since imx-dt-3.14.
-> > There will be another round of IMX DT changes for 3.15 later, but this
-> > one should be the majority.  Please pull, thanks.
+On 02/05/2014 05:06 PM, Illia Smyrnov wrote:
+> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
+> softreset bit cleaning right after set one. It is caused L3 error for
+> OMAP4 ISS because ISS register write occurs when ISS reset process is in
+> progress. Avoid this situation by cleaning softreset bit later, when reset
+> process is successfully finished.
 > 
-> Hi Shawn,
-> 
-> no objections to the stuff you add here, but the way it's organized
-> is not good. Instead of adding the controversial patches first and
-> then reverting them, please redo the series so you don't actually
-> have the patches in the history. I see that you have rebased the
-> patches on 3.14-rc1 already so there really shouldn't be any cross-
-> tree dependencies that make it necessary to keep them in.
+> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
 
-I haven't checked the patches one by one in the pull request, but it
-probably means that I will have to redo most of the patches, because
-every single new board dts and addition of device for existing board
-have new pinctrl data along with them.  I will look at the work/effort
-closer tomorrow.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
 > 
-> Also, because of the pure size of the pull request:
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 42d8188..1f33f5d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1947,29 +1947,31 @@ static int _ocp_softreset(struct omap_hwmod *oh)
+>  		goto dis_opt_clks;
+>  
+>  	_write_sysconfig(v, oh);
+> -	ret = _clear_softreset(oh, &v);
+> -	if (ret)
+> -		goto dis_opt_clks;
+> -
+> -	_write_sysconfig(v, oh);
+>  
+>  	if (oh->class->sysc->srst_udelay)
+>  		udelay(oh->class->sysc->srst_udelay);
+>  
+>  	c = _wait_softreset_complete(oh);
+> -	if (c == MAX_MODULE_SOFTRESET_WAIT)
+> +	if (c == MAX_MODULE_SOFTRESET_WAIT) {
+>  		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
+>  			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
+> -	else
+> +		ret = -ETIMEDOUT;
+> +		goto dis_opt_clks;
+> +	} else {
+>  		pr_debug("omap_hwmod: %s: softreset in %d usec\n", oh->name, c);
+> +	}
+> +
+> +	ret = _clear_softreset(oh, &v);
+> +	if (ret)
+> +		goto dis_opt_clks;
+> +
+> +	_write_sysconfig(v, oh);
+>  
+>  	/*
+>  	 * XXX add _HWMOD_STATE_WEDGED for modules that don't come back from
+>  	 * _wait_target_ready() or _reset()
+>  	 */
+>  
+> -	ret = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
+> -
+>  dis_opt_clks:
+>  	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
+>  		_disable_optional_clocks(oh);
 > 
->  105 files changed, 14073 insertions(+), 3127 deletions(-)
-> 
-> it would be nice to split it up into smaller units. A good
-> separation would be to have new board support in one pull
-> request and the changes to existing boards in another one.
-
-Ok, I will try.
-
-Shawn
