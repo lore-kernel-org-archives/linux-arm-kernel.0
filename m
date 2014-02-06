@@ -1,67 +1,183 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Feb 2014 10:09:09 +0000
-Subject: [PATCH] arm64: Change misleading function names in dma-mapping
-In-Reply-To: <CAD15agZzJ4=RMbky+GymJbyktLz0PO+uZ-GOh1SbvH476k4hzA@mail.gmail.com>
-References: <CAD15agZzJ4=RMbky+GymJbyktLz0PO+uZ-GOh1SbvH476k4hzA@mail.gmail.com>
-Message-ID: <20140206100909.GC26035@mudshark.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 6 Feb 2014 10:18:15 +0000
+Subject: [PATCH] pci: Add support for creating a generic host_bridge from
+ device tree
+In-Reply-To: <CACoXjckKRQfR3CbC1JpgbhOumED+OqiMh1_Y73-h6q=ByMNanw@mail.gmail.com>
+References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391452428-22917-2-git-send-email-Liviu.Dudau@arm.com>
+ <7398333.9L5KlyFggU@wuerfel>
+ <CACoXjckKRQfR3CbC1JpgbhOumED+OqiMh1_Y73-h6q=ByMNanw@mail.gmail.com>
+Message-ID: <20140206101814.GA4993@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 06:28:22AM +0000, Ritesh Harjani wrote:
-> 
-> From: Ritesh Harjani <ritesh.harjani at gmail.com<mailto:ritesh.harjani@gmail.com>>
-> 
-> arm64_swiotlb_alloc/free_coherent name can be misleading
-> somtimes with CMA support being enabled after this
-> patch (c2104debc235b745265b64d610237a6833fd53)
-> 
-> Change this name to be more generic:
-> arm64_dma_alloc/free_coherent
+On Wed, Feb 05, 2014 at 10:26:27PM +0000, Tanmay Inamdar wrote:
+> Hello Liviu,
+>
+> I did not get the first email of this particular patch on any of
+> subscribed mailing lists (don't know why), hence replying here.
 
-I'm fine with this cosmetic change, but the (pre-existing) arm64 prefix looks
-a little odd for a static function.
+Strange, it shows in the MARC and GMANE archive for linux-pci, probably
+a hickup on your receiving side?
 
-Will
+>
+> +struct pci_host_bridge *
+> +pci_host_bridge_of_init(struct device *parent, int busno, struct pci_ops *ops,
+> + void *host_data, struct list_head *resources)
+> +{
+> + struct pci_bus *root_bus;
+> + struct pci_host_bridge *bridge;
+> +
+> + /* first parse the host bridge bus ranges */
+> + if (pci_host_bridge_of_get_ranges(parent->of_node, resources))
+> + return NULL;
+> +
+> + /* then create the root bus */
+> + root_bus = pci_create_root_bus(parent, busno, ops, host_data, resources);
+> + if (!root_bus)
+> + return NULL;
+> +
+> + bridge = to_pci_host_bridge(root_bus->bridge);
+> +
+> + return bridge;
+> +}
+>
+> You are keeping the domain_nr inside pci_host_bridge structure. In
+> above API, domain_nr is required in 'pci_find_bus' function called
+> from 'pci_create_root_bus'. Since the bridge is allocated after
+> creating root bus, 'pci_find_bus' always gets domain_nr as 0. This
+> will cause problem for scanning multiple domains.
 
-> Signed-off-by: Ritesh Harjani <ritesh.harjani at gmail.com<mailto:ritesh.harjani@gmail.com>>
-> ---
->  arch/arm64/mm/dma-mapping.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 45b5ab5..7517796 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -30,7 +30,7 @@
->  struct dma_map_ops *dma_ops;
->  EXPORT_SYMBOL(dma_ops);
-> 
-> -static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
-> +static void *arm64_dma_alloc_coherent(struct device *dev, size_t size,
->                                           dma_addr_t *dma_handle, gfp_t flags,
->                                           struct dma_attrs *attrs)
->  {
-> @@ -57,7 +57,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
->         }
->  }
-> 
-> -static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
-> +static void arm64_dma_free_coherent(struct device *dev, size_t size,
->                                         void *vaddr, dma_addr_t dma_handle,
->                                         struct dma_attrs *attrs)
->  {
-> @@ -78,8 +78,8 @@ static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
->  }
-> 
->  static struct dma_map_ops arm64_swiotlb_dma_ops = {
-> -       .alloc = arm64_swiotlb_alloc_coherent,
-> -       .free = arm64_swiotlb_free_coherent,
-> +       .alloc = arm64_dma_alloc_coherent,
-> +       .free = arm64_dma_free_coherent,
->         .map_page = swiotlb_map_page,
->         .unmap_page = swiotlb_unmap_page,
->         .map_sg = swiotlb_map_sg_attrs,
-> --
-> 1.8.1.3
-> 
-> 
+Good catch. I was switching between creating a pci_controller in arch/arm64 and
+adding the needed bits in pci_host_bridge. After internal review I've decided to
+add the domain_nr to pci_host_bridge, but forgot to update the code everywhere.
+
+Thanks for reviewing this, will fix in v2.
+
+Do you find porting to the new API straight forward?
+
+Best regards,
+Liviu
+
+>
+>
+> On Mon, Feb 3, 2014 at 10:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 03 February 2014 18:33:48 Liviu Dudau wrote:
+> >> +/**
+> >> + * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
+> >> + * @dev: device node of the host bridge having the range property
+> >> + * @resources: list where the range of resources will be added after DT parsing
+> >> + *
+> >> + * This function will parse the "ranges" property of a PCI host bridge device
+> >> + * node and setup the resource mapping based on its content. It is expected
+> >> + * that the property conforms with the Power ePAPR document.
+> >> + *
+> >> + * Each architecture will then apply their filtering based on the limitations
+> >> + * of each platform. One general restriction seems to be the number of IO space
+> >> + * ranges, the PCI framework makes intensive use of struct resource management,
+> >> + * and for IORESOURCE_IO types they can only be requested if they are contained
+> >> + * within the global ioport_resource, so that should be limited to one IO space
+> >> + * range.
+> >
+> > Actually we have quite a different set of restrictions around I/O space on ARM32
+> > at the moment: Each host bridge can have its own 64KB range in an arbitrary
+> > location on MMIO space, and the total must not exceed 2MB of I/O space.
+> >
+> >> + */
+> >> +static int pci_host_bridge_of_get_ranges(struct device_node *dev,
+> >> +                                     struct list_head *resources)
+> >> +{
+> >> +     struct resource *res;
+> >> +     struct of_pci_range range;
+> >> +     struct of_pci_range_parser parser;
+> >> +     int err;
+> >> +
+> >> +     pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> >> +
+> >> +     /* Check for ranges property */
+> >> +     err = of_pci_range_parser_init(&parser, dev);
+> >> +     if (err)
+> >> +             return err;
+> >> +
+> >> +     pr_debug("Parsing ranges property...\n");
+> >> +     for_each_of_pci_range(&parser, &range) {
+> >> +             /* Read next ranges element */
+> >> +             pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> >> +                             range.pci_space, range.pci_addr);
+> >> +             pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> >> +                                     range.cpu_addr, range.size);
+> >> +
+> >> +             /* If we failed translation or got a zero-sized region
+> >> +              * (some FW try to feed us with non sensical zero sized regions
+> >> +              * such as power3 which look like some kind of attempt
+> >> +              * at exposing the VGA memory hole) then skip this range
+> >> +              */
+> >> +             if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> >> +                     continue;
+> >> +
+> >> +             res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> >> +             if (!res) {
+> >> +                     err = -ENOMEM;
+> >> +                     goto bridge_ranges_nomem;
+> >> +             }
+> >> +
+> >> +             of_pci_range_to_resource(&range, dev, res);
+> >> +
+> >> +             pci_add_resource_offset(resources, res,
+> >> +                             range.cpu_addr - range.pci_addr);
+> >> +     }
+> >
+> > I believe of_pci_range_to_resource() will return the MMIO aperture for the
+> > I/O space window here, which is not what you are supposed to pass into
+> > pci_add_resource_offset.
+> >
+> >> +EXPORT_SYMBOL(pci_host_bridge_of_init);
+> >
+> > EXPORT_SYMBOL_GPL
+> >
+> >> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> >> index 6e34498..16febae 100644
+> >> --- a/drivers/pci/probe.c
+> >> +++ b/drivers/pci/probe.c
+> >> @@ -1787,6 +1787,17 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> >>       list_for_each_entry_safe(window, n, resources, list) {
+> >>               list_move_tail(&window->list, &bridge->windows);
+> >>               res = window->res;
+> >> +             /*
+> >> +              * IO resources are stored in the kernel with a CPU start
+> >> +              * address of zero. Adjust the data accordingly and remember
+> >> +              * the offset
+> >> +              */
+> >> +             if (resource_type(res) == IORESOURCE_IO) {
+> >> +                     bridge->io_offset = res->start;
+> >> +                     res->end -= res->start;
+> >> +                     window->offset -= res->start;
+> >> +                     res->start = 0;
+> >> +             }
+> >>               offset = window->offset;
+> >>               if (res->flags & IORESOURCE_BUS)
+> >
+> > Won't this break all existing host bridges?
+> >
+> >         Arnd
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+--
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
