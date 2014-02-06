@@ -1,102 +1,120 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  6 Feb 2014 14:20:13 -0300
-Subject: [PATCH v6 06/19] watchdog: orion: Handle the interrupt so it's
- properly acked
+Date: Thu,  6 Feb 2014 14:20:18 -0300
+Subject: [PATCH v6 11/19] watchdog: orion: Add per-compatible clock
+ initialization
 In-Reply-To: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1391707226-18258-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1391707226-18258-12-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT-enabled plaforms, where the irqchip driver for the brigde interrupt
-controller is available, can handle the watchdog IRQ properly. Therefore,
-request the interrupt and add a dummy handler that merely calls panic().
+Following the introduction of the compatible-data field,
+it's now possible to further abstract the clock initialization.
+This will allow to support SoC with a different clock setup.
 
-This is done in order to have an initial 'ack' of the interruption,
-which clears the watchdog state.
-
-Furthermore, since some platforms don't have such IRQ, this commit
-makes the interrupt specification optional.
-
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Tested-by: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../devicetree/bindings/watchdog/marvel.txt        |  2 ++
- drivers/watchdog/orion_wdt.c                       | 24 +++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/watchdog/orion_wdt.c | 53 ++++++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-index 5dc8d30..0731fbd 100644
---- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-+++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- Optional properties:
- 
-+- interrupts	: Contains the IRQ for watchdog expiration
- - timeout-sec	: Contains the watchdog timeout in seconds
- 
- Example:
-@@ -14,6 +15,7 @@ Example:
- 	wdt at 20300 {
- 		compatible = "marvell,orion-wdt";
- 		reg = <0x20300 0x28>;
-+		interrupts = <3>;
- 		timeout-sec = <10>;
- 		status = "okay";
- 	};
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 2dbeee9..5b9b80c 100644
+index 12fedf4..de7a10b 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/watchdog.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-@@ -109,10 +110,16 @@ static struct watchdog_device orion_wdt = {
- 	.min_timeout = 1,
+@@ -42,10 +42,14 @@
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+ 
++struct orion_watchdog;
++
+ struct orion_watchdog_data {
+ 	int wdt_counter_offset;
+ 	int wdt_enable_bit;
+ 	int rstout_enable_bit;
++	int (*clock_init)(struct platform_device *,
++			  struct orion_watchdog *);
  };
  
-+static irqreturn_t orion_wdt_irq(int irq, void *devid)
+ struct orion_watchdog {
+@@ -57,6 +61,22 @@ struct orion_watchdog {
+ 	const struct orion_watchdog_data *data;
+ };
+ 
++static int orion_wdt_clock_init(struct platform_device *pdev,
++				struct orion_watchdog *dev)
 +{
-+	panic("Watchdog Timeout");
-+	return IRQ_HANDLED;
++	int ret;
++
++	dev->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(dev->clk))
++		return PTR_ERR(dev->clk);
++	ret = clk_prepare_enable(dev->clk);
++	if (ret)
++		return ret;
++
++	dev->clk_rate = clk_get_rate(dev->clk);
++	return 0;
 +}
 +
- static int orion_wdt_probe(struct platform_device *pdev)
+ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
  {
- 	struct resource *res;
--	int ret;
-+	int ret, irq;
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+@@ -162,6 +182,7 @@ static const struct orion_watchdog_data orion_data = {
+ 	.rstout_enable_bit = BIT(1),
+ 	.wdt_enable_bit = BIT(4),
+ 	.wdt_counter_offset = 0x24,
++	.clock_init = orion_wdt_clock_init,
+ };
  
- 	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
-@@ -145,6 +152,21 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	/* Let's make sure the watchdog is fully stopped */
- 	orion_wdt_stop(&orion_wdt);
+ static const struct of_device_id orion_wdt_of_match_table[] = {
+@@ -196,34 +217,24 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	dev->wdt.min_timeout = 1;
+ 	dev->data = match->data;
  
-+	/* Request the IRQ only after the watchdog is disabled */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		/*
-+		 * Not all supported platforms specify an interrupt for the
-+		 * watchdog, so let's make it optional.
-+		 */
-+		ret = devm_request_irq(&pdev->dev, irq, orion_wdt_irq, 0,
-+				       pdev->name, &orion_wdt);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to request IRQ\n");
-+			goto disable_clk;
-+		}
-+	}
+-	dev->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(dev->clk)) {
+-		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
+-		return PTR_ERR(dev->clk);
+-	}
+-	ret = clk_prepare_enable(dev->clk);
+-	if (ret)
+-		return ret;
+-	dev->clk_rate = clk_get_rate(dev->clk);
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		ret = -ENODEV;
+-		goto disable_clk;
+-	}
++	if (!res)
++		return -ENODEV;
+ 
+ 	dev->reg = devm_ioremap(&pdev->dev, res->start,
+ 			       resource_size(res));
+-	if (!dev->reg) {
+-		ret = -ENOMEM;
+-		goto disable_clk;
+-	}
++	if (!dev->reg)
++		return -ENOMEM;
+ 
+ 	dev->rstout = orion_wdt_ioremap_rstout(pdev, res->start &
+ 						     INTERNAL_REGS_MASK);
+-	if (!dev->rstout) {
+-		ret = -ENODEV;
+-		goto disable_clk;
++	if (!dev->rstout)
++		return -ENODEV;
 +
- 	watchdog_set_nowayout(&orion_wdt, nowayout);
- 	ret = watchdog_register_device(&orion_wdt);
- 	if (ret)
++	ret = dev->data->clock_init(pdev, dev);
++	if (ret) {
++		dev_err(&pdev->dev, "cannot initialize clock\n");
++		return ret;
+ 	}
+ 
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / dev->clk_rate;
 -- 
 1.8.1.5
