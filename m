@@ -1,61 +1,143 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Thu,  6 Feb 2014 16:24:39 -0600
-Subject: [PATCH v3 0/5] Split mach-msm into legacy and mach-qcom
- (multiplatform)
-Message-ID: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
+Date: Thu,  6 Feb 2014 16:24:41 -0600
+Subject: [PATCH v3 2/5] clocksource: qcom: Move clocksource code out of
+ mach-msm
+In-Reply-To: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
+References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1391725484-6673-3-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the splits the Qualcomm MSM platform into legacy support that we will
-not try and convert to multiplatform and multiplatform support.
+We intend to share the clocksource code for MSM platforms between legacy
+and multiplatform supported qcom SoCs.
 
-- k
+Acked-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig                                   | 13 +++++--------
+ arch/arm/mach-msm/Makefile                                  |  1 -
+ drivers/clocksource/Kconfig                                 |  3 +++
+ drivers/clocksource/Makefile                                |  1 +
+ .../mach-msm/timer.c => drivers/clocksource/qcom-timer.c    |  6 +-----
+ 5 files changed, 10 insertions(+), 14 deletions(-)
+ rename arch/arm/mach-msm/timer.c => drivers/clocksource/qcom-timer.c (98%)
 
-Changes from v2:
-* Dropped ARCH_MSM depends from CLKSRC_QCOM, since we select it
-* Fixed some grammar/typo's in commit messages
-* kept smp ops code in platsmp.c to match what other mach's do
-* Kept mach-qcom/Kconfig sorted alphabetically
-
-Changes from v1:
-* Added patch to remove hotplug.c
-* Added patch to rename msm_ to qcom_
-* Changes the Kconfig to drop CPU_V7
-* used wfi() in cpu_die function
-* Added git tree to MAINTAINERS file
-
-Kumar Gala (5):
-      ARM: msm: kill off hotplug.c
-      clocksource: qcom: Move clocksource code out of mach-msm
-      ARM: qcom: Split Qualcomm support into legacy and multiplatform
-      clocksource: qcom: split building of legacy vs multiplatform support
-      ARM: qcom: Rename various msm prefixed functions to qcom
-
- arch/arm/mach-msm/board-dt.c       |   41 ----
- arch/arm/mach-msm/hotplug.c        |   51 -----
- arch/arm/mach-msm/platsmp.c        |  130 --------------
- arch/arm/mach-msm/scm-boot.c       |   39 ----
- arch/arm/mach-msm/scm-boot.h       |   22 --
- arch/arm/mach-msm/scm.c            |  299 ---------------------------------
- arch/arm/mach-msm/scm.h            |   25 --
- arch/arm/mach-msm/timer.c          |  333 -------------------------------------
- b/MAINTAINERS                      |    8 
- b/arch/arm/Kconfig                 |    7 
- b/arch/arm/Kconfig.debug           |    2 
- b/arch/arm/Makefile                |    1 
- b/arch/arm/boot/dts/Makefile       |    6 
- b/arch/arm/mach-msm/Kconfig        |   54 ------
- b/arch/arm/mach-msm/Makefile       |    8 
- b/arch/arm/mach-msm/common.h       |    1 
- b/arch/arm/mach-qcom/Kconfig       |   33 +++
- b/arch/arm/mach-qcom/Makefile      |    5 
- b/arch/arm/mach-qcom/board.c       |   40 ++++
- b/arch/arm/mach-qcom/platsmp.c     |  137 +++++++++++++++
- b/arch/arm/mach-qcom/scm-boot.c    |   39 ++++
- b/arch/arm/mach-qcom/scm-boot.h    |   22 ++
- b/arch/arm/mach-qcom/scm.c         |  299 +++++++++++++++++++++++++++++++++
- b/arch/arm/mach-qcom/scm.h         |   25 ++
- b/drivers/clocksource/Kconfig      |    3 
- b/drivers/clocksource/Makefile     |    1 
- b/drivers/clocksource/qcom-timer.c |  330 ++++++++++++++++++++++++++++++++++++
- 27 files changed, 956 insertions(+), 1005 deletions(-)
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 9625cf3..3c4eca7 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -21,7 +21,7 @@ config ARCH_MSM8X60
+ 	select CPU_V7
+ 	select HAVE_SMP
+ 	select MSM_SCM if SMP
+-	select MSM_TIMER
++	select CLKSRC_QCOM
+ 
+ config ARCH_MSM8960
+ 	bool "Enable support for MSM8960"
+@@ -29,7 +29,7 @@ config ARCH_MSM8960
+ 	select CPU_V7
+ 	select HAVE_SMP
+ 	select MSM_SCM if SMP
+-	select MSM_TIMER
++	select CLKSRC_QCOM
+ 
+ config ARCH_MSM8974
+ 	bool "Enable support for MSM8974"
+@@ -54,7 +54,7 @@ config ARCH_MSM7X00A
+ 	select MACH_TROUT if !MACH_HALIBUT
+ 	select MSM_PROC_COMM
+ 	select MSM_SMD
+-	select MSM_TIMER
++	select CLKSRC_QCOM
+ 	select MSM_SMD_PKG3
+ 
+ config ARCH_MSM7X30
+@@ -66,7 +66,7 @@ config ARCH_MSM7X30
+ 	select MSM_GPIOMUX
+ 	select MSM_PROC_COMM
+ 	select MSM_SMD
+-	select MSM_TIMER
++	select CLKSRC_QCOM
+ 	select MSM_VIC
+ 
+ config ARCH_QSD8X50
+@@ -78,7 +78,7 @@ config ARCH_QSD8X50
+ 	select MSM_GPIOMUX
+ 	select MSM_PROC_COMM
+ 	select MSM_SMD
+-	select MSM_TIMER
++	select CLKSRC_QCOM
+ 	select MSM_VIC
+ 
+ endchoice
+@@ -153,7 +153,4 @@ config MSM_GPIOMUX
+ config MSM_SCM
+ 	bool
+ 
+-config MSM_TIMER
+-	bool
+-
+ endif
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 8327f60..04b1bee 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,4 +1,3 @@
+-obj-$(CONFIG_MSM_TIMER) += timer.o
+ obj-$(CONFIG_MSM_PROC_COMM) += clock.o
+ 
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cd6950f..6510ec4 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -140,3 +140,6 @@ config VF_PIT_TIMER
+ 	bool
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
++
++config CLKSRC_QCOM
++	bool
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index c7ca50a..2e0c0cc 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
+ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+ obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+ obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
++obj-$(CONFIG_CLKSRC_QCOM)	+= qcom-timer.o
+ 
+ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+ obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+diff --git a/arch/arm/mach-msm/timer.c b/drivers/clocksource/qcom-timer.c
+similarity index 98%
+rename from arch/arm/mach-msm/timer.c
+rename to drivers/clocksource/qcom-timer.c
+index fd16449..dca829e 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/drivers/clocksource/qcom-timer.c
+@@ -1,7 +1,7 @@
+ /*
+  *
+  * Copyright (C) 2007 Google, Inc.
+- * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2009-2012,2014, The Linux Foundation. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -26,10 +26,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/sched_clock.h>
+ 
+-#include <asm/mach/time.h>
+-
+-#include "common.h"
+-
+ #define TIMER_MATCH_VAL			0x0000
+ #define TIMER_COUNT_VAL			0x0004
+ #define TIMER_ENABLE			0x0008
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
