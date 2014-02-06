@@ -1,56 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:21:05 +0900
-Subject: [PATCH 08/13] ARM: shmobile: r8a7790: Add VIN clock support
+Date: Thu,  6 Feb 2014 15:21:07 +0900
+Subject: [PATCH 10/13] ARM: shmobile: r8a7791: Add ZS clock
 In-Reply-To: <cover.1391666228.git.horms+renesas@verge.net.au>
 References: <cover.1391666228.git.horms+renesas@verge.net.au>
-Message-ID: <b89dfdfad949798e1624dd2ff494bdb7ac943b04.1391666228.git.horms+renesas@verge.net.au>
+Message-ID: <5a6f994abbfde8e17671541db04399dfc4aebe62.1391666228.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-This adds VIN[0-3] clock support to R8A7790 SoC.
+This adds fixed ratio zs_clk to R8A7791 clocks.
 
 Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-[horms+renesas at verge.net.au: manually applied]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7791.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 58f3dcf..b2b2323 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -197,6 +197,7 @@ enum {
- 	MSTP931, MSTP930, MSTP929, MSTP928,
- 	MSTP917,
- 	MSTP813,
-+	MSTP811, MSTP810, MSTP809, MSTP808,
- 	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
- 	MSTP717, MSTP716,
- 	MSTP704,
-@@ -226,6 +227,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
- 	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
- 	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
-+	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
-+	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
-+	[MSTP809] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8,  9, MSTPSR8, 0), /* VIN2 */
-+	[MSTP808] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8,  8, MSTPSR8, 0), /* VIN3 */
- 	[MSTP726] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 26, MSTPSR7, 0), /* LVDS0 */
- 	[MSTP725] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 25, MSTPSR7, 0), /* LVDS1 */
- 	[MSTP724] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 24, MSTPSR7, 0), /* DU0 */
-@@ -312,6 +317,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
- 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
-+	CLKDEV_DEV_ID("r8a7790-vin.0", &mstp_clks[MSTP811]),
-+	CLKDEV_DEV_ID("r8a7790-vin.1", &mstp_clks[MSTP810]),
-+	CLKDEV_DEV_ID("r8a7790-vin.2", &mstp_clks[MSTP809]),
-+	CLKDEV_DEV_ID("r8a7790-vin.3", &mstp_clks[MSTP808]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP502]),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index 1074ba4..52d7d13 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -113,6 +113,7 @@ SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
+ SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
+ SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
+ SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
++SH_FIXED_RATIO_CLK_SET(zs_clk,			pll1_clk,	1, 6);
+ 
+ static struct clk *main_clks[] = {
+ 	&extal_clk,
+@@ -128,6 +129,7 @@ static struct clk *main_clks[] = {
+ 	&cp_clk,
+ 	&zg_clk,
+ 	&zx_clk,
++	&zs_clk,
+ };
+ 
+ /* MSTP */
+@@ -187,6 +189,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
+ 	CLKDEV_CON_ID("pll3",		&pll3_clk),
+ 	CLKDEV_CON_ID("zg",		&zg_clk),
++	CLKDEV_CON_ID("zs",		&zs_clk),
+ 	CLKDEV_CON_ID("hp",		&hp_clk),
+ 	CLKDEV_CON_ID("p",		&p_clk),
+ 	CLKDEV_CON_ID("rclk",		&rclk_clk),
 -- 
 1.8.5.2
