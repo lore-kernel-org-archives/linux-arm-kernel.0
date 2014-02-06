@@ -1,19 +1,63 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 06 Feb 2014 23:21:54 +0100
-Subject: [PATCH] clk: samsung: Initialize clock table with error pointers
-In-Reply-To: <1391711591-19416-1-git-send-email-t.figa@samsung.com>
-References: <1391711591-19416-1-git-send-email-t.figa@samsung.com>
-Message-ID: <52F40B02.8070403@gmail.com>
+From: x-linux@infra-silbe.de (Sascha Silbe)
+Date: Thu,  6 Feb 2014 23:24:13 +0100
+Subject: [PATCH resend] ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC
+ interrupt
+Message-ID: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 07:33 PM, Tomasz Figa wrote:
-> Before this patch, the driver was simply zeroing the clock table, which
-> is incorrect, because invalid clock numbers returned NULL instead of
-> error pointers. This patch fixes this by changing the driver to
-> initialize the array with PTR_ERR(-ENOENT).
->
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
+Apply the same work-around for i.MX 6D/Q erratum 006687 as used for
+Sabre Lite for the Wandboard Dual / Quad.
 
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Like on the Sabre Lite, GPIO6 is used as a power down output for
+camera expansion boards. However, these expansion boards do not work
+with mainline yet anyway.
+
+Tested on a Wandboard Quad. Before the patch:
+
+root at arm:~# ping -q -f -c 10000 192.168.2.1
+PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
+
+--- 192.168.2.1 ping statistics ---
+10000 packets transmitted, 10000 received, 0% packet loss, time 97363ms
+rtt min/avg/max/mdev = 0.290/9.586/10.198/1.432 ms, pipe 2, ipg/ewma 9.737/9.672 ms
+
+After the patch:
+
+root at arm:~# ping -q -f -c 10000 192.168.2.1
+PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
+
+--- 192.168.2.1 ping statistics ---
+10000 packets transmitted, 10000 received, 0% packet loss, time 4810ms
+rtt min/avg/max/mdev = 0.246/0.355/0.863/0.044 ms, ipg/ewma 0.481/0.319 ms
+
+Signed-off-by: Sascha Silbe <x-linux@infra-silbe.de>
+---
+ Resend after fixing up sendemail.envelopesender.
+
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index d050888..4d82878 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -123,6 +123,7 @@
+ 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+ 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+ 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
++				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+ 			>;
+ 		};
+ 
+@@ -201,6 +202,8 @@
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rgmii";
+ 	phy-reset-gpios = <&gpio3 29 0>;
++	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
++			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 	status = "okay";
+ };
+ 
+-- 
+1.8.4.3
