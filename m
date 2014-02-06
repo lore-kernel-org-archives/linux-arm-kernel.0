@@ -1,143 +1,124 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Thu,  6 Feb 2014 16:24:41 -0600
-Subject: [PATCH v3 2/5] clocksource: qcom: Move clocksource code out of
- mach-msm
+Date: Thu,  6 Feb 2014 16:24:40 -0600
+Subject: [PATCH v3 1/5] ARM: msm: kill off hotplug.c
 In-Reply-To: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
 References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1391725484-6673-3-git-send-email-galak@codeaurora.org>
+Message-ID: <1391725484-6673-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We intend to share the clocksource code for MSM platforms between legacy
-and multiplatform supported qcom SoCs.
+Right now hotplug.c only really implements msm_cpu_die as a wfi.  Just
+move that implementation into platsmp.c.  At the same time we use the
+existing wfi() instead of inline asm.
 
-Acked-by: Olof Johansson <olof@lixom.net>
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig                                   | 13 +++++--------
- arch/arm/mach-msm/Makefile                                  |  1 -
- drivers/clocksource/Kconfig                                 |  3 +++
- drivers/clocksource/Makefile                                |  1 +
- .../mach-msm/timer.c => drivers/clocksource/qcom-timer.c    |  6 +-----
- 5 files changed, 10 insertions(+), 14 deletions(-)
- rename arch/arm/mach-msm/timer.c => drivers/clocksource/qcom-timer.c (98%)
+ arch/arm/mach-msm/Makefile  |  1 -
+ arch/arm/mach-msm/common.h  |  1 -
+ arch/arm/mach-msm/hotplug.c | 51 ---------------------------------------------
+ arch/arm/mach-msm/platsmp.c |  7 +++++++
+ 4 files changed, 7 insertions(+), 53 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/hotplug.c
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 9625cf3..3c4eca7 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -21,7 +21,7 @@ config ARCH_MSM8X60
- 	select CPU_V7
- 	select HAVE_SMP
- 	select MSM_SCM if SMP
--	select MSM_TIMER
-+	select CLKSRC_QCOM
- 
- config ARCH_MSM8960
- 	bool "Enable support for MSM8960"
-@@ -29,7 +29,7 @@ config ARCH_MSM8960
- 	select CPU_V7
- 	select HAVE_SMP
- 	select MSM_SCM if SMP
--	select MSM_TIMER
-+	select CLKSRC_QCOM
- 
- config ARCH_MSM8974
- 	bool "Enable support for MSM8974"
-@@ -54,7 +54,7 @@ config ARCH_MSM7X00A
- 	select MACH_TROUT if !MACH_HALIBUT
- 	select MSM_PROC_COMM
- 	select MSM_SMD
--	select MSM_TIMER
-+	select CLKSRC_QCOM
- 	select MSM_SMD_PKG3
- 
- config ARCH_MSM7X30
-@@ -66,7 +66,7 @@ config ARCH_MSM7X30
- 	select MSM_GPIOMUX
- 	select MSM_PROC_COMM
- 	select MSM_SMD
--	select MSM_TIMER
-+	select CLKSRC_QCOM
- 	select MSM_VIC
- 
- config ARCH_QSD8X50
-@@ -78,7 +78,7 @@ config ARCH_QSD8X50
- 	select MSM_GPIOMUX
- 	select MSM_PROC_COMM
- 	select MSM_SMD
--	select MSM_TIMER
-+	select CLKSRC_QCOM
- 	select MSM_VIC
- 
- endchoice
-@@ -153,7 +153,4 @@ config MSM_GPIOMUX
- config MSM_SCM
- 	bool
- 
--config MSM_TIMER
--	bool
--
- endif
 diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 8327f60..04b1bee 100644
+index 721f27f..8327f60 100644
 --- a/arch/arm/mach-msm/Makefile
 +++ b/arch/arm/mach-msm/Makefile
-@@ -1,4 +1,3 @@
--obj-$(CONFIG_MSM_TIMER) += timer.o
- obj-$(CONFIG_MSM_PROC_COMM) += clock.o
+@@ -18,7 +18,6 @@ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
  
- obj-$(CONFIG_MSM_VIC) += irq-vic.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index cd6950f..6510ec4 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -140,3 +140,6 @@ config VF_PIT_TIMER
- 	bool
- 	help
- 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-+
-+config CLKSRC_QCOM
-+	bool
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index c7ca50a..2e0c0cc 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
- obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-+obj-$(CONFIG_CLKSRC_QCOM)	+= qcom-timer.o
+ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-diff --git a/arch/arm/mach-msm/timer.c b/drivers/clocksource/qcom-timer.c
-similarity index 98%
-rename from arch/arm/mach-msm/timer.c
-rename to drivers/clocksource/qcom-timer.c
-index fd16449..dca829e 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/drivers/clocksource/qcom-timer.c
-@@ -1,7 +1,7 @@
- /*
-  *
-  * Copyright (C) 2007 Google, Inc.
-- * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2009-2012,2014, The Linux Foundation. All rights reserved.
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -26,10 +26,6 @@
- #include <linux/of_irq.h>
- #include <linux/sched_clock.h>
+-obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ obj-$(CONFIG_SMP) += platsmp.o
  
--#include <asm/mach/time.h>
+ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index 33c7725..0a4899b 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -24,7 +24,6 @@ extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 					  unsigned int mtype, void *caller);
+ 
+ extern struct smp_operations msm_smp_ops;
+-extern void msm_cpu_die(unsigned int cpu);
+ 
+ struct msm_mmc_platform_data;
+ 
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+deleted file mode 100644
+index cea80fc..0000000
+--- a/arch/arm/mach-msm/hotplug.c
++++ /dev/null
+@@ -1,51 +0,0 @@
+-/*
+- *  Copyright (C) 2002 ARM Ltd.
+- *  All Rights Reserved
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+-
+-#include <asm/smp_plat.h>
 -
 -#include "common.h"
 -
- #define TIMER_MATCH_VAL			0x0000
- #define TIMER_COUNT_VAL			0x0004
- #define TIMER_ENABLE			0x0008
+-static inline void cpu_enter_lowpower(void)
+-{
+-}
+-
+-static inline void cpu_leave_lowpower(void)
+-{
+-}
+-
+-static inline void platform_do_lowpower(unsigned int cpu)
+-{
+-	asm("wfi"
+-	    :
+-	    :
+-	    : "memory", "cc");
+-}
+-
+-/*
+- * platform-specific code to shutdown a CPU
+- *
+- * Called with IRQs disabled
+- */
+-void __ref msm_cpu_die(unsigned int cpu)
+-{
+-	/*
+-	 * we're ready for shutdown now, so do it
+-	 */
+-	cpu_enter_lowpower();
+-	platform_do_lowpower(cpu);
+-
+-	/*
+-	 * bring this CPU back into the world of cache
+-	 * coherency, and then restore interrupts
+-	 */
+-	cpu_leave_lowpower();
+-}
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 3721b31..251a91e 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -29,6 +29,13 @@ extern void secondary_startup(void);
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static void __ref msm_cpu_die(unsigned int cpu)
++{
++	wfi();
++}
++#endif
++
+ static inline int get_core_count(void)
+ {
+ 	/* 1 + the PART[1:0] field of MIDR */
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
