@@ -1,34 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Feb 2014 11:30:51 +0000
-Subject: [PATCH 4/6] iommu/arm-smmu: provide option to dsb macro when
- publishing tables
+Date: Thu,  6 Feb 2014 11:30:53 +0000
+Subject: [PATCH 6/6] arm64: barriers: use barrier() instead of smp_mb() when
+ !SMP
 In-Reply-To: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
 References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1391686253-13436-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1391686253-13436-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On coherent systems, publishing new page tables to the SMMU walker is
-achieved with a dsb instruction. In fact, this can be a dsb(ishst) which
-also provides the mandatory barrier option for arm64.
+The recently introduced acquire/release accessors refer to smp_mb()
+in the !CONFIG_SMP case. This is confusing when reading the code, so use
+barrier() directly when we know we're UP.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/barrier.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 8911850c9444..8f6fee54f3b1 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1417,7 +1417,7 @@ out_unlock:
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index b5219b651850..ef483c75ae34 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -40,7 +40,7 @@
+ #define smp_store_release(p, v)						\
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+-	smp_mb();							\
++	barrier();							\
+ 	ACCESS_ONCE(*p) = (v);						\
+ } while (0)
  
- 	/* Ensure new page tables are visible to the hardware walker */
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
--		dsb();
-+		dsb(ishst);
+@@ -48,7 +48,7 @@ do {									\
+ ({									\
+ 	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+-	smp_mb();							\
++	barrier();							\
+ 	___p1;								\
+ })
  
- 	return ret;
- }
 -- 
 1.8.2.2
