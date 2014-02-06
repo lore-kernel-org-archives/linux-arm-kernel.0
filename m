@@ -1,123 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:15:26 +0900
-Subject: [PATCH] ARM: shmobile: wait for MSTP clock status to toggle,
- when enabling it
-In-Reply-To: <cover.1391651474.git.horms+renesas@verge.net.au>
-References: <cover.1391651474.git.horms+renesas@verge.net.au>
-Message-ID: <a028c6da34d434e35ba8322568c756ea97ff3c18.1391651474.git.horms+renesas@verge.net.au>
+Date: Thu,  6 Feb 2014 15:17:08 +0900
+Subject: [GIT PULL 00/21] Renesas ARM based SoC Board Updates for v3.15
+Message-ID: <cover.1391665225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On r-/sh-mobile SoCs MSTP clocks are used by the runtime PM to dynamically
-enable and disable peripheral clocks. To make sure the clock has really
-started we have to read back its status register until it confirms success.
+please consider these Renesas ARM based SoC board updates for v3.15.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/sh/clk/cpg.c   | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/sh_clk.h | 19 ++++++++++++-------
- 2 files changed, 50 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/sh/clk/cpg.c b/drivers/sh/clk/cpg.c
-index 1ebe67c..7442bc1 100644
---- a/drivers/sh/clk/cpg.c
-+++ b/drivers/sh/clk/cpg.c
-@@ -36,9 +36,47 @@ static void sh_clk_write(int value, struct clk *clk)
- 		iowrite32(value, clk->mapped_reg);
- }
- 
-+static unsigned int r8(const void __iomem *addr)
-+{
-+	return ioread8(addr);
-+}
-+
-+static unsigned int r16(const void __iomem *addr)
-+{
-+	return ioread16(addr);
-+}
-+
-+static unsigned int r32(const void __iomem *addr)
-+{
-+	return ioread32(addr);
-+}
-+
- static int sh_clk_mstp_enable(struct clk *clk)
- {
- 	sh_clk_write(sh_clk_read(clk) & ~(1 << clk->enable_bit), clk);
-+	if (clk->status_reg) {
-+		unsigned int (*read)(const void __iomem *addr);
-+		int i;
-+		void __iomem *mapped_status = (phys_addr_t)clk->status_reg -
-+			(phys_addr_t)clk->enable_reg + clk->mapped_reg;
-+
-+		if (clk->flags & CLK_ENABLE_REG_8BIT)
-+			read = r8;
-+		else if (clk->flags & CLK_ENABLE_REG_16BIT)
-+			read = r16;
-+		else
-+			read = r32;
-+
-+		for (i = 1000;
-+		     (read(mapped_status) & (1 << clk->enable_bit)) && i;
-+		     i--)
-+			cpu_relax();
-+		if (!i) {
-+			pr_err("cpg: failed to enable %p[%d]\n",
-+			       clk->enable_reg, clk->enable_bit);
-+			return -ETIMEDOUT;
-+		}
-+	}
- 	return 0;
- }
- 
-diff --git a/include/linux/sh_clk.h b/include/linux/sh_clk.h
-index 60c7239..1f208b2 100644
---- a/include/linux/sh_clk.h
-+++ b/include/linux/sh_clk.h
-@@ -52,6 +52,7 @@ struct clk {
- 	unsigned long		flags;
- 
- 	void __iomem		*enable_reg;
-+	void __iomem		*status_reg;
- 	unsigned int		enable_bit;
- 	void __iomem		*mapped_reg;
- 
-@@ -116,22 +117,26 @@ long clk_round_parent(struct clk *clk, unsigned long target,
- 		      unsigned long *best_freq, unsigned long *parent_freq,
- 		      unsigned int div_min, unsigned int div_max);
- 
--#define SH_CLK_MSTP(_parent, _enable_reg, _enable_bit, _flags)		\
-+#define SH_CLK_MSTP(_parent, _enable_reg, _enable_bit, _status_reg, _flags) \
- {									\
- 	.parent		= _parent,					\
- 	.enable_reg	= (void __iomem *)_enable_reg,			\
- 	.enable_bit	= _enable_bit,					\
-+	.status_reg	= _status_reg,					\
- 	.flags		= _flags,					\
- }
- 
--#define SH_CLK_MSTP32(_p, _r, _b, _f)					\
--	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_32BIT)
-+#define SH_CLK_MSTP32(_p, _r, _b, _f)				\
-+	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_32BIT)
- 
--#define SH_CLK_MSTP16(_p, _r, _b, _f)					\
--	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_16BIT)
-+#define SH_CLK_MSTP32_STS(_p, _r, _b, _s, _f)			\
-+	SH_CLK_MSTP(_p, _r, _b, _s, _f | CLK_ENABLE_REG_32BIT)
- 
--#define SH_CLK_MSTP8(_p, _r, _b, _f)					\
--	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_8BIT)
-+#define SH_CLK_MSTP16(_p, _r, _b, _f)				\
-+	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_16BIT)
-+
-+#define SH_CLK_MSTP8(_p, _r, _b, _f)				\
-+	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_8BIT)
- 
- int sh_clk_mstp_register(struct clk *clks, int nr);
- 
--- 
-1.8.5.2
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.15
+
+for you to fetch changes up to 235cda29e4d5047622ff9b82b1f0b4cb6cf95f6c:
+
+  ARM: shmobile: Remove Lager USBHS UDC ifdefs (2014-02-04 14:28:33 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC Board Updates for v3.15
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Fix error return code check from clk_get()
+  - Add SATA0 support
+  - Conditionally select MICREL_PHY for Multiplatform
+
+* r8a7790 (R-Car H2) based Lager board
+  - Add USBHS support
+  - Fix error return code check from clk_get()
+  - Add SATA support
+  - Make spi_flash_data const
+  - Add VIN1 SoC camera support
+  - Conditionally select CONFIG_MICREL_PHY
+
+* r8a7778 (R-Car M1) based Bock-W board
+  - Add USB Func DMAEngine support
+  - Use HPBIF DMAEngine for sound
+  - Use SSI DMAEngine for sound
+
+* emev2 (Emma Mobile EV2) based kzm9d board
+  - Use common clock framework
+
+* r8a773a0 (SH-Mobile AG5) based kzm9g board
+  - Add zboot support
+
+* Many boards
+  - Conditionally select SMSC_PHY
+
+----------------------------------------------------------------
+Ben Dooks (2):
+      ARM: shmobile: lager: fix error return code check from clk_get()
+      ARM: shmobile: koelsch: fix error return code check from clk_get()
+
+Geert Uytterhoeven (1):
+      ARM: shmobile: lager: Make spi_flash_data const
+
+Kuninori Morimoto (3):
+      ARM: shmobile: bockw: use SSI DMAEngine for sound
+      ARM: shmobile: bockw: use HPBIF DMAEngine for sound
+      ARM: shmobile: bockw: add USB Func DMAEngine support
+
+Magnus Damm (1):
+      ARM: shmobile: Remove Lager USBHS UDC ifdefs
+
+Sergei Shtylyov (1):
+      ARM: shmobile: Lager: conditionally select CONFIG_MICREL_PHY
+
+Simon Horman (7):
+      ARM: shmobile: koelsch: Conditionally select MICREL_PHY for Multiplatform
+      ARM: shmobile: ape6evm: Conditionally select SMSC_PHY
+      ARM: shmobile: armadillo800eva: Conditionally select SMSC_PHY
+      ARM: shmobile: bockw: Sort Kconfig node's selections
+      ARM: shmobile: kzm9d: Conditionally select SMSC_PHY
+      ARM: shmobile: mackerel: Conditionally select SMSC_PHY
+      ARM: shmobile: marzen: Conditionally select SMSC_PHY
+
+Takashi Yoshii (1):
+      ARM: shmobile: kzm9d: Use common clock framework
+
+Ulrich Hecht (1):
+      ARM: mach-shmobile: kzm9g: add zboot support
+
+Valentine Barshak (4):
+      ARM: shmobile: lager: Add VIN1 SoC camera support
+      ARM: shmobile: lager: Add SATA support
+      ARM: shmobile: koelsch: Add SATA0 support
+      ARM: shmobile: lager: Add USBHS support
+
+ arch/arm/mach-shmobile/Kconfig                     |  15 +-
+ arch/arm/mach-shmobile/board-bockw.c               |  24 +-
+ arch/arm/mach-shmobile/board-koelsch-reference.c   |   4 +-
+ arch/arm/mach-shmobile/board-koelsch.c             |  17 +
+ arch/arm/mach-shmobile/board-kzm9d-reference.c     |   5 +-
+ arch/arm/mach-shmobile/board-lager-reference.c     |   4 +-
+ arch/arm/mach-shmobile/board-lager.c               | 229 +++++++++++-
+ arch/arm/mach-shmobile/include/mach/head-kzm9g.txt | 410 +++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/zboot.h        |   3 +
+ arch/arm/mach-shmobile/include/mach/zboot_macros.h |  43 +++
+ 10 files changed, 737 insertions(+), 17 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/head-kzm9g.txt
