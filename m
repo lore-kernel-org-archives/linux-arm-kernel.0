@@ -1,48 +1,66 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 6 Feb 2014 11:28:24 +0900
-Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
-In-Reply-To: <52F266A2.1030503@wwwdotorg.org>
-References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
- <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
- <52E02DCC.1000404@wwwdotorg.org>
- <CAAVeFuKLtC62+bujY4724hMV_6M8Ow0s=6zRn_M87VX4PHQgxA@mail.gmail.com>
- <52F266A2.1030503@wwwdotorg.org>
-Message-ID: <52F2F348.3000502@nvidia.com>
+From: satish.patel@ti.com (Satish Patel)
+Date: Thu, 6 Feb 2014 09:16:24 +0530
+Subject: [PATCH v2 3/5] char: ti-usim: Add driver for USIM module on AM43xx
+In-Reply-To: <52F0E8EC.8030900@ti.com>
+References: <1390192434-19386-1-git-send-email-satish.patel@ti.com>
+ <1390192434-19386-4-git-send-email-satish.patel@ti.com>
+ <52F0E8EC.8030900@ti.com>
+Message-ID: <52F30590.1020802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 01:28 AM, Stephen Warren wrote:
-> On 01/23/2014 12:39 AM, Alexandre Courbot wrote:
->> On Thu, Jan 23, 2014 at 5:45 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 01/21/2014 03:10 AM, Alexandre Courbot wrote:
->>>> Invoke the do_idle() firmware call before suspending a CPU so that the
->>>> underlying firmware (if any) can take necessary action.
->>>
->>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
->>>
->>>> @@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
->>>>
->>>>        clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
->>>>
->>>> +     call_firmware_op(do_idle);
->>>> +
->>>>        cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
->>>>
->>>>        clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
->>>
->>> Don't you need to have the kernel also *not* do something when entering
->>> idle; doesn't the FW op replace some of the register writes that the
->>> kernel would otherwise be doing?
+
+
+On 2/4/2014 6:49 PM, Roger Quadros wrote:
+> Hi Satish,
+> 
+> On 01/20/2014 06:33 AM, Satish Patel wrote:
+>> TI-USIM driver is a platform driver that provides a character
+>> driver interface to user applications.
 >>
->> It seems like the operation is actually to inform the firmware that we
->> are going to suspend the CPU. Downstream kernel also uses it that way.
->> But you are right in that we should expect do_idle() to actually
->> perform the suspend operation. Maybe a prepare_idle() operation should
->> be added to the firmware interface for this purpose?
->
-> That sounds like a reasonable change. Is it easy to plumb in?
+>> It allows user applications to call IOCTL's to
+>> perform smart card operations.
+>>
+>> Driver currently supports
+>> - ATR
+>> - T=0 & T=1 protocol
+>> - clock stop mode
+>> - smart card clock configuration
+>> - Tx/Rx application data units (APDU) to smart card
+>> - Interface to PHY using DT & phy interface
+>>
+>> Validation is done with ACOS3 smart cards
+>>
+>> Signed-off-by: Satish Patel <satish.patel@ti.com>
+>> ---
+>>  .../devicetree/bindings/ti-usim/ti-usim.txt        |   31 +
+>>  drivers/char/Kconfig                               |    7 +
+>>  drivers/char/Makefile                              |    1 +
+>>  drivers/char/ti-usim-hw.h                          |  863 +++++++++
+>>  drivers/char/ti-usim.c                             | 1859 ++++++++++++++++++++
+> 
+> ti-usim.c is a very large driver that does everything but looks like limited to TI hardware.
+> How about splitting it into generic stuff and hw specific glue logic so that most of the generic stuff
+> could be used by different hardware types.
+> 
+Two things over here
+- First interface between user application and smartcard controller
+driver. There is already an open source f/w in user space called "pcsc"
+exists for this.
 
-I think so. Will post a v2 of this soon.
+- Second communication between smartcard controller and smartcard phy. I
+have introduce lite interface called sc_phy which covers generic stuff
+between controller and phy.
 
-Thanks,
-Alex.
+
+>>  include/linux/ti-usim.h                            |   98 +
+>>  6 files changed, 2859 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/ti-usim/ti-usim.txt
+>>  create mode 100644 drivers/char/ti-usim-hw.h
+>>  create mode 100644 drivers/char/ti-usim.c
+>>  create mode 100644 include/linux/ti-usim.h
+>>
+> 
+> cheers,
+> -roger
+> 
