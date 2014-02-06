@@ -1,25 +1,43 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu,  6 Feb 2014 14:16:08 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-Message-ID: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 06 Feb 2014 09:16:28 -0500
+Subject: [PATCH 2/2] ARM64: powernv: remove redundant cpuidle_idle_call()
+In-Reply-To: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1391696188-14540-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series replaces the Transparent HugePage pmd manipulation
-functions with calls to the standard pte functions. This allows the THP
-code to take advantage of the new PTE_WRITE logic, and provides better
-parity with the HugeTLB code (which already uses the pte functions).
+The core idle loop now takes care of it.
 
-Testing was done on the Fast Model with LTP THP tests, and the 3.14-rc1
-kernel was used.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm64/kernel/process.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-Steve Capper (3):
-  arm64: mm: Remove PMD_BIT_FUNC macro
-  arm64: mm: Route pmd thp functions through pte equivalents
-  arm64: mm: Correct definition of pmd_mknotpresent
-
- arch/arm64/include/asm/pgtable.h | 91 +++++++++++++++++++++++++++-------------
- 1 file changed, 62 insertions(+), 29 deletions(-)
-
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 1c0a9be2ff..9cce0098f4 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -33,7 +33,6 @@
+ #include <linux/kallsyms.h>
+ #include <linux/init.h>
+ #include <linux/cpu.h>
+-#include <linux/cpuidle.h>
+ #include <linux/elfcore.h>
+ #include <linux/pm.h>
+ #include <linux/tick.h>
+@@ -94,10 +93,8 @@ void arch_cpu_idle(void)
+ 	 * This should do all the clock switching and wait for interrupt
+ 	 * tricks
+ 	 */
+-	if (cpuidle_idle_call()) {
+-		cpu_do_idle();
+-		local_irq_enable();
+-	}
++	cpu_do_idle();
++	local_irq_enable();
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
-1.8.1.4
+1.8.4.108.g55ea5f6
