@@ -1,62 +1,150 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 6 Feb 2014 13:08:08 -0200
-Subject: [PATCH] ARM: dts: imx6sl-evk: Add debug LED support
-Message-ID: <1391699288-7101-1-git-send-email-fabio.estevam@freescale.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 6 Feb 2014 10:12:58 -0500
+Subject: [PATCH 1/4] Power: Reset: Generalize qnap-poweroff to with on
+ Synology devices.
+In-Reply-To: <1391634309-3123-2-git-send-email-andrew@lunn.ch>
+References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
+ <1391634309-3123-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20140206151258.GA8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO3_20 is connected to a debug LED. 
 
-Add support for it.
++ Dmitry Eremin-Solenikov, David Woodhouse
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+On Wed, Feb 05, 2014 at 10:05:06PM +0100, Andrew Lunn wrote:
+> The Synology NAS devices use a very similar mechanism to QNAP NAS
+> devices to power off. Both send a single charactor command to a PIC,
+> over the second serial port. However the baud rate and the command
+> differ. Generalize the driver to support this.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> cc: Anton Vorontsov <anton@enomsg.org>
+> ---
+>  .../bindings/power_supply/qnap-poweroff.txt        |    5 ++-
+>  drivers/power/reset/qnap-poweroff.c                |   46 +++++++++++++++-----
+>  2 files changed, 40 insertions(+), 11 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+> index 0347d8350d94..4ac3ee80dead 100644
+> --- a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+> +++ b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+> @@ -6,8 +6,11 @@ Orion5x SoCs. Sending the character 'A', at 19200 baud, tells the
+>  microcontroller to turn the power off. This driver adds a handler to
+>  pm_power_off which is called to turn the power off.
+>  
+> +Synology NAS devices use a similar scheme, but a different baud rate,
+> +9660, and a different character, 1.
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 0001804..4d23e28 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -8,6 +8,7 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- #include "imx6sl.dtsi"
- 
-@@ -19,6 +20,18 @@
- 		reg = <0x80000000 0x40000000>;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led>;
-+
-+		user {
-+			label = "debug";
-+			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -108,6 +121,12 @@
- 			>;
- 		};
- 
-+		pinctrl_led: ledgrp {
-+			fsl,pins = <
-+				MX6SL_PAD_HSIC_STROBE__GPIO3_IO20 0x17059
-+			>;
-+		};
-+
- 		pinctrl_kpp: kppgrp {
- 			fsl,pins = <
- 				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
--- 
-1.8.1.2
+nit: s/9660/9600/
+
+other than that,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
+
+> +
+>  Required Properties:
+> -- compatible: Should be "qnap,power-off"
+> +- compatible: Should be "qnap,power-off" or "synology,power-off"
+>  
+>  - reg: Address and length of the register set for UART1
+>  - clocks: tclk clock
+> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
+> index 37f56f7ee926..10c91fa2466c 100644
+> --- a/drivers/power/reset/qnap-poweroff.c
+> +++ b/drivers/power/reset/qnap-poweroff.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * QNAP Turbo NAS Board power off
+> + * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
+>   *
+>   * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
+>   *
+> @@ -25,17 +25,42 @@
+>  
+>  #define UART1_REG(x)	(base + ((UART_##x) << 2))
+>  
+> +struct power_off_cfg {
+> +	u32 baud;
+> +	char cmd;
+> +};
+> +
+> +static const struct power_off_cfg qnap_power_off_cfg = {
+> +	.baud = 19200,
+> +	.cmd = 'A',
+> +};
+> +
+> +static const struct power_off_cfg synology_power_off_cfg = {
+> +	.baud = 9600,
+> +	.cmd = '1',
+> +};
+> +
+> +static const struct of_device_id qnap_power_off_of_match_table[] = {
+> +	{ .compatible = "qnap,power-off",
+> +	  .data = (void *) &qnap_power_off_cfg,
+> +	},
+> +	{ .compatible = "synology,power-off",
+> +	  .data = (void *) &synology_power_off_cfg,
+> +	},
+> +	{}
+> +};
+> +
+>  static void __iomem *base;
+>  static unsigned long tclk;
+> +static struct power_off_cfg *cfg;
+>  
+>  static void qnap_power_off(void)
+>  {
+> -	/* 19200 baud divisor */
+> -	const unsigned divisor = ((tclk + (8 * 19200)) / (16 * 19200));
+> +	const unsigned divisor = ((tclk + (8 * cfg->baud)) / (16 * cfg->baud));
+>  
+>  	pr_err("%s: triggering power-off...\n", __func__);
+>  
+> -	/* hijack UART1 and reset into sane state (19200,8n1) */
+> +	/* hijack UART1 and reset into sane state */
+>  	writel(0x83, UART1_REG(LCR));
+>  	writel(divisor & 0xff, UART1_REG(DLL));
+>  	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
+> @@ -44,16 +69,21 @@ static void qnap_power_off(void)
+>  	writel(0x00, UART1_REG(FCR));
+>  	writel(0x00, UART1_REG(MCR));
+>  
+> -	/* send the power-off command 'A' to PIC */
+> -	writel('A', UART1_REG(TX));
+> +	/* send the power-off command to PIC */
+> +	writel(cfg->cmd, UART1_REG(TX));
+>  }
+>  
+>  static int qnap_power_off_probe(struct platform_device *pdev)
+>  {
+> +	struct device_node *np = pdev->dev.of_node;
+>  	struct resource *res;
+>  	struct clk *clk;
+>  	char symname[KSYM_NAME_LEN];
+>  
+> +	const struct of_device_id *match =
+> +		of_match_node(qnap_power_off_of_match_table, np);
+> +	cfg = (struct power_off_cfg *)match->data;
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res) {
+>  		dev_err(&pdev->dev, "Missing resource");
+> @@ -94,10 +124,6 @@ static int qnap_power_off_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id qnap_power_off_of_match_table[] = {
+> -	{ .compatible = "qnap,power-off", },
+> -	{}
+> -};
+>  MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
+>  
+>  static struct platform_driver qnap_power_off_driver = {
+> -- 
+> 1.7.10.4
+> 
