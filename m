@@ -1,56 +1,65 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Feb 2014 08:35:56 -0600
-Subject: [PATCH 3/3] ARM: dts: Add support for both OMAP35xx and OMAP36xx
- Overo/Tobi
-In-Reply-To: <1391677818-21154-4-git-send-email-florian.vaussard@epfl.ch>
-References: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
- <1391677818-21154-4-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <52F39DCC.8000006@ti.com>
+Date: Thu, 6 Feb 2014 08:38:44 -0600
+Subject: [PATCH 2/3] ARM: OMAP2+: AM43x: Add ID for ES1.1
+In-Reply-To: <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
+References: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
+ <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <52F39E74.3030404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 03:10 AM, Florian Vaussard wrote:
-> Unfortunatly the device tree for older OMAP35xx Overo cannot be used
-Unfortunately ?
-> with newer OMAP36xx and vice-versa. To address this issue, move most of
-> the Tobi DTS to a common include file, and create model-specific Tobi
-> DTS.
+On 02/06/2014 02:45 AM, Lokesh Vutla wrote:
+> Adding ID for AM437x ES1.1 silicon.
 > 
-[...]
-> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> new file mode 100644
-> index 0000000..2f82192
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/*
-> + * Tobi expansion board is manufactured by Gumstix Inc.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap34xx.dtsi"
-> +#include "omap3-overo-tobi-common.dtsi"
-> +
-> +/ {
-> +	model = "OMAP35xx Gumstix Overo on Tobi";
-> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3";
-To reduce any future problems, I suggest:
-compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo",
-"ti,omap3430", "ti,omap3";
-
-> +};
-> +
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
+>  arch/arm/mach-omap2/soc.h |    3 ++-
+>  2 files changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 9428c5f..8a05eaf 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -465,8 +465,18 @@ void __init omap3xxx_check_revision(void)
+>  		}
+>  		break;
+>  	case 0xb98c:
+> -		omap_revision = AM437X_REV_ES1_0;
+> -		cpu_rev = "1.0";
+> +		switch (rev) {
+> +		case 0:
+> +			omap_revision = AM437X_REV_ES1_0;
+> +			cpu_rev = "1.0";
+> +			break;
+> +		case 1:
+> +		/* FALLTHROUGH */
+> +		default:
+> +			omap_revision = AM437X_REV_ES1_1;
+> +			cpu_rev = "1.1";
+> +			break;
+> +		}
+>  		break;
+>  	case 0xb8f2:
+>  		switch (rev) {
+> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> index 076bd90..30abcc8 100644
+> --- a/arch/arm/mach-omap2/soc.h
+> +++ b/arch/arm/mach-omap2/soc.h
+> @@ -438,7 +438,8 @@ IS_OMAP_TYPE(3430, 0x3430)
+>  #define AM335X_REV_ES2_1	(AM335X_CLASS | (0x2 << 8))
+>  
+>  #define AM437X_CLASS		0x43700000
+> -#define AM437X_REV_ES1_0	AM437X_CLASS
+> +#define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
+> +#define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
+>  
+>  #define OMAP443X_CLASS		0x44300044
+>  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
 > 
 
+can you also check if socbus shows proper results?
+I had http://slexy.org/view/s20e3OsIVx with v3.14-rc1
 
 -- 
 Regards,
