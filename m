@@ -1,137 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Feb 2014 18:09:31 +0000
-Subject: [PATCH 3/5] iommu/arm-smmu: fix table flushing during initial
- allocations
-In-Reply-To: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
-References: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1391710173-4343-4-git-send-email-will.deacon@arm.com>
+From: kevin@bracey.fi (Kevin Bracey)
+Date: Thu, 06 Feb 2014 20:10:44 +0200
+Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
+In-Reply-To: <20140206112039.GA31054@arm.com>
+References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
+ <20140206112039.GA31054@arm.com>
+Message-ID: <52F3D024.5020804@bracey.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we populate page tables as we traverse them ("iommu/arm-smmu:
-fix pud/pmd entry fill sequence"), we need to ensure that we flush out
-our zeroed tables after initial allocation, to prevent speculative TLB
-fills using bogus data.
+On 06/02/2014 13:20, Catalin Marinas wrote:
+> On Tue, Feb 04, 2014 at 10:19:06PM +0200, Kevin Bracey wrote:
+>> See http://comments.gmane.org/gmane.linux.ports.arm.omap/59256 for
+>> an earlier report of the observed might_sleep() warning.
+> There was a follow-up on this:
+>
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/263765
 
-This patch adds additional calls to arm_smmu_flush_pgtable during
-initial table allocation, and moves the dsb required by coherent table
-walkers into the helper.
+Thanks for that pointer - we failed to find that thread. And from it I 
+see I totally missed the iwmmxt path. :(
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 51 +++++++++++++++++++++++++-----------------------
- 1 file changed, 27 insertions(+), 24 deletions(-)
+>   __und_usr:
+>   	usr_entry
+> +	enable_irq
+> The problem is that you can be preempted here and parts of the kernel
+> may not cope with this.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 6eb54ae97470..509f01f054d9 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -79,7 +79,6 @@
- 
- #define ARM_SMMU_PTE_CONT_SIZE		(PAGE_SIZE * ARM_SMMU_PTE_CONT_ENTRIES)
- #define ARM_SMMU_PTE_CONT_MASK		(~(ARM_SMMU_PTE_CONT_SIZE - 1))
--#define ARM_SMMU_PTE_HWTABLE_SIZE	(PTRS_PER_PTE * sizeof(pte_t))
- 
- /* Stage-1 PTE */
- #define ARM_SMMU_PTE_AP_UNPRIV		(((pteval_t)1) << 6)
-@@ -632,6 +631,28 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
-+				   size_t size)
-+{
-+	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
-+
-+
-+	/* Ensure new page tables are visible to the hardware walker */
-+	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK) {
-+		dsb();
-+	} else {
-+		/*
-+		 * If the SMMU can't walk tables in the CPU caches, treat them
-+		 * like non-coherent DMA since we need to flush the new entries
-+		 * all the way out to memory. There's no possibility of
-+		 * recursion here as the SMMU table walker will not be wired
-+		 * through another SMMU.
-+		 */
-+		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
-+				DMA_TO_DEVICE);
-+	}
-+}
-+
- static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- {
- 	u32 reg;
-@@ -715,6 +736,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	}
- 
- 	/* TTBR0 */
-+	arm_smmu_flush_pgtable(smmu, root_cfg->pgd,
-+			       PTRS_PER_PGD * sizeof(pgd_t));
- 	reg = __pa(root_cfg->pgd);
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0_LO);
- 	reg = (phys_addr_t)__pa(root_cfg->pgd) >> 32;
-@@ -1177,23 +1200,6 @@ static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
- 		arm_smmu_domain_remove_master(smmu_domain, master);
- }
- 
--static void arm_smmu_flush_pgtable(struct arm_smmu_device *smmu, void *addr,
--				   size_t size)
--{
--	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
--
--	/*
--	 * If the SMMU can't walk tables in the CPU caches, treat them
--	 * like non-coherent DMA since we need to flush the new entries
--	 * all the way out to memory. There's no possibility of recursion
--	 * here as the SMMU table walker will not be wired through another
--	 * SMMU.
--	 */
--	if (!(smmu->features & ARM_SMMU_FEAT_COHERENT_WALK))
--		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
--			     DMA_TO_DEVICE);
--}
--
- static bool arm_smmu_pte_is_contiguous_range(unsigned long addr,
- 					     unsigned long end)
- {
-@@ -1214,8 +1220,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 		if (!table)
- 			return -ENOMEM;
- 
--		arm_smmu_flush_pgtable(smmu, page_address(table),
--				       ARM_SMMU_PTE_HWTABLE_SIZE);
-+		arm_smmu_flush_pgtable(smmu, page_address(table), PAGE_SIZE);
- 		if (!pgtable_page_ctor(table)) {
- 			__free_page(table);
- 			return -ENOMEM;
-@@ -1321,6 +1326,7 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
- 		if (!pmd)
- 			return -ENOMEM;
- 
-+		arm_smmu_flush_pgtable(smmu, pmd, PAGE_SIZE);
- 		pud_populate(NULL, pud, pmd);
- 		arm_smmu_flush_pgtable(smmu, pud, sizeof(*pud));
- 
-@@ -1353,6 +1359,7 @@ static int arm_smmu_alloc_init_pud(struct arm_smmu_device *smmu, pgd_t *pgd,
- 		if (!pud)
- 			return -ENOMEM;
- 
-+		arm_smmu_flush_pgtable(smmu, pud, PAGE_SIZE);
- 		pgd_populate(NULL, pgd, pud);
- 		arm_smmu_flush_pgtable(smmu, pgd, sizeof(*pgd));
- 
-@@ -1421,10 +1428,6 @@ static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
- out_unlock:
- 	spin_unlock(&smmu_domain->lock);
- 
--	/* Ensure new page tables are visible to the hardware walker */
--	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
--		dsb();
--
- 	return ret;
- }
- 
--- 
-1.8.2.2
+A very close analogue to this code is vector_swi. As far as I can see, 
+having interrupts+preemption enabled in this __und_usr section should be 
+as safe as it is there, so I'm pretty confident there shouldn't be a 
+general kernel issue. But...
+
+> The reason I haven't pushed my patches to mainline is that I was worried
+> about such preemption cases. We enter iwmmxt_task_enable for example
+> with interrupts and preemption enabled, we disable preemption there but
+> is it too late? I don't have a way to test these and even for VFP I'm
+> not sure testing would guarantee it in all scenarios.
+
+The only concern I can see - and it's a big one - is that of how a HW 
+coprocessor responds. If the coprocessor bounces an instruction, and we 
+switch context before reaching the support code, will the hardware and 
+its support code cope - both with switching to another context in that 
+state, and handling the original bounce in this context when we get back?
+
+I know that because they're asynchronous, the FPA+VFP have always had to 
+cope with possible pre-emption in the window between them deciding they 
+need support and their next opportunity to bounce an instruction; but 
+what if they get pre-empted between a bounce being generated and the 
+support code processing it?
+
+The VFP code did take pains to increment the pre-emption count before 
+enabling interrupts, but it's not obvious whether it requires no 
+pre-emption between the bounce and handler, or just no pre-emption 
+during the handler.
+
+For the FPA, we only have FPA emulation, not FPA support code, so 
+nothing to worry about there.
+
+What about the iwmmxt and the crunchbits? They are only lazy-enable 
+routines, to activate an inactive coprocessor. Which I think makes them 
+safe. If we schedule before reaching the handler, when this context is 
+returned to, the coprocessor must still be disabled in our context - the 
+handler can proceed to enable it. And there can't be any other context 
+state to worry about, assuming the lazy enable scheme works.
+
+Personally, I've always wondered why ARM never implemented a CP15 
+register you could read to find out what instruction generated a SWI or 
+undefined instruction exception, to save all this hassle. It's always 
+seemed to me like an obvious addition, ever since the I+D caches were 
+split; why do I have to load my code into the data cache?
+
+> So it needs more thinking. Please have a look at my patches, if we get
+> to the conclusion there is no issue, I'll push them upstream.
+>
+I think if there's a problem, it will be in the VFP code - the others 
+seem straightforward.  The interrupt enable has to be made safe - as 
+long as another core can age a page before the handler is reached, the 
+VFP support code will /have/ to be able to cope with pre-emption between 
+the fault and handler, if it doesn't already. We need a VFP expert to 
+figure it out properly.
+
+We will stress test your posted patch for our failure case, which is 
+Android skipping VFP instructions thanks to the extra irqs_disabled() 
+patch in do_page_fault().
+
+I think we should also include the fixup handler modification from my 
+patch -  I think __und_usr having a fixup handler that skips the 
+instruction if do_page_fault fails is just asking for trouble, so it 
+should be aligned with vector_swi so it retries.
+
+I share Alexey's Ignatov's concern that your patch ends up running the 
+support code with interrupts either on or off depending on whether you 
+came from user or supervisor mode, which feels a little odd. But then, 
+always enabling interrupts like the current code does, when they might 
+have been off in the SVC mode context, also seems wrong.
+
+I did ponder for my version whether the __und_svc path should restore 
+original IRQ status before going to call_fpe, to make the handler entry 
+environment more uniform -  IRQ status would always be as in original 
+context.
+
+Maybe it's a fine detail, as we don't really expect to be handling any 
+of these instructions from the kernel anyway, but if we are going to the 
+trouble to send __und_svc to handlers rather than going straight to 
+__und_svc_fault...
+
+Kevin
