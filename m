@@ -1,36 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:47:38 +0900
-Subject: [PATCH 0/2] sh_sci updates for v3.15
-Message-ID: <1391669260-23970-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Feb 2014 15:47:39 +0900
+Subject: [PATCH 1/2] serial: sh-sci: Restrict non-COMPILE_TEST compilation
+In-Reply-To: <1391669260-23970-1-git-send-email-horms+renesas@verge.net.au>
+References: <1391669260-23970-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1391669260-23970-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-for the v3.14 release you asked me to handle merging sh_sci
-updates through my renesas tree as there were circular dependencies between
-sh_sci and Renesas SoC code.
+Hardware supported by the driver is only found on SUPERH or
+ARCH_SHMOBILE platforms. Restrict non-COMPILE_TEST compilation to them.
 
-While I am happy to keep doing this for v3.15 and beyond as the
-motivation above no longer exists I assume that you would like
-to go back to handling sh_sci patches through your tree.
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/tty/serial/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-If that is the case then please consider this series for v3.15.
-It consists of two patches that were sitting in my tree but
-didn't make the cut for v3.14 (the arm-soc window for that closed
-over a month ago).
-
-Otherwise I will queue them, and other sh_sci patches that have been
-more recently posted by others, up in my renesas tree.
-
-
-Laurent Pinchart (2):
-  serial: sh-sci: Restrict non-COMPILE_TEST compilation
-  serial: sh-sci: Fix compatible string in DT bindings example
-
- Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 2 +-
- drivers/tty/serial/Kconfig                                      | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index a3815ea..923d3de 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -708,7 +708,8 @@ config SERIAL_IP22_ZILOG_CONSOLE
+ 
+ config SERIAL_SH_SCI
+ 	tristate "SuperH SCI(F) serial port support"
+-	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
++	depends on HAVE_CLK
++	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
+ 	select SERIAL_CORE
+ 
+ config SERIAL_SH_SCI_NR_UARTS
 -- 
 1.8.5.2
