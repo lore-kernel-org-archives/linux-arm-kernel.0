@@ -1,50 +1,29 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 06 Feb 2014 11:28:52 +0100
-Subject: [PATCH] ARM: shmobile: r8a7790: Correct SYS DMAC clock defines
-In-Reply-To: <1391646301-20197-1-git-send-email-horms+renesas@verge.net.au>
-References: <1391646301-20197-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1910899.86Rh9nDz51@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Feb 2014 10:29:09 +0000
+Subject: [PATCH] arm64: Change misleading function names in dma-mapping
+In-Reply-To: <20140206100909.GC26035@mudshark.cambridge.arm.com>
+References: <CAD15agZzJ4=RMbky+GymJbyktLz0PO+uZ-GOh1SbvH476k4hzA@mail.gmail.com>
+ <20140206100909.GC26035@mudshark.cambridge.arm.com>
+Message-ID: <20140206102909.GA29446@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-Thank you for the patch.
-
-On Thursday 06 February 2014 09:25:01 Simon Horman wrote:
-> This brings the implementation into line with the documentation.
+On Thu, Feb 06, 2014 at 10:09:09AM +0000, Will Deacon wrote:
+> On Thu, Feb 06, 2014 at 06:28:22AM +0000, Ritesh Harjani wrote:
+> > 
+> > From: Ritesh Harjani <ritesh.harjani at gmail.com<mailto:ritesh.harjani@gmail.com>>
+> > 
+> > arm64_swiotlb_alloc/free_coherent name can be misleading
+> > somtimes with CMA support being enabled after this
+> > patch (c2104debc235b745265b64d610237a6833fd53)
+> > 
+> > Change this name to be more generic:
+> > arm64_dma_alloc/free_coherent
 > 
-> This problem was introduced when SYS DMAC clock defines were added by
-> ac991dce6498b5fc ("ARM: shmobile: r8a7790: Add clock index macros for DT
-> sources") in v3.13-rc2. I do not believe this results in any problems as
-> these defines do not appear to be used anywhere yet.
-> 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> I'm fine with this cosmetic change, but the (pre-existing) arm64 prefix looks
+> a little odd for a static function.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  include/dt-bindings/clock/r8a7790-clock.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/dt-bindings/clock/r8a7790-clock.h
-> b/include/dt-bindings/clock/r8a7790-clock.h index 859e9be..6548a5f 100644
-> --- a/include/dt-bindings/clock/r8a7790-clock.h
-> +++ b/include/dt-bindings/clock/r8a7790-clock.h
-> @@ -46,8 +46,8 @@
->  #define R8A7790_CLK_MSIOF1		8
->  #define R8A7790_CLK_MSIOF3		15
->  #define R8A7790_CLK_SCIFB2		16
-> -#define R8A7790_CLK_SYS_DMAC0		18
-> -#define R8A7790_CLK_SYS_DMAC1		19
-> +#define R8A7790_CLK_SYS_DMAC1		18
-> +#define R8A7790_CLK_SYS_DMAC0		19
-> 
->  /* MSTP3 */
->  #define R8A7790_CLK_TPU0		4
+Good point. I'm happy with a simpler __dma_alloc_coherent().
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
