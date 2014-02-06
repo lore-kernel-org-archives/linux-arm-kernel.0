@@ -1,77 +1,86 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 19:16:48 +0100
-Subject: [PATCH v2 1/9] clk: exynos4: Remove remnants of non-DT support
+Date: Thu, 06 Feb 2014 19:16:49 +0100
+Subject: [PATCH v2 2/9] clk: samsung: Provide common helpers for register
+ save/restore
 In-Reply-To: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
 References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391710616-14226-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1391710616-14226-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simplifies a bit clock initialization code by removing
-remnants of non-DT clock initialization, such as reg_base and xom values
-passed in function parameters.
+As suspend/resume handlers are being moved to SoC specific code, due to
+differencies in suspend/resume handling of particular SoCs, to minimize
+code duplication this patch provides common register save/restore
+helpers that save/restore given list of registers of clock controller.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/clk/samsung/clk.c | 32 ++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk.h | 10 ++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 010f071..12a9f28 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -908,12 +908,13 @@ static unsigned long exynos4_get_xom(void)
- 	return xom;
- }
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index f503f32..c0a716b 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -22,6 +22,38 @@ static struct clk_onecell_data clk_data;
+ #endif
  
--static void __init exynos4_clk_register_finpll(unsigned long xom)
-+static void __init exynos4_clk_register_finpll(void)
- {
- 	struct samsung_fixed_rate_clock fclk;
- 	struct clk *clk;
- 	unsigned long finpll_f = 24000000;
- 	char *parent_name;
-+	unsigned int xom = exynos4_get_xom();
- 
- 	parent_name = xom & 1 ? "xusbxti" : "xxti";
- 	clk = clk_get(NULL, parent_name);
-@@ -1038,9 +1039,10 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
- 
- /* register exynos4 clocks */
- static void __init exynos4_clk_init(struct device_node *np,
--				    enum exynos4_soc exynos4_soc,
--				    void __iomem *reg_base, unsigned long xom)
-+				    enum exynos4_soc exynos4_soc)
- {
-+	void __iomem *reg_base;
+ #ifdef CONFIG_PM_SLEEP
++void samsung_clk_save(void __iomem *base,
++				    struct samsung_clk_reg_dump *rd,
++				    unsigned int num_regs)
++{
++	for (; num_regs > 0; --num_regs, ++rd)
++		rd->value = readl(base + rd->offset);
++}
 +
- 	reg_base = of_iomap(np, 0);
- 	if (!reg_base)
- 		panic("%s: failed to map registers\n", __func__);
-@@ -1058,7 +1060,7 @@ static void __init exynos4_clk_init(struct device_node *np,
- 			ARRAY_SIZE(exynos4_fixed_rate_ext_clks),
- 			ext_clk_match);
++void samsung_clk_restore(void __iomem *base,
++				      const struct samsung_clk_reg_dump *rd,
++				      unsigned int num_regs)
++{
++	for (; num_regs > 0; --num_regs, ++rd)
++		writel(rd->value, base + rd->offset);
++}
++
++struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(unsigned long *rdump,
++							unsigned long nr_rdump)
++{
++	struct samsung_clk_reg_dump *rd;
++	unsigned int i;
++
++	rd = kcalloc(nr_rdump, sizeof(*rd), GFP_KERNEL);
++	if (!rd)
++		return NULL;
++
++	for (i = 0; i < nr_rdump; ++i)
++		rd[i].offset = rdump[i];
++
++	return rd;
++}
++
+ static struct samsung_clk_reg_dump *reg_dump;
+ static unsigned long nr_reg_dump;
  
--	exynos4_clk_register_finpll(xom);
-+	exynos4_clk_register_finpll();
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 31b4174..ec8d46b 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -340,4 +340,14 @@ extern void __init samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
  
- 	if (exynos4_soc == EXYNOS4210) {
- 		samsung_clk_register_mux(exynos4210_mux_early,
-@@ -1136,12 +1138,12 @@ static void __init exynos4_clk_init(struct device_node *np,
+ extern unsigned long _get_rate(const char *clk_name);
  
- static void __init exynos4210_clk_init(struct device_node *np)
- {
--	exynos4_clk_init(np, EXYNOS4210, NULL, exynos4_get_xom());
-+	exynos4_clk_init(np, EXYNOS4210);
- }
- CLK_OF_DECLARE(exynos4210_clk, "samsung,exynos4210-clock", exynos4210_clk_init);
- 
- static void __init exynos4412_clk_init(struct device_node *np)
- {
--	exynos4_clk_init(np, EXYNOS4X12, NULL, exynos4_get_xom());
-+	exynos4_clk_init(np, EXYNOS4X12);
- }
- CLK_OF_DECLARE(exynos4412_clk, "samsung,exynos4412-clock", exynos4412_clk_init);
++extern void samsung_clk_save(void __iomem *base,
++			     struct samsung_clk_reg_dump *rd,
++			     unsigned int num_regs);
++extern void samsung_clk_restore(void __iomem *base,
++				const struct samsung_clk_reg_dump *rd,
++				unsigned int num_regs);
++extern struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(
++							unsigned long *rdump,
++							unsigned long nr_rdump);
++
+ #endif /* __SAMSUNG_CLK_H */
 -- 
 1.8.5.2
