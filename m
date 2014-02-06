@@ -1,51 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Feb 2014 09:32:59 +0100
-Subject: [PATCH] backlight: add PWM dependencies
-In-Reply-To: <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
-References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
- <000401cf222f$43263b20$c972b160$%han@samsung.com>
- <CACRpkdbB8LFM0Vu8VRo4niqxwxUdS-c5gmmWaxbUTbnLCLZbMA@mail.gmail.com>
- <000101cf2307$97a3c770$c6eb5650$%han@samsung.com>
- <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
-Message-ID: <CACRpkda6SFeDKftn7he++dbkuqHwMF5M5ZbucmiWfASfJq0GbA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  6 Feb 2014 17:36:11 +0900
+Subject: [PATCH v8 0/4] Add ethernet support for r7s72100
+Message-ID: <1391675773-5430-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 8:23 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+From: Simon Horman <horms@verge.net.au>
 
-> In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", it makes
-> the problem.
->
-> The HAVE_PWM symbol is only for legacy platforms that provide
-> the PWM API without using the generic framework. PXA looks to
-> use the generic PWM framework. Then, how about removing
-> "select HAVE_PWM" from PXA as below?
->
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
->  config MACH_PXA3XX_DT
->         bool "Support PXA3xx platforms from device tree"
->         select CPU_PXA300
-> -       select HAVE_PWM
->         select POWER_SUPPLY
->         select PXA3xx
->         select USE_OF
-> @@ -23,12 +22,10 @@ config ARCH_LUBBOCK
->
->  config MACH_MAINSTONE
->         bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
-> -       select HAVE_PWM
->         select PXA27x
->
->  config MACH_ZYLONITE
->         bool
-> -       select HAVE_PWM
->         select PXA3xx
+Hi,
 
-Looks like the right solution to me.
+this series integrates ethernet support to sh-pfc for the r7s72100 SoC
+and Genmai board.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+This series is based on renesas-devel-v3.14-rc1-20140204
+but patches from topic/r7s72100-v3.14-rc1-20140206 are required
+in order to boot the Genmai board.
 
-Yours,
-Linus Walleij
+
+There are no changes to these patches since v7,
+however driver patches included in that series have
+been dropped as they are present in v3.14-rc1.
+
+Simon Horman (2):
+  ARM: shmobile: r7s72100: Add clock for r7s72100-ether
+  ARM: shmobile: genmai: Enable r7s72100-ether
+
+ arch/arm/mach-shmobile/board-genmai.c   | 21 +++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-r7s72100.c |  4 ++++
+ 2 files changed, 25 insertions(+)
+
+-- 
+1.8.5.2
