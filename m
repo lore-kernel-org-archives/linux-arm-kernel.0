@@ -1,67 +1,48 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 06 Feb 2014 11:24:21 +0900
-Subject: [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
-In-Reply-To: <20140205140450.GE5196@lee--X1>
-References: <1390911522-28209-1-git-send-email-k.kozlowski@samsung.com>
- <1390911522-28209-12-git-send-email-k.kozlowski@samsung.com>
- <52F18A08.6070409@samsung.com> <1391596810.3726.5.camel@AMDC1943>
- <20140205140450.GE5196@lee--X1>
-Message-ID: <52F2F255.90705@samsung.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 6 Feb 2014 11:28:24 +0900
+Subject: [PATCH 5/5] ARM: tegra: cpuidle: use firmware call for power down
+In-Reply-To: <52F266A2.1030503@wwwdotorg.org>
+References: <1390299016-14105-1-git-send-email-acourbot@nvidia.com>
+ <1390299016-14105-6-git-send-email-acourbot@nvidia.com>
+ <52E02DCC.1000404@wwwdotorg.org>
+ <CAAVeFuKLtC62+bujY4724hMV_6M8Ow0s=6zRn_M87VX4PHQgxA@mail.gmail.com>
+ <52F266A2.1030503@wwwdotorg.org>
+Message-ID: <52F2F348.3000502@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2014 11:04 PM, Lee Jones wrote:
->>> Following patch has conflict on extcon-next branch(Linus 3.14-rc1)
->>> when apply patchset by using git am.
+On 02/06/2014 01:28 AM, Stephen Warren wrote:
+> On 01/23/2014 12:39 AM, Alexandre Courbot wrote:
+>> On Thu, Jan 23, 2014 at 5:45 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 01/21/2014 03:10 AM, Alexandre Courbot wrote:
+>>>> Invoke the do_idle() firmware call before suspending a CPU so that the
+>>>> underlying firmware (if any) can take necessary action.
 >>>
->>> [PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
->>> [PATCH 12/18] extcon: max14577: Choose muic_irqs according to device type
->>> [PATCH 14/18] extcon: max14577: Add support for max77836
+>>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
 >>>
->>> The base commit of this patchset isn't mainline. You need to rebase this patchset 
->>> on extcon-next branch and please resend this patchset.
-> 
-> <snip>
-> 
->> This patch patch (along with other) depends on previous rename patches
->> from this patchset:
->> [PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols to prepare
->> for max77836
->> http://article.gmane.org/gmane.linux.kernel/1636674
+>>>> @@ -45,6 +46,8 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>>>>
+>>>>        clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+>>>>
+>>>> +     call_firmware_op(do_idle);
+>>>> +
+>>>>        cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>>>>
+>>>>        clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+>>>
+>>> Don't you need to have the kernel also *not* do something when entering
+>>> idle; doesn't the FW op replace some of the register writes that the
+>>> kernel would otherwise be doing?
 >>
->> I can resolve the conflict but then they will return on applying patch
->> 7/18.
->>
->> I think this patch may wait for a little until the rename-like patches
->> will be accepted.
->>
->> Can you ACK other patches touch extcon?
->>  - [PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols...
->>  - [PATCH 08/18] mfd: max14577: Rename state container to maxim_core
->>  - [PATCH 09/18] mfd: max14577: Add "muic" suffix to regmap and irq_chip
-> 
-> If you can obtain Acks for all of the patches, I can apply the entire
-> patch-set to an immutable branch and issue a pull-request for the
-> other maintainers to pull from.
-> 
+>> It seems like the operation is actually to inform the firmware that we
+>> are going to suspend the CPU. Downstream kernel also uses it that way.
+>> But you are right in that we should expect do_idle() to actually
+>> perform the suspend operation. Maybe a prepare_idle() operation should
+>> be added to the firmware interface for this purpose?
+>
+> That sounds like a reasonable change. Is it easy to plumb in?
 
-Hi Lee,
-
-OK, I agree your opionion.
-I'd like you to apply this patchset dependent on extcon subsytem
-on your tree. I acked on following patchset and tested all of this patchset series.
-
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-[PATCH 06/18] extcon: max14577: Change extcon name instead of static name according to device type
-- I will delete this patch([PATCH 06/18]) on extcon-next branch.
-[PATCH 07/18] mfd: max14577: Rename and add MAX14577 symbols...
-[PATCH 08/18] mfd: max14577: Rename state container to maxim_core
-[PATCH 09/18] mfd: max14577: Add "muic" suffix to regmap and irq_chip
-
-[PATCH 11/18] extcon: max14577: Add max14577 prefix to muic_irqs
-[PATCH 12/18] extcon: max14577: Choose muic_irqs according to device type
-[PATCH 14/18] extcon: max14577: Add support for max77836
+I think so. Will post a v2 of this soon.
 
 Thanks,
-Chanwoo Choi
+Alex.
