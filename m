@@ -1,51 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:47 +0900
-Subject: [PATCH 12/17] ARM: shmobile: r8a7791: Add SATA nodes to r8a7791.dtsi
+Date: Thu,  6 Feb 2014 15:20:48 +0900
+Subject: [PATCH 13/17] ARM: shmobile: koelsch: Enable SATA0 in
+ r8a7791-koelsch.dts
 In-Reply-To: <cover.1391665761.git.horms+renesas@verge.net.au>
 References: <cover.1391665761.git.horms+renesas@verge.net.au>
-Message-ID: <b8532c699a163702bfcadaaa4c23c4ff71b67eec.1391665761.git.horms+renesas@verge.net.au>
+Message-ID: <760c277b23973a3db181b2ae98d9a87f6e8f843e.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-This adds SATA[01] device nodes to r8a7791.dtsi.
+This enables SATA0 in Koelsch device tree.
+SATA1 is not available on Koelsch since
+its pinmux configuration is fixed to PCIe.
 
 Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 94e3cc1..d5cc362 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -366,6 +366,24 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index d30527d..74f0985 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -122,3 +122,7 @@
+ 		renesas,function = "scif1";
  	};
- 
-+	sata0: sata at ee300000 {
-+		compatible = "renesas,sata-r8a7791";
-+		reg = <0 0xee300000 0 0x2000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_SATA0>;
-+		status = "disabled";
-+	};
+ };
 +
-+	sata1: sata at ee500000 {
-+		compatible = "renesas,sata-r8a7791";
-+		reg = <0 0xee500000 0 0x2000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_SATA1>;
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
++&sata0 {
++	status = "okay";
++};
 -- 
 1.8.5.2
