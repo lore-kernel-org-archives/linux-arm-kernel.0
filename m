@@ -1,273 +1,123 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 6 Feb 2014 11:44:30 +0530
-Subject: [PATCH V4 4/8] phy: st-miphy-40lp: Add skeleton driver
-In-Reply-To: <52F32549.5010303@ti.com>
-References: <cover.1391661589.git.pratyush.anand@st.com>
- <8596e7596e0dfa9a487c4c2deb325bbdf785e55e.1391661589.git.pratyush.anand@st.com>
- <52F32549.5010303@ti.com>
-Message-ID: <20140206061430.GA2394@pratyush-vbox>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  6 Feb 2014 15:15:26 +0900
+Subject: [PATCH] ARM: shmobile: wait for MSTP clock status to toggle,
+ when enabling it
+In-Reply-To: <cover.1391651474.git.horms+renesas@verge.net.au>
+References: <cover.1391651474.git.horms+renesas@verge.net.au>
+Message-ID: <a028c6da34d434e35ba8322568c756ea97ff3c18.1391651474.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-On Thu, Feb 06, 2014 at 02:01:45PM +0800, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Thursday 06 February 2014 10:14 AM, Pratyush Anand wrote:
-> > ST miphy-40lp supports PCIe, SATA and Super Speed USB. This driver adds
-> > skeleton support for the same.
-> > 
-> > Currently phy ops are returning -EINVAL. They can be elaborated
-> > depending on the SOC being supported in future.
-> > 
-> > Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> > Tested-by: Mohit Kumar <mohit.kumar@st.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> > Cc: spear-devel at list.st.com
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  .../devicetree/bindings/phy/st-miphy40lp.txt       |  12 ++
-> >  drivers/phy/Kconfig                                |   6 +
-> >  drivers/phy/Makefile                               |   1 +
-> >  drivers/phy/phy-miphy40lp.c                        | 174 +++++++++++++++++++++
-> >  4 files changed, 193 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/st-miphy40lp.txt
-> >  create mode 100644 drivers/phy/phy-miphy40lp.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/st-miphy40lp.txt b/Documentation/devicetree/bindings/phy/st-miphy40lp.txt
-> > new file mode 100644
-> > index 0000000..d0c7096
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/phy/st-miphy40lp.txt
-> > @@ -0,0 +1,12 @@
-> > +Required properties:
-> > +- compatible : should be "st,miphy40lp-phy"
-> > +	Other supported soc specific compatible:
-> > +		"st,spear1310-miphy"
-> > +		"st,spear1340-miphy"
-> > +- reg : offset and length of the PHY register set.
-> > +- misc: phandle for the syscon node to access misc registers
-> > +- phy-id: Instance id of the phy.
-> > +- #phy-cells : from the generic PHY bindings, must be 1.
-> > +	- 1st cell: phandle to the phy node.
-> > +	- 2nd cell: 0 if phy (in 1st cell) is to be used for SATA, 1 for PCIe
-> > +	  and 2 for Super Speed USB.
-> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> > index afa2354..2f58993 100644
-> > --- a/drivers/phy/Kconfig
-> > +++ b/drivers/phy/Kconfig
-> > @@ -64,4 +64,10 @@ config BCM_KONA_USB2_PHY
-> >  	help
-> >  	  Enable this to support the Broadcom Kona USB 2.0 PHY.
-> >  
-> > +config PHY_ST_MIPHY40LP
-> > +	tristate "ST MIPHY 40LP driver"
-> > +	help
-> > +	  Support for ST MIPHY 40LP which can be used for PCIe, SATA and Super Speed USB.
-> > +	select GENERIC_PHY
-> > +
-> >  endmenu
-> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> > index b57c253..c061091 100644
-> > --- a/drivers/phy/Makefile
-> > +++ b/drivers/phy/Makefile
-> > @@ -9,3 +9,4 @@ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
-> >  obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
-> >  obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
-> >  obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
-> > +obj-$(CONFIG_PHY_ST_MIPHY40LP)		+= phy-miphy40lp.o
-> > diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
-> > new file mode 100644
-> > index 0000000..d478c14
-> > --- /dev/null
-> > +++ b/drivers/phy/phy-miphy40lp.c
-> > @@ -0,0 +1,174 @@
-> > +/*
-> > + * ST MiPHY-40LP PHY driver
-> > + *
-> > + * Copyright (C) 2014 ST Microelectronics
-> > + * Pratyush Anand <pratyush.anand@st.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +#include <linux/delay.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/phy/phy.h>
-> > +#include <linux/regmap.h>
-> > +
-> > +enum phy_mode {
-> > +	SATA,
-> > +	PCIE,
-> > +	SS_USB,
-> > +};
-> > +
-> > +struct st_miphy40lp_priv {
-> > +	/* regmap for any soc specific misc registers */
-> > +	struct regmap		*misc;
-> > +	/* phy struct pointer */
-> > +	struct phy		*phy;
-> > +	/* device node pointer */
-> > +	struct device_node	*np;
-> > +	/* phy mode: 0 for SATA 1 for PCIe and 2 for SS-USB */
-> > +	enum phy_mode		mode;
-> > +	/* instance id of this phy */
-> > +	u32			id;
-> > +};
-> > +
-> > +static int miphy40lp_init(struct phy *phy)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int miphy40lp_exit(struct phy *phy)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int miphy40lp_power_off(struct phy *phy)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int miphy40lp_power_on(struct phy *phy)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static const struct of_device_id st_miphy40lp_of_match[] = {
-> > +	{ .compatible = "st,miphy40lp-phy" },
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, st_miphy40lp_of_match);
-> > +
-> > +static struct phy_ops st_miphy40lp_ops = {
-> > +	.init = miphy40lp_init,
-> > +	.exit = miphy40lp_exit,
-> > +	.power_off = miphy40lp_power_off,
-> > +	.power_on = miphy40lp_power_on,
-> > +	.owner		= THIS_MODULE,
-> 
-> Would prefer to either align all the fields or align none. Here only owner is
-> aligned.
+On r-/sh-mobile SoCs MSTP clocks are used by the runtime PM to dynamically
+enable and disable peripheral clocks. To make sure the clock has really
+started we have to read back its status register until it confirms success.
 
-ok.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/sh/clk/cpg.c   | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/sh_clk.h | 19 ++++++++++++-------
+ 2 files changed, 50 insertions(+), 7 deletions(-)
 
-> > +};
-> > +
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int miphy40lp_suspend(struct device *dev)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int miphy40lp_resume(struct device *dev)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> > +#endif
-> > +
-> > +static SIMPLE_DEV_PM_OPS(miphy40lp_pm_ops, miphy40lp_suspend,
-> > +		miphy40lp_resume);
-> > +
-> > +static struct phy *st_miphy40lp_xlate(struct device *dev,
-> > +					struct of_phandle_args *args)
-> > +{
-> > +	struct st_miphy40lp_priv *phypriv = dev_get_drvdata(dev);
-> > +
-> > +	if (args->args_count < 1) {
-> > +		dev_err(dev, "DT did not pass correct no of args\n");
-> > +		return NULL;
-> > +	}
-> > +
-> > +	phypriv->mode = args->args[0];
-> > +
-> > +	return phypriv->phy;
-> > +}
-> > +
-> > +static int __init st_miphy40lp_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct st_miphy40lp_priv *phypriv;
-> > +	struct phy_provider *phy_provider;
-> > +
-> > +	phypriv = devm_kzalloc(dev, sizeof(*phypriv), GFP_KERNEL);
-> > +	if (!phypriv) {
-> > +		dev_err(dev, "can't alloc miphy40lp private date memory\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	phypriv->np = dev->of_node;
-> > +
-> > +	phypriv->misc =
-> > +		syscon_regmap_lookup_by_phandle(dev->of_node, "misc");
-> > +	if (IS_ERR(phypriv->misc)) {
-> > +		dev_err(dev, "failed to find misc regmap\n");
-> > +		return PTR_ERR(phypriv->misc);
-> > +	}
-> > +
-> > +	if (of_property_read_u32(dev->of_node, "phy-id", &phypriv->id)) {
-> > +		dev_err(dev, "failed to find phy id\n");
-> > +		return -EINVAL;
-> > +	}
-> Do we really need this phy id? How is it being used?
-
-Yes , it is being used by patch 6/8.
-
-> 
-> > +
-> > +	phy_provider = devm_of_phy_provider_register(dev, st_miphy40lp_xlate);
-> > +	if (IS_ERR(phy_provider)) {
-> > +		dev_err(dev, "failed to register phy provider\n");
-> > +		return PTR_ERR(phy_provider);
-> > +	}
-> 
-> phy_provider_register should be the last step in registering the PHY. Or your
-> PHY call backs can be called before you create the PHY. Btw in your case you
-
-But every one else like  phy-exynos-mipi-video or phy-omap-usb2 or any
-other did it same way. First phy_provider_register and then
-phy_create.
-
-> should call dev_set_drvdata before doing phy_provider_register.
-
-yes, I need to correct it.
-
-> > +
-> > +	phypriv->phy = devm_phy_create(dev, &st_miphy40lp_ops, NULL);
-> > +	if (IS_ERR(phypriv->phy)) {
-> > +		dev_err(dev, "failed to create SATA PCIe PHY\n");
-> > +		return PTR_ERR(phypriv->phy);
-> > +	}
-> > +
-> > +	dev_set_drvdata(dev, phypriv);
-> > +	phy_set_drvdata(phypriv->phy, phypriv);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int __exit st_miphy40lp_remove(struct platform_device *pdev)
-> > +{
-> > +	return 0;
-> > +}
-> 
-> I think you can remove this empty 'remove' callback.
-
-Yaa.. Can be removed.
-
-Rgds
-Pratyush
-> 
-> Thanks
-> Kishon
+diff --git a/drivers/sh/clk/cpg.c b/drivers/sh/clk/cpg.c
+index 1ebe67c..7442bc1 100644
+--- a/drivers/sh/clk/cpg.c
++++ b/drivers/sh/clk/cpg.c
+@@ -36,9 +36,47 @@ static void sh_clk_write(int value, struct clk *clk)
+ 		iowrite32(value, clk->mapped_reg);
+ }
+ 
++static unsigned int r8(const void __iomem *addr)
++{
++	return ioread8(addr);
++}
++
++static unsigned int r16(const void __iomem *addr)
++{
++	return ioread16(addr);
++}
++
++static unsigned int r32(const void __iomem *addr)
++{
++	return ioread32(addr);
++}
++
+ static int sh_clk_mstp_enable(struct clk *clk)
+ {
+ 	sh_clk_write(sh_clk_read(clk) & ~(1 << clk->enable_bit), clk);
++	if (clk->status_reg) {
++		unsigned int (*read)(const void __iomem *addr);
++		int i;
++		void __iomem *mapped_status = (phys_addr_t)clk->status_reg -
++			(phys_addr_t)clk->enable_reg + clk->mapped_reg;
++
++		if (clk->flags & CLK_ENABLE_REG_8BIT)
++			read = r8;
++		else if (clk->flags & CLK_ENABLE_REG_16BIT)
++			read = r16;
++		else
++			read = r32;
++
++		for (i = 1000;
++		     (read(mapped_status) & (1 << clk->enable_bit)) && i;
++		     i--)
++			cpu_relax();
++		if (!i) {
++			pr_err("cpg: failed to enable %p[%d]\n",
++			       clk->enable_reg, clk->enable_bit);
++			return -ETIMEDOUT;
++		}
++	}
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/sh_clk.h b/include/linux/sh_clk.h
+index 60c7239..1f208b2 100644
+--- a/include/linux/sh_clk.h
++++ b/include/linux/sh_clk.h
+@@ -52,6 +52,7 @@ struct clk {
+ 	unsigned long		flags;
+ 
+ 	void __iomem		*enable_reg;
++	void __iomem		*status_reg;
+ 	unsigned int		enable_bit;
+ 	void __iomem		*mapped_reg;
+ 
+@@ -116,22 +117,26 @@ long clk_round_parent(struct clk *clk, unsigned long target,
+ 		      unsigned long *best_freq, unsigned long *parent_freq,
+ 		      unsigned int div_min, unsigned int div_max);
+ 
+-#define SH_CLK_MSTP(_parent, _enable_reg, _enable_bit, _flags)		\
++#define SH_CLK_MSTP(_parent, _enable_reg, _enable_bit, _status_reg, _flags) \
+ {									\
+ 	.parent		= _parent,					\
+ 	.enable_reg	= (void __iomem *)_enable_reg,			\
+ 	.enable_bit	= _enable_bit,					\
++	.status_reg	= _status_reg,					\
+ 	.flags		= _flags,					\
+ }
+ 
+-#define SH_CLK_MSTP32(_p, _r, _b, _f)					\
+-	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_32BIT)
++#define SH_CLK_MSTP32(_p, _r, _b, _f)				\
++	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_32BIT)
+ 
+-#define SH_CLK_MSTP16(_p, _r, _b, _f)					\
+-	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_16BIT)
++#define SH_CLK_MSTP32_STS(_p, _r, _b, _s, _f)			\
++	SH_CLK_MSTP(_p, _r, _b, _s, _f | CLK_ENABLE_REG_32BIT)
+ 
+-#define SH_CLK_MSTP8(_p, _r, _b, _f)					\
+-	SH_CLK_MSTP(_p, _r, _b, _f | CLK_ENABLE_REG_8BIT)
++#define SH_CLK_MSTP16(_p, _r, _b, _f)				\
++	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_16BIT)
++
++#define SH_CLK_MSTP8(_p, _r, _b, _f)				\
++	SH_CLK_MSTP(_p, _r, _b, 0, _f | CLK_ENABLE_REG_8BIT)
+ 
+ int sh_clk_mstp_register(struct clk *clks, int nr);
+ 
+-- 
+1.8.5.2
