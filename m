@@ -1,36 +1,116 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:50 +0900
-Subject: [PATCH 15/17] ARM: shmobile: lager: Enable SATA1 in r8a7790-lager.dts
+Date: Thu,  6 Feb 2014 15:20:52 +0900
+Subject: [PATCH 17/17] ARM: shmobile: r8a7790: Replace IRQ type numerical
+ values with macros
 In-Reply-To: <cover.1391665761.git.horms+renesas@verge.net.au>
 References: <cover.1391665761.git.horms+renesas@verge.net.au>
-Message-ID: <c6181b9f06b0821e8d34e47174e044801f03edce.1391665761.git.horms+renesas@verge.net.au>
+Message-ID: <1f4c745b2c5a083c49dc11d2f0827d9a381f1ee1.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This enables SATA1 in Lager device tree.
-SATA0 is not available on Lager since its
-pinmux is fixed to USB3.0.
+Replace the hardcoded value 4 with IRQ_TYPE_LEVEL_HIGH.
 
-Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 57569cb..1081c5e 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -91,3 +91,7 @@
- 	non-removable;
- 	status = "okay";
- };
-+
-+&sata1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 51c8978..ba0ef9a 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -304,7 +304,7 @@
+ 		compatible = "renesas,scifa-r8a7790", "renesas,scifa";
+ 		reg = <0 0xe6c40000 0 64>;
+ 		interrupt-parent = <&gic>;
+-		interrupts = <0 144 4>;
++		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -314,7 +314,7 @@
+ 		compatible = "renesas,scifa-r8a7790", "renesas,scifa";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6c50000 0 64>;
+-		interrupts = <0 145 4>;
++		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -324,7 +324,7 @@
+ 		compatible = "renesas,scifa-r8a7790", "renesas,scifa";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6c60000 0 64>;
+-		interrupts = <0 151 4>;
++		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -334,7 +334,7 @@
+ 		compatible = "renesas,scifb-r8a7790", "renesas,scifb";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6c20000 0 64>;
+-		interrupts = <0 148 4>;
++		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -344,7 +344,7 @@
+ 		compatible = "renesas,scifb-r8a7790", "renesas,scifb";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6c30000 0 64>;
+-		interrupts = <0 149 4>;
++		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -354,7 +354,7 @@
+ 		compatible = "renesas,scifb-r8a7790", "renesas,scifb";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6ce0000 0 64>;
+-		interrupts = <0 150 4>;
++		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -364,7 +364,7 @@
+ 		compatible = "renesas,scif-r8a7790", "renesas,scif";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6e60000 0 64>;
+-		interrupts = <0 152 4>;
++		interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -374,7 +374,7 @@
+ 		compatible = "renesas,scif-r8a7790", "renesas,scif";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe6e68000 0 64>;
+-		interrupts = <0 153 4>;
++		interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -384,7 +384,7 @@
+ 		compatible = "renesas,hscif-r8a7790", "renesas,hscif";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe62c0000 0 96>;
+-		interrupts = <0 154 4>;
++		interrupts = <0 154 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF0>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+@@ -394,7 +394,7 @@
+ 		compatible = "renesas,hscif-r8a7790", "renesas,hscif";
+ 		interrupt-parent = <&gic>;
+ 		reg = <0 0xe62c8000 0 96>;
+-		interrupts = <0 155 4>;
++		interrupts = <0 155 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF1>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
 -- 
 1.8.5.2
