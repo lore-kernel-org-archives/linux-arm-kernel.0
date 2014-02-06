@@ -1,64 +1,79 @@
 From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 6 Feb 2014 10:14:48 +0530
-Subject: [PATCH V4 1/8] clk: SPEAr13xx: Fix pcie clock name
+Date: Thu, 6 Feb 2014 10:14:50 +0530
+Subject: [PATCH V4 3/8] SPEAr13xx: defconfig: Update
 In-Reply-To: <cover.1391661589.git.pratyush.anand@st.com>
 References: <cover.1391661589.git.pratyush.anand@st.com>
-Message-ID: <af117110226e2dd90438233b03d3b72a5f7ee883.1391661589.git.pratyush.anand@st.com>
+Message-ID: <283802bf1d806903bc90e724906854087845f540.1391661589.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow dt clock naming convention for PCIe clocks.
+From: Mohit Kumar <mohit.kumar@st.com>
 
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Enable EABI, VFP and NFS configs in default configuration file for
+SPEAr13xx.
+
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Pratyush Anand <pratyush.anand@st.com>
 Cc: spear-devel at list.st.com
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/clk/spear/spear1310_clock.c | 6 +++---
- drivers/clk/spear/spear1340_clock.c | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/configs/spear13xx_defconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 65894f7..4daa597 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.0");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.1");
-+	clk_register_clkdev(clk, NULL, "b1800000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
- 
- 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.2");
-+	clk_register_clkdev(clk, NULL, "b4000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index fe835c1..5a5c664 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 82eaa55..1e0bb6f 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -14,10 +14,18 @@ CONFIG_MACH_SPEAR1340=y
+ CONFIG_SMP=y
+ # CONFIG_SMP_ON_UP is not set
+ # CONFIG_ARM_CPU_TOPOLOGY is not set
++CONFIG_AEABI=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+ CONFIG_MTD_OF_PARTS=y
+@@ -27,6 +35,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -66,6 +75,7 @@ CONFIG_USB=y
+ # CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+@@ -79,11 +89,14 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
++CONFIG_FUSE_FS=y
+ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=m
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=m
 -- 
 1.8.1.2
