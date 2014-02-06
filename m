@@ -1,70 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Feb 2014 11:03:15 +0100
-Subject: mv64xxx: I2C bus locked when scanning absent devices on Armada XP
-Message-ID: <52F35DE3.8060503@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 10:07:34 +0000
+Subject: IOMMU DMA-mapping API for arm64 ?
+In-Reply-To: <CAD15agaA9c1+0svk_d97ZEcaOg6x_PGcbKVHM9dWAZ_t1T8FXw@mail.gmail.com>
+References: <CAD15agaA9c1+0svk_d97ZEcaOg6x_PGcbKVHM9dWAZ_t1T8FXw@mail.gmail.com>
+Message-ID: <20140206100734.GB26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 06, 2014 at 05:05:45AM +0000, Ritesh Harjani wrote:
+> Hi everyone,
+> 
+> I tried looking for IOMMU support in ARM64 but what I was able to see is
+> only swiotlb is currently supported.
+> 
+> Based on my understanding for IOMMU support, we need DMA-MAPPING API to
+> have IOMMU ops field, similar to what is present in arm32.  I could see
+> the iommu field added in dev_archdata in below mentioned patch
+> (arch/arm64/include/asm/device.h), but there is no ops field in
+> arch/arm64/mm/dma-mapping.c ?
 
-I write this email mainly to let you know that there are some issues
-on i2c on the Armada XP (rev A0 and B0) based boards.
+Correct, there needs to be a way to plumb dma-mapping into the IOMMU layer.
 
-What we observed was that if the i2c driver try to access an address
-where the device is absent, then the bus is locked. After the timeout
-the driver give up, but if we have a lot of i2c client registered,
-then the kernel spend a lot of time trying to scan all the
-addresses. It is noticeable when using the multiv7_defconfig where
-many i2c clients are registered, whereas with mvebu_defconfig we have
-fewer i2c clients, and most of them are present on the boards.
+> I also saw one mail discussion between you guys on what is the best place
+> for adding iommu support in ARM64, but couldn't see any followed up
+> patches for the same.
+> 
+> Please tell us the current status/updates on the same. Your feedback will
+> be greatly appreciated.
 
-Here is an extract of what you can see during a boot:
+There are a few related topics here:
 
-[    4.127648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[    4.137338] rtc-s35390a 1-0030: rtc core: registered rtc-s35390a as rtc0
-[    6.137649] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[    8.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   10.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   12.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   14.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   16.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   18.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   20.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   22.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   24.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   26.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   28.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   30.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   32.137649] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   34.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   36.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   38.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   40.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   42.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   44.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   46.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   48.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   50.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   52.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   54.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   56.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   58.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   60.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   62.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-[   62.144403] sdhci: Secure Digital Host Controller Interface driver
+  (1) Moving a bunch of the boilerplate IOMMU code into a common place
+      (iommu-helper.c or similar). This is because we don't want to blindly
+      duplicate common code across architectures.
 
-Then the kernel continue to boot. and except this very annoying delay,
-everything else is working on i2c.
+  (2) Standardising at least part of a system topology description in
+      device-tree, so that we can deal with different combinations of
+      {coherent,nocoherent} device {with,without} a series of IOMMUs.
 
-If anyone have an idea of the cause of this issue, I would be glad to
-have any input.
+Once both of those are sorted, the actual plumbing should be fairly
+straightforward.
 
-I continue to investigate it, and for the record v3.12 was not
-affected but v3.13 was. So now I am going to bisect.
-
-Gregory
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
