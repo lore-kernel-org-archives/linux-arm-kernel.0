@@ -1,52 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Feb 2014 11:30:52 +0000
-Subject: [PATCH 5/6] arm64: barriers: wire up new barrier options
+Date: Thu,  6 Feb 2014 11:30:51 +0000
+Subject: [PATCH 4/6] iommu/arm-smmu: provide option to dsb macro when
+ publishing tables
 In-Reply-To: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
 References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1391686253-13436-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1391686253-13436-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all callers of the barrier macros are updated to pass the
-mandatory options, update the macros so the option is actually used.
+On coherent systems, publishing new page tables to the SMMU walker is
+achieved with a dsb instruction. In fact, this can be a dsb(ishst) which
+also provides the mandatory barrier option for arm64.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/barrier.h | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 09f4cb4b665e..b5219b651850 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -25,11 +25,12 @@
- #define wfi()		asm volatile("wfi" : : : "memory")
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 8911850c9444..8f6fee54f3b1 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1417,7 +1417,7 @@ out_unlock:
  
- #define isb()		asm volatile("isb" : : : "memory")
--#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
-+#define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
-+#define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
+ 	/* Ensure new page tables are visible to the hardware walker */
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+-		dsb();
++		dsb(ishst);
  
- #define mb()		dsb(sy)
--#define rmb()		asm volatile("dsb ld" : : : "memory")
--#define wmb()		asm volatile("dsb st" : : : "memory")
-+#define rmb()		dsb(ld)
-+#define wmb()		dsb(st)
- 
- #ifndef CONFIG_SMP
- #define smp_mb()	barrier()
-@@ -53,9 +54,9 @@ do {									\
- 
- #else
- 
--#define smp_mb()	asm volatile("dmb ish" : : : "memory")
--#define smp_rmb()	asm volatile("dmb ishld" : : : "memory")
--#define smp_wmb()	asm volatile("dmb ishst" : : : "memory")
-+#define smp_mb()	dmb(ish)
-+#define smp_rmb()	dmb(ishld)
-+#define smp_wmb()	dmb(ishst)
- 
- #define smp_store_release(p, v)						\
- do {									\
+ 	return ret;
+ }
 -- 
 1.8.2.2
