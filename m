@@ -1,56 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Feb 2014 11:20:39 +0000
-Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
-In-Reply-To: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
-References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
-Message-ID: <20140206112039.GA31054@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 6 Feb 2014 13:26:51 +0200
+Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+In-Reply-To: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+Message-ID: <52F3717B.6020809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 10:19:06PM +0200, Kevin Bracey wrote:
-> If an abort occurs while loading an instruction from user space in
-> __und_usr, the resulting do_page_fault() can output "sleeping function
-> called from invalid context" warnings, due to IRQs being disabled in
-> __und_usr, and hence in do_page_fault().
+Hi Illia,
+
+On 02/05/2014 05:06 PM, Illia Smyrnov wrote:
+> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
+> softreset bit cleaning right after set one. It is caused L3 error for
+> OMAP4 ISS because ISS register write occurs when ISS reset process is in
+> progress. Avoid this situation by cleaning softreset bit later, when reset
+> process is successfully finished.
 > 
-> Avoid the problem by enabling IRQs in __und_usr before attempting to
-> load the instruction, and modify code and comments in the undefined
-> instruction handlers to note that IRQs are enabled on entry iff the
-> instruction was executed in user mode.
+> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
+
+Thanks for the patch. Could you please send --cc this to stable as well. Thanks.
+
+cheers,
+-roger
+
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
 > 
-> See http://comments.gmane.org/gmane.linux.ports.arm.omap/59256 for
-> an earlier report of the observed might_sleep() warning.
-
-There was a follow-up on this:
-
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/263765
-
->  arch/arm/kernel/entry-armv.S       | 11 ++++++++---
->  arch/arm/mach-ep93xx/crunch-bits.S |  7 ++++++-
->  arch/arm/vfp/entry.S               |  2 +-
->  3 files changed, 15 insertions(+), 5 deletions(-)
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 42d8188..1f33f5d 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1947,29 +1947,31 @@ static int _ocp_softreset(struct omap_hwmod *oh)
+>  		goto dis_opt_clks;
+>  
+>  	_write_sysconfig(v, oh);
+> -	ret = _clear_softreset(oh, &v);
+> -	if (ret)
+> -		goto dis_opt_clks;
+> -
+> -	_write_sysconfig(v, oh);
+>  
+>  	if (oh->class->sysc->srst_udelay)
+>  		udelay(oh->class->sysc->srst_udelay);
+>  
+>  	c = _wait_softreset_complete(oh);
+> -	if (c == MAX_MODULE_SOFTRESET_WAIT)
+> +	if (c == MAX_MODULE_SOFTRESET_WAIT) {
+>  		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
+>  			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
+> -	else
+> +		ret = -ETIMEDOUT;
+> +		goto dis_opt_clks;
+> +	} else {
+>  		pr_debug("omap_hwmod: %s: softreset in %d usec\n", oh->name, c);
+> +	}
+> +
+> +	ret = _clear_softreset(oh, &v);
+> +	if (ret)
+> +		goto dis_opt_clks;
+> +
+> +	_write_sysconfig(v, oh);
+>  
+>  	/*
+>  	 * XXX add _HWMOD_STATE_WEDGED for modules that don't come back from
+>  	 * _wait_target_ready() or _reset()
+>  	 */
+>  
+> -	ret = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
+> -
+>  dis_opt_clks:
+>  	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
+>  		_disable_optional_clocks(oh);
 > 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index b3fb8c9..bed1567 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -399,6 +399,7 @@ ENDPROC(__irq_usr)
->  	.align	5
->  __und_usr:
->  	usr_entry
-> +	enable_irq
-
-The problem is that you can be preempted here and parts of the kernel
-may not cope with this.
-
-The reason I haven't pushed my patches to mainline is that I was worried
-about such preemption cases. We enter iwmmxt_task_enable for example
-with interrupts and preemption enabled, we disable preemption there but
-is it too late? I don't have a way to test these and even for VFP I'm
-not sure testing would guarantee it in all scenarios.
-
-So it needs more thinking. Please have a look at my patches, if we get
-to the conclusion there is no issue, I'll push them upstream.
-
--- 
-Catalin
