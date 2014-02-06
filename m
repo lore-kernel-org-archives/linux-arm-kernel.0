@@ -1,82 +1,31 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 06 Feb 2014 17:08:37 +0530
-Subject: [PATCH 08/51] arm,
- hw-breakpoint: Fix CPU hotplug callback registration
-In-Reply-To: <20140206113933.GJ26035@mudshark.cambridge.arm.com>
-References: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
- <20140205220603.19080.80971.stgit@srivatsabhat.in.ibm.com>
- <20140206105718.GG26035@mudshark.cambridge.arm.com>
- <52F3713A.3040407@linux.vnet.ibm.com>
- <20140206113933.GJ26035@mudshark.cambridge.arm.com>
-Message-ID: <52F3743D.3030105@linux.vnet.ibm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 11:45:59 +0000
+Subject: [PATCH 2/6] arm64: barriers: make use of barrier options with
+ explicit barriers
+In-Reply-To: <20140206114130.GJ29446@arm.com>
+References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+ <1391686253-13436-2-git-send-email-will.deacon@arm.com>
+ <20140206114130.GJ29446@arm.com>
+Message-ID: <20140206114559.GM26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 05:09 PM, Will Deacon wrote:
-> On Thu, Feb 06, 2014 at 11:25:46AM +0000, Srivatsa S. Bhat wrote:
->> Hi Will,
+On Thu, Feb 06, 2014 at 11:41:30AM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 11:30:49AM +0000, Will Deacon wrote:
+> > --- a/arch/arm64/include/asm/barrier.h
+> > +++ b/arch/arm64/include/asm/barrier.h
+> > @@ -20,14 +20,14 @@
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > -#define sev()		asm volatile("sev" : : : "memory")
+> > +#define sev(l)		asm volatile("sev" #l : : : "memory")
 > 
-> Hello,
-> 
->> On 02/06/2014 04:27 PM, Will Deacon wrote:
->>> On Wed, Feb 05, 2014 at 10:06:04PM +0000, Srivatsa S. Bhat wrote:
->>>> Subsystems that want to register CPU hotplug callbacks, as well as perform
->>>> initialization for the CPUs that are already online, often do it as shown
->>>> below:
->>>>
->>>> 	get_online_cpus();
->>>>
->>>> 	for_each_online_cpu(cpu)
->>>> 		init_cpu(cpu);
->>>>
->>>> 	register_cpu_notifier(&foobar_cpu_notifier);
->>>>
->>>> 	put_online_cpus();
->>>>
->>>> This is wrong, since it is prone to ABBA deadlocks involving the
->>>> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
->>>> with CPU hotplug operations).
->>>
->>> Hmm, the code in question (for this patch) runs from an arch_initcall. How
->>> can you generate CPU hotplug operations at that stage?
->>>
->>
->> You are right - in today's design of the init sequence, CPU hotplug
->> operations can't be triggered at that time during boot.
-> 
-> Phew, so we don't have a bug as the code stands today.
+> Would we actually ever use sev(l) form C? And it's a new instruction
+> rather than an argument to the existing sev.
 
-Yes, that's right.
+I don't know, but if it's not there then I'm pretty sure people will always
+use sev, even if sevl could be used. In fact, sev and sevl are both aliases
+of hint, so they're the same instruction with different immediate operands.
 
-> 
->> However, there have been proposals to boot CPUs in parallel along with the
->> rest of the kernel initialization [1] (and that would need full synchronization
->> with CPU hotplug even at the initcall stage). Of course this needs a lot of
->> auditing and modifications to the CPU hotplug notifiers of various subsystems
->> to make them robust enough to handle the parallel boot; so its not going to
->> happen very soon. But I felt that it would be a good idea to ensure that we
->> get the locking/synchronization right, even if the registrations happen very
->> early during boot today.. you know, just to be on the safer side and also to
->> make the job easier for whoever that is, who tries to implement parallel
->> CPU booting again in the future ;-)
->>
->> [1]. http://thread.gmane.org/gmane.linux.kernel/1246209
-> 
-> Makes sense, and this seems like a good start.
-> 
->>> so it's best if you take this all via your tree.
->>>
->>
->> Hmm.. I'm not a maintainer myself, so I'm hoping that either Oleg or Rusty
->> or any of the other CPU hotplug maintainers (Thomas/Peter/Ingo) would be
->> willing to take these patches through their tree.
-> 
-> Well, you can have my ack for this patch:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
-
-Great! Thanks a lot Will!
-
-Regards,
-Srivatsa S. Bhat
+Will
