@@ -1,36 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Feb 2014 12:28:20 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140206110016.GI26035@mudshark.cambridge.arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <20140206105442.GB4993@e106497-lin.cambridge.arm.com>
- <20140206110016.GI26035@mudshark.cambridge.arm.com>
-Message-ID: <2047274.53Y3xD1lQ0@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  6 Feb 2014 11:30:48 +0000
+Subject: [PATCH 1/6] arm64: barriers: allow dsb macro to take option parameter
+Message-ID: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 February 2014 11:00:16 Will Deacon wrote:
-> On Thu, Feb 06, 2014 at 10:54:42AM +0000, Liviu Dudau wrote:
-> > On Thu, Feb 06, 2014 at 08:54:03AM +0000, Anup Patel wrote:
-> > > On Tue, Feb 4, 2014 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > 
-> > This is another reason why I prefer the reg property for specifying the configuration
-> > space address range. I don't see a straight way of making the distinction you
-> > need using the ranges property.
-> 
-> Well if we need to distinguish cam vs ecam, then adding ioport to the mix
-> should be (conceptually) easy and I don't think it would involve the "reg"
-> property.
-> 
-> However, I'm not planning to add ioport support myself.
+The dsb instruction takes an option specifying both the target access
+types and shareability domain.
 
-Maybe it's better to have separate compatible strings for these cases,
-can call it "pci-ecam-generic" or "pci-cam-generic" to have an easy
-distinction. Or we just use the "reg-names" property so the device
-can have a "cam" register or an "ecam" register or both.
+This patch allows such an option to be passed to the dsb macro,
+resulting in potentially more efficient code. Currently the option is
+ignored until all callers are updated (unlike ARM, the option is
+mandated by the assembler).
 
-I don't think we can make the driver generic enough for
-x86 as Anup suggests though, since x86 has its own set of quirks to
-deal with the various PCI config space access methods.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-	Arnd
+Catalin -- I'd like to get this simple change in for 3.14, since it's a
+           blocker for actually implementing the barrier options (we
+	   need to move all of the callers over before making the switch).
+
+ arch/arm64/include/asm/barrier.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 78e20ba8806b..409ca370cfe2 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -25,7 +25,7 @@
+ #define wfi()		asm volatile("wfi" : : : "memory")
+ 
+ #define isb()		asm volatile("isb" : : : "memory")
+-#define dsb()		asm volatile("dsb sy" : : : "memory")
++#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
+ 
+ #define mb()		dsb()
+ #define rmb()		asm volatile("dsb ld" : : : "memory")
+-- 
+1.8.2.2
