@@ -1,188 +1,128 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 20:12:51 +0100
-Subject: [PATCH v2 06/12] ARM: SAMSUNG: pm: Move Samsung PM debug code into
+Date: Thu, 06 Feb 2014 20:12:52 +0100
+Subject: [PATCH v2 07/12] ARM: SAMSUNG: Move common save/restore helpers to
  separate file
 In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
 References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391713977-22300-7-git-send-email-t.figa@samsung.com>
+Message-ID: <1391713977-22300-8-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all Samsung SoC platforms are going to use the legacy Samsung PM
-code enabled by CONFIG_SAMSUNG_PM_DEBUG. To allow using Samsung PM debug
-helpers on such platforms, related code is moved to separate file and
-a plat/pm-common.h header is added to separate legacy and generic code.
+To separate legacy PM code from generic helpers, this patch moves the
+generic register save/restore helpers to a new file called pm-common.c
+that is compiled always when CONFIG_PM_SLEEP is enabled, to allow
+platforms that do not want to use the legacy PM code use the generic
+helpers.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
  arch/arm/plat-samsung/Makefile                 |  1 +
- arch/arm/plat-samsung/include/plat/pm-common.h | 70 ++++++++++++++++++
- arch/arm/plat-samsung/include/plat/pm.h        | 39 +---------
- arch/arm/plat-samsung/pm-debug.c               | 98 ++++++++++++++++++++++++++
- arch/arm/plat-samsung/pm.c                     | 85 ----------------------
- 5 files changed, 170 insertions(+), 123 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/pm-common.h
- create mode 100644 arch/arm/plat-samsung/pm-debug.c
+ arch/arm/plat-samsung/include/plat/pm-common.h | 26 +++++++++
+ arch/arm/plat-samsung/include/plat/pm.h        | 25 ---------
+ arch/arm/plat-samsung/pm-common.c              | 75 ++++++++++++++++++++++++++
+ arch/arm/plat-samsung/pm.c                     | 56 -------------------
+ 5 files changed, 102 insertions(+), 81 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/pm-common.c
 
 diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 9267d29..ba30a16 100644
+index ba30a16..25c826e 100644
 --- a/arch/arm/plat-samsung/Makefile
 +++ b/arch/arm/plat-samsung/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
+@@ -47,6 +47,7 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
+ 
+ # PM support
+ 
++obj-$(CONFIG_PM_SLEEP)		+= pm-common.o
  obj-$(CONFIG_SAMSUNG_PM)	+= pm.o
  obj-$(CONFIG_SAMSUNG_PM_GPIO)	+= pm-gpio.o
  obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
-+obj-$(CONFIG_SAMSUNG_PM_DEBUG)	+= pm-debug.o
- 
- obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- obj-$(CONFIG_SAMSUNG_WDT_RESET)	+= watchdog-reset.o
 diff --git a/arch/arm/plat-samsung/include/plat/pm-common.h b/arch/arm/plat-samsung/include/plat/pm-common.h
-new file mode 100644
-index 0000000..f72974a
---- /dev/null
+index f72974a..741723e 100644
+--- a/arch/arm/plat-samsung/include/plat/pm-common.h
 +++ b/arch/arm/plat-samsung/include/plat/pm-common.h
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ *	Tomasz Figa <t.figa@samsung.com>
-+ * Copyright (c) 2004 Simtec Electronics
-+ *	http://armlinux.simtec.co.uk/
-+ *	Written by Ben Dooks, <ben@simtec.co.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+@@ -13,6 +13,32 @@
+ #ifndef __PLAT_SAMSUNG_PM_COMMON_H
+ #define __PLAT_SAMSUNG_PM_COMMON_H __FILE__
+ 
++#include <linux/irq.h>
 +
-+#ifndef __PLAT_SAMSUNG_PM_COMMON_H
-+#define __PLAT_SAMSUNG_PM_COMMON_H __FILE__
-+
-+/* PM debug functions */
++/* sleep save info */
 +
 +/**
-+ * struct pm_uart_save - save block for core UART
-+ * @ulcon: Save value for S3C2410_ULCON
-+ * @ucon: Save value for S3C2410_UCON
-+ * @ufcon: Save value for S3C2410_UFCON
-+ * @umcon: Save value for S3C2410_UMCON
-+ * @ubrdiv: Save value for S3C2410_UBRDIV
++ * struct sleep_save - save information for shared peripherals.
++ * @reg: Pointer to the register to save.
++ * @val: Holder for the value saved from reg.
 + *
-+ * Save block for UART registers to be held over sleep and restored if they
-+ * are needed (say by debug).
-+*/
-+struct pm_uart_save {
-+	u32	ulcon;
-+	u32	ucon;
-+	u32	ufcon;
-+	u32	umcon;
-+	u32	ubrdiv;
-+	u32	udivslot;
++ * This describes a list of registers which is used by the pm core and
++ * other subsystem to save and restore register values over suspend.
++ */
++struct sleep_save {
++	void __iomem	*reg;
++	unsigned long	val;
 +};
 +
-+#ifdef CONFIG_SAMSUNG_PM_DEBUG
-+/**
-+ * s3c_pm_dbg() - low level debug function for use in suspend/resume.
-+ * @msg: The message to print.
-+ *
-+ * This function is used mainly to debug the resume process before the system
-+ * can rely on printk/console output. It uses the low-level debugging output
-+ * routine printascii() to do its work.
-+ */
-+extern void s3c_pm_dbg(const char *msg, ...);
++#define SAVE_ITEM(x) \
++	{ .reg = (x) }
 +
-+/**
-+ * s3c_pm_debug_init() - suspend/resume low level debug initialization.
-+ * @base: Virtual base of UART to use for suspend/resume debugging.
-+ *
-+ * This function needs to be called before S3C_PMDBG() can be used, to set up
-+ * UART port base address and configuration.
-+ */
-+extern void s3c_pm_debug_init(void);
++/* helper functions to save/restore lists of registers. */
 +
-+#define S3C_PMDBG(fmt...) s3c_pm_dbg(fmt)
++extern void s3c_pm_do_save(struct sleep_save *ptr, int count);
++extern void s3c_pm_do_restore(const struct sleep_save *ptr, int count);
++extern void s3c_pm_do_restore_core(const struct sleep_save *ptr, int count);
 +
-+extern void s3c_pm_save_uarts(void);
-+extern void s3c_pm_restore_uarts(void);
-+#else
-+#define S3C_PMDBG(fmt...) pr_debug(fmt)
-+#define s3c_pm_debug_init() do { } while (0)
-+
-+static inline void s3c_pm_save_uarts(void) { }
-+static inline void s3c_pm_restore_uarts(void) { }
-+#endif
-+
-+#endif
+ /* PM debug functions */
+ 
+ /**
 diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 21758c6..2e04396 100644
+index 2e04396..4099e8d 100644
 --- a/arch/arm/plat-samsung/include/plat/pm.h
 +++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -16,6 +16,7 @@
+@@ -15,7 +15,6 @@
+  * management
  */
  
- #include <linux/irq.h>
-+#include <plat/pm-common.h>
+-#include <linux/irq.h>
+ #include <plat/pm-common.h>
  
  struct device;
+@@ -59,30 +58,6 @@ extern unsigned long s3c_pm_flags;
  
-@@ -76,26 +77,6 @@ struct sleep_save {
- #define SAVE_ITEM(x) \
- 	{ .reg = (x) }
+ extern int s3c2410_cpu_suspend(unsigned long);
  
+-/* sleep save info */
+-
 -/**
-- * struct pm_uart_save - save block for core UART
-- * @ulcon: Save value for S3C2410_ULCON
-- * @ucon: Save value for S3C2410_UCON
-- * @ufcon: Save value for S3C2410_UFCON
-- * @umcon: Save value for S3C2410_UMCON
-- * @ubrdiv: Save value for S3C2410_UBRDIV
+- * struct sleep_save - save information for shared peripherals.
+- * @reg: Pointer to the register to save.
+- * @val: Holder for the value saved from reg.
 - *
-- * Save block for UART registers to be held over sleep and restored if they
-- * are needed (say by debug).
--*/
--struct pm_uart_save {
--	u32	ulcon;
--	u32	ucon;
--	u32	ufcon;
--	u32	umcon;
--	u32	ubrdiv;
--	u32	udivslot;
+- * This describes a list of registers which is used by the pm core and
+- * other subsystem to save and restore register values over suspend.
+- */
+-struct sleep_save {
+-	void __iomem	*reg;
+-	unsigned long	val;
 -};
 -
- /* helper functions to save/restore lists of registers. */
- 
- extern void s3c_pm_do_save(struct sleep_save *ptr, int count);
-@@ -112,24 +93,6 @@ extern void s3c_cpu_resume(void);
- #define s3c_cpu_resume NULL
- #endif
- 
--/* PM debug functions */
+-#define SAVE_ITEM(x) \
+-	{ .reg = (x) }
 -
--#ifdef CONFIG_SAMSUNG_PM_DEBUG
--/**
-- * s3c_pm_dbg() - low level debug function for use in suspend/resume.
-- * @msg: The message to print.
-- *
-- * This function is used mainly to debug the resume process before the system
-- * can rely on printk/console output. It uses the low-level debugging output
-- * routine printascii() to do its work.
-- */
--extern void s3c_pm_dbg(const char *msg, ...);
+-/* helper functions to save/restore lists of registers. */
 -
--#define S3C_PMDBG(fmt...) s3c_pm_dbg(fmt)
--#else
--#define S3C_PMDBG(fmt...) printk(KERN_DEBUG fmt)
--#endif
+-extern void s3c_pm_do_save(struct sleep_save *ptr, int count);
+-extern void s3c_pm_do_restore(const struct sleep_save *ptr, int count);
+-extern void s3c_pm_do_restore_core(const struct sleep_save *ptr, int count);
 -
- #ifdef CONFIG_S3C_PM_DEBUG_LED_SMDK
- /**
-  * s3c_pm_debug_smdkled() - Debug PM suspend/resume via SMDK Board LEDs
-diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
+ #ifdef CONFIG_SAMSUNG_PM
+ extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
+ extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
+diff --git a/arch/arm/plat-samsung/pm-common.c b/arch/arm/plat-samsung/pm-common.c
 new file mode 100644
-index 0000000..9f979b2
+index 0000000..515cd53
 --- /dev/null
-+++ b/arch/arm/plat-samsung/pm-debug.c
-@@ -0,0 +1,98 @@
++++ b/arch/arm/plat-samsung/pm-common.c
+@@ -0,0 +1,75 @@
 +/*
 + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
 + *	Tomasz Figa <t.figa@samsung.com>
@@ -191,203 +131,139 @@ index 0000000..9f979b2
 + *	Ben Dooks <ben@simtec.co.uk>
 + *	http://armlinux.simtec.co.uk/
 + *
-+ * Samsung common power management (suspend to RAM) debug support
++ * Samsung common power management helper functions.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ */
++*/
 +
-+#include <linux/serial_core.h>
 +#include <linux/io.h>
++#include <linux/kernel.h>
 +
-+#include <asm/mach/map.h>
-+
-+#include <plat/cpu.h>
 +#include <plat/pm-common.h>
-+#include <plat/regs-serial.h>
 +
-+#ifdef CONFIG_SAMSUNG_ATAGS
-+#include <mach/pm-core.h>
-+#else
-+static inline void s3c_pm_debug_init_uart(void) {}
-+static inline void s3c_pm_arch_update_uart(void __iomem *regs,
-+					   struct pm_uart_save *save) {}
-+#endif
++/* helper functions to save and restore register state */
 +
-+static struct pm_uart_save uart_save;
-+
-+extern void printascii(const char *);
-+
-+void s3c_pm_dbg(const char *fmt, ...)
++/**
++ * s3c_pm_do_save() - save a set of registers for restoration on resume.
++ * @ptr: Pointer to an array of registers.
++ * @count: Size of the ptr array.
++ *
++ * Run through the list of registers given, saving their contents in the
++ * array for later restoration when we wakeup.
++ */
++void s3c_pm_do_save(struct sleep_save *ptr, int count)
 +{
-+	va_list va;
-+	char buff[256];
-+
-+	va_start(va, fmt);
-+	vsnprintf(buff, sizeof(buff), fmt, va);
-+	va_end(va);
-+
-+	printascii(buff);
++	for (; count > 0; count--, ptr++) {
++		ptr->val = __raw_readl(ptr->reg);
++		S3C_PMDBG("saved %p value %08lx\n", ptr->reg, ptr->val);
++	}
 +}
 +
-+void s3c_pm_debug_init(void)
++/**
++ * s3c_pm_do_restore() - restore register values from the save list.
++ * @ptr: Pointer to an array of registers.
++ * @count: Size of the ptr array.
++ *
++ * Restore the register values saved from s3c_pm_do_save().
++ *
++ * Note, we do not use S3C_PMDBG() in here, as the system may not have
++ * restore the UARTs state yet
++*/
++
++void s3c_pm_do_restore(const struct sleep_save *ptr, int count)
 +{
-+	/* restart uart clocks so we can use them to output */
-+	s3c_pm_debug_init_uart();
++	for (; count > 0; count--, ptr++) {
++		pr_debug("restore %p (restore %08lx, was %08x)\n",
++				ptr->reg, ptr->val, __raw_readl(ptr->reg));
++
++		__raw_writel(ptr->val, ptr->reg);
++	}
 +}
 +
-+static inline void __iomem *s3c_pm_uart_base(void)
++/**
++ * s3c_pm_do_restore_core() - early restore register values from save list.
++ *
++ * This is similar to s3c_pm_do_restore() except we try and minimise the
++ * side effects of the function in case registers that hardware might need
++ * to work has been restored.
++ *
++ * WARNING: Do not put any debug in here that may effect memory or use
++ * peripherals, as things may be changing!
++*/
++
++void s3c_pm_do_restore_core(const struct sleep_save *ptr, int count)
 +{
-+	unsigned long paddr;
-+	unsigned long vaddr;
-+
-+	debug_ll_addr(&paddr, &vaddr);
-+
-+	return (void __iomem *)vaddr;
-+}
-+
-+void s3c_pm_save_uarts(void)
-+{
-+	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
-+
-+	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
-+	save->ucon = __raw_readl(regs + S3C2410_UCON);
-+	save->ufcon = __raw_readl(regs + S3C2410_UFCON);
-+	save->umcon = __raw_readl(regs + S3C2410_UMCON);
-+	save->ubrdiv = __raw_readl(regs + S3C2410_UBRDIV);
-+
-+	if (!soc_is_s3c2410())
-+		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
-+
-+	S3C_PMDBG("UART[%p]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
-+		  regs, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
-+}
-+
-+void s3c_pm_restore_uarts(void)
-+{
-+	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
-+
-+	s3c_pm_arch_update_uart(regs, save);
-+
-+	__raw_writel(save->ulcon, regs + S3C2410_ULCON);
-+	__raw_writel(save->ucon,  regs + S3C2410_UCON);
-+	__raw_writel(save->ufcon, regs + S3C2410_UFCON);
-+	__raw_writel(save->umcon, regs + S3C2410_UMCON);
-+	__raw_writel(save->ubrdiv, regs + S3C2410_UBRDIV);
-+
-+	if (!soc_is_s3c2410())
-+		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
++	for (; count > 0; count--, ptr++)
++		__raw_writel(ptr->val, ptr->reg);
 +}
 diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index 7c1d4385..a655192 100644
+index a655192..0e7ac5f 100644
 --- a/arch/arm/plat-samsung/pm.c
 +++ b/arch/arm/plat-samsung/pm.c
-@@ -17,16 +17,11 @@
- #include <linux/errno.h>
- #include <linux/delay.h>
- #include <linux/of.h>
--#include <linux/serial_core.h>
- #include <linux/io.h>
+@@ -65,62 +65,6 @@ int s3c_irqext_wake(struct irq_data *data, unsigned int state)
+ 	return 0;
+ }
  
- #include <asm/cacheflush.h>
--#include <asm/mach/map.h>
- #include <asm/suspend.h>
- 
--#include <plat/cpu.h>
--#include <plat/regs-serial.h>
+-/* helper functions to save and restore register state */
 -
- #ifdef CONFIG_SAMSUNG_ATAGS
- #include <mach/hardware.h>
- #include <mach/map.h>
-@@ -46,86 +41,6 @@
- 
- unsigned long s3c_pm_flags;
- 
--/* Debug code:
+-/**
+- * s3c_pm_do_save() - save a set of registers for restoration on resume.
+- * @ptr: Pointer to an array of registers.
+- * @count: Size of the ptr array.
 - *
-- * This code supports debug output to the low level UARTs for use on
-- * resume before the console layer is available.
+- * Run through the list of registers given, saving their contents in the
+- * array for later restoration when we wakeup.
+- */
+-void s3c_pm_do_save(struct sleep_save *ptr, int count)
+-{
+-	for (; count > 0; count--, ptr++) {
+-		ptr->val = __raw_readl(ptr->reg);
+-		S3C_PMDBG("saved %p value %08lx\n", ptr->reg, ptr->val);
+-	}
+-}
+-
+-/**
+- * s3c_pm_do_restore() - restore register values from the save list.
+- * @ptr: Pointer to an array of registers.
+- * @count: Size of the ptr array.
+- *
+- * Restore the register values saved from s3c_pm_do_save().
+- *
+- * Note, we do not use S3C_PMDBG() in here, as the system may not have
+- * restore the UARTs state yet
 -*/
 -
--#ifdef CONFIG_SAMSUNG_PM_DEBUG
--extern void printascii(const char *);
--
--void s3c_pm_dbg(const char *fmt, ...)
+-void s3c_pm_do_restore(const struct sleep_save *ptr, int count)
 -{
--	va_list va;
--	char buff[256];
+-	for (; count > 0; count--, ptr++) {
+-		printk(KERN_DEBUG "restore %p (restore %08lx, was %08x)\n",
+-		       ptr->reg, ptr->val, __raw_readl(ptr->reg));
 -
--	va_start(va, fmt);
--	vsnprintf(buff, sizeof(buff), fmt, va);
--	va_end(va);
--
--	printascii(buff);
+-		__raw_writel(ptr->val, ptr->reg);
+-	}
 -}
 -
--static inline void s3c_pm_debug_init(void)
+-/**
+- * s3c_pm_do_restore_core() - early restore register values from save list.
+- *
+- * This is similar to s3c_pm_do_restore() except we try and minimise the
+- * side effects of the function in case registers that hardware might need
+- * to work has been restored.
+- *
+- * WARNING: Do not put any debug in here that may effect memory or use
+- * peripherals, as things may be changing!
+-*/
+-
+-void s3c_pm_do_restore_core(const struct sleep_save *ptr, int count)
 -{
--	/* restart uart clocks so we can use them to output */
--	s3c_pm_debug_init_uart();
+-	for (; count > 0; count--, ptr++)
+-		__raw_writel(ptr->val, ptr->reg);
 -}
 -
--static struct pm_uart_save uart_save;
--
--static inline void __iomem *s3c_pm_uart_base(void)
--{
--	unsigned long paddr;
--	unsigned long vaddr;
--
--	debug_ll_addr(&paddr, &vaddr);
--
--	return (void __iomem *)vaddr;
--}
--
--static void s3c_pm_save_uarts(void)
--{
--	void __iomem *regs = s3c_pm_uart_base();
--	struct pm_uart_save *save = &uart_save;
--
--	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
--	save->ucon = __raw_readl(regs + S3C2410_UCON);
--	save->ufcon = __raw_readl(regs + S3C2410_UFCON);
--	save->umcon = __raw_readl(regs + S3C2410_UMCON);
--	save->ubrdiv = __raw_readl(regs + S3C2410_UBRDIV);
--
--	if (!soc_is_s3c2410())
--		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
--
--	S3C_PMDBG("UART[%p]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
--		  regs, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
--}
--
--static void s3c_pm_restore_uarts(void)
--{
--	void __iomem *regs = s3c_pm_uart_base();
--	struct pm_uart_save *save = &uart_save;
--
--	s3c_pm_arch_update_uart(regs, save);
--
--	__raw_writel(save->ulcon, regs + S3C2410_ULCON);
--	__raw_writel(save->ucon,  regs + S3C2410_UCON);
--	__raw_writel(save->ufcon, regs + S3C2410_UFCON);
--	__raw_writel(save->umcon, regs + S3C2410_UMCON);
--	__raw_writel(save->ubrdiv, regs + S3C2410_UBRDIV);
--
--	if (!soc_is_s3c2410())
--		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
--}
--#else
--#define s3c_pm_debug_init() do { } while (0)
--
--static void s3c_pm_save_uarts(void) { }
--static void s3c_pm_restore_uarts(void) { }
--#endif
--
- /* The IRQ ext-int code goes here, it is too small to currently bother
-  * with its own file. */
- 
+ /* s3c2410_pm_show_resume_irqs
+  *
+  * print any IRQs asserted at resume time (ie, we woke from)
 -- 
 1.8.5.2
