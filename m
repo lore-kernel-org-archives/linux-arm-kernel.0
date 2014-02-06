@@ -1,36 +1,144 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:32 +0900
-Subject: [PATCH 12/13] ARM: shmobile: armadillo: enable CONFIG_DEVTMPFS in
- defconfig
-In-Reply-To: <cover.1391651074.git.horms+renesas@verge.net.au>
-References: <cover.1391651074.git.horms+renesas@verge.net.au>
-Message-ID: <a3b74d3e45f2e28e7c57d5c16a94b59c1a68dd09.1391651074.git.horms+renesas@verge.net.au>
+Date: Thu,  6 Feb 2014 15:20:36 +0900
+Subject: [PATCH 01/17] ARM: shmobile: dts: Remove r8a7791-koelsch-reference.dts
+In-Reply-To: <cover.1391665761.git.horms+renesas@verge.net.au>
+References: <cover.1391665761.git.horms+renesas@verge.net.au>
+Message-ID: <52e62f7f4b25d4f087395f805768e985e9d91bd0.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-DEVTMPFS is needed for udev
+The dts file has been superseded by r8a7791-koelsch.dts and been removed
+from the ARCH_SHMOBILE_LEGACY dtb target. Remove it.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/armadillo800eva_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 115 ------------------------
+ 1 file changed, 115 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7791-koelsch-reference.dts
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index 9287a62..065addd 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -58,6 +58,8 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_IPV6 is not set
- # CONFIG_WIRELESS is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_MD=y
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
+deleted file mode 100644
+index 588ca17..0000000
+--- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
++++ /dev/null
+@@ -1,115 +0,0 @@
+-/*
+- * Device Tree Source for the Koelsch board
+- *
+- * Copyright (C) 2013 Renesas Electronics Corporation
+- * Copyright (C) 2013 Renesas Solutions Corp.
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/dts-v1/;
+-#include "r8a7791.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-
+-/ {
+-	model = "Koelsch";
+-	compatible = "renesas,koelsch-reference", "renesas,r8a7791";
+-
+-	chosen {
+-		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+-	};
+-
+-	memory at 40000000 {
+-		device_type = "memory";
+-		reg = <0 0x40000000 0 0x80000000>;
+-	};
+-
+-	lbsc {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-	};
+-
+-	gpio-keys {
+-		compatible = "gpio-keys";
+-
+-		key-a {
+-			gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
+-			linux,code = <30>;
+-			label = "SW30";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-b {
+-			gpios = <&gpio7 1 GPIO_ACTIVE_LOW>;
+-			linux,code = <48>;
+-			label = "SW31";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-c {
+-			gpios = <&gpio7 2 GPIO_ACTIVE_LOW>;
+-			linux,code = <46>;
+-			label = "SW32";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-d {
+-			gpios = <&gpio7 3 GPIO_ACTIVE_LOW>;
+-			linux,code = <32>;
+-			label = "SW33";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-e {
+-			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
+-			linux,code = <18>;
+-			label = "SW34";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-f {
+-			gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
+-			linux,code = <33>;
+-			label = "SW35";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-		key-g {
+-			gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+-			linux,code = <34>;
+-			label = "SW36";
+-			gpio-key,wakeup;
+-			debounce-interval = <20>;
+-		};
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		led6 {
+-			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+-		};
+-		led7 {
+-			gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
+-		};
+-		led8 {
+-			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-};
+-
+-&pfc {
+-	pinctrl-0 = <&scif0_pins &scif1_pins>;
+-	pinctrl-names = "default";
+-
+-	scif0_pins: serial0 {
+-		renesas,groups = "scif0_data_d";
+-		renesas,function = "scif0";
+-	};
+-
+-	scif1_pins: serial1 {
+-		renesas,groups = "scif1_data_d";
+-		renesas,function = "scif1";
+-	};
+-};
 -- 
 1.8.5.2
