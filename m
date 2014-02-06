@@ -1,50 +1,36 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 6 Feb 2014 18:21:26 +0800
-Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <201401311623.56902.arnd@arndb.de>
-References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
- <201401302049.27521.arnd@arndb.de>
- <CAGsJ_4xFKytv=Mj9eVwGY7RjyUy2W=iSXvnULKyBETYVzMVbOg@mail.gmail.com>
- <201401311623.56902.arnd@arndb.de>
-Message-ID: <CAGsJ_4xmtt2Pg_mHJmvt9uc3Y4gN7KUT1UOJhbr6FQYdiAH3qw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 06 Feb 2014 11:26:15 +0100
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <1391532784-1953-3-git-send-email-will.deacon@arm.com>
+ <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
+Message-ID: <2629498.fOknbqpyEP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-01-31 23:23 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 31 January 2014, Barry Song wrote:
->> >
->> > Is SRC_OSC_RATE the rate of spwm->clk? If so, it would be nice to just call
->> > clk_get_rate() here, in case you ever have a chip with a different rate.
->> >
->>
->> SRC_OSC_RATE is the fixed frequency of crystal oscillator, but
->> spwm->clk comes from the IO bus. the design is a little strange, pwm
->> channels don't use the clock of PWM controller to generate
->> period/duty, but use other sources.
->
-> How about modeling  that other source as a fixed-rate clock in DT
-> then?
+On Thursday 06 February 2014 14:24:03 Anup Patel wrote:
+> > diff --git a/Documentation/devicetree/bindings/pci/linux,pci-virt.txt b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
+> > new file mode 100644
+> > index 000000000000..54668a283498
+> > +- compatible     : Must be "linux,pci-virt"
+> > +
+> > +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> > +                   at least a definition of the Configuration Space plus
+> > +                   one or both of IO and Memory Space.
+> > +
+> > +- #address-cells : Must be 3
+> > +
+> > +- #size-cells    : Must be 2
+> > +
+> > +Configuration Space is assumed to be memory-mapped (as opposed to being
+> 
+> It would be great to have a flag to specify whether Configuration Space is over
+> ioports or memory mapped.
+> 
 
-sirfsoc clock drivers have a clock node for OSC whose index is "1".
-do you think the following is the right way to handle?
+I haven't seen config space access through ioport for a long
+time on non-x86. Do you have reason to believe that we will need
+that?
 
-in dts, put both pwm controller clock and OSC
-672                         pwm: pwm at b0130000 {
-673                                 compatible = "sirf,prima2-pwm";
-674                                 #pwm-cells = <2>;
-675                                 reg = <0xb0130000 0x10000>;
-676                                 clocks = <&clks 21>,  <&clks 1>;
-677                                 clock-names = "pwmc", "osc";
-678                         };
-
-and in pwm-sirf.c driver, use
-clk = clk_get(dev, "osc");
-clk_get_rate(clk);
-
-to get the rate in probe()?
-
-
->
->         Arnd
-
--barry
+	Arnd
