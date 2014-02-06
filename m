@@ -1,58 +1,41 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Thu, 6 Feb 2014 17:21:51 +0530
-Subject: [PATCH] arm64: Change misleading function names in dma-mapping
-Message-ID: <CAD15agYoPm8krMTAFRRRPRWu2Z7SQaUJUkO9mm_QGR=zeFvO5A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 11:52:08 +0000
+Subject: [PATCH 2/6] arm64: barriers: make use of barrier options with
+ explicit barriers
+In-Reply-To: <20140206114952.GL29446@arm.com>
+References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+ <1391686253-13436-2-git-send-email-will.deacon@arm.com>
+ <20140206114130.GJ29446@arm.com>
+ <20140206114559.GM26035@mudshark.cambridge.arm.com>
+ <20140206114952.GL29446@arm.com>
+Message-ID: <20140206115208.GO26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ritesh Harjani <ritesh.harjani@gmail.com>
+On Thu, Feb 06, 2014 at 11:49:52AM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 11:45:59AM +0000, Will Deacon wrote:
+> > On Thu, Feb 06, 2014 at 11:41:30AM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 06, 2014 at 11:30:49AM +0000, Will Deacon wrote:
+> > > > --- a/arch/arm64/include/asm/barrier.h
+> > > > +++ b/arch/arm64/include/asm/barrier.h
+> > > > @@ -20,14 +20,14 @@
+> > > >  
+> > > >  #ifndef __ASSEMBLY__
+> > > >  
+> > > > -#define sev()		asm volatile("sev" : : : "memory")
+> > > > +#define sev(l)		asm volatile("sev" #l : : : "memory")
+> > > 
+> > > Would we actually ever use sev(l) form C? And it's a new instruction
+> > > rather than an argument to the existing sev.
+> > 
+> > I don't know, but if it's not there then I'm pretty sure people will always
+> > use sev, even if sevl could be used. In fact, sev and sevl are both aliases
+> > of hint, so they're the same instruction with different immediate operands.
+> 
+> SEVL was pretty much introduced to avoid a branch in the spinlock
+> functions. I'm not aware of other uses (on arm64 we don't even use the
+> wfe() macro directly). I would skip this for now.
 
-arm64_swiotlb_alloc/free_coherent name can be misleading
-somtimes with CMA support being enabled after this
-patch (c2104debc235b745265b64d610237a6833fd53)
+Okey doke, I'll drop this hunk for the time being.
 
-Change this name to be more generic:
-__dma_alloc/free_coherent
-
-Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
----
- arch/arm64/mm/dma-mapping.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 45b5ab5..aee7521 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -30,7 +30,7 @@
- struct dma_map_ops *dma_ops;
- EXPORT_SYMBOL(dma_ops);
-
--static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
-+static void *__dma_alloc_coherent(struct device *dev, size_t size,
-                                          dma_addr_t *dma_handle, gfp_t flags,
-                                          struct dma_attrs *attrs)
- {
-@@ -57,7 +57,7 @@ static void *arm64_swiotlb_alloc_coherent(struct
-device *dev, size_t size,
-        }
- }
-
--static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
-+static void __dma_free_coherent(struct device *dev, size_t size,
-                                        void *vaddr, dma_addr_t dma_handle,
-                                        struct dma_attrs *attrs)
- {
-@@ -78,8 +78,8 @@ static void arm64_swiotlb_free_coherent(struct
-device *dev, size_t size,
- }
-
- static struct dma_map_ops arm64_swiotlb_dma_ops = {
--       .alloc = arm64_swiotlb_alloc_coherent,
--       .free = arm64_swiotlb_free_coherent,
-+       .alloc = __dma_alloc_coherent,
-+       .free = __dma_free_coherent,
-        .map_page = swiotlb_map_page,
-        .unmap_page = swiotlb_unmap_page,
-        .map_sg = swiotlb_map_sg_attrs,
---
-1.8.1.3
+Will
