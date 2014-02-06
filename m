@@ -1,36 +1,37 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 6 Feb 2014 17:43:36 +0100
-Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
-In-Reply-To: <alpine.LFD.2.11.1402061152550.1906@knanqh.ubzr>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
- <20140130152500.GB5002@laptop.programming.kicks-ass.net>
- <alpine.LFD.2.11.1401301102210.1652@knanqh.ubzr>
- <20140130162753.GF5002@laptop.programming.kicks-ass.net>
- <alpine.LFD.2.11.1402061152550.1906@knanqh.ubzr>
-Message-ID: <20140206164336.GU2936@laptop.programming.kicks-ass.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Feb 2014 09:45:53 -0700
+Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <20140206091114.GK19389@tbergstrom-lnx.Nvidia.com>
+References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
+ <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
+ <52F28DE2.1040207@wwwdotorg.org>
+ <20140206091114.GK19389@tbergstrom-lnx.Nvidia.com>
+Message-ID: <52F3BC41.1030901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 02:09:59PM +0000, Nicolas Pitre wrote:
-> Hi Peter,
+On 02/06/2014 02:11 AM, Peter De Schrijver wrote:
+> On Wed, Feb 05, 2014 at 08:15:46PM +0100, Stephen Warren wrote:
+>> On 01/28/2014 04:36 PM, Peter De Schrijver wrote:
+>>> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+
+>>> diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
+>>> +What:		/sys/devices/*/<our-device>/fuse
+>>> +Date:		December 2013
+>>> +Contact:	Peter De Schrijver <pdeschrijver@nvidia.com>
+>>> +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
+>>> +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
+>>> +		data programmed at the factory.
+>>> +Users:		any user space application which wants to read the efuses on
+>>> +		Tegra SoC's
+>>
+>> Surely this file should describe the format of the file, since that's
+>> part of the ABI too, right?
+>>
 > 
-> Did you merge those patches in your tree? 
+> Part of the fuse data is ODM defined so possibly board specific.
 
-tree, tree, what's in a word. Its in my patch stack yes. I should get
-some of that into tip I suppose, been side-tracked a bit this week.
-Sorry for the delay.
-
-> If so, is it published somewhere?  
-
-http://programming.kicks-ass.net/sekrit/patches.tar.bz2
-
-It is of varying quality at best.
-
-> That would be a good idea if that could appear in linux-next 
-> so to prevent people from adding more calls to cpuidle_idle_call() from 
-> architecture code.  I'm sending you 2 additional patches right away to 
-> remove those that appeared in v3.14-rc1.
-
-Yeah, once they land in tip they'll end up in -next automagically. I'll
-try and get that sorted tomorrow somewhere.
+I didn't mean the interpretation of which fuses mean what semantically,
+but rather the data format of the file. IIRC looking at the code, it's
+just a binary dump of the fuses, but it might be worth spelling out that
+it's a byte-oriented binary file, with fuse 0 in bit 0 of byte 0 etc.?
