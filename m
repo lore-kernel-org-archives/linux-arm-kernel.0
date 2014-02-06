@@ -1,36 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Feb 2014 11:26:15 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-3-git-send-email-will.deacon@arm.com>
- <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
-Message-ID: <2629498.fOknbqpyEP@wuerfel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 06 Feb 2014 11:28:52 +0100
+Subject: [PATCH] ARM: shmobile: r8a7790: Correct SYS DMAC clock defines
+In-Reply-To: <1391646301-20197-1-git-send-email-horms+renesas@verge.net.au>
+References: <1391646301-20197-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1910899.86Rh9nDz51@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 February 2014 14:24:03 Anup Patel wrote:
-> > diff --git a/Documentation/devicetree/bindings/pci/linux,pci-virt.txt b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
-> > new file mode 100644
-> > index 000000000000..54668a283498
-> > +- compatible     : Must be "linux,pci-virt"
-> > +
-> > +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> > +                   at least a definition of the Configuration Space plus
-> > +                   one or both of IO and Memory Space.
-> > +
-> > +- #address-cells : Must be 3
-> > +
-> > +- #size-cells    : Must be 2
-> > +
-> > +Configuration Space is assumed to be memory-mapped (as opposed to being
-> 
-> It would be great to have a flag to specify whether Configuration Space is over
-> ioports or memory mapped.
-> 
+Hi Simon,
 
-I haven't seen config space access through ioport for a long
-time on non-x86. Do you have reason to believe that we will need
-that?
+Thank you for the patch.
 
-	Arnd
+On Thursday 06 February 2014 09:25:01 Simon Horman wrote:
+> This brings the implementation into line with the documentation.
+> 
+> This problem was introduced when SYS DMAC clock defines were added by
+> ac991dce6498b5fc ("ARM: shmobile: r8a7790: Add clock index macros for DT
+> sources") in v3.13-rc2. I do not believe this results in any problems as
+> these defines do not appear to be used anywhere yet.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  include/dt-bindings/clock/r8a7790-clock.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/dt-bindings/clock/r8a7790-clock.h
+> b/include/dt-bindings/clock/r8a7790-clock.h index 859e9be..6548a5f 100644
+> --- a/include/dt-bindings/clock/r8a7790-clock.h
+> +++ b/include/dt-bindings/clock/r8a7790-clock.h
+> @@ -46,8 +46,8 @@
+>  #define R8A7790_CLK_MSIOF1		8
+>  #define R8A7790_CLK_MSIOF3		15
+>  #define R8A7790_CLK_SCIFB2		16
+> -#define R8A7790_CLK_SYS_DMAC0		18
+> -#define R8A7790_CLK_SYS_DMAC1		19
+> +#define R8A7790_CLK_SYS_DMAC1		18
+> +#define R8A7790_CLK_SYS_DMAC0		19
+> 
+>  /* MSTP3 */
+>  #define R8A7790_CLK_TPU0		4
+
+-- 
+Regards,
+
+Laurent Pinchart
