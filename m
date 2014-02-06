@@ -1,88 +1,174 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  7 Feb 2014 00:41:56 +0100
-Subject: [PATCH 00/21] Move DT kirkwood into mach-mvebu
-Message-ID: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+Date: Fri,  7 Feb 2014 00:42:06 +0100
+Subject: [PATCH 10/21] ARM: MM: Add DT binding for Feroceon L2 cache
+In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1391730137-14814-11-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The process of making most kirkwood boards boot using DT is nearly
-complete. We can now move these boards into mach-mvebu, freeing them
-of the legacy code needed for none-DT systems. At the same time, they
-can become part of ARCH_MULTI_V5.
+Instantiate the L2 cache from DT. Indicate in DT where the cache
+control register is and if write through should be made.
 
-Andrew Lunn (21):
-  ARM: Kirkwood: Give pm.c its own header file.
-  IRQ: Orion: Fix getting generic chip pointer.
-  ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup to DT
-  ARM: Kirkwood: Drop printing the SoC type and revision
-  ARM: Kirkwood: Seperate board-dt from common and pcie code.
-  ARM: Kirkwood: ioremap the cpu_config register before using it.
-  ARM: Kirkwood: ioremap memory control register
-  ARM: MVEBU: Add ARCH_MULTI_V7 to SoCs
-  ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
-  ARM: MM: Add DT binding for Feroceon L2 cache
-  ARM: Fix default CPU selection for ARCH_MULTI_V5
-  ARM: Fix MULTI_TLB for feroceon
-  ARM: MM Enable building Feroceon L2 cache controller with ARCH_MVEBU
-  ARM: Move kirkwood DT boards into mach-mvebu
-  ARM: MVEBU: Let kirkwood use the system controller for restart
-  drivers: Enable building of Kirkwood drivers for mach-mvebu
-  ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
-  ARM: config: Add a multi_v5_defconfig
-  ARM: MVEBU: Simplifiy headers and make local
-  ARM: MVEBU: Remove unneeded headers
-  ARM: Kirkwood: Remove DT support
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ .../devicetree/bindings/arm/mrvl/foroceon.txt      | 19 +++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |  5 +++
+ arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
+ arch/arm/mach-kirkwood/board-dt.c                  | 15 +------
+ arch/arm/mm/cache-feroceon-l2.c                    | 46 ++++++++++++++++++++++
+ 5 files changed, 73 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
 
- .../devicetree/bindings/arm/mrvl/forocean.txt      |  19 +++
- arch/arm/Kconfig                                   |   2 +-
- arch/arm/boot/dts/Makefile                         |  34 ++--
- arch/arm/boot/dts/kirkwood.dtsi                    |  10 ++
- arch/arm/configs/kirkwood_defconfig                |   6 -
- arch/arm/configs/multi_v5_defconfig                | 183 ++++++++++++++++++++
- arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  13 ++
- arch/arm/mach-kirkwood/Kconfig                     |  25 ---
- arch/arm/mach-kirkwood/Makefile                    |   6 +-
- arch/arm/mach-kirkwood/Module.symvers              |   0
- arch/arm/mach-kirkwood/board-dt.c                  | 150 ----------------
- arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c     |  50 ------
- arch/arm/mach-kirkwood/common.c                    |   3 +-
- arch/arm/mach-kirkwood/common.h                    |  13 --
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   2 +
- arch/arm/mach-kirkwood/pm.c                        |   9 +-
- arch/arm/mach-kirkwood/pm.h                        |  26 +++
- arch/arm/mach-mv78xx0/common.c                     |   2 +-
- arch/arm/mach-mvebu/Kconfig                        |  28 ++-
- arch/arm/mach-mvebu/Makefile                       |   1 +
- arch/arm/mach-mvebu/kirkwood-pm.c                  |  76 +++++++++
- arch/arm/mach-mvebu/kirkwood-pm.h                  |  26 +++
- arch/arm/mach-mvebu/kirkwood.c                     | 189 +++++++++++++++++++++
- arch/arm/mach-mvebu/kirkwood.h                     |  22 +++
- arch/arm/mach-mvebu/mvebu-soc-id.c                 |   1 +
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm/mm/cache-feroceon-l2.c                    |  48 +++++-
- arch/arm/mm/proc-feroceon.S                        |   2 +-
- arch/arm/mm/tlb-v4wbi.S                            |   3 +
- .../plat-orion/include/plat/cache-feroceon-l2.h    |  11 --
- drivers/cpufreq/Kconfig.arm                        |   2 +-
- drivers/cpuidle/Kconfig.arm                        |   2 +-
- drivers/irqchip/irq-orion.c                        |   3 +-
- drivers/leds/Kconfig                               |   4 +-
- drivers/phy/Kconfig                                |   2 +-
- drivers/thermal/Kconfig                            |   2 +-
- sound/soc/kirkwood/Kconfig                         |   2 +-
- 37 files changed, 682 insertions(+), 297 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/forocean.txt
- create mode 100644 arch/arm/configs/multi_v5_defconfig
- create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
- create mode 100644 arch/arm/mach-kirkwood/Module.symvers
- delete mode 100644 arch/arm/mach-kirkwood/board-dt.c
- delete mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
- create mode 100644 arch/arm/mach-kirkwood/pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood.h
- delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
-
+diff --git a/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+new file mode 100644
+index 000000000000..8058676d1476
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+@@ -0,0 +1,19 @@
++* Marvell Feroceon Cache
++
++Required properties:
++- compatible : Should be "marvell,feroceon-kirkwood".
++- reg        : Address of the L2 cache control register
++
++Optional properties:
++- writethrough : only if present, the cache will be used in write through mode.
++
++Example:
++		l2: l2-cache at 20128 {
++			compatible = "marvell,marvell,feroceon-kirkwood";
++			reg = <0x20128 0x4>;
++		};
++
++There are at least two variants of the Feroceon, differing in how
++write through is enabled or not. If mv78xx0 support is added, it is
++expected to have a different compatibility string.
++
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 6abf44d257df..1d8129ac2672 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -161,6 +161,11 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		l2: l2-cache at 20128 {
++			compatible = "marvell,feroceon-kirkwood";
++			reg = <0x20128 0x4>;
++		};
++
+ 		intc: main-interrupt-ctrl at 20200 {
+ 			compatible = "marvell,orion-intc";
+ 			interrupt-controller;
+diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+index 8edd330aabf6..12e1588dc4f1 100644
+--- a/arch/arm/include/asm/hardware/cache-feroceon-l2.h
++++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+@@ -9,3 +9,5 @@
+  */
+ 
+ extern void __init feroceon_l2_init(int l2_wt_override);
++extern int __init feroceon_of_init(void);
++
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 34c35510fd17..2ef59ee2182d 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -42,19 +42,6 @@ static void __init kirkwood_map_io(void)
+ 	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
+ }
+ 
+-static void __init kirkwood_l2_init(void)
+-{
+-#ifdef CONFIG_CACHE_FEROCEON_L2
+-#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+-	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
+-	feroceon_l2_init(1);
+-#else
+-	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
+-	feroceon_l2_init(0);
+-#endif
+-#endif
+-}
+-
+ static struct resource kirkwood_cpufreq_resources[] = {
+ 	[0] = {
+ 		.start  = CPU_CONTROL_PHYS,
+@@ -211,7 +198,7 @@ static void __init kirkwood_dt_init(void)
+ 
+ 	BUG_ON(mvebu_mbus_dt_init());
+ 
+-	kirkwood_l2_init();
++	feroceon_of_init();
+ 
+ 	kirkwood_cpufreq_init();
+ 	kirkwood_cpuidle_init();
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index 898362e7972b..193fe7dbdb12 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -13,11 +13,17 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/highmem.h>
++#include <linux/io.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/hardware/cache-feroceon-l2.h>
+ 
++#define L2_WRITETHROUGH_KIRKWOOD	0x00000010
++
++
+ /*
+  * Low-level cache maintenance operations.
+  *
+@@ -350,3 +356,43 @@ void __init feroceon_l2_init(int __l2_wt_override)
+ 	printk(KERN_INFO "Feroceon L2: Cache support initialised%s.\n",
+ 			 l2_wt_override ? ", in WT override mode" : "");
+ }
++#ifdef CONFIG_OF
++static const struct of_device_id feroceon_ids[] __initconst = {
++	{ .compatible = "marvell,feroceon-kirkwood"},
++	{}
++};
++
++int __init feroceon_of_init(void)
++{
++	struct device_node *node;
++	void __iomem *base;
++	bool writethrough = false;
++	struct resource res;
++
++	node = of_find_matching_node(NULL, feroceon_ids);
++	if (!node) {
++		pr_info("Didn't find marvell,feroceon-*, not enabling it\n");
++		return -ENODEV;
++	}
++
++	if (of_property_read_bool(node, "writethrough"))
++		writethrough = true;
++
++	if (of_address_to_resource(node, 0, &res))
++		return -ENODEV;
++
++	base = ioremap(res.start, resource_size(&res));
++	if (!base)
++		return -ENOMEM;
++
++	if (writethrough) {
++		writel(readl(base) | L2_WRITETHROUGH_KIRKWOOD, base);
++		feroceon_l2_init(1);
++	} else {
++		writel(readl(base) & ~L2_WRITETHROUGH_KIRKWOOD, base);
++	feroceon_l2_init(0);
++	}
++
++	return 0;
++}
++#endif
 -- 
 1.8.5.3
