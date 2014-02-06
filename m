@@ -1,36 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:33 +0900
-Subject: [PATCH 13/13] ARM: shmobile: ape6evm: enable CONFIG_DEVTMPFS in
- defconfig
-In-Reply-To: <cover.1391651074.git.horms+renesas@verge.net.au>
-References: <cover.1391651074.git.horms+renesas@verge.net.au>
-Message-ID: <0771ddff31186836f62a20c42e7958bd37f7b4ed.1391651074.git.horms+renesas@verge.net.au>
+Date: Thu,  6 Feb 2014 15:20:50 +0900
+Subject: [GIT PULL 00/17] Renesas ARM Based SoC DT Updates for v3.15
+Message-ID: <cover.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-DEVTMPFS is needed for udev
+please consider these Renesas ARM Based SoC DT updates for v3.15.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/ape6evm_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
-index cb26c62..bb396c0 100644
---- a/arch/arm/configs/ape6evm_defconfig
-+++ b/arch/arm/configs/ape6evm_defconfig
-@@ -48,6 +48,8 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_IPV6_SIT is not set
- CONFIG_NETFILTER=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_FW_LOADER_USER_HELPER is not set
- CONFIG_NETDEVICES=y
- # CONFIG_NET_CADENCE is not set
--- 
-1.8.5.2
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.15
+
+for you to fetch changes up to 1f4c745b2c5a083c49dc11d2f0827d9a381f1ee1:
+
+  ARM: shmobile: r8a7790: Replace IRQ type numerical values with macros (2014-02-04 10:17:00 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Updates for v3.15
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Enable GPIO Keys, (1+1)GiB memory, SATA0 and serial ports
+  - Add VIN and thermal clocks
+  - Remove r8a7791-koelsch-reference.dts
+
+* r8a7790 (R-Car H2) based Lager board
+  - Replace IRQ type numerical values with macros
+  - Enable SATA0 and serial ports
+  - Add VIN and thermal clocks
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7791: Add thermal clock in device tree
+      ARM: shmobile: r8a7790: Add thermal clock in device tree
+
+Laurent Pinchart (10):
+      ARM: shmobile: dts: Remove r8a7791-koelsch-reference.dts
+      ARM: shmobile: Add GPIO keys to Koelsch DTS
+      ARM: shmobile: r8a7791: Add serial ports to the device tree
+      ARM: shmobile: r8a7790: Add serial ports to the device tree
+      ARM: shmobile: r8a7790: Add VIN clocks to device tree
+      ARM: shmobile: r8a7791: Add VIN clocks to device tree
+      ARM: shmobile: r8a7790: Add SATA clocks to device tree
+      ARM: shmobile: r8a7791: Add SATA clocks to device tree
+      ARM: shmobile: r8a7790: Fix serial ports DT compatible strings
+      ARM: shmobile: r8a7790: Replace IRQ type numerical values with macros
+
+Takashi Yoshii (1):
+      ARM: shmobile: koelsch: (1+1)GiB memory in DT
+
+Valentine Barshak (4):
+      ARM: shmobile: r8a7791: Add SATA nodes to r8a7791.dtsi
+      ARM: shmobile: koelsch: Enable SATA0 in r8a7791-koelsch.dts
+      ARM: shmobile: r8a7790: Add SATA nodes to r8a7790.dtsi
+      ARM: shmobile: lager: Enable SATA1 in r8a7790-lager.dts
+
+ arch/arm/boot/dts/r8a7790-lager.dts             |   4 +
+ arch/arm/boot/dts/r8a7790.dtsi                  | 131 ++++++++++++++-
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts | 115 -------------
+ arch/arm/boot/dts/r8a7791-koelsch.dts           |  65 +++++++-
+ arch/arm/boot/dts/r8a7791.dtsi                  | 210 +++++++++++++++++++++++-
+ 5 files changed, 403 insertions(+), 122 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7791-koelsch-reference.dts
