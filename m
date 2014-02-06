@@ -1,32 +1,17 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 06 Feb 2014 15:49:37 +0400
-Subject: [PATCH 0/2] Add Ether's PHY IRQ support for Lager/Koelsh boards
-In-Reply-To: <20140206063423.GB13435@verge.net.au>
-References: <201402041851.47198.sergei.shtylyov@cogentembedded.com>
- <CANqRtoRj9EVVZ+0Xx+7cm8s2=iBOfgNUXXR7uS=T-fKBUkczsw@mail.gmail.com>
- <52F268AA.6070808@cogentembedded.com> <20140206063423.GB13435@verge.net.au>
-Message-ID: <52F376D1.4090907@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Feb 2014 11:55:27 +0000
+Subject: [PATCH 5/6] arm64: barriers: wire up new barrier options
+In-Reply-To: <1391686253-13436-5-git-send-email-will.deacon@arm.com>
+References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+ <1391686253-13436-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20140206115526.GO29446@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Feb 06, 2014 at 11:30:52AM +0000, Will Deacon wrote:
+> Now that all callers of the barrier macros are updated to pass the
+> mandatory options, update the macros so the option is actually used.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-On 06-02-2014 10:34, Simon Horman wrote:
-
->>>>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
->>>> 'renesas-devel-v3.14-rc1-20130204' tag. Here we add support for the Ether's PHY
->>>> IRQ to the R8A7790/Lager and R8A7791/Koelsch boards.
-
->>>> [1/2] ARM: shmobile: Lager: pass Ether PHY IRQ
->>>> [1/2] ARM: shmobile: Koelsch: pass Ether PHY IRQ
-
->>> Thanks, looking good!
-
->>     Not at all, you've already tested these patches, IIRC.
-
-> Thanks, I have queued these up with Magnus's ack which
-> he supplied the previous time that you posted them.
-
-    Oh, sorry, I forgot to pick it up myself. :-/
-
-WBR, Sergei
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
