@@ -1,104 +1,58 @@
 From: pratyush.anand@st.com (Pratyush Anand)
-Date: Thu, 6 Feb 2014 10:14:47 +0530
-Subject: [PATCH V4 0/8]PCI:Add SPEAr13xx PCie support
-Message-ID: <cover.1391661589.git.pratyush.anand@st.com>
+Date: Thu, 6 Feb 2014 10:14:49 +0530
+Subject: [PATCH V4 2/8] SPEAr13xx: Fix static mapping table
+In-Reply-To: <cover.1391661589.git.pratyush.anand@st.com>
+References: <cover.1391661589.git.pratyush.anand@st.com>
+Message-ID: <4258166515f894425cd2a9a19b8872012f377276.1391661589.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First three patches are improvement and fixes for SPEAr13xx support.
-Patches 4-6 add miphy40lp skelten driver and support for spear1310/40 miphy
-wrapper. Patch 7 add support for SPEAr13xx PCIe.
+SPEAr13xx was using virtual address space 0xFE000000 to map physical address
+space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
+change 0xFE000000 to 0xF9000000.
 
-These pathes are tested with linux-3.14-rc1 with following patch on the top of
-it:
-Author: Balaji T K <balajitk@ti.com>
-Date:   Mon Jan 20 16:41:27 2014 +0200
-
-    ata: ahci_platform: Manage SATA PHY
-
-Tested with SPEAr1310 evaluation board:
-	- INTEL PRO 100/100 EP card
-	- USB xhci gen2 card
- 	- Above cards connected through LeCROY PTC switch
-
-Modifications for SATA are tested with SPEAr1340-evb board
-
-Changes since v3:
-- Phy driver renamed to phy-miphy40lp
-- ahci phy hook patch used as suggested by Arnd
-- Incorporated other minor comments from v3
-
-Changes since v2:
-- Incorporated comments to move SPEAr13xx PCIe and SATA phy specific routines to
-  the phy framework
-- Modify ahci driver to include phy hooks
-- phy-core driver modifications for subsys_initcall() 
- 
-Changes since v1:
-- Few patches of the series are already accepted and applied to mainline e.g.
- pcie designware driver improvements,fixes for IO translation bug, PCIe dw
- driver maintainer. So dropped these from v2.
-- Incorporated comment to move the common/reset PCIe code to the seperate driver
-- PCIe and SATA share common PHY configuration registers, so move SATA
- platform code to the system config driver
-Fourth patch is improves pcie designware driver and fixes the IO
-translation bug. IO translation bug fix leads to the working of PCIe EP devices
-connected to RC through switch.
-
-PCIe driver support for SPEAr1310/40 platform board is added.
-
-These patches are tested with SPEAr1310 evaluation board:
-	- INTEL PRO 100/100 EP card
-	- USB xhci gen2 card
- 	- Above cards connected through LeCROY PTC switch
-
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-ide at vger.kernel.org
-Cc: linux-pci at vger.kernel.org
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: spear-devel at list.st.com
-Cc: linux-kernel at vger.kernel.org
+Cc: stable at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-spear/include/mach/spear.h | 4 ++--
+ arch/arm/mach-spear/spear13xx.c          | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Mohit Kumar (2):
-  SPEAr13xx: defconfig: Update
-  MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
-
-Pratyush Anand (6):
-  clk: SPEAr13xx: Fix pcie clock name
-  SPEAr13xx: Fix static mapping table
-  phy: st-miphy-40lp: Add skeleton driver
-  SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code to phy driver
-  phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340 PCIe phy support
-  pcie: SPEAr13xx: Add designware pcie support
-
- .../devicetree/bindings/arm/spear-misc.txt         |   4 +
- .../devicetree/bindings/pci/spear13xx-pcie.txt     |   7 +
- .../devicetree/bindings/phy/st-miphy40lp.txt       |  12 +
- MAINTAINERS                                        |   6 +
- arch/arm/boot/dts/spear1310-evb.dts                |   4 +
- arch/arm/boot/dts/spear1310.dtsi                   |  96 +++-
- arch/arm/boot/dts/spear1340-evb.dts                |   4 +
- arch/arm/boot/dts/spear1340.dtsi                   |  32 +-
- arch/arm/boot/dts/spear13xx.dtsi                   |  10 +-
- arch/arm/configs/spear13xx_defconfig               |  15 +
- arch/arm/mach-spear/Kconfig                        |   3 +
- arch/arm/mach-spear/include/mach/spear.h           |   4 +-
- arch/arm/mach-spear/spear1340.c                    | 127 +----
- arch/arm/mach-spear/spear13xx.c                    |   2 +-
- drivers/clk/spear/spear1310_clock.c                |   6 +-
- drivers/clk/spear/spear1340_clock.c                |   2 +-
- drivers/pci/host/Kconfig                           |   5 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pcie-spear13xx.c                  | 414 ++++++++++++++++
- drivers/phy/Kconfig                                |   6 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-miphy40lp.c                        | 544 +++++++++++++++++++++
- 22 files changed, 1166 insertions(+), 139 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
- create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/phy/st-miphy40lp.txt
- create mode 100644 drivers/pci/host/pcie-spear13xx.c
- create mode 100644 drivers/phy/phy-miphy40lp.c
-
+diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
+index 5cdc53d..f2d6a01 100644
+--- a/arch/arm/mach-spear/include/mach/spear.h
++++ b/arch/arm/mach-spear/include/mach/spear.h
+@@ -52,10 +52,10 @@
+ #ifdef CONFIG_ARCH_SPEAR13XX
+ 
+ #define PERIP_GRP2_BASE				UL(0xB3000000)
+-#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
++#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
+ #define MCIF_SDHCI_BASE				UL(0xB3000000)
+ #define SYSRAM0_BASE				UL(0xB3800000)
+-#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
++#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
+ #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
+ 
+ #define PERIP_GRP1_BASE				UL(0xE0000000)
+diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
+index 7aa6e8c..89212ff 100644
+--- a/arch/arm/mach-spear/spear13xx.c
++++ b/arch/arm/mach-spear/spear13xx.c
+@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
+ /*
+  * Following will create 16MB static virtual/physical mappings
+  * PHYSICAL		VIRTUAL
+- * 0xB3000000		0xFE000000
++ * 0xB3000000		0xF9000000
+  * 0xE0000000		0xFD000000
+  * 0xEC000000		0xFC000000
+  * 0xED000000		0xFB000000
 -- 
 1.8.1.2
