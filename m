@@ -1,156 +1,72 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu,  6 Feb 2014 09:05:19 -0200
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
-Message-ID: <1391684719-7720-1-git-send-email-festevam@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 06 Feb 2014 12:14:21 +0100
+Subject: [PATCH 1/3] wdt: sunxi: Introduce a new compatible for the A10
+ and A31
+In-Reply-To: <1391349325-11132-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391349325-11132-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <52F36E8D.4050503@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
+On 02/02/2014 02:55 PM, Maxime Ripard wrote:
+> For historical reasons, the Allwinner A10 compatibles are not following the
+> patterns used for this other Allwinner SoCs.
+>
+> Introduce a new compatible following the usual pattern, and deprecate the olders.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 7 ++++---
+>   drivers/watchdog/sunxi_wdt.c                             | 1 +
+>   2 files changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+> index e39cb26..6e8c937 100644
+> --- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+> @@ -2,13 +2,14 @@ Allwinner SoCs Watchdog timer
+>
+>   Required properties:
+>
+> -- compatible : should be "allwinner,<soc-family>-wdt", the currently supported
+> -  SoC families being sun4i and sun6i
+> +- compatible : should be either "allwinner,sun4i-a10-wdt" or
+> +               "allwinner,sun6i-a31-wdt" (deprecated:
+> +               "allwinner,sun4i-wdt", "allwinner,sun6i-wdt")
+>   - reg : Specifies base physical address and size of the registers.
+>
+>   Example:
+>
+>   wdt: watchdog at 01c20c90 {
+> -	compatible = "allwinner,sun4i-wdt";
+> +	compatible = "allwinner,sun4i-a10-wdt";
+>   	reg = <0x01c20c90 0x10>;
+>   };
 
-ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
+You talk about deprecating the old compat strings in the commit message, but
+here you outright replace them, which will break things with old dtb files ?
 
-mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
+Other 2 patches in the series look good and are:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Keep it sorted
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 113 +++++++++++++++++++++++++++++++
- 1 file changed, 113 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 10a00e4..466a544 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -63,6 +63,112 @@
- 	status = "okay";
- };
- 
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -133,6 +239,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_EB2__I2C2_SCL	0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_pwm3: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
--- 
-1.8.1.2
+> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+> index 76332d8..7c8923d 100644
+> --- a/drivers/watchdog/sunxi_wdt.c
+> +++ b/drivers/watchdog/sunxi_wdt.c
+> @@ -206,6 +206,7 @@ static void sunxi_wdt_shutdown(struct platform_device *pdev)
+>
+>   static const struct of_device_id sunxi_wdt_dt_ids[] = {
+>   	{ .compatible = "allwinner,sun4i-wdt" },
+> +	{ .compatible = "allwinner,sun4i-a10-wdt" },
+>   	{ /* sentinel */ }
+>   };
+>   MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
+>
+
+Regards,
+
+Hans
