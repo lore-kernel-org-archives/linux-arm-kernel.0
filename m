@@ -1,40 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Feb 2014 16:27:16 +0100
-Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <CAGsJ_4xmtt2Pg_mHJmvt9uc3Y4gN7KUT1UOJhbr6FQYdiAH3qw@mail.gmail.com>
-References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
- <201401311623.56902.arnd@arndb.de>
- <CAGsJ_4xmtt2Pg_mHJmvt9uc3Y4gN7KUT1UOJhbr6FQYdiAH3qw@mail.gmail.com>
-Message-ID: <201402061627.17086.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 6 Feb 2014 09:29:31 -0600
+Subject: [PATCH] ARM: multi_v7_defconfig: Select CONFIG_SOC_DRA7XX
+Message-ID: <1391700571-31784-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 February 2014, Barry Song wrote:
-> > How about modeling  that other source as a fixed-rate clock in DT
-> > then?
-> 
-> sirfsoc clock drivers have a clock node for OSC whose index is "1".
-> do you think the following is the right way to handle?
-> 
-> in dts, put both pwm controller clock and OSC
-> 672                         pwm: pwm at b0130000 {
-> 673                                 compatible = "sirf,prima2-pwm";
-> 674                                 #pwm-cells = <2>;
-> 675                                 reg = <0xb0130000 0x10000>;
-> 676                                 clocks = <&clks 21>,  <&clks 1>;
-> 677                                 clock-names = "pwmc", "osc";
-> 678                         };
-> 
-> and in pwm-sirf.c driver, use
-> clk = clk_get(dev, "osc");
-> clk_get_rate(clk);
-> 
-> to get the rate in probe()?
+Select CONFIG_SOC_DRA7XX so that we can boot dra7-evm.
+DRA7 family are A15 based processors that supports LPAE and an
+evolutionary update to the OMAP5 generation of processors.
 
-Ah, if that's the right clock, it sounds great, yes.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-Just make sure that the clock-names values make sense from the
-point of view of the pwm node, rather than referring to the
-name given in the clock provider.
+based on v3.13-rc1 kernel tag - tested on v3.14-rc1 and next-20140206
 
-	Arnd
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 845bc74..ee69829 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -29,6 +29,7 @@ CONFIG_ARCH_OMAP3=y
+ CONFIG_ARCH_OMAP4=y
+ CONFIG_SOC_OMAP5=y
+ CONFIG_SOC_AM33XX=y
++CONFIG_SOC_DRA7XX=y
+ CONFIG_SOC_AM43XX=y
+ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SOCFPGA=y
+-- 
+1.7.9.5
