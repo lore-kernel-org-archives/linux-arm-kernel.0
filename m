@@ -1,32 +1,182 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  6 Feb 2014 09:55:56 +0100
-Subject: [PATCH v2 0/2] clk: sunxi: Change compatibles pattern
-Message-ID: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu,  6 Feb 2014 09:55:57 +0100
+Subject: [PATCH v2 1/2] clk: sunxi: Add new clock compatibles
+In-Reply-To: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391676958-13883-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Allwinner A10 compatibles were following a slightly different compatible
+patterns than the rest of the SoCs for historical reasons. Add compatibles
+matching the other pattern to the clock driver for consistency, and keep the
+older one for backward compatibility.
 
-This is the second version of the clock compatible changes.
-The only difference with the v1 being that we're now droping the old
-compatibles, instead of keeping them, since the DT maintainers said it was
-fine.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++++++------------
+ drivers/clk/sunxi/clk-sunxi.c                     | 30 +++++++++----------
+ 2 files changed, 33 insertions(+), 33 deletions(-)
 
-Thanks,
-Maxime
-
-Maxime Ripard (2):
-  clk: sunxi: Add new clock compatibles
-  ARM: sunxi: dt: Convert to the new clock compatibles
-
- Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++-------
- arch/arm/boot/dts/sun4i-a10.dtsi                  | 60 +++++++++++------------
- arch/arm/boot/dts/sun5i-a10s.dtsi                 | 48 +++++++++---------
- arch/arm/boot/dts/sun5i-a13.dtsi                  | 48 +++++++++---------
- arch/arm/boot/dts/sun6i-a31.dtsi                  | 10 ++--
- arch/arm/boot/dts/sun7i-a20.dtsi                  | 54 ++++++++++----------
- drivers/clk/sunxi/clk-sunxi.c                     | 30 ++++++------
- 7 files changed, 143 insertions(+), 143 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index c2cb762..887649a 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -6,36 +6,36 @@ This binding uses the common clock binding[1].
+ 
+ Required properties:
+ - compatible : shall be one of the following:
+-	"allwinner,sun4i-osc-clk" - for a gatable oscillator
+-	"allwinner,sun4i-pll1-clk" - for the main PLL clock and PLL4
++	"allwinner,sun4i-a10-osc-clk" - for a gatable oscillator
++	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+ 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+-	"allwinner,sun4i-pll5-clk" - for the PLL5 clock
+-	"allwinner,sun4i-pll6-clk" - for the PLL6 clock
+-	"allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+-	"allwinner,sun4i-axi-clk" - for the AXI clock
+-	"allwinner,sun4i-axi-gates-clk" - for the AXI gates
+-	"allwinner,sun4i-ahb-clk" - for the AHB clock
+-	"allwinner,sun4i-ahb-gates-clk" - for the AHB gates on A10
++	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
++	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
++	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
++	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
++	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
++	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
++	"allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
+ 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+ 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+ 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+ 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+-	"allwinner,sun4i-apb0-clk" - for the APB0 clock
+-	"allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
++	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
++	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+ 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+ 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+ 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+-	"allwinner,sun4i-apb1-clk" - for the APB1 clock
+-	"allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+-	"allwinner,sun4i-apb1-gates-clk" - for the APB1 gates on A10
++	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
++	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
++	"allwinner,sun4i-a10-apb1-gates-clk" - for the APB1 gates on A10
+ 	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+ 	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
+ 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+ 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+ 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+-	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
++	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+ 
+ Required properties for all clocks:
+@@ -58,21 +58,21 @@ For example:
+ 
+ osc24M: osc24M at 01c20050 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-osc-clk";
++	compatible = "allwinner,sun4i-a10-osc-clk";
+ 	reg = <0x01c20050 0x4>;
+ 	clocks = <&osc24M_fixed>;
+ };
+ 
+ pll1: pll1 at 01c20000 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-pll1-clk";
++	compatible = "allwinner,sun4i-a10-pll1-clk";
+ 	reg = <0x01c20000 0x4>;
+ 	clocks = <&osc24M>;
+ };
+ 
+ cpu: cpu at 01c20054 {
+ 	#clock-cells = <0>;
+-	compatible = "allwinner,sun4i-cpu-clk";
++	compatible = "allwinner,sun4i-a10-cpu-clk";
+ 	reg = <0x01c20054 0x4>;
+ 	clocks = <&osc32k>, <&osc24M>, <&pll1>;
+ };
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index abb6c5a..370db0d 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -77,7 +77,7 @@ err_free_gate:
+ err_free_fixed:
+ 	kfree(fixed);
+ }
+-CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-osc-clk", sun4i_osc_clk_setup);
++CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-a10-osc-clk", sun4i_osc_clk_setup);
+ 
+ 
+ 
+@@ -970,51 +970,51 @@ free_clkdata:
+ 
+ /* Matches for factors clocks */
+ static const struct of_device_id clk_factors_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-pll1-clk", .data = &sun4i_pll1_data,},
++	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
+ 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
+-	{.compatible = "allwinner,sun4i-apb1-clk", .data = &sun4i_apb1_data,},
+-	{.compatible = "allwinner,sun4i-mod0-clk", .data = &sun4i_mod0_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
++	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
+ 	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+ 	{}
+ };
+ 
+ /* Matches for divider clocks */
+ static const struct of_device_id clk_div_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-axi-clk", .data = &sun4i_axi_data,},
+-	{.compatible = "allwinner,sun4i-ahb-clk", .data = &sun4i_ahb_data,},
+-	{.compatible = "allwinner,sun4i-apb0-clk", .data = &sun4i_apb0_data,},
++	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
++	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
++	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
+ 	{}
+ };
+ 
+ /* Matches for divided outputs */
+ static const struct of_device_id clk_divs_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-pll5-clk", .data = &pll5_divs_data,},
+-	{.compatible = "allwinner,sun4i-pll6-clk", .data = &pll6_divs_data,},
++	{.compatible = "allwinner,sun4i-a10-pll5-clk", .data = &pll5_divs_data,},
++	{.compatible = "allwinner,sun4i-a10-pll6-clk", .data = &pll6_divs_data,},
+ 	{}
+ };
+ 
+ /* Matches for mux clocks */
+ static const struct of_device_id clk_mux_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-cpu-clk", .data = &sun4i_cpu_mux_data,},
+-	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
++	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-mux-clk", .data = &sun4i_apb1_mux_data,},
+ 	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
+ 	{}
+ };
+ 
+ /* Matches for gate clocks */
+ static const struct of_device_id clk_gates_match[] __initconst = {
+-	{.compatible = "allwinner,sun4i-axi-gates-clk", .data = &sun4i_axi_gates_data,},
+-	{.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-axi-gates-clk", .data = &sun4i_axi_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-ahb-gates-clk", .data = &sun4i_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-ahb-gates-clk", .data = &sun5i_a10s_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
+-	{.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
+-	{.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
++	{.compatible = "allwinner,sun4i-a10-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
 -- 
 1.8.4.2
