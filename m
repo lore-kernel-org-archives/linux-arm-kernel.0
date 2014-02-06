@@ -1,70 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Feb 2014 16:37:05 +0100
-Subject: [PATCH V4 6/8] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340
- PCIe phy support
-In-Reply-To: <dca9c501de8386003142b463469c3d267a049eeb.1391661589.git.pratyush.anand@st.com>
-References: <cover.1391661589.git.pratyush.anand@st.com>
- <dca9c501de8386003142b463469c3d267a049eeb.1391661589.git.pratyush.anand@st.com>
-Message-ID: <201402061637.05414.arnd@arndb.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 6 Feb 2014 15:38:04 +0000
+Subject: [RFC/RFT 1/2] ARM: mm: introduce arch hooks for dma address
+ translation routines
+In-Reply-To: <52F284F3.3080601@ti.com>
+References: <1391470107-15927-1-git-send-email-santosh.shilimkar@ti.com>
+ <201402041715.54538.arnd@arndb.de> <52F11788.4030500@ti.com>
+ <3284212.inOfNqnVqs@wuerfel>
+ <20140205162325.GB2248@e103592.cambridge.arm.com>
+ <52F284F3.3080601@ti.com>
+Message-ID: <20140206153804.GB2358@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 February 2014, Pratyush Anand wrote:
-> +static int spear1310_pcie_miphy_exit(struct st_miphy40lp_priv *phypriv)
-> +{
-> +       u32 mask;
-> +
-> +       switch (phypriv->id) {
-> +       case 0:
-> +               mask = SPEAR1310_PCIE_CFG_MASK(0);
-> +               break;
-> +       case 1:
-> +               mask = SPEAR1310_PCIE_CFG_MASK(1);
-> +               break;
-> +       case 2:
-> +               mask = SPEAR1310_PCIE_CFG_MASK(2);
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +
-> +       regmap_update_bits(phypriv->misc, SPEAR1310_PCIE_SATA_CFG,
-> +                       SPEAR1310_PCIE_CFG_MASK(phypriv->id), 0);
-> +
-> +       regmap_update_bits(phypriv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
-> +                       SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK, 0);
-> +
-> +       return 0;
-> +}
+On Wed, Feb 05, 2014 at 06:37:39PM +0000, Santosh Shilimkar wrote:
+> Dave,
+> 
+> On Wednesday 05 February 2014 11:23 AM, Dave Martin wrote:
 
-hmm, you set the mask based on the id, but then use the macro below
-and ignore the mask?
+[...]
 
-> +
-> +static int pcie_miphy_init(struct st_miphy40lp_priv *phypriv)
-> +{
-> +       if (of_device_is_compatible(phypriv->np, "st,spear1340-miphy"))
-> +               return spear1340_pcie_miphy_init(phypriv);
-> +       else if (of_device_is_compatible(phypriv->np, "st,spear1310-miphy"))
-> +               return spear1310_pcie_miphy_init(phypriv);
-> +       else
-> +               return -EINVAL;
-> +}
-> +
-> +static int pcie_miphy_exit(struct st_miphy40lp_priv *phypriv)
-> +{
-> +       if (of_device_is_compatible(phypriv->np, "st,spear1340-miphy"))
-> +               return spear1340_pcie_miphy_exit(phypriv);
-> +       else if (of_device_is_compatible(phypriv->np, "st,spear1310-miphy"))
-> +               return spear1310_pcie_miphy_exit(phypriv);
-> +       else
-> +               return -EINVAL;
-> +}
+> > Santosh, bearing these arguments in mind, do you think that dma-ranges
+> > is natural for your hardware?
+> > 
+> > The answer may be "yes", but if we're having to twist things to fit,
+> > by having to describe something fake or unreal in DT and/or writing board
+> > specific code to work around it, that motivates coming up with a better
+> > way of describing the hardware in these cases.
+> >
+> The answer at least not fully "yes" with the limited look at dma-ranges
+> so far.
+> - The of_translate_dma_address() can be used to translate addresses
+> from DMA to CPU address space. And this should work but it will be
+> expensive compared to classic macro's.
+> - We don't see a way for CPU -> DMA addresses translation using DT.
+> Probably some more digging/pointers are is needed.
 
-I think it's better to make this code table-driven. Rather than checking
-'of_device_is_compatible()', it's much easier to add a .data field to
-the of_device_id array that describes the PHY. You can use .data to
-point to a structure containing per-device function pointers or
-(better) values and offsets to be used.
+Are you saying that dma-ranges does correctly describe your hardware,
+but the kernel frameworks are inadequate or suboptimal for making use of
+this information?
 
-	Arnd
+This is a different problem from not being able to describe the hardware.
+
+Cheers
+---Dave
