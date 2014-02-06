@@ -1,51 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 6 Feb 2014 15:21:36 +0100 (CET)
-Subject: [PATCH v5 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <52F3975B.2080806@ti.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391608060-10760-2-git-send-email-ivan.khoronzhuk@ti.com>
- <alpine.DEB.2.02.1402052123560.24986@ionos.tec.linutronix.de>
- <52F3975B.2080806@ti.com>
-Message-ID: <alpine.DEB.2.02.1402061521190.21991@ionos.tec.linutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 6 Feb 2014 08:35:56 -0600
+Subject: [PATCH 3/3] ARM: dts: Add support for both OMAP35xx and OMAP36xx
+ Overo/Tobi
+In-Reply-To: <1391677818-21154-4-git-send-email-florian.vaussard@epfl.ch>
+References: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
+ <1391677818-21154-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <52F39DCC.8000006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Feb 2014, Ivan Khoronzhuk wrote:
-> On 02/05/2014 10:27 PM, Thomas Gleixner wrote:
-> > On Wed, 5 Feb 2014, Ivan Khoronzhuk wrote:
-> > > +	/* here we have to be sure the timer has been disabled */
-> > Sigh. This is not a proper explanation for a barrier, really. You want
-> > to explain what it serializes against what. i.e. you want to explain
-> > why you are using the relaxed functions and avoid a separate non
-> > relaxed variant in favour of an explicit barrier.
-> > 
-> > > +	__iowmb();
-> > The proper thing is to have an inline function key_stone_barrier() and
-> > a full explanation of the issue in exactly that place instead of
-> > handwaving comments here and there.
-> > 
-> > Thanks,
-> > 
-> > 	tglx
+On 02/06/2014 03:10 AM, Florian Vaussard wrote:
+> Unfortunatly the device tree for older OMAP35xx Overo cannot be used
+Unfortunately ?
+> with newer OMAP36xx and vice-versa. To address this issue, move most of
+> the Tobi DTS to a common include file, and create model-specific Tobi
+> DTS.
 > 
-> I can add new inline function like:
-> 
-> /**
->  * keystone_timer_barrier: write memory barrier
->  * use explicit barrier to avoid using readl/writel non relaxed function
->  * variants, because in our case relaxed variants hide the true places
->  * where barrier is needed.
->  */
-> static inline void keystone_timer_barrier(void)
-> {
->     __iowmb();
-> }
-> 
-> and use it where it is needed.
-> Are you OK with it?
-> 
-> And I propose to leave comments under the barriers in order to be
-> able to understand why they are used.
+[...]
+> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> new file mode 100644
+> index 0000000..2f82192
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Tobi expansion board is manufactured by Gumstix Inc.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "omap34xx.dtsi"
+> +#include "omap3-overo-tobi-common.dtsi"
+> +
+> +/ {
+> +	model = "OMAP35xx Gumstix Overo on Tobi";
+> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3";
+To reduce any future problems, I suggest:
+compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo",
+"ti,omap3430", "ti,omap3";
 
-Sounds good.
+> +};
+> +
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
