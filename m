@@ -1,65 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 Feb 2014 14:26:13 +0100
-Subject: [PATCH v2 4/5] ARM: init: add support for reserved memory defined
- by device tree
-In-Reply-To: <20140205101510.59A95C40A89@trevor.secretlab.ca>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
- <1391515773-6112-5-git-send-email-m.szyprowski@samsung.com>
- <20140205101510.59A95C40A89@trevor.secretlab.ca>
-Message-ID: <52F38D75.4030704@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 13:26:44 +0000
+Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
+ writel_relaxed
+In-Reply-To: <20140206122340.GC32520@arm.com>
+References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+ <1391686253-13436-3-git-send-email-will.deacon@arm.com>
+ <20140206114559.GK29446@arm.com>
+ <20140206115121.GN26035@mudshark.cambridge.arm.com>
+ <20140206115430.GN29446@arm.com>
+ <20140206115739.GP26035@mudshark.cambridge.arm.com>
+ <20140206120035.GQ29446@arm.com>
+ <20140206121350.GQ26035@mudshark.cambridge.arm.com>
+ <20140206122340.GC32520@arm.com>
+Message-ID: <20140206132643.GS26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Feb 06, 2014 at 12:23:40PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 12:13:50PM +0000, Will Deacon wrote:
+> > Ok, so if we assume that a dsb(ishst) is sufficient because the CPU we're
+> > talking to is either (a) coherent in the inner-shareable domain or (b)
+> > incoherent, and we flushed everything to PoC, then why wouldn't a dmb(ishst)
+> > work?
+> 
+> Because you want to guarantee the ordering between a store to Normal
+> Cacheable memory vs store to Device for the IPI (see the mailbox example
+> in the Barrier Litmus section ;)). The second is just a slave access, DMB
+> guarantees observability from the master access perspective.
 
-On 2014-02-05 11:15, Grant Likely wrote:
-> On Tue, 04 Feb 2014 13:09:32 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > Enable reserved memory initialization from device tree.
-> >
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Laura Abbott <lauraa@codeaurora.org>
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  arch/arm/mm/init.c |    3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > index 804d61566a53..ebafdb479410 100644
-> > --- a/arch/arm/mm/init.c
-> > +++ b/arch/arm/mm/init.c
-> > @@ -17,6 +17,7 @@
-> >  #include <linux/nodemask.h>
-> >  #include <linux/initrd.h>
-> >  #include <linux/of_fdt.h>
-> > +#include <linux/of_reserved_mem.h>
-> >  #include <linux/highmem.h>
-> >  #include <linux/gfp.h>
-> >  #include <linux/memblock.h>
-> > @@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
-> >  	if (mdesc->reserve)
-> >  		mdesc->reserve();
-> >
-> > +	early_init_dt_scan_reserved_mem();
-> > +
->
-> The new binding is being made fundamental. If the reserved-memory node
-> is present, then it needs to be honored, even if the kernel doesn't know
-> how to use the regions. Therefore, This needs to be unconditional for
-> all architectures. The hook should be called in early_init_dt_scan()
-> (drivers/of/fdt.c) immediately after the early_init_dt_scan_memory()
-> hook.
+Ok, my reasoning is as follows:
 
-In theory this will be the best solution, but it practice there is a
-problem. early_init_dt_scan() is called as the first function from kernel
-booting code. That time there is no memory yet added to the system, so it
-would be really hard to reserve anything. Memory nodes are being added
-later either with memblock_add() or by some other arch specific way.
+  - CPU0 tries to message CPU1. It writes to a location in normal memory,
+    then writes to the GICD to send the SGI
 
-Finally, once all memory has been added to the system we can parse and
-reserve all regions defined in the device tree. This really requires
-creating another function which will be called by arch specific code.
+  - We need to ensure that CPU1 observes the write to normal memory before
+    the write to GICD reaches the distributor. This is *not* about end-point
+    ordering (the usual non-coherent DMA example).
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+  - A dmb ishst ensures that the two writes are observed in order by CPU1
+    (and, in fact, the inner-shareable domain containing CPU0).
+
+so the only way this can break is if the GICD write reaches the distributor
+before being observed by CPU1 (otherwise, we know the mailbox write was
+observed by CPU1). I dread to think how you would build such a beast
+(dual-ported GICD with no serialisation to the same locations?)...
+
+Furthermore, if we decide that device writes can reach their endpoints
+before being observed by other inner-shareable observers, then doesn't that
+pose a potential problem for spinlocks? If I take a lock and write to a
+device, the write can hit the device before the lock appears to be taken.
+That doesn't sound right to me.
+
+Using a dsb(ishst) will ensure that we don't issue the GICD write until the
+mailbox is visible to CPU1, but may be overkill.
+
+Will
