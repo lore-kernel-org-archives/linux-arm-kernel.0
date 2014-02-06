@@ -1,40 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Feb 2014 11:30:48 +0000
-Subject: [PATCH 1/6] arm64: barriers: allow dsb macro to take option parameter
-Message-ID: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+Date: Thu,  6 Feb 2014 11:30:52 +0000
+Subject: [PATCH 5/6] arm64: barriers: wire up new barrier options
+In-Reply-To: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1391686253-13436-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dsb instruction takes an option specifying both the target access
-types and shareability domain.
-
-This patch allows such an option to be passed to the dsb macro,
-resulting in potentially more efficient code. Currently the option is
-ignored until all callers are updated (unlike ARM, the option is
-mandated by the assembler).
+Now that all callers of the barrier macros are updated to pass the
+mandatory options, update the macros so the option is actually used.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
-
-Catalin -- I'd like to get this simple change in for 3.14, since it's a
-           blocker for actually implementing the barrier options (we
-	   need to move all of the callers over before making the switch).
-
- arch/arm64/include/asm/barrier.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/barrier.h | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 78e20ba8806b..409ca370cfe2 100644
+index 09f4cb4b665e..b5219b651850 100644
 --- a/arch/arm64/include/asm/barrier.h
 +++ b/arch/arm64/include/asm/barrier.h
-@@ -25,7 +25,7 @@
+@@ -25,11 +25,12 @@
  #define wfi()		asm volatile("wfi" : : : "memory")
  
  #define isb()		asm volatile("isb" : : : "memory")
--#define dsb()		asm volatile("dsb sy" : : : "memory")
-+#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
+-#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
++#define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
++#define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
  
- #define mb()		dsb()
- #define rmb()		asm volatile("dsb ld" : : : "memory")
+ #define mb()		dsb(sy)
+-#define rmb()		asm volatile("dsb ld" : : : "memory")
+-#define wmb()		asm volatile("dsb st" : : : "memory")
++#define rmb()		dsb(ld)
++#define wmb()		dsb(st)
+ 
+ #ifndef CONFIG_SMP
+ #define smp_mb()	barrier()
+@@ -53,9 +54,9 @@ do {									\
+ 
+ #else
+ 
+-#define smp_mb()	asm volatile("dmb ish" : : : "memory")
+-#define smp_rmb()	asm volatile("dmb ishld" : : : "memory")
+-#define smp_wmb()	asm volatile("dmb ishst" : : : "memory")
++#define smp_mb()	dmb(ish)
++#define smp_rmb()	dmb(ishld)
++#define smp_wmb()	dmb(ishst)
+ 
+ #define smp_store_release(p, v)						\
+ do {									\
 -- 
 1.8.2.2
