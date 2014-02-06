@@ -1,120 +1,53 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  6 Feb 2014 14:20:18 -0300
-Subject: [PATCH v6 11/19] watchdog: orion: Add per-compatible clock
- initialization
+Date: Thu,  6 Feb 2014 14:20:15 -0300
+Subject: [PATCH v6 08/19] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
 In-Reply-To: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1391707226-18258-12-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1391707226-18258-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the introduction of the compatible-data field,
-it's now possible to further abstract the clock initialization.
-This will allow to support SoC with a different clock setup.
+After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
+bridge interrupt controller. There's no longer a need to do it in the watchdog
+driver, so we can simply remove it.
 
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Tested-by: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 53 ++++++++++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 21 deletions(-)
+ drivers/watchdog/orion_wdt.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 12fedf4..de7a10b 100644
+index ad141d5..d280b17 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -42,10 +42,14 @@
+@@ -24,7 +24,6 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
+-#include <mach/bridge-regs.h>
+ 
+ /* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
+ #define ORION_RSTOUT_MASK_OFFSET	0x20108
+@@ -42,7 +41,6 @@
+ #define WDT_MAX_CYCLE_COUNT	0xffffffff
+ 
+ #define WDT_RESET_OUT_EN	BIT(1)
+-#define WDT_INT_REQ		BIT(3)
+ 
  static bool nowayout = WATCHDOG_NOWAYOUT;
  static int heartbeat = -1;		/* module parameter (seconds) */
+@@ -64,9 +62,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
  
-+struct orion_watchdog;
-+
- struct orion_watchdog_data {
- 	int wdt_counter_offset;
- 	int wdt_enable_bit;
- 	int rstout_enable_bit;
-+	int (*clock_init)(struct platform_device *,
-+			  struct orion_watchdog *);
- };
- 
- struct orion_watchdog {
-@@ -57,6 +61,22 @@ struct orion_watchdog {
- 	const struct orion_watchdog_data *data;
- };
- 
-+static int orion_wdt_clock_init(struct platform_device *pdev,
-+				struct orion_watchdog *dev)
-+{
-+	int ret;
-+
-+	dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dev->clk))
-+		return PTR_ERR(dev->clk);
-+	ret = clk_prepare_enable(dev->clk);
-+	if (ret)
-+		return ret;
-+
-+	dev->clk_rate = clk_get_rate(dev->clk);
-+	return 0;
-+}
-+
- static int orion_wdt_ping(struct watchdog_device *wdt_dev)
- {
- 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-@@ -162,6 +182,7 @@ static const struct orion_watchdog_data orion_data = {
- 	.rstout_enable_bit = BIT(1),
- 	.wdt_enable_bit = BIT(4),
- 	.wdt_counter_offset = 0x24,
-+	.clock_init = orion_wdt_clock_init,
- };
- 
- static const struct of_device_id orion_wdt_of_match_table[] = {
-@@ -196,34 +217,24 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	dev->wdt.min_timeout = 1;
- 	dev->data = match->data;
- 
--	dev->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(dev->clk)) {
--		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
--		return PTR_ERR(dev->clk);
--	}
--	ret = clk_prepare_enable(dev->clk);
--	if (ret)
--		return ret;
--	dev->clk_rate = clk_get_rate(dev->clk);
+-	/* Clear watchdog timer interrupt */
+-	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
 -
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		ret = -ENODEV;
--		goto disable_clk;
--	}
-+	if (!res)
-+		return -ENODEV;
+ 	/* Enable watchdog timer */
+ 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
  
- 	dev->reg = devm_ioremap(&pdev->dev, res->start,
- 			       resource_size(res));
--	if (!dev->reg) {
--		ret = -ENOMEM;
--		goto disable_clk;
--	}
-+	if (!dev->reg)
-+		return -ENOMEM;
- 
- 	dev->rstout = orion_wdt_ioremap_rstout(pdev, res->start &
- 						     INTERNAL_REGS_MASK);
--	if (!dev->rstout) {
--		ret = -ENODEV;
--		goto disable_clk;
-+	if (!dev->rstout)
-+		return -ENODEV;
-+
-+	ret = dev->data->clock_init(pdev, dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "cannot initialize clock\n");
-+		return ret;
- 	}
- 
- 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / dev->clk_rate;
 -- 
 1.8.1.5
